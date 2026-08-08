@@ -294,14 +294,3 @@ def read_provider_traces(
             )
         )
     return records
-
-
-# --- Retention ---------------------------------------------------------------
-
-
-def prune_provider_traces(*, retention_days: int, max_total_mb: int) -> None:
-    """Delete trace shards older than retention_days, then prune oldest-first over
-    max_total_mb. Best-effort: errors are ignored (telemetry, not critical path)."""
-    from forge.core.telemetry.downstream import prune_downstream_records
-
-    prune_downstream_records(retention_days=retention_days, max_total_mb=max_total_mb)

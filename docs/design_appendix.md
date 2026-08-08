@@ -314,22 +314,30 @@ status_timeout: 2.0
 memory_writer_timeout: 300
 log_level: off               # off | debug | info | warning
 interactive_anthropic_api_key: inherit   # inherit | omit
+provider_trace:
+  inject_provider_user: false
+telemetry:
+  downstream:
+    retention_days: 14       # 0 = no age bound
+    max_total_mb: 512        # 0 = no size bound
 ```
 
-`interactive_anthropic_api_key: omit` strips `ANTHROPIC_API_KEY` from Forge-managed **interactive** `claude` launches
-only (session start/resume/fork and `forge claude start`), so a subscription/OAuth session is not billed against a key
-meant for other tools. Headless subprocesses (supervisor, memory writer, panel workers, `claude -p --bare`) keep normal
-credential resolution. The omission is recorded as `confirmed.launch.api_key_source = omitted_by_config`. Host launches
-finalize the key in `build_claude_env`'s interactive wrapper (after `extra_vars`); sidecar launches pass
-`FORGE_OMIT_INTERACTIVE_KEY=1` so `entrypoint.sh` unsets the key for Claude *after* the in-container proxy captured its
-upstream credential (so the proxy keeps upstream auth for every template).
+`interactive_anthropic_api_key: omit` strips `ANTHROPIC_API_KEY` only from managed interactive Claude launches; headless
+consumers keep normal credential resolution. The manifest records `omitted_by_config`. Host launchers strip after
+`extra_vars`; sidecars pass `FORGE_OMIT_INTERACTIVE_KEY=1`, and the entrypoint strips only after its proxy captures
+upstream credentials.
 
-- **Optional**: missing file = built-in defaults
-- **Auto-created on first access**: `forge config show` seeds the file with documented defaults
-- **Fail-open**: invalid YAML warns, returns defaults
-- **Unknown keys**: warned, ignored (forward compatible)
+- **Optional/seeded**: a missing file uses defaults; `forge config show` creates the documented file
+- **Validation**: general preferences warn and fall back, but the destructive-retention raw resolver rejects malformed
+  or unknown `telemetry.downstream` input and skips pruning
 - **CLI**: `forge config` (help), `forge config show [--raw]`, `forge config set`, `forge config edit`,
-  `forge config reset`; `%config` (read-only) in-session
+  `forge config reset`, `forge config migrate-retention [--yes] [--json]`; `%config` (read-only) in-session
+
+`telemetry.downstream` owns shared audit, cost, and provider-lifecycle shards. Explicit global config wins; otherwise
+agreeing explicit legacy values bridge, no values use defaults, and conflict/unreadable input disables pruning. Explicit
+migration writes global state before removing still-matching proxy keys; startup never rewrites them. During this
+compatibility window, a sidecar sees only its mounted proxy directory despite sharing host telemetry, so multi-sidecar
+operators must set/migrate global policy on the host. Following-release rejection of legacy keys removes that limit.
 
 See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
@@ -533,33 +541,20 @@ Runtime logs:
 
 | Path                                       | Schema owner                      | Retention policy                                     |
 | ------------------------------------------ | --------------------------------- | ---------------------------------------------------- |
-| `~/.forge/telemetry/downstream/*.jsonl`    | `forge.core.telemetry.downstream` | Append-only, reset/user-prune                        |
-| `~/.forge/telemetry/upstream/*.jsonl`      | `forge.core.telemetry.upstream`   | Append-only, reset/user-prune                        |
+| `~/.forge/telemetry/downstream/*.jsonl`    | `forge.core.telemetry.downstream` | Global `telemetry.downstream`; current month kept    |
+| `~/.forge/telemetry/upstream/*.jsonl`      | `forge.core.telemetry.upstream`   | Append-only until explicit reset/user prune          |
 | `~/.forge/telemetry/caps/<proxy_id>.json`  | `forge.core.telemetry.caps`       | Durable cap checkpoint; reset by explicit cost reset |
 | `~/.forge/telemetry/audit_state/<id>.json` | `forge.proxy.audit_logger`        | Sidecar drift baseline                               |
 | `~/.forge/usage/events/*.jsonl`            | `forge.core.usage.ledger`         | Transitional attribution ledger; reset/user-prune    |
 
-Downstream attempt records contain timestamp, proxy id, backend instance id, model/tier, token counts, `cost_micros`
-(null when no route reported a cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`),
-provider lifecycle fields, optional redacted audit payloads, and the **run-tree correlation**
-`forge_run_id`/`forge_root_run_id` (§3.14 / §A.13: null for the interactive harness and any non-Forge-originated
-traffic; set when a Forge-routed `claude -p` subprocess forwarded the validated `X-Forge-Run-ID` / `X-Forge-Root-Run-ID`
-headers). `backend_id` is the canonical backend instance id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.)
-used for backend attribution. For local LiteLLM, it remains the logical backend instance id rather than the managed
-process id. It is distinct from `source_id`/`source_kind`, which remain the telemetry-origin axis (`proxy` or
-`provider`). Current downstream writes use `schema_version=2`; readers skip missing/older schemas with a one-time
-warning and expose `skipped_legacy_schema` counts in activity/cost views rather than reattributing historical records.
-Two companion headers ride the same proven-proxy path for provider-trace correlation: `X-Forge-Session` (an opaque
-`forge_sess_<hash>` / `forge_run_<hash>` grouping id derived by hashing the session name + role — the raw name is never
-sent) and `X-Forge-Command` (the sanitized command role). Like the run-id headers they are validated on read, stored on
-`request.state`, and are **internal Forge↔proxy correlation only — never forwarded upstream** (the passthrough allowlist
-drops them). They are distinct from provider-bound metadata such as the OpenRouter `user` field, which is deliberately
-sent upstream. There is no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. The
-downstream idempotency key is `downstream_event_id`: the proxy mints one stable id per physical attempt and uses it for
-both cost and provider lifecycle writes; true duplicate writes of that same attempt merge, while distinct
-attempts/retries get distinct ids. `backend_id` filtering is applied after duplicate-attempt merge so later same-attempt
-records with null `backend_id` can add evidence without erasing attribution. Legacy verb records are no longer written;
-by-verb cost derives from downstream attempts joined to `usage/events` by run id.
+Downstream attempts carry model/tokens, reported-or-null cost with provenance, redacted audit/provider lifecycle fields
+(§A.14), and optional run-tree ids from validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers. `backend_id` is the
+logical backend instance (not a local managed-process id), while `source_id`/`source_kind` identify telemetry origin.
+Schema-v2 readers warn and count skipped older records instead of reattributing them. Internal `X-Forge-Session`
+(hashed, never the raw name) and `X-Forge-Command` correlation headers are validated and never forwarded upstream; the
+explicit OpenRouter `user` field is separate. There is no local price catalog. Stable per-attempt `downstream_event_id`
+merges duplicate evidence without collapsing retries; backend filtering occurs after merge. By-verb cost joins
+downstream to transitional `usage/events` by run id.
 
 The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The downstream telemetry shards
 remain the bootstrap source for cap enforcement after restart.
@@ -568,34 +563,19 @@ Cap enforcement is process-local. Each proxy process bootstraps from shared JSON
 is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
 proxy ID.
 
-Telemetry logs accumulate indefinitely. `forge telemetry costs reset` wipes the downstream/upstream telemetry shards,
-cap-state snapshots, audit sidecar state, **and** the usage-attribution ledger (`usage/events/`) to zero in one step,
-and clears the derived status-line caches (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for
-supervisor health) so a wiped ledger cannot replay a cached value; it prompts for confirmation unless `--yes`, and
-`--dry-run` previews. Either way, a running proxy keeps its cost totals and cap counters in memory until restarted — it
-re-bootstraps from the remaining downstream logs plus cap state at next startup, so restart any active proxy to also
-zero its live cumulative cost and cap enforcement.
+After cap bootstrap, global retention bounds downstream shards but preserves the current UTC month; upstream and usage
+accumulate until cleanup. `forge telemetry costs reset` (previewable with `--dry-run`) wipes all telemetry, cap/audit
+state, usage attribution, and derived cost/health caches. Running proxies retain in-memory totals/caps until restarted.
 
 ---
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 
-When a Forge session launches with a proxy that routes to non-Anthropic models, the session launcher injects a
-model-family-specific system prompt addendum via `--append-system-prompt-file`. These addendums teach the model to
-construct minimal valid tool-call objects (avoiding empty placeholders like `"pages": ""` or `"offset": null`) and to
-prefer dedicated tools (Read/Edit/Write) over Bash. Both OpenAI and Gemini share the same core tool-discipline guidance;
-the Gemini variant uses stronger Bash-avoidance language due to a higher observed rate of `cat`/`sed`/`grep` use.
-
-**Injection layer:** `src/forge/session/addendum.py` resolves and writes the addendum; `launch_claude_session` in
-`src/forge/core/ops/claude_session.py` composes it at session launch time, not inside the proxy request path. Direct
-HTTP use of a proxy does not get addendum injection.
-
-**Catalog field:** `system_prompt_addendum` on each model entry in `model_catalog.yaml`. Value is a relative path like
-`system_prompt_addendums/openai.md` pointing to a markdown resource in `src/forge/core/data/`.
-
-**Lookup:** `get_system_prompt_addendum(model_or_alias)` in `forge.core.models.catalog` resolves the model, loads the
-resource, and returns the content string. Returns `None` for models not in the catalog or without an addendum (fails
-open -- common with OpenRouter's open model space).
+Non-Anthropic proxy sessions may inject a catalog-selected `--append-system-prompt-file` that teaches valid minimal tool
+calls and prefers dedicated tools over shell substitutes (Gemini uses stronger Bash guidance). The
+`system_prompt_addendum` catalog field points into `src/forge/core/data/`; `forge.session.addendum` resolves and writes
+it at session launch, never in the proxy request path. Unknown/unconfigured models fail open with no addendum, and
+direct HTTP proxy use receives none.
 
 ---
 
@@ -617,8 +597,6 @@ intercept:
 audit:
   audit_full_body: false # opt-in: capture REDACTED bodies (never plaintext)
   redact_headers: [] # extra header names to redact (denylist + substring)
-  retention_days: 14
-  max_total_mb: 512
 logging:
   requests: # bounded debug diagnostics under ~/.forge/logs/requests/ (proxy_log_hygiene)
     enabled: auto # off | auto (couples to log_level=debug) | on
@@ -639,8 +617,6 @@ logging:
 | `intercept.override.system_prompt_guards`  | list of `{pattern, action}`                  | `pattern` is a regex (compiled at config load); action warn/block/strip                           |
 | `audit.audit_full_body`                    | bool (default `false`)                       | Capture redacted bodies; there is **no** raw-body mode                                            |
 | `audit.redact_headers`                     | list of strings                              | Extra header names to redact beyond the built-in denylist                                         |
-| `audit.retention_days`                     | int                                          | Prune shards older than N days at proxy startup                                                   |
-| `audit.max_total_mb`                       | int                                          | Prune oldest shards once total exceeds N MB at startup                                            |
 | `logging.requests.enabled`                 | `off`, `auto`, `on` (default `auto`)         | `auto` couples to `log_level=debug`; `on` decouples bounded capture                               |
 | `logging.requests.body_capture`            | `metadata`, `redacted` (default `metadata`)  | `metadata` omits the body; `redacted` reuses the audit redaction builder; **no** `full`/plaintext |
 | `logging.requests.response_capture`        | `metadata`, `redacted` (default `metadata`)  | Same policy for the response body                                                                 |
@@ -650,17 +626,14 @@ logging:
 | `logging.requests.stream_chunks`           | bool (default `false`)                       | Opt-in per-chunk debug dumps; off even at `log_level=debug`                                       |
 | `logging.requests.stream_chunk_max_bytes`  | int (default `0` = small cap)                | Truncate each dumped chunk                                                                        |
 
-Reasoning-effort pinning in override mode **reuses** `tier_overrides.<tier>.reasoning_effort` (§A.1) — it is not a new
-`intercept` key. `forge proxy set <id> intercept.mode=inspect` (and `audit.audit_full_body=true`, which prints a privacy
-warning naming `~/.forge/telemetry/downstream/`) edits these via the normal proxy surface.
+Override reasoning reuses `tier_overrides.<tier>.reasoning_effort` (§A.1). Normal `forge proxy set` edits
+intercept/audit fields and warns that full-body audit writes redacted structure to downstream telemetry. Audit/provider
+lifecycle share cost shards under global `telemetry.downstream`; old proxy retention keys are compatibility inputs
+removed explicitly by `forge config migrate-retention`.
 
-`logging.requests` (`RequestLogConfig`, `forge.config.schema`) governs the **debug request-diagnostics** plane at
-`~/.forge/logs/requests/<YYYYMMDD>_requests.<pid>[.<seq>].jsonl` — owner-only 0600 (`open_secure_append`), PID-sharded,
-rotated at `max_file_mb`. It is distinct from downstream telemetry, which may share similar shard names but is a
-separate plane. The block is strictly coerced (unknown sub-keys raise; `body_capture=full` is rejected with a pointer to
-the audit no-plaintext policy) and reuses the audit body redactor — there is no second sanitizer and no plaintext mode.
-Retention is enforced once per process at proxy startup by the shared `prune_jsonl_shards` helper (which also backs the
-audit and provider-trace planes); the global `log_retention_days` sweep remains the coarse floor.
+Strict `RequestLogConfig` owns separate owner-only, PID-sharded debug diagnostics under `~/.forge/logs/requests/`, with
+rotation and per-proxy retention via `prune_jsonl_shards`. It rejects unknown/full-plaintext modes and reuses the audit
+redactor; `log_retention_days` remains the coarse floor.
 
 ---
 
@@ -853,6 +826,9 @@ a supervised fork's checks timed out before the final streaming usage chunk and 
 | Path                                    | Owner                             | Notes                                                               |
 | --------------------------------------- | --------------------------------- | ------------------------------------------------------------------- |
 | `~/.forge/telemetry/downstream/*.jsonl` | `forge.core.telemetry.downstream` | Owner-only 0600 shards; provider fields live on `DownstreamRecord`s |
+
+These shards use the global `telemetry.downstream` policy described in §A.7 and §A.11. Provider trace has no independent
+retention owner or pruner.
 
 `read_provider_traces()` projects downstream attempts into the legacy `ProviderTraceRecord` DTO for CLI/core-op callers.
 Provider lifecycle fields carried by the downstream schema include:

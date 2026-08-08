@@ -78,4 +78,4 @@ Docker, and clean-wheel coverage pass. Independent review found no violations, a
 All three members shipped independently with marked regressions and the required Docker and clean-wheel coverage. The
 review ledger, member cards, normative installer design, and end-user hook guide record exact Codex rollback, immutable
 Claude settings-baseline ownership, and value-aware legacy removal. Wave 5 is coordinated separately by
-[`epic_cli_proxy_runtime_correctness`](../../todo/epic_cli_proxy_runtime_correctness/card.md).
+[`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).

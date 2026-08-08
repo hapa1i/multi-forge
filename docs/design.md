@@ -789,6 +789,7 @@ The proxy exposes runtime truth via `GET /`:
 ```json
 {
   "is_proxy": true,
+  "status": "running",
   "proxy": { "template": "litellm-openai", "base_url": "http://localhost:8085" },
   "wire_shape": "openai_translated",
   "intercept_mode": "passthrough",
@@ -806,6 +807,9 @@ The proxy exposes runtime truth via `GET /`:
 - The proxy does **not** know about sessions (see §3.6.2)
 - Session info comes from the session file, not the proxy
 - Status line tools read both sources independently
+- Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
+  `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
+  identity fields available; the nested `downstream_retention` object carries the recovery detail.
 - Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
 - `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
@@ -1312,55 +1316,38 @@ Operation outcomes (policy checks, including no-call fail-opens) write to `~/.fo
 | `telemetry/audit_state/<proxy_id>.json`    | Audit drift detector in proxy-id sidecars | Writable sidecar drift baseline                             |
 | `usage/events/<month>_<pid>.jsonl`         | Legacy usage emitters                     | Transitional session activity/read-surface attribution      |
 
-Downstream attempt records are the source of truth for proxy spend. **Forge is not a cost oracle:** it records the cost
-a route actually reported — OpenRouter's response-body `usage.cost` (`confidence="reported"`) or a LiteLLM gateway's
-`x-litellm-response-cost` header (`confidence="gateway_calculated"`) — and writes `cost_micros:null` /
-`confidence="unavailable"` when no route reported one (Anthropic passthrough always; LiteLLM streaming, whose header
-predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
-`reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). Downstream records also carry a nullable
-`backend_id`: the canonical backend instance id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.). For local
-LiteLLM this is the logical backend instance (`litellm-gemini-local`), not the managed process id (`litellm-4000`).
-Proxy-origin writers populate it from `proxy.backend`; direct emitters populate it only where the provider/reporter maps
-unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1. `source_id`/`source_kind` remain
-the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with backend identity. New downstream writes
-use `schema_version=2`; current readers skip missing/older downstream schemas with a one-time warning and surface
-`skipped_legacy_schema` counts in activity/cost views rather than silently reattributing historical records. The proxy
-bootstraps its in-memory `CostTracker` from downstream attempts on startup, then reconciles with
-`telemetry/caps/<proxy_id>.json` using the larger monthly total so a clean-cut path migration or dropped best-effort
-JSONL write does not silently reset spend caps to `$0`. Live request handling remains in-memory authoritative: a
-downstream write failure warns but does not block successful model traffic. The fail-closed posture lives at bootstrap
-via the durable cap checkpoint, not by turning a transient telemetry write failure into a live-request denial. Cap-state
-writes are coalesced by request count/time and flushed on graceful proxy shutdown so the request path does not fsync on
-every costed request. Downstream retention preserves current-calendar-month shards even when their mtime is old or the
-size budget is tight, so unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend
-on restart.
+Downstream attempts are the proxy-spend source of truth. **Forge is not a cost oracle:** it records only route-reported
+cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its reporter/confidence, and records
+`cost_micros:null`/`confidence="unavailable"` otherwise; no local price catalog infers dollars from tokens. Nullable
+`backend_id` names the logical backend instance, distinct from the telemetry-origin `source_id`/`source_kind`; direct
+emitters set it only when the mapping is unambiguous. Schema-v2 readers fence older records with a warning and expose
+skip counts rather than reattribute them.
+
+At startup, `CostTracker` bootstraps from downstream attempts and reconciles the durable cap checkpoint using the larger
+monthly total. Live counters remain authoritative; telemetry-write failure warns without denying model traffic, and
+coalesced checkpoints avoid per-request fsync. Current-calendar-month shards survive retention so restart cannot erase
+active-month cap evidence.
+
+The directory's lifecycle owner is global `telemetry.downstream` in `~/.forge/config.yaml` (`14` days/`512` MB by
+default; `0` disables either bound). After cap bootstrap, each process resolves once and prunes once. Explicit global
+config wins; otherwise agreeing explicit legacy values become warned `legacy_consensus`, omissions do not conflict, and
+conflicting/unreadable inputs disable pruning with degraded status. Startup never rewrites proxy files. Explicit
+`forge config migrate-retention [--yes]` writes the global owner before removing still-matching legacy keys; human/JSON
+status exposes configured/effective/source plus deprecations and conflicts.
 
 The legacy `costs/verbs/` writer and reader have been removed. The default `forge telemetry costs show` by-verb view
 derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests remain
 "Interactive"/unattributed. The usage ledger itself remains during the transition for session activity and run-tree
 joins, but it is no longer the durable spend source.
 
-A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
-[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
-runtime/provider/model and what it consumed, referencing the cost and audit planes via a shared proxy `request_id`
-(nullable `source_refs`). The planes stay physically separate by design — cost is the spend source of truth, audit is
-the redacted wire record, usage is attribution, and the **provider-trace** plane (below) is provider lifecycle /
-correlation evidence. Each event also carries metric-evidence provenance — `route` (how the work reached the model),
-`reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's own* `cost_micro_usd`:
-`reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired everywhere: the workflow
-verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
-supervisor, and shadow curation record one event per headless dispatch through either their Claude or Codex arm; the
-team supervisor records one event per `claude -p` run; and the action tagger records exact provider tokens from its
-direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact `source_refs.cost_request_id`
-join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably direct + credentialed). All
-emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p` events carry null `source_refs`
-because Forge is not the HTTP client and can't know the proxy `request_id`. Run-tree correlation instead ties a proxied
-`claude -p` run to its **exact** cost through the run tree, not a per-request ref: Forge stamps the headless
-subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a
-proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface
-(`forge telemetry activity`, `forge +$Y`) sums cost records by `forge_root_run_id` — superseding the concurrency-fragile
-verb snapshot rather than adding to it. `source_refs` stays null by design (one run makes many requests; the
-single-valued ref is the wrong shape — see [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+The transitional **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
+[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)) records which run/workflow/session invoked each
+model and carries `route`, `reporter`, `confidence`, consumption, and latency. It remains physically separate from
+downstream, where spend, audit, and provider-lifecycle evidence coexist. Workflow verbs and headless consumers emit
+best-effort events that never gate measured work. Direct `core.llm` calls may join by `source_refs.cost_request_id`;
+`claude -p` cannot know individual proxy request ids, so its `source_refs` stays null. Instead, validated run-tree
+headers let the proxy record `forge_run_id`/`forge_root_run_id`, and `forge telemetry activity`/`forge +$Y` join exact
+downstream cost by root run id (one run can make many requests, so a single request ref is the wrong shape).
 
 **Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
 retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost
@@ -1391,31 +1378,15 @@ ambient run identity, so a plain `forge session resume --strategy ai-curated` st
 mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and
 `forge telemetry activity` shows both sides of the hop.
 
-**Provider lifecycle evidence.** Provider-trace data is now stored as fields on downstream attempt records, answering
-"what happened to this provider request?" after a timeout — born from an incident where a supervised fork's checks
-routed through an OpenRouter proxy, timed out before the final streaming usage chunk, and left no trace locally or in
-OpenRouter's UI. The proxy `on_complete` seam writes one downstream attempt record per request
-([§A.14](design_appendix.md#a14-provider-trace-plane-schema-314), owner-only 0600, versioned). It is gated by the
-selected backend instance's provider-trace capability (`ModelSource.capabilities.provider_trace`), with `openrouter`
-enabled in v1 and gateway-routed OpenRouter through non-capable backend instances kept quiet. The record carries the
-provider/generation id (probe 1: OpenRouter's `gen-…` id rides every stream `chunk.id`), the selected upstream,
-allowlisted correlation headers (never auth/cookie), stream lifecycle flags
-(`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and a local `local_usage_status`
-(`available` when the proxy saw a final usage/cost figure, else `unavailable`). The generation id is captured on the
-**first** stream event, so a stream **cancelled before the final usage chunk** — the incident — still surfaces its id.
-`timeout_seen` is always `false` at the proxy boundary: the proxy observes only its own client disconnect, never the
-parent's `subprocess.run` timeout (that is a later run-tree-correlation join target). Traces join the cost/usage planes
-by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely
-retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup). The read surface
-is `forge telemetry trace list|show|explain` (op-backed `core/ops/provider_trace.py`; no in-session `%` mirror);
-`explain` answers the incident's five questions from the trace plus a bounded (±5m) cost-plane join for confidence,
-never a remote lookup. An opt-in `provider_trace.inject_provider_user` (default off, a **global** toggle in
-`~/.forge/config.yaml`) also records the Forge session grouping id in the provider's top-level `user` field for
-OpenRouter routes — probe 3 confirmed `user` (not a custom `session_id`) survives in the indexed `/generation` record
-for account-side lookup; observability only (probe 4 stickiness-neutral). One toggle governs **both** proxied routes
-(server-gated `_provider_user_value`) and direct `core.llm` callers (plan-check, curation); both planes derive the id
-from the same `derive_provider_session_id` hash, so a run's proxied and direct OpenRouter calls group identically
-account-side.
+**Provider lifecycle evidence.** Backend-capability-gated fields on downstream attempts answer whether a request left
+Forge, which provider/generation handled it, and whether streaming reached content/final usage
+([§A.14](design_appendix.md#a14-provider-lifecycle-fields-in-downstream-telemetry-314)). Correlation headers are
+allowlisted; prompts, auth, and cookies are absent. The generation id is captured on the first stream event, while
+`timeout_seen=false` reflects that the proxy sees client disconnects, not the parent's subprocess timeout. Trace reads
+are local-only (`forge telemetry trace list|show|explain`); aborted streams are not assumed remotely retrievable, and
+`explain` uses a bounded request-id cost join. Global opt-in `provider_trace.inject_provider_user` sends the same hashed
+session/run grouping in OpenRouter's `user` field from proxied and direct `core.llm` paths; it changes observability,
+not routing.
 
 Each proxy may define:
 
@@ -1425,14 +1396,13 @@ costs:
     per_day: 20.00
     per_month: 100.00
   on_cap_hit: reject  # reject | warn
-provider_trace:
-  retention_days: 14   # diagnostics, not spend truth; matches the audit plane
-  max_total_mb: 512
 ```
 
-`provider_trace` in `proxy.yaml` is **retention-only**. The user-injection opt-in moved to the global
-`~/.forge/config.yaml` (`provider_trace.inject_provider_user`, governing both proxied and direct routes); a stale
-`inject_provider_user` left in `proxy.yaml` loads with a one-time relocation warning and is ignored.
+The user-injection opt-in is global in `~/.forge/config.yaml` (`provider_trace.inject_provider_user`, governing both
+proxied and direct routes). Downstream lifecycle is also global, under `telemetry.downstream`. The old proxy-local
+`audit`/`provider_trace` retention keys remain deprecated migration inputs for one compatibility release; new proxy
+files do not author them. A stale `inject_provider_user` left in `proxy.yaml` loads with a one-time relocation warning
+and is ignored.
 
 Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
 then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar
@@ -1725,8 +1695,8 @@ prompt and tool surface, cache markers, token counts — never plaintext) and ru
 of a hash dimension seeds a baseline; a later change emits a `drift` record. `audit.audit_full_body` (opt-in, OFF by
 default) additionally captures **redacted** bodies (structure only — never plaintext, no raw-body mode): the request
 body on every path, the response body only for non-streaming passthrough today (streaming/translated deferred; §A.12 has
-the per-path contract). Retention (`audit.retention_days`, `audit.max_total_mb`) is enforced by `prune_audit_logs()` at
-startup, so it is not a dangling promise.
+the per-path contract). The global `telemetry.downstream` policy bounds these shared shards; audit does not own a
+separate pruner or effective retention promise.
 
 **Control (`override`).** Builds → validates → applies a mutation plan to the **current request's control surfaces
 only** — the system prompt and generation parameters, **never** historical messages:

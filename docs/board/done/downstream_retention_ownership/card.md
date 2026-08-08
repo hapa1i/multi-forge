@@ -3,7 +3,7 @@
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG3; D015).
 
 **Lane**: `done/` -- approved on 2026-08-04; implementation is parked in
-[`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md).
+[`unify_downstream_retention`](../../doing/unify_downstream_retention/card.md).
 
 ## Problem
 
@@ -113,5 +113,5 @@ one-call startup behavior, warning/failure output, and user-owned config migrati
 
 Global ownership, migration precedence, conflict degradation, status reporting, and preservation rules are approved. The
 current design documents continue to describe the shipped dual-pruner configuration until
-[`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md) changes it; that member owns synchronized
+[`unify_downstream_retention`](../../doing/unify_downstream_retention/card.md) changes it; that member owns synchronized
 design, appendix, runtime-config, and operator documentation. Verification: `make pre-commit-md` and `git diff --check`.

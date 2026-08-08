@@ -2,17 +2,17 @@
 
 Configuration is split by ownership. Each type of setting has a single authoritative location:
 
-| What you want to change                          | Where                              | Command                                |
-| ------------------------------------------------ | ---------------------------------- | -------------------------------------- |
-| Proxy mode, context limit, timeouts, logging     | `~/.forge/config.yaml`             | `forge config set/edit`                |
-| Model routing, reasoning effort, temperature     | `~/.forge/proxies/<id>/proxy.yaml` | `forge proxy set/edit`                 |
-| Claude Code hooks, status line, permissions, env | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
-| Policy, memory, verification settings            | Session manifest                   | `forge session set`                    |
-| Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
-| Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
-| Project Forge compatibility                      | `<forge_root>/.forge/project.toml` | edit file                              |
-| Trusted project enrollment                       | `~/.forge/projects.json`           | extension `enable` / `cleanup-project` |
-| API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
+| What you want to change                            | Where                              | Command                                |
+| -------------------------------------------------- | ---------------------------------- | -------------------------------------- |
+| Proxy mode, timeouts, logging, telemetry retention | `~/.forge/config.yaml`             | `forge config set/edit`                |
+| Model routing, reasoning effort, temperature       | `~/.forge/proxies/<id>/proxy.yaml` | `forge proxy set/edit`                 |
+| Claude Code hooks, status line, permissions, env   | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
+| Policy, memory, verification settings              | Session manifest                   | `forge session set`                    |
+| Multi-model review and analysis                    | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
+| Automatic doc updates after sessions               | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
+| Project Forge compatibility                        | `<forge_root>/.forge/project.toml` | edit file                              |
+| Trusted project enrollment                         | `~/.forge/projects.json`           | extension `enable` / `cleanup-project` |
+| API keys and credentials                           | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
 ---
 
@@ -33,6 +33,7 @@ forge config show --raw     # Commented YAML only, no headings or syntax highlig
 # Set a value
 forge config set proxy_mode=sidecar
 forge config set status_timeout=1.0
+forge config set telemetry.downstream.retention_days=30
 
 # Edit in $EDITOR
 forge config edit
@@ -40,6 +41,10 @@ forge config edit
 # Reset to built-in defaults
 forge config reset proxy_mode   # Reset one key
 forge config reset              # Delete config.yaml and use defaults
+
+# Preview/apply migration from old proxy-local retention keys
+forge config migrate-retention
+forge config migrate-retention --yes
 ```
 
 Notes:
@@ -52,19 +57,21 @@ Notes:
 
 Available settings:
 
-| Key                              | Default                | Description                                                                                                                                                                                                                   |
-| -------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `proxy_mode`                     | `host`                 | `host` (proxy on host) or `sidecar` (bundled in Docker)                                                                                                                                                                       |
-| `sidecar_image`                  | `forge-sidecar:latest` | Docker image for sidecar mode                                                                                                                                                                                                 |
-| `user_agent_claude_code_version` | *(empty)*              | Version in User-Agent header sent to upstream LLM providers                                                                                                                                                                   |
-| `context_limit`                  | `200000`               | Fallback auto-compact window for proxy mode (passed as `CLAUDE_CODE_AUTO_COMPACT_WINDOW`)                                                                                                                                     |
-| `status_timeout`                 | `2.0`                  | Status line proxy/git call timeout (seconds)                                                                                                                                                                                  |
-| `memory_writer_timeout`          | `300`                  | Memory writer timeout (seconds)                                                                                                                                                                                               |
-| `log_level`                      | `off`                  | File logging level (`off`, `debug`, `info`, `warning`)                                                                                                                                                                        |
-| `policy_summary_feedback`        | `on`                   | Post-evaluation summary lines and additionalContext (`on`/`off`)                                                                                                                                                              |
-| `log_tool_failures`              | `false`                | Log tool failures to `~/.forge/logs/tool_failures/` (proxy; includes tool inputs/errors)                                                                                                                                      |
-| `auth_ignore_env`                | `false`                | Ignore env vars for credential resolution; use credential file only. See [authentication.md](authentication.md#ignoring-environment-variables-auth_ignore_env)                                                                |
-| `interactive_anthropic_api_key`  | `inherit`              | `omit` strips `ANTHROPIC_API_KEY` from interactive `claude` launches only (headless subprocesses keep it). See [authentication.md](authentication.md#keeping-a-key-out-of-interactive-sessions-interactive_anthropic_api_key) |
+| Key                                   | Default                | Description                                                                                                                                                                                                                   |
+| ------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proxy_mode`                          | `host`                 | `host` (proxy on host) or `sidecar` (bundled in Docker)                                                                                                                                                                       |
+| `sidecar_image`                       | `forge-sidecar:latest` | Docker image for sidecar mode                                                                                                                                                                                                 |
+| `user_agent_claude_code_version`      | *(empty)*              | Version in User-Agent header sent to upstream LLM providers                                                                                                                                                                   |
+| `context_limit`                       | `200000`               | Fallback auto-compact window for proxy mode (passed as `CLAUDE_CODE_AUTO_COMPACT_WINDOW`)                                                                                                                                     |
+| `status_timeout`                      | `2.0`                  | Status line proxy/git call timeout (seconds)                                                                                                                                                                                  |
+| `memory_writer_timeout`               | `300`                  | Memory writer timeout (seconds)                                                                                                                                                                                               |
+| `log_level`                           | `off`                  | File logging level (`off`, `debug`, `info`, `warning`)                                                                                                                                                                        |
+| `policy_summary_feedback`             | `on`                   | Post-evaluation summary lines and additionalContext (`on`/`off`)                                                                                                                                                              |
+| `log_tool_failures`                   | `false`                | Log tool failures to `~/.forge/logs/tool_failures/` (proxy; includes tool inputs/errors)                                                                                                                                      |
+| `auth_ignore_env`                     | `false`                | Ignore env vars for credential resolution; use credential file only. See [authentication.md](authentication.md#ignoring-environment-variables-auth_ignore_env)                                                                |
+| `interactive_anthropic_api_key`       | `inherit`              | `omit` strips `ANTHROPIC_API_KEY` from interactive `claude` launches only (headless subprocesses keep it). See [authentication.md](authentication.md#keeping-a-key-out-of-interactive-sessions-interactive_anthropic_api_key) |
+| `telemetry.downstream.retention_days` | `14`                   | Delete non-current-month downstream shards older than N days (`0` disables the age bound)                                                                                                                                     |
+| `telemetry.downstream.max_total_mb`   | `512`                  | Prune non-current-month downstream shards oldest-first over N MB (`0` disables the size bound)                                                                                                                                |
 
 Environment overrides:
 
@@ -76,11 +83,42 @@ Environment overrides:
   because global inheritance can break Claude Code auto-mode classification.
 
 **Note on running processes:** Runtime config is cached per-process. Changes via `forge config set` take effect for new
-CLI invocations and new sessions, but **already-running proxies do not pick up changes until restart**. To toggle
-`log_tool_failures` on a live proxy, run `forge proxy stop <id> && forge proxy start <id>`.
+CLI invocations and new sessions, but **already-running proxies do not pick up changes until restart**. Restart a live
+proxy with `forge proxy stop <id> && forge proxy start <id>` after changing proxy-consumed settings such as downstream
+retention or `log_tool_failures`.
 
 **In-session access (read-only):** Type `%config` in the Claude prompt to see effective config. See
 [hook.md](hook.md#in-session-commands--commands) for all `%` commands.
+
+---
+
+## Downstream telemetry retention
+
+Audit, cost, and provider-lifecycle records share `~/.forge/telemetry/downstream/`, so they have one global policy and
+one startup prune pass. `forge config show` reports the configured policy, effective policy, and source; use
+`forge config show --json` for the same facts under `downstream_retention`. Current UTC calendar-month shards are always
+preserved because proxy restart may need them to rebuild spend-cap state.
+
+Old releases wrote retention defaults into each `proxy.yaml` under `audit` and `provider_trace`. Forge accepts those
+keys for one migration window and reports their exact `telemetry.downstream` replacements. Without an explicit global
+policy, matching explicit legacy values become `legacy_consensus`; conflicting or unreadable inputs disable automatic
+pruning instead of selecting a policy that could delete data.
+
+Migration is explicit because proxy files are user-owned:
+
+```bash
+forge config migrate-retention          # preview only
+forge config migrate-retention --json   # machine-readable preview
+forge config migrate-retention --yes    # write global policy, then remove matching legacy keys
+```
+
+The global policy is written first, so an interrupted migration remains coherent and rerunning the same command removes
+the remaining keys. Normal proxy startup never edits proxy files. `forge proxy show <id>` points to the global owner and
+names any deprecated keys still present in that proxy.
+
+If you run more than one sidecar, set or migrate the global policy on the host before restarting them during this
+compatibility window. Each container sees only its own mounted proxy file while sharing the host telemetry directory, so
+it cannot detect a conflicting legacy policy in another sidecar.
 
 ---
 

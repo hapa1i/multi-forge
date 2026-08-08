@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the Wave 5 admission record without activating D015.
+Current focus: execute D015 as the first bounded Wave 5 member; later members remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -84,7 +84,10 @@ Current focus: review and merge the Wave 5 admission record without activating D
 - [x] Sequence Wave 5 into seven parked members under `epic_cli_proxy_runtime_correctness` without activating
   implementation.
 - [x] Run Wave 5 admission Markdown, relative-link, stale-lane, change-log size, and diff checks.
-- [ ] Review and merge the Wave 5 admission record before activating D015.
+- [x] Review and merge the Wave 5 admission record before activating D015 (PR #147, `92b981a5`).
+- [x] Start `fix/unify-downstream-retention`, move the Wave 5 child epic and D015 to `doing/`, create their checklists,
+  and repoint inbound links.
+- [ ] Implement, independently review, and merge D015 before activating O002.
 - [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
   activating their implementation cards.
 

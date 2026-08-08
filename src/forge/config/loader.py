@@ -474,7 +474,12 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         raise ValueError(f"Malformed proxy configuration: {e}") from e
 
 
-def write_proxy_instance_config(proxy_id: str, config: "ProxyInstanceConfig") -> Path:
+def write_proxy_instance_config(
+    proxy_id: str,
+    config: "ProxyInstanceConfig",
+    *,
+    omit_legacy_retention: bool = False,
+) -> Path:
     """Write proxy config to proxy.yaml with atomic write.
 
     Uses temp file + rename for atomicity (POSIX).
@@ -483,6 +488,9 @@ def write_proxy_instance_config(proxy_id: str, config: "ProxyInstanceConfig") ->
     Args:
         proxy_id: The proxy identifier
         config: ProxyInstanceConfig to write
+        omit_legacy_retention: Do not author deprecated proxy-local retention keys.
+            New proxy creation uses this while existing-file writes keep round-trip
+            compatibility for the migration window.
 
     Returns:
         Path to the written file
@@ -493,6 +501,16 @@ def write_proxy_instance_config(proxy_id: str, config: "ProxyInstanceConfig") ->
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = asdict(config)
+
+    if omit_legacy_retention:
+        for section_name in ("audit", "provider_trace"):
+            section = data.get(section_name)
+            if not isinstance(section, dict):
+                continue
+            section.pop("retention_days", None)
+            section.pop("max_total_mb", None)
+            if not section:
+                del data[section_name]
 
     # Clean up None values from tier_overrides for cleaner YAML
     if data.get("tier_overrides"):

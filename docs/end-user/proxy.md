@@ -633,6 +633,10 @@ snapshot is deliberate: a path migration or dropped best-effort JSONL write must
 `$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the live proxy's
 in-memory counters remain authoritative between flushes.
 
+Shared downstream shards are bounded by the global `telemetry.downstream` policy in `~/.forge/config.yaml`, after cap
+bootstrap. Current UTC calendar-month shards survive both age and size pruning. See
+[Downstream telemetry retention](config.md#downstream-telemetry-retention) for status, conflict handling, and migration.
+
 ### Budget planning
 
 If your provider gives you a monthly API credit or your team has a fixed budget for model usage, set caps to match:
@@ -680,8 +684,9 @@ curl -s localhost:<port>/ | jq '.intercept_mode, .wire_shape'   # preflight: is 
 
 Audit records are **redacted before they are written** — metadata records hold hashes/lengths/counts only, never prompt
 or response text. Records live in downstream telemetry at `~/.forge/telemetry/downstream/*.jsonl` (owner-only).
-Retention is enforced at proxy startup via `audit.retention_days` and `audit.max_total_mb`; current-calendar-month
-downstream shards are preserved because the same files also carry active-month spend evidence for cap bootstrap.
+Retention is enforced once at proxy startup through the global `telemetry.downstream` policy; audit has no independent
+pruner or effective retention setting. Current-calendar-month downstream shards are preserved because the same files
+also carry active-month spend evidence for cap bootstrap.
 
 ⚠︎ **`audit_full_body` is a higher-risk opt-in.** It additionally captures **redacted** bodies (roles, block types,
 per-block lengths — still never plaintext) in downstream telemetry: the request body on every path, and the response
@@ -797,8 +802,9 @@ toggle. Observability only (not routing -- recognition is stickiness-neutral); n
 
 > **Moved from `proxy.yaml`.** This was previously a per-proxy `proxy.yaml` key. It is now global in
 > `~/.forge/config.yaml`. A stale `provider_trace.inject_provider_user` left in `proxy.yaml` still loads but is
-> **ignored** with a one-time warning naming the `forge config set` command above. `proxy.yaml`'s `provider_trace` now
-> holds retention keys only (`retention_days`, `max_total_mb`).
+> **ignored** with a one-time warning naming the `forge config set` command above. Retention also moved to global
+> `telemetry.downstream`; stale `audit`/`provider_trace` retention keys are compatibility inputs only and can be removed
+> explicitly with `forge config migrate-retention --yes`.
 
 ### Remote reconciliation
 

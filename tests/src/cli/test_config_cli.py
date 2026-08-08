@@ -8,6 +8,9 @@ sets FORGE_HOME to an isolated temp directory for every test. Tests use
 
 from __future__ import annotations
 
+import json
+
+import yaml
 from click.testing import CliRunner
 
 from forge.cli.config_cmd import config
@@ -55,6 +58,8 @@ class TestConfigShow:
         assert "# Status-line display preferences." in result.output
         assert "# Ordered segment list." in result.output
         assert "provider_trace:" in result.output
+        assert "Downstream retention" in result.output
+        assert "retention_days=14, max_total_mb=512 (default)" in result.output
 
     def test_bare_config_prints_help(self):
         """Bare non-leaf prints help to stderr and exits 2 (usage error), like every other group."""
@@ -87,14 +92,14 @@ class TestConfigShow:
         result = CliRunner().invoke(config, ["show", "--help"])
 
         assert result.exit_code == 0
-        assert "{path, env_sources, config}" in result.output
+        assert "{path, env_sources, config, downstream_retention}" in result.output
 
 
 class TestConfigShowJson:
     """Tests for `forge config show --json`.
 
-    Shape: {path, env_sources, config} where config is the effective
-    RuntimeConfig mapping (nested sections render as plain dicts).
+    Shape: {path, env_sources, config, downstream_retention} where config is the
+    effective RuntimeConfig mapping (nested sections render as plain dicts).
     """
 
     def setup_method(self):
@@ -103,14 +108,22 @@ class TestConfigShowJson:
     def teardown_method(self):
         reset_runtime_config()
 
-    def test_json_has_three_top_level_keys(self):
+    def test_json_has_expected_top_level_keys(self):
         runner = CliRunner()
         result = runner.invoke(config, ["show", "--json"])
         assert result.exit_code == 0
-        import json
-
         payload = json.loads(result.output)
-        assert set(payload.keys()) == {"path", "env_sources", "config"}
+        assert set(payload.keys()) == {
+            "path",
+            "env_sources",
+            "config",
+            "downstream_retention",
+        }
+        assert payload["downstream_retention"]["effective"] == {
+            "retention_days": 14,
+            "max_total_mb": 512,
+        }
+        assert payload["downstream_retention"]["source"] == "default"
 
     def test_json_path_points_at_config_file(self):
         runner = CliRunner()
@@ -143,6 +156,7 @@ class TestConfigShowJson:
         # dataclass instance; show_cmd asdict()s them).
         assert isinstance(cfg["statusline"], dict)
         assert isinstance(cfg["provider_trace"], dict)
+        assert isinstance(cfg["telemetry"], dict)
 
     def test_json_env_sources_empty_without_overrides(self):
         runner = CliRunner()
@@ -526,6 +540,124 @@ class TestConfigSetProviderTrace:
         assert rc.statusline.cost_mode == "auto"
 
 
+class TestConfigSetDownstreamRetention:
+    """Tests for global ``telemetry.downstream`` mutation."""
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def test_set_zero_bounds_round_trips(self):
+        runner = CliRunner()
+
+        assert runner.invoke(config, ["set", "telemetry.downstream.retention_days=0"]).exit_code == 0
+        assert runner.invoke(config, ["set", "telemetry.downstream.max_total_mb=0"]).exit_code == 0
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["telemetry"]["downstream"] == {
+            "retention_days": 0,
+            "max_total_mb": 0,
+        }
+        assert get_runtime_config().telemetry.downstream.retention_days == 0
+        assert get_runtime_config().telemetry.downstream.max_total_mb == 0
+
+    def test_set_negative_bound_is_rejected_without_writing(self):
+        result = CliRunner().invoke(config, ["set", "telemetry.downstream.retention_days=-1"])
+
+        assert result.exit_code == 1
+        assert "telemetry.downstream.retention_days" in result.stderr
+        assert not (get_forge_home() / "config.yaml").exists()
+
+    def test_set_unknown_downstream_key_is_rejected(self):
+        result = CliRunner().invoke(config, ["set", "telemetry.downstream.days=14"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "Unknown telemetry.downstream key" in result.stderr
+
+
+class TestConfigMigrateRetention:
+    def _write_proxy(self, proxy_id: str, data: dict) -> None:
+        path = get_forge_home() / "proxies" / proxy_id / "proxy.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+    def test_preview_json_reports_consensus_without_mutation(self):
+        self._write_proxy("alpha", {"audit": {"retention_days": 30, "max_total_mb": 600}})
+
+        result = CliRunner().invoke(config, ["migrate-retention", "--json"])
+
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["applied"] is False
+        assert payload["plan"]["write_global_policy"] is True
+        assert payload["plan"]["resolution"]["source"] == "legacy_consensus"
+        assert not (get_forge_home() / "config.yaml").exists()
+
+    def test_apply_json_writes_global_first_and_removes_legacy_keys(self):
+        self._write_proxy(
+            "alpha",
+            {
+                "audit": {
+                    "audit_full_body": True,
+                    "retention_days": 30,
+                    "max_total_mb": 600,
+                },
+                "provider_trace": {"retention_days": 30, "max_total_mb": 600},
+            },
+        )
+
+        result = CliRunner().invoke(config, ["migrate-retention", "--yes", "--json"])
+
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["applied"] is True
+        assert payload["result"] == {
+            "wrote_global_policy": True,
+            "migrated_proxy_ids": ["alpha"],
+        }
+        runtime = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert runtime["telemetry"]["downstream"] == {
+            "retention_days": 30,
+            "max_total_mb": 600,
+        }
+        proxy = yaml.safe_load((get_forge_home() / "proxies" / "alpha" / "proxy.yaml").read_text())
+        assert proxy["audit"] == {"audit_full_body": True}
+        assert "provider_trace" not in proxy
+
+    def test_conflict_json_fails_on_stderr_and_names_proxies(self):
+        self._write_proxy("alpha", {"audit": {"retention_days": 90}})
+        self._write_proxy("beta", {"provider_trace": {"retention_days": 14}})
+
+        result = CliRunner().invoke(config, ["migrate-retention", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        payload = json.loads(result.stderr)
+        conflicts = payload["plan"]["resolution"]["conflicts"]
+        assert {proxy for value in conflicts[0]["values"] for proxy in value["proxy_ids"]} == {"alpha", "beta"}
+
+    def test_unreadable_proxy_recovery_names_proxy_editor(self):
+        (get_forge_home() / "config.yaml").write_text(
+            "telemetry:\n  downstream:\n    retention_days: 14\n    max_total_mb: 512\n"
+        )
+        broken = get_forge_home() / "proxies" / "broken" / "proxy.yaml"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("audit: [unterminated")
+
+        result = CliRunner().invoke(config, ["migrate-retention"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "forge proxy edit broken" in result.stderr
+        assert "forge config edit" not in result.stderr
+        assert "effective global policy remains active" in result.stderr
+
+
 class TestConfigEdit:
     """`forge config edit` is a write surface: it must reject unknown nested subkeys and bad values
     (strict gate, parity with `forge config set`), not silently drop them."""
@@ -592,3 +724,21 @@ class TestConfigEdit:
         assert result.exit_code == 0
         # The toggle actually loads on after the edit (the whole point of the user-facing switch).
         assert get_runtime_config().provider_trace.inject_provider_user is True
+
+    def test_edit_rejects_unknown_downstream_retention_subkey(self, monkeypatch):
+        result = self._run_edit_with("telemetry:\n  downstream:\n    retention_dayz: 14\n", monkeypatch)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "telemetry.downstream" in result.stderr
+        assert "retention_dayz" in result.stderr
+
+    def test_edit_accepts_zero_downstream_retention_bounds(self, monkeypatch):
+        result = self._run_edit_with(
+            "telemetry:\n  downstream:\n    retention_days: 0\n    max_total_mb: 0\n",
+            monkeypatch,
+        )
+
+        assert result.exit_code == 0
+        assert get_runtime_config().telemetry.downstream.retention_days == 0
+        assert get_runtime_config().telemetry.downstream.max_total_mb == 0

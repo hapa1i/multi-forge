@@ -1,22 +1,27 @@
 """Shared JSONL shard retention for append-only state planes.
 
-The audit, provider-trace, and request-log planes all bound on-disk size the same way:
-delete shards older than ``retention_days``, then prune oldest-first until total size is under
-``max_total_mb``. This was duplicated byte-for-byte; centralizing it keeps the policy from
-drifting between planes. Best-effort: telemetry retention must never raise into a request.
+Downstream telemetry and per-proxy request diagnostics use the same age/size primitive.
+Failures are returned to the owning surface rather than raised into request handling.
 """
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
+from stat import S_ISDIR
 
 _BYTES_PER_MB = 1024 * 1024
 _SECONDS_PER_DAY = 86400
+
+
+@dataclass(frozen=True)
+class PruneJsonlShardsResult:
+    """Observable outcome from a best-effort shard prune."""
+
+    removed: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
 
 
 def prune_jsonl_shards(
@@ -26,26 +31,45 @@ def prune_jsonl_shards(
     max_total_mb: int,
     pattern: str = "*.jsonl",
     preserve: Callable[[Path], bool] | None = None,
-) -> None:
+) -> PruneJsonlShardsResult:
     """Delete shards older than ``retention_days``, then prune oldest-first over ``max_total_mb``.
 
-    ``0`` disables that bound (matches the global ``log_retention_days`` convention). Errors are
-    swallowed -- this is telemetry, not the critical path.
+    ``0`` disables that bound (matches the global ``log_retention_days`` convention). Errors do
+    not raise into the caller, but are returned so an owning surface can report degraded
+    enforcement instead of silently claiming success.
     """
-    if not directory.is_dir():
-        return
+    removed: list[str] = []
+    errors: list[str] = []
+    try:
+        directory_mode = directory.stat().st_mode
+    except FileNotFoundError:
+        return PruneJsonlShardsResult()
+    except OSError as exc:
+        return PruneJsonlShardsResult(errors=(f"could not inspect {directory}: {exc}",))
+    if not S_ISDIR(directory_mode):
+        return PruneJsonlShardsResult(errors=(f"retention path is not a directory: {directory}",))
     try:
         shards = sorted(directory.glob(pattern), key=lambda p: p.stat().st_mtime)
-    except OSError:
-        return
+    except OSError as exc:
+        return PruneJsonlShardsResult(errors=(f"could not enumerate {directory}: {exc}",))
+
+    preserve_decisions: dict[Path, bool] = {}
 
     def should_preserve(shard: Path) -> bool:
+        if shard in preserve_decisions:
+            return preserve_decisions[shard]
         if preserve is None:
             return False
         try:
-            return preserve(shard)
-        except Exception:
-            return False
+            decision = preserve(shard)
+        except Exception as exc:
+            errors.append(f"could not evaluate preservation for {shard}: {exc}")
+            decision = True
+        # A preservation fact is evaluated once per operation. In particular, a
+        # transient callback failure must keep the shard through both the age and
+        # size passes rather than being retried into a destructive answer.
+        preserve_decisions[shard] = decision
+        return decision
 
     now = datetime.now(timezone.utc).timestamp()
     if retention_days > 0:
@@ -57,15 +81,17 @@ def prune_jsonl_shards(
                 if shard.stat().st_mtime < cutoff:
                     shard.unlink()
                     shards.remove(shard)
-            except OSError:
-                pass
+                    removed.append(str(shard))
+            except OSError as exc:
+                errors.append(f"could not age-prune {shard}: {exc}")
 
     if max_total_mb > 0:
         limit = max_total_mb * _BYTES_PER_MB
         try:
             total = sum(p.stat().st_size for p in shards)
-        except OSError:
-            return
+        except OSError as exc:
+            errors.append(f"could not measure {directory}: {exc}")
+            return PruneJsonlShardsResult(tuple(removed), tuple(errors))
         for shard in shards:  # oldest first
             if total <= limit:
                 break
@@ -75,5 +101,8 @@ def prune_jsonl_shards(
                 size = shard.stat().st_size
                 shard.unlink()
                 total -= size
-            except OSError:
-                pass
+                removed.append(str(shard))
+            except OSError as exc:
+                errors.append(f"could not size-prune {shard}: {exc}")
+
+    return PruneJsonlShardsResult(tuple(removed), tuple(errors))

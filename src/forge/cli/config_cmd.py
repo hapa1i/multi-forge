@@ -26,7 +26,7 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
-from forge.cli.output import err_console, print_error
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
 from forge.runtime_config import (
     RuntimeConfig,
@@ -62,13 +62,16 @@ def show_cmd(raw: bool = False, as_json: bool = False) -> None:
     """Show effective runtime configuration.
 
     Displays current values (from file + defaults + env var overrides).
-    With --json, emits {path, env_sources, config}.
+    With --json, emits {path, env_sources, config, downstream_retention}.
     """
     console = Console(width=200)
     config_path = ensure_config()
 
     rc = load_runtime_config()
     env_sources: dict[str, str] = getattr(rc, "_env_sources", {})
+    from forge.core.telemetry.downstream_retention import resolve_downstream_retention
+
+    retention = resolve_downstream_retention(runtime_config_path=config_path)
 
     effective: dict[str, Any] = {}
     for f in fields(RuntimeConfig):
@@ -88,6 +91,7 @@ def show_cmd(raw: bool = False, as_json: bool = False) -> None:
                     "path": str(config_path),
                     "env_sources": env_sources,
                     "config": effective,
+                    "downstream_retention": retention.to_dict(),
                 },
                 indent=2,
                 default=str,
@@ -108,6 +112,7 @@ def show_cmd(raw: bool = False, as_json: bool = False) -> None:
         console.print()
         syntax = Syntax(content, "yaml", theme="monokai")
         console.print(syntax)
+        _print_downstream_retention_status(console, retention)
 
 
 @config.command("set")
@@ -122,6 +127,7 @@ def set_cmd(key_value: str) -> None:
         forge config set context_limit=1000000
         forge config set statusline.cost_mode=actual
         forge config set provider_trace.inject_provider_user=true
+        forge config set telemetry.downstream.retention_days=30
     """
     console = Console(width=200)
 
@@ -168,6 +174,125 @@ def set_cmd(key_value: str) -> None:
 
     write_runtime_config(data)
     console.print(f"[green]Set[/green] {key}={coerced_value}")
+
+
+@config.command("migrate-retention")
+@click.option("--yes", "apply_changes", is_flag=True, help="Apply the previewed migration")
+@click.option("--json", "as_json", is_flag=True, help="Output one JSON result")
+def migrate_retention_cmd(apply_changes: bool = False, as_json: bool = False) -> None:
+    """Move proxy-local downstream retention keys to the global owner.
+
+    Preview is the default. With --yes, Forge writes the global policy before
+    removing matching legacy keys from user-owned proxy files, so a partial
+    failure remains coherent and the same command can be rerun safely.
+    """
+    import json
+
+    from forge.core.telemetry.downstream_retention import (
+        DownstreamRetentionMigrationError,
+        apply_downstream_retention_migration,
+        plan_downstream_retention_migration,
+    )
+
+    console = Console(width=200)
+    plan = plan_downstream_retention_migration()
+    payload: dict[str, Any] = {"applied": False, "plan": plan.to_dict(), "result": None}
+
+    if plan.blocked:
+        if as_json:
+            payload["error"] = "Retention migration is blocked by conflicting or unreadable configuration"
+            click.echo(json.dumps(payload, indent=2), err=True)
+        else:
+            _print_downstream_retention_status(err_console, plan.resolution)
+            if plan.resolution.pruning_enabled:
+                print_error("Retention migration is blocked; the effective global policy remains active.")
+            else:
+                print_error("Retention migration is blocked; automatic pruning remains disabled.")
+            if plan.resolution.errors:
+                recovery = "Repair each named configuration input, then rerun this command:"
+                commands = []
+                if any(error.scope == "global" for error in plan.resolution.errors):
+                    commands.append("forge config edit")
+                commands.extend(
+                    f"forge proxy edit {proxy_id}"
+                    for proxy_id in sorted(
+                        {
+                            error.proxy_id
+                            for error in plan.resolution.errors
+                            if error.scope == "proxy" and error.proxy_id is not None
+                        }
+                    )
+                )
+                commands.append("forge config migrate-retention --yes")
+            else:
+                recovery = "Choose the global policy explicitly, then rerun this command:"
+                commands = [
+                    "forge config set telemetry.downstream.retention_days=<days>",
+                    "forge config set telemetry.downstream.max_total_mb=<mb>",
+                    "forge config migrate-retention --yes",
+                ]
+            print_tip(
+                recovery,
+                commands=commands,
+                console=err_console,
+            )
+        sys.exit(1)
+
+    if not apply_changes:
+        if as_json:
+            click.echo(json.dumps(payload, indent=2))
+        else:
+            console.print("[bold]Downstream retention migration preview[/bold]")
+            _print_downstream_retention_status(console, plan.resolution)
+            if not plan.has_changes:
+                console.print("[dim]No legacy retention keys require migration.[/dim]")
+            else:
+                if plan.write_global_policy:
+                    console.print(f"[cyan]Write[/cyan] global policy to {display_path(plan.runtime_config_path)}")
+                for target in plan.targets:
+                    keys = ", ".join(item.key for item in target.keys)
+                    console.print(f"[cyan]Update[/cyan] {target.proxy_id}: remove {keys}")
+                print_tip(
+                    "Review the plan, then apply it.",
+                    commands=["forge config migrate-retention --yes"],
+                    console=console,
+                )
+        return
+
+    try:
+        result = apply_downstream_retention_migration()
+    except (DownstreamRetentionMigrationError, OSError) as exc:
+        if as_json:
+            payload["error"] = str(exc)
+            click.echo(json.dumps(payload, indent=2), err=True)
+        else:
+            print_error(f"Retention migration failed: {exc}")
+            print_tip(
+                "Fix the named file and rerun 'forge config migrate-retention --yes'.",
+                console=err_console,
+            )
+        sys.exit(1)
+
+    payload["applied"] = True
+    payload["result"] = {
+        "wrote_global_policy": result.wrote_global_policy,
+        "migrated_proxy_ids": list(result.migrated_proxy_ids),
+    }
+    if as_json:
+        click.echo(json.dumps(payload, indent=2))
+    else:
+        console.print("[green]Downstream retention migration complete[/green]")
+        if result.wrote_global_policy:
+            console.print(f"  Global policy: {display_path(get_config_path())}")
+        if result.migrated_proxy_ids:
+            console.print(f"  Updated proxies: {', '.join(result.migrated_proxy_ids)}")
+        else:
+            console.print("  No proxy files required changes")
+        print_tip(
+            "Restart running proxies so they use the global retention policy.",
+            blank_before=False,
+            console=console,
+        )
 
 
 @config.command("edit")
@@ -233,8 +358,9 @@ def edit_cmd() -> None:
         # see _coerce_*_config), so a typo like provider_trace.inject_provider_usre would pass the
         # validation above and then persist while the toggle stays off. The edit path is a write
         # surface, so reject unknown nested subkeys here -- parity with `forge config set` (fail-closed).
-        for section_name, section_cls in _nested_sections().items():
-            section_block = edited_data.get(section_name)
+        for section_path, section_cls in _nested_sections().items():
+            section_name = ".".join(section_path)
+            section_block = _mapping_at_path(edited_data, section_path)
             if not isinstance(section_block, dict):
                 continue
             known_sub = {f.name for f in fields(section_cls)}
@@ -382,17 +508,33 @@ def _unknown_segments(segments: list[Any]) -> list[Any]:
     return [s for s in segments if s not in SEGMENT_NAMES]
 
 
-def _nested_sections() -> dict[str, type]:
-    """Map nested config section name -> its dataclass (the dotted-key registry).
+def _nested_sections() -> dict[tuple[str, ...], type]:
+    """Map nested config paths to their dataclasses (the dotted-key registry).
 
-    Add a section here to make ``forge config set <section>.<subkey>`` work.
+    Add a path here to make ``forge config set <section>.<subkey>`` work.
     """
-    from forge.runtime_config import RuntimeProviderTraceConfig, StatusLineConfig
+    from forge.runtime_config import (
+        RuntimeDownstreamRetentionConfig,
+        RuntimeProviderTraceConfig,
+        RuntimeTelemetryConfig,
+        StatusLineConfig,
+    )
 
     return {
-        "statusline": StatusLineConfig,
-        "provider_trace": RuntimeProviderTraceConfig,
+        ("statusline",): StatusLineConfig,
+        ("provider_trace",): RuntimeProviderTraceConfig,
+        ("telemetry",): RuntimeTelemetryConfig,
+        ("telemetry", "downstream"): RuntimeDownstreamRetentionConfig,
     }
+
+
+def _mapping_at_path(data: MutableMapping[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = data
+    for part in path:
+        if not isinstance(current, MutableMapping):
+            return None
+        current = current.get(part)
+    return current
 
 
 def _set_nested_key(key: str, value: str, console: Console) -> None:
@@ -405,22 +547,25 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     from forge.cli.statusline.names import SEGMENT_NAMES
 
     sections = _nested_sections()
-    section, _, subkey = key.partition(".")
-    section_cls = sections.get(section)
+    parts = tuple(key.split("."))
+    section_path, subkey = parts[:-1], parts[-1]
+    section_name = ".".join(section_path)
+    section_cls = sections.get(section_path)
     if section_cls is None:
-        print_error(f"Unknown config section: '{section}'")
-        err_console.print(f"\n[dim]Nested sections: {', '.join(sorted(sections))}[/dim]")
+        print_error(f"Unknown config section: '{section_name}'")
+        names = sorted(".".join(path) for path in sections)
+        err_console.print(f"\n[dim]Nested sections: {', '.join(names)}[/dim]")
         sys.exit(1)
 
     sec_fields = {f.name: f for f in fields(section_cls)}
     if subkey not in sec_fields:
-        print_error(f"Unknown {section} key: '{subkey}'")
+        print_error(f"Unknown {section_name} key: '{subkey}'")
         err_console.print(f"\n[dim]Available: {', '.join(sorted(sec_fields))}[/dim]")
         sys.exit(1)
 
     coerced_sub: Any
     # statusline.segments is the one list field needing allowlist validation.
-    if section == "statusline" and subkey == "segments":
+    if section_path == ("statusline",) and subkey == "segments":
         coerced_sub = [s.strip() for s in value.split(",") if s.strip()]
         unknown = _unknown_segments(coerced_sub)
         if unknown:
@@ -430,7 +575,7 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     else:
         coerced_sub = _coerce_value(value, sec_fields[subkey])
         if coerced_sub is _COERCE_ERROR:
-            print_error(f"Invalid value for '{section}.{subkey}': {value}")
+            print_error(f"Invalid value for '{section_name}.{subkey}': {value}")
             sys.exit(1)
 
     config_path = get_config_path()
@@ -444,11 +589,14 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     else:
         data = {}
 
-    section_data = data.get(section)
-    if not isinstance(section_data, dict):
-        section_data = {}
-    section_data[subkey] = coerced_sub
-    data[section] = section_data
+    current = data
+    for part in section_path:
+        child = current.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            current[part] = child
+        current = child
+    current[subkey] = coerced_sub
 
     # Validate via construction — the nested dataclass __post_init__ rejects bad
     # values (fail-closed); statusline segment names were already checked above.
@@ -461,3 +609,33 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
 
     write_runtime_config(data)
     console.print(f"[green]Set[/green] {key}={coerced_sub}")
+
+
+def _print_downstream_retention_status(console: Console, resolution: Any) -> None:
+    """Render the effective global owner and any compatibility/degraded facts."""
+    console.print("\n[bold]Downstream retention[/bold]")
+    console.print(f"[bold]Owner:[/bold] telemetry.downstream in {display_path(get_config_path())}")
+    configured = resolution.configured
+    if configured is None:
+        console.print("[bold]Configured:[/bold] not set")
+    else:
+        days = configured.retention_days if configured.retention_days is not None else "default"
+        size = configured.max_total_mb if configured.max_total_mb is not None else "default"
+        console.print(f"[bold]Configured:[/bold] retention_days={days}, max_total_mb={size}")
+    if resolution.effective is None:
+        console.print("[bold]Effective:[/bold] [yellow]disabled (configuration requires recovery)[/yellow]")
+    else:
+        console.print(
+            f"[bold]Effective:[/bold] retention_days={resolution.effective.retention_days}, "
+            f"max_total_mb={resolution.effective.max_total_mb} ([cyan]{resolution.source}[/cyan])"
+        )
+    if resolution.deprecated_keys:
+        console.print(f"[yellow]Deprecated proxy keys:[/yellow] {len(resolution.deprecated_keys)}")
+        for item in resolution.deprecated_keys:
+            console.print(f"  {item.proxy_id}: {item.key} -> {item.replacement}")
+    for conflict in resolution.conflicts:
+        values = "; ".join(f"{item.value} ({', '.join(item.proxy_ids)})" for item in conflict.values)
+        console.print(f"[yellow]Conflict {conflict.field}:[/yellow] {values}")
+    for error in resolution.errors:
+        label = f"{error.proxy_id}: " if error.proxy_id else ""
+        console.print(f"[yellow]Invalid input:[/yellow] {label}{error.detail} ({display_path(error.path)})")

@@ -71,6 +71,13 @@ from forge.proxy.proxy_orchestrator import (
     start_proxy,
 )
 
+_LEGACY_DOWNSTREAM_RETENTION_REPLACEMENTS = {
+    "audit.retention_days": "telemetry.downstream.retention_days",
+    "audit.max_total_mb": "telemetry.downstream.max_total_mb",
+    "provider_trace.retention_days": "telemetry.downstream.retention_days",
+    "provider_trace.max_total_mb": "telemetry.downstream.max_total_mb",
+}
+
 
 def _infer_proxy_source(entry: ProxyEntry) -> str:
     """Derive display source from pid + status (no schema change needed)."""
@@ -79,6 +86,18 @@ def _infer_proxy_source(entry: ProxyEntry) -> str:
     if entry.status == "healthy":
         return "adopted"
     return entry.status or "-"
+
+
+def _downstream_retention_view(proxy_id: str) -> tuple[Any, dict[str, Any]]:
+    """Return global retention status scoped for one proxy's compatibility keys."""
+    from forge.core.telemetry.downstream_retention import resolve_downstream_retention
+
+    resolution = resolve_downstream_retention()
+    payload = resolution.to_dict()
+    payload["owner"] = "telemetry.downstream"
+    payload["config_path"] = str(get_forge_home() / "config.yaml")
+    payload["deprecated_keys"] = [item for item in payload["deprecated_keys"] if item["proxy_id"] == proxy_id]
+    return resolution, payload
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -251,6 +270,12 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
     path = get_proxy_file_path(proxy_id)
     entry = result.entry
 
+    if raw and not as_json:
+        console.print(content)
+        return
+
+    retention, retention_payload = _downstream_retention_view(proxy_id)
+
     if as_json:
         import json
 
@@ -268,31 +293,42 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
                 if entry
                 else None
             ),
+            "downstream_retention": retention_payload,
         }
         click.echo(json.dumps(data, indent=2, default=str))
         return
 
-    if raw:
-        console.print(content)
+    syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
+    console.print(f"[bold]Proxy:[/bold] {proxy_id}")
+    console.print(f"[bold]Path:[/bold] {display_path(path)}")
+
+    if entry is not None:
+        status_color = "green" if entry.status == "healthy" else "dim"
+        console.print(f"[bold]Status:[/bold] [{status_color}]{entry.status or 'unknown'}[/{status_color}]")
+        if entry.pid:
+            console.print(f"[bold]PID:[/bold] {entry.pid}")
+
+        from forge.core.logging import find_latest_log
+
+        latest_log = find_latest_log("proxy", "proxy.*.log")
+        if latest_log:
+            console.print(f"[bold]Log:[/bold] {display_path(latest_log)}")
+
+    console.print("[bold]Downstream retention:[/bold] telemetry.downstream (global)")
+    if retention.effective is None:
+        console.print("[bold]Retention policy:[/bold] [yellow]disabled; run 'forge config show' for recovery[/yellow]")
     else:
-        syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
-        console.print(f"[bold]Proxy:[/bold] {proxy_id}")
-        console.print(f"[bold]Path:[/bold] {display_path(path)}")
+        console.print(
+            f"[bold]Retention policy:[/bold] {retention.effective.retention_days} days, "
+            f"{retention.effective.max_total_mb} MB ([cyan]{retention.source}[/cyan])"
+        )
+    proxy_legacy = [item for item in retention.deprecated_keys if item.proxy_id == proxy_id]
+    for item in proxy_legacy:
+        console.print(f"[yellow]Deprecated:[/yellow] {item.key} -> {item.replacement}")
+    console.print("[dim]Configure and inspect the owner with 'forge config show'.[/dim]")
 
-        if entry is not None:
-            status_color = "green" if entry.status == "healthy" else "dim"
-            console.print(f"[bold]Status:[/bold] [{status_color}]{entry.status or 'unknown'}[/{status_color}]")
-            if entry.pid:
-                console.print(f"[bold]PID:[/bold] {entry.pid}")
-
-            from forge.core.logging import find_latest_log
-
-            latest_log = find_latest_log("proxy", "proxy.*.log")
-            if latest_log:
-                console.print(f"[bold]Log:[/bold] {display_path(latest_log)}")
-
-        console.print()
-        console.print(syntax)
+    console.print()
+    console.print(syntax)
 
 
 # --- Create (replaces acquire + clone) ---
@@ -995,6 +1031,17 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     atomic_write_text(proxy_path, buf.getvalue(), create_parents=False)
 
     console.print(f"[green]Set[/green] {key}={coerced_value} in proxy '{proxy_id}'")
+    replacement = _LEGACY_DOWNSTREAM_RETENTION_REPLACEMENTS.get(key)
+    if replacement is not None:
+        print_tip(
+            f"'{key}' is deprecated and may create a legacy retention conflict; use '{replacement}' instead.",
+            commands=[
+                f"forge config set {replacement}={coerced_value}",
+                "forge config migrate-retention",
+            ],
+            blank_before=False,
+            console=console,
+        )
     if key.startswith("costs."):
         print_tip(
             "Cost config is read at proxy startup. Restart the proxy for this change to take effect.",
@@ -1004,7 +1051,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     if key == "audit.audit_full_body" and coerced_value is True:
         print_tip(
             "Full-body audit logs request/response structure (redacted, but retains code/file structure).",
-            f"Written owner-only under {display_path(get_forge_home() / 'audit' / 'requests')}.",
+            f"Written owner-only under {display_path(get_forge_home() / 'telemetry' / 'downstream')}.",
             commands=[f"forge proxy set {proxy_id} audit.audit_full_body=false"],
             console=console,
         )
@@ -1247,7 +1294,7 @@ def _delete_single_proxy(
         console.print(f"[dim]Related sessions on {base_url_label}:[/dim] none")
 
     if shared_proxy_ids:
-        console.print(f"[dim]Related proxies on the same port " f"({base_url_label}):[/dim]")
+        console.print(f"[dim]Related proxies on the same port ({base_url_label}):[/dim]")
         for related_proxy_id in shared_proxy_ids[:5]:
             console.print(f"  - {related_proxy_id}")
         if len(shared_proxy_ids) > 5:

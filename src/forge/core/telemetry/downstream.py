@@ -20,6 +20,7 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.state import decode_json_object, utc_timestamp_z
+from forge.core.state.retention import PruneJsonlShardsResult
 from forge.core.telemetry.jsonl_io import append_jsonl_record
 
 # Reporter/Confidence live in the neutral telemetry leaf so the usage ledger can share the
@@ -310,7 +311,7 @@ def read_downstream_records_with_stats(
     )
 
 
-def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> None:
+def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> PruneJsonlShardsResult:
     """Apply shard retention to the shared downstream telemetry directory."""
     from forge.core.state import prune_jsonl_shards
 
@@ -320,7 +321,7 @@ def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> None:
         shard_month = shard.stem.split("_", 1)[0]
         return shard_month == current_month
 
-    prune_jsonl_shards(
+    return prune_jsonl_shards(
         _downstream_dir(),
         retention_days=retention_days,
         max_total_mb=max_total_mb,

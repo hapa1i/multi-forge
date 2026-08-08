@@ -54,7 +54,67 @@ forge config reset -y
 - [ ] `reset` restores default
 - [ ] Type validation works (rejects invalid values)
 
-### 11.4 Edit in Editor
+### 11.4 Migrate Downstream Retention
+
+<!-- prereq: 4.2 -->
+
+<!-- auto -->
+
+Seed deprecated proxy-local values, prove preview is non-mutating, apply the migration, and prove the command is
+rerunnable.
+
+```bash
+forge config reset telemetry -y 2>/dev/null || true
+forge proxy set test-proxy-nostart audit.retention_days=21
+forge proxy set test-proxy-nostart audit.max_total_mb=300
+
+forge config migrate-retention --json >/tmp/forge-retention-preview.json
+jq -e '
+  .applied == false
+  and .plan.write_global_policy == true
+  and .plan.resolution.source == "legacy_consensus"
+  and (.plan.targets | map(.proxy_id) | index("test-proxy-nostart") != null)
+' /tmp/forge-retention-preview.json
+
+forge config migrate-retention --yes --json >/tmp/forge-retention-apply.json
+jq -e '
+  .applied == true
+  and .result.wrote_global_policy == true
+  and (.result.migrated_proxy_ids | index("test-proxy-nostart") != null)
+' /tmp/forge-retention-apply.json
+forge config show --json | jq -e '
+  .downstream_retention.source == "global"
+  and .downstream_retention.effective.retention_days == 21
+  and .downstream_retention.effective.max_total_mb == 300
+'
+
+python3 - <<'PY'
+import os
+from pathlib import Path
+
+import yaml
+
+forge_home = Path(os.environ.get("FORGE_HOME", str(Path.home() / ".forge")))
+data = yaml.safe_load((forge_home / "proxies" / "test-proxy-nostart" / "proxy.yaml").read_text())
+for section_name in ("audit", "provider_trace"):
+    section = data.get(section_name, {})
+    assert "retention_days" not in section
+    assert "max_total_mb" not in section
+PY
+
+forge config migrate-retention --yes --json | jq -e '
+  .plan.has_changes == false
+  and .result.wrote_global_policy == false
+  and (.result.migrated_proxy_ids | length) == 0
+'
+```
+
+- [ ] Deprecated `forge proxy set` keys print their exact `telemetry.downstream` replacements and migration command
+- [ ] JSON preview reports `legacy_consensus` and the target proxy without changing either file
+- [ ] Apply writes the global `21` day / `300` MB policy and removes only the deprecated proxy keys
+- [ ] Reapplying the migration reports no changes
+
+### 11.5 Edit in Editor
 
 <!-- human:guided -->
 
@@ -66,7 +126,7 @@ forge config edit
 
 - [ ] Opens `${FORGE_HOME:-$HOME/.forge}/config.yaml` in `$EDITOR`
 
-### 11.5 Show Claude Preset
+### 11.6 Show Claude Preset
 
 <!-- auto -->
 
@@ -94,7 +154,7 @@ PY
 - [ ] Preset file created at `${FORGE_HOME:-$HOME/.forge}/claude.preset.json`
 - [ ] Built-in preset includes `hooks` and `statusLine`
 
-### 11.6 Reset Claude Preset
+### 11.7 Reset Claude Preset
 
 <!-- auto -->
 
@@ -134,7 +194,7 @@ PY
 - [ ] `reset --yes` restores the built-in preset non-interactively
 - [ ] Custom preset additions are removed while built-in values remain
 
-### 11.7 Edit Claude Preset in Editor
+### 11.8 Edit Claude Preset in Editor
 
 <!-- human:guided -->
 

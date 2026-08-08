@@ -1,7 +1,7 @@
 """Shared JSONL shard pruning plus request-log per-file rotation.
 
-``prune_jsonl_shards`` is the one pruner shared by the audit, provider-trace, and request-log
-planes (delete-by-age, then oldest-first over a size budget; 0 disables a bound).
+``prune_jsonl_shards`` is the primitive shared by downstream telemetry and request-log
+retention (delete-by-age, then oldest-first over a size budget; 0 disables a bound).
 ``_active_request_log_shard`` rolls to a numbered shard once the active one hits max_file_mb.
 """
 
@@ -30,12 +30,16 @@ def _shard(directory: Path, name: str, *, size: int = 10, age_days: float = 0.0)
 
 def test_prune_removes_shards_older_than_retention(tmp_path: Path) -> None:
     old = _shard(tmp_path, "a.jsonl", age_days=30)
+    also_old = _shard(tmp_path, "aa.jsonl", age_days=20)
     fresh = _shard(tmp_path, "b.jsonl", age_days=0)
 
-    prune_jsonl_shards(tmp_path, retention_days=14, max_total_mb=0)
+    result = prune_jsonl_shards(tmp_path, retention_days=14, max_total_mb=0)
 
     assert not old.exists()
+    assert not also_old.exists()
     assert fresh.exists()
+    assert result.removed == (str(old), str(also_old))
+    assert result.errors == ()
 
 
 def test_prune_size_cap_removes_oldest_first(tmp_path: Path) -> None:
@@ -65,7 +69,44 @@ def test_prune_pattern_scopes_the_glob(tmp_path: Path) -> None:
 
 
 def test_prune_missing_dir_is_noop(tmp_path: Path) -> None:
-    prune_jsonl_shards(tmp_path / "nope", retention_days=1, max_total_mb=1)  # must not raise
+    result = prune_jsonl_shards(tmp_path / "nope", retention_days=1, max_total_mb=1)
+    assert result.removed == ()
+    assert result.errors == ()
+
+
+def test_prune_reports_when_retention_path_is_not_a_directory(tmp_path: Path) -> None:
+    path = tmp_path / "downstream"
+    path.write_text("not a directory")
+
+    result = prune_jsonl_shards(path, retention_days=1, max_total_mb=1)
+
+    assert result.removed == ()
+    assert result.errors == (f"retention path is not a directory: {path}",)
+
+
+def test_prune_reports_preservation_errors_and_keeps_the_shard(tmp_path: Path) -> None:
+    old = _shard(tmp_path, "old.jsonl", size=2 * 1024 * 1024, age_days=30)
+    calls = 0
+
+    def fail_preservation(_path: Path) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected preservation fault")
+        return False
+
+    result = prune_jsonl_shards(
+        tmp_path,
+        retention_days=14,
+        max_total_mb=1,
+        preserve=fail_preservation,
+    )
+
+    assert old.exists()
+    assert calls == 1
+    assert result.removed == ()
+    assert len(result.errors) == 1
+    assert "injected preservation fault" in result.errors[0]
 
 
 def test_prune_request_logs_targets_requests_dir(tmp_path: Path, monkeypatch) -> None:

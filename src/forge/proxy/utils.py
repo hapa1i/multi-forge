@@ -505,7 +505,8 @@ def prune_request_logs(*, retention_days: int, max_total_mb: int) -> None:
     """Bound the request-diagnostics shards under ``~/.forge/logs/requests/`` (proxy_log_hygiene).
 
     Per-proxy budget enforced at proxy startup; the global ``log_retention_days`` sweep remains a
-    coarse floor over all of ``logs/``. Best-effort (shared pruner swallows errors)."""
+    coarse floor over all of ``logs/``. Best-effort: this diagnostics owner intentionally ignores
+    the shared pruner's structured error result."""
     from forge.core.state import prune_jsonl_shards
 
     prune_jsonl_shards(

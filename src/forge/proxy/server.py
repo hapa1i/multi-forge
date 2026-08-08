@@ -220,43 +220,121 @@ def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) ->
         costs["caps"] = caps
 
 
-_audit_pruned = False
-_provider_traces_pruned = False
+_downstream_pruned = False
 _request_logs_pruned = False
+_downstream_retention_resolution: Any | None = None
+_downstream_prune_error: str | None = None
 
 
-def _maybe_prune_audit_logs() -> None:
-    """Enforce audit retention once per process (best-effort) once config is loaded."""
-    global _audit_pruned
-    if _audit_pruned:
+def _maybe_prune_downstream_records() -> None:
+    """Resolve and enforce the one downstream retention policy once per process."""
+    global _downstream_pruned, _downstream_prune_error, _downstream_retention_resolution
+    if _downstream_pruned:
         return
-    _audit_pruned = True
-    audit = getattr(config.proxy, "audit", None)
-    if audit is None:
-        return
+    _downstream_pruned = True
+
+    from forge.core.paths import get_forge_home
+    from forge.core.telemetry.downstream_retention import resolve_downstream_retention
+
     try:
-        from forge.proxy.audit_logger import prune_audit_logs
-
-        prune_audit_logs(retention_days=audit.retention_days, max_total_mb=audit.max_total_mb)
+        resolution = resolve_downstream_retention()
     except Exception as e:
-        logger.debug("audit prune skipped: %s", e)
-
-
-def _maybe_prune_provider_traces() -> None:
-    """Enforce provider-trace retention once per process (best-effort) once config is loaded."""
-    global _provider_traces_pruned
-    if _provider_traces_pruned:
+        _downstream_prune_error = f"could not resolve policy: {e}"
+        logger.warning(
+            "Downstream retention could not resolve a policy; automatic pruning was skipped for %s: %s",
+            get_forge_home() / "telemetry" / "downstream",
+            e,
+        )
         return
-    _provider_traces_pruned = True
-    pt = getattr(config.proxy, "provider_trace", None)
-    if pt is None:
+    _downstream_retention_resolution = resolution
+
+    if resolution.deprecated_keys:
+        rendered = ", ".join(
+            f"{item.proxy_id}:{item.key}->{item.replacement}" for item in resolution.deprecated_keys[:8]
+        )
+        suffix = f" (+{len(resolution.deprecated_keys) - 8} more)" if len(resolution.deprecated_keys) > 8 else ""
+        logger.warning(
+            "Deprecated proxy-local downstream retention keys detected: %s%s. "
+            "Run 'forge config migrate-retention' to preview the global migration.",
+            rendered,
+            suffix,
+        )
+
+    for error in resolution.errors:
+        logger.warning(
+            "Downstream retention input could not be inspected at %s: %s",
+            error.path,
+            error.detail,
+        )
+
+    if not resolution.pruning_enabled or resolution.effective is None:
+        proxy_ids = sorted(
+            {proxy_id for conflict in resolution.conflicts for item in conflict.values for proxy_id in item.proxy_ids}
+        )
+        conflict_detail = f" Conflicting proxy IDs: {', '.join(proxy_ids)}." if proxy_ids else ""
+        if resolution.errors:
+            recovery = "Repair the named global or proxy file, then retry migration."
+        else:
+            recovery = (
+                "Set telemetry.downstream.retention_days and telemetry.downstream.max_total_mb, "
+                "then run 'forge config migrate-retention'."
+            )
+        logger.warning(
+            "Downstream retention is degraded; automatic pruning was skipped.%s %s",
+            conflict_detail,
+            recovery,
+        )
         return
+
+    policy = resolution.effective
+    downstream_dir = get_forge_home() / "telemetry" / "downstream"
     try:
-        from forge.proxy.provider_trace_logger import prune_provider_traces
+        from forge.core.telemetry.downstream import prune_downstream_records
 
-        prune_provider_traces(retention_days=pt.retention_days, max_total_mb=pt.max_total_mb)
+        result = prune_downstream_records(
+            retention_days=policy.retention_days,
+            max_total_mb=policy.max_total_mb,
+        )
+        if result is not None and result.errors:
+            _downstream_prune_error = "; ".join(result.errors)
+            logger.warning(
+                "Downstream retention was only partially enforced for %s with retention_days=%s, max_total_mb=%s: %s",
+                downstream_dir,
+                policy.retention_days,
+                policy.max_total_mb,
+                _downstream_prune_error,
+            )
     except Exception as e:
-        logger.debug("provider trace prune skipped: %s", e)
+        _downstream_prune_error = str(e)
+        logger.warning(
+            "Downstream retention could not be enforced for %s with retention_days=%s, max_total_mb=%s: %s",
+            downstream_dir,
+            policy.retention_days,
+            policy.max_total_mb,
+            e,
+        )
+
+
+def _downstream_retention_status_section() -> tuple[dict[str, Any], bool]:
+    """Return the root-status payload and whether retention enforcement is degraded."""
+    section = (
+        _downstream_retention_resolution.to_dict()
+        if _downstream_retention_resolution is not None
+        else {
+            "configured": None,
+            "effective": None,
+            "source": None,
+            "pruning_enabled": False,
+            "degraded": True,
+            "deprecated_keys": [],
+            "conflicts": [],
+            "errors": [],
+        }
+    )
+    section["prune_error"] = _downstream_prune_error
+    degraded = not section["pruning_enabled"] or _downstream_prune_error is not None
+    section["degraded"] = degraded
+    return section, degraded
 
 
 def _maybe_prune_request_logs() -> None:
@@ -301,8 +379,7 @@ def _ensure_runtime_state() -> None:
         reload(proxy_id=PROXY_ID)
 
     _initialize_cost_tracker_from_config()
-    _maybe_prune_audit_logs()
-    _maybe_prune_provider_traces()
+    _maybe_prune_downstream_records()
     _maybe_prune_request_logs()
 
 
@@ -533,7 +610,9 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
     return fallback_model
 
 
-def _resolve_model_with_alternatives(request_data: MessagesRequest | TokenCountRequest) -> _ResolvedModelRoute:
+def _resolve_model_with_alternatives(
+    request_data: MessagesRequest | TokenCountRequest,
+) -> _ResolvedModelRoute:
     """Resolve request tier and backend model for message and token-count routes."""
     if request_data.has_explicit_tier and request_data.tier:
         resolved_tier: str = request_data.tier
@@ -1477,6 +1556,7 @@ async def root(request: Request):
     - tiers: Mapping of Claude tiers to actual models with context windows
     - proxy: First-class proxy identity (proxy_id, template, port, base_url)
     - runtime: Actual resolved tier → model mappings, context windows, llm defaults
+    - downstream_retention: Effective global policy plus migration/degraded status
 
     Note: Session state is no longer returned by proxy. Consumers should read
     session state locally via FORGE_SESSION env var or CWD manifest.
@@ -1595,7 +1675,9 @@ async def root(request: Request):
     _intercept_mode = _intercept_cfg.mode if _intercept_cfg is not None else "passthrough"
     _audit_cfg = getattr(config.proxy, "audit", None)
     intercept_section = build_intercept_capability_section(
-        _wire_shape, _intercept_mode, bool(getattr(_audit_cfg, "audit_full_body", False))
+        _wire_shape,
+        _intercept_mode,
+        bool(getattr(_audit_cfg, "audit_full_body", False)),
     )
     # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
     _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
@@ -1604,6 +1686,8 @@ async def root(request: Request):
     # proximity is attached under metrics.costs.caps when caps are configured.
     metrics_snapshot = proxy_metrics.snapshot()
     _attach_cap_summary(metrics_snapshot, cost_tracker)
+
+    retention_section, retention_degraded = _downstream_retention_status_section()
 
     response = {
         "is_proxy": True,
@@ -1616,12 +1700,13 @@ async def root(request: Request):
         "intercept": intercept_section,
         "capabilities": {"responses_ingress": _responses_ingress},
         "tiers": tiers,
-        "status": "running",
+        "status": "degraded" if retention_degraded else "running",
         "routing": routing_section,
         # Proxy identity (B2.1.5): first-class proxy identity
         "proxy": proxy_section,
         # Runtime truth: tier mappings, context windows, hyperparameter defaults
         "runtime": runtime_section,
+        "downstream_retention": retention_section,
         "metrics": metrics_snapshot,
     }
 
