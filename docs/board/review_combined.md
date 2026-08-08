@@ -35,8 +35,9 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1--3 are closed after all eight Wave 3
 members shipped through PR #142. Wave 4's four installer findings were rechecked on merged `main` at `2461e3fa` and
 converted into three parked members under
-[`epic_installer_transaction_safety`](todo/epic_installer_transaction_safety/card.md); no installer implementation is
-active.
+[`epic_installer_transaction_safety`](doing/epic_installer_transaction_safety/card.md); D013/D014 is implemented and
+verified, and independent review found no design violations; merge remains pending while the other two installer members
+stay parked.
 
 ### Finding fields
 
@@ -297,6 +298,13 @@ implementation outcome below records its completed code and regression work.
   before the shared launch seam. A marked fail-first regression, 12 focused CLI tests, all 23 Docker session lifecycle
   tests, 669 regressions, and final `make pre-commit` cover the boundary. It shipped in PR #142 (`2461e3fa`). See
   [`align_incognito_worktree_guard`](done/align_incognito_worktree_guard/card.md).
+- **D013 and D014 — implemented 2026-08-07; reviewed 2026-08-08:** enable/sync now retains an exact pre-write Codex
+  config snapshot through managed-block apply, registration read-back, and the final tracking commit. A failure restores
+  config bytes/mode or removes the newly created config together with settings ownership and new extension files.
+  Rollback preserves and reports a later edit instead of overwriting it. A marked fail-first regression covers both
+  fault points across missing, user-owned, and stale managed-block configs. Independent review found no design
+  violations and passed the 793-test install unit slice plus all 6 Docker Codex installer tests. See
+  [`rollback_codex_install_transaction`](doing/rollback_codex_install_transaction/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -501,7 +509,7 @@ well as creating the newer Forge-bearing backup. No implementation member was ac
 
 | Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                           |
 | ----- | --------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](todo/rollback_codex_install_transaction/card.md)   |
+| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](doing/rollback_codex_install_transaction/card.md)  |
 | 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](todo/preserve_install_settings_baseline/card.md)   |
 | 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](todo/preserve_legacy_settings_user_edits/card.md) |
 
@@ -519,9 +527,9 @@ HIGH-severity baseline invariant; D019's bounded no-sidecar compatibility path s
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](done/epic_session_durable_state_safety/card.md):** all eight Wave 3 members shipped
   independently in PRs #134--#138 and #140--#142.
-- **[Installer epic](todo/epic_installer_transaction_safety/card.md):** D013/D014 share one Codex rollback transaction;
-  D012 and D019 remain separate settings-baseline and legacy-value members. All three are parked pending admission
-  review.
+- **[Installer epic](doing/epic_installer_transaction_safety/card.md):** D013/D014's shared Codex rollback transaction
+  is implemented, verified, and independently reviewed pending merge; D012 and D019 remain parked as separate
+  settings-baseline and legacy-value members.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit
   status, result-on-stdout, and diagnostics-on-stderr across accepted members.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol

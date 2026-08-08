@@ -1089,7 +1089,10 @@ fields; dropping owner pairs prevents sync resurrection. Partial removal retains
 coverage includes them and deletes the row. `profile` stays historical.
 
 All file, settings/sidecar, Codex-scope, and marker checks preflight before mutation; filesystem work precedes atomic
-tracking. Later failure commits a coherent completed subset. A failed reconciliation leaves the old safe over-claim;
+tracking. Enable/sync snapshots settings ownership and the exact bytes/mode of any Codex config it will change. A Codex
+apply/read-back or final tracking failure restores those snapshots and newly created files; if the config changed again
+after Forge wrote it, rollback preserves that newer state and names the incomplete path instead of overwriting it. A
+runtime-removal failure commits a coherent completed subset. A failed reconciliation leaves the old safe over-claim;
 landed settings restore first, and errors name tracking plus incomplete rollback paths.
 
 `disable --all` aggregates every row and exits 1 on any failure. Setup uninstall deletes `$FORGE_HOME` only after
@@ -1248,8 +1251,10 @@ migration. It installs the user block only after migrating project Codex state a
 
 Mechanics (`src/forge/install/codex_hooks.py`):
 
-- **Managed block:** append/replace only Forge's block; validate, back up, and atomically preserve mode. Disable removes
-  only that block and deletes a whitespace-only file.
+- **Managed block:** append/replace only Forge's block; validate, back up, and atomically preserve mode. Enable/sync
+  keeps the pre-write bytes/mode until registration read-back and tracking commit; failure restores them or removes a
+  config created by that attempt, unless a later edit makes rollback fail visibly. Disable removes only that block and
+  deletes a whitespace-only file.
 - **Stable trust bytes:** golden-pinned entry bytes define Codex enrollment.
 - **Manual dedupe:** all commands outside markers skips untracked; a partial set conflicts.
 - **Best effort:** missing Codex or config conflict visibly skips without blocking Claude.

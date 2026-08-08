@@ -80,4 +80,4 @@ All eight members shipped independently with marked regressions and the required
 ledger, member cards, normative design, and end-user documentation record the final unreadable-state, manifest-shape,
 runtime-identity, missing-worktree, terminal-delete, newer-schema, transfer-strategy, and worktree-guard contracts. Wave
 4 is coordinated separately by
-[`epic_installer_transaction_safety`](../../todo/epic_installer_transaction_safety/card.md).
+[`epic_installer_transaction_safety`](../../doing/epic_installer_transaction_safety/card.md).

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import tomllib
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -14,6 +16,7 @@ from forge.install.codex_hooks import (
     CODEX_HOOK_EVENTS,
     CodexHookEntry,
     apply_codex_merge,
+    apply_codex_merge_transaction,
     apply_codex_runtime_remove,
     backup_codex_config,
     codex_registration_key,
@@ -26,6 +29,7 @@ from forge.install.codex_hooks import (
     read_codex_registration,
     remove_codex_block,
     render_codex_block,
+    restore_codex_config_rollback_state,
     validate_codex_events,
 )
 from forge.install.exceptions import ForgeInstallError
@@ -255,6 +259,67 @@ class TestApplyMerge:
         before = config.read_text()
         assert apply_codex_merge(config, _entries()) is None
         assert config.read_text() == before
+
+    def test_transaction_skip_has_no_rollback_state(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        apply_codex_merge(config, _entries())
+
+        result = apply_codex_merge_transaction(config, _entries())
+
+        assert result.backup_path is None
+        assert result.rollback_state is None
+
+    @pytest.mark.parametrize("existed", [False, True], ids=["missing", "existing"])
+    def test_transaction_rollback_restores_exact_config(self, tmp_path: Path, existed: bool) -> None:
+        config = tmp_path / "config.toml"
+        original = USER_CONTENT.encode() if existed else None
+        if original is not None:
+            config.write_bytes(original)
+            config.chmod(0o640)
+
+        result = apply_codex_merge_transaction(config, _entries())
+        assert result.rollback_state is not None
+
+        assert restore_codex_config_rollback_state(result.rollback_state) == []
+        if original is None:
+            assert not config.exists()
+        else:
+            assert config.read_bytes() == original
+            assert config.stat().st_mode & 0o777 == 0o640
+
+    def test_transaction_rollback_preserves_a_later_user_edit(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        config.write_text(USER_CONTENT)
+        result = apply_codex_merge_transaction(config, _entries())
+        assert result.rollback_state is not None
+        config.write_text(config.read_text() + "\nuser_after_forge = true\n")
+        changed = config.read_bytes()
+
+        failures = restore_codex_config_rollback_state(result.rollback_state)
+
+        assert failures == [f"Codex config '{config}' changed after Forge wrote it"]
+        assert config.read_bytes() == changed
+
+    def test_transaction_rollback_preserves_config_when_applied_mode_is_unknown(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        config.write_text(USER_CONTENT)
+        result = apply_codex_merge_transaction(config, _entries())
+        assert result.rollback_state is not None
+        applied = config.read_bytes()
+
+        failures = restore_codex_config_rollback_state(replace(result.rollback_state, applied_mode=None))
+
+        assert failures == [f"Codex config '{config}' changed after Forge wrote it"]
+        assert config.read_bytes() == applied
+
+    def test_compatibility_apply_preserves_oserror_boundary(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+
+        with (
+            patch("forge.install.codex_hooks.atomic_write_text", side_effect=OSError("disk full")),
+            pytest.raises(OSError, match="disk full"),
+        ):
+            apply_codex_merge(config, _entries())
 
     def test_update_replaces_block_in_place(self, tmp_path: Path) -> None:
         config = tmp_path / "config.toml"

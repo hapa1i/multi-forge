@@ -28,12 +28,15 @@ from forge.core.state import StateError, now_iso
 from forge.session.claude.paths import get_claude_home
 
 from .codex_hooks import (
-    apply_codex_merge,
+    CodexConfigRollbackState,
+    CodexMergeMutationError,
+    apply_codex_merge_transaction,
     get_builtin_codex_entries,
     get_codex_config_path,
     plan_codex_merge,
     read_codex_registration,
     remove_codex_block,
+    restore_codex_config_rollback_state,
 )
 from .exceptions import (
     CodexConfigScopeMismatchError,
@@ -142,6 +145,16 @@ _EXTENSION_MODULE_NAMES = ("skills", "agents", "commands")
 _INVALID_SKILL_PACKAGE_RECOVERY = (
     "Remove the unexpected package entry or repair the invalid tracking row before sync or disable."
 )
+
+
+class _CodexExecutionError(Exception):
+    """Codex mutation/read-back failure carrying any state that must roll back."""
+
+    def __init__(self, message: str, cause: OSError, rollback_state: CodexConfigRollbackState | None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.cause = cause
+        self.rollback_state = rollback_state
 
 
 def get_forge_source_root() -> Path:
@@ -1372,43 +1385,57 @@ class Installer:
             commands=commands,
         )
 
-    def _execute_codex(self, codex_plan: CodexPlan | None) -> tuple[str | None, list[str]] | None:
-        """Execute the planned Codex merge; return fresh tracking fields.
+    def _execute_codex(
+        self,
+        codex_plan: CodexPlan | None,
+    ) -> tuple[tuple[str | None, list[str]] | None, CodexConfigRollbackState | None]:
+        """Execute the planned Codex merge; return tracking and rollback state.
 
-        Returns (codex_config_path, codex_commands) read back from disk after
-        a resolved outcome -- where (None, []) legitimately means "nothing
-        Forge-owned on disk" (skip due to a manual registration: ownership
-        transferred to the user). Returns None when the merge could NOT act
-        (module not selected, no codex binary, conflict, apply failure):
-        there is no authoritative read, so the caller must keep its previous
-        tracking -- a managed block written by an earlier enable may still be
-        on disk and disable must keep knowing about it. Apply failures
-        degrade to a warning recorded on the plan (best-effort module; never
-        fails the install).
+        Returns ``(tracking_result, rollback_state)``. A resolved tracking
+        result is ``(codex_config_path, codex_commands)`` read back from disk;
+        ``(None, [])`` means a manual registration left nothing Forge-owned.
+        A ``None`` tracking result means the module was omitted, Codex was
+        unavailable, or a conflict prevented action. With no authoritative
+        read, the caller keeps previous tracking because a prior managed block
+        may still be on disk. Planned/apply-time conflicts remain best-effort;
+        unexpected filesystem failures carry config state to roll back.
         """
         if codex_plan is None or codex_plan.action == "unavailable" or codex_plan.config_path is None:
-            return None
+            return None, None
         if codex_plan.action == "conflict":
             logger.warning("Codex hook registration skipped: %s", codex_plan.reason)
-            return None
+            return None, None
 
         entries = get_builtin_codex_entries()
         config_path = Path(codex_plan.config_path)
+        rollback_state: CodexConfigRollbackState | None = None
         if codex_plan.action in ("install", "update"):
             try:
-                apply_codex_merge(config_path, entries)
+                merge_result = apply_codex_merge_transaction(config_path, entries)
+            except CodexMergeMutationError as e:
+                raise _CodexExecutionError(
+                    "Failed to apply Codex hook registration",
+                    e.cause,
+                    e.rollback_state,
+                ) from e
             except ForgeInstallError as e:
                 # Race between plan and apply (config changed under us).
                 logger.warning("Codex hook registration skipped: %s", e)
                 codex_plan.action = "conflict"
                 codex_plan.reason = str(e)
-                return None
+                return None, None
+            except OSError as e:
+                raise _CodexExecutionError("Failed to apply Codex hook registration", e, None) from e
+            rollback_state = merge_result.rollback_state
 
-        status = read_codex_registration(config_path, entries)
+        try:
+            status = read_codex_registration(config_path, entries)
+        except OSError as e:
+            raise _CodexExecutionError("Failed to verify Codex hook registration", e, rollback_state) from e
         if status.block_present:
-            return (str(config_path), list(status.commands_registered))
+            return (str(config_path), list(status.commands_registered)), rollback_state
         # skip due to manual registration: user-owned, not tracked
-        return (None, [])
+        return (None, []), rollback_state
 
     def _plan_file(
         self,
@@ -1959,12 +1986,22 @@ class Installer:
                         # Keep existing tracked file that was skipped (source still exists)
                         final_files.append(existing_file)
 
-        codex_result = self._execute_codex(plan.codex)
+        try:
+            codex_result, codex_rollback_state = self._execute_codex(plan.codex)
+        except _CodexExecutionError as e:
+            self._raise_post_file_failure(
+                e.message,
+                e.cause,
+                newly_created_files,
+                plan,
+                settings_rollback_state=settings_rollback_state,
+                codex_rollback_state=e.rollback_state,
+            )
         if codex_result is not None:
             codex_path, codex_commands = codex_result
         elif existing is not None:
             # No authoritative outcome (module not selected, codex binary
-            # unavailable, conflict, or apply failure): preserve prior
+            # unavailable, or planned/apply-time conflict): preserve prior
             # tracking -- the previously written managed block may still be
             # on disk and disable must keep knowing to remove it.
             codex_path = existing.codex_config_path
@@ -2043,6 +2080,7 @@ class Installer:
                 newly_created_files,
                 plan,
                 settings_rollback_state=settings_rollback_state,
+                codex_rollback_state=codex_rollback_state,
             )
 
         return plan
@@ -2056,6 +2094,7 @@ class Installer:
         *,
         unrecorded_targets: tuple[Path, ...] = (),
         settings_rollback_state: _SettingsRollbackState | None = None,
+        codex_rollback_state: CodexConfigRollbackState | None = None,
     ) -> NoReturn:
         rollback_failures = self._rollback_newly_created_files(
             newly_created_files,
@@ -2064,15 +2103,18 @@ class Installer:
         )
         if settings_rollback_state is not None:
             rollback_failures.extend(restore_settings_rollback_state(settings_rollback_state))
+        if codex_rollback_state is not None:
+            rollback_failures.extend(restore_codex_config_rollback_state(codex_rollback_state))
+        rolled_back = ["Newly created extension files"]
+        if settings_rollback_state is not None:
+            rolled_back.append("settings ownership state")
+        if codex_rollback_state is not None:
+            rolled_back.append("Codex config")
         rollback_note = (
-            f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
+            f" Could not roll back: {', '.join(rollback_failures)}; inspect and restore those paths before retrying."
             if rollback_failures
-            else (
-                " Newly created extension files and settings ownership state were rolled back; "
-                "rerun the same command after repairing the failure."
-                if settings_rollback_state is not None
-                else " Newly created extension files were rolled back; rerun the same command after repairing the failure."
-            )
+            else f" {' and '.join(rolled_back)} were rolled back; "
+            "rerun the same command after repairing the failure."
         )
         raise ForgeInstallError(f"{message}: {cause}.{rollback_note}") from cause
 

@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--3 are closed. Wave 4's four installer findings were reproduced on merged `main` at `2461e3fa` and sequenced
-into three parked members; no installer implementation member is active.
+Waves 1--3 are closed. Wave 4's D013/D014 implementation is verified and independently reviewed pending merge; D012 and
+D019 remain parked.
 
 ## Goal
 
@@ -65,9 +65,10 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 closed through
 [`epic_session_durable_state_safety`](../../done/epic_session_durable_state_safety/card.md) after all eight members
-shipped in PRs #134--#138 and #140--#142. Wave 4 is parked under
-[`epic_installer_transaction_safety`](../../todo/epic_installer_transaction_safety/card.md) as three independently
-reviewable members; the admission record must merge before the first one activates.
+shipped in PRs #134--#138 and #140--#142. Wave 4 is coordinated under
+[`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md) as three independently reviewable
+members; D013/D014 is implemented, verified, and independently reviewed after the admission record merged in PR #143,
+with merge still required before D012 activates.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -86,7 +87,7 @@ reviewable members; the admission record must merge before the first one activat
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
 | 3    | D022            | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               |
 | 3    | D010            | [`align_incognito_worktree_guard`](../../done/align_incognito_worktree_guard/card.md)                               |
-| 4    | D013–D014       | [`rollback_codex_install_transaction`](../../todo/rollback_codex_install_transaction/card.md)                       |
+| 4    | D013–D014       | [`rollback_codex_install_transaction`](../rollback_codex_install_transaction/card.md)                               |
 | 4    | D012            | [`preserve_install_settings_baseline`](../../todo/preserve_install_settings_baseline/card.md)                       |
 | 4    | D019            | [`preserve_legacy_settings_user_edits`](../../todo/preserve_legacy_settings_user_edits/card.md)                     |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                       |
