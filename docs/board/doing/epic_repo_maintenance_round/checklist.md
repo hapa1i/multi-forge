@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: independently review and merge D019 as the final Wave 4 member.
+Current focus: review and merge the Wave 5 admission record without activating D015.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -77,8 +77,15 @@ Current focus: independently review and merge D019 as the final Wave 4 member.
 - [x] Merge D012 before activating D019 (PR #145, `f069226f`).
 - [x] Activate D019 from merged `main` at `f069226f` and create its execution checklist.
 - [x] Retain D019's unconditional scalar/env deletion regression and implement value-aware legacy removal.
-- [ ] Verify and independently review D019, then close the Wave 4 child epic after merge.
-- [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
-- [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
+- [x] Independently review D019 with no findings and merge it (PR #146, `3f3a3c6d`).
+- [x] Close the Wave 4 child epic after synchronizing its three shipped members and inbound links.
+- [x] Recheck the seven remaining Wave 5 HIGH findings on merged `main` (7 disposable broken-behavior characterizations
+  passed on `3f3a3c6d`; O003 was already shipped in Wave 3).
+- [x] Sequence Wave 5 into seven parked members under `epic_cli_proxy_runtime_correctness` without activating
+  implementation.
+- [x] Run Wave 5 admission Markdown, relative-link, stale-lane, change-log size, and diff checks.
+- [ ] Review and merge the Wave 5 admission record before activating D015.
+- [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
+  activating their implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -79,5 +79,4 @@ members follow the HIGH-severity set; D021 explicitly depends on D011's unreadab
 All eight members shipped independently with marked regressions and the required integration coverage. The review
 ledger, member cards, normative design, and end-user documentation record the final unreadable-state, manifest-shape,
 runtime-identity, missing-worktree, terminal-delete, newer-schema, transfer-strategy, and worktree-guard contracts. Wave
-4 is coordinated separately by
-[`epic_installer_transaction_safety`](../../doing/epic_installer_transaction_safety/card.md).
+4 closed separately under [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
