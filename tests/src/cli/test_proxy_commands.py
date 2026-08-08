@@ -970,6 +970,111 @@ tiers:
         registry = ProxyRegistryStore().read()
         assert "dir-fail" in registry.proxies
 
+    def test_delete_restores_stopped_ownership_when_directory_delete_fails_after_kill(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A post-stop filesystem failure must restore truthful, actionable ownership."""
+        proxy_file = _create_proxy_file(
+            temp_env,
+            "dir-fail-after-stop",
+            "template: litellm-openai\nport: 8085\n",
+        )
+        _create_proxy_registry_from_entries(
+            {
+                "dir-fail-after-stop": ProxyEntry(
+                    proxy_id="dir-fail-after-stop",
+                    template="litellm-openai",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                    pid=4242,
+                    status="healthy",
+                )
+            }
+        )
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+        killed_pids: list[int] = []
+        monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: killed_pids.append(pid))
+
+        def fail_rmtree(path: Path) -> None:
+            raise OSError("permission denied")
+
+        monkeypatch.setattr("forge.cli.proxy.shutil.rmtree", fail_rmtree)
+
+        result = runner.invoke(main, ["proxy", "delete", "dir-fail-after-stop", "--yes"])
+
+        assert result.exit_code == 1
+        assert killed_pids == [4242]
+        assert proxy_file.exists()
+        assert "Deleted" not in result.output
+        restored = ProxyRegistryStore().read().proxies["dir-fail-after-stop"]
+        assert restored.pid is None
+        assert restored.status == "stopped"
+
+    def test_delete_managed_stop_failure_retains_registry_and_config(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proxy_file = _create_proxy_file(
+            temp_env,
+            "managed-stop-fail",
+            "template: litellm-openai\nport: 8085\n",
+        )
+        entry = ProxyEntry(
+            proxy_id="managed-stop-fail",
+            template="litellm-openai",
+            base_url="http://localhost:8085",
+            port=8085,
+            pid=4242,
+            status="healthy",
+        )
+        _create_proxy_registry_from_entries({entry.proxy_id: entry})
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+
+        def deny_kill(pid: int, sig: int) -> None:
+            raise PermissionError("operation not permitted")
+
+        monkeypatch.setattr("forge.cli.proxy.os.kill", deny_kill)
+
+        result = runner.invoke(main, ["proxy", "delete", entry.proxy_id, "--yes"])
+
+        assert result.exit_code == 1
+        assert "Could not stop server" in result.stderr
+        assert "configuration was preserved" in result.stderr
+        assert f"forge proxy delete {entry.proxy_id}" in result.stderr
+        assert "Deleted" not in result.output
+        assert proxy_file.exists()
+        assert ProxyRegistryStore().read().proxies[entry.proxy_id] == entry
+
+    def test_delete_managed_process_race_removes_stale_ownership(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proxy_file = _create_proxy_file(
+            temp_env,
+            "managed-process-race",
+            "template: litellm-openai\nport: 8085\n",
+        )
+        entry = ProxyEntry(
+            proxy_id="managed-process-race",
+            template="litellm-openai",
+            base_url="http://localhost:8085",
+            port=8085,
+            pid=4242,
+            status="healthy",
+        )
+        _create_proxy_registry_from_entries({entry.proxy_id: entry})
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+
+        def process_disappeared(pid: int, sig: int) -> None:
+            raise ProcessLookupError("process disappeared")
+
+        monkeypatch.setattr("forge.cli.proxy.os.kill", process_disappeared)
+
+        result = runner.invoke(main, ["proxy", "delete", entry.proxy_id, "--yes"])
+
+        assert result.exit_code == 0
+        assert "Deleted" in result.output
+        assert not proxy_file.exists()
+        assert entry.proxy_id not in ProxyRegistryStore().read().proxies
+
     def test_delete_no_warning_for_intent_only_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """Delete does NOT warn for sessions that only share base_url via intent.
 
@@ -1524,6 +1629,38 @@ tiers:
         assert "not found" in result.output
         assert "1 deleted" in result.output
         assert "1 failed" in result.output
+
+    def test_delete_stop_failure_continues_other_targets(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._setup_proxies(temp_env, "stop-fail", "healthy")
+        store = ProxyRegistryStore()
+        registry = store.read()
+        registry.proxies["stop-fail"].pid = 4101
+        registry.proxies["healthy"].pid = 4102
+        store.write(registry)
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+        killed_pids: list[int] = []
+
+        def selective_kill(pid: int, sig: int) -> None:
+            if pid == 4101:
+                raise PermissionError("operation not permitted")
+            killed_pids.append(pid)
+
+        monkeypatch.setattr("forge.cli.proxy.os.kill", selective_kill)
+
+        result = runner.invoke(main, ["proxy", "delete", "stop-fail", "healthy", "--yes"])
+
+        assert result.exit_code == 1
+        assert killed_pids == [4102]
+        remaining = store.read().proxies
+        assert "stop-fail" in remaining
+        assert "healthy" not in remaining
+        assert (Path(os.environ["FORGE_HOME"]) / "proxies" / "stop-fail" / "proxy.yaml").exists()
+        assert not (Path(os.environ["FORGE_HOME"]) / "proxies" / "healthy").exists()
+        assert "Deleted proxy 'stop-fail'" not in result.output
+        assert "Deleted proxy 'healthy'" in result.output
+        assert "Summary: 1 deleted, 1 failed" in result.output
 
     def test_delete_all_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
         """--all without --yes should prompt with proxy list."""
@@ -2175,6 +2312,7 @@ class TestDeleteAdoptedProxy:
         FORGE_HOME. Port discovery may find a real listener, but the health
         check must also match the expected proxy_id before we signal it.
         """
+        proxy_file = _create_proxy_file(temp_env, "adopted", "template: litellm-openai\nport: 8085\n")
         _create_proxy_registry_from_entries(
             {
                 "adopted": ProxyEntry(
@@ -2210,9 +2348,12 @@ class TestDeleteAdoptedProxy:
 
         result = runner.invoke(main, ["proxy", "delete", "adopted", "--yes", "--kill-adopted"])
 
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert killed_pids == []
-        assert "doesn't match proxy 'adopted'" in result.output
+        assert "doesn't match proxy 'adopted'" in result.stderr
+        assert "Deleted" not in result.output
+        assert proxy_file.exists()
+        assert "adopted" in ProxyRegistryStore().read().proxies
 
     def test_delete_no_kill_flag_skips_termination(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -2340,6 +2481,67 @@ class TestStopAdoptedProxy:
         registry = store.read()
         assert registry.proxies["managed-dead"].status == "stopped"
         assert registry.proxies["managed-dead"].pid is None
+
+    def test_stop_managed_permission_failure_exits_nonzero_and_retains_ownership(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        proxy_file = _create_proxy_file(temp_env, "managed", "template: litellm-openai\nport: 8085\n")
+        entry = ProxyEntry(
+            proxy_id="managed",
+            template="litellm-openai",
+            base_url="http://localhost:8085",
+            port=8085,
+            pid=4242,
+            status="healthy",
+        )
+        _create_proxy_registry_from_entries({entry.proxy_id: entry})
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+
+        def fail_kill(pid: int, sig: int) -> None:
+            raise PermissionError("operation not permitted")
+
+        monkeypatch.setattr("forge.cli.proxy.os.kill", fail_kill)
+
+        result = runner.invoke(main, ["proxy", "stop", entry.proxy_id])
+
+        assert result.exit_code == 1
+        assert "Could not stop server" in result.stderr
+        assert "configuration was preserved" in result.stderr
+        assert f"forge proxy stop {entry.proxy_id}" in result.stderr
+        assert "Stopped server for" not in result.output
+        assert proxy_file.exists()
+        assert ProxyRegistryStore().read().proxies[entry.proxy_id] == entry
+
+    def test_stop_managed_process_race_clears_stale_ownership(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _create_proxy_file(temp_env, "managed", "template: litellm-openai\nport: 8085\n")
+        entry = ProxyEntry(
+            proxy_id="managed",
+            template="litellm-openai",
+            base_url="http://localhost:8085",
+            port=8085,
+            pid=4242,
+            status="healthy",
+        )
+        _create_proxy_registry_from_entries({entry.proxy_id: entry})
+        monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
+
+        def process_disappeared(pid: int, sig: int) -> None:
+            raise ProcessLookupError("process disappeared")
+
+        monkeypatch.setattr("forge.cli.proxy.os.kill", process_disappeared)
+
+        result = runner.invoke(main, ["proxy", "stop", entry.proxy_id])
+
+        assert result.exit_code == 0
+        assert "Cleared" in result.output
+        cleared = ProxyRegistryStore().read().proxies[entry.proxy_id]
+        assert cleared.pid is None
+        assert cleared.status == "stopped"
 
     def test_stop_shared_port_refuses_without_force(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch

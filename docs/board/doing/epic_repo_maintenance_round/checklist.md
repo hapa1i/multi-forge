@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: execute D015 as the first bounded Wave 5 member; later members remain parked.
+Current focus: execute O002 as the second bounded Wave 5 member; later members remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -87,7 +87,9 @@ Current focus: execute D015 as the first bounded Wave 5 member; later members re
 - [x] Review and merge the Wave 5 admission record before activating D015 (PR #147, `92b981a5`).
 - [x] Start `fix/unify-downstream-retention`, move the Wave 5 child epic and D015 to `doing/`, create their checklists,
   and repoint inbound links.
-- [ ] Implement, independently review, and merge D015 before activating O002.
+- [x] Implement, independently review, and merge D015 before activating O002 (PR #148, `8b997e6a`).
+- [x] Activate O002 from merged `main`, close D015, and create the O002 execution checklist.
+- [ ] Implement, independently review, and merge O002 before activating D016.
 - [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
   activating their implementation cards.
 

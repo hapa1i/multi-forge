@@ -1,11 +1,10 @@
 # Unify downstream telemetry retention ownership
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
-**Decision**: [`downstream_retention_ownership`](../../done/downstream_retention_ownership/card.md) (DG3; D015).
+**Decision**: [`downstream_retention_ownership`](../downstream_retention_ownership/card.md) (DG3; D015).
 
-**Lane**: `doing/` -- active on `fix/unify-downstream-retention` after the admission record merged in PR #147
-(`92b981a5`).
+**Lane**: `done/` -- shipped in PR #148 (`8b997e6a`) after independent review.
 
 ## Goal
 

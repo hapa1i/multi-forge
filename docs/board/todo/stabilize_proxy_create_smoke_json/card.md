@@ -4,7 +4,7 @@
 
 **Finding**: D016 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind D015 and O002.
+**Lane**: `todo/` -- accepted Wave 5 member, parked behind active O002.
 
 ## Goal
 

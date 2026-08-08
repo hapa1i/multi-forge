@@ -275,8 +275,8 @@ registered policy check; auxiliary-consumer lanes freeze at first real dispatch.
 | `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
 | `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
 | `forge proxy start <id>`             | Start server for existing proxy                         |
-| `forge proxy stop <id>`              | Stop server (keeps config)                              |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
+| `forge proxy stop <id>`              | Stop server; retain ownership on failure                |
+| `forge proxy delete <id>...`         | Stop then delete; retain last ownership if stop fails   |
 | `forge proxy validate <id>`          | Validate proxy configuration                            |
 | `forge proxy metrics [id]`           | Show runtime metrics (`--json`; aggregates all when >1) |
 | `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
@@ -285,6 +285,12 @@ registered policy check; auxiliary-consumer lanes freeze at first real dispatch.
 | `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
 | `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
 | `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
+
+`proxy stop` exits non-zero without clearing its registry row when termination is refused or fails. `proxy delete`
+removes a last live registry/config owner only after its required stop succeeds; a stop failure omits the `Deleted`
+claim. Default adopted detach, `delete --no-kill`, and deletion of one live shared-port alias intentionally leave the
+process running and succeed. Multi-delete continues other IDs, reports deleted/failed totals, and exits non-zero if any
+required stop fails.
 
 ### Telemetry
 

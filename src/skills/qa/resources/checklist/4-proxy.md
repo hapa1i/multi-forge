@@ -581,4 +581,42 @@ forge proxy delete retention-degraded-qa --yes
 - [ ] Runtime truth reports top-level `status: degraded` and names `retention-degraded-qa` in the nested conflicts
 - [ ] The disposable degraded proxy stops and deletes cleanly
 
+### 4.23 Stop Failure Retains Proxy Ownership
+
+<!-- prereq: 4.2 -->
+
+<!-- auto -->
+
+Use a foreign HTTP listener to force the adopted-process identity guard. The failed required stop must leave every
+recovery surface intact.
+
+```bash
+forge proxy delete ownership-failure-qa --yes --no-kill 2>/dev/null || true
+python3 -m http.server 18201 >/tmp/forge-ownership-failure.log 2>&1 &
+FOREIGN_PID=$!
+for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:18201/ >/dev/null && break; sleep 0.1; done
+curl --fail --silent http://127.0.0.1:18201/ >/dev/null
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name ownership-failure-qa --port 18201 --no-start
+
+set +e
+forge proxy delete ownership-failure-qa --yes --kill-adopted \
+  >/tmp/forge-ownership-delete.stdout 2>/tmp/forge-ownership-delete.stderr
+DELETE_EXIT=$?
+set -e
+
+test "$DELETE_EXIT" -ne 0
+grep "refusing to stop" /tmp/forge-ownership-delete.stderr
+! grep "Deleted" /tmp/forge-ownership-delete.stdout
+kill -0 "$FOREIGN_PID"
+forge proxy show ownership-failure-qa --raw
+
+kill "$FOREIGN_PID"
+forge proxy delete ownership-failure-qa --yes --no-kill
+```
+
+- [ ] The identity-refused delete exits non-zero
+- [ ] The diagnostic is on stderr and stdout does not claim `Deleted`
+- [ ] The foreign listener remains alive after the refused stop
+- [ ] The retained proxy remains readable and can be deleted after the listener stops
+
 ---

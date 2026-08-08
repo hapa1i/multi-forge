@@ -183,7 +183,7 @@ forge proxy template reset <name># Reset to built-in default
 # Create / start
 forge proxy create <template> [--name <id>] [--no-start]
 forge proxy start <proxy_id> [--smoke-test]
-forge proxy stop <proxy_id>
+forge proxy stop <proxy_id> [--force] [--kill-adopted]
 
 # Show / list
 forge proxy show <proxy_id>      # Full proxy configuration
@@ -194,7 +194,7 @@ forge proxy edit <proxy_id>      # Open in $EDITOR
 forge proxy set <proxy_id> <key>=<value>
 
 # Delete
-forge proxy delete <proxy_id> [--yes] [--kill-adopted]
+forge proxy delete <proxy_id>... [--yes] [--kill-adopted] [--no-kill]
 
 # Metrics
 forge proxy metrics [proxy_id]   # Runtime metrics (tokens, latency, failures); aggregates all when >1
@@ -206,6 +206,12 @@ forge proxy validate <proxy_id>  # Validate config
 
 Stale proxies (dead PIDs) are pruned automatically by `forge proxy list`, `create`, and `start`; `forge clean` removes
 them globally.
+
+**Ownership is retained on stop failure.** `stop` exits non-zero and leaves the registry row/config available when
+termination is refused or fails. `delete` removes the last live owner only after its required stop succeeds, so
+rerunning the command remains possible and failure never prints `Deleted`. Deleting a shared-port alias,
+default-detaching an adopted process, or using `--no-kill` intentionally leaves the process alive and succeeds.
+Multi-delete continues other targets, then exits non-zero if any required stop failed.
 
 **Auto-start from a template.** `--proxy` (on `forge session start/resume/fork` and `forge claude start`) and
 `--supervisor-proxy` (on `forge session start/fork` and `forge policy supervisor set`) accept a **template name** as
@@ -390,7 +396,10 @@ user-supplied `-m`/`--model` overrides the proxy default model.
 forge proxy delete <proxy_id>
 ```
 
-Stops the proxy and cleans up registry entries and overlay files.
+Stops the proxy and then removes its registry entry and overlay. If a required stop is refused or fails, the command
+exits non-zero and preserves both ownership records; it does not print `Deleted`. Deleting one of several live same-port
+aliases keeps the shared process running. Use `--no-kill` for an explicit detach, or `--kill-adopted` only when Forge
+may terminate an adopted process after verifying its identity.
 
 ### Other commands
 

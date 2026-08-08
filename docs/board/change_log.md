@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-08
 
+### Unify downstream retention ownership
+
+**Goal/outcome**: Give shared downstream telemetry one global retention policy and one startup pruner without silently
+choosing among conflicting legacy proxy policies.
+
+**Key changes**:
+
+- Added runtime-owned `telemetry.downstream` policy resolution, fail-closed legacy conflict handling, one post-cap
+  startup prune, and current-UTC-month shard preservation.
+- Added preview-first migration, effective/source/conflict/deprecation status, and explicit guidance for the bounded
+  multi-sidecar compatibility limitation.
+
+**Verification**: The retained D015 regression reached the dual-pruner failure on `92b981a5`. After implementation,
+8,884 unit tests (one skip), 684 regressions, the targeted Docker retention integration, final pre-commit, wheel build,
+and independent review passed. Shipped in PR #148 (`8b997e6a`).
+
 ### Close installer safety and sequence CLI/proxy correctness
 
 **Goal/outcome**: Close Wave 4 after D019 shipped and admit the seven remaining Wave 5 HIGH findings as separate parked

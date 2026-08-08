@@ -352,6 +352,55 @@ tiers:
         registry = json.loads(check.stdout)
         assert "delete-me" not in registry["proxies"]
 
+    def test_delete_last_managed_proxy_stops_process_and_removes_ownership(
+        self, mock_claude_workspace: ContainerLike
+    ) -> None:
+        """The last managed owner is removed only after its real process can be stopped."""
+        proxy_yaml = """\
+template: litellm-openai
+provider: litellm
+proxy_endpoint: http://localhost:8085
+port: 8085
+upstream_base_url: https://litellm.test.example.com
+tiers:
+  haiku: gpt-4o-mini
+"""
+        self._create_proxy_file(mock_claude_workspace, "managed-delete", proxy_yaml)
+        pid_result = mock_claude_workspace.exec(
+            'bash -c \'trap "touch /tmp/managed-delete-stopped; exit 0" TERM; '
+            "while true; do sleep 1; done' >/tmp/managed-delete.log 2>&1 & echo $!"
+        )
+        assert pid_result.returncode == 0
+        managed_pid = int(pid_result.stdout.strip())
+        self._create_registry(
+            mock_claude_workspace,
+            {
+                "managed-delete": {
+                    "proxy_id": "managed-delete",
+                    "template": "litellm-openai",
+                    "base_url": "http://localhost:8085",
+                    "port": 8085,
+                    "pid": managed_pid,
+                    "status": "healthy",
+                }
+            },
+        )
+
+        try:
+            result = mock_claude_workspace.exec("forge proxy delete managed-delete --yes")
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "Deleted" in result.stdout
+            stopped = mock_claude_workspace.exec(
+                "for i in $(seq 1 30); do test -f /tmp/managed-delete-stopped && exit 0; sleep 0.1; done; exit 1"
+            )
+            assert stopped.returncode == 0, "managed process did not observe SIGTERM"
+            assert not mock_claude_workspace.file_exists("$HOME/.forge/proxies/managed-delete/proxy.yaml")
+            registry = json.loads(mock_claude_workspace.read_file("$HOME/.forge/proxies/index.json"))
+            assert "managed-delete" not in registry["proxies"]
+        finally:
+            mock_claude_workspace.exec(f"kill {managed_pid} 2>/dev/null || true")
+
     def test_delete_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
         """Should error when proxy not in registry."""
         result = mock_claude_workspace.exec("forge proxy delete nonexistent --yes")

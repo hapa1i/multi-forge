@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active Wave 5 coordination; D015 is in flight and the other six members remain parked.
+**Lane**: `doing/` -- active Wave 5 coordination; D015 shipped in PR #148, O002 is active, and five members remain
+parked.
 
 ## Goal
 
@@ -42,15 +43,15 @@ seven broken-behavior characterizations and was removed after evidence capture.
 
 ## Members and Sequence
 
-| Order | Finding | Member                                                                                                    | Review boundary                                      |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 1     | D015    | [`unify_downstream_retention`](../unify_downstream_retention/card.md)                                     | global policy, compatibility resolver, single pruner |
-| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../../todo/preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
-| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../../todo/stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
-| 4     | D017    | [`align_search_corruption_failures`](../../todo/align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
-| 5     | O001    | [`forward_litellm_user_agent`](../../todo/forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
-| 6     | O004    | [`relay_anthropic_response_headers`](../../todo/relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
-| 7     | D018    | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md)         | segment dependencies and status-line hot-path I/O    |
+| Order | Finding | Member                                                                                            | Review boundary                                      |
+| ----- | ------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 1     | D015    | [`unify_downstream_retention`](../../done/unify_downstream_retention/card.md)                     | global policy, compatibility resolver, single pruner |
+| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
+| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../../todo/stabilize_proxy_create_smoke_json/card.md)       | one JSON document and smoke-test result status       |
+| 4     | D017    | [`align_search_corruption_failures`](../../todo/align_search_corruption_failures/card.md)         | corruption diagnostics and exit parity               |
+| 5     | O001    | [`forward_litellm_user_agent`](../../todo/forward_litellm_user_agent/card.md)                     | translated request metadata gate                     |
+| 6     | O004    | [`relay_anthropic_response_headers`](../../todo/relay_anthropic_response_headers/card.md)         | safe upstream response-header relay                  |
+| 7     | D018    | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md) | segment dependencies and status-line hot-path I/O    |
 
 D015 goes first because two startup passes can delete shared telemetry under a policy the operator did not choose, and
 DG3 already resolves its broader config/migration contract. O002 follows because a failed stop currently discards or
@@ -77,6 +78,8 @@ not expand this epic's member count or closeout condition.
   byte-compatible and existing per-segment fail-open behavior remains local to that segment.
 - Every member retains a marked regression that fails on its merged-`main` base. Proxy runtime changes run targeted
   Docker integration; CLI members extend stream/JSON contract tests where applicable.
+- O002 does not serialize `proxy stop`'s shared-port decision with process signaling; locking parity is separate
+  concurrency work that requires its own reproduction and admission before implementation.
 
 ## Closeout
 

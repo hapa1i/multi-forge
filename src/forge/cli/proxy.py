@@ -27,7 +27,7 @@ import signal
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -638,6 +638,10 @@ def create_cmd(
 StopProxyOutcome = Literal["stopped", "already_stopped", "adopted_left_running", "error"]
 
 
+class _RequiredProxyStopFailed(Exception):
+    """Abort a registry transaction when required process teardown fails."""
+
+
 def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bool = False) -> StopProxyOutcome:
     """Kill the proxy process if Forge owns it (known PID).
 
@@ -647,6 +651,7 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
     Returns:
         "stopped": A process was killed.
         "already_stopped": No live process remained; registry state should be cleared.
+        "adopted_left_running": Default adopted detach intentionally left the process alive.
         "error": Refused or failed to stop the process.
     """
     # Known PID — Forge started this process, safe to kill
@@ -655,8 +660,11 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
             os.kill(entry.pid, signal.SIGTERM)
             console.print(f"Stopped server (pid {entry.pid})")
             return "stopped"
-        except (ProcessLookupError, PermissionError) as e:
-            console.print(f"[yellow]Warning:[/yellow] Could not stop server: {e}")
+        except ProcessLookupError:
+            console.print(f"[dim]Process pid {entry.pid} stopped before the signal completed[/dim]")
+            return "already_stopped"
+        except PermissionError as e:
+            print_error(f"Could not stop server: {e}", console=err_console)
             return "error"
 
     # PID unknown (adopted) — not our process to kill
@@ -679,9 +687,10 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
             timeout_s=1.0,
             expected_proxy_id=entry.proxy_id,
         ):
-            console.print(
-                f"[yellow]Warning:[/yellow] Process on port {entry.port} doesn't match "
-                f"proxy '{entry.proxy_id}' (template '{entry.template}'), skipping kill"
+            print_error(
+                f"Process on port {entry.port} doesn't match proxy '{entry.proxy_id}' "
+                f"(template '{entry.template}'); refusing to stop it",
+                console=err_console,
             )
             return "error"
 
@@ -689,8 +698,11 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
             os.kill(discovered_pid, signal.SIGTERM)
             console.print(f"Stopped server on port {entry.port} (discovered pid {discovered_pid})")
             return "stopped"
-        except (ProcessLookupError, PermissionError) as e:
-            console.print(f"[yellow]Warning:[/yellow] Could not stop process on port {entry.port}: {e}")
+        except ProcessLookupError:
+            console.print(f"[dim]Process on port {entry.port} stopped before the signal completed[/dim]")
+            return "already_stopped"
+        except PermissionError as e:
+            print_error(f"Could not stop process on port {entry.port}: {e}", console=err_console)
             return "error"
 
     # PID known but process is dead
@@ -796,6 +808,7 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
             f"Proxy '{proxy_id}' not found in registry",
             "The proxy may not be running.",
             "Run 'forge proxy list' to see configured proxies.",
+            console=err_console,
         )
         sys.exit(1)
 
@@ -807,6 +820,7 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
             print_error_with_tip(
                 f"Cannot stop: other proxies share port {entry.port}: {names}",
                 "Use --force to stop anyway, or delete individual proxies.",
+                console=err_console,
             )
             sys.exit(1)
 
@@ -830,7 +844,12 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
         return
     else:
         # _stop_proxy_process already printed the reason
-        return
+        print_tip(
+            f"Proxy '{proxy_id}' remains registered and its configuration was preserved.",
+            commands=[f"forge proxy stop {proxy_id}"],
+            console=err_console,
+        )
+        raise SystemExit(1)
 
     # Update registry: mark this proxy AND all siblings on the same port as stopped.
     # When --force bypasses the shared-port guard, siblings become stale.
@@ -1142,6 +1161,13 @@ def _restore_proxy_registry_entry(store: ProxyRegistryStore, entry: ProxyEntry) 
     store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=_restore)
 
 
+def _entry_after_successful_stop(entry: ProxyEntry, outcome: StopProxyOutcome | None) -> ProxyEntry:
+    """Return truthful rollback ownership after deletion stopped a process."""
+    if outcome in {"stopped", "already_stopped"}:
+        return replace(entry, pid=None, status="stopped")
+    return entry
+
+
 @proxy.command("delete")
 @click.argument("proxy_ids", nargs=-1)
 @click.option("--all", "-a", "delete_all", is_flag=True, help="Delete all proxies")
@@ -1242,6 +1268,7 @@ def _delete_single_proxy(
     Args:
         yes: Skip confirmation prompts (informational output stays visible).
         kill_adopted: Terminate adopted processes during deletion.
+        no_kill: Explicitly detach ownership without terminating a process.
 
     Raises:
         SystemExit: If user cancels or proxy not found.
@@ -1320,22 +1347,40 @@ def _delete_single_proxy(
             console.print("Cancelled.")
             raise SystemExit(0)
 
-    # Remove from registry and determine PID fate under lock (TOCTOU-safe).
-    should_kill_pid = False
+    # Determine shared ownership and complete any required stop under the same
+    # registry lock. Raising from the callback aborts the write, so a failed stop
+    # cannot transiently or durably discard the last actionable registry row.
+    stop_outcome: StopProxyOutcome | None = None
     remaining_aliases: list[str] = []
+    removed_entry: ProxyEntry | None = None
     if entry:
 
-        def remove_and_check(reg: ProxyRegistry) -> None:
-            nonlocal should_kill_pid, remaining_aliases
+        def stop_and_remove(reg: ProxyRegistry) -> None:
+            nonlocal stop_outcome, remaining_aliases, removed_entry
+            current_entry = reg.proxies.get(proxy_id)
+            if current_entry is None:
+                return
+
+            remaining_aliases = _live_proxy_ids_on_port(reg, proxy_id, current_entry.port)
+            if not remaining_aliases and not no_kill:
+                stop_outcome = _stop_proxy_process(console, current_entry, kill_adopted=kill_adopted)
+                if stop_outcome == "error":
+                    raise _RequiredProxyStopFailed
+
+            removed_entry = current_entry
             reg.proxies.pop(proxy_id, None)
-            remaining_aliases = _live_proxy_ids_on_port(reg, proxy_id, entry.port)
-            if not remaining_aliases:
-                should_kill_pid = True
 
         try:
-            store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=remove_and_check)
+            store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=stop_and_remove)
+        except _RequiredProxyStopFailed:
+            print_tip(
+                f"Proxy '{proxy_id}' remains registered and its configuration was preserved.",
+                commands=[f"forge proxy delete {proxy_id}"],
+                console=err_console,
+            )
+            raise SystemExit(1)
         except Exception as e:
-            print_error(f"Could not update registry: {e}")
+            print_error(f"Could not update registry: {e}", console=err_console)
             raise SystemExit(1)
 
     # Post-lock summary: show authoritative remaining aliases
@@ -1347,22 +1392,19 @@ def _delete_single_proxy(
         try:
             shutil.rmtree(proxy_dir)
         except OSError as e:
-            if entry is not None:
+            if removed_entry is not None:
                 try:
-                    _restore_proxy_registry_entry(store, entry)
+                    rollback_entry = _entry_after_successful_stop(removed_entry, stop_outcome)
+                    _restore_proxy_registry_entry(store, rollback_entry)
                 except Exception as restore_error:
-                    console.print(
-                        f"[yellow]Warning:[/yellow] Could not restore registry entry after delete failure: "
-                        f"{restore_error}"
+                    err_console.print(
+                        f"[yellow]Warning:[/yellow] Could not restore registry entry after delete failure: {restore_error}"
                     )
-            print_error(f"Could not delete proxy directory: {e}")
+            print_error(f"Could not delete proxy directory: {e}", console=err_console)
             raise SystemExit(1)
 
-    # Kill server only if the locked check confirmed we're the last reference
-    if entry and should_kill_pid and not no_kill:
-        _stop_proxy_process(console, entry, kill_adopted=kill_adopted)
-    elif entry and not should_kill_pid:
-        console.print(f"[dim]Server kept alive (other proxies share port {entry.port})[/dim]")
+    if removed_entry and remaining_aliases:
+        console.print(f"[dim]Server kept alive (other proxies share port {removed_entry.port})[/dim]")
 
     console.print(f"[green]Deleted[/green] proxy '{proxy_id}'")
 

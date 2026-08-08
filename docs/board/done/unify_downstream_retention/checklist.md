@@ -1,6 +1,6 @@
 # Unify downstream telemetry retention ownership checklist
 
-Current focus: resolve independent-review feedback before merge.
+Completed in PR #148 (`8b997e6a`).
 
 ## Activation and reproduction
 
@@ -63,4 +63,5 @@ Current focus: resolve independent-review feedback before merge.
 - [x] Run final `make pre-commit`.
 - [x] Resolve Markdown paths/fragments in all 23 changed docs; run stale-lane and `git diff --check` scans.
 - [x] Obtain independent review and resolve its required fail-on-base evidence correction and bounded follow-ups.
-- [ ] Merge, then synchronize the review ledger, change log, card, and epic cursors before activating O002.
+- [x] Merge, then synchronize the review ledger, change log, card, and epic cursors before activating O002 (PR #148,
+  `8b997e6a`).
