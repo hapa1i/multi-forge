@@ -89,6 +89,12 @@ forge search clean --yes
 `search clean --yes` strict-check the current Forge root before replacing or pruning index state; preview output labels
 targets that apply would refuse. `--yes` and other force/confirmation controls do not bypass `required_forge`.
 
+For project-scoped `query` and `status`, known index corruption is a failed read in both human and JSON modes. Human
+diagnostics go to stderr; `--json` writes one error object to stderr and leaves stdout empty; every corrupt outcome
+exits non-zero and names `forge search rebuild-index`. Forge does not rewrite or delete the index during these reads. A
+missing index and an empty valid search remain successful, while `query --scope all` continues past an unusable project
+index.
+
 ---
 
 ## What gets indexed
@@ -149,7 +155,8 @@ forge search clean --yes   # actually prune
 
 ### "Index corrupted"
 
-If search returns errors about store mismatches:
+If `query` or `status` reports malformed index state or store mismatches, the command exits non-zero without changing
+the index. Rebuild explicitly from the source transcript artifacts:
 
 ```bash
 forge search rebuild-index

@@ -10,10 +10,10 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 152 severity-ranked findings: 1 CRITICAL, 21 HIGH, 95 MEDIUM, and 35 LOW, plus unranked U001. The
+**Inventory:** 154 severity-ranked findings: 1 CRITICAL, 21 HIGH, 96 MEDIUM, and 36 LOW, plus unranked U001. The
 original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and follow-up
-reviews admitted D045 and D046 as MEDIUM plus D047--D050 as LOW from 2026-08-05 through 2026-08-07. Three Opus claims
-were refuted and five were adjusted during the merge audit.
+reviews admitted D045, D046, and D051 as MEDIUM plus D047--D050 and D052 as LOW from 2026-08-05 through 2026-08-09.
+Three Opus claims were refuted and five were adjusted during the merge audit.
 
 ## Review Status and Execution Gate
 
@@ -35,8 +35,8 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1--4 are closed after D019 shipped in PR
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
 members under [`epic_cli_proxy_runtime_correctness`](doing/epic_cli_proxy_runtime_correctness/card.md). The admission
-record merged in PR #147 (`92b981a5`). D015 and O002 then shipped in PRs #148--#149; D016 is now the active third
-member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
+record merged in PR #147 (`92b981a5`). D015, O002, and D016 then shipped in PRs #148--#150; D017 is now the active
+fourth member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
 
 ### Finding fields
 
@@ -201,6 +201,8 @@ implementation outcome below records its completed code and regression work.
 | D048 | LOW      | R     | `relaunch_session` deep-copies a parent's already-persisted illegal `overrides.launch.runtime` into its child. Raw-intent dispatch remains correct and reset can remove the key, but the recorded/effective divergence propagates across relaunches until reset. Whether inheritance should preserve, scrub, or diagnose stale immutable keys is unresolved compatibility policy.                                                                                                                                              | §3.3 override/identity ownership; §3.9 immutable runtime | `session/manager.py:1715`                                                                               |
 | D049 | LOW      | R     | The Codex SessionStart hook resolves `FORGE_SESSION` without rechecking manifest liveness, then its nothing-staged observation writer creates missing parent directories. A delete landing after resolution can therefore recreate a receipt-only session shell; the O003 cleanup correctly preserves that non-lock content. Whether hook receipt writes need a liveness guard or another terminal-delete authority is unresolved. *Runtime-reproduced with `write_observation_receipt` after removing the session directory.* | §3.2 terminal deletion; §3.5 hook receipt ownership      | `cli/hooks/codex_transfer.py:94-104`; `session/codex_handoff.py:179-202`; `core/state/io.py:130-146`    |
 | D050 | LOW      | R     | Fork transfer-context regeneration is not strategy-authoritative: `_generate_parent_transfer_context` silently coerces unknown input to `structured`; the never-launched relaunch caller omits `confirmed.derivation.strategy` when a per-child context is missing, so a valid non-default fork regenerates and launches as `structured` while retaining different provenance. CLI choice validation and rewind routing currently shield the invalid-input arm. *Source-confirmed; recovery-path impact not yet reproduced.*   | §3.9 strategy provenance; appendix §H.3 child artifacts  | `cli/session.py:427-429`; `cli/session_lifecycle.py:1596-1604`                                          |
+| D051 | MED      | R     | Project-scoped `search query --json` catches unreadable search state, prints its failure payload on stdout, and returns normally. Human query and both status modes instead route unreadability to stderr with exit 1, so a transient read failure looks successful only to the JSON query consumer. *Source-confirmed; runtime impact not yet reproduced.*                                                                                                                                                                    | §4 clean-failure contract; coding_standards §5           | `cli/search.py:171-175,632-636`; `cli/main.py:90-93`                                                    |
+| D052 | LOW      | R     | `search clean` in human mode rethrows known search-store corruption to the generic durable-state handler, which recommends a project/global reset and extension re-enable rather than the search-specific `forge search rebuild-index` recovery used by query/status. The command still exits non-zero on stderr; only the recovery guidance is inconsistent. *Source-confirmed; runtime impact not yet reproduced.*                                                                                                           | cli_style_guidelines recovery-output contract            | `cli/search.py:454-460`; `cli/output.py:120-136`                                                        |
 
 ### Implementation Outcomes
 
@@ -331,6 +333,12 @@ implementation outcome below records its completed code and regression work.
   review's stderr assertion was resolved, and its separate pre-lock `proxy stop` race remains outside O002. It shipped
   in PR #149 (`c20b8d10`). See
   [`preserve_proxy_ownership_on_stop_failure`](done/preserve_proxy_ownership_on_stop_failure/card.md).
+- **D016 — resolved 2026-08-08:** optional create-time smoke facts now augment the single proxy creation JSON object;
+  failed probes exit non-zero while leaving the spawned, reused, or adopted proxy registered for inspection and retry.
+  JSON without smoke, human output, and config-only `--no-start` behavior remain compatible. The retained regression,
+  176 focused tests, 8,899 unit tests (one skip), 686 regressions, all 3 Docker create/start cases, package build, final
+  pre-commit, and documentation-link checks cover the contract. It shipped in PR #150 (`61580fdb`). See
+  [`stabilize_proxy_create_smoke_json`](done/stabilize_proxy_create_smoke_json/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -501,7 +509,7 @@ one card coordinates them.
 | 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                               | State authority, fault outcomes, and recovery paths defined                     |
 | 4 — installer transactions              | D012–D014, D019                                                                    | Fault points and rollback ownership enumerated; integration fixtures identified |
 | 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                           | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
-| 6 — bounded maintenance fixes           | D045–D050 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
+| 6 — bounded maintenance fixes           | D045–D052 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
 | 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings             | Behavior characterized; DG4 resolved; unverified symbols excluded               |
 
 ### Wave 3 admission record
@@ -555,8 +563,8 @@ classification; no implementation member was activated during admission.
 | ----- | ------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | 1     | D015    | two policies prune one downstream shard; the stricter second pass deletes it | [`unify_downstream_retention`](done/unify_downstream_retention/card.md)                             |
 | 2     | O002    | stop error exits 0; delete drops ownership and reports success               | [`preserve_proxy_ownership_on_stop_failure`](done/preserve_proxy_ownership_on_stop_failure/card.md) |
-| 3     | D016    | failed create smoke emits two JSON documents and exits 0                     | [`stabilize_proxy_create_smoke_json`](doing/stabilize_proxy_create_smoke_json/card.md)              |
-| 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](todo/align_search_corruption_failures/card.md)                 |
+| 3     | D016    | failed create smoke emits two JSON documents and exits 0                     | [`stabilize_proxy_create_smoke_json`](done/stabilize_proxy_create_smoke_json/card.md)               |
+| 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](doing/align_search_corruption_failures/card.md)                |
 | 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](todo/forward_litellm_user_agent/card.md)                             |
 | 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](todo/relay_anthropic_response_headers/card.md)                 |
 | 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](todo/make_statusline_sources_segment_lazy/card.md)         |
@@ -578,8 +586,8 @@ default status line while eliminating unrelated hot-path I/O.
   independently in PRs #134--#138 and #140--#142.
 - **[Installer epic](done/epic_installer_transaction_safety/card.md):** all three members shipped independently in PRs
   #144--#146 with required regression, Docker, and clean-wheel coverage.
-- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** D015 and O002 shipped in PRs
-  #148--#149; D016 is active, and four parked members preserve separate review boundaries while sharing scriptability,
+- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** D015, O002, and D016 shipped in PRs
+  #148--#150; D017 is active, and three parked members preserve separate review boundaries while sharing scriptability,
   lifecycle-truth, metadata-relay, retention, and hot-path constraints.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.

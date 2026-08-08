@@ -102,6 +102,37 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["search", "query", "anything", "--json"],
+        ["search", "status", "--json"],
+    ],
+    ids=["search-query", "search-status"],
+)
+def test_search_corruption_json_failure_keeps_stdout_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    args: list[str],
+) -> None:
+    from forge.search.bm25_store import BM25IndexStore
+    from forge.search.store import SearchDocumentStore
+
+    project_root = tmp_path / "project"
+    (project_root / ".git").mkdir(parents=True)
+    monkeypatch.chdir(project_root)
+    SearchDocumentStore(forge_root=project_root).write([])
+    BM25IndexStore(forge_root=project_root).store_path.write_text("not json", encoding="utf-8")
+
+    result = CliRunner().invoke(main, args)
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    payload = json.loads(result.stderr)
+    assert "corrupted" in payload["error"].lower()
+    assert "rebuild-index" in payload["hint"]
+
+
 def _seed_audit_logs(monkeypatch: pytest.MonkeyPatch, records: list[dict]) -> None:
     # audit_show/diff import read_audit_logs lazily from the source module, so the
     # patch must target the source attribute, not forge.cli.proxy_audit.

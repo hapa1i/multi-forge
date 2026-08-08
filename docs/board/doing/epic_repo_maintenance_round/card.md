@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--4 are closed. Wave 5 is active under `epic_cli_proxy_runtime_correctness`; D015 and O002 shipped in PRs
-#148--#149, D016 is in flight, and four members remain parked.
+Waves 1--4 are closed. Wave 5 is active under `epic_cli_proxy_runtime_correctness`; D015, O002, and D016 shipped in PRs
+#148--#150, D017 is in flight, and three members remain parked.
 
 ## Goal
 
@@ -11,7 +11,7 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D050, for a current total of 152 ranked findings
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D052, for a current total of 154 ranked findings
 plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
@@ -68,8 +68,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 shipped in PRs #134--#138 and #140--#142. Wave 4 closed under
 [`epic_installer_transaction_safety`](../../done/epic_installer_transaction_safety/card.md) after its three members
 shipped in PRs #144--#146. Wave 5 is active under
-[`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md), with D015 and O002 shipped, D016
-in flight, and four members parked.
+[`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md), with D015, O002, and D016
+shipped, D017 in flight, and three members parked.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -93,8 +93,8 @@ in flight, and four members parked.
 | 4    | D019            | [`preserve_legacy_settings_user_edits`](../../done/preserve_legacy_settings_user_edits/card.md)                     |
 | 5    | D015            | [`unify_downstream_retention`](../../done/unify_downstream_retention/card.md)                                       |
 | 5    | O002            | [`preserve_proxy_ownership_on_stop_failure`](../../done/preserve_proxy_ownership_on_stop_failure/card.md)           |
-| 5    | D016            | [`stabilize_proxy_create_smoke_json`](../stabilize_proxy_create_smoke_json/card.md)                                 |
-| 5    | D017            | [`align_search_corruption_failures`](../../todo/align_search_corruption_failures/card.md)                           |
+| 5    | D016            | [`stabilize_proxy_create_smoke_json`](../../done/stabilize_proxy_create_smoke_json/card.md)                         |
+| 5    | D017            | [`align_search_corruption_failures`](../align_search_corruption_failures/card.md)                                   |
 | 5    | O001            | [`forward_litellm_user_agent`](../../todo/forward_litellm_user_agent/card.md)                                       |
 | 5    | O004            | [`relay_anthropic_response_headers`](../../todo/relay_anthropic_response_headers/card.md)                           |
 | 5    | D018            | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md)                   |

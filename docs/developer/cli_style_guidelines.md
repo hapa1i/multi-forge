@@ -147,9 +147,10 @@ terminal output) — the allowlist is pinned to those payloads, not the whole fi
 `print_error_with_tip`, and `test_output.py::test_cli_rich_errors_go_through_print_error` guards hand-rolled
 `[red]Error:[/red]` the same way. Both allowlists are now drained (Slice 11) and locked: a new offender fails the test.
 
-Errors that must not pollute stdout (the results stream) pass `console=err_console` — the shared `Console(stderr=True)`
-in `output.py`. Use it for failures that previously raised `click.ClickException` (which Click renders to stderr); the
-helper defaults stay stdout, so opt into stderr explicitly at the call site.
+`print_error` and `print_error_with_tip` default to `err_console`, the shared `Console(stderr=True)` in `output.py`, so
+failures do not pollute stdout (the results stream). Standalone `print_tip` defaults to stdout; pass
+`console=err_console` when it accompanies an error outside `print_error_with_tip`. Call sites may still pass an explicit
+console to preserve a local destination or width.
 
 ```python
 from forge.cli.output import print_error, print_error_with_tip, print_tip, handle_session_error

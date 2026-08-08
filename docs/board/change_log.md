@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-08
 
+### Stabilize proxy create smoke-test JSON
+
+**Goal/outcome**: Make create-time proxy verification one scriptable result whose process status reflects probe failure
+without discarding the successfully resolved proxy.
+
+**Key changes**:
+
+- Nested optional smoke facts into the single creation JSON object and made failed probes exit non-zero across
+  spawn/reuse/adopt while preserving the proxy for inspection and retry.
+- Kept JSON without smoke, human output, and config-only `--no-start` behavior compatible; synchronized operator docs
+  and bundled QA coverage.
+
+**Verification**: The retained D016 regression failed on `c20b8d10` with two JSON documents and exit 0. After
+implementation, 176 focused tests, 8,899 unit tests (one skip), 686 regressions, all 3 Docker proxy create/start cases,
+package build, final pre-commit, and documentation-link checks passed. Shipped in PR #150 (`61580fdb`).
+
 ### Preserve proxy ownership on stop failure
 
 **Goal/outcome**: Make proxy stop/delete failures visible without discarding the registry and configuration needed for

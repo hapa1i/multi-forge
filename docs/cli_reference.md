@@ -438,6 +438,11 @@ cancellation domain. `forge workflow list-models [--json]` reports readiness and
 | `forge search status`        | Show index statistics                                           |
 | `forge search clean`         | Preview orphaned documents; `--yes` to prune; `--json` for JSON |
 
+A malformed document, BM25, content, or index-state store encountered by project-scoped `search query` or
+`search status` is a failure in both output modes. Human diagnostics use stderr; `--json` emits one error object on
+stderr with empty stdout; both exit non-zero and name `search rebuild-index`. A missing index or an empty successful
+result still exits zero, and `query --scope all` keeps its skip-and-continue partial-result policy.
+
 ### System
 
 | Command                          | Purpose                                                                                                         |
