@@ -1,6 +1,6 @@
 # Installer transaction safety checklist
 
-Current focus: merge the independently reviewed D012 implementation; D019 remains parked until then.
+Current focus: independently review and merge D019, then close the installer transaction epic.
 
 ## Activation and sequencing
 
@@ -13,11 +13,15 @@ Current focus: merge the independently reviewed D012 implementation; D019 remain
 - [x] Merge D013/D014 before moving D012 from `todo/` (PR #144, `37a03209`).
 - [x] Start `fix/preserve-install-settings-baseline`, move D012 to `doing/`, and create its checklist.
 - [x] Independently review D012 and resolve its LOW tracked-baseline deletion race.
+- [x] Merge D012 before moving D019 from `todo/` (PR #145, `f069226f`).
+- [x] Start `fix/preserve-legacy-settings-user-edits`, move D019 to `doing/`, and create its checklist.
+- [x] Retain D019's fail-first regression and implement value-aware legacy scalar/environment removal.
+- [x] Verify D019 with focused host, Docker, clean-wheel, and regression coverage.
 
 ## Remaining members
 
-- [ ] Ship D012 immutable pre-Forge settings-baseline ownership (active).
-- [ ] Ship D019 value-aware legacy scalar/environment removal.
+- [x] Ship D012 immutable pre-Forge settings-baseline ownership (PR #145, `f069226f`).
+- [ ] Ship D019 value-aware legacy scalar/environment removal (active).
 
 ## Closeout
 

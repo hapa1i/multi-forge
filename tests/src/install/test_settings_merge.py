@@ -534,6 +534,88 @@ class TestUnmerge:
         assert "statusLine" not in settings
         assert "otherKey" in settings
 
+    @pytest.mark.parametrize(
+        ("settings", "expected"),
+        [
+            (
+                {"statusLine": "/user/path", "otherKey": "value"},
+                {"statusLine": "/user/path", "otherKey": "value"},
+            ),
+            ({"otherKey": "value"}, {"otherKey": "value"}),
+        ],
+        ids=["modified", "absent"],
+    )
+    def test_preserves_modified_or_absent_scalar_keys(
+        self,
+        settings: dict[str, Any],
+        expected: dict[str, Any],
+    ) -> None:
+        tracking_entries = [
+            InstalledSettingsEntry(
+                key_path="statusLine",
+                value="/forge/path",
+                merge_type="scalar",
+                stable_id="statusLine",
+                attribution=STATUSLINE_ATTRIBUTION,
+            )
+        ]
+
+        unmerge(settings, tracking_entries)
+
+        assert settings == expected
+
+    def test_removes_only_environment_values_that_still_match_tracking(self) -> None:
+        settings = {
+            "env": {
+                "OWNED": "forge-value",
+                "EDITED": "user-value",
+                "USER_ONLY": "keep-me",
+            }
+        }
+        tracking_entries = [
+            InstalledSettingsEntry(
+                key_path="env.OWNED",
+                value="forge-value",
+                merge_type="env",
+                stable_id="OWNED",
+                attribution=PERMISSION_ATTRIBUTION,
+            ),
+            InstalledSettingsEntry(
+                key_path="env.EDITED",
+                value="forge-value",
+                merge_type="env",
+                stable_id="EDITED",
+                attribution=PERMISSION_ATTRIBUTION,
+            ),
+            InstalledSettingsEntry(
+                key_path="env.ABSENT",
+                value="forge-value",
+                merge_type="env",
+                stable_id="ABSENT",
+                attribution=PERMISSION_ATTRIBUTION,
+            ),
+        ]
+
+        unmerge(settings, tracking_entries)
+
+        assert settings == {"env": {"EDITED": "user-value", "USER_ONLY": "keep-me"}}
+
+    def test_removes_empty_environment_container_after_matching_value(self) -> None:
+        settings = {"env": {"OWNED": "forge-value"}}
+        tracking_entries = [
+            InstalledSettingsEntry(
+                key_path="env.OWNED",
+                value="forge-value",
+                merge_type="env",
+                stable_id="OWNED",
+                attribution=PERMISSION_ATTRIBUTION,
+            )
+        ]
+
+        unmerge(settings, tracking_entries)
+
+        assert settings == {}
+
     def test_unmerge_preserves_untracked_entries(self) -> None:
         settings: dict[str, Any] = {
             "hooks": {

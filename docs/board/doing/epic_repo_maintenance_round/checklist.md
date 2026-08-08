@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: merge the independently reviewed D012 implementation without activating D019.
+Current focus: independently review and merge D019 as the final Wave 4 member.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -74,7 +74,10 @@ Current focus: merge the independently reviewed D012 implementation without acti
 - [x] Retain D012's baseline-rotation regression and implement immutable baseline ownership across both disable paths.
 - [x] Verify D012 with focused, Docker, clean-wheel, regression, and pre-commit coverage.
 - [x] Independently review D012 and resolve its LOW tracked-baseline deletion race.
-- [ ] Merge D012 before activating D019.
+- [x] Merge D012 before activating D019 (PR #145, `f069226f`).
+- [x] Activate D019 from merged `main` at `f069226f` and create its execution checklist.
+- [x] Retain D019's unconditional scalar/env deletion regression and implement value-aware legacy removal.
+- [ ] Verify and independently review D019, then close the Wave 4 child epic after merge.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

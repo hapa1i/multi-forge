@@ -105,6 +105,78 @@ PY
     return json.loads(result.stdout)
 
 
+def _seed_legacy_settings_installation(
+    container: ContainerLike,
+    *,
+    project_root: str,
+    python_command: str,
+    working_directory: str = "/forge",
+) -> None:
+    """Create a no-sidecar project row with matching and user-modified values."""
+    result = container.exec(f"""
+mkdir -p {project_root}
+cd {working_directory}
+{python_command} - <<'PY'
+from pathlib import Path
+
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME
+from forge.install.models import Installation, InstalledSettingsEntry, InstallModule, InstallScope
+from forge.install.ownership import attributed
+from forge.install.settings_merge import write_settings
+from forge.install.tracking import TrackingStore
+
+project_root = Path({project_root!r})
+statusline_owner = attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME)
+permissions_owner = attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME)
+entries = [
+    InstalledSettingsEntry(
+        key_path="statusLine",
+        value={{"type": "command", "command": "forge status-line"}},
+        merge_type="scalar",
+        stable_id="statusLine",
+        attribution=statusline_owner,
+    ),
+    InstalledSettingsEntry(
+        key_path="env.EDITED",
+        value="forge-value",
+        merge_type="env",
+        stable_id="EDITED",
+        attribution=permissions_owner,
+    ),
+    InstalledSettingsEntry(
+        key_path="env.OWNED",
+        value="forge-value",
+        merge_type="env",
+        stable_id="OWNED",
+        attribution=permissions_owner,
+    ),
+]
+write_settings(
+    project_root / ".claude" / "settings.json",
+    {{
+        "statusLine": {{"type": "command", "command": "my status-line"}},
+        "env": {{"EDITED": "user-value", "OWNED": "forge-value", "USER_ONLY": "keep-me"}},
+    }},
+)
+TrackingStore().set_installation(
+    InstallScope.PROJECT.value,
+    Installation(
+        scope=InstallScope.PROJECT.value,
+        project_path=str(project_root),
+        mode="copy",
+        profile="minimal",
+        module_owners=sorted({{statusline_owner, permissions_owner}}),
+        settings_entries=entries,
+        installed_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+    ),
+    str(project_root),
+)
+PY
+""")
+    assert result.returncode == 0, f"Legacy installation setup failed: {result.stderr}"
+
+
 class TestForgeExtensionEnable:
     """Tests for forge extension enable command."""
 
@@ -542,6 +614,39 @@ PY
             "forge_file": f"{_PACKAGED_SITE_ROOT}/forge/__init__.py",
             "extensions": f"{_PACKAGED_SITE_ROOT}/forge/_extensions",
         }
+
+        legacy_home = f"{_PACKAGED_LIFECYCLE_ROOT}/legacy/home"
+        legacy_project = f"{_PACKAGED_LIFECYCLE_ROOT}/legacy/project"
+        _seed_legacy_settings_installation(
+            synced_container,
+            project_root=legacy_project,
+            working_directory=legacy_project,
+            python_command=(
+                f"HOME={legacy_home} FORGE_HOME={legacy_home}/.forge "
+                f"CLAUDE_HOME={legacy_home}/.claude CODEX_HOME={legacy_home}/.codex "
+                f"PYTHONPATH={_PACKAGED_SITE_ROOT} /forge/.venv/bin/python"
+            ),
+        )
+
+        legacy_disable = synced_container.exec(
+            _packaged_forge_command(
+                "extension disable --scope project --yes",
+                project_root=legacy_project,
+                home=legacy_home,
+            )
+        )
+        assert (
+            legacy_disable.returncode == 0
+        ), f"Wheel legacy disable failed: stdout={legacy_disable.stdout!r} stderr={legacy_disable.stderr!r}"
+        assert synced_container.read_json(f"{legacy_project}/.claude/settings.json") == {
+            "statusLine": {"type": "command", "command": "my status-line"},
+            "env": {"EDITED": "user-value", "USER_ONLY": "keep-me"},
+        }
+        legacy_tracking_key = f"project:{legacy_project}"
+        assert (
+            legacy_tracking_key
+            not in synced_container.read_json(f"{legacy_home}/.forge/installed.json")["installations"]
+        )
 
         matrix_root = f"{_PACKAGED_LIFECYCLE_ROOT}/matrix"
         for runtime, managed_runtimes in (
@@ -1224,6 +1329,45 @@ else:
         # CLI returns 0 and informs user - graceful no-op behavior
         assert result.returncode == 0
         assert "no forge installation" in result.stdout.lower()
+
+    def test_legacy_no_sidecar_uninstall_preserves_modified_scalar_and_env(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        """A real project disable removes only legacy values that still match tracking."""
+        cleanup = synced_container.exec("rm -rf ~/.forge /tmp/forge-d019-project")
+        assert cleanup.returncode == 0, cleanup.stderr
+        _seed_legacy_settings_installation(
+            synced_container,
+            project_root="/tmp/forge-d019-project",
+            python_command="uv run python",
+        )
+
+        result = synced_container.exec(
+            "cd /tmp/forge-d019-project && /forge/.venv/bin/forge extension disable --scope project --yes"
+        )
+        assert result.returncode == 0, f"Disable failed: stdout={result.stdout!r} stderr={result.stderr!r}"
+
+        check = synced_container.exec("""
+cd /forge
+uv run python - <<'PY'
+from pathlib import Path
+
+from forge.install.models import InstallScope
+from forge.install.settings_merge import read_settings
+from forge.install.tracking import TrackingStore
+
+project_root = Path("/tmp/forge-d019-project")
+assert read_settings(project_root / ".claude" / "settings.json") == {
+    "statusLine": {"type": "command", "command": "my status-line"},
+    "env": {"EDITED": "user-value", "USER_ONLY": "keep-me"},
+}
+assert TrackingStore().get_installation(InstallScope.PROJECT.value, str(project_root)) is None
+print("legacy-disable-ok")
+PY
+""")
+        assert check.returncode == 0, check.stderr
+        assert "legacy-disable-ok" in check.stdout
 
 
 class TestSymlinkMode:
