@@ -1,10 +1,10 @@
 # Stabilize proxy create smoke-test JSON
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D016 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- active on `fix/stabilize-proxy-create-smoke-json` from merged PR #149 (`c20b8d10`).
+**Lane**: `done/` -- shipped in PR #150 (`61580fdb`) after independent review.
 
 ## Goal
 

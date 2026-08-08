@@ -266,10 +266,11 @@ class TestSearchCommand:
         assert data["total_results"] == 0
         assert "hint" in data
 
-    def test_search_scope_all_skips_unreadable_project(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.parametrize("corrupted", [False, True], ids=["unreadable", "corrupted"])
+    def test_search_scope_all_skips_unusable_project(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, corrupted: bool
     ) -> None:
-        """--scope all skips one unreadable project index and returns other project results."""
+        """--scope all skips one unreadable or corrupt index and returns other project results."""
         current_root = tmp_path / "current"
         current_root.mkdir()
         (current_root / ".git").mkdir()
@@ -288,7 +289,8 @@ class TestSearchCommand:
 
         def _fake_search_project(project_root: Path, _query: str, *, limit: int):
             if project_root == other_root:
-                raise SearchDocumentStoreUnreadableError(str(other_root / ".forge/search-index/documents.json"), "nope")
+                error_type = SearchDocumentStoreCorruptedError if corrupted else SearchDocumentStoreUnreadableError
+                raise error_type(str(other_root / ".forge/search-index/documents.json"), "nope")
             return [result_row][:limit]
 
         with (
@@ -308,7 +310,7 @@ class TestSearchCommand:
     def test_search_corrupted_store_returns_error_json(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Corrupted BM25 index returns JSON error with rebuild hint, not a traceback."""
+        """Corrupted BM25 index returns one stderr JSON error and a failed status."""
         project = tmp_path / "corrupt-project"
         project.mkdir()
         (project / ".git").mkdir()
@@ -320,12 +322,32 @@ class TestSearchCommand:
         (store_dir / "bm25_index.json").write_text("not valid json {{{")
 
         result = runner.invoke(main, ["search", "query", "anything", "--json"])
-        assert result.exit_code == 0
-        data = json.loads(result.output)
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        data = json.loads(result.stderr)
         assert data["total_results"] == 0
         assert "error" in data
         assert "corrupted" in data["error"].lower() or "invalid" in data["error"].lower()
         assert "rebuild" in data["hint"].lower()
+
+    def test_search_corrupted_store_returns_human_error_on_stderr(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Human query corruption is an stderr failure, not a successful result."""
+        project = tmp_path / "corrupt-project"
+        (project / ".git").mkdir(parents=True)
+        monkeypatch.chdir(project)
+
+        store = BM25IndexStore(forge_root=project)
+        store.store_path.parent.mkdir(parents=True)
+        store.store_path.write_text("not valid json {{{", encoding="utf-8")
+
+        result = runner.invoke(main, ["search", "query", "anything"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "Search index corrupted or outdated" in result.stderr
+        assert "rebuild-index" in result.stderr
 
 
 class TestRebuildIndex:
@@ -893,18 +915,23 @@ class TestSearchStatus:
         assert data["documents_indexed"] == 3
         assert data["bm25"] is None
 
-    def test_status_json_corrupted_index_reports_rebuild_hint(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.parametrize("filename", ["documents.json", "state.json", "bm25_index.json"])
+    def test_status_json_corrupted_store_reports_rebuild_hint(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        filename: str,
     ) -> None:
-        """`search status --json` routes corrupt index files to rebuild guidance, not a traceback."""
+        """Every status store routes corruption to the same stderr JSON failure."""
         project_root = tmp_path / "project"
         project_root.mkdir()
         (project_root / ".git").mkdir()
         monkeypatch.chdir(project_root)
 
         index_dir = project_root / ".forge" / "search-index"
-        index_dir.mkdir(parents=True)
-        (index_dir / "documents.json").write_text("not json")
+        SearchDocumentStore(forge_root=project_root).write([])
+        (index_dir / filename).write_text("not json", encoding="utf-8")
 
         result = runner.invoke(main, ["search", "status", "--json"])
 

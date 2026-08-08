@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: execute D016 as the third bounded Wave 5 member; later members remain parked.
+Current focus: execute D017 as the fourth bounded Wave 5 member; later members remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -91,7 +91,11 @@ Current focus: execute D016 as the third bounded Wave 5 member; later members re
 - [x] Activate O002 from merged `main`, close D015, and create the O002 execution checklist.
 - [x] Implement, independently review, and merge O002 before activating D016 (PR #149, `c20b8d10`).
 - [x] Activate D016 from merged `main`, close O002, and create the D016 execution checklist.
-- [ ] Implement, independently review, and merge D016 before activating D017.
+- [x] Implement, independently review, and merge D016 before activating D017 (PR #150, `61580fdb`).
+- [x] Activate D017 from merged `main`, close D016, and create the D017 execution checklist.
+- [x] Independently review D017; add its missing corrupt `--scope all` control, correct the CLI helper docs, and admit
+  D051/D052 separately (2026-08-09).
+- [ ] Merge D017 before activating O001.
 - [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
   activating their implementation cards.
 

@@ -2,9 +2,9 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.40 -->
+<!-- version: 1.0.41 -->
 
-<!-- test-count: 618 -->
+<!-- test-count: 622 -->
 
 <!-- last-updated: 2026-08-08 -->
 
@@ -12,19 +12,20 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-08-08 (proxy QA now verifies one-result create/smoke JSON, failed-probe status, and preservation
-of the created proxy). Earlier 2026-08-08: proxy QA added refused adopted-kill ownership preservation. Earlier
-2026-08-08: proxy/config QA added fail-closed degraded downstream-retention runtime truth, preview/apply migration,
-exact global ownership, legacy-key removal, and rerun safety. Earlier 2026-08-03: session QA verifies the Git-derived
-workspace worktree view, session occupancy, missing/prunable state, JSON shape, and the non-Git fallback. Earlier
-2026-07-31: extension QA removes one project runtime, proves sync does not resurrect it, and restores the dual-runtime
-package set. Earlier 2026-07-30: extension QA now asserts schema-v3 runtime/module ownership, the merged `hooks` module,
-and runtime-wide selection. Earlier 2026-07-26: model refresh: section 4 tier assertions now expect Opus 5 on
-openrouter-anthropic, Kimi K3 on openrouter-kimi, Qwen3.7 Plus/Max on openrouter-qwen, and Gemini 3.6 Flash on the
-gemini/gemini-flash templates. Earlier 2026-07-23: runtime skill inventory assertions now cover all nine portable Codex
-packages across enable, status, sync, cleanup, and disable. Earlier 2026-07-22: extension status probes now enforce the
-schema-v2 object, runtime-package QA verifies the always-copied provenance sentinel, and a disposable project exercises
-tracking-loss plus compiled-cache-reset cleanup and re-enable. Earlier 2026-07-17: runtime-aware skill QA also covers
+**Last updated**: 2026-08-08 (search QA now verifies that corrupt query/status reads fail consistently in human/JSON
+modes with empty stdout and actionable stderr). Earlier 2026-08-08: proxy QA added one-result create/smoke JSON and
+refused adopted-kill ownership preservation. Earlier 2026-08-08: proxy/config QA added fail-closed degraded
+downstream-retention runtime truth, preview/apply migration, exact global ownership, legacy-key removal, and rerun
+safety. Earlier 2026-08-03: session QA verifies the Git-derived workspace worktree view, session occupancy,
+missing/prunable state, JSON shape, and the non-Git fallback. Earlier 2026-07-31: extension QA removes one project
+runtime, proves sync does not resurrect it, and restores the dual-runtime package set. Earlier 2026-07-30: extension QA
+now asserts schema-v3 runtime/module ownership, the merged `hooks` module, and runtime-wide selection. Earlier
+2026-07-26: model refresh: section 4 tier assertions now expect Opus 5 on openrouter-anthropic, Kimi K3 on
+openrouter-kimi, Qwen3.7 Plus/Max on openrouter-qwen, and Gemini 3.6 Flash on the gemini/gemini-flash templates. Earlier
+2026-07-23: runtime skill inventory assertions now cover all nine portable Codex packages across enable, status, sync,
+cleanup, and disable. Earlier 2026-07-22: extension status probes now enforce the schema-v2 object, runtime-package QA
+verifies the always-copied provenance sentinel, and a disposable project exercises tracking-loss plus
+compiled-cache-reset cleanup and re-enable. Earlier 2026-07-17: runtime-aware skill QA also covers
 Codex-host-authoritative `openai` family selection, dangling leaf health, strict package/file-ledger failure, and
 tracking-row discovery help; its existing lifecycle covers absent-binary automatic re-enable, explicit runtime
 preservation, user/project Codex targets, scope rejection, out-of-CWD tracked-project duplicate prevention, package-root

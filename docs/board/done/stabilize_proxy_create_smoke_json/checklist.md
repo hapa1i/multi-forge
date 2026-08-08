@@ -1,6 +1,6 @@
 # Stabilize proxy create smoke-test JSON checklist
 
-Current focus: finish final repository gates and prepare the verified D016 change for independent review.
+Completed in PR #150 (`61580fdb`).
 
 ## Activation and reproduction
 
@@ -47,4 +47,4 @@ Current focus: finish final repository gates and prepare the verified D016 chang
 - [x] Build the wheel and verify both changed bundled QA resources; resolve all 194 local links/fragments across the 15
   changed Markdown files; confirm the change log measures 20,622 tokens / 1,382 physical lines.
 - [x] Run final `make pre-commit`, stale-lane scans, and diff checks after recording verification evidence.
-- [ ] Obtain independent review and merge before activating D017.
+- [x] Obtain independent review and merge before activating D017 (PR #150, `61580fdb`).

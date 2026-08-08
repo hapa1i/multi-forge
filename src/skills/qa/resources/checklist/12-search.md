@@ -61,4 +61,61 @@ forge search clean --yes    # actually prune
 - [ ] `--yes` removes entries for deleted transcripts
 - [ ] Reports removed/pruned count or "No orphaned entries found."
 
+### 12.5 Corrupt Reads Fail Consistently
+
+<!-- prereq: 12.2 -->
+
+<!-- auto -->
+
+Temporarily replace the BM25 store with malformed JSON, exercise both read leaves and output modes, then restore the
+byte-identical store before asserting the captured results.
+
+```bash
+cd "$FORGE_TEST_REPO"
+D017_SEARCH_DIR="$FORGE_TEST_REPO/.forge/search-index"
+D017_BM25="$D017_SEARCH_DIR/bm25_index.json"
+D017_BACKUP="$(mktemp /tmp/forge-d017-bm25.XXXXXX)"
+test -f "$D017_SEARCH_DIR/documents.json"
+test -f "$D017_BM25"
+cp "$D017_BM25" "$D017_BACKUP"
+printf '%s\n' 'not valid json {{{' >"$D017_BM25"
+
+set +e
+forge search query d017-corruption >/tmp/forge-d017-query-human.stdout 2>/tmp/forge-d017-query-human.stderr
+D017_QUERY_HUMAN_EXIT=$?
+forge search query d017-corruption --json >/tmp/forge-d017-query-json.stdout 2>/tmp/forge-d017-query-json.stderr
+D017_QUERY_JSON_EXIT=$?
+forge search status >/tmp/forge-d017-status-human.stdout 2>/tmp/forge-d017-status-human.stderr
+D017_STATUS_HUMAN_EXIT=$?
+forge search status --json >/tmp/forge-d017-status-json.stdout 2>/tmp/forge-d017-status-json.stderr
+D017_STATUS_JSON_EXIT=$?
+cp "$D017_BACKUP" "$D017_BM25"
+D017_RESTORE_EXIT=$?
+rm -f "$D017_BACKUP"
+set -e
+
+test "$D017_RESTORE_EXIT" -eq 0
+test "$D017_QUERY_HUMAN_EXIT" -ne 0
+test "$D017_QUERY_JSON_EXIT" -ne 0
+test "$D017_STATUS_HUMAN_EXIT" -ne 0
+test "$D017_STATUS_JSON_EXIT" -ne 0
+test ! -s /tmp/forge-d017-query-human.stdout
+test ! -s /tmp/forge-d017-query-json.stdout
+test ! -s /tmp/forge-d017-status-human.stdout
+test ! -s /tmp/forge-d017-status-json.stdout
+jq -s -e 'length == 1 and .[0].error and (.[0].hint | contains("rebuild-index"))' \
+  /tmp/forge-d017-query-json.stderr
+jq -s -e 'length == 1 and .[0].error and (.[0].hint | contains("rebuild-index"))' \
+  /tmp/forge-d017-status-json.stderr
+grep -q 'Search index corrupted or outdated' /tmp/forge-d017-query-human.stderr
+grep -q 'rebuild-index' /tmp/forge-d017-query-human.stderr
+grep -q 'Search index corrupted or outdated' /tmp/forge-d017-status-human.stderr
+grep -q 'rebuild-index' /tmp/forge-d017-status-human.stderr
+```
+
+- [ ] Query corruption exits non-zero with empty stdout in human and JSON modes
+- [ ] Status corruption exits non-zero with empty stdout in human and JSON modes
+- [ ] Each JSON failure is one stderr object with rebuild guidance
+- [ ] Each human failure uses the shared stderr error/tip path
+
 ---

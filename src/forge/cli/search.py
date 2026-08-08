@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import NoReturn
 
 import click
 from rich.console import Console
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error_with_tip, print_tip
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError, SchemaVersionError
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
@@ -72,6 +73,19 @@ def _search_corrupted_payload(error: BaseException, *, query: str | None = None)
     if query is not None:
         payload.update({"query": query, "total_results": 0, "results": []})
     return payload
+
+
+def _fail_search_corruption(error: BaseException, *, as_json: bool, query: str | None = None) -> NoReturn:
+    """Render one corruption failure on stderr and terminate consistently."""
+    if as_json:
+        click.echo(json.dumps(_search_corrupted_payload(error, query=query), indent=2), err=True)
+    else:
+        print_error_with_tip(
+            f"Search index corrupted or outdated: {error}",
+            "Run 'forge search rebuild-index' to rebuild.",
+            console=err_console,
+        )
+    raise SystemExit(1) from error
 
 
 def _resolve_forge_root() -> Path:
@@ -153,14 +167,7 @@ def _run_search(query: str, *, limit: int, scope: str, as_json: bool) -> None:
     try:
         results = _search_project(project_root, query, limit=limit)
     except SEARCH_CORRUPTED_ERRORS as e:
-        if as_json:
-            click.echo(json.dumps(_search_corrupted_payload(e, query=query), indent=2))
-            return
-        print_error_with_tip(
-            f"Search index corrupted or outdated: {e}",
-            "Run 'forge search rebuild-index' to rebuild.",
-        )
-        return
+        _fail_search_corruption(e, as_json=as_json, query=query)
     except SEARCH_UNREADABLE_ERRORS as e:
         if as_json:
             click.echo(json.dumps(_search_unreadable_payload(e, query=query), indent=2))
@@ -619,15 +626,9 @@ def status_cmd(as_json: bool) -> None:
     try:
         documents = doc_store.read()
         state = index_store.read()
+        bm25_index = bm25_store.read()
     except SEARCH_CORRUPTED_ERRORS as e:
-        if as_json:
-            click.echo(json.dumps(_search_corrupted_payload(e), indent=2), err=True)
-            raise SystemExit(1) from e
-        print_error_with_tip(
-            f"Search index corrupted or outdated: {e}",
-            "Run 'forge search rebuild-index' to rebuild.",
-        )
-        return
+        _fail_search_corruption(e, as_json=as_json)
     except SEARCH_UNREADABLE_ERRORS as e:
         if as_json:
             click.echo(json.dumps(_search_unreadable_payload(e), indent=2), err=True)
@@ -635,14 +636,6 @@ def status_cmd(as_json: bool) -> None:
         raise
 
     if as_json:
-        try:
-            bm25_index = bm25_store.read()
-        except SEARCH_CORRUPTED_ERRORS as e:
-            click.echo(json.dumps(_search_corrupted_payload(e), indent=2), err=True)
-            raise SystemExit(1) from e
-        except SEARCH_UNREADABLE_ERRORS as e:
-            click.echo(json.dumps(_search_unreadable_payload(e), indent=2), err=True)
-            raise SystemExit(1) from e
         click.echo(
             json.dumps(
                 {
@@ -676,17 +669,6 @@ def status_cmd(as_json: bool) -> None:
         session_names = {d.session_name for d in documents}
         console.print(f"Sessions: [cyan]{len(session_names)}[/cyan]")
 
-    # BM25 index stats
-    try:
-        bm25_index = bm25_store.read()
-    except SEARCH_CORRUPTED_ERRORS as e:
-        print_error_with_tip(
-            f"Search index corrupted or outdated: {e}",
-            "Run 'forge search rebuild-index' to rebuild.",
-        )
-        return
-    except SEARCH_UNREADABLE_ERRORS:
-        raise
     if bm25_index is not None:
         console.print(
             f"BM25 index: [cyan]{len(bm25_index.doc_keys)}[/cyan] documents, "

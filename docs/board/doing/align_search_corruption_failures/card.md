@@ -1,10 +1,10 @@
 # Align search corruption failures
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D017 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind the proxy create JSON member.
+**Lane**: `doing/` -- active on `fix/align-search-corruption-failures` from merged PR #150 (`61580fdb`).
 
 ## Goal
 
@@ -20,8 +20,9 @@ JSON modes.
 
 ## Evidence
 
-Rechecked on `3f3a3c6d` with malformed BM25 and document-store files. `search query` exited 0 in JSON and human modes;
-`search status` exited 1 only in JSON mode and exited 0 in human mode.
+Rechecked on merged `main` at `61580fdb` with a valid empty document store and malformed BM25 file. The retained
+four-case regression failed for query human, query JSON, and status human because each exited 0; status JSON was the
+only passing case because it already emitted one stderr object and exited 1.
 
 ## Expected Behavior
 
@@ -39,3 +40,5 @@ Rechecked on `3f3a3c6d` with malformed BM25 and document-store files. `search qu
 
 - Do not change `--scope all` partial-result policy without separate evidence.
 - Do not rebuild or delete corrupt state automatically; keep the explicit `search rebuild-index` recovery action.
+- Keep query's unreadable-state stream/exit mismatch separate as D051; inability to read bytes is not known corruption.
+- Keep `search clean`'s generic human corruption guidance separate as D052; this member owns query/status recovery only.
