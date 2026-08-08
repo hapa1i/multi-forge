@@ -39,9 +39,9 @@ from .settings_merge import (
     cleanup_empty_settings,
     entries_to_added_structure,
     find_added_files,
-    find_backup_files,
     get_settings_path,
     read_settings,
+    read_tracked_settings_baseline,
     save_added_settings,
     settings_equal,
     smart_unmerge,
@@ -483,10 +483,12 @@ class RuntimeRemovalExecutor:
             try:
                 added_files = tuple(find_added_files(settings_path))
                 needs_settings_transition = bool(
-                    plan.settings_entries or plan.surviving_settings_entries or added_files
+                    plan.settings_entries
+                    or plan.surviving_settings_entries
+                    or existing.settings_backup_path is not None
+                    or added_files
                 )
                 if needs_settings_transition:
-                    backup_files = find_backup_files(settings_path)
                     self._validate_path_within_boundary(settings_path, base_dir, "update settings")
                     for added_file in added_files:
                         self._validate_path_within_boundary(
@@ -494,15 +496,19 @@ class RuntimeRemovalExecutor:
                             base_dir,
                             "update settings ownership",
                         )
-                    if plan.settings_entries and backup_files:
+                    baseline_path = (
+                        Path(existing.settings_backup_path) if existing.settings_backup_path is not None else None
+                    )
+                    if baseline_path is not None:
                         self._validate_path_within_boundary(
-                            backup_files[0],
+                            baseline_path,
                             base_dir,
-                            "read settings backup",
+                            "read settings baseline",
                         )
                     rollback_state = capture_settings_rollback_state(settings_path)
                     current = read_settings(settings_path) if plan.settings_entries else {}
-                    backup = read_settings(backup_files[0]) if plan.settings_entries and backup_files else {}
+                    tracked_baseline = read_tracked_settings_baseline(baseline_path)
+                    backup = tracked_baseline if plan.settings_entries else {}
                     settings_preflight = _RuntimeSettingsPreflight(
                         settings_path=settings_path,
                         current=current,

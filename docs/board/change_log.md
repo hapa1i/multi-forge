@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-08
+
+### Preserve the installation settings baseline
+
+**Goal/outcome**: Keep one pre-Forge Claude settings baseline across repeated enable/sync and both disable paths.
+
+**Key changes**:
+
+- Preserved the first settings baseline, including authoritative null, while collision-safe later snapshots remain
+  rollback history instead of replacing it.
+- Made full and runtime-scoped disable validate and read the tracked baseline before mutation; invalid paths retain
+  ownership, and null legacy rows never adopt newer Forge-bearing history.
+
+**Verification**: The retained regression failed on merged `main`. After implementation and review amendment, 826
+installer/D012 tests (one skip), 109 focused CLI/regression tests, 682 regressions, and the targeted Docker and isolated
+wheel lifecycles passed; final `make pre-commit` also passed. Independent review's one LOW tracked-baseline deletion
+race is closed by direct decoding and a deterministic regression; its two informational observations remain unchanged.
+
 ## 2026-08-07
 
 ### Restore Codex install transaction rollback
@@ -41,7 +59,7 @@ wc -l docs/board/change_log.md
 **Verification**: The marked regression failed on the base. After the fix, 74 focused, 921 broader installer/CLI (one
 skip), 678 regression, and 8,818 unit tests (one skip) passed; an isolated wheel-installed enable/status/disable smoke
 and final `make pre-commit` also passed. Independent review found no design violations and passed 793 install unit tests
-plus all 6 Docker Codex installer tests.
+plus all 6 Docker Codex installer tests. Shipped in PR #144 (`37a03209`).
 
 ### Close session/state safety and sequence installer transactions
 

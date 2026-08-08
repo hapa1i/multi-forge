@@ -14,6 +14,7 @@ from forge.install.ownership import attributed
 from forge.install.settings_merge import (
     backup_settings,
     check_scalar_conflict,
+    find_backup_files,
     get_settings_path,
     hooks_already_present,
     merge,
@@ -21,6 +22,7 @@ from forge.install.settings_merge import (
     merge_permissions,
     permissions_already_present,
     read_settings,
+    read_tracked_settings_baseline,
     restore_settings_backup,
     scalar_already_set,
     set_scalar,
@@ -125,6 +127,97 @@ class TestBackupSettings:
         # New format: .settings.json.forge.backup.{timestamp}
         assert backup_path.name.startswith(".settings.json.forge.backup.")
         assert backup_path.read_text() == '{"key": "value"}'
+
+    def test_same_second_backups_never_overwrite_prior_snapshot(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings_file = tmp_path / "settings.json"
+        monkeypatch.setattr("forge.install.settings_merge._get_timestamp", lambda: "20260101-000000")
+        settings_file.write_text('{"generation": 1}', encoding="utf-8")
+
+        first = backup_settings(settings_file)
+        settings_file.write_text('{"generation": 2}', encoding="utf-8")
+        second = backup_settings(settings_file)
+
+        assert first is not None
+        assert second is not None
+        assert second != first
+        assert second.name == f"{first.name}.001"
+        assert first.read_text(encoding="utf-8") == '{"generation": 1}'
+        assert second.read_text(encoding="utf-8") == '{"generation": 2}'
+        assert find_backup_files(settings_file) == [second, first]
+
+    def test_failed_snapshot_does_not_remove_same_second_baseline(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text('{"generation": 2}', encoding="utf-8")
+        baseline = tmp_path / ".settings.json.forge.backup.20260101-000000"
+        baseline.write_text('{"generation": 1}', encoding="utf-8")
+        monkeypatch.setattr("forge.install.settings_merge._get_timestamp", lambda: "20260101-000000")
+        real_open = Path.open
+
+        def fail_source_read(path: Path, *args: Any, **kwargs: Any) -> Any:
+            if path == settings_file and args and args[0] == "rb":
+                raise PermissionError("injected source read failure")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", fail_source_read)
+
+        with pytest.raises(PermissionError, match="injected source read failure"):
+            backup_settings(settings_file)
+
+        assert baseline.read_text(encoding="utf-8") == '{"generation": 1}'
+        assert not baseline.with_name(f"{baseline.name}.001").exists()
+
+
+class TestReadTrackedSettingsBaseline:
+    def test_null_legacy_path_does_not_discover_newer_history(self, tmp_path: Path) -> None:
+        settings_file = tmp_path / "settings.json"
+        backup = tmp_path / ".settings.json.forge.backup.20260101-000000"
+        write_settings(backup, {"statusLine": "forge status-line"})
+
+        assert read_tracked_settings_baseline(None) == {}
+        assert find_backup_files(settings_file) == [backup]
+
+    def test_recorded_path_must_remain_a_regular_file(self, tmp_path: Path) -> None:
+        missing = tmp_path / ".settings.json.forge.backup.missing"
+        directory = tmp_path / ".settings.json.forge.backup.directory"
+        directory.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="tracked settings baseline does not exist"):
+            read_tracked_settings_baseline(missing)
+        with pytest.raises(OSError, match="tracked settings baseline is not a regular file"):
+            read_tracked_settings_baseline(directory)
+
+    def test_recorded_baseline_vanishing_after_validation_is_not_authoritative_null(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        baseline = tmp_path / ".settings.json.forge.backup.20260101-000000"
+        write_settings(baseline, {"statusLine": "original"})
+        real_lstat = Path.lstat
+
+        def delete_after_lstat(path: Path) -> Any:
+            result = real_lstat(path)
+            if path == baseline:
+                path.unlink()
+            return result
+
+        monkeypatch.setattr(Path, "lstat", delete_after_lstat)
+
+        with pytest.raises(FileNotFoundError, match="tracked settings baseline does not exist"):
+            read_tracked_settings_baseline(baseline)
+
+    def test_recorded_baseline_must_contain_a_json_object(self, tmp_path: Path) -> None:
+        baseline = tmp_path / ".settings.json.forge.backup.20260101-000000"
+        baseline.write_text('["not", "an", "object"]', encoding="utf-8")
+
+        with pytest.raises(ValueError, match="tracked settings baseline is not a JSON object"):
+            read_tracked_settings_baseline(baseline)
 
 
 class TestRestoreSettingsBackup:

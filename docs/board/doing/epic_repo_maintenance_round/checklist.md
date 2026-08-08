@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: merge the independently reviewed D013/D014 member before activating D012.
+Current focus: merge the independently reviewed D012 implementation without activating D019.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -69,7 +69,12 @@ Current focus: merge the independently reviewed D013/D014 member before activati
 - [x] Activate D013/D014 from merged `main` at `afde43bf` and create its execution checklists.
 - [x] Retain D013/D014 regressions and implement exact Codex config rollback across read-back and tracking failures.
 - [x] Independently review D013/D014 (2026-08-08; no design violations).
-- [ ] Merge D013/D014 before activating D012.
+- [x] Merge D013/D014 before activating D012 (PR #144, `37a03209`).
+- [x] Activate D012 from merged `main` and create its execution checklist.
+- [x] Retain D012's baseline-rotation regression and implement immutable baseline ownership across both disable paths.
+- [x] Verify D012 with focused, Docker, clean-wheel, regression, and pre-commit coverage.
+- [x] Independently review D012 and resolve its LOW tracked-baseline deletion race.
+- [ ] Merge D012 before activating D019.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

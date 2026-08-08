@@ -36,6 +36,7 @@ from forge.install.installer import (
 from forge.install.models import (
     FilePlan,
     Installation,
+    InstalledFile,
     InstalledSettingsEntry,
     InstallMode,
     InstallModule,
@@ -44,7 +45,13 @@ from forge.install.models import (
     InstallScope,
 )
 from forge.install.ownership import attributed, module_values
-from forge.install.settings_merge import load_added_settings, read_settings
+from forge.install.settings_merge import (
+    entries_to_added_structure,
+    load_added_settings,
+    read_settings,
+    save_added_settings,
+    write_settings,
+)
 from forge.install.tracking import TrackingStore
 
 
@@ -814,6 +821,63 @@ class TestInstallerUpdate:
 class TestInstallerUninstall:
     """Tests for Installer.uninstall method."""
 
+    @pytest.fixture
+    def settings_uninstall_setup(
+        self,
+        tmp_path: Path,
+    ) -> tuple[Installer, TrackingStore, Installation, Path, Path, Path, Path]:
+        project_root = tmp_path / "project"
+        claude_root = project_root / ".claude"
+        settings_path = claude_root / "settings.json"
+        tracked_file = claude_root / "commands" / "review.md"
+        tracked_file.parent.mkdir(parents=True)
+        tracked_file.write_text("# Review\n", encoding="utf-8")
+        baseline_path = claude_root / ".settings.json.forge.backup.20260101-000000"
+        baseline = {"theme": "dark"}
+        statusline = {"type": "command", "command": "forge status-line"}
+        entry = InstalledSettingsEntry(
+            key_path="statusLine",
+            value=statusline,
+            merge_type="scalar",
+            stable_id="statusLine",
+            attribution=attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
+        )
+        write_settings(baseline_path, baseline)
+        write_settings(settings_path, {**baseline, "statusLine": statusline})
+        added_path = save_added_settings(settings_path, entries_to_added_structure([entry]))
+        installation = Installation(
+            scope=InstallScope.PROJECT.value,
+            project_path=str(project_root),
+            mode=InstallMode.COPY.value,
+            profile=InstallProfile.MINIMAL.value,
+            module_owners=[
+                attributed(InstallModule.COMMANDS, CLAUDE_CODE_RUNTIME),
+                attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
+            ],
+            files=[
+                InstalledFile(
+                    target_path=str(tracked_file),
+                    source_path=str(tmp_path / "source" / "review.md"),
+                    checksum="tracked",
+                    mode=InstallMode.COPY.value,
+                    installed_at="2026-01-01T00:00:00+00:00",
+                    attribution=attributed(InstallModule.COMMANDS, CLAUDE_CODE_RUNTIME),
+                )
+            ],
+            settings_entries=[entry],
+            settings_backup_path=str(baseline_path),
+            installed_at="2026-01-01T00:00:00+00:00",
+            updated_at="2026-01-01T00:00:00+00:00",
+        )
+        tracking = TrackingStore(tmp_path / ".forge" / "installed.json")
+        tracking.set_installation(InstallScope.PROJECT.value, installation, str(project_root))
+        installer = Installer(
+            scope=InstallScope.PROJECT,
+            project_root=project_root,
+            tracking_store=tracking,
+        )
+        return installer, tracking, installation, settings_path, added_path, baseline_path, tracked_file
+
     def test_uninstall_raises_when_not_installed(self, temp_forge_home: Path) -> None:
         tracking = TrackingStore(tracking_path=temp_forge_home / "installed.json")
         installer = Installer(
@@ -825,6 +889,69 @@ class TestInstallerUninstall:
             installer.uninstall()
 
         assert exc_info.value.scope == "user"
+
+    @pytest.mark.parametrize("baseline_state", ["missing", "unreadable", "unsafe"])
+    def test_invalid_recorded_baseline_refuses_full_uninstall_before_mutation(
+        self,
+        settings_uninstall_setup: tuple[Installer, TrackingStore, Installation, Path, Path, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        baseline_state: str,
+    ) -> None:
+        installer, tracking, installation, settings_path, added_path, baseline_path, tracked_file = (
+            settings_uninstall_setup
+        )
+        if baseline_state == "missing":
+            baseline_path.unlink()
+        elif baseline_state == "unreadable":
+
+            def fail_baseline_read(_path: Path | None) -> dict[str, Any]:
+                raise PermissionError("injected unreadable baseline")
+
+            monkeypatch.setattr(
+                "forge.install.installer.read_tracked_settings_baseline",
+                fail_baseline_read,
+            )
+        else:
+            unsafe_path = tmp_path / "outside-settings-baseline.json"
+            write_settings(unsafe_path, {"theme": "dark"})
+            installation.settings_backup_path = str(unsafe_path)
+            tracking.set_installation(InstallScope.PROJECT.value, installation, str(installation.project_path))
+
+        settings_before = settings_path.read_bytes()
+        added_before = added_path.read_bytes()
+        expected_error = PathBoundaryViolationError if baseline_state == "unsafe" else ForgeInstallError
+
+        with pytest.raises(expected_error):
+            installer.uninstall()
+
+        assert tracked_file.exists()
+        assert settings_path.read_bytes() == settings_before
+        assert added_path.read_bytes() == added_before
+        assert tracking.get_installation(InstallScope.PROJECT.value, str(installation.project_path)) == installation
+
+    def test_null_legacy_baseline_does_not_adopt_newest_history_on_full_uninstall(
+        self,
+        settings_uninstall_setup: tuple[Installer, TrackingStore, Installation, Path, Path, Path, Path],
+    ) -> None:
+        installer, tracking, installation, settings_path, _added_path, baseline_path, tracked_file = (
+            settings_uninstall_setup
+        )
+        current = read_settings(settings_path)
+        current["theme"] = "light"
+        write_settings(settings_path, current)
+        newer_backup = settings_path.parent / ".settings.json.forge.backup.20270101-000000"
+        write_settings(newer_backup, current)
+        installation.settings_backup_path = None
+        tracking.set_installation(InstallScope.PROJECT.value, installation, str(installation.project_path))
+
+        installer.uninstall()
+
+        assert read_settings(settings_path) == {"theme": "light"}
+        assert baseline_path.exists()
+        assert newer_backup.exists()
+        assert not tracked_file.exists()
+        assert tracking.get_installation(InstallScope.PROJECT.value, str(installation.project_path)) is None
 
 
 class TestInstallerSymlinkMode:

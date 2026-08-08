@@ -91,10 +91,10 @@ from .settings_merge import (
     find_backup_files,
     get_settings_path,
     hooks_already_present,
-    load_added_settings,
     merge,
     permissions_already_present,
     read_settings,
+    read_tracked_settings_baseline,
     save_added_settings,
     scalar_already_set,
     settings_equal,
@@ -2055,6 +2055,12 @@ class Installer:
         else:
             module_owners.discard(codex_owner)
 
+        # An earlier no-file enable establishes authoritative null; later Forge-bearing snapshots stay history.
+        settings_baseline_established = existing is not None and (
+            existing.settings_backup_path is not None
+            or bool(existing.settings_entries)
+            or any(has_module_owner(existing, module, CLAUDE_CODE_RUNTIME) for module in _CLAUDE_SETTINGS_MODULES)
+        )
         installation = Installation(
             scope=self._scope.value,
             mode=mode.value,
@@ -2064,7 +2070,9 @@ class Installer:
             skill_packages=final_skill_packages,
             settings_entries=final_entries,
             settings_backup_path=(
-                str(backup_path) if backup_path else existing.settings_backup_path if existing is not None else None
+                existing.settings_backup_path
+                if settings_baseline_established and existing is not None
+                else str(backup_path) if backup_path else None
             ),
             codex_config_path=codex_path,
             codex_commands=codex_commands,
@@ -2388,11 +2396,7 @@ class Installer:
         )
 
     def uninstall(self) -> None:
-        """Remove Forge installation.
-
-        Raises:
-            NotInstalledError: If no existing installation.
-        """
+        """Remove the tracked Forge installation."""
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
         if existing is None:
             raise NotInstalledError(self._scope.value)
@@ -2408,13 +2412,26 @@ class Installer:
             removals.append((file_record, target, boundary))
 
         settings_path = get_settings_path(self._scope, self._project_root)
-        backup_files = find_backup_files(settings_path)
         added_files = find_added_files(settings_path)
-        has_settings_state = bool(existing.settings_entries or existing.settings_backup_path or added_files)
+        has_settings_state = bool(existing.settings_entries or added_files) or existing.settings_backup_path is not None
+        current: dict[str, Any] = {}
+        backup: dict[str, Any] = {}
+        added: dict[str, Any] = {}
+        baseline_path = Path(existing.settings_backup_path) if existing.settings_backup_path is not None else None
         if has_settings_state:
-            validate_path_within_boundary(settings_path, base_dir, "delete settings")
-            for added_file in added_files:
-                validate_path_within_boundary(added_file, base_dir, "delete added file")
+            try:
+                validate_path_within_boundary(settings_path, base_dir, "delete settings")
+                for added_file in added_files:
+                    validate_path_within_boundary(added_file, base_dir, "delete added file")
+                if baseline_path is not None:
+                    validate_path_within_boundary(baseline_path, base_dir, "read settings baseline")
+                current = read_settings(settings_path)
+                backup = read_tracked_settings_baseline(baseline_path)
+                added = read_settings(added_files[0]) if added_files else {}
+            except PathBoundaryViolationError:
+                raise
+            except (OSError, ValueError) as e:
+                raise ForgeInstallError(f"Cannot safely prepare Claude settings at '{settings_path}': {e}") from e
 
         dirs_to_clean: set[tuple[Path, Path]] = set()
         for _file_record, target, boundary in removals:
@@ -2426,7 +2443,6 @@ class Installer:
                 dirs_to_clean.add((parent, boundary))
                 parent = parent.parent
 
-        # Clean up empty directories (deepest first)
         for dir_path, _boundary in sorted(dirs_to_clean, key=lambda item: len(item[0].parts), reverse=True):
             try:
                 dir_path.rmdir()
@@ -2434,22 +2450,15 @@ class Installer:
                 pass  # Directory not empty or doesn't exist
 
         if has_settings_state:
-            current = read_settings(settings_path)
-            backup = read_settings(backup_files[0]) if backup_files else {}
-            added = load_added_settings(settings_path)  # Already finds most recent
-
             if added:
-                # Use smart unmerge: removes our additions, preserves user changes
                 result = smart_unmerge(current, backup, added)
                 result = cleanup_empty_settings(result)
 
                 backup_cleaned = cleanup_empty_settings(backup)
                 if settings_equal(result, backup_cleaned):
-                    if backup_files and backup_cleaned:
-                        # Had content before, restore it (use cleaned for consistency)
+                    if baseline_path is not None and backup_cleaned:
                         write_settings(settings_path, backup_cleaned)
                     elif settings_path.is_file():
-                        # Was empty/non-existent before, delete
                         settings_path.unlink()
                 else:
                     write_settings(settings_path, result)
@@ -2467,11 +2476,7 @@ class Installer:
         self._tracking.remove_installation(self._scope.value, self._project_path_str)
 
     def validate_codex_config_scope(self, existing: Installation) -> None:
-        """Refuse disable when tracked Codex ownership conflicts with the current scope mapping.
-
-        A mismatch leaves both the managed hook block and its tracking row intact,
-        so the user can restore the original ``CODEX_HOME`` and retry.
-        """
+        """Refuse a tracked Codex config outside the current scope mapping."""
         if not existing.codex_config_path:
             return
         tracked = Path(existing.codex_config_path)
@@ -2480,12 +2485,7 @@ class Installer:
             raise CodexConfigScopeMismatchError(str(tracked), str(expected))
 
     def _remove_codex_registration(self, existing: Installation) -> None:
-        """Remove the Forge-managed Codex hook block recorded in tracking.
-
-        ``validate_codex_config_scope`` runs before any removal work. A mismatch
-        refuses the whole operation and preserves tracking instead of merely
-        skipping the unexpected file.
-        """
+        """Remove tracked Forge-managed Codex hooks after scope validation."""
         if not existing.codex_config_path:
             return
         tracked = Path(existing.codex_config_path)

@@ -1062,42 +1062,43 @@ row. They mount project skills, not host-user or Codex skill targets.
 | `statusLine`        | Scalar merge; conflict fails unless `--force`                          |
 | `model`             | Never touched                                                          |
 
-Changed settings are backed up as `.settings[.local].json.forge.backup.<timestamp>`. Legacy cleanup removes only a
-normalized, exact released wrapper; tracked removal requires the full current canonical value. Other Forge-looking
-wrappers remain and are reported.
+Snapshots use `.settings[.local].json.forge.backup.<timestamp>` with numeric collision suffixes. The first
+settings-bearing enable records the existing file's pre-Forge snapshot or authoritative null; later snapshots remain
+history. Legacy cleanup removes only a normalized exact released wrapper; tracked removal requires the current canonical
+value; other Forge-looking wrappers are reported.
 
-Runtime disable smart-unmerges selected tracked values against the pre-Forge backup. Settings and all `.forge-added`
-sidecars form one reversible, byte/mode-snapshotted transition. Survivors rewrite the newest sidecar and retain its
-baseline; no survivors removes all sidecars and clears `settings_backup_path`, not backup history. Legacy/no-sidecar
-removal still compares values, preserving user edits. Failure restores both surfaces and names incomplete paths.
+Full and runtime disable validate, then smart-unmerge against that baseline. A recorded path must be an in-scope
+readable regular JSON object or ownership remains. Settings and `.forge-added` sidecars form one byte/mode-snapshotted
+transition. Survivors update the newest sidecar and retain the baseline; no survivors removes sidecars and clears
+`settings_backup_path`, not history. Legacy/no-sidecar removal compares values. Failures restore surfaces and name
+incomplete paths.
 
 ### C.4 Durable install/project files
 
 #### Installed manifest (`~/.forge/installed.json`)
 
-Schema v3 has sorted unique `module_owners: [{module, runtime}]`; each file/settings row has a backed pair or explicit
-`{unattributed_reason}`, and duplicate identities are invalid.
+Schema v3 requires unique sorted `module_owners: [{module, runtime}]`. Every file/settings row has a backed pair or
+explicit `{unattributed_reason}`; duplicate identities are invalid.
 
-Frozen v1/v2 rows normalize in memory and persist v3 on the next mutation. Only the released Codex-hook value migrates;
-other unknown modules remain corruption. `(hooks, codex)` exists iff `codex_config_path` witnesses the block. V2 skills
-use package runtime; older rows use closed path/key maps, leaving unknowns unattributed. A new Codex-owned module needs
-a versioned migration.
+Frozen v1/v2 rows normalize in memory and persist v3 on mutation. Only the released Codex-hook value migrates; unknown
+modules remain corruption. `(hooks, codex)` exists iff `codex_config_path` witnesses the block. V2 skills use package
+runtime; older rows use closed path/key maps and leave unknowns unattributed. New Codex-owned modules require a
+versioned migration.
 
-Runtime removal intersects requested ids and `MODULE_RUNTIME_OWNERS` with persisted owners; it never adopts untracked
-surfaces. Attributed file, settings, package, and owner rows drop together. Removing Codex hooks clears both Codex
-fields; dropping owner pairs prevents sync resurrection. Partial removal retains visible unattributed rows; full
-coverage includes them and deletes the row. `profile` stays historical.
+Runtime removal intersects requested ids and `MODULE_RUNTIME_OWNERS` with persisted owners, never adopting untracked
+surfaces. Attributed file, settings, package, and owner rows drop together. Removing Codex hooks clears both fields;
+dropping owners prevents sync resurrection. Partial removal retains visible unattributed rows; full coverage deletes the
+row. `profile` stays historical.
 
-All file, settings/sidecar, Codex-scope, and marker checks preflight before mutation; filesystem work precedes atomic
-tracking. Enable/sync snapshots settings ownership and the exact bytes/mode of any Codex config it will change. A Codex
-apply/read-back or final tracking failure restores those snapshots and newly created files; if the config changed again
-after Forge wrote it, rollback preserves that newer state and names the incomplete path instead of overwriting it. A
-runtime-removal failure commits a coherent completed subset. A failed reconciliation leaves the old safe over-claim;
-landed settings restore first, and errors name tracking plus incomplete rollback paths.
+File, baseline, sidecar, Codex-scope, and marker checks preflight; filesystem work precedes atomic tracking. Enable/sync
+snapshot per-attempt ownership without rotating the baseline, plus exact Codex config bytes/mode. Codex apply/read-back
+or final tracking failure restores snapshots and new files; if the config changes again, rollback preserves it and names
+the incomplete path. A runtime-removal failure commits a coherent completed subset. A failed reconciliation leaves the
+old safe over-claim; landed settings restore first, and errors name tracking plus incomplete rollback paths.
 
-`disable --all` aggregates every row and exits 1 on any failure. Setup uninstall deletes `$FORGE_HOME` only after
-success and preserves tracking when teardown cannot run. Legacy `cleanup-project` validates one canonical row and newest
-sidecar, removes only hook ownership, and leaves stale/unrecoverable rows report-only.
+`disable --all` aggregates rows and exits 1 on failure. Setup uninstall deletes `$FORGE_HOME` only after success,
+preserving tracking when teardown cannot run. Legacy `cleanup-project` validates one canonical row and newest sidecar,
+removes only hook ownership, and leaves stale/unrecoverable rows report-only.
 
 #### Runtime metadata (`~/.forge/runtime.json`)
 
