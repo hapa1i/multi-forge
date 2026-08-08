@@ -130,6 +130,10 @@ outside the applicable `.claude` directory, disable stops before removing tracke
 record; restore that named path, then retry. Older records with no baseline do not adopt a newer Forge-bearing backup
 automatically.
 
+For older installations without an added-settings record, disable removes a tracked scalar or environment value only
+when it still equals the value Forge recorded. Values changed after installation and unrelated settings remain; tracked
+hook and permission entries keep their existing value-based removal behavior.
+
 Removing Codex deletes only the balanced Forge marker block and preserves every byte outside it, including manual
 Forge-looking registrations. Those outside-marker commands are user-owned and produce a warning; they do not keep
 managed ownership alive. A missing config or an existing config with no Forge markers clears stale tracking without

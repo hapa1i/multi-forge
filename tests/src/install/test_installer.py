@@ -953,6 +953,83 @@ class TestInstallerUninstall:
         assert not tracked_file.exists()
         assert tracking.get_installation(InstallScope.PROJECT.value, str(installation.project_path)) is None
 
+    @pytest.mark.parametrize("with_baseline", [False, True], ids=["without-baseline", "with-baseline"])
+    def test_legacy_full_uninstall_preserves_modified_scalar_and_environment_values(
+        self,
+        tmp_path: Path,
+        with_baseline: bool,
+    ) -> None:
+        project_root = tmp_path / "project"
+        settings_path = project_root / ".claude" / "settings.json"
+        baseline_path = project_root / ".claude" / ".settings.json.forge.backup.20260101-000000"
+        tracked_statusline = {"type": "command", "command": "forge status-line"}
+        user_statusline = {"type": "command", "command": "my status-line"}
+        write_settings(
+            settings_path,
+            {
+                "statusLine": user_statusline,
+                "env": {
+                    "EDITED": "user-value",
+                    "OWNED": "forge-value",
+                    "USER_ONLY": "keep-me",
+                },
+            },
+        )
+        if with_baseline:
+            write_settings(baseline_path, {"theme": "dark"})
+
+        statusline_owner = attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME)
+        permissions_owner = attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME)
+        entries = [
+            InstalledSettingsEntry(
+                key_path="statusLine",
+                value=tracked_statusline,
+                merge_type="scalar",
+                stable_id="statusLine",
+                attribution=statusline_owner,
+            ),
+            InstalledSettingsEntry(
+                key_path="env.EDITED",
+                value="forge-value",
+                merge_type="env",
+                stable_id="EDITED",
+                attribution=permissions_owner,
+            ),
+            InstalledSettingsEntry(
+                key_path="env.OWNED",
+                value="forge-value",
+                merge_type="env",
+                stable_id="OWNED",
+                attribution=permissions_owner,
+            ),
+        ]
+        installation = Installation(
+            scope=InstallScope.PROJECT.value,
+            project_path=str(project_root),
+            mode=InstallMode.COPY.value,
+            profile=InstallProfile.MINIMAL.value,
+            module_owners=sorted({statusline_owner, permissions_owner}),
+            settings_entries=entries,
+            settings_backup_path=str(baseline_path) if with_baseline else None,
+            installed_at="2026-01-01T00:00:00+00:00",
+            updated_at="2026-01-01T00:00:00+00:00",
+        )
+        tracking = TrackingStore(tmp_path / ".forge" / "installed.json")
+        tracking.set_installation(InstallScope.PROJECT.value, installation, str(project_root))
+
+        Installer(
+            scope=InstallScope.PROJECT,
+            project_root=project_root,
+            tracking_store=tracking,
+        ).uninstall()
+
+        assert read_settings(settings_path) == {
+            "statusLine": user_statusline,
+            "env": {"EDITED": "user-value", "USER_ONLY": "keep-me"},
+        }
+        assert baseline_path.exists() is with_baseline
+        assert tracking.get_installation(InstallScope.PROJECT.value, str(project_root)) is None
+
 
 class TestInstallerSymlinkMode:
     """Tests for symlink installation mode."""

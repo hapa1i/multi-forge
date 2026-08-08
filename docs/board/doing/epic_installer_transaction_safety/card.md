@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D013/D014 shipped in PR #144; D012 implementation, verification, and independent review are
-complete pending merge, and D019 remains parked.
+**Lane**: `doing/` -- D013/D014 shipped in PR #144 and D012 in PR #145; D019 is implemented and awaiting review as the
+final member.
 
 ## Goal
 
@@ -38,11 +38,11 @@ disable later selects.
 
 ## Members and Sequence
 
-| Order | Findings  | Member                                                                                          | Review boundary                                             |
-| ----- | --------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1     | D013–D014 | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md)   | Codex mutation, failure rollback, and final tracking commit |
-| 2     | D012      | [`preserve_install_settings_baseline`](../preserve_install_settings_baseline/card.md)           | Immutable pre-Forge baseline across enable/sync and disable |
-| 3     | D019      | [`preserve_legacy_settings_user_edits`](../../todo/preserve_legacy_settings_user_edits/card.md) | Value-aware fallback when no ownership sidecar exists       |
+| Order | Findings  | Member                                                                                        | Review boundary                                             |
+| ----- | --------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1     | D013–D014 | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md) | Codex mutation, failure rollback, and final tracking commit |
+| 2     | D012      | [`preserve_install_settings_baseline`](../../done/preserve_install_settings_baseline/card.md) | Immutable pre-Forge baseline across enable/sync and disable |
+| 3     | D019      | [`preserve_legacy_settings_user_edits`](../preserve_legacy_settings_user_edits/card.md)       | Value-aware fallback when no ownership sidecar exists       |
 
 D013 and D014 stay together because one pre-mutation Codex snapshot and one rollback path must cover both the post-write
 read-back boundary and the later manifest commit; splitting them would duplicate the transaction mechanism while
@@ -53,8 +53,9 @@ legacy compatibility path and ships last.
 D013/D014 restores the exact Codex config bytes/mode across apply, read-back, and final tracking failures while
 preserving and reporting a later concurrent edit. Independent review found no design violations, and the member shipped
 in PR #144 (`37a03209`). D012 now retains one immutable settings baseline across enable/sync and both disable paths; its
-implementation, required verification, and independent review are complete pending merge. The review's one LOW
-tracked-baseline deletion race is closed; its two informational observations require no change.
+review's one LOW tracked-baseline deletion race is closed, and the member shipped in PR #145 (`f069226f`). D019 now
+removes legacy scalar/environment values only when they still match tracking; its fail-first regression plus host,
+Docker, and clean-wheel coverage pass, and independent review/merge remain.
 
 ## Drift Constraints
 

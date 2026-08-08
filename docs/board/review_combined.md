@@ -36,7 +36,7 @@ sequencing and disposition; this report remains the evidence ledger. Waves 1--3 
 members shipped through PR #142. Wave 4's four installer findings were rechecked on merged `main` at `2461e3fa` and
 converted into three members under
 [`epic_installer_transaction_safety`](doing/epic_installer_transaction_safety/card.md). D013/D014 shipped in PR #144,
-D012 is independently reviewed pending merge, and D019 remains parked.
+D012 shipped in PR #145, and D019 is implemented and awaiting review as the final member.
 
 ### Finding fields
 
@@ -304,7 +304,7 @@ implementation outcome below records its completed code and regression work.
   missing, user-owned, and stale managed-block configs. Independent review found no design violations and passed the
   793-test install unit slice plus all 6 Docker Codex installer tests. It shipped in PR #144 (`37a03209`). See
   [`rollback_codex_install_transaction`](done/rollback_codex_install_transaction/card.md).
-- **D012 — implemented 2026-08-08:** the first settings-bearing enable now establishes an immutable pre-Forge baseline,
+- **D012 — resolved 2026-08-08:** the first settings-bearing enable now establishes an immutable pre-Forge baseline,
   including an authoritative null when no settings file existed. Later enable/sync attempts keep collision-safe history
   snapshots without rotating that baseline. Whole and runtime-scoped disable validate and read the tracked path instead
   of selecting the newest backup; invalid non-null paths fail before removal, while null legacy rows never invent a
@@ -313,8 +313,15 @@ implementation outcome below records its completed code and regression work.
   direct decoding and a deterministic regression close it. The 826-test installer/D012 slice (one skip), 109 focused
   CLI/regression tests, all 682 marked regressions, a dedicated Docker lifecycle, and an isolated wheel lifecycle pass.
   Final `make pre-commit` also passes. The parked test-only restore helper and acceptable end-user path simplification
-  remain unchanged. Merge remains. See
-  [`preserve_install_settings_baseline`](doing/preserve_install_settings_baseline/card.md).
+  remain unchanged. It shipped in PR #145 (`f069226f`). See
+  [`preserve_install_settings_baseline`](done/preserve_install_settings_baseline/card.md).
+- **D019 — implemented 2026-08-08, pending review/merge:** legacy no-sidecar removal now deletes scalar and environment
+  values only when they still equal their tracked Forge values. Missing and user-modified values remain while matching
+  siblings are removed; hook canonical matching and permission stable-id matching are unchanged. The retained regression
+  failed on `f069226f`, then 148 focused settings/installer/D019 regression tests and 105 CLI tests passed. The broader
+  install slice passed 828 with one skip; all 683 marked regressions, a targeted Docker disable case, the clean wheel
+  lifecycle, and final `make pre-commit` also passed. See
+  [`preserve_legacy_settings_user_edits`](doing/preserve_legacy_settings_user_edits/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -517,11 +524,11 @@ module passed four assertions of the broken behavior and was removed after evide
 characterization corrected D012's stale claim that tracking retained the first backup: sync replaces the tracked path as
 well as creating the newer Forge-bearing backup. No implementation member was activated during admission.
 
-| Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                           |
-| ----- | --------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](done/rollback_codex_install_transaction/card.md)   |
-| 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](doing/preserve_install_settings_baseline/card.md)  |
-| 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](todo/preserve_legacy_settings_user_edits/card.md) |
+| Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                            |
+| ----- | --------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](done/rollback_codex_install_transaction/card.md)    |
+| 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](done/preserve_install_settings_baseline/card.md)    |
+| 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](doing/preserve_legacy_settings_user_edits/card.md) |
 
 D013 and D014 share one rollback transaction: the same pre-mutation Codex snapshot must cover a post-write read-back
 failure and the later manifest commit, so they form one member rather than two partial rollback implementations. It goes
@@ -538,8 +545,7 @@ HIGH-severity baseline invariant; D019's bounded no-sidecar compatibility path s
 - **[Durable-state/session epic](done/epic_session_durable_state_safety/card.md):** all eight Wave 3 members shipped
   independently in PRs #134--#138 and #140--#142.
 - **[Installer epic](doing/epic_installer_transaction_safety/card.md):** D013/D014's shared Codex rollback transaction
-  shipped in PR #144; D012 is independently reviewed pending merge, and D019 remains parked as the separate legacy-value
-  member.
+  shipped in PR #144 and D012 in PR #145; D019 is implemented and awaiting review as the final legacy-value member.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit
   status, result-on-stdout, and diagnostics-on-stderr across accepted members.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol

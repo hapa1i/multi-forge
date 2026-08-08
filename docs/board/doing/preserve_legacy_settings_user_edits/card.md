@@ -1,10 +1,11 @@
 # Preserve user edits during legacy settings removal
 
-**Epic**: [`epic_installer_transaction_safety`](../../doing/epic_installer_transaction_safety/card.md).
+**Epic**: [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
 
 **Finding**: D019 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- final Wave 4 member after the tracked-baseline work.
+**Lane**: `doing/` -- implemented and verified on `fix/preserve-legacy-settings-user-edits`; awaiting independent review
+and merge after D012 shipped in PR #145.
 
 ## Goal
 
@@ -20,9 +21,16 @@ tracked Forge-owned values.
 
 ## Evidence
 
-Rechecked on `2461e3fa` with a valid legacy installation row and no `.forge.added.*` sidecar. After changing both the
+Rechecked on `f069226f` with a valid legacy installation row and no `.forge.added.*` sidecar. After changing both the
 tracked `statusLine` and a tracked environment value, full disable deleted both; an unrelated environment value
 survived. Hooks and permissions already remove by tracked value and are not the failing branch.
+
+## Implementation Status
+
+Legacy `unmerge` now compares scalar and environment values against the values in their tracking entries before removal.
+The marked regression failed on merged `main`, then passed with the focused helper and real-installer cases. Host,
+Docker, and clean-wheel coverage confirm that modified values remain, matching owned siblings are removed, and the
+successful installation row is cleared. Independent review and merge remain before closeout.
 
 ## Expected Behavior
 

@@ -819,7 +819,8 @@ def unmerge(
 ) -> None:
     """Remove Forge-added entries from settings.
 
-    Uses stable_id for value-based matching (not index-based).
+    Uses canonical/stable-id matching for hook/permission collections and
+    recorded values for scalar/env matching (not index-based).
 
     Args:
         settings: Current settings dict (modified in place).
@@ -860,12 +861,12 @@ def unmerge(
     for key_path, entries in by_key.items():
         if key_path.startswith("env."):
             env_key = key_path.split(".", 1)[1]
-            if env_key in env:
+            if env_key in env and any(_deep_equals(env[env_key], entry.value) for entry in entries):
                 del env[env_key]
     if "env" in settings and not settings["env"]:
         del settings["env"]
 
     for key_path, entries in by_key.items():
         if entries and entries[0].merge_type == "scalar":
-            if key_path in settings:
+            if key_path in settings and any(_deep_equals(settings[key_path], entry.value) for entry in entries):
                 del settings[key_path]

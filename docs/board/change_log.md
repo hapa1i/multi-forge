@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-08
 
+### Preserve legacy settings user edits
+
+**Goal/outcome**: Make full disable's legacy no-sidecar fallback remove only scalar and environment values that still
+match their tracked Forge values.
+
+**Key changes**:
+
+- Compared legacy scalar/environment values with their tracking entries before removal, preserving modified and absent
+  values while still removing unchanged owned siblings.
+- Retained hook and permission matching, the sidecar-backed path, settings-baseline selection, and successful tracking
+  cleanup; added fail-first, unit, installer, Docker, and packaged-wheel coverage.
+
+**Verification**: The marked regression failed on merged `main` at `f069226f`. After implementation, 148 focused
+settings/installer/D019 regression tests and 105 CLI tests passed; the broader install slice passed 828 with one skip.
+All 683 marked regressions, the targeted Docker disable case, the clean wheel lifecycle, and final `make pre-commit`
+passed. Independent review and merge remain.
+
 ### Preserve the installation settings baseline
 
 **Goal/outcome**: Keep one pre-Forge Claude settings baseline across repeated enable/sync and both disable paths.
@@ -42,6 +59,7 @@ wc -l docs/board/change_log.md
 installer/D012 tests (one skip), 109 focused CLI/regression tests, 682 regressions, and the targeted Docker and isolated
 wheel lifecycles passed; final `make pre-commit` also passed. Independent review's one LOW tracked-baseline deletion
 race is closed by direct decoding and a deterministic regression; its two informational observations remain unchanged.
+Shipped in PR #145 (`f069226f`).
 
 ## 2026-08-07
 

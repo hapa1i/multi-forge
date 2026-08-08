@@ -4,8 +4,7 @@
 
 **Finding**: D012 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- implementation, verification, and independent review are complete on
-`fix/preserve-install-settings-baseline`; merge remains.
+**Lane**: `done/` -- shipped in PR #145 (`f069226f`) after implementation, verification, and independent review.
 
 ## Goal
 
@@ -64,7 +63,7 @@ installer/D012 tests (one skip), 109 focused CLI/regression tests, and all 682 m
 Docker enable/sync/disable test, the isolated wheel-installed cross-runtime lifecycle, and final `make pre-commit` also
 passed. Independent review identified one LOW deletion race in the tracked-baseline reader; direct decoding plus a
 deterministic regression closes it. The parked test-only restore helper and acceptable end-user path simplification
-remain unchanged.
+remain unchanged. The member shipped in PR #145 (`f069226f`).
 
 ## Implementation Outcome
 

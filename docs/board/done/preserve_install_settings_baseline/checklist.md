@@ -1,6 +1,6 @@
 # Preserve the installation settings baseline checklist
 
-Current focus: merge the independently reviewed D012 implementation before D019 activation.
+Current focus: complete -- D012 shipped in PR #145 (`f069226f`).
 
 ## Activation and reproduction
 
@@ -43,4 +43,4 @@ Current focus: merge the independently reviewed D012 implementation before D019 
 - [x] Synchronize the normative installer design, end-user hook guidance, review ledger, change log, and epic cursor.
 - [x] Obtain independent review and resolve its LOW baseline-deletion race; leave the parked test-only helper and
   acceptable end-user path simplification unchanged.
-- [ ] Merge before activating D019.
+- [x] Merge before activating D019 (PR #145, `f069226f`).
