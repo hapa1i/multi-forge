@@ -619,4 +619,44 @@ forge proxy delete ownership-failure-qa --yes --no-kill
 - [ ] The foreign listener remains alive after the refused stop
 - [ ] The retained proxy remains readable and can be deleted after the listener stops
 
+### 4.24 Create Smoke Failure Is One JSON Result
+
+<!-- prereq: 4.2 -->
+
+<!-- auto -->
+
+Start a real proxy against a deliberately unreachable upstream. Creation must remain durable while verification fails as
+one scriptable result.
+
+```bash
+forge proxy delete smoke-json-qa --yes --no-kill 2>/dev/null || true
+
+set +e
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" \
+  --name smoke-json-qa \
+  --port 18203 \
+  --base-url http://127.0.0.1:9/v1 \
+  --json \
+  --smoke-test \
+  >/tmp/forge-smoke-json.stdout 2>/tmp/forge-smoke-json.stderr
+SMOKE_EXIT=$?
+set -e
+
+test "$SMOKE_EXIT" -ne 0
+jq -s -e '
+  length == 1
+  and .[0].proxy_id == "smoke-json-qa"
+  and .[0].status == "healthy"
+  and .[0].smoke_test.passed == false
+  and (.[0].smoke_test.detail | length > 0)
+' /tmp/forge-smoke-json.stdout
+forge proxy show smoke-json-qa --raw >/dev/null
+forge proxy delete smoke-json-qa --yes
+```
+
+- [ ] Failed create-time verification exits non-zero
+- [ ] Stdout contains exactly one JSON object with creation facts and `smoke_test.passed=false`
+- [ ] The failed probe leaves the created proxy registered and readable
+- [ ] The preserved proxy can be deleted cleanly after inspection
+
 ---

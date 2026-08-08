@@ -706,6 +706,11 @@ Default adopted detach, explicit `--no-kill`, already-stopped processes, and del
 remains are intentional successful outcomes. Multi-delete continues independent targets but exits non-zero and reports
 failures if any required stop fails.
 
+**Create smoke-result contract.** On the normal reuse/adopt/spawn path, `proxy create --json` emits one creation result.
+Without `--smoke-test`, its established top-level fields remain unchanged. With `--smoke-test`, the same object adds
+`smoke_test: {passed, detail}`; a failed probe exits non-zero but retains the successfully created or resolved proxy.
+Human-mode verification output remains unchanged. `--no-start` is config-only and does not run a smoke probe.
+
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
 `--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a
 template, the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead

@@ -490,23 +490,7 @@ def create_cmd(
 
         proxy_entry = result.proxy
 
-        if as_json:
-            import json
-
-            print(
-                json.dumps(
-                    {
-                        "proxy_id": proxy_entry.proxy_id,
-                        "template": proxy_entry.template,
-                        "base_url": proxy_entry.base_url,
-                        "port": proxy_entry.port,
-                        "pid": proxy_entry.pid,
-                        "status": proxy_entry.status,
-                        "source": result.source,
-                    }
-                )
-            )
-        else:
+        if not as_json:
             if result.source == "reuse":
                 prefix = "Reusing existing"
             elif result.source == "adopt":
@@ -536,23 +520,40 @@ def create_cmd(
                     console=console,
                 )
 
+        smoke_ok = True
+        smoke_detail = ""
         if smoke_test:
             from forge.proxy.proxy_orchestrator import smoke_test_proxy
 
             if not as_json:
                 console.print("\n[dim]Smoke testing upstream LLM...[/dim]")
 
-            ok, detail = smoke_test_proxy(base_url=proxy_entry.base_url)
+            smoke_ok, smoke_detail = smoke_test_proxy(base_url=proxy_entry.base_url)
 
-            if as_json:
-                import json
+            if not as_json:
+                if smoke_ok:
+                    console.print(f"[green]Smoke test passed[/green]: {smoke_detail[:80]}")
+                else:
+                    console.print(f"[red]Smoke test failed[/red]: {smoke_detail}")
 
-                print(json.dumps({"smoke_test": {"passed": ok, "detail": detail}}))
-            elif ok:
-                console.print(f"[green]Smoke test passed[/green]: {detail[:80]}")
-            else:
-                console.print(f"[red]Smoke test failed[/red]: {detail}")
-                sys.exit(1)
+        if as_json:
+            import json
+
+            payload: dict[str, Any] = {
+                "proxy_id": proxy_entry.proxy_id,
+                "template": proxy_entry.template,
+                "base_url": proxy_entry.base_url,
+                "port": proxy_entry.port,
+                "pid": proxy_entry.pid,
+                "status": proxy_entry.status,
+                "source": result.source,
+            }
+            if smoke_test:
+                payload["smoke_test"] = {"passed": smoke_ok, "detail": smoke_detail}
+            print(json.dumps(payload))
+
+        if not smoke_ok:
+            sys.exit(1)
     else:
         proxy_path = get_proxy_file_path(proxy_name)
         if proxy_path.exists():

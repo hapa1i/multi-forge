@@ -564,6 +564,31 @@ class TestProxyCreateAndStart:
     the actual server startup works end-to-end.
     """
 
+    def test_create_json_failed_smoke_is_one_result_and_preserves_proxy(
+        self, mock_claude_workspace: ContainerLike
+    ) -> None:
+        """A real spawned proxy survives failed upstream verification with one JSON result."""
+        proxy_id = "smoke-json-failure"
+        try:
+            result = mock_claude_workspace.exec(
+                f"forge proxy create litellm-openai --name {proxy_id} --port 18203 "
+                "--base-url http://127.0.0.1:9/v1 --json --smoke-test",
+                timeout=60,
+            )
+
+            assert result.returncode == 1, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["proxy_id"] == proxy_id
+            assert payload["source"] == "spawn"
+            assert payload["status"] == "healthy"
+            assert payload["smoke_test"]["passed"] is False
+            assert payload["smoke_test"]["detail"]
+            assert mock_claude_workspace.file_exists(f"$HOME/.forge/proxies/{proxy_id}/proxy.yaml")
+            registry = json.loads(mock_claude_workspace.read_file("$HOME/.forge/proxies/index.json"))
+            assert proxy_id in registry["proxies"]
+        finally:
+            mock_claude_workspace.exec(f"forge proxy delete {proxy_id} --yes >/dev/null 2>&1 || true")
+
     def test_create_starts_server_and_becomes_healthy(self, mock_claude_workspace: ContainerLike) -> None:
         """Should create proxy, start server, and register as healthy.
 

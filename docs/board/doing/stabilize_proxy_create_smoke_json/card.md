@@ -1,10 +1,10 @@
 # Stabilize proxy create smoke-test JSON
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D016 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind active O002.
+**Lane**: `doing/` -- active on `fix/stabilize-proxy-create-smoke-json` from merged PR #149 (`c20b8d10`).
 
 ## Goal
 
@@ -20,13 +20,14 @@ fails, while retaining the successfully created proxy.
 
 ## Evidence
 
-Rechecked on `3f3a3c6d` with a successful mocked create and a failed smoke probe. JSON mode printed the proxy object and
-a second smoke-test object as separate documents, then exited 0. The human branch already exits 1 for the same failed
-probe.
+Rechecked on merged `main` at `c20b8d10` with a successful mocked spawn and a failed smoke probe. JSON mode exited 0
+with two top-level documents: the first had no `smoke_test`, while the second contained only the failed probe result.
+The human branch already exits 1 for the same failed probe.
 
 ## Expected Behavior
 
-- With `--smoke-test`, JSON mode emits exactly one object containing proxy creation facts and the smoke result.
+- On the normal start path, `--smoke-test` JSON mode emits exactly one object containing proxy creation facts and the
+  smoke result.
 - A passed probe exits 0; a failed probe exits non-zero while honestly reporting that creation succeeded and
   verification failed.
 - Without `--smoke-test`, the existing create JSON fields and exit behavior remain compatible.
@@ -41,3 +42,4 @@ probe.
 
 - Do not roll back or delete a proxy merely because its optional upstream smoke test failed.
 - Do not change `proxy start --smoke-test`, template selection, port allocation, or proxy registry semantics.
+- Preserve `--no-start` as config-only creation; it does not run a smoke probe even when both flags are supplied.
