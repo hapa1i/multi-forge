@@ -235,7 +235,8 @@ class Installation:
         skill_packages: Runtime/package ownership records. InstalledFile remains
                         canonical for checksums and removal.
         settings_entries: List of InstalledSettingsEntry records.
-        settings_backup_path: Path to settings backup file (if created).
+        settings_backup_path: Immutable pre-Forge settings baseline path, or
+                              None when no baseline file was recorded.
         codex_config_path: Codex config.toml carrying the Forge-managed hook
                           block (None when Codex hooks were skipped/unmanaged).
         codex_commands: Forge hook commands registered in that block.

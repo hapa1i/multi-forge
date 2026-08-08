@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import stat
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -141,9 +142,49 @@ def backup_settings(path: Path) -> Path | None:
     """
     if not path.is_file():
         return None
-    backup_path = get_backup_path(path)
-    shutil.copy2(path, backup_path)
-    return backup_path
+    base_path = get_backup_path(path)
+    collision_index = 0
+    while True:
+        backup_path = (
+            base_path if collision_index == 0 else base_path.with_name(f"{base_path.name}.{collision_index:03d}")
+        )
+        created = False
+        try:
+            with backup_path.open("xb") as target:
+                created = True
+                with path.open("rb") as source:
+                    shutil.copyfileobj(source, target)
+            shutil.copystat(path, backup_path)
+            return backup_path
+        except FileExistsError:
+            collision_index += 1
+        except Exception:
+            if created:
+                backup_path.unlink(missing_ok=True)
+            raise
+
+
+def read_tracked_settings_baseline(path: Path | None) -> dict[str, Any]:
+    """Read the recorded pre-Forge baseline without discovering backup history.
+
+    A null legacy path means no recoverable baseline. A recorded path must
+    still name the regular file Forge originally created; callers validate its
+    scope boundary before invoking this helper.
+    """
+
+    if path is None:
+        return {}
+    try:
+        mode = path.lstat().st_mode
+        if not stat.S_ISREG(mode):
+            raise OSError(f"tracked settings baseline is not a regular file: {path}")
+        with path.open(encoding="utf-8") as baseline_file:
+            baseline = json.load(baseline_file)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"tracked settings baseline does not exist: {path}") from e
+    if not isinstance(baseline, dict):
+        raise ValueError(f"tracked settings baseline is not a JSON object: {path}")
+    return baseline
 
 
 def restore_settings_backup(path: Path) -> bool:

@@ -122,6 +122,14 @@ forge extension disable --scope user --runtime codex
 forge extension disable --scope user --runtime claude
 ```
 
+The first settings-bearing enable establishes the uninstall baseline: an existing Claude settings file gets a recorded
+pre-Forge backup, while an absent file records that absence with no backup path. Later enable/sync runs keep additional
+timestamped recovery snapshots without changing either baseline, including when two runs land in the same second.
+Disable uses the recorded baseline rather than the newest backup. If a recorded backup is missing, unreadable, or
+outside the applicable `.claude` directory, disable stops before removing tracked files and keeps the installation
+record; restore that named path, then retry. Older records with no baseline do not adopt a newer Forge-bearing backup
+automatically.
+
 Removing Codex deletes only the balanced Forge marker block and preserves every byte outside it, including manual
 Forge-looking registrations. Those outside-marker commands are user-owned and produce a warning; they do not keep
 managed ownership alive. A missing config or an existing config with no Forge markers clears stale tracking without

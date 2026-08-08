@@ -306,6 +306,66 @@ print('preserved')
         """)
         assert "preserved" in check.stdout
 
+    def test_sync_preserves_project_settings_baseline_for_disable(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        """Enable and sync retain the first baseline even when both backups share a second."""
+        setup = synced_container.exec("""
+rm -rf ~/.forge ~/repo-settings-baseline
+mkdir -p ~/repo-settings-baseline/.claude
+cd ~/repo-settings-baseline
+git init -b main
+git config user.email "test@forge.local"
+git config user.name "Forge Test"
+printf '{"theme":"dark"}\n' > .claude/settings.json
+git add .
+git commit -m init
+""")
+        assert setup.returncode == 0, setup.stderr
+        project_root = synced_container.exec("cd ~/repo-settings-baseline && pwd").stdout.strip()
+        tracking_path = _get_tracking_path(synced_container)
+        tracking_key = f"project:{project_root}"
+        enable = synced_container.exec(
+            f"cd {project_root} && /forge/.venv/bin/forge extension enable "
+            "--scope project --profile minimal --with status-line --runtime claude"
+        )
+        assert enable.returncode == 0, f"Enable failed: {enable.stderr}"
+        first = synced_container.read_json(tracking_path)["installations"][tracking_key]
+        baseline_path = first["settings_backup_path"]
+        assert baseline_path
+        assert synced_container.read_json(baseline_path) == {"theme": "dark"}
+
+        update_user_setting = synced_container.exec(f"""
+/forge/.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path({f"{project_root}/.claude/settings.json"!r})
+settings = json.loads(path.read_text())
+settings["theme"] = "light"
+path.write_text(json.dumps(settings, indent=2) + "\\n")
+PY
+""")
+        assert update_user_setting.returncode == 0, update_user_setting.stderr
+
+        sync = synced_container.exec(f"cd {project_root} && /forge/.venv/bin/forge extension sync --scope project")
+        assert sync.returncode == 0, f"Sync failed: {sync.stderr}"
+        updated = synced_container.read_json(tracking_path)["installations"][tracking_key]
+        assert updated["settings_backup_path"] == baseline_path
+        assert synced_container.read_json(baseline_path) == {"theme": "dark"}
+        backup_count = synced_container.exec(
+            f"find {project_root}/.claude -maxdepth 1 -name '.settings.json.forge.backup.*' | wc -l"
+        )
+        assert backup_count.stdout.strip() == "2"
+
+        disable = synced_container.exec(
+            f"cd {project_root} && /forge/.venv/bin/forge extension disable --scope project --yes"
+        )
+        assert disable.returncode == 0, f"Disable failed: {disable.stderr}"
+        assert synced_container.read_json(f"{project_root}/.claude/settings.json") == {"theme": "light"}
+        assert tracking_key not in synced_container.read_json(tracking_path)["installations"]
+
 
 class TestCrossRuntimeSkillLifecycle:
     """Runtime skill packages stay isolated and tracked through their CLI lifecycle."""

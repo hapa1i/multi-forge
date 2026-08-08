@@ -4,7 +4,8 @@
 
 **Finding**: D012 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- second Wave 4 member after Codex install rollback.
+**Lane**: `doing/` -- implementation, verification, and independent review are complete on
+`fix/preserve-install-settings-baseline`; merge remains.
 
 ## Goal
 
@@ -27,8 +28,8 @@ in runtime-scoped removal.
 
 ## Expected Behavior
 
-- The first successful settings-bearing enable establishes `settings_backup_path`; later enable/sync operations do not
-  overwrite that baseline or its file.
+- The first successful settings-bearing enable establishes the baseline state (`settings_backup_path` or authoritative
+  null); later enable/sync operations do not overwrite that baseline or its file.
 - Full and runtime-scoped disable read the validated tracked baseline when it is present, never a newer history file.
 - A present but missing, unreadable, or out-of-bound tracked baseline fails closed before removal and retains ownership
   for recovery.
@@ -54,3 +55,25 @@ in runtime-scoped removal.
 - Preserve ownership-sidecar selection, partial-runtime survivor behavior, and settings rollback on write/tracking
   faults.
 - Do not absorb D019's no-sidecar value comparison or Codex config rollback.
+
+## Verification
+
+The retained regression first failed on merged `main` at `37a03209` because sync replaced the tracked baseline. It now
+covers re-enable and sync with later and same-second backup generations. After implementation and review amendment, 826
+installer/D012 tests (one skip), 109 focused CLI/regression tests, and all 682 marked regressions passed. A dedicated
+Docker enable/sync/disable test, the isolated wheel-installed cross-runtime lifecycle, and final `make pre-commit` also
+passed. Independent review identified one LOW deletion race in the tracked-baseline reader; direct decoding plus a
+deterministic regression closes it. The parked test-only restore helper and acceptable end-user path simplification
+remain unchanged.
+
+## Implementation Outcome
+
+The first settings-bearing enable now establishes one durable baseline: an existing settings file records its backup,
+while a missing file records the authoritative null. Later enable/sync runs keep separate history snapshots without
+rotating that value. Exclusive collision suffixes keep same-second snapshots from overwriting the baseline.
+
+Whole and runtime-scoped disable validate and read the tracked baseline before removing files. A missing, unreadable,
+non-regular, non-object, or out-of-scope recorded baseline retains tracking and every selected surface. Null legacy rows
+use an empty compatibility baseline and never adopt a newer Forge-bearing history file. A baseline that disappears after
+metadata validation now raises from the direct file open instead of collapsing to authoritative null. User edits,
+sidecars, partial-runtime survivors, rollback behavior, and backup history remain intact.

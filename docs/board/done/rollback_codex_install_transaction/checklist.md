@@ -1,6 +1,6 @@
 # Roll back Codex install transactions checklist
 
-Current focus: merge the reviewed D013/D014 member before activating D012.
+Current focus: shipped in PR #144 (`37a03209`); D012 is now active.
 
 ## Activation and reproduction
 
@@ -34,4 +34,4 @@ Current focus: merge the reviewed D013/D014 member before activating D012.
 - [x] Run `make test-regression` and final `make pre-commit`.
 - [x] Synchronize the card, review ledger, change log, and normative installer documentation affected by the fix.
 - [x] Complete independent review (2026-08-08; no design violations).
-- [ ] Merge before activating D012.
+- [x] Merge before activating D012 (PR #144, `37a03209`, 2026-08-08).

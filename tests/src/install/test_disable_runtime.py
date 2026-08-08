@@ -406,6 +406,92 @@ def test_claude_removal_is_symmetric_and_clears_settings_ownership(
     assert {owner.runtime for owner in surviving.module_owners} == {CODEX_RUNTIME}
 
 
+def test_claude_removal_reads_recorded_baseline_instead_of_newest_history(tmp_path: Path) -> None:
+    installation, tracking, settings_path, _added_path, baseline_path = _materialize_dual_installation(tmp_path)
+    newer_backup = settings_path.parent / ".settings.json.forge.backup.20270101-000000"
+    write_settings(newer_backup, read_settings(settings_path))
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=tmp_path,
+        tracking_store=tracking,
+    )
+
+    installer.uninstall_runtimes((CLAUDE_CODE_RUNTIME,))
+
+    assert read_settings(settings_path) == {"userSetting": "preserve"}
+    assert baseline_path.exists()
+    assert newer_backup.exists()
+    surviving = tracking.get_installation(InstallScope.PROJECT.value, str(tmp_path))
+    assert surviving is not None
+    assert surviving.settings_backup_path is None
+    assert {owner.runtime for owner in surviving.module_owners} == {CODEX_RUNTIME}
+
+
+def test_null_legacy_baseline_does_not_adopt_newest_history(tmp_path: Path) -> None:
+    installation, tracking, settings_path, _added_path, baseline_path = _materialize_dual_installation(tmp_path)
+    newer_backup = settings_path.parent / ".settings.json.forge.backup.20270101-000000"
+    write_settings(newer_backup, read_settings(settings_path))
+    installation.settings_backup_path = None
+    tracking.set_installation(InstallScope.PROJECT.value, installation, str(tmp_path))
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=tmp_path,
+        tracking_store=tracking,
+    )
+
+    installer.uninstall_runtimes((CLAUDE_CODE_RUNTIME,))
+
+    assert read_settings(settings_path) == {"userSetting": "preserve"}
+    assert baseline_path.exists()
+    assert newer_backup.exists()
+    surviving = tracking.get_installation(InstallScope.PROJECT.value, str(tmp_path))
+    assert surviving is not None
+    assert surviving.settings_backup_path is None
+
+
+@pytest.mark.parametrize("baseline_state", ["missing", "unreadable", "unsafe"])
+def test_invalid_recorded_baseline_refuses_runtime_removal_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    baseline_state: str,
+) -> None:
+    installation, tracking, settings_path, added_path, baseline_path = _materialize_dual_installation(tmp_path)
+    if baseline_state == "missing":
+        baseline_path.unlink()
+    elif baseline_state == "unreadable":
+        real_read_baseline = runtime_removal_module.read_tracked_settings_baseline
+
+        def fail_read(path: Path | None) -> dict[str, object]:
+            if path == baseline_path:
+                raise PermissionError("injected unreadable baseline")
+            return real_read_baseline(path)
+
+        monkeypatch.setattr(runtime_removal_module, "read_tracked_settings_baseline", fail_read)
+    else:
+        unsafe_path = tmp_path / "outside-settings-baseline.json"
+        write_settings(unsafe_path, {"userSetting": "preserve"})
+        installation.settings_backup_path = str(unsafe_path)
+        tracking.set_installation(InstallScope.PROJECT.value, installation, str(tmp_path))
+
+    settings_before = settings_path.read_bytes()
+    added_before = added_path.read_bytes()
+    tracked_paths = [Path(record.target_path) for record in installation.files]
+    expected_error = PathBoundaryViolationError if baseline_state == "unsafe" else ForgeInstallError
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=tmp_path,
+        tracking_store=tracking,
+    )
+
+    with pytest.raises(expected_error):
+        installer.uninstall_runtimes((CLAUDE_CODE_RUNTIME,))
+
+    assert all(path.exists() for path in tracked_paths)
+    assert settings_path.read_bytes() == settings_before
+    assert added_path.read_bytes() == added_before
+    assert tracking.get_installation(InstallScope.PROJECT.value, str(tmp_path)) == installation
+
+
 def test_zero_row_claude_settings_ownership_clears_sidecars_without_rewriting_settings(
     tmp_path: Path,
 ) -> None:

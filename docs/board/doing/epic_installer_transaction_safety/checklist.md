@@ -1,6 +1,6 @@
 # Installer transaction safety checklist
 
-Current focus: merge the reviewed D013/D014 member; D012 and D019 remain parked.
+Current focus: merge the independently reviewed D012 implementation; D019 remains parked until then.
 
 ## Activation and sequencing
 
@@ -10,11 +10,13 @@ Current focus: merge the reviewed D013/D014 member; D012 and D019 remain parked.
 - [x] Retain a marked D013/D014 regression that fails on the merged baseline before implementation.
 - [x] Implement and verify D013/D014 without activating D012 or D019.
 - [x] Independently review D013/D014 (2026-08-08; no design violations).
-- [ ] Merge D013/D014 before moving D012 from `todo/`.
+- [x] Merge D013/D014 before moving D012 from `todo/` (PR #144, `37a03209`).
+- [x] Start `fix/preserve-install-settings-baseline`, move D012 to `doing/`, and create its checklist.
+- [x] Independently review D012 and resolve its LOW tracked-baseline deletion race.
 
 ## Remaining members
 
-- [ ] Ship D012 immutable pre-Forge settings-baseline ownership.
+- [ ] Ship D012 immutable pre-Forge settings-baseline ownership (active).
 - [ ] Ship D019 value-aware legacy scalar/environment removal.
 
 ## Closeout

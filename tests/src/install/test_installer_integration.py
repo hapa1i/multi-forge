@@ -13,11 +13,19 @@ import pytest
 
 from forge.install.installer import Installer
 from forge.install.models import (
+    InstalledSettingsEntry,
     InstallMode,
+    InstallModule,
     InstallProfile,
     InstallScope,
 )
-from forge.install.settings_merge import read_settings, write_settings
+from forge.install.ownership import unattributed
+from forge.install.settings_merge import (
+    cleanup_empty_settings,
+    find_backup_files,
+    read_settings,
+    write_settings,
+)
 from forge.install.tracking import TrackingStore
 
 pytestmark = pytest.mark.integration
@@ -142,28 +150,12 @@ def installer(mock_repo: Path, mock_claude_home: Path, mock_forge_home: Path):
                 "forge.install.installer.get_settings_path",
                 return_value=claude_home / "settings.json",
             ),
-            patch(
-                "forge.install.installer.backup_settings",
-                side_effect=lambda path: _backup_settings_mock(path, claude_home),
-            ),
             # Preset is now at ~/.forge/claude.preset.json (not in source tree)
             patch(
                 "forge.install.preset.load_preset",
                 return_value=e2e_preset,
             ),
         ]
-
-    def _backup_settings_mock(path: Path, claude_home: Path) -> Path | None:
-        """Mock backup_settings that works with the mock claude_home."""
-        from forge.install.settings_merge import read_settings, write_settings
-
-        settings_path = claude_home / "settings.json"
-        if not settings_path.is_file():
-            return None
-        backup_path = claude_home / "settings.json.forge-backup"
-        settings = read_settings(settings_path)
-        write_settings(backup_path, settings)
-        return backup_path
 
     # Create a patched version that keeps the patches active
     class PatchedInstaller:
@@ -451,9 +443,133 @@ class TestInstallerIntegration:
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
         # Verify backup created
-        backup_path = mock_claude_home / "settings.json.forge-backup"
+        tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
+        installation = tracking.get_installation(InstallScope.USER.value)
+        assert installation is not None
+        assert installation.settings_backup_path is not None
+        backup_path = Path(installation.settings_backup_path)
         assert backup_path.exists()
 
         # Verify backup contains original settings
         backup_settings = read_settings(backup_path)
         assert backup_settings == original_settings
+
+    def test_update_keeps_initial_settings_backup_for_uninstall(
+        self,
+        installer,
+        mock_repo: Path,
+        mock_claude_home: Path,
+        mock_forge_home: Path,
+    ) -> None:
+        settings_path = mock_claude_home / "settings.json"
+        original_settings = read_settings(settings_path)
+        installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
+        tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
+        first = tracking.get_installation(InstallScope.USER.value)
+        assert first is not None
+        assert first.settings_backup_path is not None
+        baseline_path = Path(first.settings_backup_path)
+
+        current = read_settings(settings_path)
+        current["userEdit"] = "after enable"
+        write_settings(settings_path, current)
+        installer.update()
+
+        updated = tracking.get_installation(InstallScope.USER.value)
+        assert updated is not None
+        assert updated.settings_backup_path == str(baseline_path)
+        assert read_settings(baseline_path) == original_settings
+        assert len(find_backup_files(settings_path)) == 2
+
+        installer.uninstall()
+
+        assert read_settings(settings_path) == {
+            **cleanup_empty_settings(original_settings),
+            "userEdit": "after enable",
+        }
+        assert len(find_backup_files(settings_path)) == 2
+
+    def test_first_settings_enable_after_minimal_install_establishes_baseline(
+        self,
+        installer,
+        mock_repo: Path,
+        mock_claude_home: Path,
+        mock_forge_home: Path,
+    ) -> None:
+        settings_path = mock_claude_home / "settings.json"
+        original_settings = read_settings(settings_path)
+        tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
+
+        installer.init(profile=InstallProfile.MINIMAL, mode=InstallMode.COPY)
+        minimal = tracking.get_installation(InstallScope.USER.value)
+        assert minimal is not None
+        assert minimal.settings_backup_path is None
+
+        installer.init(
+            profile=InstallProfile.MINIMAL,
+            mode=InstallMode.COPY,
+            with_modules={InstallModule.PERMISSIONS},
+        )
+
+        settings_install = tracking.get_installation(InstallScope.USER.value)
+        assert settings_install is not None
+        assert settings_install.settings_backup_path is not None
+        assert read_settings(Path(settings_install.settings_backup_path)) == original_settings
+
+    def test_missing_initial_settings_keeps_null_baseline_across_sync(
+        self,
+        installer,
+        mock_repo: Path,
+        mock_claude_home: Path,
+        mock_forge_home: Path,
+    ) -> None:
+        settings_path = mock_claude_home / "settings.json"
+        settings_path.unlink()
+        tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
+
+        installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
+        first = tracking.get_installation(InstallScope.USER.value)
+        assert first is not None
+        assert first.settings_backup_path is None
+
+        installer.update()
+
+        updated = tracking.get_installation(InstallScope.USER.value)
+        assert updated is not None
+        assert updated.settings_backup_path is None
+        assert len(find_backup_files(settings_path)) == 1
+
+        installer.uninstall()
+
+        assert not settings_path.exists()
+        assert len(find_backup_files(settings_path)) == 1
+
+    def test_null_legacy_row_is_not_replaced_when_settings_ownership_is_added(
+        self,
+        installer,
+        mock_forge_home: Path,
+    ) -> None:
+        tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
+        installer.init(profile=InstallProfile.MINIMAL, mode=InstallMode.COPY)
+        legacy = tracking.get_installation(InstallScope.USER.value)
+        assert legacy is not None
+        legacy.settings_entries = [
+            InstalledSettingsEntry(
+                key_path="legacySetting",
+                value="managed",
+                merge_type="scalar",
+                stable_id="legacySetting",
+                attribution=unattributed("legacy_key_unmapped"),
+            )
+        ]
+        tracking.set_installation(InstallScope.USER.value, legacy)
+
+        installer.init(
+            profile=InstallProfile.MINIMAL,
+            mode=InstallMode.COPY,
+            with_modules={InstallModule.PERMISSIONS},
+        )
+
+        updated = tracking.get_installation(InstallScope.USER.value)
+        assert updated is not None
+        assert updated.settings_backup_path is None
