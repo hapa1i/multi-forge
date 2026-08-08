@@ -1,6 +1,6 @@
 # CLI, proxy, and runtime correctness checklist
 
-Current focus: execute D015 global downstream retention ownership; O002, D016, D017, O001, O004, and D018 remain parked.
+Current focus: execute O002 proxy stop/delete ownership preservation; D016, D017, O001, O004, and D018 remain parked.
 
 ## Activation and sequencing
 
@@ -9,12 +9,13 @@ Current focus: execute D015 global downstream retention ownership; O002, D016, D
 - [x] Move this epic and D015 to `doing/`, create their checklists, and repoint inbound links.
 - [x] Retain a marked D015 regression that fails on the merged baseline before implementation.
 - [x] Implement and verify D015 without activating any later member.
-- [ ] Independently review and merge D015 before moving O002 from `todo/`.
+- [x] Independently review and merge D015 before moving O002 from `todo/` (PR #148, `8b997e6a`).
+- [x] Start `fix/preserve-proxy-ownership-on-stop-failure`, move D015 to `done/`, and activate O002 from merged `main`.
 
 ## Members
 
-- [ ] D015 -- global downstream retention ownership (active).
-- [ ] O002 -- preserve proxy ownership on stop failure (parked next).
+- [x] D015 -- global downstream retention ownership (PR #148, `8b997e6a`).
+- [ ] O002 -- preserve proxy ownership on stop failure (active).
 - [ ] D016 -- stabilize proxy create smoke-test JSON (parked).
 - [ ] D017 -- align search corruption failures (parked).
 - [ ] O001 -- forward LiteLLM User-Agent metadata (parked).

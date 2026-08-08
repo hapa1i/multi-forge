@@ -1,10 +1,10 @@
 # Preserve proxy ownership on stop failure
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O002 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind D015.
+**Lane**: `doing/` -- active on `fix/preserve-proxy-ownership-on-stop-failure` from merged PR #148 (`8b997e6a`).
 
 ## Goal
 
@@ -20,9 +20,9 @@ refused or fails.
 
 ## Evidence
 
-Rechecked on `3f3a3c6d` by forcing `_stop_proxy_process()` to return `error`. `proxy stop` returned without raising and
-exited 0. `proxy delete` had already removed the registry row and proxy directory, ignored the stop outcome, printed
-`Deleted`, and exited 0 while the simulated process remained live.
+Rechecked on merged `main` at `8b997e6a` by forcing `_stop_proxy_process()` to return `error`. `proxy stop` returned
+without raising and exited 0. `proxy delete` removed the registry row and proxy directory, ignored the stop outcome,
+printed `Deleted`, and exited 0 while the simulated process remained live.
 
 ## Expected Behavior
 
@@ -35,8 +35,9 @@ exited 0. `proxy delete` had already removed the registry row and proxy director
 
 ## Acceptance Criteria
 
-- Add a marked O002 regression covering stop and delete with refusal, permission failure, and identity mismatch.
-- Cover managed/adopted, last/shared reference, `--kill-adopted`, `--no-kill`, and multi-delete aggregation.
+- Add a marked O002 regression covering both stop and delete when their required stop reports failure.
+- Cover permission failure and identity refusal plus managed/adopted, last/shared reference, `--kill-adopted`,
+  `--no-kill`, already-stopped races, and multi-delete aggregation in focused tests.
 - Assert registry/config/process facts and output text/exit status; run focused proxy CLI tests, targeted process-backed
   integration, and `make pre-commit`.
 

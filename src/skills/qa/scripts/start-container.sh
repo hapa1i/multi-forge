@@ -412,9 +412,9 @@ docker exec "$CONTAINER_NAME" bash -c 'rm -f /forge/.env /forge/.env.*'
 # --- Preflight inside container ---
 info "Running preflight checks..."
 
-# Install jq (many checklist items use it)
-docker exec "$CONTAINER_NAME" bash -c 'apt-get update -qq && apt-get install -y -qq jq > /dev/null 2>&1' || {
-    error "Failed to install jq in container."
+# Install checklist/runtime process-inspection dependencies.
+docker exec "$CONTAINER_NAME" bash -c 'apt-get update -qq && apt-get install -y -qq jq lsof > /dev/null 2>&1' || {
+    error "Failed to install jq/lsof in container."
     exit 3
 }
 

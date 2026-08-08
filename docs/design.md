@@ -698,6 +698,14 @@ forge proxy edit <proxy_id>
 forge proxy delete <proxy_id>
 ```
 
+**Stop/delete ownership contract.** A required process stop that is refused or fails exits non-zero and keeps the
+registry row and proxy configuration as actionable ownership. `delete` decides shared-port ownership under the registry
+lock; when the target is the last live reference and termination is required, it completes that stop before removing the
+row or overlay. A later overlay-removal failure restores the row with stopped state when termination already succeeded.
+Default adopted detach, explicit `--no-kill`, already-stopped processes, and deletion while another live same-port alias
+remains are intentional successful outcomes. Multi-delete continues independent targets but exits non-zero and reports
+failures if any required stop fails.
+
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
 `--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a
 template, the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead
