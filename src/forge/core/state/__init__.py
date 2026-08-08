@@ -33,7 +33,7 @@ from .lock import (
 )
 
 # Retention utilities
-from .retention import prune_jsonl_shards
+from .retention import PruneJsonlShardsResult, prune_jsonl_shards
 
 # Timestamp utilities
 from .timestamps import iso_to_timestamp, now_iso, parse_iso, utc_timestamp_z
@@ -64,6 +64,7 @@ __all__ = [
     "file_lock_for_target",
     "FileLockTimeoutError",
     # Retention
+    "PruneJsonlShardsResult",
     "prune_jsonl_shards",
     # Timestamps
     "now_iso",

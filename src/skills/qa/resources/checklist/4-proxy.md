@@ -548,4 +548,37 @@ forge proxy delete passthrough-test --yes 2>/dev/null || true
 - [ ] `anthropic-passthrough` proxy created config-only with `wire_shape: anthropic_passthrough` (default port 8096)
 - [ ] `intercept.mode=override` succeeds on the `anthropic-passthrough` proxy
 
+### 4.22 Degraded Downstream Retention Status
+
+<!-- auto -->
+
+<!-- requires: proxy,api-key -->
+
+Use a disposable proxy with conflicting legacy retention inputs. The proxy must stay reachable while runtime truth
+reports that destructive maintenance was disabled.
+
+```bash
+forge config reset telemetry -y 2>/dev/null || true
+forge proxy delete retention-degraded-qa --yes 2>/dev/null || true
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name retention-degraded-qa --port 18199 --no-start
+forge proxy set retention-degraded-qa audit.retention_days=90
+forge proxy set retention-degraded-qa provider_trace.retention_days=14
+forge proxy start retention-degraded-qa
+
+curl --fail --silent http://127.0.0.1:18199/ >/tmp/forge-retention-degraded.json
+jq -e '
+  .status == "degraded"
+  and .downstream_retention.degraded == true
+  and ([.downstream_retention.conflicts[].values[].proxy_ids[]]
+       | index("retention-degraded-qa") != null)
+' /tmp/forge-retention-degraded.json
+
+forge proxy stop retention-degraded-qa
+forge proxy delete retention-degraded-qa --yes
+```
+
+- [ ] A proxy with conflicting legacy retention inputs starts and `GET /` remains reachable
+- [ ] Runtime truth reports top-level `status: degraded` and names `retention-degraded-qa` in the nested conflicts
+- [ ] The disposable degraded proxy stops and deletes cleanly
+
 ---

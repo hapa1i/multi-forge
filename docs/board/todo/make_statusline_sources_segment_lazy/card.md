@@ -1,6 +1,6 @@
 # Make status-line sources segment-lazy
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D018 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 

@@ -396,7 +396,8 @@ class AuditConfig:
 
     Metadata-only audit is implied by intercept.mode in (inspect, override).
     audit_full_body is the high-risk opt-in for redacted full request/response
-    capture; retention_days/max_total_mb bound on-disk exposure.
+    capture. ``retention_days`` and ``max_total_mb`` are deprecated compatibility
+    inputs; ``telemetry.downstream`` owns the shared shard lifecycle globally.
     """
 
     audit_full_body: bool = False
@@ -432,7 +433,11 @@ def _coerce_audit_config(value: Any) -> AuditConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid audit: must be a mapping")
-    _reject_unknown_keys(value, {"audit_full_body", "redact_headers", "retention_days", "max_total_mb"}, "audit")
+    _reject_unknown_keys(
+        value,
+        {"audit_full_body", "redact_headers", "retention_days", "max_total_mb"},
+        "audit",
+    )
     return AuditConfig(
         audit_full_body=value.get("audit_full_body", False),
         redact_headers=value.get("redact_headers", []) or [],
@@ -443,15 +448,12 @@ def _coerce_audit_config(value: Any) -> AuditConfig:
 
 @dataclass
 class ProviderTraceConfig:
-    """Retention bounds for the provider-trace plane (proxy-owned, per-proxy).
-
-    Diagnostics, not spend truth — matches the audit plane's defaults (14d / 512 MB) so the
-    two on-disk telemetry surfaces share one mental model.
+    """Deprecated compatibility inputs for downstream shard retention.
 
     The ``inject_provider_user`` toggle is deliberately NOT here: it moved to the global
     ``~/.forge/config.yaml`` (``provider_trace.inject_provider_user``, see ``runtime_config.py``)
-    so one switch governs both the proxied and the direct OpenRouter routes. Retention stays
-    proxy-owned — it is a proxy-local disk concern, not a cross-cutting observability preference.
+    so one switch governs both the proxied and the direct OpenRouter routes. Retention also moved:
+    ``telemetry.downstream`` now owns the lifecycle of shared audit, cost, and provider records.
     """
 
     retention_days: int = 14
@@ -554,7 +556,12 @@ class RequestLogConfig:
                 )
         # bool is an int subclass; reject it so logging.requests.max_file_mb=true fails loudly.
         # 0 means unbounded (matches the prune helper + global log_retention_days semantics).
-        for fname in ("max_file_mb", "max_total_mb", "retention_days", "stream_chunk_max_bytes"):
+        for fname in (
+            "max_file_mb",
+            "max_total_mb",
+            "retention_days",
+            "stream_chunk_max_bytes",
+        ):
             val = getattr(self, fname)
             if isinstance(val, bool) or not isinstance(val, int) or val < 0:
                 raise ValueError(f"logging.requests.{fname} must be a non-negative int")

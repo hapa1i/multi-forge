@@ -4,7 +4,8 @@
 
 **Decision**: [`downstream_retention_ownership`](../../done/downstream_retention_ownership/card.md) (DG3; D015).
 
-**Lane**: `todo/` -- accepted as the first Wave 5 member; parked until the admission record merges.
+**Lane**: `doing/` -- active on `fix/unify-downstream-retention` after the admission record merged in PR #147
+(`92b981a5`).
 
 ## Goal
 
@@ -25,6 +26,13 @@ delegate to `prune_downstream_records()` over the same directory, so the effecti
 - On conflicting legacy policies, skip pruning, start degraded, and expose the conflicting proxy IDs.
 - Preserve spend-cap bootstrap order and current-UTC-month protection from age and size pruning.
 - Provide an explicit user-owned config migration path; normal startup must not rewrite proxy files.
+
+## Recorded Compatibility Limit
+
+During the first-release compatibility window, a sidecar sees only its mounted proxy directory while sharing the host
+downstream telemetry directory. Distinct sidecars therefore cannot detect each other's conflicting legacy inputs unless
+the host has an explicit global policy. Operators must migrate or set that policy before multi-sidecar use; the approved
+following-release rejection of proxy-local keys retires this limitation.
 
 ## Acceptance Criteria
 

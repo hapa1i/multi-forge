@@ -418,14 +418,3 @@ def read_audit_logs(
         payload.setdefault("ts", rec.ts)
         records.append(payload)
     return records
-
-
-# --- Retention ---------------------------------------------------------------
-
-
-def prune_audit_logs(*, retention_days: int, max_total_mb: int) -> None:
-    """Delete audit shards older than retention_days, then prune oldest-first over
-    max_total_mb. Best-effort: errors are ignored (telemetry, not critical path)."""
-    from forge.core.telemetry.downstream import prune_downstream_records
-
-    prune_downstream_records(retention_days=retention_days, max_total_mb=max_total_mb)

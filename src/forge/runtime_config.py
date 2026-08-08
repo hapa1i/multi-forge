@@ -3,8 +3,10 @@
 Separate from forge.config (which the proxy imports for routing) so runtime
 preferences never affect tier->model routing. The proxy MAY read specific
 non-routing fields here (auth_ignore_env, log_tool_failures, and the global
-provider_trace.inject_provider_user observability toggle); none of them may
-influence a routing decision.
+provider_trace.inject_provider_user observability toggle). The destructive
+downstream-retention path resolves its telemetry subtree separately so malformed
+input disables pruning instead of inheriting this loader's fail-open defaults.
+None of these fields may influence a routing decision.
 
 File: ~/.forge/config.yaml (optional, fail-open if missing or invalid).
 
@@ -42,6 +44,9 @@ _VALID_COST_MODES = ("auto", "api", "subscription")
 _VALID_PALETTES = ("default", "earthy")
 _VALID_GLYPHS = ("ascii", "unicode")
 _VALID_CACHE_HIT = ("auto", "off")
+
+DEFAULT_DOWNSTREAM_RETENTION_DAYS = 14
+DEFAULT_DOWNSTREAM_MAX_TOTAL_MB = 512
 
 
 _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
@@ -103,6 +108,10 @@ _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
         "Provider-trace observability preferences.",
         "Set nested values with: forge config set provider_trace.<key>=<value>",
     ),
+    "telemetry": (
+        "Global telemetry lifecycle preferences.",
+        "Set downstream retention with: forge config set telemetry.downstream.<key>=<value>",
+    ),
 }
 
 _STATUSLINE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
@@ -128,6 +137,18 @@ _PROVIDER_TRACE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
         "One global switch governs both proxied OpenRouter traffic and direct core.llm callers.",
         "Only a hashed id is sent, never the raw session name.",
     ),
+}
+
+_TELEMETRY_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "downstream": (
+        "One policy for shared audit, cost, and provider-lifecycle shards.",
+        "This replaces proxy-local audit/provider_trace retention keys.",
+    ),
+}
+
+_DOWNSTREAM_RETENTION_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "retention_days": ("Delete non-current-month shards older than this many days; 0 disables the age bound.",),
+    "max_total_mb": ("Prune non-current-month shards oldest-first over this size; 0 disables the size bound.",),
 }
 
 # Scalar spellings that YAML 1.1 (PyYAML, our loader via yaml.safe_load) resolves
@@ -213,9 +234,9 @@ class RuntimeProviderTraceConfig:
     AND the proxied path (``proxy/server.py`` reads this, not the per-proxy
     ``proxy.yaml`` key, which is deprecated). One switch, one mental model.
 
-    Retention of the on-disk trace shards stays proxy-owned in ``proxy.yaml``
-    (``provider_trace.retention_days``/``max_total_mb``) — that is a proxy-local
-    disk concern; whether to group at all is a global observability preference.
+    Retention of the shared on-disk downstream shards is owned separately by
+    ``telemetry.downstream``. Legacy proxy-local retention keys remain compatibility
+    inputs for one migration window, but this block owns observability only.
     """
 
     inject_provider_user: bool = False  # opt-in: record the hashed session id in OpenRouter's `user`
@@ -265,6 +286,54 @@ def _coerce_provider_trace_config(value: Any) -> RuntimeProviderTraceConfig:
     if "inject_provider_user" in kwargs:
         kwargs["inject_provider_user"] = _coerce_bool(kwargs["inject_provider_user"])
     return RuntimeProviderTraceConfig(**kwargs)
+
+
+@dataclass
+class RuntimeDownstreamRetentionConfig:
+    """Global policy for shared downstream telemetry shards."""
+
+    retention_days: int = DEFAULT_DOWNSTREAM_RETENTION_DAYS
+    max_total_mb: int = DEFAULT_DOWNSTREAM_MAX_TOTAL_MB
+
+    def __post_init__(self) -> None:
+        if isinstance(self.retention_days, bool) or not isinstance(self.retention_days, int) or self.retention_days < 0:
+            raise ValueError("telemetry.downstream.retention_days must be a non-negative int")
+        if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb < 0:
+            raise ValueError("telemetry.downstream.max_total_mb must be a non-negative int")
+
+
+def _coerce_downstream_retention_config(value: Any) -> RuntimeDownstreamRetentionConfig:
+    if value is None:
+        return RuntimeDownstreamRetentionConfig()
+    if isinstance(value, RuntimeDownstreamRetentionConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("telemetry.downstream must be a mapping")
+    known = {f.name for f in fields(RuntimeDownstreamRetentionConfig)}
+    kwargs = {k: v for k, v in value.items() if k in known}
+    return RuntimeDownstreamRetentionConfig(**kwargs)
+
+
+@dataclass
+class RuntimeTelemetryConfig:
+    """Global telemetry configuration (``telemetry:`` in config.yaml)."""
+
+    downstream: RuntimeDownstreamRetentionConfig = field(default_factory=RuntimeDownstreamRetentionConfig)
+
+    def __post_init__(self) -> None:
+        self.downstream = _coerce_downstream_retention_config(self.downstream)
+
+
+def _coerce_telemetry_config(value: Any) -> RuntimeTelemetryConfig:
+    if value is None:
+        return RuntimeTelemetryConfig()
+    if isinstance(value, RuntimeTelemetryConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("telemetry must be a mapping")
+    known = {f.name for f in fields(RuntimeTelemetryConfig)}
+    kwargs = {k: v for k, v in value.items() if k in known}
+    return RuntimeTelemetryConfig(**kwargs)
 
 
 @dataclass
@@ -351,12 +420,16 @@ class RuntimeConfig:
     # Home of the global inject_provider_user toggle (governs proxied + direct paths).
     provider_trace: RuntimeProviderTraceConfig = field(default_factory=RuntimeProviderTraceConfig)
 
+    # Global telemetry lifecycle policy. Shared downstream shards have one owner.
+    telemetry: RuntimeTelemetryConfig = field(default_factory=RuntimeTelemetryConfig)
+
     def __post_init__(self) -> None:
         # Coerce a raw dict (from YAML or `forge config set`/`edit`) into the
         # nested dataclass. This is the single convergence point for the load,
         # set, and edit paths (see _coerce_statusline_config).
         self.statusline = _coerce_statusline_config(self.statusline)
         self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
+        self.telemetry = _coerce_telemetry_config(self.telemetry)
 
         valid_modes = {"host", "sidecar"}
         if self.proxy_mode not in valid_modes:
@@ -427,7 +500,11 @@ def _apply_env_overrides(config: RuntimeConfig) -> RuntimeConfig:
         # Only FORGE_DEBUG -> log_level is wired. A future non-log_level override needs its
         # own coercion here rather than silently misrouting through the debug coercion.
         if field_name != "log_level":
-            logger.warning("Ignoring env %s: no coercion registered for field %r", env_var, field_name)
+            logger.warning(
+                "Ignoring env %s: no coercion registered for field %r",
+                env_var,
+                field_name,
+            )
             continue
         try:
             overrides[field_name] = _coerce_debug_to_log_level(raw)
@@ -570,6 +647,20 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
             )
             kwargs["provider_trace"] = RuntimeProviderTraceConfig()
 
+    # Retention is destructive, so the resolver separately treats malformed on-disk
+    # telemetry config as a reason to skip pruning. The general runtime loader keeps
+    # its established subtree fail-open behavior for non-destructive consumers.
+    if "telemetry" in kwargs:
+        try:
+            _coerce_telemetry_config(kwargs["telemetry"])
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Invalid telemetry config in %s: %s — using telemetry defaults",
+                source,
+                e,
+            )
+            kwargs["telemetry"] = RuntimeTelemetryConfig()
+
     try:
         return RuntimeConfig(**kwargs)
     except (ValueError, TypeError) as e:
@@ -649,6 +740,22 @@ def _commented_runtime_config_map(data: Mapping[str, Any]) -> Any:
                 value,
                 field_owner=RuntimeProviderTraceConfig,
                 comments=_PROVIDER_TRACE_FIELD_COMMENTS,
+                indent=2,
+            )
+        elif key == "telemetry" and isinstance(value, Mapping):
+            telemetry = dict(value)
+            downstream = telemetry.get("downstream")
+            if isinstance(downstream, Mapping):
+                telemetry["downstream"] = _commented_section_map(
+                    downstream,
+                    field_owner=RuntimeDownstreamRetentionConfig,
+                    comments=_DOWNSTREAM_RETENTION_FIELD_COMMENTS,
+                    indent=4,
+                )
+            value = _commented_section_map(
+                telemetry,
+                field_owner=RuntimeTelemetryConfig,
+                comments=_TELEMETRY_FIELD_COMMENTS,
                 indent=2,
             )
         result[key] = value
@@ -833,4 +940,13 @@ proxy_mode: host
 #   Off by default. Set with: forge config set provider_trace.inject_provider_user=true
 # provider_trace:
 #   inject_provider_user: false
+
+# Shared downstream telemetry retention (audit, cost, and provider lifecycle).
+# Current UTC calendar-month shards are always preserved for spend-cap bootstrap.
+# 0 disables the corresponding age or size bound.
+# Set with: forge config set telemetry.downstream.retention_days=14
+# telemetry:
+#   downstream:
+#     retention_days: 14
+#     max_total_mb: 512
 """

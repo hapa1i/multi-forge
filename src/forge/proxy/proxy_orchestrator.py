@@ -84,7 +84,12 @@ class ProxyIdentityMismatchError(Exception):
     """
 
     def __init__(
-        self, base_url: str, *, expected_proxy_id: str | None, actual_proxy_id: str | None, detail: str
+        self,
+        base_url: str,
+        *,
+        expected_proxy_id: str | None,
+        actual_proxy_id: str | None,
+        detail: str,
     ) -> None:
         self.base_url = base_url
         self.expected_proxy_id = expected_proxy_id
@@ -262,7 +267,7 @@ def create_proxy_file(
         **{name: getattr(cfg.proxy, name) for name in PROXY_BLOCK_FIELDS},
     )
 
-    return write_proxy_instance_config(proxy_id, proxy_config)
+    return write_proxy_instance_config(proxy_id, proxy_config, omit_legacy_retention=True)
 
 
 def prune_stale_proxies(*, timeout_s: float = 5.0) -> PruneStaleProxiesResult:
@@ -941,7 +946,11 @@ def _default_model_from_root(data: dict[str, Any]) -> str | None:
 
 
 def _verify_proxy_identity(
-    data: dict[str, Any], *, base_url: str, expected_proxy_id: str | None, expected_template: str | None
+    data: dict[str, Any],
+    *,
+    base_url: str,
+    expected_proxy_id: str | None,
+    expected_template: str | None,
 ) -> None:
     """Reject a ``GET /`` body that is not the resolved proxy's identity.
 
@@ -1024,7 +1033,10 @@ def assert_proxy_responses_capable(
         raise ProxyUnreachableError(f"proxy at {base_url} returned an unexpected GET / body")
 
     _verify_proxy_identity(
-        data, base_url=base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template
+        data,
+        base_url=base_url,
+        expected_proxy_id=expected_proxy_id,
+        expected_template=expected_template,
     )
 
     wire_shape = data.get("wire_shape")

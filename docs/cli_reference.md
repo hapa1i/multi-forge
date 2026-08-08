@@ -430,15 +430,20 @@ cancellation domain. `forge workflow list-models [--json]` reports readiness and
 
 ### System
 
-| Command             | Purpose                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `forge info`        | Show global system information (`--json`)                                                                       |
-| `forge clean`       | Preview/remove orphaned state (`--scope`, `--yes`, `--json`)                                                    |
-| `forge config`      | Manage global runtime preferences                                                                               |
-| `forge auth login`  | Store credentials for LLM providers                                                                             |
-| `forge auth status` | Show credential status per provider                                                                             |
-| `forge logs show`   | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
-| `forge logs clean`  | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
+| Command                          | Purpose                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `forge info`                     | Show global system information (`--json`)                                                                       |
+| `forge clean`                    | Preview/remove orphaned state (`--scope`, `--yes`, `--json`)                                                    |
+| `forge config`                   | Manage global runtime preferences                                                                               |
+| `forge config show`              | Show effective config plus downstream-retention status (`--raw`, `--json`)                                      |
+| `forge config set`               | Set a top-level or dotted runtime key                                                                           |
+| `forge config edit`              | Validate and replace the user-owned runtime config                                                              |
+| `forge config reset`             | Reset one top-level key or the whole runtime config                                                             |
+| `forge config migrate-retention` | Preview/apply legacy proxy-retention migration (`--yes`, `--json`)                                              |
+| `forge auth login`               | Store credentials for LLM providers                                                                             |
+| `forge auth status`              | Show credential status per provider                                                                             |
+| `forge logs show`                | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| `forge logs clean`               | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
 
 `forge clean --yes --json` still emits its result object on stdout and exits 1 when either `failed` or
 `skipped_project_compatibility` is non-empty.
@@ -471,8 +476,8 @@ ownership.
 
 **Design principles:**
 
-- **Narrow global config** -- `forge config` owns runtime preferences only; routing stays per-proxy and workflow state
-  stays per-session
+- **Narrow global config** -- `forge config` owns runtime preferences and shared telemetry lifecycle only; routing stays
+  per-proxy and workflow state stays per-session
 - **Explicit verbs** -- non-leaf groups print help; leaves perform the action
 - **Launch through Forge** -- `forge session start`, `forge session resume`, or `forge claude start --proxy` sets up env
   vars correctly

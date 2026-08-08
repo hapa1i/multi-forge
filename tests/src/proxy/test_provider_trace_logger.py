@@ -1,10 +1,8 @@
-"""Unit tests for the provider-trace plane (write/read/gate/prune/perms)."""
+"""Unit tests for the provider-trace projection (write/read/gate/perms)."""
 
 from __future__ import annotations
 
 import json
-import os
-import time
 from dataclasses import fields
 from typing import Any
 
@@ -230,36 +228,3 @@ class TestPlaneRobustness:
         traces = _downstream_dir()
         for d in (traces, traces.parent):  # downstream/, telemetry/
             assert oct(d.stat().st_mode)[-3:] == "700"
-
-
-class TestPrune:
-    def test_prune_by_age_deletes_old_downstream_shard(self):
-        _record()
-        shard = list(_downstream_dir().glob("*.jsonl"))[0]
-        shard = shard.rename(shard.with_name("2000-01_1.jsonl"))
-        old = time.time() - 30 * 86400
-        os.utime(shard, (old, old))
-        ptl.prune_provider_traces(retention_days=14, max_total_mb=512)
-        assert not shard.exists()
-
-    def test_prune_keeps_recent(self):
-        _record()
-        ptl.prune_provider_traces(retention_days=14, max_total_mb=512)
-        assert list(_downstream_dir().glob("*.jsonl"))
-
-    def test_prune_by_total_size_deletes_oldest_downstream_shards(self):
-        traces_dir = _downstream_dir()
-        traces_dir.mkdir(parents=True, exist_ok=True)
-        shards = []
-        for i in range(3):  # 0.5 MiB each -> 1.5 MiB total
-            path = traces_dir / f"2026-0{i + 1}_{i}.jsonl"
-            path.write_text("x" * (512 * 1024))
-            stamp = time.time() - (3 - i) * 86400  # shard 0 = oldest
-            os.utime(path, (stamp, stamp))
-            shards.append(path)
-
-        ptl.prune_provider_traces(retention_days=0, max_total_mb=1)  # cap 1 MiB
-
-        assert not shards[0].exists()
-        assert shards[1].exists()
-        assert shards[2].exists()

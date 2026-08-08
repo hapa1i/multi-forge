@@ -1,9 +1,8 @@
 # Epic: CLI, proxy, and runtime correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `todo/` -- accepted Wave 5 coordination work; all seven members remain parked until this admission record
-merges.
+**Lane**: `doing/` -- active Wave 5 coordination; D015 is in flight and the other six members remain parked.
 
 ## Goal
 
@@ -43,15 +42,15 @@ seven broken-behavior characterizations and was removed after evidence capture.
 
 ## Members and Sequence
 
-| Order | Finding | Member                                                                                            | Review boundary                                      |
-| ----- | ------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 1     | D015    | [`unify_downstream_retention`](../unify_downstream_retention/card.md)                             | global policy, compatibility resolver, single pruner |
-| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
-| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
-| 4     | D017    | [`align_search_corruption_failures`](../align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
-| 5     | O001    | [`forward_litellm_user_agent`](../forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
-| 6     | O004    | [`relay_anthropic_response_headers`](../relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
-| 7     | D018    | [`make_statusline_sources_segment_lazy`](../make_statusline_sources_segment_lazy/card.md)         | segment dependencies and status-line hot-path I/O    |
+| Order | Finding | Member                                                                                                    | Review boundary                                      |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 1     | D015    | [`unify_downstream_retention`](../unify_downstream_retention/card.md)                                     | global policy, compatibility resolver, single pruner |
+| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../../todo/preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
+| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../../todo/stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
+| 4     | D017    | [`align_search_corruption_failures`](../../todo/align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
+| 5     | O001    | [`forward_litellm_user_agent`](../../todo/forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
+| 6     | O004    | [`relay_anthropic_response_headers`](../../todo/relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
+| 7     | D018    | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md)         | segment dependencies and status-line hot-path I/O    |
 
 D015 goes first because two startup passes can delete shared telemetry under a policy the operator did not choose, and
 DG3 already resolves its broader config/migration contract. O002 follows because a failed stop currently discards or

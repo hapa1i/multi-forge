@@ -289,6 +289,41 @@ tiers:
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
+    def test_show_points_legacy_retention_to_global_owner(self, runner: CliRunner, temp_env: Path) -> None:
+        _create_proxy_file(
+            temp_env,
+            "legacy-proxy",
+            "template: litellm-openai\naudit:\n  retention_days: 30\n  max_total_mb: 640\n",
+        )
+
+        result = runner.invoke(main, ["proxy", "show", "legacy-proxy"])
+
+        assert result.exit_code == 0
+        assert "Downstream retention: telemetry.downstream (global)" in result.output
+        assert "30 days, 640 MB (legacy_consensus)" in result.output
+        assert "audit.retention_days -> telemetry.downstream.retention_days" in result.output
+        assert "forge config show" in result.output
+
+    def test_show_json_includes_global_retention_status(self, runner: CliRunner, temp_env: Path) -> None:
+        _create_proxy_file(
+            temp_env,
+            "legacy-proxy",
+            "template: litellm-openai\nprovider_trace:\n  retention_days: 21\n  max_total_mb: 300\n",
+        )
+
+        result = runner.invoke(main, ["proxy", "show", "legacy-proxy", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        retention = payload["downstream_retention"]
+        assert retention["owner"] == "telemetry.downstream"
+        assert retention["effective"] == {"retention_days": 21, "max_total_mb": 300}
+        assert retention["source"] == "legacy_consensus"
+        assert {item["key"] for item in retention["deprecated_keys"]} == {
+            "provider_trace.retention_days",
+            "provider_trace.max_total_mb",
+        }
+
 
 class TestProxyValidate:
     """Tests for `forge proxy validate`."""
@@ -479,6 +514,66 @@ tiers:
         assert result.exit_code == 0
         content = proxy_file.read_text()
         assert "default_tier: opus" in content
+
+    def test_set_full_body_audit_tip_names_shared_downstream_storage(self, runner: CliRunner, temp_env: Path) -> None:
+        proxy_yaml = """\
+template: litellm-openai
+provider: litellm
+proxy_endpoint: http://localhost:8085
+port: 8085
+upstream_base_url: https://litellm.test.example.com
+tiers:
+  haiku: gpt-4o-mini
+  sonnet: gpt-4o
+"""
+        _create_proxy_file(temp_env, "audit-tip-test", proxy_yaml)
+
+        result = runner.invoke(
+            main,
+            ["proxy", "set", "audit-tip-test", "audit.audit_full_body=true"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "telemetry/downstream" in result.output
+        assert "audit/requests" not in result.output
+
+    @pytest.mark.parametrize(
+        ("legacy_key", "replacement"),
+        [
+            ("audit.retention_days", "telemetry.downstream.retention_days"),
+            ("audit.max_total_mb", "telemetry.downstream.max_total_mb"),
+            ("provider_trace.retention_days", "telemetry.downstream.retention_days"),
+            ("provider_trace.max_total_mb", "telemetry.downstream.max_total_mb"),
+        ],
+    )
+    def test_set_legacy_retention_key_prints_global_replacement(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        legacy_key: str,
+        replacement: str,
+    ) -> None:
+        proxy_yaml = """\
+template: litellm-openai
+provider: litellm
+proxy_endpoint: http://localhost:8085
+port: 8085
+upstream_base_url: https://litellm.test.example.com
+tiers:
+  haiku: gpt-4o-mini
+  sonnet: gpt-4o
+"""
+        _create_proxy_file(temp_env, "retention-tip-test", proxy_yaml)
+
+        result = runner.invoke(
+            main,
+            ["proxy", "set", "retention-tip-test", f"{legacy_key}=30"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert f"'{legacy_key}' is deprecated" in result.output
+        assert f"forge config set {replacement}=30" in result.output
+        assert "forge config migrate-retention" in result.output
 
     def test_set_nested_field_with_dot_notation(self, runner: CliRunner, temp_env: Path) -> None:
         """Set command updates nested field with dot notation."""
@@ -1599,7 +1694,14 @@ class TestProxyCreateNoStart:
 
         result = runner.invoke(
             main,
-            ["proxy", "create", "litellm-openai", "--name", "rollback-proxy", "--no-start"],
+            [
+                "proxy",
+                "create",
+                "litellm-openai",
+                "--name",
+                "rollback-proxy",
+                "--no-start",
+            ],
         )
 
         assert result.exit_code != 0
@@ -1703,8 +1805,18 @@ _SAMPLE_METRICS = {
         },
     },
     "by_model": {
-        "openai/gpt-5.5": {"requests": 35, "input_tokens": 80000, "output_tokens": 20000, "cached_tokens": 50000},
-        "openai/o3": {"requests": 7, "input_tokens": 20000, "output_tokens": 5000, "cached_tokens": 10000},
+        "openai/gpt-5.5": {
+            "requests": 35,
+            "input_tokens": 80000,
+            "output_tokens": 20000,
+            "cached_tokens": 50000,
+        },
+        "openai/o3": {
+            "requests": 7,
+            "input_tokens": 20000,
+            "output_tokens": 5000,
+            "cached_tokens": 10000,
+        },
     },
     "failures_by_type": {"tool_call_error": 2},
     "last_request_at": "2026-03-23T01:00:00+00:00",
@@ -1765,8 +1877,18 @@ class TestProxyMetrics:
         """Bare `metrics --json` with >1 proxy emits one JSON object; unreachable proxies are null."""
         _create_proxy_registry_from_entries(
             {
-                "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
-                "proxy-b": ProxyEntry(proxy_id="proxy-b", template="t", base_url="http://localhost:8086", port=8086),
+                "proxy-a": ProxyEntry(
+                    proxy_id="proxy-a",
+                    template="t",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                ),
+                "proxy-b": ProxyEntry(
+                    proxy_id="proxy-b",
+                    template="t",
+                    base_url="http://localhost:8086",
+                    port=8086,
+                ),
             }
         )
 
@@ -1838,8 +1960,18 @@ class TestProxyMetrics:
         """Leaf command with no args should do the sensible broad action."""
         _create_proxy_registry_from_entries(
             {
-                "p1": ProxyEntry(proxy_id="p1", template="t", base_url="http://localhost:8085", port=8085),
-                "p2": ProxyEntry(proxy_id="p2", template="t", base_url="http://localhost:8086", port=8086),
+                "p1": ProxyEntry(
+                    proxy_id="p1",
+                    template="t",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                ),
+                "p2": ProxyEntry(
+                    proxy_id="p2",
+                    template="t",
+                    base_url="http://localhost:8086",
+                    port=8086,
+                ),
             }
         )
         monkeypatch.setattr(
@@ -1859,8 +1991,18 @@ class TestProxyMetrics:
         """`forge proxy metrics --json` should mirror implicit --all for multiple proxies."""
         _create_proxy_registry_from_entries(
             {
-                "p1": ProxyEntry(proxy_id="p1", template="t", base_url="http://localhost:8085", port=8085),
-                "p2": ProxyEntry(proxy_id="p2", template="t", base_url="http://localhost:8086", port=8086),
+                "p1": ProxyEntry(
+                    proxy_id="p1",
+                    template="t",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                ),
+                "p2": ProxyEntry(
+                    proxy_id="p2",
+                    template="t",
+                    base_url="http://localhost:8086",
+                    port=8086,
+                ),
             }
         )
         monkeypatch.setattr(
@@ -1932,12 +2074,23 @@ class TestProxyMetrics:
         """Bare `metrics` with multiple proxies shows separator lines between them."""
         _create_proxy_registry_from_entries(
             {
-                "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
-                "proxy-b": ProxyEntry(proxy_id="proxy-b", template="t", base_url="http://localhost:8086", port=8086),
+                "proxy-a": ProxyEntry(
+                    proxy_id="proxy-a",
+                    template="t",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                ),
+                "proxy-b": ProxyEntry(
+                    proxy_id="proxy-b",
+                    template="t",
+                    base_url="http://localhost:8086",
+                    port=8086,
+                ),
             }
         )
         monkeypatch.setattr(
-            "forge.cli.proxy._fetch_proxy_info", lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t")
+            "forge.cli.proxy._fetch_proxy_info",
+            lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t"),
         )
 
         result = runner.invoke(main, ["proxy", "metrics"])

@@ -20,7 +20,9 @@ import pytest
 from forge.core.paths import get_forge_home
 from forge.runtime_config import (
     RuntimeConfig,
+    RuntimeDownstreamRetentionConfig,
     RuntimeProviderTraceConfig,
+    RuntimeTelemetryConfig,
     StatusLineConfig,
     get_default_config_content,
     get_runtime_config,
@@ -75,6 +77,10 @@ class TestRuntimeConfigDefaults:
     def test_interactive_anthropic_api_key_defaults_inherit(self):
         rc = RuntimeConfig()
         assert rc.interactive_anthropic_api_key == "inherit"
+
+    def test_downstream_retention_defaults(self):
+        rc = RuntimeConfig()
+        assert rc.telemetry.downstream == RuntimeDownstreamRetentionConfig(retention_days=14, max_total_mb=512)
 
 
 class TestRuntimeConfigValidation:
@@ -451,6 +457,9 @@ class TestGetDefaultConfigContent:
             "memory_writer_timeout",
             "log_tool_failures",
             "auth_ignore_env",
+            "telemetry",
+            "retention_days",
+            "max_total_mb",
         ]:
             assert key in content, f"Missing key in default content: {key}"
 
@@ -470,6 +479,10 @@ class TestRenderRuntimeConfigYaml:
         assert data["proxy_mode"] == "host"
         assert data["statusline"]["cost_mode"] == "auto"
         assert data["provider_trace"]["inject_provider_user"] is False
+        assert data["telemetry"]["downstream"] == {
+            "retention_days": 14,
+            "max_total_mb": 512,
+        }
 
     def test_rendered_output_is_copy_paste_safe(self, tmp_path: Path):
         """`forge config show` output, pasted back into config.yaml, must load unchanged.
@@ -528,6 +541,22 @@ class TestConfigCommentCoverage:
 
         missing = [f.name for f in fields(RuntimeProviderTraceConfig) if f.name not in _PROVIDER_TRACE_FIELD_COMMENTS]
         assert not missing, f"RuntimeProviderTraceConfig fields missing a comment: {missing}"
+
+    def test_every_telemetry_field_has_a_comment(self):
+        from forge.runtime_config import _TELEMETRY_FIELD_COMMENTS
+
+        missing = [f.name for f in fields(RuntimeTelemetryConfig) if f.name not in _TELEMETRY_FIELD_COMMENTS]
+        assert not missing, f"RuntimeTelemetryConfig fields missing a comment: {missing}"
+
+    def test_every_downstream_retention_field_has_a_comment(self):
+        from forge.runtime_config import _DOWNSTREAM_RETENTION_FIELD_COMMENTS
+
+        missing = [
+            f.name
+            for f in fields(RuntimeDownstreamRetentionConfig)
+            if f.name not in _DOWNSTREAM_RETENTION_FIELD_COMMENTS
+        ]
+        assert not missing, f"RuntimeDownstreamRetentionConfig fields missing a comment: {missing}"
 
 
 # ---------------------------------------------------------------------------
@@ -788,3 +817,47 @@ class TestProviderTraceConfigLoad:
         write_runtime_config({"provider_trace": {"inject_provider_user": True}}, cfg)
         rc = load_runtime_config(cfg)
         assert rc.provider_trace.inject_provider_user is True
+
+
+# ---------------------------------------------------------------------------
+# RuntimeTelemetryConfig (global shared downstream retention)
+# ---------------------------------------------------------------------------
+
+
+class TestDownstreamRetentionConfig:
+    def test_dict_coercion_set_edit_path(self):
+        rc = RuntimeConfig(telemetry={"downstream": {"retention_days": 0, "max_total_mb": 0}})  # type: ignore[arg-type]
+        assert isinstance(rc.telemetry, RuntimeTelemetryConfig)
+        assert rc.telemetry.downstream == RuntimeDownstreamRetentionConfig(retention_days=0, max_total_mb=0)
+
+    @pytest.mark.parametrize(
+        ("field_name", "value"),
+        [
+            ("retention_days", -1),
+            ("retention_days", True),
+            ("max_total_mb", -1),
+            ("max_total_mb", False),
+        ],
+    )
+    def test_invalid_bound_raises_strict(self, field_name: str, value: object):
+        with pytest.raises(ValueError, match=f"telemetry.downstream.{field_name}"):
+            RuntimeConfig(telemetry={"downstream": {field_name: value}})  # type: ignore[arg-type]
+
+    def test_load_round_trips_downstream_policy(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("telemetry:\n  downstream:\n    retention_days: 30\n    max_total_mb: 1024\n")
+
+        rc = load_runtime_config(cfg)
+
+        assert rc.telemetry.downstream == RuntimeDownstreamRetentionConfig(retention_days=30, max_total_mb=1024)
+
+    def test_bad_telemetry_subtree_fails_open_without_losing_other_values(self, tmp_path: Path, caplog):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("status_timeout: 0.5\ntelemetry:\n  downstream:\n    retention_days: -1\n")
+
+        with caplog.at_level(logging.WARNING):
+            rc = load_runtime_config(cfg)
+
+        assert rc.status_timeout == 0.5
+        assert rc.telemetry == RuntimeTelemetryConfig()
+        assert any("telemetry" in record.message for record in caplog.records)

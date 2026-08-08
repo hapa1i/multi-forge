@@ -8,8 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+import yaml
 
-from forge.config.loader import load_proxy_instance_config
+from forge.config.loader import get_proxy_file_path, load_proxy_instance_config
 from forge.proxy.ports import NoAvailablePortError
 from forge.proxy.proxies import ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import (
@@ -220,6 +221,10 @@ def test_start_spawns_new_and_persists(
     proxy_config = load_proxy_instance_config("proxy_spawned")
     assert proxy_config is not None
     assert proxy_config.backend == "litellm-remote"
+    persisted = yaml.safe_load(get_proxy_file_path("proxy_spawned").read_text())
+    assert "retention_days" not in persisted["audit"]
+    assert "max_total_mb" not in persisted["audit"]
+    assert "provider_trace" not in persisted
 
 
 def test_start_persists_failed_reuse_status_before_spawn(
@@ -1351,7 +1356,10 @@ def _patch_root(*, status=200, body=None, json_exc=None, get_exc=None):
         resp.json.side_effect = json_exc
     else:
         resp.json.return_value = body
-    return patch(f"{_ORCH}.httpx.Client", return_value=_FakeRootClient(resp=resp, get_exc=get_exc))
+    return patch(
+        f"{_ORCH}.httpx.Client",
+        return_value=_FakeRootClient(resp=resp, get_exc=get_exc),
+    )
 
 
 class TestAssertProxyResponsesCapable:
@@ -1437,7 +1445,9 @@ class TestProxyIdentityVerification:
     def test_matching_identity_passes(self) -> None:
         with _patch_root(body=_capable_root_body()):
             model, ws = assert_proxy_responses_capable(
-                "http://x", expected_proxy_id="proxy_abc", expected_template="codex-responses-local"
+                "http://x",
+                expected_proxy_id="proxy_abc",
+                expected_template="codex-responses-local",
             )
         assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
 

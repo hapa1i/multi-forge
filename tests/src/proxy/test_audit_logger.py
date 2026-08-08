@@ -1,10 +1,8 @@
-"""Unit tests for the Phase 2 audit logger (logging, hashing, drift, retention)."""
+"""Unit tests for the Phase 2 audit logger (logging, hashing, drift, and redaction)."""
 
 from __future__ import annotations
 
 import json
-import os
-import time
 
 import pytest
 
@@ -312,39 +310,6 @@ class TestDrift:
 
     def test_none_hash_is_noop(self):
         assert self._drift(None) is False
-
-
-class TestPrune:
-    def test_prune_by_age_deletes_old_downstream_shard(self):
-        _meta()
-        shard = list(_downstream_dir().glob("*.jsonl"))[0]
-        shard = shard.rename(shard.with_name("2000-01_1.jsonl"))
-        old = time.time() - 30 * 86400
-        os.utime(shard, (old, old))
-        audit_logger.prune_audit_logs(retention_days=14, max_total_mb=512)
-        assert not shard.exists()
-
-    def test_prune_keeps_recent(self):
-        _meta()
-        audit_logger.prune_audit_logs(retention_days=14, max_total_mb=512)
-        assert list(_downstream_dir().glob("*.jsonl"))
-
-    def test_prune_by_total_size_deletes_oldest_downstream_shards(self):
-        audit_dir = _downstream_dir()
-        audit_dir.mkdir(parents=True, exist_ok=True)
-        shards = []
-        for i in range(3):  # 0.5 MiB each -> 1.5 MiB total
-            path = audit_dir / f"2026-0{i + 1}_{i}.jsonl"
-            path.write_text("x" * (512 * 1024))
-            stamp = time.time() - (3 - i) * 86400  # shard 0 = oldest
-            os.utime(path, (stamp, stamp))
-            shards.append(path)
-
-        audit_logger.prune_audit_logs(retention_days=0, max_total_mb=1)  # cap 1 MiB
-
-        assert not shards[0].exists()
-        assert shards[1].exists()
-        assert shards[2].exists()
 
 
 class TestRedactHeaders:
