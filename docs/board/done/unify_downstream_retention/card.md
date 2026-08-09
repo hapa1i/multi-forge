@@ -1,6 +1,6 @@
 # Unify downstream telemetry retention ownership
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Decision**: [`downstream_retention_ownership`](../downstream_retention_ownership/card.md) (DG3; D015).
 

@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--4 are closed. Wave 5 is active under `epic_cli_proxy_runtime_correctness`; its first six members shipped in PRs
-#148--#153, and D018 is the active final member.
+Waves 1--4 and the bounded Wave 5 HIGH child epic are closed. Rechecking and admitting Wave 5 MEDIUM correctness rows is
+the next gate; later waves remain parked.
 
 ## Goal
 
@@ -67,9 +67,9 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_session_durable_state_safety`](../../done/epic_session_durable_state_safety/card.md) after all eight members
 shipped in PRs #134--#138 and #140--#142. Wave 4 closed under
 [`epic_installer_transaction_safety`](../../done/epic_installer_transaction_safety/card.md) after its three members
-shipped in PRs #144--#146. Wave 5 is active under
-[`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md), with its first six members
-shipped and D018 active last.
+shipped in PRs #144--#146. The bounded Wave 5 HIGH set closed under
+[`epic_cli_proxy_runtime_correctness`](../../done/epic_cli_proxy_runtime_correctness/card.md) after all seven members
+shipped independently in PRs #148--#154. Wave 5 MEDIUM correctness rows still require separate admission.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -97,7 +97,7 @@ shipped and D018 active last.
 | 5    | D017            | [`align_search_corruption_failures`](../../done/align_search_corruption_failures/card.md)                           |
 | 5    | O001            | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                                       |
 | 5    | O004            | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
-| 5    | D018            | [`make_statusline_sources_segment_lazy`](../make_statusline_sources_segment_lazy/card.md)                           |
+| 5    | D018            | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

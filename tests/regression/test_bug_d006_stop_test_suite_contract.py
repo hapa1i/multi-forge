@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from forge.cli.hooks import verification
 from forge.cli.hooks.verification import _run_verification_check
 from forge.session import SessionStore, create_session_state
 from forge.session.models import SessionState, VerificationConfig
@@ -58,6 +59,10 @@ def test_fixed_suite_is_synchronous_in_session_worktree_and_excludes_subprocess_
         return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
+    # Keep overhead accounting deterministic under scheduler contention: the
+    # verification spans 140 ms, of which the subprocess owns 120 ms.
+    clock_samples = iter((10.0, 10.01, 10.13, 10.14))
+    monkeypatch.setattr(verification, "perf_counter", lambda: next(clock_samples))
     started = time.perf_counter()
     with caplog.at_level(logging.WARNING, logger="forge.cli.hooks.verification"):
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
@@ -70,6 +75,7 @@ def test_fixed_suite_is_synchronous_in_session_worktree_and_excludes_subprocess_
     assert observed["timeout"] == 300
     assert observed["shell"] is False
     assert "Forge-owned verification overhead exceeded" not in caplog.text
+    assert list(clock_samples) == []
     confirmed = store.read().confirmed.verification
     assert confirmed is not None
     assert confirmed.last_result == "passed"

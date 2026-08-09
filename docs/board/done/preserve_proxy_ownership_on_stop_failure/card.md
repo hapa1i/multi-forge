@@ -1,6 +1,6 @@
 # Preserve proxy ownership on stop failure
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O002 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 

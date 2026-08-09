@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: execute D018 as the final bounded Wave 5 member.
+Current focus: recheck and admit Wave 5 MEDIUM correctness rows against the execution-entry contract.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -101,6 +101,7 @@ Current focus: execute D018 as the final bounded Wave 5 member.
 - [x] Activate O004 from merged `main`, close O001, and create the O004 execution checklist.
 - [x] Implement, independently review, and merge O004 before activating D018 (PR #153, `8f030ef4`).
 - [x] Activate D018 from merged `main`, close O004, and create the D018 execution checklist.
+- [x] Implement, independently review, and merge D018; close its seven-member child epic (PR #154, `c4f14037`).
 - [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
   activating their implementation cards.
 

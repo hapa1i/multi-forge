@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-09
 
+### Make status-line sources segment-lazy
+
+**Goal/outcome**: Avoid proxy and managed-session discovery when the configured status-line fields cannot consume those
+facts, without changing the default bar.
+
+**Key changes**:
+
+- Added registry-owned proxy/session dependencies and one immutable render plan shared by source acquisition and segment
+  rendering; each required source is acquired at most once per refresh.
+- Made `path,branch` skip both shared probes while preserving default/unknown fallback, output bytes, source fail-open,
+  and segment-specific git, transcript/cache, and hook-diagnostic work; synchronized design, operator, and bundled QA
+  guidance.
+
+**Verification**: The retained D018 regression failed on `8f030ef4`. After implementation, 494 focused tests, 14
+targeted Docker cases, 8,929 unit tests (one skip, 122 deselected), 696 regressions, wheel/sdist and packaged-resource
+checks, final pre-commit, and documentation-link checks passed. Independent review found no issues; GitHub Tests,
+Pre-commit, and CodeQL passed. Shipped in PR #154 (`c4f14037`).
+
 ### Relay safe Anthropic response headers
 
 **Goal/outcome**: Preserve actionable upstream retry and rate-limit metadata without exposing framing, credentials,

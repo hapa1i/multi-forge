@@ -34,9 +34,10 @@ contract requires an epic.
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger. Waves 1--4 are closed after D019 shipped in PR
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
-members under [`epic_cli_proxy_runtime_correctness`](doing/epic_cli_proxy_runtime_correctness/card.md). The admission
-record merged in PR #147 (`92b981a5`). The first six members then shipped in PRs #148--#153; D018 is now the active
-seventh and final member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
+members under [`epic_cli_proxy_runtime_correctness`](done/epic_cli_proxy_runtime_correctness/card.md). The admission
+record merged in PR #147 (`92b981a5`), and all seven members shipped independently in PRs #148--#154. The bounded HIGH
+child epic is closed; Wave 5 MEDIUM correctness rows require a separate admission review. O003 already shipped in Wave 3
+and is not part of the Wave 5 set.
 
 ### Finding fields
 
@@ -360,6 +361,13 @@ implementation outcome below records its completed code and regression work.
   (one skip), 695 regressions, both fresh-image Docker cases, wheel/sdist build, final pre-commit, and
   documentation-link checks cover the contract. Independent review found no issues. It shipped in PR #153 (`8f030ef4`).
   See [`relay_anthropic_response_headers`](done/relay_anthropic_response_headers/card.md).
+- **D018 — resolved 2026-08-09:** every status-line segment now declares its proxy/session source requirements, and one
+  immutable render plan drives both source acquisition and producer order. A `path`/`branch` layout skips both probes;
+  default and unknown-only fallback layouts retain both sources, exact output, and existing fail-open behavior. The
+  retained regression, 494 focused tests, 14 targeted Docker cases, 8,929 unit tests (one skip), 696 regressions,
+  wheel/sdist and packaged-resource checks, and final pre-commit cover the contract. Independent review found no issues,
+  and all GitHub checks passed. It shipped in PR #154 (`c4f14037`). See
+  [`make_statusline_sources_segment_lazy`](done/make_statusline_sources_segment_lazy/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -588,7 +596,7 @@ classification; no implementation member was activated during admission.
 | 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](done/align_search_corruption_failures/card.md)                 |
 | 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](done/forward_litellm_user_agent/card.md)                             |
 | 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](done/relay_anthropic_response_headers/card.md)                 |
-| 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](doing/make_statusline_sources_segment_lazy/card.md)        |
+| 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](done/make_statusline_sources_segment_lazy/card.md)         |
 
 D015 goes first because its duplicate startup passes can destroy shared telemetry under a policy the operator did not
 choose, and DG3 already defines its config/migration contract. O002 follows because failed process teardown currently
@@ -607,9 +615,9 @@ default status line while eliminating unrelated hot-path I/O.
   independently in PRs #134--#138 and #140--#142.
 - **[Installer epic](done/epic_installer_transaction_safety/card.md):** all three members shipped independently in PRs
   #144--#146 with required regression, Docker, and clean-wheel coverage.
-- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** the first six members shipped in PRs
-  #148--#153; D018 is active last while preserving separate review boundaries across scriptability, lifecycle-truth,
-  metadata-relay, retention, and hot-path constraints.
+- **[CLI/proxy/runtime epic](done/epic_cli_proxy_runtime_correctness/card.md):** all seven bounded HIGH members shipped
+  independently in PRs #148--#154 with separate scriptability, lifecycle-truth, metadata-relay, retention, and hot-path
+  review boundaries. Later Wave 5 MEDIUM rows remain subject to separate admission.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 
