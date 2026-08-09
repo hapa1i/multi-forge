@@ -1,6 +1,6 @@
 # CLI, proxy, and runtime correctness checklist
 
-Current focus: execute D018 segment-lazy status-line sources as the final bounded Wave 5 member.
+Current focus: closed after all seven members shipped through PR #154 (`c4f14037`).
 
 ## Activation and sequencing
 
@@ -22,6 +22,7 @@ Current focus: execute D018 segment-lazy status-line sources as the final bounde
 - [x] Start `fix/relay-anthropic-response-headers`, move O001 to `done/`, and activate O004 from merged `main`.
 - [x] Independently review and merge O004 before moving D018 from `todo/` (PR #153, `8f030ef4`).
 - [x] Start `fix/make-statusline-sources-segment-lazy`, move O004 to `done/`, and activate D018 from merged `main`.
+- [x] Independently review and merge D018, then move D018 and this bounded child epic to `done/` (PR #154, `c4f14037`).
 
 ## Members
 
@@ -31,11 +32,11 @@ Current focus: execute D018 segment-lazy status-line sources as the final bounde
 - [x] D017 -- align search corruption failures (PR #151, `efbefce9`).
 - [x] O001 -- forward LiteLLM User-Agent metadata (PR #152, `983e4470`).
 - [x] O004 -- relay safe Anthropic response headers (PR #153, `8f030ef4`).
-- [ ] D018 -- make status-line sources segment-lazy (active final member).
+- [x] D018 -- make status-line sources segment-lazy (PR #154, `c4f14037`).
 
 ## Coordination and closeout
 
-- [ ] Keep the review ledger, parent epic cursor, member paths, and change log current after each merge.
-- [ ] Keep later Wave 5 MEDIUM correctness rows outside this bounded seven-member epic pending separate admission.
-- [ ] Close the epic only after all seven members ship independently with their required regression, focused, and Docker
+- [x] Keep the review ledger, parent epic cursor, member paths, and change log current after each merge.
+- [x] Keep later Wave 5 MEDIUM correctness rows outside this bounded seven-member epic pending separate admission.
+- [x] Close the epic only after all seven members ship independently with their required regression, focused, and Docker
   coverage.

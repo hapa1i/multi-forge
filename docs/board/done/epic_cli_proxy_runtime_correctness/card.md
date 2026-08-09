@@ -1,9 +1,9 @@
 # Epic: CLI, proxy, and runtime correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active Wave 5 coordination; the first six members shipped in PRs #148--#153, and D018 is the
-active final member.
+**Lane**: `done/` -- all seven bounded HIGH members shipped independently in PRs #148--#154; the coordinated outcome
+closed on 2026-08-09.
 
 ## Goal
 
@@ -12,8 +12,8 @@ status-line source discovery tell one observable truth without combining seven i
 
 ## Design Authority
 
-- [`downstream_retention_ownership`](../../done/downstream_retention_ownership/card.md) (DG3): the shared downstream
-  directory has one global policy and one pruner, with fail-closed conflict handling.
+- [`downstream_retention_ownership`](../downstream_retention_ownership/card.md) (DG3): the shared downstream directory
+  has one global policy and one pruner, with fail-closed conflict handling.
 - [`cli_style_guidelines.md`](../../../developer/cli_style_guidelines.md#output-streams): scriptable output is one
   stable JSON result, diagnostics/errors use stderr, and failed leaves exit non-zero.
 - [`docs/design.md` §3.6.3](../../../design.md#363-proxy-lifecycle-ux): proxy configuration and process lifecycle are
@@ -43,15 +43,15 @@ seven broken-behavior characterizations and was removed after evidence capture.
 
 ## Members and Sequence
 
-| Order | Finding | Member                                                                                                    | Review boundary                                      |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 1     | D015    | [`unify_downstream_retention`](../../done/unify_downstream_retention/card.md)                             | global policy, compatibility resolver, single pruner |
-| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../../done/preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
-| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../../done/stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
-| 4     | D017    | [`align_search_corruption_failures`](../../done/align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
-| 5     | O001    | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
-| 6     | O004    | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
-| 7     | D018    | [`make_statusline_sources_segment_lazy`](../make_statusline_sources_segment_lazy/card.md)                 | segment dependencies and status-line hot-path I/O    |
+| Order | Finding | Member                                                                                            | Review boundary                                      |
+| ----- | ------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 1     | D015    | [`unify_downstream_retention`](../unify_downstream_retention/card.md)                             | global policy, compatibility resolver, single pruner |
+| 2     | O002    | [`preserve_proxy_ownership_on_stop_failure`](../preserve_proxy_ownership_on_stop_failure/card.md) | process stop, registry/config ownership, exit truth  |
+| 3     | D016    | [`stabilize_proxy_create_smoke_json`](../stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
+| 4     | D017    | [`align_search_corruption_failures`](../align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
+| 5     | O001    | [`forward_litellm_user_agent`](../forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
+| 6     | O004    | [`relay_anthropic_response_headers`](../relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
+| 7     | D018    | [`make_statusline_sources_segment_lazy`](../make_statusline_sources_segment_lazy/card.md)         | segment dependencies and status-line hot-path I/O    |
 
 D015 goes first because two startup passes can delete shared telemetry under a policy the operator did not choose, and
 DG3 already resolves its broader config/migration contract. O002 follows because a failed stop currently discards or
@@ -62,6 +62,12 @@ declaring segment dependencies across the registry.
 This child epic is intentionally bounded to the seven remaining HIGH findings admitted above. Any MEDIUM correctness
 rows later accepted into canonical Wave 5 require a separately reviewed admission record and execution cards; they do
 not expand this epic's member count or closeout condition.
+
+All seven members shipped as separate review boundaries. D015 through D017 and O001/O002/O004 established global
+retention ownership, truthful CLI/process outcomes, and safe request/response metadata in PRs #148--#153. D018 then made
+shared status-line source acquisition segment-lazy without changing the default bar and shipped in PR #154 (`c4f14037`).
+Each member retained its fail-first regression and passed its required focused, Docker, packaging, and pre-commit tiers;
+independent review completed before every merge.
 
 ## Drift Constraints
 
@@ -83,5 +89,7 @@ not expand this epic's member count or closeout condition.
 
 ## Closeout
 
-Close this epic only after all seven members ship independently, the review ledger records each outcome, normative
-design and operator docs match the shipped contracts, and focused plus required Docker coverage passes.
+All seven members shipped independently with marked regressions and their required focused and Docker coverage. The
+review ledger, member cards, normative design, operator guidance, and change log record the coordinated retention,
+scriptability, lifecycle-truth, metadata-relay, and status-line source contracts. Later Wave 5 MEDIUM correctness rows
+remain outside this closed epic and return to the parent maintenance epic for a separate admission review.

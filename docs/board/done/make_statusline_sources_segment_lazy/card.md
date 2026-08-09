@@ -4,7 +4,7 @@
 
 **Finding**: D018 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- active on `fix/make-statusline-sources-segment-lazy` from merged PR #153 (`8f030ef4`).
+**Lane**: `done/` -- shipped in PR #154 (`c4f14037`) after implementation, verification, and independent review.
 
 ## Goal
 
@@ -23,6 +23,13 @@ Rechecked on merged `main` at `8f030ef4` with `statusline.segments: [path, branc
 the exact call sequence `proxy`, `session` before the segment registry, even though neither source can affect that
 layout. In a proxied managed session those calls include live HTTP plus registry/index/manifest reads on every poll.
 
+## Implementation Outcome
+
+Every registered segment now declares its proxy/session source requirements. The status-line command resolves one
+immutable render plan before source acquisition, acquires each requested shared source at most once, and renders from
+the same plan. A `path`/`branch` layout skips both probes, while empty/default and unknown-only fallback layouts retain
+both sources and their existing byte-compatible fail-open behavior.
+
 ## Expected Behavior
 
 - `path`/`branch`-only rendering performs no proxy HTTP/registry read and no session index/manifest read.
@@ -40,3 +47,11 @@ layout. In a proxied managed session those calls include live HTTP plus registry
 
 - Do not infer session identity from CWD or Claude's `session_id`; `FORGE_SESSION` remains authoritative.
 - Do not alter segment order, formatting, palette/glyph behavior, source fallback semantics, or per-producer fail-open.
+
+## Verification
+
+The retained D018 regression failed on `8f030ef4`, then passed with the exhaustive source-declaration and full-command
+probe matrix. The branch recorded 494 focused status-line/runtime-config/regression tests, 14 targeted Docker
+integration tests, 8,929 unit tests (one skip, 122 deselected), 696 marked regressions, wheel/sdist and
+packaged-resource checks, and final pre-commit. Independent review found no design or standard issues; GitHub Tests,
+Pre-commit, and CodeQL passed on the final head. D018 shipped in PR #154 (`c4f14037`).

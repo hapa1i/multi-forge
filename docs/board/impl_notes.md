@@ -737,6 +737,11 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   producer would let `forge config set` accept a field that renders nothing. There are no reserved-but-unimplemented
   names. `forge config set`/`edit` is the strict gate (rejects unknown names/enums); the renderer drops unknown names
   and falls back to `DEFAULT_ORDER` when empty OR when a non-empty config resolves to nothing (never blanks the bar).
+- **Proxy/session acquisition is plan-lazy**: every `registry.Segment` declares its `StatusSource` requirements. Resolve
+  configured/default order into one immutable `RenderPlan` before calling `detect_proxy()` or `discover_session()`, then
+  render from that same plan so acquisition and producers cannot drift. A zero-source layout skips both probes; each
+  requested source runs at most once. New segments must extend the exhaustive declaration test, while their own git,
+  transcript/cache, or hook-diagnostic work remains governed by lazy `RenderContext` access.
 - **`DEFAULT_ORDER` is the golden contract**: empty `statusline.segments` reproduces the pre-config bar byte-for-byte
   (`test_statusline_registry.py` golden snapshots). It EXCLUDES `rate_limits` + every opt-in segment.
 - **Lazy `RenderContext`**: derivations are `cached_property`, so a segment not in the active set does zero I/O (no

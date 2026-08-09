@@ -1,6 +1,6 @@
 # Make status-line sources segment-lazy checklist
 
-Current focus: publish the independently reviewed registry-owned source plan.
+Current focus: complete -- D018 shipped in PR #154 (`c4f14037`).
 
 ## Activation and reproduction
 
@@ -40,4 +40,5 @@ Current focus: publish the independently reviewed registry-owned source plan.
 - [x] Resolve all 168 local paths/fragments across 14 changed Markdown files and stale-lane references; confirm the QA
   index's 625 checks, measure the change log at 21,412 tokens / 1,449 physical lines, and pass diff checks.
 - [x] Receive independent review with no findings before PR publication.
-- [ ] Merge, then close the seven-member child epic before admitting later Wave 5 MEDIUM rows.
+- [x] Merge D018 in PR #154 (`c4f14037`), then close the seven-member child epic before admitting later Wave 5 MEDIUM
+  rows.
