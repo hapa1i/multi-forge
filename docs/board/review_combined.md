@@ -36,8 +36,10 @@ sequencing and disposition; this report remains the evidence ledger. Waves 1--4 
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
 members under [`epic_cli_proxy_runtime_correctness`](done/epic_cli_proxy_runtime_correctness/card.md). The admission
 record merged in PR #147 (`92b981a5`), and all seven members shipped independently in PRs #148--#154. The bounded HIGH
-child epic is closed; Wave 5 MEDIUM correctness rows require a separate admission review. O003 already shipped in Wave 3
-and is not part of the Wave 5 set.
+child epic is closed. D035, D036, O037, O038, and O042 form the first separately reproduced MEDIUM admission set under
+[`epic_proxy_diagnostic_data_hygiene`](todo/epic_proxy_diagnostic_data_hygiene/card.md); its three members remain parked
+pending admission review. Other Wave 5 MEDIUM rows still require separate admission. O003 already shipped in Wave 3 and
+is not part of the Wave 5 set.
 
 ### Finding fields
 
@@ -186,8 +188,8 @@ implementation outcome below records its completed code and regression work.
 | D032 | MED      | F5    | Status line crash cluster at the entry: valid-JSON-non-object stdin and `"workspace": null` crash with exit 1; malformed `ANTHROPIC_BASE_URL` raises in unguarded `urlparse`.                                                                                                                                                                                                                                                                                                                                                  | appendix §A.8 always exit 0                              | `cli/status_line.py:1698`, `:199`                                                                       |
 | D033 | MED      | F5+O5 | `compute_effective_intent(strict=False)` is byte-identical to strict — the `%cancel-verification` escape-hatch caller gets no leniency (raw `DaciteError` instead), the exact case the flag exists for.                                                                                                                                                                                                                                                                                                                        | workflows §1.3 escape hatches                            | `session/effective.py:85-98`; `cli/hooks/direct_commands.py:1307`                                       |
 | D034 | MED      | F5+O5 | Five `%` handlers emit a third output shape (`{"success": true, "action": "skip", ...}`) that is neither block nor silence — hook internals injected as context on a bare `claude` launch.                                                                                                                                                                                                                                                                                                                                     | §3.11 two-outcome contract                               | `cli/hooks/direct_commands.py:547,685,733,779,1294`                                                     |
-| D035 | MED      | F5+O5 | Debug tool-event logging writes unbounded, unredacted client `tool_result` content to `~/.forge/logs/tool_events/` — a third plane covered by **no pruner**, whose three append sites also skip `append_jsonl_record`'s `0o700` hardening; bypasses the opt-in + truncation its sibling was given.                                                                                                                                                                                                                             | appendix §A.11 no-plaintext posture                      | `proxy/server.py:1859`; `proxy/utils.py:193-244`, `:229`, `:240`, `:329`, `:617`                        |
-| D036 | MED      | F5    | Client-supplied `X-Request-ID` is adopted verbatim into cost/audit/diagnostic records and response headers — the untrusted-header class the four adjacent `X-Forge-*` reads validate.                                                                                                                                                                                                                                                                                                                                          | §3.14/§A.13 validated-header posture                     | `proxy/server.py:1651` vs `core/reactive/run_id.py:59`                                                  |
+| D035 | MED      | F5+O5 | Debug tool events persist unbounded free-form `details`, including raw client `tool_result` errors and tool schemas; the same path logs the first 100 caller characters at WARNING. **Recheck:** shards now use `open_secure_append` (`0600`), mitigating file exposure, and global cleanup refutes only the original no-pruner claim. Free-form details and missing `0700` directory hardening remain; keep opt-in bounded `tool_failures` distinct.                                                                          | appendix §A.11 no-plaintext posture                      | `proxy/server.py:1898,1938`; `proxy/converters.py:521,532`; `proxy/utils.py:193`; `cli/logs.py:285`     |
+| D036 | MED      | F5    | Client-supplied `X-Request-ID` is adopted verbatim into cost/audit/diagnostic records, ordinary logs, and response headers — the untrusted-header class the four adjacent `X-Forge-*` reads validate.                                                                                                                                                                                                                                                                                                                          | §3.14/§A.13 validated-header posture                     | `proxy/server.py:1737-1752` vs `core/run_id.py:15-83`                                                   |
 | D037 | MED      | F5    | Passport-update path (`resolve_with_overrides` → `write_passport` with no `okf_path`) skips the reserved-basename guard — re-tracking a hand-authored passport on `docs/index.md` writes an OKF-reserved file.                                                                                                                                                                                                                                                                                                                 | workflows §5.7 reserved-name guard                       | `session/passport.py:676`; `cli/memory.py:300`                                                          |
 | D038 | MED      | F5    | Search stores treat wrong-typed `documents`/`content` fields as empty-healthy; BM25 `read()` never validates element types — corrupt indexes crash scoring with raw tracebacks instead of `rebuild-index` guidance.                                                                                                                                                                                                                                                                                                            | strict-read contract                                     | `search/store.py:121`; `content_store.py:105`; `bm25_store.py:140`                                      |
 | D039 | MED      | F5    | Sidecar Stop hook probes `has_pending_candidates` against the **host** forge root (nonexistent in-container) — sidecar shadow candidates never enqueue their drain marker.                                                                                                                                                                                                                                                                                                                                                     | workflows §1.2 shadow drain; §7 path model               | `cli/hooks/commands.py:640`                                                                             |
@@ -604,6 +606,26 @@ discards or misreports ownership. D016 and D017 then align machine-readable fail
 independent request/response metadata boundaries. D018 ships last so its segment dependency declaration can preserve the
 default status line while eliminating unrelated hot-path I/O.
 
+### Wave 5 MEDIUM proxy-hygiene admission record
+
+D035, D036, O037, O038, and O042 were rechecked on merged `main` at `c9c4bc2e`. One disposable pytest module passed six
+broken-behavior characterizations; one also confirmed the current `0600` shard mode. The module was removed after
+evidence capture. The recheck narrowed D035: global log cleanup discovers the plane, but free-form full caller payloads,
+missing directory hardening, and the ordinary client-failure WARNING remain. No implementation member was activated
+during admission.
+
+| Order | Findings         | Reproduced boundary                                                            | Accepted member                                                                               |
+| ----- | ---------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 1     | O037, O038, O042 | converter logs request/schema/tool payloads and formats suppressed DEBUG dumps | [`remove_proxy_converter_plaintext_logs`](todo/remove_proxy_converter_plaintext_logs/card.md) |
+| 2     | D035             | tool-event details and the client-failure WARNING retain caller plaintext      | [`make_tool_events_metadata_only`](todo/make_tool_events_metadata_only/card.md)               |
+| 3     | D036             | invalid client request ID reaches state, logs, and response header verbatim    | [`validate_proxy_request_ids`](todo/validate_proxy_request_ids/card.md)                       |
+
+The three members share a metadata-only diagnostic contract but remain independent review boundaries. Converter logging
+goes first because the same payload dumps cause both the confidentiality and eager-formatting findings. D035 then makes
+the structured tool-event schema and adjacent warning metadata-only while preserving the explicit `tool_failures` plane.
+D036 follows separately because its compatibility contract preserves conventional client correlation tokens and mints a
+Forge ID only for malformed or overlong input. Remaining MEDIUM rows are not admitted by this bounded record.
+
 ### Suggested coordination boundaries
 
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
@@ -617,7 +639,10 @@ default status line while eliminating unrelated hot-path I/O.
   #144--#146 with required regression, Docker, and clean-wheel coverage.
 - **[CLI/proxy/runtime epic](done/epic_cli_proxy_runtime_correctness/card.md):** all seven bounded HIGH members shipped
   independently in PRs #148--#154 with separate scriptability, lifecycle-truth, metadata-relay, retention, and hot-path
-  review boundaries. Later Wave 5 MEDIUM rows remain subject to separate admission.
+  review boundaries.
+- **[Proxy diagnostic data hygiene epic](todo/epic_proxy_diagnostic_data_hygiene/card.md):** five reproduced MEDIUM
+  findings are parked as converter-log, tool-event, and request-ID members. Remaining Wave 5 MEDIUM rows stay subject to
+  separate admission.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 
