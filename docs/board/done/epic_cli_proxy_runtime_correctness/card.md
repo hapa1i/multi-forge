@@ -66,8 +66,8 @@ not expand this epic's member count or closeout condition.
 All seven members shipped as separate review boundaries. D015 through D017 and O001/O002/O004 established global
 retention ownership, truthful CLI/process outcomes, and safe request/response metadata in PRs #148--#153. D018 then made
 shared status-line source acquisition segment-lazy without changing the default bar and shipped in PR #154 (`c4f14037`).
-Each member retained its fail-first regression and passed its required focused, Docker, packaging, and pre-commit tiers;
-independent review completed before every merge.
+Each member retained its fail-first regression and passed the verification required by its scope: focused coverage,
+targeted Docker coverage where applicable, packaging, and pre-commit; independent review completed before every merge.
 
 ## Drift Constraints
 
@@ -89,7 +89,8 @@ independent review completed before every merge.
 
 ## Closeout
 
-All seven members shipped independently with marked regressions and their required focused and Docker coverage. The
-review ledger, member cards, normative design, operator guidance, and change log record the coordinated retention,
-scriptability, lifecycle-truth, metadata-relay, and status-line source contracts. Later Wave 5 MEDIUM correctness rows
-remain outside this closed epic and return to the parent maintenance epic for a separate admission review.
+All seven members shipped independently with marked regressions and the verification required by each member's scope,
+including targeted Docker coverage where applicable. The review ledger, member cards, normative design, operator
+guidance, and change log record the coordinated retention, scriptability, lifecycle-truth, metadata-relay, and
+status-line source contracts. Later Wave 5 MEDIUM correctness rows remain outside this closed epic and return to the
+parent maintenance epic for a separate admission review.
