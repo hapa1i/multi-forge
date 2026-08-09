@@ -18,7 +18,12 @@ import pytest
 
 import forge.proxy.converters as converters
 from forge.proxy.converters import convert_openai_to_anthropic_sse
-from forge.proxy.data_models import Message, MessagesRequest
+from forge.proxy.data_models import (
+    Message,
+    MessagesRequest,
+    ToolDefinition,
+    ToolInputSchema,
+)
 from forge.proxy.utils import format_stream_lifecycle_summary
 
 _LOGGER_NAME = "forge.proxy.converters"
@@ -329,3 +334,122 @@ async def test_malformed_chunk_warning_dumps_keys_not_body(caplog) -> None:
     assert len(warnings) == 1  # the warning still fires -- it just no longer dumps the body
     assert "SECRET_CHUNK_VALUE" not in warnings[0].getMessage()
     assert "payload" in warnings[0].getMessage()  # key names are safe to surface
+
+
+# --- O037/O038/O042: non-streaming converter diagnostics ------------------------------
+
+
+def _close_created_coroutine(coroutine: Any) -> None:
+    coroutine.close()
+
+
+def _non_streaming_tool_response(arguments: object) -> dict[str, object]:
+    return {
+        "id": "chatcmpl-log-hygiene",
+        "request_id": "req_log_hygiene",
+        "choices": [
+            {
+                "finish_reason": "tool_calls",
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_log_hygiene",
+                            "type": "function",
+                            "function": {"name": "CustomTool", "arguments": arguments},
+                        }
+                    ],
+                },
+            }
+        ],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+
+
+def test_request_schema_dumps_are_not_formatted_when_debug_is_off(monkeypatch, caplog) -> None:
+    calls = _spy_format(monkeypatch)
+    monkeypatch.setattr(converters.asyncio, "create_task", _close_created_coroutine)
+    caplog.set_level(logging.INFO, logger=_LOGGER_NAME)
+    request = MessagesRequest(
+        model="claude-sonnet-4-6",
+        messages=[Message(role="user", content="SECRET_REQUEST_BODY")],
+        max_tokens=64,
+        tools=[
+            ToolDefinition(
+                name="CustomTool",
+                description="SECRET_TOOL_DESCRIPTION",
+                input_schema=ToolInputSchema(
+                    type="object",
+                    properties={"value": {"type": "string", "description": "SECRET_SCHEMA"}},
+                ),
+            )
+        ],
+    )
+
+    converted = converters.convert_anthropic_to_openai(request, provider="litellm")
+
+    assert calls["n"] == 0
+    assert converted["messages"][0]["content"] == "SECRET_REQUEST_BODY"
+    assert converted["tools"][0]["function"]["description"] == "SECRET_TOOL_DESCRIPTION"
+
+
+@pytest.mark.parametrize(
+    ("arguments", "error_type"),
+    [
+        ("invalid-json-SECRET_ARGUMENT", None),
+        ({"secret": "SECRET_ARGUMENT"}, "TypeError"),
+    ],
+)
+def test_non_streaming_malformed_arguments_log_shape_and_preserve_fallback(
+    arguments, error_type, monkeypatch, caplog
+) -> None:
+    monkeypatch.setattr(converters.asyncio, "create_task", _close_created_coroutine)
+    caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
+
+    converted = converters.convert_openai_to_anthropic(_non_streaming_tool_response(arguments))
+    records = "\n".join(record.getMessage() for record in caplog.records)
+
+    assert converted is not None
+    tool_block = next(block for block in converted.content if block.type == "tool_use")
+    assert tool_block.input["raw_arguments"] == arguments
+    assert "SECRET_ARGUMENT" not in records
+    assert f"value_type={type(arguments).__name__}" in records
+    assert "fallback=" in records
+    if error_type is None:
+        assert "error_type=" not in records
+    else:
+        assert f"error_type={error_type}" in records
+
+
+def test_non_function_tool_call_logs_allowlisted_shape_only(caplog) -> None:
+    response = {
+        "id": "chatcmpl-log-hygiene",
+        "request_id": "req_log_hygiene",
+        "choices": [
+            {
+                "finish_reason": "tool_calls",
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_log_hygiene",
+                            "type": "code_interpreter",
+                            "payload": "SECRET_TOOL_CALL_VALUE",
+                        }
+                    ],
+                },
+            }
+        ],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+    caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
+
+    converted = converters.convert_openai_to_anthropic(response)
+    records = "\n".join(record.getMessage() for record in caplog.records)
+
+    assert converted is not None
+    assert all(block.type != "tool_use" for block in converted.content)
+    assert "SECRET_TOOL_CALL_VALUE" not in records
+    assert "value_type=dict" in records
+    assert "known_keys=id,type" in records
+    assert "unknown_keys=1" in records
