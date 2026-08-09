@@ -1,10 +1,10 @@
 # Make status-line sources segment-lazy
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D018 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked last in the child epic.
+**Lane**: `doing/` -- active on `fix/make-statusline-sources-segment-lazy` from merged PR #153 (`8f030ef4`).
 
 ## Goal
 
@@ -19,8 +19,8 @@ Run proxy and session discovery only when the resolved status-line segment layou
 
 ## Evidence
 
-Rechecked on `3f3a3c6d` with `statusline.segments: [path, branch]`. A disposable characterization observed both
-`detect_proxy()` and `discover_session()` run before the segment registry, even though neither source can affect that
+Rechecked on merged `main` at `8f030ef4` with `statusline.segments: [path, branch]`. The retained regression observed
+the exact call sequence `proxy`, `session` before the segment registry, even though neither source can affect that
 layout. In a proxied managed session those calls include live HTTP plus registry/index/manifest reads on every poll.
 
 ## Expected Behavior

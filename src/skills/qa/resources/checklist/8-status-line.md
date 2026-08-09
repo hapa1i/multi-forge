@@ -279,4 +279,28 @@ forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
   not `+$0.00`)
 - [ ] Fixture shard, `fcost-*` throttle caches, and both throwaway sessions removed at the end
 
+### 8.6 Segment-lazy proxy/session sources
+
+<!-- human:guided -->
+
+A status line configured with only `path` and `branch` does not consume proxy or Forge-session facts. This packaged-CLI
+smoke supplies deliberately unavailable source addresses and confirms the selected fields still render alone. The
+retained regression and Docker instrumentation pin the stronger invariant that neither discovery function is called.
+
+```bash
+cd $FORGE_TEST_REPO
+SOURCE_FREE=$(jq -nc --arg cwd "$FORGE_TEST_REPO" \
+  '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"}}')
+
+forge config set statusline.segments=path,branch
+echo "$SOURCE_FREE" \
+  | FORGE_SESSION=qa-missing-session \
+    ANTHROPIC_BASE_URL=http://127.0.0.1:9 \
+    forge status-line
+forge config reset statusline
+```
+
+- [ ] Output contains only the configured repository path/branch fields—no model, cost, proxy, or session segment—and
+  `forge config reset statusline` restores the default layout
+
 ---

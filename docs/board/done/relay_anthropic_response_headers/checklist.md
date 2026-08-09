@@ -1,6 +1,6 @@
 # Relay safe Anthropic response headers checklist
 
-Current focus: receive independent review of the verified shared response-header boundary before PR publication.
+Completed in PR #153 (`8f030ef4`).
 
 ## Activation and reproduction
 
@@ -41,5 +41,5 @@ Current focus: receive independent review of the verified shared response-header
   wheel/sdist, verify the new module and both changed QA resources in the wheel, and pass `make pre-commit`.
 - [x] Resolve all 206 relative paths/fragments across 15 changed Markdown files and stale-lane references; the change
   log measures 21,202 tokens / 1,432 physical lines, and diff checks pass.
-- [ ] Receive independent review and resolve findings before PR publication.
-- [ ] Merge before activating D018.
+- [x] Complete independent review with no findings before merge.
+- [x] Merge before activating D018 (PR #153, `8f030ef4`).

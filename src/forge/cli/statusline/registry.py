@@ -1,9 +1,10 @@
 """Status-line segment registry.
 
-Each ``Segment`` pairs a name with a *producer* — a thin adapter over the
-``format_*`` helpers in ``forge.cli.status_line`` that returns the segment's
-rendered string (or ``None`` to omit it). ``status_line()`` resolves the
-configured order, runs the producers, and routes their output into two buckets:
+Each ``Segment`` pairs a name with a *producer* and an explicit set of expensive
+proxy/session sources. ``status_line()`` resolves the configured order and its
+source union before discovery, then runs the thin producer adapters over the
+``format_*`` helpers in ``forge.cli.status_line`` and routes their output into
+two buckets:
 
 - ``where`` — concatenated with no separator (``path`` + ``branch``).
 - ``stream`` — separator-joined (everything else).
@@ -23,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Callable, Optional
 
 from forge.cli import status_line as sl
@@ -34,9 +36,26 @@ logger = logging.getLogger(__name__)
 Producer = Callable[[RenderContext], Optional[str]]
 
 
+class StatusSource(StrEnum):
+    """Expensive facts acquired once per poll for segments that declare them."""
+
+    PROXY = "proxy"
+    SESSION = "session"
+
+
+_NO_SOURCES: frozenset[StatusSource] = frozenset()
+_PROXY_SOURCE = frozenset({StatusSource.PROXY})
+_SESSION_SOURCE = frozenset({StatusSource.SESSION})
+_PROXY_AND_SESSION_SOURCES = frozenset({StatusSource.PROXY, StatusSource.SESSION})
+
+
 @dataclass(frozen=True)
 class Segment:
     """A named, ordered status-line atom.
+
+    sources: proxy/session facts required for correct rendering. Every registry
+    entry declares this explicitly so a new segment cannot silently reintroduce
+    eager discovery.
 
     bucket: ``"where"`` (concatenated, leads the line) or ``"stream"``
     (separator-joined). The bucket is a fixed property of the segment, not
@@ -45,7 +64,16 @@ class Segment:
 
     name: str
     producer: Producer
+    sources: frozenset[StatusSource]
     bucket: str = "stream"
+
+
+@dataclass(frozen=True)
+class RenderPlan:
+    """One resolved segment order and the exact source union it consumes."""
+
+    segments: tuple[Segment, ...]
+    sources: frozenset[StatusSource]
 
 
 # --- Producers (thin adapters; each mirrors one slice of the old inline assembly) ---
@@ -324,26 +352,26 @@ def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
 # allowlist == producer-names equality test (test_statusline_registry.py)
 # enforces this two-way sync whenever a segment is added.
 SEGMENTS: tuple[Segment, ...] = (
-    Segment("path", _produce_path, "where"),
-    Segment("branch", _produce_branch, "where"),
-    Segment("breadcrumb", _produce_breadcrumb),
-    Segment("model", _produce_model),
-    Segment("cost", _produce_cost),
-    Segment("rate_limits", _produce_rate_limits),
-    Segment("lines", _produce_lines),
-    Segment("tokens", _produce_tokens),
-    Segment("think", _produce_think),
-    Segment("loop", _produce_loop),
-    Segment("sidecar", _produce_sidecar),
-    Segment("hooks", _produce_hooks),
-    Segment("cache_hit", _produce_cache_hit),
-    Segment("supervisor", _produce_supervisor),
-    Segment("policy", _produce_policy),
-    Segment("audit", _produce_audit),
-    Segment("drift", _produce_drift),
-    Segment("spend_cap", _produce_spend_cap),
-    Segment("launch", _produce_launch),
-    Segment("forge_cost", _produce_forge_cost),
+    Segment("path", _produce_path, _NO_SOURCES, "where"),
+    Segment("branch", _produce_branch, _NO_SOURCES, "where"),
+    Segment("breadcrumb", _produce_breadcrumb, _SESSION_SOURCE),
+    Segment("model", _produce_model, _PROXY_SOURCE),
+    Segment("cost", _produce_cost, _PROXY_AND_SESSION_SOURCES),
+    Segment("rate_limits", _produce_rate_limits, _PROXY_SOURCE),
+    Segment("lines", _produce_lines, _NO_SOURCES),
+    Segment("tokens", _produce_tokens, _NO_SOURCES),
+    Segment("think", _produce_think, _NO_SOURCES),
+    Segment("loop", _produce_loop, _SESSION_SOURCE),
+    Segment("sidecar", _produce_sidecar, _SESSION_SOURCE),
+    Segment("hooks", _produce_hooks, _NO_SOURCES),
+    Segment("cache_hit", _produce_cache_hit, _PROXY_SOURCE),
+    Segment("supervisor", _produce_supervisor, _SESSION_SOURCE),
+    Segment("policy", _produce_policy, _SESSION_SOURCE),
+    Segment("audit", _produce_audit, _PROXY_SOURCE),
+    Segment("drift", _produce_drift, _PROXY_SOURCE),
+    Segment("spend_cap", _produce_spend_cap, _PROXY_SOURCE),
+    Segment("launch", _produce_launch, _SESSION_SOURCE),
+    Segment("forge_cost", _produce_forge_cost, _SESSION_SOURCE),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}
@@ -375,21 +403,31 @@ def resolve_order(configured: list[str]) -> list[str]:
     return resolved
 
 
+def resolve_plan(configured: list[str]) -> RenderPlan:
+    """Resolve one immutable plan shared by source acquisition and rendering."""
+    segments = tuple(_BY_NAME[name] for name in resolve_order(configured))
+    sources = frozenset(source for segment in segments for source in segment.sources)
+    return RenderPlan(segments=segments, sources=sources)
+
+
 def render_segments(ctx: RenderContext, configured: list[str]) -> tuple[list[str], list[str]]:
     """Run producers in resolved order, splitting output into (where, stream)."""
-    order = resolve_order(configured)
-    ctx.active_segments = set(order)  # let producers see what else is active
+    return render_plan(ctx, resolve_plan(configured))
+
+
+def render_plan(ctx: RenderContext, plan: RenderPlan) -> tuple[list[str], list[str]]:
+    """Render the same immutable plan used to decide source acquisition."""
+    ctx.active_segments = {segment.name for segment in plan.segments}
     where: list[str] = []
     stream: list[str] = []
-    for name in order:
-        segment = _BY_NAME[name]
+    for segment in plan.segments:
         try:
             rendered = segment.producer(ctx)
         except Exception:
             # Fail-open: the status line must always render (exit 0). A producer
             # bug or malformed upstream payload degrades that ONE segment to
             # absent, never crashing the whole line.
-            logger.debug("status-line: producer %r failed; dropping segment", name, exc_info=True)
+            logger.debug("status-line: producer %r failed; dropping segment", segment.name, exc_info=True)
             continue
         if rendered is None:
             continue

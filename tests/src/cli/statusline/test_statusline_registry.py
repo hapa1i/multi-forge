@@ -21,7 +21,13 @@ from forge.cli import status_line as sl
 from forge.cli.status_line import ProxyRuntimeTruth, TranscriptStats, status_line
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
-from forge.cli.statusline.registry import SEGMENTS, render_segments, resolve_order
+from forge.cli.statusline.registry import (
+    SEGMENTS,
+    StatusSource,
+    render_segments,
+    resolve_order,
+    resolve_plan,
+)
 from forge.runtime_config import RuntimeConfig
 
 
@@ -333,6 +339,48 @@ class TestRegistryInvariants:
 
     def test_resolve_preserves_user_order(self):
         assert resolve_order(["model", "path"]) == ["model", "path"]
+
+    def test_every_segment_declares_its_exact_expensive_sources(self):
+        none = frozenset()
+        proxy = frozenset({StatusSource.PROXY})
+        session = frozenset({StatusSource.SESSION})
+        both = frozenset({StatusSource.PROXY, StatusSource.SESSION})
+        expected = {
+            "path": none,
+            "branch": none,
+            "breadcrumb": session,
+            "model": proxy,
+            "cost": both,
+            "rate_limits": proxy,
+            "lines": none,
+            "tokens": none,
+            "think": none,
+            "loop": session,
+            "sidecar": session,
+            "hooks": none,
+            "cache_hit": proxy,
+            "supervisor": session,
+            "policy": session,
+            "audit": proxy,
+            "drift": proxy,
+            "spend_cap": proxy,
+            "launch": session,
+            "forge_cost": session,
+        }
+
+        assert {segment.name: segment.sources for segment in SEGMENTS} == expected
+
+    def test_render_plan_sources_follow_resolved_and_default_orders(self):
+        proxy = frozenset({StatusSource.PROXY})
+        session = frozenset({StatusSource.SESSION})
+        both = frozenset({StatusSource.PROXY, StatusSource.SESSION})
+
+        assert resolve_plan(["path", "branch"]).sources == frozenset()
+        assert resolve_plan(["model"]).sources == proxy
+        assert resolve_plan(["breadcrumb"]).sources == session
+        assert resolve_plan(["cost"]).sources == both
+        assert resolve_plan([]).sources == both
+        assert resolve_plan(["from_newer_forge"]).sources == both
 
 
 class TestLazyContext:

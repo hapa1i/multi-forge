@@ -1,6 +1,6 @@
 # CLI, proxy, and runtime correctness checklist
 
-Current focus: execute O004 safe Anthropic response-header relay; D018 remains parked last.
+Current focus: execute D018 segment-lazy status-line sources as the final bounded Wave 5 member.
 
 ## Activation and sequencing
 
@@ -20,6 +20,8 @@ Current focus: execute O004 safe Anthropic response-header relay; D018 remains p
 - [x] Start `fix/forward-litellm-user-agent`, move D017 to `done/`, and activate O001 from merged `main`.
 - [x] Independently review and merge O001 before moving O004 from `todo/` (PR #152, `983e4470`).
 - [x] Start `fix/relay-anthropic-response-headers`, move O001 to `done/`, and activate O004 from merged `main`.
+- [x] Independently review and merge O004 before moving D018 from `todo/` (PR #153, `8f030ef4`).
+- [x] Start `fix/make-statusline-sources-segment-lazy`, move O004 to `done/`, and activate D018 from merged `main`.
 
 ## Members
 
@@ -28,8 +30,8 @@ Current focus: execute O004 safe Anthropic response-header relay; D018 remains p
 - [x] D016 -- stabilize proxy create smoke-test JSON (PR #150, `61580fdb`).
 - [x] D017 -- align search corruption failures (PR #151, `efbefce9`).
 - [x] O001 -- forward LiteLLM User-Agent metadata (PR #152, `983e4470`).
-- [ ] O004 -- relay safe Anthropic response headers (active).
-- [ ] D018 -- make status-line sources segment-lazy (parked last).
+- [x] O004 -- relay safe Anthropic response headers (PR #153, `8f030ef4`).
+- [ ] D018 -- make status-line sources segment-lazy (active final member).
 
 ## Coordination and closeout
 

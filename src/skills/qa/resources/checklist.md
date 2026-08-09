@@ -2,9 +2,9 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.41 -->
+<!-- version: 1.0.42 -->
 
-<!-- test-count: 624 -->
+<!-- test-count: 625 -->
 
 <!-- last-updated: 2026-08-09 -->
 
@@ -12,12 +12,13 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-08-09 (proxy QA now verifies safe Anthropic passthrough response metadata and translated requests
-with an explicit Claude Code User-Agent). Earlier 2026-08-08: search QA added consistent corrupt query/status failures
-in human/JSON modes with empty stdout and actionable stderr. Earlier 2026-08-08: proxy QA added one-result create/smoke
-JSON and refused adopted-kill ownership preservation. Earlier 2026-08-08: proxy/config QA added fail-closed degraded
-downstream-retention runtime truth, preview/apply migration, exact global ownership, legacy-key removal, and rerun
-safety. Earlier 2026-08-03: session QA verifies the Git-derived workspace worktree view, session occupancy,
+**Last updated**: 2026-08-09 (status-line QA now verifies that a `path,branch` layout stays independent of unavailable
+proxy/session inputs). Earlier 2026-08-09: proxy QA added safe Anthropic passthrough response metadata and translated
+requests with an explicit Claude Code User-Agent. Earlier 2026-08-08: search QA added consistent corrupt query/status
+failures in human/JSON modes with empty stdout and actionable stderr. Earlier 2026-08-08: proxy QA added one-result
+create/smoke JSON and refused adopted-kill ownership preservation. Earlier 2026-08-08: proxy/config QA added fail-closed
+degraded downstream-retention runtime truth, preview/apply migration, exact global ownership, legacy-key removal, and
+rerun safety. Earlier 2026-08-03: session QA verifies the Git-derived workspace worktree view, session occupancy,
 missing/prunable state, JSON shape, and the non-Git fallback. Earlier 2026-07-31: extension QA removes one project
 runtime, proves sync does not resurrect it, and restores the dual-runtime package set. Earlier 2026-07-30: extension QA
 now asserts schema-v3 runtime/module ownership, the merged `hooks` module, and runtime-wide selection. Earlier

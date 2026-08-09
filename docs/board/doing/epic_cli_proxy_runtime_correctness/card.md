@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active Wave 5 coordination; D015--D017, O001, and O002 shipped in PRs #148--#152, O004 is active,
-and D018 remains parked.
+**Lane**: `doing/` -- active Wave 5 coordination; the first six members shipped in PRs #148--#153, and D018 is the
+active final member.
 
 ## Goal
 
@@ -50,8 +50,8 @@ seven broken-behavior characterizations and was removed after evidence capture.
 | 3     | D016    | [`stabilize_proxy_create_smoke_json`](../../done/stabilize_proxy_create_smoke_json/card.md)               | one JSON document and smoke-test result status       |
 | 4     | D017    | [`align_search_corruption_failures`](../../done/align_search_corruption_failures/card.md)                 | corruption diagnostics and exit parity               |
 | 5     | O001    | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                             | translated request metadata gate                     |
-| 6     | O004    | [`relay_anthropic_response_headers`](../relay_anthropic_response_headers/card.md)                         | safe upstream response-header relay                  |
-| 7     | D018    | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md)         | segment dependencies and status-line hot-path I/O    |
+| 6     | O004    | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                 | safe upstream response-header relay                  |
+| 7     | D018    | [`make_statusline_sources_segment_lazy`](../make_statusline_sources_segment_lazy/card.md)                 | segment dependencies and status-line hot-path I/O    |
 
 D015 goes first because two startup passes can delete shared telemetry under a policy the operator did not choose, and
 DG3 already resolves its broader config/migration contract. O002 follows because a failed stop currently discards or

@@ -1,10 +1,10 @@
 # Relay safe Anthropic response headers
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O004 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `doing/` -- active on `fix/relay-anthropic-response-headers` from merged PR #152 (`983e4470`).
+**Lane**: `done/` -- shipped in PR #153 (`8f030ef4`).
 
 ## Goal
 

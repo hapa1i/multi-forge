@@ -1701,7 +1701,23 @@ def status_line() -> None:
         data.get("workspace", {}).get("current_dir", "<missing>"),
     )
 
-    is_proxy, runtime, is_proxy_authoritative = detect_proxy()
+    # Resolve the registry-owned source plan before any live proxy or durable
+    # session work. A configured segment may trigger only the sources declared
+    # by its registry entry; each requested source is acquired once and shared
+    # by every producer through RenderContext.
+    from forge.cli.statusline.context import RenderContext
+    from forge.cli.statusline.palette import apply_palette
+    from forge.cli.statusline.registry import StatusSource, render_plan, resolve_plan
+    from forge.runtime_config import get_runtime_config
+
+    config = get_runtime_config()
+    plan = resolve_plan(config.statusline.segments)
+    logger.debug("status-line: required sources=%s", sorted(source.value for source in plan.sources))
+
+    if StatusSource.PROXY in plan.sources:
+        is_proxy, runtime, is_proxy_authoritative = detect_proxy()
+    else:
+        is_proxy, runtime, is_proxy_authoritative = False, None, False
 
     logger.debug("proxy: is_proxy=%s, authoritative=%s", is_proxy, is_proxy_authoritative)
     if runtime:
@@ -1713,8 +1729,10 @@ def status_line() -> None:
     else:
         logger.debug("proxy: runtime=None")
 
-    # Discover session early (used by breadcrumb / loop / sidecar segments)
-    session_manifest, is_session_authoritative = discover_session()
+    if StatusSource.SESSION in plan.sources:
+        session_manifest, is_session_authoritative = discover_session()
+    else:
+        session_manifest, is_session_authoritative = None, False
     session_name = session_manifest.get("name") if session_manifest else None
     logger.debug("session: name=%s, authoritative=%s", session_name, is_session_authoritative)
     logger.debug(
@@ -1728,12 +1746,6 @@ def status_line() -> None:
     # subprocess runs only if an enabled segment accesses it. The registry routes
     # producer output into a `where` list (concatenated) + a `stream` list
     # (separator-joined), preserving today's exact order via DEFAULT_ORDER.
-    from forge.cli.statusline.context import RenderContext
-    from forge.cli.statusline.palette import apply_palette
-    from forge.cli.statusline.registry import render_segments
-    from forge.runtime_config import get_runtime_config
-
-    config = get_runtime_config()
     ctx = RenderContext(
         data=data,
         is_proxy=is_proxy,
@@ -1744,7 +1756,7 @@ def status_line() -> None:
         config=config,
         forge_root=os.environ.get("FORGE_FORGE_ROOT"),
     )
-    where, stream = render_segments(ctx, config.statusline.segments)
+    where, stream = render_plan(ctx, plan)
 
     # === RENDER ===
     output = render_categories(where, [], [], stream, [])
