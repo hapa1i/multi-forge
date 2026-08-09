@@ -1698,16 +1698,26 @@ durable observation point and a signature-safe control point.
 **Two orthogonal axes** (kept distinct everywhere):
 
 1. **Wire shape** (`wire_shape` on the proxy config) — how the request reaches the upstream:
+
    - `openai_translated` (default): `convert_anthropic_to_openai` → upstream → `convert_openai_to_anthropic`. **Strips
      `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy).
    - `anthropic_passthrough`: forwards the raw Anthropic body unchanged and streams the response back unchanged.
      **Preserves thinking blocks byte-for-byte** (signature-safe). Shipped as the `anthropic-passthrough` template
      (`provider: litellm` is a credential slot only; `wire_shape` is the wire truth, and `GET /` labels it so).
+
 2. **Intercept mode** (`intercept.mode`, per proxy):
+
    - `passthrough` (default): no body inspection.
    - `inspect`: observe only — hash the system prompt + tool surface, detect drift, write redacted audit metadata.
    - `override`: inspect **plus** apply mutations to the current request. **Requires
      `wire_shape: anthropic_passthrough`** (rejected at config load otherwise) so mutations are signature-safe.
+
+Both raw passthrough transports share one response-header boundary. Safe provider metadata such as `retry-after` and
+rate-limit counters is relayed on successful, error, streaming, and non-streaming upstream responses. Hop-by-hop fields
+(including names nominated by `Connection`), authentication/cookie fields, content length/encoding, and upstream
+proxy-owned fields (`x-request-id`, cost/resolution headers, and `X-Forge-*`) are stripped case-insensitively. Forge
+then overlays its own request id, spend warning, and streaming `Cache-Control` with case-insensitive replacement. Header
+handling never mutates the relayed response body or SSE chunks.
 
 **Observe (`inspect`).** Before forwarding, the proxy records a redacted metadata audit record (hashes of the system
 prompt and tool surface, cache markers, token counts — never plaintext) and runs drift detection: the first observation

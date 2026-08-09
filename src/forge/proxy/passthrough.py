@@ -25,6 +25,7 @@ import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.response_headers import merge_response_headers, relay_response_headers
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
@@ -177,13 +178,9 @@ async def forward(
     url = base_url.rstrip("/") + path
     headers = build_upstream_headers(inbound_headers, api_key)
 
-    resp_headers: dict[str, str] = {"X-Request-ID": request_id}
-    if extra_headers:
-        resp_headers.update(extra_headers)
+    forge_headers = merge_response_headers({"X-Request-ID": request_id}, extra_headers)
 
     if raw_body.get("stream"):
-        stream_headers = dict(resp_headers)
-        stream_headers["Cache-Control"] = "no-cache"
         client_cm = httpx.AsyncClient(timeout=_PASSTHROUGH_TIMEOUT)
         stream_cm = None
         try:
@@ -198,7 +195,7 @@ async def forward(
                 status_code=502,
                 content=b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}',
                 media_type="application/json",
-                headers=resp_headers,
+                headers=forge_headers,
             )
 
         if resp.status_code != 200:
@@ -211,9 +208,17 @@ async def forward(
                 status_code=resp.status_code,
                 content=body,
                 media_type=resp.headers.get("content-type", "application/json"),
-                headers=resp_headers,
+                headers=merge_response_headers(
+                    relay_response_headers(resp.headers, request_id),
+                    extra_headers,
+                ),
             )
 
+        stream_headers = merge_response_headers(
+            relay_response_headers(resp.headers, request_id),
+            extra_headers,
+        )
+        stream_headers = merge_response_headers(stream_headers, {"Cache-Control": "no-cache"})
         return StreamingResponse(
             _stream_opened_upstream(
                 client_cm,
@@ -237,7 +242,7 @@ async def forward(
             status_code=502,
             content=b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream request failed"}}',
             media_type="application/json",
-            headers={"X-Request-ID": request_id},
+            headers=forge_headers,
         )
 
     failed = resp.status_code >= 400
@@ -263,7 +268,10 @@ async def forward(
         status_code=resp.status_code,
         content=resp.content,
         media_type=resp.headers.get("content-type", "application/json"),
-        headers=resp_headers,
+        headers=merge_response_headers(
+            relay_response_headers(resp.headers, request_id),
+            extra_headers,
+        ),
     )
 
 

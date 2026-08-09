@@ -1,10 +1,10 @@
 # Relay safe Anthropic response headers
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O004 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind translated User-Agent forwarding.
+**Lane**: `doing/` -- active on `fix/relay-anthropic-response-headers` from merged PR #152 (`983e4470`).
 
 ## Goal
 
@@ -20,9 +20,10 @@ security-sensitive headers.
 
 ## Evidence
 
-Rechecked on `3f3a3c6d` with an upstream 429 carrying `retry-after` and `anthropic-ratelimit-requests-remaining`. The
-Anthropic passthrough preserved the status and body but returned neither header; its streaming and non-streaming paths
-construct responses from Forge-owned headers only. The Responses sibling already applies a denylist relay.
+Rechecked on merged `main` at `983e4470` with upstream 429 and 529 responses carrying `retry-after` and
+`anthropic-ratelimit-requests-remaining`. All four streaming/non-streaming cases preserved status and body but returned
+neither header because the Anthropic paths construct responses from Forge-owned headers only. The Responses sibling
+already applies a denylist relay.
 
 ## Expected Behavior
 

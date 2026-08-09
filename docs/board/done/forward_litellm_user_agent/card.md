@@ -1,10 +1,10 @@
 # Forward LiteLLM User-Agent metadata
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O001 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `doing/` -- active on `fix/forward-litellm-user-agent` from merged PR #151 (`efbefce9`).
+**Lane**: `done/` -- shipped in PR #152 (`983e4470`).
 
 ## Goal
 

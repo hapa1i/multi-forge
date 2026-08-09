@@ -684,4 +684,46 @@ curl --fail --silent --show-error \
 
 - [ ] A translated request with an explicit Claude Code User-Agent completes through the selected provider profile
 
+### 4.26 Anthropic Passthrough Response Metadata
+
+<!-- prereq: 2.4 -->
+
+<!-- human:guided -->
+
+<!-- requires: api_key -->
+
+When a native Anthropic credential is available, send one small request through the signature-safe passthrough and
+inspect the downstream headers. Retry/error parity and the denylist are pinned by hermetic integration tests; this live
+smoke confirms Anthropic's current rate-limit metadata crosses the operator boundary.
+
+```bash
+if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "SKIP: ANTHROPIC_API_KEY is not configured"
+else
+  forge proxy delete passthrough-header-qa --yes 2>/dev/null || true
+  PASSTHROUGH_HEADERS=$(mktemp)
+  PASSTHROUGH_BODY=$(mktemp)
+  cleanup_passthrough_header_qa() {
+    rm -f "$PASSTHROUGH_HEADERS" "$PASSTHROUGH_BODY"
+    forge proxy delete passthrough-header-qa --yes >/dev/null 2>&1 || true
+  }
+  trap cleanup_passthrough_header_qa EXIT
+  forge proxy create anthropic-passthrough --name passthrough-header-qa
+  PASSTHROUGH_URL=$(forge proxy show passthrough-header-qa --json | jq -r '.entry.base_url')
+  curl --fail --silent --show-error \
+    --dump-header "$PASSTHROUGH_HEADERS" \
+    --output "$PASSTHROUGH_BODY" \
+    -H 'x-api-key: test' \
+    -H 'content-type: application/json' \
+    --data '{"model":"claude-haiku-4-5","max_tokens":16,"messages":[{"role":"user","content":"Reply with OK."}]}' \
+    "$PASSTHROUGH_URL/v1/messages"
+  rg -i '^anthropic-ratelimit-[^:]+:' "$PASSTHROUGH_HEADERS"
+  jq -e '.type == "message" and (.content | type == "array")' "$PASSTHROUGH_BODY"
+  cleanup_passthrough_header_qa
+  trap - EXIT
+fi
+```
+
+- [ ] Safe Anthropic rate-limit metadata reaches the downstream response
+
 ---

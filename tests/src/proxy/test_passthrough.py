@@ -77,6 +77,18 @@ class _FakeAsyncClient:
         return _FakeStream()
 
 
+_UPSTREAM_CONTROL_HEADERS = {
+    "content-type": "application/problem+json",
+    "Retry-After": "7",
+    "Anthropic-RateLimit-Requests-Remaining": "0",
+    "Set-Cookie": "session=secret",
+    "Authorization": "Bearer secret",
+    "Content-Length": "9999",
+    "X-Request-ID": "upstream-request-id",
+    "x-spend-warning": "upstream-warning",
+}
+
+
 def test_build_upstream_headers_injects_key_and_forwards_flags():
     inbound = {
         "authorization": "Bearer client-secret",
@@ -189,6 +201,117 @@ async def test_forward_streaming_upstream_error_preserves_status(monkeypatch):
     assert resp.status_code == 401
     assert b"authentication_error" in bytes(resp.body)
     assert captured == {"usage": {}, "body": None, "failed": True}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status_code", [200, 429])
+async def test_forward_non_streaming_relays_safe_headers_with_forge_overlay(monkeypatch, status_code):
+    body = b'\x00{"opaque":"response-bytes"}\xff'
+
+    class _HeaderClient(_FakeAsyncClient):
+        async def post(self, url, headers=None, json=None):
+            return _FakeResponse(status_code=status_code, content=body, headers=_UPSTREAM_CONTROL_HEADERS)
+
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderClient)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.test",
+        api_key="K",
+        request_id="forge-request-id",
+        extra_headers={"X-Spend-Warning": "forge-warning"},
+    )
+
+    assert resp.status_code == status_code
+    assert bytes(resp.body) == body
+    assert resp.headers["retry-after"] == "7"
+    assert resp.headers["anthropic-ratelimit-requests-remaining"] == "0"
+    assert resp.headers["x-request-id"] == "forge-request-id"
+    assert resp.headers["x-spend-warning"] == "forge-warning"
+    assert "set-cookie" not in resp.headers
+    assert "authorization" not in resp.headers
+    assert resp.headers["content-length"] == str(len(body))
+
+
+@pytest.mark.asyncio
+async def test_forward_streaming_success_relays_safe_headers_and_preserves_chunks(monkeypatch):
+    chunks = (b"event: ping\n", b"data: {}\n\n")
+    upstream_headers = {**_UPSTREAM_CONTROL_HEADERS, "Cache-Control": "public, max-age=60"}
+
+    class _HeaderStreamClient(_FakeAsyncClient):
+        def stream(self, method, url, headers=None, json=None):
+            return _FakeStream(status_code=200, chunks=chunks, headers=upstream_headers)
+
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderStreamClient)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "stream": True, "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.test",
+        api_key="K",
+        request_id="forge-stream-id",
+        extra_headers={"X-Spend-Warning": "forge-warning"},
+    )
+
+    assert resp.headers["retry-after"] == "7"
+    assert resp.headers["x-request-id"] == "forge-stream-id"
+    assert resp.headers["x-spend-warning"] == "forge-warning"
+    assert resp.headers["cache-control"] == "no-cache"
+    assert "set-cookie" not in resp.headers
+    assert "content-length" not in resp.headers
+    assert sum(name.lower() == b"cache-control" for name, _value in resp.raw_headers) == 1
+    relayed_chunks = [chunk async for chunk in resp.body_iterator]
+    assert tuple(relayed_chunks) == chunks
+
+
+@pytest.mark.asyncio
+async def test_forward_streaming_error_relays_safe_headers_with_forge_overlay(monkeypatch):
+    body = b'{"type":"error","error":{"type":"overloaded_error"}}'
+
+    class _HeaderErrorClient(_FakeAsyncClient):
+        def stream(self, method, url, headers=None, json=None):
+            return _FakeStream(status_code=529, chunks=(body,), headers=_UPSTREAM_CONTROL_HEADERS)
+
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderErrorClient)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "stream": True, "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.test",
+        api_key="K",
+        request_id="forge-error-id",
+        extra_headers={"X-Spend-Warning": "forge-warning"},
+    )
+
+    assert resp.status_code == 529
+    assert bytes(resp.body) == body
+    assert resp.headers["retry-after"] == "7"
+    assert resp.headers["x-request-id"] == "forge-error-id"
+    assert resp.headers["x-spend-warning"] == "forge-warning"
+    assert "set-cookie" not in resp.headers
+
+
+@pytest.mark.asyncio
+async def test_forward_transport_error_preserves_forge_overlay(monkeypatch):
+    class _TransportErrorClient(_FakeAsyncClient):
+        async def post(self, url, headers=None, json=None):
+            raise passthrough.httpx.ConnectError("injected transport failure")
+
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _TransportErrorClient)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.test",
+        api_key="K",
+        request_id="forge-transport-id",
+        extra_headers={"X-Spend-Warning": "forge-warning"},
+    )
+
+    assert resp.status_code == 502
+    assert resp.headers["x-request-id"] == "forge-transport-id"
+    assert resp.headers["x-spend-warning"] == "forge-warning"
 
 
 @pytest.mark.asyncio

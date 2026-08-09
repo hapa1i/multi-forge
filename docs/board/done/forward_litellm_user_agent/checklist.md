@@ -1,6 +1,6 @@
 # Forward LiteLLM User-Agent metadata checklist
 
-Current focus: publish the independently reviewed provider-gate repair before activating O004.
+Completed in PR #152 (`983e4470`).
 
 ## Activation and reproduction
 
@@ -41,4 +41,4 @@ Current focus: publish the independently reviewed provider-gate repair before ac
 - [x] Resolve all 205 relative paths/fragments across 15 changed Markdown files, stale-lane references, and diff checks.
 - [x] Receive independent review and resolve its D017 ledger-closeout and mechanical staging findings before PR
   publication.
-- [ ] Merge before activating O004.
+- [x] Merge before activating O004 (PR #152, `983e4470`).
