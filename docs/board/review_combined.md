@@ -35,8 +35,8 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1--4 are closed after D019 shipped in PR
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
 members under [`epic_cli_proxy_runtime_correctness`](doing/epic_cli_proxy_runtime_correctness/card.md). The admission
-record merged in PR #147 (`92b981a5`). D015--D017, O001, and O002 then shipped in PRs #148--#152; O004 is now the active
-sixth member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
+record merged in PR #147 (`92b981a5`). The first six members then shipped in PRs #148--#153; D018 is now the active
+seventh and final member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
 
 ### Finding fields
 
@@ -353,6 +353,13 @@ implementation outcome below records its completed code and regression work.
   regressions, targeted Docker integration, wheel/sdist build, and final pre-commit cover the contract. Independent
   review added the missing D017 resolution record before publication. It shipped in PR #152 (`983e4470`). See
   [`forward_litellm_user_agent`](done/forward_litellm_user_agent/card.md).
+- **O004 — resolved 2026-08-09:** Anthropic and Responses passthrough now share one case-insensitive response-header
+  boundary. Safe retry/rate-limit metadata crosses buffered and streaming success/error responses, while hop-by-hop,
+  authentication, cookie, framing, and upstream Forge-owned fields remain stripped; Forge overlays and response bytes
+  retain precedence and identity. The retained regression, 131 focused tests, the 787-test proxy slice, 8,921 unit tests
+  (one skip), 695 regressions, both fresh-image Docker cases, wheel/sdist build, final pre-commit, and
+  documentation-link checks cover the contract. Independent review found no issues. It shipped in PR #153 (`8f030ef4`).
+  See [`relay_anthropic_response_headers`](done/relay_anthropic_response_headers/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -580,8 +587,8 @@ classification; no implementation member was activated during admission.
 | 3     | D016    | failed create smoke emits two JSON documents and exits 0                     | [`stabilize_proxy_create_smoke_json`](done/stabilize_proxy_create_smoke_json/card.md)               |
 | 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](done/align_search_corruption_failures/card.md)                 |
 | 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](done/forward_litellm_user_agent/card.md)                             |
-| 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](doing/relay_anthropic_response_headers/card.md)                |
-| 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](todo/make_statusline_sources_segment_lazy/card.md)         |
+| 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](done/relay_anthropic_response_headers/card.md)                 |
+| 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](doing/make_statusline_sources_segment_lazy/card.md)        |
 
 D015 goes first because its duplicate startup passes can destroy shared telemetry under a policy the operator did not
 choose, and DG3 already defines its config/migration contract. O002 follows because failed process teardown currently
@@ -600,9 +607,9 @@ default status line while eliminating unrelated hot-path I/O.
   independently in PRs #134--#138 and #140--#142.
 - **[Installer epic](done/epic_installer_transaction_safety/card.md):** all three members shipped independently in PRs
   #144--#146 with required regression, Docker, and clean-wheel coverage.
-- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** D015--D017, O001, and O002 shipped in
-  PRs #148--#152; O004 is active, and D018 remains parked while preserving separate review boundaries across
-  scriptability, lifecycle-truth, metadata-relay, retention, and hot-path constraints.
+- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** the first six members shipped in PRs
+  #148--#153; D018 is active last while preserving separate review boundaries across scriptability, lifecycle-truth,
+  metadata-relay, retention, and hot-path constraints.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

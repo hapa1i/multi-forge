@@ -78,6 +78,76 @@ class TestStatusLineCommand:
         assert "exists" in check.stdout, "status-line should NOT process pending-work queue"
 
 
+class TestStatusLineSourcePlan:
+    """Installed-CLI instrumentation for registry-owned proxy/session acquisition."""
+
+    def test_configured_layout_acquires_only_declared_sources(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        instrument_dir = "/tmp/d018-statusline-instrument"
+        proxy_marker = "/tmp/d018-proxy-probes"
+        session_marker = "/tmp/d018-session-probes"
+        mock_claude_workspace.mkdir(instrument_dir, parents=True)
+        mock_claude_workspace.write_file(proxy_marker, "")
+        mock_claude_workspace.write_file(session_marker, "")
+        mock_claude_workspace.write_file(
+            f"{instrument_dir}/sitecustomize.py",
+            """from pathlib import Path
+from forge.cli import status_line as sl
+
+def _detect_proxy():
+    with Path('/tmp/d018-proxy-probes').open('a', encoding='utf-8') as handle:
+        handle.write('1')
+    return False, None, False
+
+def _discover_session():
+    with Path('/tmp/d018-session-probes').open('a', encoding='utf-8') as handle:
+        handle.write('1')
+    return None, False
+
+sl.detect_proxy = _detect_proxy
+sl.discover_session = _discover_session
+""",
+        )
+        mock_claude_workspace.mkdir("$HOME/.forge", parents=True)
+        mock_claude_workspace.write_json(
+            "/tmp/d018-statusline-input.json",
+            {
+                "workspace": {"current_dir": "/workspace"},
+                "model": {"display_name": "Claude"},
+            },
+        )
+
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "statusline:\n  segments: [path, branch]\n",
+        )
+        zero_source = mock_claude_workspace.exec(
+            f"env PYTHONPATH={instrument_dir} forge status-line < /tmp/d018-statusline-input.json"
+        )
+
+        assert zero_source.returncode == 0
+        assert "/workspace" in zero_source.stdout
+        assert mock_claude_workspace.read_file(proxy_marker) == ""
+        assert mock_claude_workspace.read_file(session_marker) == ""
+
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "statusline:\n  segments: [model, breadcrumb]\n",
+        )
+        mixed = mock_claude_workspace.exec(
+            f"env PYTHONPATH={instrument_dir} forge status-line < /tmp/d018-statusline-input.json"
+        )
+
+        assert mixed.returncode == 0
+        assert mock_claude_workspace.read_file(proxy_marker) == "1"
+        assert mock_claude_workspace.read_file(session_marker) == "1"
+
+        reset = mock_claude_workspace.exec("forge config reset statusline")
+        assert reset.returncode == 0
+
+
 class TestStatusLineRegistryFallback:
     """Tests for status-line registry fallback behavior.
 

@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-09
 
+### Relay safe Anthropic response headers
+
+**Goal/outcome**: Preserve actionable upstream retry and rate-limit metadata without exposing framing, credentials,
+cookies, or proxy-owned response fields.
+
+**Key changes**:
+
+- Gave Anthropic and Responses passthrough one case-insensitive header boundary across buffered and streaming
+  success/error paths, including dynamic `Connection` exclusions.
+- Kept Forge request/cost/cache overlays authoritative and preserved response bodies, SSE chunks, accounting callbacks,
+  and stream teardown; synchronized design, operator, and bundled QA guidance.
+
+**Verification**: The retained O004 regression failed in all four 429/529 streaming/non-streaming cases on `983e4470`.
+After implementation, 131 focused tests, the 787-test proxy slice, 8,921 unit tests (one skip), 695 regressions, both
+fresh-image Docker cases, wheel/sdist build, final pre-commit, and documentation-link checks passed. Independent review
+found no issues. Shipped in PR #153 (`8f030ef4`).
+
 ### Forward LiteLLM User-Agent metadata
 
 **Goal/outcome**: Preserve Claude Code's inbound identity across translated LiteLLM requests without widening any

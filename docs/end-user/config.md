@@ -241,6 +241,12 @@ ambient `claude`. The `forge_cost` segment shows `forge +$Y` — the LLM cost Fo
 supervisor, review fan-out), **excluding** the main interactive session, reported-or-nothing (subscription/OAuth
 sessions show nothing) and distinct from Claude's own `cost`; Forge-managed sessions only.
 
+Source discovery follows the selected fields. A `path,branch` layout never contacts a proxy or reads the Forge session
+index/manifest; fields that need proxy or managed-session facts acquire each source once per refresh and share it. The
+default bar still reads both sources so its output and fail-open behavior are unchanged. This optimization concerns
+proxy/session discovery only: selected fields can still perform their own git, transcript/cache, or hook-diagnostic
+work.
+
 ```bash
 forge config set statusline.segments=path,model,cost,cache_hit,spend_cap
 forge config set statusline.palette=earthy
