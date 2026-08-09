@@ -15,6 +15,7 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
 ) -> None:
     """The bundled remote LiteLLM template forwards sonnet to the exact Sol slug."""
     proxy_base_url, fake_upstream = proxy_server_fake_litellm_openai
+    inbound_user_agent = "claude-code/integration-" + "x" * 300
 
     with httpx.Client(timeout=30) as client:
         response = client.post(
@@ -24,7 +25,7 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
                 "max_tokens": 16,
                 "messages": [{"role": "user", "content": "Say hello"}],
             },
-            headers={"x-api-key": "test"},
+            headers={"x-api-key": "test", "user-agent": inbound_user_agent},
         )
 
     assert response.status_code == 200, response.text[:500]
@@ -40,3 +41,4 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
     assert upstream_request["body"]["model"] == "openai/gpt-5.6-sol"
     assert upstream_request["body"]["reasoning"] == {"effort": "medium"}
     assert upstream_request["body"]["text"] == {"verbosity": "high"}
+    assert upstream_request["headers"]["User-Agent"] == inbound_user_agent[:256]

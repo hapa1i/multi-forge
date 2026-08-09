@@ -453,7 +453,7 @@ def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
         def do_POST(self) -> None:  # noqa: N802
             content_length = int(self.headers.get("Content-Length", "0"))
             request_body = json.loads(self.rfile.read(content_length))
-            requests.append({"path": self.path, "body": request_body})
+            requests.append({"path": self.path, "body": request_body, "headers": dict(self.headers.items())})
 
             if self.path != "/v1/responses":
                 self.send_error(404)

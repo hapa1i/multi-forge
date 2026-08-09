@@ -59,7 +59,7 @@ from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
-from forge.proxy.client_factory import TierClientFactory
+from forge.proxy.client_factory import ModelProvider, TierClientFactory
 from forge.proxy.converters import (
     convert_anthropic_to_openai,
     convert_openai_to_anthropic,
@@ -936,8 +936,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         # Forward User-Agent from incoming request (Claude Code identity).
         # Upstream LLM gateways may filter traffic by User-Agent; without this,
         # the proxy's OpenAI SDK default header could cause requests to be blocked.
-        # Only inject for LiteLLM providers (other clients don't need it).
-        if provider_name in ("litellm_remote", "litellm_local", "openrouter"):
+        # The factory deliberately collapses local/remote LiteLLM into one routing enum;
+        # backend-instance provider strings are a different vocabulary.
+        if detected_provider in (ModelProvider.LITELLM, ModelProvider.OPENROUTER):
             incoming_user_agent = raw_request.headers.get("user-agent")
             if incoming_user_agent:
                 openai_request_dict["_user_agent"] = incoming_user_agent

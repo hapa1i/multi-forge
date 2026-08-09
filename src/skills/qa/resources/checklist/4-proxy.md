@@ -659,4 +659,29 @@ forge proxy delete smoke-json-qa --yes
 - [ ] The failed probe leaves the created proxy registered and readable
 - [ ] The preserved proxy can be deleted cleanly after inspection
 
+### 4.25 Translated User-Agent Relay
+
+<!-- prereq: 4.2 -->
+
+<!-- auto -->
+
+<!-- requires: api_key -->
+
+Send a small Anthropic-shaped request with an explicit Claude Code User-Agent through the selected translated proxy. The
+exact sanitized upstream header is pinned by integration tests; this operator smoke catches gateways that reject the
+OpenAI SDK default identity.
+
+```bash
+UA_PROXY_URL=$(forge proxy show "$FORGE_QA_OPENAI_PROXY" --json | jq -r '.entry.base_url')
+curl --fail --silent --show-error \
+  -H 'x-api-key: test' \
+  -H 'user-agent: claude-code/forge-qa' \
+  -H 'content-type: application/json' \
+  --data '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"messages":[{"role":"user","content":"Reply with OK."}]}' \
+  "$UA_PROXY_URL/v1/messages" \
+  | jq -e '.type == "message" and (.content | type == "array")'
+```
+
+- [ ] A translated request with an explicit Claude Code User-Agent completes through the selected provider profile
+
 ---

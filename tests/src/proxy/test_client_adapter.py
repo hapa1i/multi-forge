@@ -521,6 +521,34 @@ async def test_streaming_completion_forwards_user_agent() -> None:
     assert hp.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
 
 
+@pytest.mark.asyncio
+async def test_streaming_completion_sanitizes_and_caps_user_agent() -> None:
+    """The streaming adapter applies the same control-character and length boundary."""
+    adapter = _make_adapter_with_mock_client()
+    captured_hyperparams = []
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        captured_hyperparams.append(kwargs.get("hyperparams"))
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    async for _chunk in adapter.create_streaming_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "claude\r\n" + "x" * 300,
+        },
+        request_id="req-stream-sanitized-ua",
+    ):
+        pass
+
+    forwarded = captured_hyperparams[0].extra["openai"]["extra_headers"]["User-Agent"]
+    assert forwarded == "claude" + "x" * 250
+    assert len(forwarded) == 256
+
+
 # ---------------------------------------------------------------------------
 # _forge_user -> extra["openai"]["user"] forwarding (provider-user grouping)
 # ---------------------------------------------------------------------------

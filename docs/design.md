@@ -711,6 +711,12 @@ Without `--smoke-test`, its established top-level fields remain unchanged. With 
 `smoke_test: {passed, detail}`; a failed probe exits non-zero but retains the successfully created or resolved proxy.
 Human-mode verification output remains unchanged. `--no-start` is config-only and does not run a smoke probe.
 
+**Translated request-metadata contract.** The `openai_translated` route carries the inbound User-Agent through internal
+`_user_agent` metadata for both LiteLLM (local or remote) and OpenRouter clients. The adapter strips control characters
+and caps the upstream value at 256 characters. This is a narrow identity relay, not general header passthrough:
+authorization, API keys, cookies, and internal `X-Forge-*` correlation headers do not enter it, and the Anthropic-native
+and Responses passthrough allowlists are unchanged.
+
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
 `--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a
 template, the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead

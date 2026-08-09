@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-09
+
+### Align search corruption failures
+
+**Goal/outcome**: Make corrupt search state fail consistently across query/status and human/JSON modes without changing
+missing, unreadable, or scope-all partial-result policy.
+
+**Key changes**:
+
+- Unified corruption rendering as stderr-only exit-1 failures, delayed status output until every store was readable, and
+  preserved explicit rebuild recovery plus successful not-built/empty outcomes.
+- Added store, stream, and scope-all controls; synchronized CLI/operator/QA guidance and admitted the separate D051/D052
+  unreadable-query and clean-recovery inconsistencies.
+
+**Verification**: The retained D017 regression failed on `61580fdb`. After implementation and review amendment, 92
+focused tests, 8,905 unit tests (one skip), 690 regressions, wheel/sdist build, final pre-commit, and documentation-link
+checks passed. Shipped in PR #151 (`efbefce9`).
+
 ## 2026-08-08
 
 ### Stabilize proxy create smoke-test JSON
