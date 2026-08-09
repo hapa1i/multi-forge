@@ -26,6 +26,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from forge.core.telemetry.downstream import RequestMode
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.response_headers import merge_response_headers, relay_response_headers
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
@@ -40,30 +41,6 @@ OnComplete = Callable[[dict[str, int], "int | None", bool, "str | None"], None]
 # the absence of authorization/x-api-key AND OpenAI-Organization/OpenAI-Project:
 # the proxy's upstream credential owns auth + org/project selection, not the child.
 _FORWARD_REQUEST_HEADERS = frozenset({"openai-beta"})
-
-# Upstream response headers NOT relayed to the client: hop-by-hop framing (which
-# would corrupt the relayed stream), security-sensitive headers, and proxy-owned
-# headers the proxy stamps itself. ``x-request-id`` is proxy-owned -- forwarding
-# upstream's too would emit a duplicate, case-insensitively colliding header that
-# shadows the proxy's correlation id. Everything else (OpenAI processing-ms,
-# version, etc.) is forwarded as useful.
-_RESPONSE_HEADER_DENYLIST = frozenset(
-    {
-        "connection",
-        "keep-alive",
-        "transfer-encoding",
-        "content-length",
-        "content-encoding",
-        "te",
-        "trailer",
-        "upgrade",
-        "proxy-authenticate",
-        "proxy-authorization",
-        "set-cookie",
-        "www-authenticate",
-        "x-request-id",
-    }
-)
 
 # Long read timeout for slow generations; short connect timeout to fail fast.
 _RESPONSES_TIMEOUT = httpx.Timeout(600.0, connect=10.0)
@@ -84,22 +61,6 @@ def build_upstream_headers(inbound: Mapping[str, str], api_key: str) -> dict[str
     for name, value in inbound.items():
         if name.lower() in _FORWARD_REQUEST_HEADERS:
             headers[name.lower()] = value
-    return headers
-
-
-def relay_response_headers(upstream: Mapping[str, str], request_id: str) -> dict[str, str]:
-    """Forward safe upstream response headers, stripping hop-by-hop/security ones."""
-    out: dict[str, str] = {"X-Request-ID": request_id}
-    for name, value in upstream.items():
-        if name.lower() not in _RESPONSE_HEADER_DENYLIST:
-            out[name] = value
-    return out
-
-
-def _merge_extra(headers: dict[str, str], extra: Mapping[str, str] | None) -> dict[str, str]:
-    """Overlay caller-supplied response headers (e.g. ``X-Spend-Warning``) onto the relay set."""
-    if extra:
-        headers.update(extra)
     return headers
 
 
@@ -292,7 +253,7 @@ async def forward(
             status_code=502,
             content=_ERROR_BODY,
             media_type="application/json",
-            headers=_merge_extra({"X-Request-ID": request_id}, extra_response_headers),
+            headers=merge_response_headers({"X-Request-ID": request_id}, extra_response_headers),
         )
 
     # Accounting and the provider-trace plane both attach only to the billable
@@ -339,7 +300,7 @@ async def forward(
         status_code=resp.status_code,
         content=resp.content,
         media_type=resp.headers.get("content-type", "application/json"),
-        headers=_merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers),
+        headers=merge_response_headers(relay_response_headers(resp.headers, request_id), extra_response_headers),
     )
 
 
@@ -367,7 +328,7 @@ async def _forward_streaming(
             status_code=502,
             content=_ERROR_BODY,
             media_type="application/json",
-            headers=_merge_extra({"X-Request-ID": request_id}, extra_response_headers),
+            headers=merge_response_headers({"X-Request-ID": request_id}, extra_response_headers),
         )
 
     if resp.status_code != 200:
@@ -380,7 +341,7 @@ async def _forward_streaming(
             status_code=resp.status_code,
             content=upstream_body,
             media_type=resp.headers.get("content-type", "application/json"),
-            headers=_merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers),
+            headers=merge_response_headers(relay_response_headers(resp.headers, request_id), extra_response_headers),
         )
 
     # Cost is on the response headers (x-litellm-response-cost), known at open.
@@ -417,8 +378,8 @@ async def _forward_streaming(
         else:
             logger.debug(_summary)
 
-    stream_headers = _merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers)
-    stream_headers["Cache-Control"] = "no-cache"
+    stream_headers = merge_response_headers(relay_response_headers(resp.headers, request_id), extra_response_headers)
+    stream_headers = merge_response_headers(stream_headers, {"Cache-Control": "no-cache"})
     return StreamingResponse(
         relay_upstream(
             client_cm,

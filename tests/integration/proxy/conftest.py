@@ -56,6 +56,15 @@ class FakeOpenAIUpstream:
     requests: list[dict[str, Any]]
 
 
+@dataclass
+class FakeAnthropicUpstream:
+    """Captured requests and fixed error bytes for an Anthropic-compatible upstream."""
+
+    base_url: str
+    requests: list[dict[str, Any]]
+    response_body: bytes
+
+
 def _check_port(port: int) -> bool:
     """Check if port is currently in use.
 
@@ -508,6 +517,52 @@ def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
 
 
 @pytest.fixture(scope="module")
+def fake_anthropic_upstream() -> Generator[FakeAnthropicUpstream, None, None]:
+    """Serve a hermetic Anthropic Messages error with safe and denied metadata."""
+    port = allocate_ephemeral_port()
+    requests: list[dict[str, Any]] = []
+    response_body = b'{"type":"error","error":{"type":"overloaded_error","message":"try again"}}'
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            content_length = int(self.headers.get("Content-Length", "0"))
+            request_body = json.loads(self.rfile.read(content_length))
+            requests.append({"path": self.path, "body": request_body, "headers": dict(self.headers.items())})
+
+            if self.path != "/v1/messages":
+                self.send_error(404)
+                return
+
+            self.send_response(529)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response_body)))
+            self.send_header("Retry-After", "11")
+            self.send_header("Anthropic-RateLimit-Requests-Remaining", "0")
+            self.send_header("X-Request-ID", "upstream-request-id")
+            self.send_header("Set-Cookie", "session=secret")
+            self.end_headers()
+            self.wfile.write(response_body)
+
+        def log_message(self, _format: str, *args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        yield FakeAnthropicUpstream(
+            base_url=f"http://127.0.0.1:{port}",
+            requests=requests,
+            response_body=response_body,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture(scope="module")
 def module_forge_home() -> Generator[Path, None, None]:
     """Create a module-scoped temp directory for FORGE_HOME.
 
@@ -701,6 +756,43 @@ def proxy_server_fake_litellm_openai(
         )
         fake_litellm_openai.requests.clear()
         yield proxy_base_url, fake_litellm_openai
+    finally:
+        kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
+def proxy_server_fake_anthropic_passthrough(
+    fake_anthropic_upstream: FakeAnthropicUpstream,
+    module_forge_home: Path,
+    tmp_path_factory,
+) -> Generator[tuple[str, FakeAnthropicUpstream], None, None]:
+    """Start Anthropic passthrough against the hermetic error upstream."""
+    port = allocate_ephemeral_port()
+    proxy_id = f"itest-anthropic-passthrough-{port}"
+    _register_proxy_for_test(
+        proxy_id=proxy_id,
+        template="anthropic-passthrough",
+        port=port,
+        forge_home=module_forge_home,
+        upstream_base_url=fake_anthropic_upstream.base_url,
+    )
+
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+    env["ANTHROPIC_API_KEY"] = "test-anthropic-key"
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_anthropic_passthrough_")
+    proc = _start_proxy_subprocess(
+        template="anthropic-passthrough",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+        proxy_id=proxy_id,
+    )
+
+    try:
+        fake_anthropic_upstream.requests.clear()
+        yield f"http://localhost:{port}", fake_anthropic_upstream
     finally:
         kill_process(proc.pid)
 

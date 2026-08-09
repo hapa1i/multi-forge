@@ -4,7 +4,7 @@
 
 <!-- version: 1.0.41 -->
 
-<!-- test-count: 623 -->
+<!-- test-count: 624 -->
 
 <!-- last-updated: 2026-08-09 -->
 
@@ -12,9 +12,9 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-08-09 (proxy QA now exercises translated requests with an explicit Claude Code User-Agent across
-the selected provider profile). Earlier 2026-08-08: search QA added consistent corrupt query/status failures in
-human/JSON modes with empty stdout and actionable stderr. Earlier 2026-08-08: proxy QA added one-result create/smoke
+**Last updated**: 2026-08-09 (proxy QA now verifies safe Anthropic passthrough response metadata and translated requests
+with an explicit Claude Code User-Agent). Earlier 2026-08-08: search QA added consistent corrupt query/status failures
+in human/JSON modes with empty stdout and actionable stderr. Earlier 2026-08-08: proxy QA added one-result create/smoke
 JSON and refused adopted-kill ownership preservation. Earlier 2026-08-08: proxy/config QA added fail-closed degraded
 downstream-retention runtime truth, preview/apply migration, exact global ownership, legacy-key removal, and rerun
 safety. Earlier 2026-08-03: session QA verifies the Git-derived workspace worktree view, session occupancy,

@@ -690,6 +690,12 @@ Two settings, kept separate:
   metadata), or `override` (inspect plus apply prompt augment/guards and a reasoning-effort floor). `override` requires
   `wire_shape: anthropic_passthrough`.
 
+Anthropic passthrough also preserves safe upstream response metadata. Retry guidance and Anthropic rate-limit headers
+reach the client on both successful and failed requests, including responses to streaming requests. Forge removes
+upstream cookies/authentication challenges, hop-by-hop framing, content length/encoding, and the upstream proxy-owned
+request/cost/resolution fields; the proxy's own request id, spend warning, and streaming cache policy take precedence.
+Response bodies and SSE chunks remain unchanged.
+
 Quick start (observe):
 
 ```bash

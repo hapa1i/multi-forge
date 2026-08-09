@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-09
 
+### Forward LiteLLM User-Agent metadata
+
+**Goal/outcome**: Preserve Claude Code's inbound identity across translated LiteLLM requests without widening any
+request-header allowlist.
+
+**Key changes**:
+
+- Replaced incompatible backend-string comparisons with the typed client-factory provider gate, covering local/remote
+  LiteLLM and retaining OpenRouter parity.
+- Kept sanitization and the 256-character cap at the adapter boundary; excluded credentials, cookies, and Forge
+  correlation headers; synchronized design, operator, and bundled QA guidance.
+
+**Verification**: The retained O001 regression failed on `efbefce9` with missing `_user_agent`. After implementation, 49
+focused tests, 8,913 unit tests (one skip), 691 regressions, targeted Docker integration, wheel/sdist build, final
+pre-commit, and documentation-link checks passed. Shipped in PR #152 (`983e4470`).
+
 ### Align search corruption failures
 
 **Goal/outcome**: Make corrupt search state fail consistently across query/status and human/JSON modes without changing

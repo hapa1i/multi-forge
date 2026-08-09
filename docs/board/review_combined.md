@@ -35,8 +35,8 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1--4 are closed after D019 shipped in PR
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
 members under [`epic_cli_proxy_runtime_correctness`](doing/epic_cli_proxy_runtime_correctness/card.md). The admission
-record merged in PR #147 (`92b981a5`). D015--D017 and O002 then shipped in PRs #148--#151; O001 is now the active fifth
-member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
+record merged in PR #147 (`92b981a5`). D015--D017, O001, and O002 then shipped in PRs #148--#152; O004 is now the active
+sixth member. O003 already shipped in Wave 3 and is not part of the live Wave 5 set.
 
 ### Finding fields
 
@@ -346,6 +346,13 @@ implementation outcome below records its completed code and regression work.
   documentation-link checks cover the contract. Independent review added the missing corrupt scope-all control and
   admitted the separate D051/D052 inconsistencies without expanding D017. It shipped in PR #151 (`efbefce9`). See
   [`align_search_corruption_failures`](done/align_search_corruption_failures/card.md).
+- **O001 — resolved 2026-08-09:** translated LiteLLM and OpenRouter requests now gate User-Agent forwarding on the typed
+  client-factory provider enum, so both local and remote LiteLLM adapters receive the existing sanitized internal
+  metadata. Missing values remain absent, credentials/cookies/Forge correlation headers remain excluded, and native
+  passthrough allowlists are unchanged. The retained regression, 49 focused tests, 8,913 unit tests (one skip), 691
+  regressions, targeted Docker integration, wheel/sdist build, and final pre-commit cover the contract. Independent
+  review added the missing D017 resolution record before publication. It shipped in PR #152 (`983e4470`). See
+  [`forward_litellm_user_agent`](done/forward_litellm_user_agent/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -572,8 +579,8 @@ classification; no implementation member was activated during admission.
 | 2     | O002    | stop error exits 0; delete drops ownership and reports success               | [`preserve_proxy_ownership_on_stop_failure`](done/preserve_proxy_ownership_on_stop_failure/card.md) |
 | 3     | D016    | failed create smoke emits two JSON documents and exits 0                     | [`stabilize_proxy_create_smoke_json`](done/stabilize_proxy_create_smoke_json/card.md)               |
 | 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](done/align_search_corruption_failures/card.md)                 |
-| 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](doing/forward_litellm_user_agent/card.md)                            |
-| 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](todo/relay_anthropic_response_headers/card.md)                 |
+| 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](done/forward_litellm_user_agent/card.md)                             |
+| 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](doing/relay_anthropic_response_headers/card.md)                |
 | 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](todo/make_statusline_sources_segment_lazy/card.md)         |
 
 D015 goes first because its duplicate startup passes can destroy shared telemetry under a policy the operator did not
@@ -593,9 +600,9 @@ default status line while eliminating unrelated hot-path I/O.
   independently in PRs #134--#138 and #140--#142.
 - **[Installer epic](done/epic_installer_transaction_safety/card.md):** all three members shipped independently in PRs
   #144--#146 with required regression, Docker, and clean-wheel coverage.
-- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** D015--D017 and O002 shipped in PRs
-  #148--#151; O001 is active, and two parked members preserve separate review boundaries while sharing scriptability,
-  lifecycle-truth, metadata-relay, retention, and hot-path constraints.
+- **[CLI/proxy/runtime epic](doing/epic_cli_proxy_runtime_correctness/card.md):** D015--D017, O001, and O002 shipped in
+  PRs #148--#152; O004 is active, and D018 remains parked while preserving separate review boundaries across
+  scriptability, lifecycle-truth, metadata-relay, retention, and hot-path constraints.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

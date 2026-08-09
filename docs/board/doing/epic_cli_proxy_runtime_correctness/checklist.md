@@ -1,6 +1,6 @@
 # CLI, proxy, and runtime correctness checklist
 
-Current focus: execute O001 User-Agent forwarding; O004 and D018 remain parked.
+Current focus: execute O004 safe Anthropic response-header relay; D018 remains parked last.
 
 ## Activation and sequencing
 
@@ -18,6 +18,8 @@ Current focus: execute O001 User-Agent forwarding; O004 and D018 remain parked.
 - [x] Review D017, add the missing corrupt `--scope all` control, and admit adjacent D051/D052 separately.
 - [x] Merge D017 before moving O001 from `todo/` (PR #151, `efbefce9`).
 - [x] Start `fix/forward-litellm-user-agent`, move D017 to `done/`, and activate O001 from merged `main`.
+- [x] Independently review and merge O001 before moving O004 from `todo/` (PR #152, `983e4470`).
+- [x] Start `fix/relay-anthropic-response-headers`, move O001 to `done/`, and activate O004 from merged `main`.
 
 ## Members
 
@@ -25,8 +27,8 @@ Current focus: execute O001 User-Agent forwarding; O004 and D018 remain parked.
 - [x] O002 -- preserve proxy ownership on stop failure (PR #149, `c20b8d10`).
 - [x] D016 -- stabilize proxy create smoke-test JSON (PR #150, `61580fdb`).
 - [x] D017 -- align search corruption failures (PR #151, `efbefce9`).
-- [ ] O001 -- forward LiteLLM User-Agent metadata (active).
-- [ ] O004 -- relay safe Anthropic response headers (parked).
+- [x] O001 -- forward LiteLLM User-Agent metadata (PR #152, `983e4470`).
+- [ ] O004 -- relay safe Anthropic response headers (active).
 - [ ] D018 -- make status-line sources segment-lazy (parked last).
 
 ## Coordination and closeout

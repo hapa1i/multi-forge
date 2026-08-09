@@ -634,6 +634,12 @@ logging:
 | `logging.requests.stream_chunks`           | bool (default `false`)                       | Opt-in per-chunk debug dumps; off even at `log_level=debug`                                       |
 | `logging.requests.stream_chunk_max_bytes`  | int (default `0` = small cap)                | Truncate each dumped chunk                                                                        |
 
+`src/forge/proxy/response_headers.py` owns the response-metadata boundary shared by Anthropic and Responses raw
+transports. It relays every upstream header except the case-insensitive fixed security/framing denylist and extension
+fields named by `Connection`; upstream Forge-owned cost/resolution/correlation fields are also excluded. The helper
+stamps Forge's request id and applies Forge-owned overlays with case-insensitive replacement. The transport modules
+retain ownership of response bodies, SSE chunks, accounting callbacks, and stream teardown.
+
 Override reasoning reuses `tier_overrides.<tier>.reasoning_effort` (§A.1). Normal `forge proxy set` edits
 intercept/audit fields and warns that full-body audit writes redacted structure to downstream telemetry. Audit/provider
 lifecycle share cost shards under global `telemetry.downstream`; old proxy retention keys are compatibility inputs

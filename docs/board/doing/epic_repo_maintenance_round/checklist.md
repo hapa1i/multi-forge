@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: execute O001 as the fifth bounded Wave 5 member; later members remain parked.
+Current focus: execute O004 as the sixth bounded Wave 5 member; D018 remains parked last.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -97,6 +97,8 @@ Current focus: execute O001 as the fifth bounded Wave 5 member; later members re
   D051/D052 separately (2026-08-09).
 - [x] Merge D017 before activating O001 (PR #151, `efbefce9`).
 - [x] Activate O001 from merged `main`, close D017, and create the O001 execution checklist.
+- [x] Implement, independently review, and merge O001 before activating O004 (PR #152, `983e4470`).
+- [x] Activate O004 from merged `main`, close O001, and create the O004 execution checklist.
 - [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
   activating their implementation cards.
 
