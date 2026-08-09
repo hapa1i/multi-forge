@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: recheck and admit Wave 5 MEDIUM correctness rows against the execution-entry contract.
+Current focus: review and merge the bounded Wave 5 MEDIUM proxy-hygiene admission without activating implementation.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -102,7 +102,14 @@ Current focus: recheck and admit Wave 5 MEDIUM correctness rows against the exec
 - [x] Implement, independently review, and merge O004 before activating D018 (PR #153, `8f030ef4`).
 - [x] Activate D018 from merged `main`, close O004, and create the D018 execution checklist.
 - [x] Implement, independently review, and merge D018; close its seven-member child epic (PR #154, `c4f14037`).
-- [ ] Recheck and admit Wave 5 MEDIUM correctness rows and later-wave findings against their entry conditions before
-  activating their implementation cards.
+- [x] Recheck D035, D036, O037, O038, and O042 on merged `main` at `c9c4bc2e` (six disposable broken-behavior
+  characterizations passed; one also confirmed the current `0600` shard mode, and the module was removed).
+- [x] Correct D035's stale no-pruner subclaim and record its current `0600` shard mitigation while retaining the
+  reproduced plaintext, per-record bound, and `0700` directory-hardening scope.
+- [x] Sequence the five findings as three parked members under `epic_proxy_diagnostic_data_hygiene` without activating
+  implementation.
+- [ ] Review and merge the bounded proxy-hygiene admission record before activating O037/O038/O042.
+- [ ] Recheck and admit the remaining Wave 5 MEDIUM correctness rows and later-wave findings against their entry
+  conditions before activating their implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

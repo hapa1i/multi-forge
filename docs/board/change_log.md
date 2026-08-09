@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-09
 
+### Admit proxy diagnostic data hygiene
+
+**Goal/outcome**: Admit a bounded Wave 5 MEDIUM set that removes caller plaintext and untrusted identifiers from proxy
+diagnostics without combining three independent compatibility boundaries.
+
+**Key changes**:
+
+- Rechecked D035, D036, O037, O038, and O042 on merged `main`; corrected D035's stale no-pruner wording and recorded its
+  current `0600` shard mitigation while retaining the free-form payload, directory-hardening, and WARNING defects.
+- Parked converter-log, structured tool-event, and request-ID members under one child epic; retained the explicit raw
+  stream and opt-in bounded `tool_failures` planes as exclusions.
+
+**Verification**: Six disposable broken-behavior characterizations passed on `c9c4bc2e`; one also confirmed the current
+`0600` shard mode, and the module was removed after evidence capture. Board Markdown, relative-link, stale-lane,
+token-size, and diff checks passed; no implementation member was activated.
+
 ### Make status-line sources segment-lazy
 
 **Goal/outcome**: Avoid proxy and managed-session discovery when the configured status-line fields cannot consume those
