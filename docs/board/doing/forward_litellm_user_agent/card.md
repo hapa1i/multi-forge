@@ -1,10 +1,10 @@
 # Forward LiteLLM User-Agent metadata
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O001 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `todo/` -- accepted Wave 5 member, parked behind the CLI contract members.
+**Lane**: `doing/` -- active on `fix/forward-litellm-user-agent` from merged PR #151 (`efbefce9`).
 
 ## Goal
 
@@ -20,9 +20,10 @@ metadata path.
 
 ## Evidence
 
-Rechecked on `3f3a3c6d`: `TierClientFactory.detect_provider_for_model()` returned `ModelProvider.LITELLM` with value
-`litellm`, while the translated route's injection gate accepts `litellm_remote`, `litellm_local`, and `openrouter`. The
-adapter's `_user_agent` forwarding and control-character sanitization already work once metadata reaches it.
+Rechecked on merged `main` at `efbefce9`: `TierClientFactory.detect_provider_for_model()` returns
+`ModelProvider.LITELLM` with value `litellm`, while the translated route's injection gate accepts `litellm_remote`,
+`litellm_local`, and `openrouter`. The adapter's `_user_agent` forwarding and control-character sanitization already
+work once metadata reaches it.
 
 ## Expected Behavior
 

@@ -49,4 +49,4 @@ Current focus: resolve independent review and rerun the amended verification gat
 - [x] Add the missing corrupt `--scope all` control and correct the stale error-helper default in the CLI style guide.
 - [x] Admit the separate unreadable-query and clean-recovery inconsistencies as D051 and D052 without expanding D017.
 - [x] Rerun amended focused/full tests, Markdown links, formatting, and repository-quality gates.
-- [ ] Merge before activating O001.
+- [x] Merge before activating O001 (PR #151, `efbefce9`).

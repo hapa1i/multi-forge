@@ -151,6 +151,14 @@ Backend instance definitions have:
   `credential_ids`; remote backend instances never set it
 - `template_names`: current proxy templates that resolve to the canonical backend instance id during template loading
 
+The translated proxy route uses a separate, deliberately collapsed `TierClientFactory.ModelProvider` vocabulary:
+`litellm`, `openrouter`, and `unknown`. Both backend providers `litellm_local` and `litellm_remote` enter that boundary
+as `ModelProvider.LITELLM`; the factory resolves local versus remote only when it creates the adapter. Route-level
+metadata gates therefore compare the routing enum, never backend-provider string literals. For `openai_translated`
+requests, the LiteLLM and OpenRouter enum members carry only the inbound User-Agent as `_user_agent`; the adapter strips
+control characters and caps the upstream header at 256 characters. Credentials, cookies, and internal `X-Forge-*`
+headers are not part of this relay.
+
 The shipped v1 catalog includes:
 
 | Backend instance id       | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                                           |

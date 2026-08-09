@@ -375,6 +375,11 @@ What this does:
   without leaking the setting into direct Anthropic or `anthropic_passthrough` launches
 - Sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW` based on proxy's model context window
 
+On translated LiteLLM and OpenRouter routes, Forge also preserves Claude Code's inbound User-Agent for the upstream
+gateway. The forwarded value has control characters removed and is capped at 256 characters. This is not general header
+passthrough: credentials, cookies, and Forge correlation headers are not relayed by this mechanism, and native Anthropic
+or Responses passthrough routes keep their own explicit header policies.
+
 ### Start Codex with a Responses-capable proxy
 
 ```bash

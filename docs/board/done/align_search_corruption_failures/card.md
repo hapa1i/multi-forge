@@ -1,10 +1,10 @@
 # Align search corruption failures
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: D017 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- active on `fix/align-search-corruption-failures` from merged PR #150 (`61580fdb`).
+**Lane**: `done/` -- shipped in PR #151 (`efbefce9`).
 
 ## Goal
 
