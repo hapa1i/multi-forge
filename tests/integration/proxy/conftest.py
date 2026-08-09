@@ -735,6 +735,9 @@ def proxy_server_fake_litellm_openai(
     env["FORGE_HOME"] = str(module_forge_home)
     env["LITELLM_BASE_URL"] = fake_litellm_openai.base_url
     env["LITELLM_API_KEY"] = "test-litellm-key"
+    # This module has only routing and log-hygiene consumers. Share one noisy subprocess so the latter can inspect
+    # DEBUG records without paying for a second proxy startup.
+    env["FORGE_DEBUG"] = "1"
 
     cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
     proc = _start_proxy_subprocess(

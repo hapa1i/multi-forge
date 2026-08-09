@@ -56,6 +56,40 @@ _STRIP_EMPTY_PARAMS: dict[str, dict[str, tuple[Any, ...]]] = {
     },
 }
 
+_KNOWN_TOOL_CALL_KEYS = ("id", "type", "function", "index")
+
+
+def _log_value_shape(value: object) -> tuple[str, int | None]:
+    """Return content-free type and size metadata for an untrusted value."""
+    if value is None:
+        return "null", None
+    if isinstance(value, bool):
+        return "bool", None
+    if isinstance(value, str):
+        return "str", len(value)
+    if isinstance(value, bytes):
+        return "bytes", len(value)
+    if isinstance(value, dict):
+        return "dict", len(value)
+    if isinstance(value, list):
+        return "list", len(value)
+    if isinstance(value, tuple):
+        return "tuple", len(value)
+    if isinstance(value, (int, float)):
+        return type(value).__name__, None
+    return "other", None
+
+
+def _tool_call_log_shape(value: object) -> tuple[str, int | None, str, int]:
+    """Describe a tool-call value without rendering caller-controlled keys or values."""
+    value_type, value_length = _log_value_shape(value)
+    if not isinstance(value, dict):
+        return value_type, value_length, "none", 0
+
+    known_keys = [key for key in _KNOWN_TOOL_CALL_KEYS if key in value]
+    unknown_keys = max(len(value) - len(known_keys), 0)
+    return value_type, value_length, ",".join(known_keys) or "none", unknown_keys
+
 
 def _is_pdf_path(value: Any) -> bool:
     # Claude Code's Read tool accepts filesystem paths, so extension detection is sufficient here.
@@ -518,7 +552,14 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
 
             input_schema = tool.input_schema.model_dump(exclude_unset=True)
             logger.debug(f"Cleaning schema for intermediate tool format: {tool.name}")
-            logger.debug(f"Original schema for tool '{tool.name}': {smart_format_str(input_schema)}")
+            properties = input_schema.get("properties")
+            required = input_schema.get("required")
+            logger.debug(
+                "Tool schema received: fields=%d properties=%d required=%d",
+                len(input_schema),
+                len(properties) if isinstance(properties, dict) else 0,
+                len(required) if isinstance(required, list) else 0,
+            )
 
             tool_schema_details = {
                 "tool_name": tool.name,
@@ -582,7 +623,15 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
             openai_request["tool_choice"] = "none"
         logger.debug(f"Converted tool_choice '{choice_type}' to intermediate format '{openai_request['tool_choice']}'.")
 
-    logger.debug(f"Intermediate OpenAI Request Prepared: {smart_format_str(openai_request)}")
+    openai_request_tools = openai_request.get("tools")
+    logger.debug(
+        "Intermediate OpenAI request prepared: messages=%d tools=%d system=%s stream=%s stop_sequences=%d",
+        len(openai_messages),
+        len(openai_request_tools) if isinstance(openai_request_tools, list) else 0,
+        bool(system_text),
+        bool(openai_request["stream"]),
+        len(request.stop_sequences or []),
+    )
     return openai_request
 
 
@@ -666,13 +715,24 @@ def convert_openai_to_anthropic(
                                     streaming=False,
                                 )
                         except json.JSONDecodeError:
+                            value_type, value_length = _log_value_shape(args_str)
                             logger.warning(
-                                f"[{request_id}] Non-streaming: Failed to parse tool arguments JSON: {args_str}. Sending raw string."
+                                "[%s] Non-streaming: failed to parse tool arguments JSON; "
+                                "value_type=%s value_length=%s fallback=raw_arguments",
+                                request_id,
+                                value_type,
+                                value_length,
                             )
                             args_input = {"raw_arguments": args_str}
                         except Exception as e:
+                            value_type, value_length = _log_value_shape(args_str)
                             logger.error(
-                                f"[{request_id}] Non-streaming: Error parsing tool arguments: {e}. Args: {args_str}"
+                                "[%s] Non-streaming: error parsing tool arguments; "
+                                "value_type=%s value_length=%s error_type=%s fallback=error_parsing_arguments",
+                                request_id,
+                                value_type,
+                                value_length,
+                                type(e).__name__,
                             )
                             args_input = {
                                 "error_parsing_arguments": str(e),
@@ -699,8 +759,15 @@ def convert_openai_to_anthropic(
                             )
                         )
                     else:
+                        value_type, value_length, known_keys, unknown_keys = _tool_call_log_shape(tc)
                         logger.warning(
-                            f"[{request_id}] Skipping conversion of non-function tool_call in response: {tc}"
+                            "[%s] Skipping non-function tool_call; value_type=%s item_count=%s "
+                            "known_keys=%s unknown_keys=%d",
+                            request_id,
+                            value_type,
+                            value_length,
+                            known_keys,
+                            unknown_keys,
                         )
 
         # Ensure there's always at least one content block (even if empty text)

@@ -1,9 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--4 and the bounded Wave 5 HIGH child epic are closed. A five-finding Wave 5 MEDIUM proxy diagnostic set is
-reproduced and parked under `epic_proxy_diagnostic_data_hygiene`; its admission record awaits review before any member
-activates.
+Waves 1--4 and the bounded Wave 5 HIGH child epic are closed. The five-finding Wave 5 MEDIUM proxy diagnostic epic is
+active after its admission record merged in PR #156; O037/O038/O042 is the current member.
 
 ## Goal
 
@@ -12,7 +11,7 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D052, for a current total of 154 ranked findings
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D053, for a current total of 155 ranked findings
 plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
@@ -71,8 +70,8 @@ shipped in PRs #134--#138 and #140--#142. Wave 4 closed under
 shipped in PRs #144--#146. The bounded Wave 5 HIGH set closed under
 [`epic_cli_proxy_runtime_correctness`](../../done/epic_cli_proxy_runtime_correctness/card.md) after all seven members
 shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is admitted as three parked members under
-[`epic_proxy_diagnostic_data_hygiene`](../../todo/epic_proxy_diagnostic_data_hygiene/card.md); remaining MEDIUM rows
-still require separate recheck and admission.
+[`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md); remaining MEDIUM rows still
+require separate recheck and admission.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -101,7 +100,7 @@ still require separate recheck and admission.
 | 5    | O001            | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                                       |
 | 5    | O004            | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
 | 5    | D018            | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
-| 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../todo/remove_proxy_converter_plaintext_logs/card.md)                 |
+| 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../remove_proxy_converter_plaintext_logs/card.md)                         |
 | 5M   | D035            | [`make_tool_events_metadata_only`](../../todo/make_tool_events_metadata_only/card.md)                               |
 | 5M   | D036            | [`validate_proxy_request_ids`](../../todo/validate_proxy_request_ids/card.md)                                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |

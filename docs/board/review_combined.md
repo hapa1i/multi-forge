@@ -10,10 +10,10 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 154 severity-ranked findings: 1 CRITICAL, 21 HIGH, 96 MEDIUM, and 36 LOW, plus unranked U001. The
+**Inventory:** 155 severity-ranked findings: 1 CRITICAL, 21 HIGH, 97 MEDIUM, and 36 LOW, plus unranked U001. The
 original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and follow-up
-reviews admitted D045, D046, and D051 as MEDIUM plus D047--D050 and D052 as LOW from 2026-08-05 through 2026-08-09.
-Three Opus claims were refuted and five were adjusted during the merge audit.
+reviews admitted D045, D046, D051, and D053 as MEDIUM plus D047--D050 and D052 as LOW from 2026-08-05 through
+2026-08-10. Three Opus claims were refuted and five were adjusted during the merge audit.
 
 ## Review Status and Execution Gate
 
@@ -36,10 +36,10 @@ sequencing and disposition; this report remains the evidence ledger. Waves 1--4 
 #146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
 members under [`epic_cli_proxy_runtime_correctness`](done/epic_cli_proxy_runtime_correctness/card.md). The admission
 record merged in PR #147 (`92b981a5`), and all seven members shipped independently in PRs #148--#154. The bounded HIGH
-child epic is closed. D035, D036, O037, O038, and O042 form the first separately reproduced MEDIUM admission set under
-[`epic_proxy_diagnostic_data_hygiene`](todo/epic_proxy_diagnostic_data_hygiene/card.md); its three members remain parked
-pending admission review. Other Wave 5 MEDIUM rows still require separate admission. O003 already shipped in Wave 3 and
-is not part of the Wave 5 set.
+child epic is closed. D035, D036, O037, O038, and O042 form the first separately reproduced MEDIUM set under
+[`epic_proxy_diagnostic_data_hygiene`](doing/epic_proxy_diagnostic_data_hygiene/card.md). Its converter-log member is
+active after the admission record merged in PR #156; D035 and D036 remain parked. Other Wave 5 MEDIUM rows still require
+separate admission. O003 already shipped in Wave 3 and is not part of the Wave 5 set.
 
 ### Finding fields
 
@@ -206,6 +206,7 @@ implementation outcome below records its completed code and regression work.
 | D050 | LOW      | R     | Fork transfer-context regeneration is not strategy-authoritative: `_generate_parent_transfer_context` silently coerces unknown input to `structured`; the never-launched relaunch caller omits `confirmed.derivation.strategy` when a per-child context is missing, so a valid non-default fork regenerates and launches as `structured` while retaining different provenance. CLI choice validation and rewind routing currently shield the invalid-input arm. *Source-confirmed; recovery-path impact not yet reproduced.*   | §3.9 strategy provenance; appendix §H.3 child artifacts  | `cli/session.py:427-429`; `cli/session_lifecycle.py:1596-1604`                                          |
 | D051 | MED      | R     | Project-scoped `search query --json` catches unreadable search state, prints its failure payload on stdout, and returns normally. Human query and both status modes instead route unreadability to stderr with exit 1, so a transient read failure looks successful only to the JSON query consumer. *Source-confirmed; runtime impact not yet reproduced.*                                                                                                                                                                    | §4 clean-failure contract; coding_standards §5           | `cli/search.py:171-175,632-636`; `cli/main.py:90-93`                                                    |
 | D052 | LOW      | R     | `search clean` in human mode rethrows known search-store corruption to the generic durable-state handler, which recommends a project/global reset and extension re-enable rather than the search-specific `forge search rebuild-index` recovery used by query/status. The command still exits non-zero on stderr; only the recovery guidance is inconsistent. *Source-confirmed; runtime impact not yet reproduced.*                                                                                                           | cli_style_guidelines recovery-output contract            | `cli/search.py:454-460`; `cli/output.py:120-136`                                                        |
+| D053 | MED      | R     | Non-streaming and streaming response-conversion catch-alls interpolate exception text into ordinary ERROR logs; the streaming path also renders the full traceback. Provider validation and shape failures can embed `input_value` snippets or other provider output outside the explicit raw-content plane. *Runtime-reproduced with distinct provider-controlled canaries in both handlers; client error behavior was not assessed.*                                                                                         | appendix §A.11 no-plaintext posture                      | `proxy/converters.py:800-803,1323-1326`                                                                 |
 
 ### Implementation Outcomes
 
@@ -540,7 +541,7 @@ one card coordinates them.
 | 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                               | State authority, fault outcomes, and recovery paths defined                     |
 | 4 — installer transactions              | D012–D014, D019                                                                    | Fault points and rollback ownership enumerated; integration fixtures identified |
 | 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                           | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
-| 6 — bounded maintenance fixes           | D045–D052 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
+| 6 — bounded maintenance fixes           | D045–D053 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
 | 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings             | Behavior characterized; DG4 resolved; unverified symbols excluded               |
 
 ### Wave 3 admission record
@@ -614,11 +615,11 @@ evidence capture. The recheck narrowed D035: global log cleanup discovers the pl
 missing directory hardening, and the ordinary client-failure WARNING remain. No implementation member was activated
 during admission.
 
-| Order | Findings         | Reproduced boundary                                                            | Accepted member                                                                               |
-| ----- | ---------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| 1     | O037, O038, O042 | converter logs request/schema/tool payloads and formats suppressed DEBUG dumps | [`remove_proxy_converter_plaintext_logs`](todo/remove_proxy_converter_plaintext_logs/card.md) |
-| 2     | D035             | tool-event details and the client-failure WARNING retain caller plaintext      | [`make_tool_events_metadata_only`](todo/make_tool_events_metadata_only/card.md)               |
-| 3     | D036             | invalid client request ID reaches state, logs, and response header verbatim    | [`validate_proxy_request_ids`](todo/validate_proxy_request_ids/card.md)                       |
+| Order | Findings         | Reproduced boundary                                                            | Accepted member                                                                                |
+| ----- | ---------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 1     | O037, O038, O042 | converter logs request/schema/tool payloads and formats suppressed DEBUG dumps | [`remove_proxy_converter_plaintext_logs`](doing/remove_proxy_converter_plaintext_logs/card.md) |
+| 2     | D035             | tool-event details and the client-failure WARNING retain caller plaintext      | [`make_tool_events_metadata_only`](todo/make_tool_events_metadata_only/card.md)                |
+| 3     | D036             | invalid client request ID reaches state, logs, and response header verbatim    | [`validate_proxy_request_ids`](todo/validate_proxy_request_ids/card.md)                        |
 
 The three members share a metadata-only diagnostic contract but remain independent review boundaries. Converter logging
 goes first because the same payload dumps cause both the confidentiality and eager-formatting findings. D035 then makes
@@ -640,9 +641,9 @@ Forge ID only for malformed or overlong input. Remaining MEDIUM rows are not adm
 - **[CLI/proxy/runtime epic](done/epic_cli_proxy_runtime_correctness/card.md):** all seven bounded HIGH members shipped
   independently in PRs #148--#154 with separate scriptability, lifecycle-truth, metadata-relay, retention, and hot-path
   review boundaries.
-- **[Proxy diagnostic data hygiene epic](todo/epic_proxy_diagnostic_data_hygiene/card.md):** five reproduced MEDIUM
-  findings are parked as converter-log, tool-event, and request-ID members. Remaining Wave 5 MEDIUM rows stay subject to
-  separate admission.
+- **[Proxy diagnostic data hygiene epic](doing/epic_proxy_diagnostic_data_hygiene/card.md):** the converter-log member
+  is active; tool-event and request-ID members remain parked. Remaining Wave 5 MEDIUM rows stay subject to separate
+  admission.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

@@ -1,6 +1,6 @@
 # Make tool-event diagnostics metadata-only
 
-**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md).
+**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../../doing/epic_proxy_diagnostic_data_hygiene/card.md).
 
 **Lane**: `todo/` -- accepted and parked behind the converter-log member.
 

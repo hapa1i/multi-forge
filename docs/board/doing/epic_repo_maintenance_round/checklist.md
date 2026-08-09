@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the bounded Wave 5 MEDIUM proxy-hygiene admission without activating implementation.
+Current focus: review and merge O037/O038/O042 without activating D035 or D036.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -108,7 +108,13 @@ Current focus: review and merge the bounded Wave 5 MEDIUM proxy-hygiene admissio
   reproduced plaintext, per-record bound, and `0700` directory-hardening scope.
 - [x] Sequence the five findings as three parked members under `epic_proxy_diagnostic_data_hygiene` without activating
   implementation.
-- [ ] Review and merge the bounded proxy-hygiene admission record before activating O037/O038/O042.
+- [x] Review and merge the bounded proxy-hygiene admission record before activating O037/O038/O042 (PR #156,
+  `46e6a309`).
+- [x] Start `fix/remove-proxy-converter-plaintext-logs`, activate the child epic and O037/O038/O042 from merged `main`,
+  and create their execution checklists.
+- [x] Keep provider-side response-conversion exception rendering outside O037/O038/O042 and admit it separately as D053
+  after runtime reproduction (2026-08-10).
+- [ ] Implement, independently review, and merge O037/O038/O042 before activating D035.
 - [ ] Recheck and admit the remaining Wave 5 MEDIUM correctness rows and later-wave findings against their entry
   conditions before activating their implementation cards.
 

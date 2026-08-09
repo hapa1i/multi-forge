@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md).
 
-**Lane**: `todo/` -- accepted and parked; activate only after the admission record is reviewed and merged.
+**Lane**: `doing/` -- active on `fix/remove-proxy-converter-plaintext-logs` after PR #156 merged the admission record.
 
 **Findings**: O037, O038, and O042 (Wave 5 MEDIUM).
 
