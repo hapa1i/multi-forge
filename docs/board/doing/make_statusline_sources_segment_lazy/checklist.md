@@ -19,16 +19,16 @@ Current focus: publish the independently reviewed registry-owned source plan.
 
 ## Acceptance tests
 
-| Test                     | Fixture                                           | Assertion                                                     |
-| ------------------------ | ------------------------------------------------- | ------------------------------------------------------------- |
-| Retained D018 regression | configured `path`, `branch`                       | neither source probe runs and output remains compatible       |
-| Registry declaration     | every registered segment                          | declared source union is canonical and exhaustively tested    |
-| Proxy-only plan          | one proxy-dependent segment                       | proxy discovery runs once; session discovery does not run     |
-| Session-only plan        | one session-dependent segment                     | session discovery runs once; proxy discovery does not run     |
+| Test                     | Fixture                                            | Assertion                                                     |
+| ------------------------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| Retained D018 regression | configured `path`, `branch`                        | neither source probe runs and output remains compatible       |
+| Registry declaration     | every registered segment                           | declared source union is canonical and exhaustively tested    |
+| Proxy-only plan          | one proxy-dependent segment                        | proxy discovery runs once; session discovery does not run     |
+| Session-only plan        | one session-dependent segment                      | session discovery runs once; proxy discovery does not run     |
 | Mixed/default plan       | both source classes; empty configured segment list | each required probe runs once and default output is unchanged |
-| Source failure           | unavailable/malformed proxy or session state      | existing fail-open result remains local and byte-compatible   |
-| Hot-path instrumentation | repeated zero-source renders                      | proxy/session probe counters remain zero                      |
-| CLI integration          | installed status-line command with isolated homes | configured layout crosses the real CLI boundary               |
+| Source failure           | unavailable/malformed proxy or session state       | existing fail-open result remains local and byte-compatible   |
+| Hot-path instrumentation | repeated zero-source renders                       | proxy/session probe counters remain zero                      |
+| CLI integration          | installed status-line command with isolated homes  | configured layout crosses the real CLI boundary               |
 
 ## Verification and closeout
 
