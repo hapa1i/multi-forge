@@ -32,7 +32,7 @@ Current focus: implementation and verification complete; awaiting independent re
 | Endpoint prefixes      | messages, count-tokens, and root requests          | invalid/absent input yields `req_`, `tok_`, and `inf_` respectively        |
 | Passthrough parity     | translated and Anthropic-passthrough requests      | both paths share the validated state value and Forge-owned response header |
 | Existing Forge headers | valid and spoofed `X-Forge-*` values               | their independent validation and persistence behavior remain unchanged     |
-| Direct-path join       | `core.llm` request-ID minter                        | every minted ID satisfies the proxy ingress validator                      |
+| Direct-path join       | `core.llm` request-ID minter                       | every minted ID satisfies the proxy ingress validator                      |
 
 ## Verification and closeout
 
