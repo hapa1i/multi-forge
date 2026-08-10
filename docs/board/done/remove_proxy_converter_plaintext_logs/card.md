@@ -1,8 +1,8 @@
 # Remove plaintext from proxy converter logs
 
-**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md).
+**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../../doing/epic_proxy_diagnostic_data_hygiene/card.md).
 
-**Lane**: `doing/` -- active on `fix/remove-proxy-converter-plaintext-logs` after PR #156 merged the admission record.
+**Lane**: `done/` -- shipped in PR #157 (`a2fb0638`) after implementation, verification, and review follow-up.
 
 **Findings**: O037, O038, and O042 (Wave 5 MEDIUM).
 
@@ -17,6 +17,13 @@ Rechecked on merged `main` at `c9c4bc2e`. At DEBUG, `convert_anthropic_to_openai
 tool-schema canaries through the full-request and original-schema dumps. `convert_openai_to_anthropic` logged malformed
 string and dict arguments plus a non-function tool-call payload verbatim. With the logger held at INFO, a formatting spy
 still ran twice for the suppressed request/schema messages.
+
+## Implementation Outcome
+
+Translated request and schema diagnostics now emit parameterized counts, flags, value shapes, and allowlisted key
+metadata without formatting or rendering caller payloads. Malformed-argument fallback data and conversion results are
+unchanged, and the explicit guarded/capped `stream_chunks` raw-debug path remains available. Review retained the safe
+local exception class and admitted the separate provider-side catch-all leak as D053.
 
 ## Expected Behavior
 
@@ -54,5 +61,7 @@ lifetime issue remain separate findings.
 
 ## Verification
 
-Retain a marked fail-first regression, run focused converter/logging tests, the full regression suite, a targeted local
-LiteLLM translated-proxy integration, and `make pre-commit`.
+The five-case regression failed on `46e6a309`, then passed with 22 focused converter/logging tests and the 82-test
+converter/cache slice. The targeted translated-proxy Docker integration passed 2 tests; 8,933 unit tests (one skip, 122
+deselected), 701 regressions, final pre-commit, and board-link/diff checks passed. The review follow-up was resolved
+before PR #157 shipped at `a2fb0638`.

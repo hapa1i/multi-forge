@@ -1,6 +1,6 @@
 # Remove plaintext from proxy converter logs checklist
 
-Current focus: obtain independent review and merge O037/O038/O042.
+Current focus: complete -- O037/O038/O042 shipped in PR #157 (`a2fb0638`).
 
 ## Activation and reproduction
 
@@ -42,8 +42,8 @@ Current focus: obtain independent review and merge O037/O038/O042.
   already governs this internal log-text change.
 - [x] Retain the safe local exception class on the generic malformed-argument path and admit provider-side catch-all
   exception rendering separately as D053 after reproducing both log leaks.
-- [ ] After merge, synchronize the review-ledger resolution, change log, checklist, and lane links.
+- [x] After merge, synchronize the review-ledger resolution, change log, checklist, and lane links.
 - [x] Resolve all 125 local paths and 7 fragments across 9 changed Markdown files; find no stale lane references;
   measure the change log at 21,858 tokens / 1,484 lines; and pass diff checks, `make pre-commit`, and explicit checks of
   all 14 changed and untracked files.
-- [ ] Receive independent review and merge before activating D035.
+- [x] Resolve review follow-up and merge in PR #157 (`a2fb0638`) before activating D035.

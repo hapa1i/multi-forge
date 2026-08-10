@@ -12,6 +12,8 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Sized
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -183,6 +185,164 @@ def proto_to_dict(obj: object) -> dict[str, object] | list[dict[str, object]] | 
 
 
 # Tool Events Logger for JSONL file
+ToolEventKind = Literal[
+    "schema_observed",
+    "tool_call",
+    "tool_args_sanitized",
+    "client_tool_failure",
+]
+ToolEventContentType = Literal["null", "bool", "str", "bytes", "dict", "list", "tuple", "int", "float", "other"]
+ToolEventStatus = Literal["attempt", "success", "failure"]
+ToolEventStage = Literal[
+    "openai_request",
+    "gemini_request",
+    "gemini_response",
+    "client_response",
+    "client_execution_report",
+]
+
+_TOOL_EVENT_KINDS = frozenset(
+    {
+        "schema_observed",
+        "tool_call",
+        "tool_args_sanitized",
+        "client_tool_failure",
+    }
+)
+_TOOL_EVENT_CONTENT_TYPES = frozenset(
+    {"null", "bool", "str", "bytes", "dict", "list", "tuple", "int", "float", "other"}
+)
+_TOOL_EVENT_STATUSES = frozenset({"attempt", "success", "failure"})
+_TOOL_EVENT_STAGES = frozenset(
+    {"openai_request", "gemini_request", "gemini_response", "client_response", "client_execution_report"}
+)
+_TOOL_EVENT_IDENTIFIER_MAX_LENGTH = 128
+_TOOL_EVENT_STRIPPED_PARAM_MAX_ITEMS = 32
+_TOOL_EVENT_COUNT_MAX = 1_000_000
+
+
+def _bound_tool_event_text(value: str) -> tuple[str, bool]:
+    """Return control-free diagnostic text and whether its length was capped."""
+    if not isinstance(value, str):
+        raise TypeError("tool-event identifiers must be strings")
+    normalized = "".join(character if character.isprintable() else "?" for character in value)
+    return normalized[:_TOOL_EVENT_IDENTIFIER_MAX_LENGTH], len(normalized) > _TOOL_EVENT_IDENTIFIER_MAX_LENGTH
+
+
+def bounded_tool_event_identifier(value: object | None) -> str | None:
+    """Bound an identifier before rendering it in an ordinary diagnostic log."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return "invalid"
+    bounded, _truncated = _bound_tool_event_text(value)
+    return bounded
+
+
+def _bound_tool_event_count(value: int) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError("tool-event counts must be integers")
+    return min(max(value, 0), _TOOL_EVENT_COUNT_MAX)
+
+
+def _tool_event_value_length(value: Sized) -> int | None:
+    try:
+        return _bound_tool_event_count(len(value))
+    except Exception:
+        return None
+
+
+def tool_event_value_shape(value: object) -> tuple[ToolEventContentType, int | None]:
+    """Return bounded, content-free type and size metadata for an untrusted value."""
+    if value is None:
+        return "null", None
+    if isinstance(value, bool):
+        return "bool", None
+    if isinstance(value, str):
+        return "str", _tool_event_value_length(value)
+    if isinstance(value, bytes):
+        return "bytes", _tool_event_value_length(value)
+    if isinstance(value, dict):
+        return "dict", _tool_event_value_length(value)
+    if isinstance(value, list):
+        return "list", _tool_event_value_length(value)
+    if isinstance(value, tuple):
+        return "tuple", _tool_event_value_length(value)
+    if isinstance(value, int):
+        return "int", None
+    if isinstance(value, float):
+        return "float", None
+    return "other", None
+
+
+@dataclass(frozen=True)
+class ToolEventMetadata:
+    """Allowlisted metadata accepted by the debug tool-event plane."""
+
+    event: ToolEventKind
+    tool_id: str | None = None
+    streaming: bool | None = None
+    block_index: int | None = None
+    stripped_params: tuple[str, ...] = ()
+    schema_field_count: int | None = None
+    schema_property_count: int | None = None
+    schema_required_count: int | None = None
+    content_type: ToolEventContentType | None = None
+    content_length: int | None = None
+    tool_name_found: bool | None = None
+
+    def to_record(self) -> dict[str, Any]:
+        """Serialize only bounded fields from the closed metadata schema."""
+        if self.event not in _TOOL_EVENT_KINDS:
+            raise ValueError("unknown tool-event kind")
+
+        record: dict[str, Any] = {"event": self.event}
+        if self.tool_id is not None:
+            record["tool_id"], tool_id_truncated = _bound_tool_event_text(self.tool_id)
+            if tool_id_truncated:
+                record["tool_id_truncated"] = True
+        if self.streaming is not None:
+            if not isinstance(self.streaming, bool):
+                raise TypeError("tool-event streaming flag must be boolean")
+            record["streaming"] = self.streaming
+        if self.block_index is not None:
+            record["block_index"] = _bound_tool_event_count(self.block_index)
+        if self.stripped_params:
+            if not isinstance(self.stripped_params, tuple):
+                raise TypeError("tool-event stripped parameters must be a tuple")
+            bounded_params: list[str] = []
+            params_truncated = len(self.stripped_params) > _TOOL_EVENT_STRIPPED_PARAM_MAX_ITEMS
+            for parameter in self.stripped_params[:_TOOL_EVENT_STRIPPED_PARAM_MAX_ITEMS]:
+                bounded_parameter, parameter_truncated = _bound_tool_event_text(parameter)
+                bounded_params.append(bounded_parameter)
+                params_truncated = params_truncated or parameter_truncated
+            record["stripped_params"] = bounded_params
+            record["stripped_param_count"] = _bound_tool_event_count(len(self.stripped_params))
+            if params_truncated:
+                record["stripped_params_truncated"] = True
+
+        count_fields = (
+            ("schema_field_count", self.schema_field_count),
+            ("schema_property_count", self.schema_property_count),
+            ("schema_required_count", self.schema_required_count),
+        )
+        for field_name, value in count_fields:
+            if value is not None:
+                record[field_name] = _bound_tool_event_count(value)
+
+        if self.content_type is not None:
+            if self.content_type not in _TOOL_EVENT_CONTENT_TYPES:
+                raise ValueError("unknown tool-event content type")
+            record["content_type"] = self.content_type
+        if self.content_length is not None:
+            record["content_length"] = _bound_tool_event_count(self.content_length)
+        if self.tool_name_found is not None:
+            if not isinstance(self.tool_name_found, bool):
+                raise TypeError("tool-event tool-name flag must be boolean")
+            record["tool_name_found"] = self.tool_name_found
+        return record
+
+
 # Create an asyncio Lock to ensure thread-safe writing to the JSONL file
 _tool_events_lock = asyncio.Lock()
 
@@ -193,15 +353,9 @@ _request_response_lock = asyncio.Lock()
 async def log_tool_event(
     request_id: str,
     tool_name: str | None,
-    status: Literal["attempt", "success", "failure"],
-    stage: Literal[
-        "openai_request",
-        "gemini_request",
-        "gemini_response",
-        "client_response",
-        "client_execution_report",
-    ],
-    details: dict[str, Any] | None = None,
+    status: ToolEventStatus,
+    stage: ToolEventStage,
+    metadata: ToolEventMetadata,
 ) -> None:
     """Log tool usage events to a separate JSON Lines file for analysis.
 
@@ -214,28 +368,48 @@ async def log_tool_event(
         tool_name: The name of the tool being used (or None for general events)
         status: Whether this is an attempt, success, or failure
         stage: Which part of the process (request to Gemini, response from Gemini, or response to client)
-        details: Optional additional information about the event
+        metadata: Bounded fields from the closed tool-event metadata schema
     """
     if not _should_write_structured_logs():
         return
 
+    safe_request_id = "unknown"
+    safe_tool_name = None
+
     try:
-        logs_dir = get_forge_home() / "logs" / "tool_events"
-        logs_dir.mkdir(exist_ok=True, parents=True)
+        safe_request_id, request_id_truncated = _bound_tool_event_text(request_id)
+        tool_name_truncated = False
+        if tool_name is not None:
+            safe_tool_name, tool_name_truncated = _bound_tool_event_text(tool_name)
+        if status not in _TOOL_EVENT_STATUSES:
+            raise ValueError("unknown tool-event status")
+        if stage not in _TOOL_EVENT_STAGES:
+            raise ValueError("unknown tool-event stage")
+
+        logs_root = get_forge_home() / "logs"
+        logs_dir = logs_root / "tool_events"
+        logs_dir.mkdir(mode=0o700, exist_ok=True, parents=True)
+        for secure_dir in (logs_root, logs_dir):
+            try:
+                os.chmod(secure_dir, 0o700)
+            except OSError:
+                pass
 
         datestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         jsonl_path = logs_dir / f"{datestamp}_proxy.{_pid_suffix()}.jsonl"
 
         event: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            "request_id": request_id,
-            "tool_name": tool_name,
+            "request_id": safe_request_id,
+            "tool_name": safe_tool_name,
             "status": status,
             "stage": stage,
+            "metadata": metadata.to_record(),
         }
-
-        if details:
-            event["details"] = details
+        if request_id_truncated:
+            event["request_id_truncated"] = True
+        if tool_name_truncated:
+            event["tool_name_truncated"] = True
 
         from forge.core.state import open_secure_append
 
@@ -247,12 +421,16 @@ async def log_tool_event(
             "Tool event logged: %s %s for %s (request_id=%s)",
             status,
             stage,
-            tool_name or "unknown",
-            request_id,
+            safe_tool_name or "unknown",
+            safe_request_id,
         )
     except Exception as e:
         # Log error but don't fail the request
-        _logger.error("Failed to log tool event: %s (request_id=%s)", e, request_id, exc_info=True)
+        _logger.error(
+            "Failed to log tool event: error_type=%s (request_id=%s)",
+            type(e).__name__,
+            safe_request_id,
+        )
 
 
 # Tool Failure Logger — opt-in via RuntimeConfig.log_tool_failures

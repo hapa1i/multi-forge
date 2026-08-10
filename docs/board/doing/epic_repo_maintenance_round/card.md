@@ -2,7 +2,7 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--4 and the bounded Wave 5 HIGH child epic are closed. The five-finding Wave 5 MEDIUM proxy diagnostic epic is
-active after its admission record merged in PR #156; O037/O038/O042 is the current member.
+active; D035 is the current member after O037/O038/O042 shipped in PR #157.
 
 ## Goal
 
@@ -69,7 +69,7 @@ shipped in PRs #134--#138 and #140--#142. Wave 4 closed under
 [`epic_installer_transaction_safety`](../../done/epic_installer_transaction_safety/card.md) after its three members
 shipped in PRs #144--#146. The bounded Wave 5 HIGH set closed under
 [`epic_cli_proxy_runtime_correctness`](../../done/epic_cli_proxy_runtime_correctness/card.md) after all seven members
-shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is admitted as three parked members under
+shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is sequenced as three members under
 [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md); remaining MEDIUM rows still
 require separate recheck and admission.
 
@@ -100,8 +100,8 @@ require separate recheck and admission.
 | 5    | O001            | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                                       |
 | 5    | O004            | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
 | 5    | D018            | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
-| 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../remove_proxy_converter_plaintext_logs/card.md)                         |
-| 5M   | D035            | [`make_tool_events_metadata_only`](../../todo/make_tool_events_metadata_only/card.md)                               |
+| 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md)                 |
+| 5M   | D035            | [`make_tool_events_metadata_only`](../make_tool_events_metadata_only/card.md)                                       |
 | 5M   | D036            | [`validate_proxy_request_ids`](../../todo/validate_proxy_request_ids/card.md)                                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |

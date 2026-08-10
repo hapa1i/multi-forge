@@ -90,10 +90,13 @@ from forge.proxy.responses_ingress import (
     register_responses_routes,
 )
 from forge.proxy.utils import (
+    ToolEventMetadata,
+    bounded_tool_event_identifier,
     log_request_beautifully,
     log_request_response,
     log_tool_event,
     log_tool_failure,
+    tool_event_value_shape,
 )
 
 logger = logging.getLogger(__name__)
@@ -1887,6 +1890,10 @@ async def _check_client_tool_failures(request_data: MessagesRequest, request_id:
 
                     if is_error and tool_use_id:
                         tool_name, tool_input = _find_tool_use_info(request_data.messages, msg, tool_use_id)
+                        safe_request_id = bounded_tool_event_identifier(request_id) or "unknown"
+                        safe_tool_name = bounded_tool_event_identifier(tool_name) or "unknown"
+                        safe_tool_use_id = bounded_tool_event_identifier(tool_use_id) or "unknown"
+                        content_type, content_length = tool_event_value_shape(error_content)
 
                         # Check if this is a stale cleared tool result (not actionable)
                         is_cleared_content = (
@@ -1896,21 +1903,28 @@ async def _check_client_tool_failures(request_data: MessagesRequest, request_id:
                         # Only log as warning if we have actual error content (not cleared)
                         if error_content and not is_cleared_content:
                             logger.warning(
-                                f"[{request_id}] Client tool failure: "
-                                f"tool='{tool_name or 'unknown'}', id='{tool_use_id}', "
-                                f"error={str(error_content)[:100]}"
+                                "[%s] Client tool failure: tool=%s id=%s content_type=%s content_length=%s",
+                                safe_request_id,
+                                safe_tool_name,
+                                safe_tool_use_id,
+                                content_type,
+                                content_length,
                             )
                         elif is_cleared_content:
                             logger.debug(
-                                f"[{request_id}] Stale tool failure (content cleared): "
-                                f"tool='{tool_name or 'unknown'}', id='{tool_use_id}'"
+                                "[%s] Stale tool failure (content cleared): tool=%s id=%s",
+                                safe_request_id,
+                                safe_tool_name,
+                                safe_tool_use_id,
                             )
                         else:
                             # Debug log for investigation when is_error but no content
                             logger.debug(
-                                f"[{request_id}] Tool marked as error but no error content: "
-                                f"tool='{tool_name or 'unknown'}', id='{tool_use_id}', "
-                                f"is_error={getattr(block, 'is_error', None)}"
+                                "[%s] Tool marked as error but no error content: tool=%s id=%s is_error=%s",
+                                safe_request_id,
+                                safe_tool_name,
+                                safe_tool_use_id,
+                                getattr(block, "is_error", None),
                             )
 
                         enriched_content = error_content
@@ -1920,7 +1934,11 @@ async def _check_client_tool_failures(request_data: MessagesRequest, request_id:
                                 enriched_content = enrich_error_content(tool_name, error_content)
                                 if enriched_content != error_content:
                                     block.content = enriched_content
-                                    logger.debug(f"[{request_id}] Enriched error hint for tool '{tool_name}'")
+                                    logger.debug(
+                                        "[%s] Enriched error hint for tool %s",
+                                        safe_request_id,
+                                        safe_tool_name,
+                                    )
 
                         # Only log as failure if we have actual error content (not cleared)
                         if error_content and not is_cleared_content:
@@ -1940,11 +1958,13 @@ async def _check_client_tool_failures(request_data: MessagesRequest, request_id:
                                     tool_name=tool_name,
                                     status="failure",
                                     stage="client_execution_report",
-                                    details={
-                                        "tool_use_id": tool_use_id,
-                                        "error_content": enriched_content,
-                                        "tool_name_found": bool(tool_name),
-                                    },
+                                    metadata=ToolEventMetadata(
+                                        event="client_tool_failure",
+                                        tool_id=tool_use_id,
+                                        content_type=content_type,
+                                        content_length=content_length,
+                                        tool_name_found=bool(tool_name),
+                                    ),
                                 )
                             )
 
