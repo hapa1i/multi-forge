@@ -17,7 +17,6 @@ Key Components:
 import asyncio
 import json
 import logging
-import traceback
 import uuid
 from typing import Any, AsyncGenerator, Callable, Dict, List, Literal, Optional, Union
 
@@ -780,8 +779,9 @@ def convert_openai_to_anthropic(
         )
     except Exception as e:
         logger.error(
-            f"[{request_id}] Failed to convert adapted OpenAI response to Anthropic format: {e}",
-            exc_info=True,
+            "[%s] Failed to convert adapted OpenAI response to Anthropic format; error_type=%s",
+            request_id,
+            type(e).__name__,
         )
         model_name = original_model_name if original_model_name else "claude-3.7-sonnet"
 
@@ -1304,8 +1304,9 @@ async def convert_openai_to_anthropic_sse(
         _stream_failed = True
         _stream_error_type = "internal_error"
         logger.error(
-            f"[{request_id}] Error during Anthropic SSE stream conversion: {e}, "
-            f"Full traceback:\n{traceback.format_exc()}"
+            "[%s] Error during Anthropic SSE stream conversion; exception_type=%s",
+            request_id,
+            type(e).__name__,
         )
         try:
             error_payload = {
@@ -1320,7 +1321,11 @@ async def convert_openai_to_anthropic_sse(
             yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
             logger.debug(f"[{request_id}] Sent error event and message_stop after exception.")
         except Exception as e2:
-            logger.error(f"[{request_id}] Failed to send error event to client: {e2}")
+            logger.error(
+                "[%s] Failed to send error event to client; exception_type=%s",
+                request_id,
+                type(e2).__name__,
+            )
     finally:
         # One compact lifecycle line replaces the per-chunk dumps and the old bare
         # "conversion finished" INFO (proxy_log_hygiene). INFO only for the cases worth

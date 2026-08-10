@@ -2,7 +2,7 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--4, the bounded Wave 5 HIGH child epic, and the first Wave 5 MEDIUM proxy-diagnostic child epic are closed. The
-O007/D053 proxy-conversion set is accepted and parked pending review of its admission record.
+O007/D053 proxy-conversion set is active: D053 is implemented and verified pending review, while O007 remains parked.
 
 ## Goal
 
@@ -71,9 +71,9 @@ shipped in PRs #144--#146. The bounded Wave 5 HIGH set closed under
 [`epic_cli_proxy_runtime_correctness`](../../done/epic_cli_proxy_runtime_correctness/card.md) after all seven members
 shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is sequenced as three members under
 [`epic_proxy_diagnostic_data_hygiene`](../../done/epic_proxy_diagnostic_data_hygiene/card.md) and shipped independently
-in PRs #157--#159. The next bounded MEDIUM set is parked as two members under
-[`epic_proxy_conversion_failure_handling`](../../todo/epic_proxy_conversion_failure_handling/card.md); remaining MEDIUM
-rows still require separate recheck and admission.
+in PRs #157--#159. The next bounded MEDIUM set is active as two members under
+[`epic_proxy_conversion_failure_handling`](../epic_proxy_conversion_failure_handling/card.md), with D053 pending review
+and O007 parked; remaining MEDIUM rows still require separate recheck and admission.
 
 For the next pair, D053 (Wave 6) deliberately sequences before O007 (Wave 5); the child epic owns this exception to wave
 order.
@@ -109,7 +109,7 @@ order.
 | 5M   | D035            | [`make_tool_events_metadata_only`](../../done/make_tool_events_metadata_only/card.md)                               |
 | 5M   | D036            | [`validate_proxy_request_ids`](../../done/validate_proxy_request_ids/card.md)                                       |
 | 5M   | O007            | [`fail_non_streaming_response_conversion`](../../todo/fail_non_streaming_response_conversion/card.md)               |
-| 6    | D053            | [`sanitize_proxy_conversion_failure_logs`](../../todo/sanitize_proxy_conversion_failure_logs/card.md)               |
+| 6    | D053            | [`sanitize_proxy_conversion_failure_logs`](../sanitize_proxy_conversion_failure_logs/card.md)                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

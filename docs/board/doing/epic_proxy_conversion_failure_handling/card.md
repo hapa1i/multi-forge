@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `todo/` -- accepted coordination work parked pending review and merge of this bounded admission record.
+**Lane**: `doing/` -- D053 is implemented and verified on `fix/sanitize-proxy-conversion-failure-logs` pending review;
+O007 remains parked.
 
 ## Goal
 
@@ -38,10 +39,10 @@ non-streaming translated path; streaming conversion has its own in-band error-ev
 
 ## Members and Sequence
 
-| Order | Finding | Member                                                                                        | Review boundary                                  |
-| ----- | ------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| 1     | D053    | [`sanitize_proxy_conversion_failure_logs`](../sanitize_proxy_conversion_failure_logs/card.md) | ordinary non-streaming/streaming ERROR metadata  |
-| 2     | O007    | [`fail_non_streaming_response_conversion`](../fail_non_streaming_response_conversion/card.md) | client status and cost/metrics failure semantics |
+| Order | Finding | Member                                                                                                | Review boundary                                  |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 1     | D053    | [`sanitize_proxy_conversion_failure_logs`](../sanitize_proxy_conversion_failure_logs/card.md)         | ordinary non-streaming/streaming ERROR metadata  |
+| 2     | O007    | [`fail_non_streaming_response_conversion`](../../todo/fail_non_streaming_response_conversion/card.md) | client status and cost/metrics failure semantics |
 
 D053 goes first because it is a log-only correction at both converter catch-alls and establishes a safe diagnostic
 boundary before O007 changes the non-streaming exception flow. O007 remains a separate member because replacing a
