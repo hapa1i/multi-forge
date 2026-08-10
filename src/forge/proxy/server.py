@@ -84,6 +84,7 @@ from forge.proxy.ports import (
 )
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.request_id import is_valid_request_id
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
     build_intercept_capability_section,
@@ -415,6 +416,20 @@ def _valid_session_header(value: str | None) -> str | None:
 def _valid_command_header(value: str | None) -> str | None:
     """Return a validated command role from ``X-Forge-Command``, else None (Phase 1)."""
     return value if is_valid_label(value) else None
+
+
+def _canonicalize_request_id_header(request: Request, request_id: str) -> None:
+    """Replace supplied request-ID headers with the validated correlation value.
+
+    The middleware calls this before constructing a ``Request.headers`` view. Make
+    the ASGI iterable concrete defensively, then mutate the shared scope list so
+    passthrough and fresh downstream requests cannot observe rejected raw values.
+    """
+    raw_headers = request.scope["headers"]
+    if not isinstance(raw_headers, list):
+        raw_headers = request.scope["headers"] = list(raw_headers)
+    raw_headers[:] = [(name, value) for name, value in raw_headers if name.lower() != b"x-request-id"]
+    raw_headers.append((b"x-request-id", request_id.encode("ascii")))
 
 
 def _forge_run_ids(request: Request) -> tuple[str | None, str | None]:
@@ -1737,7 +1752,14 @@ async def log_requests_middleware(request: Request, call_next):
     elif "/" == path:
         prefix = "inf_"
 
-    request_id = request.headers.get("X-Request-ID") or f"{prefix}{uuid.uuid4().hex[:12]}"
+    raw_headers = request.scope["headers"]
+    if not isinstance(raw_headers, list):
+        raw_headers = request.scope["headers"] = list(raw_headers)
+    client_request_ids = [value.decode("latin-1") for name, value in raw_headers if name.lower() == b"x-request-id"]
+    client_request_id = client_request_ids[0] if len(client_request_ids) == 1 else None
+    request_id = client_request_id if is_valid_request_id(client_request_id) else f"{prefix}{uuid.uuid4().hex[:12]}"
+    if client_request_ids:
+        _canonicalize_request_id_header(request, request_id)
     request.state.request_id = request_id
     request.state.downstream_event_id = mint_downstream_event_id(event_key=f"proxy:{request_id}:{uuid.uuid4().hex}")
 

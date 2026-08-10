@@ -2,12 +2,13 @@
 
 When Forge itself is the HTTP client (a ``core.llm`` call, not a ``claude -p``
 subprocess), it can mint an ``X-Request-ID`` and forward it as a request header.
-If that call happens to hit a Forge proxy, the proxy honors the inbound id
-(``server.py``: ``request.headers.get("X-Request-ID") or ...``) and writes its
+If that call happens to hit a Forge proxy, the proxy preserves the inbound id only
+when it satisfies ``forge.proxy.request_id.is_valid_request_id`` and writes its
 cost/audit records under the same id -- making ``source_refs.cost_request_id`` an
-exact join key. Against an external provider the header is harmlessly ignored and
-no Forge cost record exists, so the caller leaves ``cost_request_id`` null rather
-than dangling.
+exact join key. ``mint_request_id`` is contract-tested against that validator so
+the join cannot silently dangle after either side changes. Against an external
+provider the header is harmlessly ignored and no Forge cost record exists, so the
+caller leaves ``cost_request_id`` null rather than dangling.
 
 The ``claude -p`` case (Forge is NOT the client) is out of scope here -- that is
 the deferred proxied-correlation slice (4g).
@@ -27,7 +28,7 @@ _FORGE_REQUEST_ID_HEADER = "X-Request-ID"
 
 
 def mint_request_id() -> str:
-    """Mint a request id (mirrors the proxy's ``req_`` prefix in server.py)."""
+    """Mint a request id accepted by the proxy ingress validator."""
     return f"req_{uuid.uuid4().hex[:12]}"
 
 

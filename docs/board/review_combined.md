@@ -38,8 +38,8 @@ members under [`epic_cli_proxy_runtime_correctness`](done/epic_cli_proxy_runtime
 record merged in PR #147 (`92b981a5`), and all seven members shipped independently in PRs #148--#154. The bounded HIGH
 child epic is closed. D035, D036, O037, O038, and O042 form the first separately reproduced MEDIUM set under
 [`epic_proxy_diagnostic_data_hygiene`](doing/epic_proxy_diagnostic_data_hygiene/card.md). Its converter-log member
-shipped in PR #157, D035 is active, and D036 remains parked. Other Wave 5 MEDIUM rows still require separate admission.
-O003 already shipped in Wave 3 and is not part of the Wave 5 set.
+shipped in PR #157, D035 shipped in PR #158, and D036 is active. Other Wave 5 MEDIUM rows still require separate
+admission. O003 already shipped in Wave 3 and is not part of the Wave 5 set.
 
 ### Finding fields
 
@@ -626,8 +626,8 @@ during admission.
 | Order | Findings         | Reproduced boundary                                                            | Accepted member                                                                               |
 | ----- | ---------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | 1     | O037, O038, O042 | converter logs request/schema/tool payloads and formats suppressed DEBUG dumps | [`remove_proxy_converter_plaintext_logs`](done/remove_proxy_converter_plaintext_logs/card.md) |
-| 2     | D035             | tool-event details and the client-failure WARNING retain caller plaintext      | [`make_tool_events_metadata_only`](doing/make_tool_events_metadata_only/card.md)              |
-| 3     | D036             | invalid client request ID reaches state, logs, and response header verbatim    | [`validate_proxy_request_ids`](todo/validate_proxy_request_ids/card.md)                       |
+| 2     | D035             | tool-event details and the client-failure WARNING retain caller plaintext      | [`make_tool_events_metadata_only`](done/make_tool_events_metadata_only/card.md)               |
+| 3     | D036             | invalid client request ID reaches state, logs, and response header verbatim    | [`validate_proxy_request_ids`](doing/validate_proxy_request_ids/card.md)                      |
 
 The three members share a metadata-only diagnostic contract but remain independent review boundaries. Converter logging
 goes first because the same payload dumps cause both the confidentiality and eager-formatting findings. D035 then makes
