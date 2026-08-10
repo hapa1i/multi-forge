@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-10
+
+### Remove plaintext from proxy converter logs
+
+**Goal/outcome**: Keep ordinary translated-converter diagnostics metadata-only and avoid formatting caller payloads for
+suppressed DEBUG records without changing conversion behavior.
+
+**Key changes**:
+
+- Replaced full request/schema dumps and raw malformed-argument/tool-call records with parameterized counts, flags,
+  value shapes, safe exception classes, and allowlisted key metadata.
+- Preserved malformed-argument client fallback, tool sanitization, and the explicit guarded/capped `stream_chunks` raw
+  plane; admitted the separate provider-side catch-all exception leak as D053.
+
+**Verification**: The five-case regression failed on `46e6a309`. After implementation, 22 focused tests, the 82-test
+converter/cache slice, 2 targeted Docker cases, 8,933 unit tests (one skip, 122 deselected), 701 regressions, final
+pre-commit, and board-link/diff checks passed. Shipped in PR #157 (`a2fb0638`).
+
 ## 2026-08-09
 
 ### Admit proxy diagnostic data hygiene

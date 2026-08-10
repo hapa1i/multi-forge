@@ -1,6 +1,6 @@
 # Proxy diagnostic data hygiene checklist
 
-Current focus: review and merge O037/O038/O042 before activating D035.
+Current focus: implement D035 without activating D036.
 
 ## Activation and sequencing
 
@@ -9,16 +9,16 @@ Current focus: review and merge O037/O038/O042 before activating D035.
 - [x] Move this epic and O037/O038/O042 to `doing/`, create their checklists, and repoint inbound links.
 - [x] Retain a marked O037/O038/O042 regression that fails all five cases on `46e6a309` before implementation.
 - [x] Implement and verify O037/O038/O042 without activating D035 or D036.
-- [ ] Independently review and merge O037/O038/O042 before moving D035 from `todo/`.
-- [ ] Start the D035 branch from its merged predecessor, close O037/O038/O042, and activate D035.
+- [x] Resolve review follow-up and merge O037/O038/O042 before moving D035 from `todo/` (PR #157, `a2fb0638`).
+- [x] Start the D035 branch from its merged predecessor, close O037/O038/O042, and activate D035.
 - [ ] Independently review and merge D035 before moving D036 from `todo/`.
 - [ ] Start the D036 branch from its merged predecessor, close D035, and activate D036.
 - [ ] Independently review and merge D036, then close this child epic.
 
 ## Members
 
-- [ ] O037/O038/O042 -- metadata-only, lazy proxy converter logs (active).
-- [ ] D035 -- metadata-only tool-event diagnostics (parked).
+- [x] O037/O038/O042 -- metadata-only, lazy proxy converter logs (PR #157, `a2fb0638`).
+- [ ] D035 -- metadata-only tool-event diagnostics (active).
 - [ ] D036 -- validated client request IDs (parked).
 
 ## Coordination and closeout

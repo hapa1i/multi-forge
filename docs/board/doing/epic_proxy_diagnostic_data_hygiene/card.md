@@ -2,7 +2,7 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active coordination work; O037/O038/O042 is the current member.
+**Lane**: `doing/` -- active coordination work; D035 is the current member after O037/O038/O042 shipped in PR #157.
 
 ## Goal
 
@@ -42,11 +42,11 @@ retention setting is admitted.
 
 ## Members and Sequence
 
-| Order | Findings         | Member                                                                                      | Review boundary                                          |
-| ----- | ---------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| 1     | O037, O038, O042 | [`remove_proxy_converter_plaintext_logs`](../remove_proxy_converter_plaintext_logs/card.md) | translated request/response logging and eager formatting |
-| 2     | D035             | [`make_tool_events_metadata_only`](../../todo/make_tool_events_metadata_only/card.md)       | tool-event schema, caller failure diagnostics, file dirs |
-| 3     | D036             | [`validate_proxy_request_ids`](../../todo/validate_proxy_request_ids/card.md)               | untrusted correlation header at proxy ingress            |
+| Order | Findings         | Member                                                                                              | Review boundary                                          |
+| ----- | ---------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1     | O037, O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md) | translated request/response logging and eager formatting |
+| 2     | D035             | [`make_tool_events_metadata_only`](../make_tool_events_metadata_only/card.md)                       | tool-event schema, caller failure diagnostics, file dirs |
+| 3     | D036             | [`validate_proxy_request_ids`](../../todo/validate_proxy_request_ids/card.md)                       | untrusted correlation header at proxy ingress            |
 
 The converter member goes first because one metadata-only rewrite closes both plaintext and suppressed-formatting
 findings without changing request/response conversion. D035 follows with a separate structured-record schema and keeps

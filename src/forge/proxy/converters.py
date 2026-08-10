@@ -30,9 +30,12 @@ from forge.proxy.data_models import (
     Usage,
 )
 from forge.proxy.utils import (
+    ToolEventContentType,
+    ToolEventMetadata,
     format_stream_lifecycle_summary,
     log_tool_event,
     smart_format_str,
+    tool_event_value_shape,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,30 +62,9 @@ _STRIP_EMPTY_PARAMS: dict[str, dict[str, tuple[Any, ...]]] = {
 _KNOWN_TOOL_CALL_KEYS = ("id", "type", "function", "index")
 
 
-def _log_value_shape(value: object) -> tuple[str, int | None]:
-    """Return content-free type and size metadata for an untrusted value."""
-    if value is None:
-        return "null", None
-    if isinstance(value, bool):
-        return "bool", None
-    if isinstance(value, str):
-        return "str", len(value)
-    if isinstance(value, bytes):
-        return "bytes", len(value)
-    if isinstance(value, dict):
-        return "dict", len(value)
-    if isinstance(value, list):
-        return "list", len(value)
-    if isinstance(value, tuple):
-        return "tuple", len(value)
-    if isinstance(value, (int, float)):
-        return type(value).__name__, None
-    return "other", None
-
-
-def _tool_call_log_shape(value: object) -> tuple[str, int | None, str, int]:
+def _tool_call_log_shape(value: object) -> tuple[ToolEventContentType, int | None, str, int]:
     """Describe a tool-call value without rendering caller-controlled keys or values."""
-    value_type, value_length = _log_value_shape(value)
+    value_type, value_length = tool_event_value_shape(value)
     if not isinstance(value, dict):
         return value_type, value_length, "none", 0
 
@@ -168,23 +150,19 @@ def _schedule_tool_args_sanitized_event(
     if not tool_name or not stripped_params:
         return
 
-    details: dict[str, Any] = {
-        "event": "tool_args_sanitized",
-        "streaming": streaming,
-        "stripped_params": stripped_params,
-    }
-    if tool_id is not None:
-        details["tool_id"] = tool_id
-    if block_index is not None:
-        details["block_index"] = block_index
-
     asyncio.create_task(
         log_tool_event(
             request_id=request_id,
             tool_name=tool_name,
             status="success",
             stage="client_response",
-            details=details,
+            metadata=ToolEventMetadata(
+                event="tool_args_sanitized",
+                tool_id=tool_id,
+                streaming=streaming,
+                block_index=block_index,
+                stripped_params=tuple(stripped_params),
+            ),
         )
     )
 
@@ -561,11 +539,6 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
                 len(required) if isinstance(required, list) else 0,
             )
 
-            tool_schema_details = {
-                "tool_name": tool.name,
-                "original_schema": input_schema,
-            }
-
             # Pass through original schema (no normalization needed for OpenAI/LiteLLM)
             cleaned_schema = input_schema
             logger.debug(f"[{provider.upper()}] Using original schema for tool '{tool.name}'")
@@ -575,7 +548,12 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
                     tool_name=tool.name,
                     status="attempt",
                     stage="openai_request",
-                    details=tool_schema_details,
+                    metadata=ToolEventMetadata(
+                        event="schema_observed",
+                        schema_field_count=len(input_schema),
+                        schema_property_count=len(properties) if isinstance(properties, dict) else 0,
+                        schema_required_count=len(required) if isinstance(required, list) else 0,
+                    ),
                 )
             )
 
@@ -715,7 +693,7 @@ def convert_openai_to_anthropic(
                                     streaming=False,
                                 )
                         except json.JSONDecodeError:
-                            value_type, value_length = _log_value_shape(args_str)
+                            value_type, value_length = tool_event_value_shape(args_str)
                             logger.warning(
                                 "[%s] Non-streaming: failed to parse tool arguments JSON; "
                                 "value_type=%s value_length=%s fallback=raw_arguments",
@@ -725,7 +703,7 @@ def convert_openai_to_anthropic(
                             )
                             args_input = {"raw_arguments": args_str}
                         except Exception as e:
-                            value_type, value_length = _log_value_shape(args_str)
+                            value_type, value_length = tool_event_value_shape(args_str)
                             logger.error(
                                 "[%s] Non-streaming: error parsing tool arguments; "
                                 "value_type=%s value_length=%s error_type=%s fallback=error_parsing_arguments",
@@ -755,7 +733,11 @@ def convert_openai_to_anthropic(
                                 tool_name=tool_name,
                                 status="success",
                                 stage="client_response",
-                                details={"tool_id": tool_id, "streaming": False},
+                                metadata=ToolEventMetadata(
+                                    event="tool_call",
+                                    tool_id=tool_id,
+                                    streaming=False,
+                                ),
                             )
                         )
                     else:
@@ -1160,11 +1142,12 @@ async def convert_openai_to_anthropic_sse(
                                     tool_name=func_name,
                                     status="success",
                                     stage="client_response",
-                                    details={
-                                        "tool_id": tc_id,
-                                        "streaming": True,
-                                        "block_index": content_block_index,
-                                    },
+                                    metadata=ToolEventMetadata(
+                                        event="tool_call",
+                                        tool_id=tc_id,
+                                        streaming=True,
+                                        block_index=content_block_index,
+                                    ),
                                 )
                             )
                         # ID can arrive before name in some providers; buffer until name arrives

@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from forge.proxy.utils import (
+    ToolEventMetadata,
     _redact_body_for_log,
     _redact_content,
     _redact_tools,
@@ -54,7 +55,7 @@ async def test_structured_proxy_logs_disabled_by_default(tmp_path, monkeypatch: 
         tool_name="bash",
         status="attempt",
         stage="openai_request",
-        details={"x": 1},
+        metadata=ToolEventMetadata(event="tool_call"),
     )
 
     assert not (tmp_path / "forge_home" / "logs" / "requests").exists()
@@ -81,7 +82,7 @@ async def test_structured_proxy_logs_write_in_debug(tmp_path, monkeypatch: pytes
         tool_name="bash",
         status="attempt",
         stage="openai_request",
-        details={"x": 1},
+        metadata=ToolEventMetadata(event="tool_call"),
     )
 
     requests_dir = tmp_path / "forge_home" / "logs" / "requests"
@@ -98,6 +99,25 @@ async def test_structured_proxy_logs_write_in_debug(tmp_path, monkeypatch: pytes
 
     assert '"request_id": "req_1"' in request_files[0].read_text(encoding="utf-8")
     assert '"tool_name": "bash"' in tool_files[0].read_text(encoding="utf-8")
+    tool_record = json.loads(tool_files[0].read_text(encoding="utf-8"))
+    assert tool_record["metadata"] == {"event": "tool_call"}
+    assert "details" not in tool_record
+
+
+def test_tool_event_metadata_has_a_closed_field_allowlist() -> None:
+    assert set(ToolEventMetadata.__dataclass_fields__) == {
+        "event",
+        "tool_id",
+        "streaming",
+        "block_index",
+        "stripped_params",
+        "schema_field_count",
+        "schema_property_count",
+        "schema_required_count",
+        "content_type",
+        "content_length",
+        "tool_name_found",
+    }
 
 
 # --- Tool failure logging (opt-in) ---

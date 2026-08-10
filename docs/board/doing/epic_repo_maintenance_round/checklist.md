@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge O037/O038/O042 without activating D035 or D036.
+Current focus: implement D035 without activating D036.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -114,7 +114,8 @@ Current focus: review and merge O037/O038/O042 without activating D035 or D036.
   and create their execution checklists.
 - [x] Keep provider-side response-conversion exception rendering outside O037/O038/O042 and admit it separately as D053
   after runtime reproduction (2026-08-10).
-- [ ] Implement, independently review, and merge O037/O038/O042 before activating D035.
+- [x] Implement, review, and merge O037/O038/O042 before activating D035 (PR #157, `a2fb0638`).
+- [x] Start `fix/make-tool-events-metadata-only`, close O037/O038/O042, activate D035, and create its checklist.
 - [ ] Recheck and admit the remaining Wave 5 MEDIUM correctness rows and later-wave findings against their entry
   conditions before activating their implementation cards.
 

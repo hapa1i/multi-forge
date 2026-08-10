@@ -13,6 +13,7 @@ from forge.proxy.converters import (
     sanitize_tool_input,
 )
 from forge.proxy.data_models import ContentBlockToolUse, Message, MessagesRequest
+from forge.proxy.utils import ToolEventMetadata
 
 pytestmark = pytest.mark.regression
 
@@ -158,16 +159,21 @@ def test_non_streaming_sanitized_read_logs_stripped_params_event() -> None:
     ):
         convert_openai_to_anthropic(response, "claude-sonnet-4-6")
 
-    sanitized_events = [event for event in captured_events if event["details"].get("event") == "tool_args_sanitized"]
+    sanitized_events = [
+        event
+        for event in captured_events
+        if isinstance(event["metadata"], ToolEventMetadata) and event["metadata"].event == "tool_args_sanitized"
+    ]
     assert len(sanitized_events) == 1
     assert sanitized_events[0]["tool_name"] == "Read"
     assert sanitized_events[0]["status"] == "success"
     assert sanitized_events[0]["stage"] == "client_response"
-    assert sanitized_events[0]["details"] == {
+    assert sanitized_events[0]["metadata"].to_record() == {
         "event": "tool_args_sanitized",
+        "tool_id": "call_read",
         "streaming": False,
         "stripped_params": ["pages", "offset"],
-        "tool_id": "call_read",
+        "stripped_param_count": 2,
     }
 
 
@@ -281,17 +287,22 @@ async def test_streaming_sanitized_read_logs_stripped_params_event() -> None:
         await _collect_sse_events(chunks)
         await asyncio.sleep(0)
 
-    sanitized_events = [event for event in captured_events if event["details"].get("event") == "tool_args_sanitized"]
+    sanitized_events = [
+        event
+        for event in captured_events
+        if isinstance(event["metadata"], ToolEventMetadata) and event["metadata"].event == "tool_args_sanitized"
+    ]
     assert len(sanitized_events) == 1
     assert sanitized_events[0]["tool_name"] == "Read"
     assert sanitized_events[0]["status"] == "success"
     assert sanitized_events[0]["stage"] == "client_response"
-    assert sanitized_events[0]["details"] == {
+    assert sanitized_events[0]["metadata"].to_record() == {
         "event": "tool_args_sanitized",
-        "streaming": True,
-        "stripped_params": ["pages", "limit"],
         "tool_id": "call_read",
+        "streaming": True,
         "block_index": 0,
+        "stripped_params": ["pages", "limit"],
+        "stripped_param_count": 2,
     }
 
 
