@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-10
 
+### Admit proxy conversion failure handling
+
+**Goal/outcome**: Admit safe logging and truthful client/accounting behavior for provider response-conversion failures
+without combining their internal-log and external-wire contracts.
+
+**Key changes**:
+
+- Closed the proxy-diagnostic hygiene epic after D036 shipped in PR #159, with all three member paths and ledger
+  dispositions synchronized.
+- Reproduced D053's provider-data ERROR rendering and O007's HTTP-200/`failed=false` outcome on merged `main`; parked
+  them as two ordered members, with the log-only correction first.
+
+**Verification**: Four disposable broken-behavior characterizations passed on `de02b09b`, and the module was removed
+after evidence capture. Markdown hooks, relative-link, stale-lane, size, and diff checks passed; no implementation
+member was activated.
+
 ### Validate client request IDs at proxy ingress
 
 **Goal/outcome**: Preserve conventional client correlation IDs without allowing malformed, control-bearing, duplicate,
@@ -43,7 +59,7 @@ or overlong `X-Request-ID` values to become Forge diagnostic and response identi
 
 **Verification**: Five retained invalid-header assertions failed on `ce7eb1ec`; four valid-ID controls passed. After
 implementation, 125 review-focused tests, 2 targeted Docker cases, 8,954 unit tests (one skip, 122 deselected), 716
-regressions, final pre-commit, and board-link/diff checks passed.
+regressions, final pre-commit, and board-link/diff checks passed. Shipped in PR #159 (`de02b09b`).
 
 ### Make tool-event diagnostics metadata-only
 

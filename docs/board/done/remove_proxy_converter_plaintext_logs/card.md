@@ -1,6 +1,6 @@
 # Remove plaintext from proxy converter logs
 
-**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../../doing/epic_proxy_diagnostic_data_hygiene/card.md).
+**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md).
 
 **Lane**: `done/` -- shipped in PR #157 (`a2fb0638`) after implementation, verification, and review follow-up.
 

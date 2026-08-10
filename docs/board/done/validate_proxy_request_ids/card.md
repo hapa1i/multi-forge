@@ -1,8 +1,8 @@
 # Validate client request IDs at proxy ingress
 
-**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../../doing/epic_proxy_diagnostic_data_hygiene/card.md).
+**Epic**: [`epic_proxy_diagnostic_data_hygiene`](../epic_proxy_diagnostic_data_hygiene/card.md).
 
-**Lane**: `doing/` -- active on `fix/validate-proxy-request-ids` after PR #158 shipped D035.
+**Lane**: `done/` -- shipped in PR #159 (`de02b09b`).
 
 **Finding**: D036 (Wave 5 MEDIUM).
 
@@ -74,4 +74,4 @@ logs/telemetry use the generated ID and omit the raw canary. Targeted mypy passe
 tests with one skip and 122 deselections, and the full regression suite passes all 716 tests. The first full pre-commit
 run passed every code gate and let mdformat rewrite the new evidence; clean reruns, including ones after
 downstream-header and independent-review hardening, passed all hooks. Board links, stale-lane, size, and diff checks
-pass.
+pass. Independent review completed, and the member shipped in PR #159 (`de02b09b`).

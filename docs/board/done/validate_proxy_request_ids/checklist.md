@@ -1,6 +1,6 @@
 # Validate proxy request IDs checklist
 
-Current focus: implementation and verification complete; awaiting independent review and merge.
+Current focus: closed after independent review and merge in PR #159 (`de02b09b`).
 
 ## Activation and reproduction
 
@@ -43,4 +43,4 @@ Current focus: implementation and verification complete; awaiting independent re
 - [x] Synchronize member, child-epic, parent-epic, ledger, and change-log evidence without closing the child epic before
   merge.
 - [x] Run board link/size checks, diff checks, and `make pre-commit`.
-- [ ] Receive independent review and merge, then close the proxy-diagnostic hygiene epic.
+- [x] Receive independent review and merge, then close the proxy-diagnostic hygiene epic (PR #159, `de02b09b`).

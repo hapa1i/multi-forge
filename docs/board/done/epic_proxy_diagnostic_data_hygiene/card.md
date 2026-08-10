@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active coordination work; D036 is the current member after D035 shipped in PR #158.
+**Lane**: `done/` -- all three members shipped independently in PRs #157--#159; the coordinated outcome closed on
+2026-08-10.
 
 ## Goal
 
@@ -42,15 +43,15 @@ retention setting is admitted.
 
 ## Members and Sequence
 
-| Order | Findings         | Member                                                                                              | Review boundary                                          |
-| ----- | ---------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| 1     | O037, O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md) | translated request/response logging and eager formatting |
-| 2     | D035             | [`make_tool_events_metadata_only`](../../done/make_tool_events_metadata_only/card.md)               | tool-event schema, caller failure diagnostics, file dirs |
-| 3     | D036             | [`validate_proxy_request_ids`](../validate_proxy_request_ids/card.md)                               | untrusted correlation header at proxy ingress            |
+| Order | Findings         | Member                                                                                      | Review boundary                                          |
+| ----- | ---------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1     | O037, O038, O042 | [`remove_proxy_converter_plaintext_logs`](../remove_proxy_converter_plaintext_logs/card.md) | translated request/response logging and eager formatting |
+| 2     | D035             | [`make_tool_events_metadata_only`](../make_tool_events_metadata_only/card.md)               | tool-event schema, caller failure diagnostics, file dirs |
+| 3     | D036             | [`validate_proxy_request_ids`](../validate_proxy_request_ids/card.md)                       | untrusted correlation header at proxy ingress            |
 
 The converter member goes first because one metadata-only rewrite closes both plaintext and suppressed-formatting
 findings without changing request/response conversion. D035 follows with a separate structured-record schema and keeps
-the explicitly opted-in `tool_failures` plane intact. D036 remains independent because accepting or replacing a client
+the explicitly opted-in `tool_failures` plane intact. D036 remained independent because accepting or replacing a client
 correlation value is an ingress compatibility decision, not log rendering.
 
 ## Shared Constraints
@@ -67,8 +68,13 @@ correlation value is an ingress compatibility decision, not log rendering.
 - Each member retains a marked regression that fails on its merged-main base and runs the relevant translated-proxy
   Docker integration before closeout.
 
+All three members shipped as separate review boundaries. PR #157 removed caller plaintext and eager payload formatting
+from ordinary converter logs, PR #158 made structured tool-event diagnostics metadata-only and hardened their
+directories, and PR #159 validated request IDs before diagnostic and response identity diverge. Each member retained its
+fail-first regression and passed focused, targeted Docker, full regression, and pre-commit verification.
+
 ## Closeout
 
-Close this epic only after all three members ship independently, the review ledger records their dispositions, and the
-ordinary-log, structured-tool-event, and request-correlation boundaries are covered by retained regressions. Remaining
-Wave 5 MEDIUM rows stay with the parent maintenance epic.
+All three members shipped independently, the review ledger records their dispositions, and retained regressions cover
+ordinary logs, structured tool events, and request-correlation ingress. Remaining MEDIUM rows stay with the parent
+maintenance epic for separately reviewed admission.
