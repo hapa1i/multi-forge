@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge D036, then close its child epic and resume MEDIUM-finding admission.
+Current focus: review and merge the bounded O007/D053 admission record, then activate D053.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -118,7 +118,15 @@ Current focus: review and merge D036, then close its child epic and resume MEDIU
 - [x] Start `fix/make-tool-events-metadata-only`, close O037/O038/O042, activate D035, and create its checklist.
 - [x] Implement, review, and merge D035 before activating D036 (PR #158, `ce7eb1ec`).
 - [x] Start `fix/validate-proxy-request-ids`, close D035, activate D036, and create its checklist.
-- [ ] Recheck and admit the remaining Wave 5 MEDIUM correctness rows and later-wave findings against their entry
-  conditions before activating their implementation cards.
+- [x] Independently review and merge D036, then close the proxy-diagnostic hygiene child epic (PR #159, `de02b09b`).
+- [x] Recheck O007 and D053 on merged `main` at `de02b09b` (four disposable broken-behavior characterizations passed,
+  and the module was removed).
+- [x] Sequence O007/D053 as two parked members under `epic_proxy_conversion_failure_handling` without activating
+  implementation.
+- [ ] Review and merge the bounded O007/D053 admission record before activating D053.
+- [ ] Compact the oldest change-log tail before recording the next MEDIUM admission, preserving dates, goals, decisions,
+  verification, and deferred items.
+- [ ] Recheck and admit the remaining MEDIUM correctness rows and later-wave findings against their entry conditions
+  before activating their implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
