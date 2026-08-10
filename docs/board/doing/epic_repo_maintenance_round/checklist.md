@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: implement D035 without activating D036.
+Current focus: review and merge D036, then close its child epic and resume MEDIUM-finding admission.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -116,6 +116,8 @@ Current focus: implement D035 without activating D036.
   after runtime reproduction (2026-08-10).
 - [x] Implement, review, and merge O037/O038/O042 before activating D035 (PR #157, `a2fb0638`).
 - [x] Start `fix/make-tool-events-metadata-only`, close O037/O038/O042, activate D035, and create its checklist.
+- [x] Implement, review, and merge D035 before activating D036 (PR #158, `ce7eb1ec`).
+- [x] Start `fix/validate-proxy-request-ids`, close D035, activate D036, and create its checklist.
 - [ ] Recheck and admit the remaining Wave 5 MEDIUM correctness rows and later-wave findings against their entry
   conditions before activating their implementation cards.
 

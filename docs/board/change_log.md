@@ -27,6 +27,41 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-10
 
+### Validate client request IDs at proxy ingress
+
+**Goal/outcome**: Preserve conventional client correlation IDs without allowing malformed, control-bearing, duplicate,
+or overlong `X-Request-ID` values to become Forge diagnostic and response identifiers.
+
+**Key changes**:
+
+- Added one exact `[A-Za-z0-9._-]{1,128}` ingress contract that preserves accepted IDs and replaces invalid or ambiguous
+  inputs with the endpoint's existing generated-ID prefix.
+- Canonicalized supplied headers before downstream audit/header consumers can copy them, while leaving routing, upstream
+  filtering, and the independent `X-Forge-*` validators unchanged.
+- Pinned Forge's direct-path minter to the validator so `source_refs.cost_request_id` cannot silently diverge from the
+  proxy cost key.
+
+**Verification**: Five retained invalid-header assertions failed on `ce7eb1ec`; four valid-ID controls passed. After
+implementation, 125 review-focused tests, 2 targeted Docker cases, 8,954 unit tests (one skip, 122 deselected), 716
+regressions, final pre-commit, and board-link/diff checks passed.
+
+### Make tool-event diagnostics metadata-only
+
+**Goal/outcome**: Keep debug tool-event records and the adjacent client-failure warning free of caller plaintext while
+preserving the explicit opt-in tool-failure plane.
+
+**Key changes**:
+
+- Replaced arbitrary event details with a closed, bounded metadata schema and updated schema, lifecycle, sanitizer, and
+  client-failure callers to retain only counts, types, flags, and normalized identifiers.
+- Hardened directories touched by the tool-event writer to `0700` while retaining `0600` shards; left the opt-in
+  `tool_failures` schema and global cleanup ownership unchanged.
+
+**Verification**: Four retained broken-behavior assertions failed on `a2fb0638` while the existing-shard `0600` control
+passed. After implementation, 49 focused tests, 55 CLI cleanup tests, 3 targeted Docker cases, 8,934 unit tests (one
+skip, 122 deselected), 706 regressions, final pre-commit, and board-link/diff checks passed. Shipped in PR #158
+(`ce7eb1ec`).
+
 ### Remove plaintext from proxy converter logs
 
 **Goal/outcome**: Keep ordinary translated-converter diagnostics metadata-only and avoid formatting caller payloads for

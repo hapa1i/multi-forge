@@ -694,6 +694,10 @@ The canonical **attribution** plane: which run/workflow/session invoked which ru
 and what it consumed. Modeled on the audit log (versioned, strictly read). The three data planes stay physically
 separate and are joined by a shared proxy `request_id`:
 
+The proxy validates an optional client `X-Request-ID` before using that join key: 1--128 ASCII letters, digits, `.`,
+`_`, and `-` are preserved exactly; an absent or invalid value mints the normal endpoint-prefixed ID. Rejected values
+never enter the joined planes or the Forge-owned response header.
+
 | Path                                          | Owner                     | Notes                                                    |
 | --------------------------------------------- | ------------------------- | -------------------------------------------------------- |
 | `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl` | `forge.core.usage.ledger` | Owner-only 0600, append-only, PID-sharded; `UsageEvent`s |
@@ -766,13 +770,14 @@ migrate around.
 through `CodexHeadlessInvoker`. The action tagger emits exact in-band provider usage from `core.llm`. On the **direct
 path**, Forge resolves the base URL synchronously: if it is a registered Forge proxy, the tagger forwards an
 `X-Request-ID` and records an exact `source_refs.cost_request_id` join (the proxy logs its cost record under the same
-id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
-`billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
-LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
-`claude -p` events carry null `source_refs` and join to exact cost by run tree (`forge_root_run_id`, Phase 4g). Helpers:
-`emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps
-`route`/`reporter`/`confidence`: tagger → `core_llm`/`provider`/`unavailable`; the verb aggregate claims no single
-`route`.
+id). The core minter is contract-tested against the proxy ingress validator so the accepted-ID precondition cannot
+silently drift; otherwise the caller sends no header and leaves the ref null (a dangling join is worse than none).
+Direct-path `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes
+via local LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record
+`latency_ms`; `claude -p` events carry null `source_refs` and join to exact cost by run tree (`forge_root_run_id`, Phase
+4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`).
+Each also stamps `route`/`reporter`/`confidence`: tagger → `core_llm`/`provider`/`unavailable`; the verb aggregate
+claims no single `route`.
 
 **Cost precedence on `claude -p` verbs (Phase 5).** Every `claude -p` run requests `--output-format json`
 (capability-gated, retry-once-and-latch), so the runtime can self-report. Exactly **one** reporter attributes cost per

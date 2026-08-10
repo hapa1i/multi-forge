@@ -21,6 +21,7 @@ from forge.core.usage.correlation import (
     with_openrouter_user,
 )
 from forge.proxy.proxies import get_proxy_registry_path
+from forge.proxy.request_id import is_valid_request_id
 from forge.runtime_config import RuntimeConfig, RuntimeProviderTraceConfig
 
 
@@ -54,6 +55,9 @@ class TestWithForgeRequestId:
     def test_mint_request_id_prefix(self) -> None:
         rid = mint_request_id()
         assert rid.startswith("req_") and len(rid) > len("req_")
+
+    def test_minted_request_id_survives_proxy_ingress_validation(self) -> None:
+        assert is_valid_request_id(mint_request_id())
 
 
 class TestWithOpenrouterUser:

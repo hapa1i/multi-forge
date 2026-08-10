@@ -2,7 +2,7 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--4 and the bounded Wave 5 HIGH child epic are closed. The five-finding Wave 5 MEDIUM proxy diagnostic epic is
-active; D035 is the current member after O037/O038/O042 shipped in PR #157.
+active; D036 is the current member after D035 shipped in PR #158.
 
 ## Goal
 
@@ -101,8 +101,8 @@ require separate recheck and admission.
 | 5    | O004            | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
 | 5    | D018            | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
 | 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md)                 |
-| 5M   | D035            | [`make_tool_events_metadata_only`](../make_tool_events_metadata_only/card.md)                                       |
-| 5M   | D036            | [`validate_proxy_request_ids`](../../todo/validate_proxy_request_ids/card.md)                                       |
+| 5M   | D035            | [`make_tool_events_metadata_only`](../../done/make_tool_events_metadata_only/card.md)                               |
+| 5M   | D036            | [`validate_proxy_request_ids`](../validate_proxy_request_ids/card.md)                                               |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

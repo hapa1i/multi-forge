@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_proxy_diagnostic_data_hygiene`](../../doing/epic_proxy_diagnostic_data_hygiene/card.md).
 
-**Lane**: `doing/` -- active on `fix/make-tool-events-metadata-only` after PR #157 merged the converter-log member.
+**Lane**: `done/` -- shipped in PR #158 (`ce7eb1ec`).
 
 **Finding**: D035 (Wave 5 MEDIUM, narrowed after merged-main recheck).
 
@@ -82,4 +82,4 @@ the wire but not in ordinary or structured diagnostics. Mypy and Pyright pass on
 unit suite passes 8,934 tests with one skip and 122 deselections, and the full regression suite passes all 706 tests.
 The first full-regression run exposed only cached-runtime-config test isolation (701 passed, five D035 writers gated
 off); the retained module now resets that singleton around each case. Final pre-commit, board links, size, and diff
-checks pass; independent review remains pending.
+checks passed, independent review completed, and the member shipped in PR #158 (`ce7eb1ec`).

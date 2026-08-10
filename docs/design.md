@@ -1712,6 +1712,14 @@ durable observation point and a signature-safe control point.
    - `override`: inspect **plus** apply mutations to the current request. **Requires
      `wire_shape: anthropic_passthrough`** (rejected at config load otherwise) so mutations are signature-safe.
 
+At proxy ingress, optional client `X-Request-ID` values are untrusted correlation metadata. Forge preserves values of
+1--128 ASCII letters, digits, `.`, `_`, and `-` exactly; absent or invalid values are replaced with a fresh endpoint
+identifier (`req_`, `tok_`, or `inf_`) before request state, logs, telemetry, audit, or response handling diverges. The
+rejected value is neither normalized nor recorded.
+
+Forge's direct `core.llm` request-ID minter is contract-tested against this ingress validator. That coupling preserves
+the exact `source_refs.cost_request_id` join when a registered Forge proxy is the resolved target.
+
 Both raw passthrough transports share one response-header boundary. Safe provider metadata such as `retry-after` and
 rate-limit counters is relayed on successful, error, streaming, and non-streaming upstream responses. Hop-by-hop fields
 (including names nominated by `Connection`), authentication/cookie fields, content length/encoding, and upstream

@@ -1,6 +1,6 @@
 # Make tool-event diagnostics metadata-only checklist
 
-Current focus: complete review evidence for the implemented D035 boundary without activating D036.
+Current focus: complete -- D035 shipped in PR #158 (`ce7eb1ec`) before D036 activation.
 
 ## Activation and reproduction
 
@@ -40,4 +40,4 @@ Current focus: complete review evidence for the implemented D035 boundary withou
   required.
 - [x] Synchronize branch evidence without recording D035 as shipped or advancing the cursor to D036.
 - [x] Run board link/size checks, diff checks, and `make pre-commit`.
-- [ ] Receive independent review and merge before activating D036.
+- [x] Receive independent review and merge before activating D036 (PR #158, `ce7eb1ec`).
