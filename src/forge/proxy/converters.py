@@ -783,17 +783,7 @@ def convert_openai_to_anthropic(
             request_id,
             type(e).__name__,
         )
-        model_name = original_model_name if original_model_name else "claude-3.7-sonnet"
-
-        return MessagesResponse(
-            id=f"error_{uuid.uuid4().hex[:24]}",
-            model=model_name,
-            type="message",
-            role="assistant",
-            content=[ContentBlockText(type="text", text=f"Error processing model response: {str(e)}")],
-            stop_reason="end_turn",  # Or maybe a custom error reason?
-            usage=Usage(input_tokens=0, output_tokens=0),
-        )
+        return None
 
 
 async def convert_openai_to_anthropic_sse(

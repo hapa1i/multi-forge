@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge verified D053 without activating O007.
+Current focus: independently review and merge verified O007, then close the proxy-conversion child epic.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -128,7 +128,11 @@ Current focus: review and merge verified D053 without activating O007.
   create their execution checklists.
 - [x] Retain D053's non-streaming and streaming fail-first regressions while preserving existing client behavior.
 - [x] Implement and verify metadata-only conversion-failure ERROR records without activating O007.
-- [ ] Independently review and merge D053 before activating O007.
+- [x] Independently review and merge D053 before activating O007 (PR #161, `8088ceae`).
+- [x] Start `fix/fail-non-streaming-response-conversion`, close D053, activate O007, and create its execution checklist.
+- [x] Retain O007's initial and authentication-retry false-success regressions on merged `main`.
+- [x] Implement and verify truthful non-streaming conversion-failure client/accounting behavior.
+- [ ] Independently review and merge O007, then close the proxy-conversion child epic.
 - [ ] Compact the oldest change-log tail before recording the next MEDIUM admission, preserving dates, goals, decisions,
   verification, and deferred items.
 - [ ] Recheck and admit the remaining MEDIUM correctness rows and later-wave findings against their entry conditions

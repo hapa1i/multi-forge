@@ -577,6 +577,12 @@ curl http://localhost:8085/ | jq .metrics
 - **Failure types**: categorized by error type (tool_call_error, api_error, stream_error)
 - **Latency**: average request duration
 
+If a provider returns a non-streaming response that Forge cannot translate into the requested API format, the proxy
+returns HTTP 500 with a stable `api_error` instead of fabricating a successful assistant response. Provider-reported
+tokens and cost still count toward totals and failed-token spend, and the provider-attempt trace remains available for
+diagnosis. Forge does not return provider response or exception text to the client or write it to ordinary proxy logs.
+Streaming conversion failures retain their existing in-band SSE error contract.
+
 ---
 
 ## Cost tracking and spend caps

@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-11
 
+### Fail non-streaming response conversion truthfully
+
+**Goal/outcome**: Report an unrepresentable translated provider response as a client and accounting failure without
+discarding the completed provider attempt's usage, cost, or trace evidence.
+
+**Key changes**:
+
+- Replaced the converter's successful assistant fallback with an explicit failure signal and one stable HTTP 500
+  `api_error` path shared by initial and authentication-retry completions.
+- Recorded provider-reported tokens and cost as failed, retained the provider-attempt trace, and kept provider response
+  and exception text out of client content and ordinary logs. Malformed usage degrades to zero-token accounting without
+  bypassing reported cost or trace recording. Successful, streaming/SSE, `ToolCallError`, and passthrough behavior
+  remains unchanged.
+
+**Verification**: Three original O007 tests failed on `8088ceae`, covering the converter, initial route, and
+authentication-retry route. A fourth review-discovered malformed-usage regression failed against the initial
+implementation. After hardening, 117 focused tests, 8,954 unit tests (one skip, 122 deselected), 723 regressions, and
+three translated-proxy Docker cases pass. The first pre-commit run passed every code, type, and secret-scanning hook
+before mdformat normalized the edited board Markdown. An explicit new-file pass then caught and corrected the regression
+fixture's generator annotation; final all-files and new-file passes plus board-link, stale-lane, size, and diff checks
+pass. Independent review and merge remain pending.
+
 ### Sanitize proxy conversion-failure logs
 
 **Goal/outcome**: Keep provider response-conversion failures diagnosable without rendering provider-controlled exception
@@ -43,8 +65,8 @@ text or tracebacks in ordinary logs.
 **Verification**: The two admitted regressions failed on `cf77c175` after their preservation controls; a follow-up
 delivery guard failed against the remaining exception render. All three pass after correction. The 96-test focused
 slice, 8,954 unit tests (one skip, 122 deselected), 719 regressions, and three translated-proxy Docker cases pass. Clean
-pre-commit reruns plus board-link, stale-lane, and diff checks pass; O007 remains parked pending review and merge of
-D053.
+pre-commit reruns plus board-link, stale-lane, and diff checks pass. D053 shipped in PR #161 (`8088ceae`), unblocking
+O007 on its own execution branch.
 
 ## 2026-08-10
 

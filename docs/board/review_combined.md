@@ -40,8 +40,9 @@ child epic is closed. D035, D036, O037, O038, and O042 form the first separately
 [`epic_proxy_diagnostic_data_hygiene`](done/epic_proxy_diagnostic_data_hygiene/card.md); all three members shipped in
 PRs #157--#159 and the child epic is closed. O007 and D053 form the next reproduced MEDIUM set under
 [`epic_proxy_conversion_failure_handling`](doing/epic_proxy_conversion_failure_handling/card.md); its admission record
-merged in PR #160 (`cf77c175`), D053 is implemented and verified pending review, and O007 remains parked. Other MEDIUM
-rows still require separate admission. O003 already shipped in Wave 3 and is not part of the Wave 5 set.
+merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 is implemented and verified on its own
+execution branch pending independent review. Other MEDIUM rows still require separate admission. O003 already shipped in
+Wave 3 and is not part of the Wave 5 set.
 
 ### Finding fields
 
@@ -646,8 +647,8 @@ and accounted as success. No implementation member was activated during admissio
 
 | Order | Finding | Reproduced boundary                                                                  | Accepted member                                                                                  |
 | ----- | ------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| 1     | D053    | non-streaming and streaming conversion ERRORs render provider canaries and traceback | [`sanitize_proxy_conversion_failure_logs`](doing/sanitize_proxy_conversion_failure_logs/card.md) |
-| 2     | O007    | invalid non-streaming response returns HTTP 200 and records `failed=false`           | [`fail_non_streaming_response_conversion`](todo/fail_non_streaming_response_conversion/card.md)  |
+| 1     | D053    | non-streaming and streaming conversion ERRORs render provider canaries and traceback | [`sanitize_proxy_conversion_failure_logs`](done/sanitize_proxy_conversion_failure_logs/card.md)  |
+| 2     | O007    | invalid non-streaming response returns HTTP 200 and records `failed=false`           | [`fail_non_streaming_response_conversion`](doing/fail_non_streaming_response_conversion/card.md) |
 
 D053 goes first as a log-only correction that establishes safe failure metadata without changing wire behavior. O007
 then changes the non-streaming client/accounting contract on its own review boundary, retaining observed provider usage
@@ -670,8 +671,8 @@ while reporting a stable HTTP failure. Remaining MEDIUM rows are not admitted by
 - **[Proxy diagnostic data hygiene epic](done/epic_proxy_diagnostic_data_hygiene/card.md):** all three members shipped
   independently in PRs #157--#159 with retained ordinary-log, structured-event, and request-ID regressions.
 - **[Proxy conversion failure handling epic](doing/epic_proxy_conversion_failure_handling/card.md):** D053's
-  log-confidentiality correction is implemented and verified pending review; O007 remains parked as the later
-  client/accounting boundary.
+  log-confidentiality correction shipped in PR #161; O007's later client/accounting boundary is implemented and verified
+  pending independent review.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

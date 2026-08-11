@@ -1,8 +1,8 @@
 # Sanitize proxy conversion-failure logs
 
-**Epic**: [`epic_proxy_conversion_failure_handling`](../epic_proxy_conversion_failure_handling/card.md).
+**Epic**: [`epic_proxy_conversion_failure_handling`](../../doing/epic_proxy_conversion_failure_handling/card.md).
 
-**Lane**: `doing/` -- active on `fix/sanitize-proxy-conversion-failure-logs` from merged `main` at `cf77c175`.
+**Lane**: `done/` -- shipped in PR #161 (`8088ceae`).
 
 **Finding**: D053 (Wave 6 MEDIUM).
 
@@ -74,4 +74,4 @@ log-hygiene, lifecycle, and adjacent O037/O038/O042 slice passes 96 tests. The f
 one skip and 122 deselections, the full regression suite passes 719 tests, and the hermetic translated-proxy Docker
 slice passes all three cases after an image rebuild. The first pre-commit pass let mdformat normalize the moved board
 tables after every code and secret-scanning hook passed; clean reruns, board links, stale-lane checks, and diff checks
-pass. O007 remains parked pending independent review and merge of this member.
+pass. The member shipped in PR #161 (`8088ceae`), unblocking O007 on its own execution branch.
