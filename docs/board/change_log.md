@@ -25,6 +25,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-11
+
+### Sanitize proxy conversion-failure logs
+
+**Goal/outcome**: Keep provider response-conversion failures diagnosable without rendering provider-controlled exception
+text or tracebacks in ordinary logs.
+
+**Key changes**:
+
+- Replaced the non-streaming and streaming catch-all records plus the nested error-delivery record with fixed context,
+  request ID, and safe exception-class metadata only. Streaming uses `exception_type` so the concrete Python class is
+  distinct from the lifecycle summary's metrics-facing `error_type`.
+- Retained the non-streaming fallback for O007's separate wire/accounting correction and preserved streaming error
+  bytes, lifecycle/callback semantics, and explicit bounded raw diagnostics.
+
+**Verification**: The two admitted regressions failed on `cf77c175` after their preservation controls; a follow-up
+delivery guard failed against the remaining exception render. All three pass after correction. The 96-test focused
+slice, 8,954 unit tests (one skip, 122 deselected), 719 regressions, and three translated-proxy Docker cases pass. Clean
+pre-commit reruns plus board-link, stale-lane, and diff checks pass; O007 remains parked pending review and merge of
+D053.
+
 ## 2026-08-10
 
 ### Admit proxy conversion failure handling
