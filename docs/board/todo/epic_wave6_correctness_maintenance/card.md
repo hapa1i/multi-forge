@@ -19,10 +19,11 @@ The 36 rows that could superficially be read as additional Wave 5 CLI/proxy/runt
 - O020: the downstream pane begins with all event-backed command rows and adds downstream-only rows, so it does not
   discard non-proxy spend.
 
-Both rejections are pinned by `tests/regression/test_bug_wave5_rejected_claims.py`. The 34 live rows belong here because
-the canonical wave table assigns unadmitted verified MED/LOW bugs to Wave 6. Acceptance into this parked epic does not
-waive the parent admission contract: every member must retain a failing regression or equivalent executable
-characterization on its execution base before production code changes.
+The rejections are pinned by `tests/regression/test_bug_d033_cancel_verification_escape_hatch.py` and
+`tests/regression/test_bug_o020_model_pane_cost_union.py`. The 34 live rows belong here because the canonical wave table
+assigns unadmitted verified MED/LOW bugs to Wave 6. Acceptance into this parked epic does not waive the parent admission
+contract: every member must retain a failing regression or equivalent executable characterization on its execution base
+before production code changes.
 
 ## Members and Sequence
 

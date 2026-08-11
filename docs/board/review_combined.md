@@ -673,9 +673,10 @@ Two claims are rejected as stale or unsupported by current behavior:
 | D033    | `%cancel-verification` catches effective-intent failure, verifies raw intent, and persists the bypass; a malformed unrelated override passes the retained guard test | rejected    |
 | O020    | model-call rows start from every event-backed command and add downstream-only records; a mixed direct/proxy/downstream control retains and sums all three            | rejected    |
 
-The controls live in `tests/regression/test_bug_wave5_rejected_claims.py`. D033's claimed escape-hatch failure does not
-occur because the caller catches the non-strict conversion error and falls back to raw intent. O020 must not be
-implemented from the old row.
+The controls live in `tests/regression/test_bug_d033_cancel_verification_escape_hatch.py` and
+`tests/regression/test_bug_o020_model_pane_cost_union.py`. D033's claimed escape-hatch failure does not occur because
+the caller catches the non-strict conversion error and falls back to raw intent. O020 must not be implemented from the
+old row.
 
 Current source still contains the cited boundary for the other 34 rows. They are accepted and parked as Wave 6 work;
 each member's implementation entry remains blocked on its own fail-first regression or equivalent executable
