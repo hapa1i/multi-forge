@@ -138,7 +138,7 @@ Current focus: Wave 5 is closed; its 34-row correctness handoff is accepted and 
 - [x] Close the open-ended Wave 5 admission boundary on `246aaff1`: recheck 36 CLI/proxy/runtime candidate rows, reject
   D033/O020 with two passing behavior controls, and park the 34 live rows under `epic_wave6_correctness_maintenance`
   without activating implementation.
-- [ ] Recheck the remaining Wave 6 performance/docs/LOW findings and Wave 7 structural findings against their entry
-  conditions before activating any additional implementation cards.
+- [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
+  before activating any additional implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
