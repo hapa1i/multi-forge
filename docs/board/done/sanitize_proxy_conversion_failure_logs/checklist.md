@@ -1,5 +1,7 @@
 # Sanitize proxy conversion-failure logs checklist
 
+Current focus: complete -- shipped in PR #161 (`8088ceae`); O007 is now active.
+
 - [x] Activate D053 from merged `main` at `cf77c175` on its own execution branch.
 - [x] Retain a marked non-streaming regression whose canary reaches the unchanged fallback but not ordinary logs.
 - [x] Retain a marked streaming regression whose canary reaches neither ordinary logs nor the generic client event.
@@ -14,3 +16,4 @@
   regression, and three Docker cases passed; one unit skip and 122 deselections).
 - [x] Run `make pre-commit`, board-link checks, and `git diff --check`.
 - [x] Record verification and deferred boundaries without activating O007.
+- [x] Independently review and merge D053 before activating O007 (PR #161, `8088ceae`).

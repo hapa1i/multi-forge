@@ -18,7 +18,7 @@ from forge.proxy.converters import (
     convert_openai_to_anthropic,
     convert_openai_to_anthropic_sse,
 )
-from forge.proxy.data_models import ContentBlockText, Message, MessagesRequest
+from forge.proxy.data_models import Message, MessagesRequest
 
 pytestmark = pytest.mark.regression
 
@@ -77,15 +77,9 @@ def test_non_streaming_conversion_error_log_is_metadata_only(
     converted = convert_openai_to_anthropic(response, "claude-sonnet-4-6")
     log_text = _log_text(caplog)
 
-    assert converted is not None
-    assert converted.model == "claude-sonnet-4-6"
-    assert converted.stop_reason == "end_turn"
-    assert converted.usage.input_tokens == 0
-    assert converted.usage.output_tokens == 0
-    assert len(converted.content) == 1
-    assert isinstance(converted.content[0], ContentBlockText)
-    assert converted.content[0].text.startswith("Error processing model response:")
-    assert _NON_STREAM_CANARY in converted.content[0].text
+    # O007 replaces D053's temporary assistant fallback with an explicit failure
+    # signal; the diagnostic boundary remains metadata-only.
+    assert converted is None
 
     assert f"[{_REQUEST_ID}] Failed to convert adapted OpenAI response to Anthropic format" in log_text
     assert "error_type=ValidationError" in log_text

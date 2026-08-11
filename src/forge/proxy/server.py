@@ -27,7 +27,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NoReturn
 
 import click
 import uvicorn
@@ -861,6 +861,21 @@ _handle_anthropic_passthrough = handle_anthropic_passthrough
 register_responses_routes(app)
 
 
+_RESPONSE_CONVERSION_ERROR_TYPE = "api_error"
+_RESPONSE_CONVERSION_ERROR_MESSAGE = "Failed to convert response"
+
+
+def _coerce_usage_count(value: Any) -> int:
+    """Return one external usage count as a non-negative int, or zero when malformed."""
+    if isinstance(value, bool):
+        return 0
+    try:
+        count = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return count if count >= 0 else 0
+
+
 @app.post("/v1/messages", response_model=None)
 async def create_message(request_data: MessagesRequest, raw_request: Request):
     """
@@ -1045,6 +1060,93 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             "provider_command": forge_command,
         }
 
+        def _fail_non_streaming_conversion(openai_response: dict[str, Any], duration_ms: float) -> NoReturn:
+            """Record a completed provider attempt whose response cannot reach the client."""
+            raw_usage = openai_response.get("usage")
+            usage = raw_usage if isinstance(raw_usage, dict) else {}
+            input_tokens = _coerce_usage_count(usage.get("prompt_tokens"))
+            output_tokens = _coerce_usage_count(usage.get("completion_tokens"))
+            cached_tokens = _coerce_usage_count(usage.get("cached_tokens"))
+            reported_cost_micros = openai_response.get("_reported_cost_micros")
+
+            cost = _calc_and_log_cost(
+                model=actual_model_id,
+                tier=resolved_tier,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cached_tokens=cached_tokens,
+                latency_ms=duration_ms,
+                failed=True,
+                request_id=request_id,
+                reported_cost_micros=reported_cost_micros,
+                forge_run_id=forge_run_id,
+                forge_root_run_id=forge_root_run_id,
+                downstream_event_id=downstream_event_id,
+            )
+            proxy_metrics.record_request(
+                tier=resolved_tier,
+                model=actual_model_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cached_tokens=cached_tokens,
+                latency_ms=duration_ms,
+                streaming=False,
+                failed=True,
+                error_type=_RESPONSE_CONVERSION_ERROR_TYPE,
+                cost_micros=cost,
+            )
+            # The provider call completed even though Forge could not represent its
+            # response. Retain that attempt's metadata and reported cost without
+            # relabelling it as an upstream transport failure.
+            record_provider_trace(
+                **_trace_ctx,
+                request_mode="non_streaming",
+                provider_meta=openai_response.get("_provider_meta"),
+                stream_started=True,
+                first_chunk_seen=True,
+                final_usage_seen=True,
+                client_disconnected=False,
+                reported_cost_micros=reported_cost_micros,
+                latency_ms=duration_ms,
+                downstream_event_id=downstream_event_id,
+            )
+            asyncio.create_task(
+                log_request_response(
+                    request_id=request_id,
+                    original_model=original_model_name or "",
+                    mapped_model=actual_model_id,
+                    request_body=request_data.model_dump(),
+                    response_body=None,
+                    request_log=_request_log_config(),
+                    status_code=500,
+                    duration_ms=duration_ms,
+                    error=_RESPONSE_CONVERSION_ERROR_MESSAGE,
+                    num_messages=num_messages,
+                    num_tools=num_tools,
+                    tool_names=tool_names,
+                    has_system=has_system,
+                    temperature=request_data.temperature,
+                    max_tokens=request_data.max_tokens,
+                    streaming=False,
+                )
+            )
+            log_request_beautifully(
+                method="POST",
+                path="/v1/messages",
+                original_model=original_model_name or "",
+                mapped_model=actual_model_id,
+                num_messages=num_messages,
+                num_tools=num_tools,
+                status_code=500,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "type": _RESPONSE_CONVERSION_ERROR_TYPE,
+                    "message": _RESPONSE_CONVERSION_ERROR_MESSAGE,
+                },
+            )
+
         if request_data.stream:
             # Streaming response
             async def stream_generator():
@@ -1178,14 +1280,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 openai_response = await client.create_completion(openai_request_dict, request_id)
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
-                if not anthropic_response:
-                    raise HTTPException(
-                        status_code=500,
-                        detail={
-                            "type": "api_error",
-                            "message": "Failed to convert response",
-                        },
-                    )
+                if anthropic_response is None:
+                    duration_ms = (time.time() - start_time) * 1000
+                    _fail_non_streaming_conversion(openai_response, duration_ms)
 
                 response_dict = anthropic_response.model_dump()
                 response_dict["_request_id"] = request_id
@@ -1353,14 +1450,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 openai_response = await client.create_completion(openai_request_dict, request_id)
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
-                if not anthropic_response:
-                    raise HTTPException(
-                        status_code=500,
-                        detail={
-                            "type": "api_error",
-                            "message": "Failed to convert response after retry",
-                        },
-                    )
+                if anthropic_response is None:
+                    retry_duration_ms = (time.time() - start_time) * 1000
+                    _fail_non_streaming_conversion(openai_response, retry_duration_ms)
 
                 retry_duration_ms = (time.time() - start_time) * 1000
                 _retry_usage = openai_response.get("usage", {})
