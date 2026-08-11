@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-11
 
+### Close Wave 5 and hand off correctness maintenance
+
+**Goal/outcome**: Replace Wave 5's open-ended MEDIUM tail with an exact terminal scope and preserve valid remaining work
+under the canonical Wave 6 boundary.
+
+**Key changes**:
+
+- Closed Wave 5 at 13/13 admitted and shipped findings. Rechecked the 36 unresolved MEDIUM rows that still described a
+  CLI, proxy, or launch/runtime boundary; rejected D033 and O020 because current executable controls contradict their
+  claimed impact.
+- Accepted the 34 still-live rows into 12 parked Wave 6 members with explicit authorities, compatibility exclusions,
+  test tiers, and fail-first activation gates. No implementation member was activated and later performance/docs,
+  structural, deletion, and unverified rows remain outside this admission.
+
+**Verification**: Two rejected-claim controls pass. Full pre-commit passes; 282 board Markdown files have no missing
+relative target, all fragments in the 17 changed board files resolve, the 12-member epic graph/lane audit passes, and
+`git diff --check` is clean.
+
 ### Fail non-streaming response conversion truthfully
 
 **Goal/outcome**: Report an unrepresentable translated provider response as a client and accounting failure without
