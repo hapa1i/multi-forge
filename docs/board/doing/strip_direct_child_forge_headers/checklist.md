@@ -14,4 +14,4 @@ Current focus: review and merge D020 independently before activating the next Wa
 - [x] Run final board integrity checks (284 files, 719 relative links, 12 changed-file fragments, and the 12-member lane
   graph pass).
 - [x] Record implementation outcome, verification, and deferred boundaries.
-- [ ] Open an independent draft PR without activating the next Wave 6 member.
+- [x] Open independent draft PR #164 without activating the next Wave 6 member.

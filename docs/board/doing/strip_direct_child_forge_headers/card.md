@@ -3,7 +3,7 @@
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `doing/` -- active on `agent/d020-inherited-forge-headers`; the retained fail-first regression and
-implementation gates are complete, pending review and merge.
+implementation gates are complete in draft PR #164, pending review and merge.
 
 **Finding**: D020.
 
