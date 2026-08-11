@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; its 34-row correctness handoff is accepted and parked in Wave 6 with no active member.
+Current focus: Wave 5 is closed; Wave 6 is active with D020 as its only implementation member in `doing/`.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -138,6 +138,8 @@ Current focus: Wave 5 is closed; its 34-row correctness handoff is accepted and 
 - [x] Close the open-ended Wave 5 admission boundary on `246aaff1`: recheck 36 CLI/proxy/runtime candidate rows, reject
   D033/O020 with two passing behavior controls, and park the 34 live rows under `epic_wave6_correctness_maintenance`
   without activating implementation.
+- [x] Activate the Wave 6 epic and D020 on `agent/d020-inherited-forge-headers`; keep the other 11 members parked.
+- [ ] Ship D020 independently before activating the next ordered Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

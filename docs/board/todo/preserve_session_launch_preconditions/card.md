@@ -1,6 +1,6 @@
 # Preserve session launch preconditions
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `todo/` -- accepted Wave 6 work; parked pending fail-first regressions.
 

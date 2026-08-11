@@ -450,26 +450,16 @@ def _target_is_proven_forge_proxy(env: Mapping[str, str]) -> bool:
 def _apply_correlation_headers(env: dict[str, str]) -> None:
     """Stamp the Forge correlation headers into ANTHROPIC_CUSTOM_HEADERS (Slice 4g + Phase 1).
 
-    No-ops unless the subprocess is proxy-routed to a *proven* Forge proxy, so the opaque
+    Inherited Forge-owned lines are always stripped (the env starts from
+    ``os.environ.copy()``, so a nested child inherits the parent's values). Fresh values are
+    stamped only when the subprocess is proxy-routed to a *proven* Forge proxy, so the opaque
     ids never reach a non-Forge gateway. Up to four Forge-owned headers are stamped: the
     run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
     (``X-Forge-Session`` -- an opaque hash of the session name + role, always emittable via
     the ``forge_run_<hash>`` fallback; ``X-Forge-Command`` -- the sanitized role, only when
-    a role is set). Inherited ``X-Forge-*`` lines are stripped first (the env starts from
-    ``os.environ.copy()``, so a nested child inherits the parent's values), then the current
-    child's values are appended; all other (user) header lines are preserved. These headers
-    are consumed by the proxy and never forwarded upstream (the passthrough allowlist drops
-    them).
+    a role is set). All other (user) header lines are preserved. These headers are consumed
+    by the proxy and never forwarded upstream (the passthrough allowlist drops them).
     """
-    run_id = env.get(FORGE_RUN_ID_VAR)
-    if not run_id or not _target_is_proven_forge_proxy(env):
-        return
-
-    root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR) or run_id
-    role = env.get(FORGE_COMMAND_VAR)
-    session_id = derive_provider_session_id(env.get(FORGE_SESSION_VAR), root_run_id, role)
-    command = sanitize_label(role)
-
     forge_owned = {
         FORGE_RUN_ID_HEADER.lower(),
         FORGE_ROOT_RUN_ID_HEADER.lower(),
@@ -485,6 +475,21 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
         if name in forge_owned:
             continue  # drop inherited Forge-owned line; re-added fresh below
         kept.append(line)
+
+    if kept:
+        env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)
+    else:
+        env.pop(ANTHROPIC_CUSTOM_HEADERS_VAR, None)
+
+    run_id = env.get(FORGE_RUN_ID_VAR)
+    if not run_id or not _target_is_proven_forge_proxy(env):
+        return
+
+    root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR) or run_id
+    role = env.get(FORGE_COMMAND_VAR)
+    session_id = derive_provider_session_id(env.get(FORGE_SESSION_VAR), root_run_id, role)
+    command = sanitize_label(role)
+
     kept.append(f"{FORGE_RUN_ID_HEADER}: {run_id}")
     kept.append(f"{FORGE_ROOT_RUN_ID_HEADER}: {root_run_id}")
     kept.append(f"{FORGE_SESSION_HEADER}: {session_id}")  # opaque grouping id, always present
