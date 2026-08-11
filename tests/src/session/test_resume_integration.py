@@ -389,8 +389,8 @@ print(json.dumps({
         assert result.data["lineage"] == ["parent-depth"]
         assert result.data["lineage_length"] == 1
 
-    def test_depth_traverses_multiple_generations_via_fork(self, manager_workspace: "WorktreeWorkspace") -> None:
-        """depth parameter should include ancestors up to specified depth.
+    def test_depth_all_traverses_multiple_generations_via_fork(self, manager_workspace: "WorktreeWorkspace") -> None:
+        """Unbounded depth should include every ancestor and persist a numeric depth.
 
         Uses fork_session to create multi-generation chain across worktrees.
         """
@@ -417,10 +417,10 @@ parent_manifest, _ = manager.fork_session(
     fork_name='parent-gen',
 )
 
-# Resume parent with depth=2 to see both generations
+# Resume parent with unbounded depth to see both generations
 child_manifest, handoff_result = manager.resume_session(
     'parent-gen',
-    depth=2,
+    depth=None,
 )
 
 # Check lineage
@@ -431,6 +431,7 @@ print(json.dumps({
     'lineage_length': len(lineage),
     'parent_in_lineage': 'parent-gen' in lineage,
     'grandparent_in_lineage': 'grandparent' in lineage,
+    'recorded_depth': child_manifest.confirmed.derivation.depth,
 }))
 """,
             home=HOME,
@@ -440,6 +441,7 @@ print(json.dumps({
         assert result.data["parent_in_lineage"] is True
         assert result.data["grandparent_in_lineage"] is True
         assert result.data["lineage_length"] == 2
+        assert result.data["recorded_depth"] == 2
 
 
 # -----------------------------------------------------------------------------

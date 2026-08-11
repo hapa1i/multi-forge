@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-11
 
+### Strip inherited Forge headers from direct children
+
+**Goal/outcome**: Prevent direct children from forwarding stale internal correlation identifiers inherited from a
+proxied parent.
+
+**Key changes**:
+
+- Removed the four Forge-owned custom-header names before the proven-proxy gate while preserving unrelated and malformed
+  user lines; proven Forge proxies still receive freshly derived identifiers.
+- Retained mixed-header and Forge-only regressions, including the review-added assertion that an empty result removes
+  `ANTHROPIC_CUSTOM_HEADERS` entirely.
+
+**Verification**: The fail-first guard failed on `55fcda59`; 85 focused tests, 727 regressions, and 6 proxy-correlation
+integration cases pass with clean pre-commit and board checks. Shipped in PR #164 (`26ab5f29`).
+
 ### Close Wave 5 and hand off correctness maintenance
 
 **Goal/outcome**: Replace Wave 5's open-ended MEDIUM tail with an exact terminal scope and preserve valid remaining work

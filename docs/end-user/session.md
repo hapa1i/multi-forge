@@ -151,7 +151,7 @@ forge session resume <name> --fresh
 forge session resume [parent] --fresh \
   [--child-name/-n <child_name>] \
   [--strategy/-s minimal|structured|full|ai-curated] \
-  [--depth/-d <n>] \
+  [--depth/-d <N|all>] \
   [--resume-mode native|transfer] \
   [--proxy <template>]
 
@@ -426,6 +426,9 @@ the existing conversation in place after the previous launch has ended.
   inactive. A pre-seeded UUID by itself is not enough evidence.
 - If that resumable session appears active, resume fails unless `--force` is supplied; `--force` launches a new lineage
   child instead of attaching a second process to the active conversation.
+- `--strategy` and `--depth` shape a fresh transfer child, so explicit uses require `--fresh`; omitted defaults do not
+  change ordinary reattach. A positive `--depth N` bounds ancestry traversal, while `--depth all` follows the lineage to
+  its terminal ancestor.
 
 ### Adopt a conversation you started outside Forge
 

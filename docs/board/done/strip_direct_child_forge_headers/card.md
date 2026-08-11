@@ -1,9 +1,8 @@
 # Strip inherited Forge headers from direct children
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/d020-inherited-forge-headers`; the retained fail-first regression and
-implementation gates are complete in draft PR #164, pending review and merge.
+**Lane**: `done/` -- shipped in PR #164 (`26ab5f29`) on 2026-08-11.
 
 **Finding**: D020.
 
@@ -49,6 +48,7 @@ No proxy-trust rule, identifier derivation, general custom-header policy, or con
 - Full pre-commit passes after mdformat normalized the edited board Markdown.
 - All 719 relative links across 284 board Markdown files resolve, all 12 fragments referenced by the 18 changed board
   files resolve, and the lane audit confirms only D020 is active while the other 11 Wave 6 members remain parked.
+- Independent review completed and PR #164 merged as `26ab5f29`.
 
 ## Compatibility and Exclusions
 

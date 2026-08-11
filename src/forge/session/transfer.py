@@ -43,7 +43,7 @@ from forge.session.artifacts import (
     latest_transcript_artifact_path,
     resolve_artifact_path,
 )
-from forge.session.claude.paths import get_transcript_path
+from forge.session.claude.paths import get_transcript_path, resolve_claude_project_root
 from forge.session.models import SessionState
 from forge.session.prev_sessions import (
     child_path_rel,
@@ -261,6 +261,51 @@ def estimate_transcript_tokens(transcript_path: Path, *, multiplier: float = 1.0
     This is a conservative estimate (~4 chars per token for English text).
     """
     return int((transcript_path.stat().st_size // 4) * multiplier)
+
+
+def resolve_transfer_transcript_source(
+    parent_state: SessionState,
+    forge_root: Path,
+) -> tuple[Path | None, str | None]:
+    """Resolve the transcript source consumed by transfer assembly.
+
+    Returns ``(transcript_path, artifact_path)``. The artifact path is populated
+    only for a copied Forge artifact because that is the only source represented
+    in transfer frontmatter. Keep this precedence shared with budget preflights:
+    copied artifact, confirmed absolute path, then the live Claude transcript.
+    """
+    copied_path = latest_transcript_artifact_path(parent_state)
+    if copied_path is not None:
+        return resolve_artifact_path(forge_root, copied_path), copied_path
+
+    confirmed = parent_state.confirmed
+    if confirmed.transcript_path:
+        inferred_path = Path(confirmed.transcript_path).expanduser()
+        if inferred_path.is_file():
+            return inferred_path, None
+
+    if confirmed.claude_session_id:
+        transcript_root = resolve_claude_project_root(parent_state)
+        inferred_path = get_transcript_path(transcript_root, confirmed.claude_session_id)
+        if inferred_path.is_file():
+            return inferred_path, None
+
+    return None, None
+
+
+def parse_lineage_depth(value: str | int) -> int | None:
+    """Parse a positive lineage depth, using ``None`` for an unbounded traversal."""
+    if isinstance(value, str) and value.strip().casefold() == "all":
+        return None
+
+    try:
+        depth = int(value)
+    except (TypeError, ValueError) as e:
+        raise ValueError("--depth must be a positive integer or 'all'") from e
+
+    if depth <= 0:
+        raise ValueError("--depth must be a positive integer or 'all'")
+    return depth
 
 
 def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
@@ -1002,23 +1047,31 @@ def _generate_ai_curated_context(
 
 def resolve_lineage(
     parent_name: str,
-    depth: int,
+    depth: int | None,
     get_session: Callable[[str], SessionState | None],
 ) -> list[str]:
-    """Build ancestry chain up to specified depth.
+    """Build an ancestry chain up to a positive depth or until it ends.
 
     Args:
         parent_name: Starting parent session name.
-        depth: Max ancestors to traverse (depth=1 returns [parent_name]).
+        depth: Max ancestors to traverse (``1`` returns ``[parent_name]``);
+            ``None`` traverses until the lineage ends.
         get_session: Function to fetch session state by name (returns None if not found).
 
     Returns:
         List of session names from parent to oldest ancestor.
     """
+    if depth is not None and depth <= 0:
+        raise ValueError("--depth must be a positive integer or 'all'")
+
     lineage: list[str] = []
+    visited: set[str] = set()
     current = parent_name
 
-    for _ in range(depth):
+    while depth is None or len(lineage) < depth:
+        if current in visited:
+            raise ValueError(f"Session lineage contains a cycle at '{current}'")
+        visited.add(current)
         lineage.append(current)
 
         state = get_session(current)
@@ -1040,7 +1093,7 @@ def assemble_transfer_context(
     parent_state: SessionState,
     forge_root: Path,
     strategy: ResumeStrategy,
-    depth: int,
+    depth: int | None,
     get_session: Callable[[str], SessionState | None],
     output_root: Path | None = None,
     inline_plan: bool = False,
@@ -1062,7 +1115,7 @@ def assemble_transfer_context(
         parent_state: Parent session state.
         forge_root: Forge project root (for artifact/snapshot resolution).
         strategy: Context assembly strategy.
-        depth: How many ancestors to traverse.
+        depth: How many ancestors to traverse; ``None`` traverses to the end.
         get_session: Function to fetch session state by name.
         output_root: Where to write the context file. Defaults to forge_root.
             Use a different path when the output directory differs from the
@@ -1111,26 +1164,7 @@ def assemble_transfer_context(
             plan_ref = latest_plan_path or "(no plan path configured)"
             warnings.append(f"Plan content not found for inlining ({plan_ref})")
 
-    transcript_path: Path | None = None
-    artifacts_path: str | None = None
-
-    copied_path = latest_transcript_artifact_path(parent_state)
-    if copied_path is not None:
-        artifacts_path = copied_path
-        transcript_path = resolve_artifact_path(forge_root, copied_path)
-
-    if transcript_path is None and confirmed.transcript_path:
-        inferred_path = Path(confirmed.transcript_path).expanduser()
-        if inferred_path.is_file():
-            transcript_path = inferred_path
-
-    if transcript_path is None and confirmed.claude_session_id:
-        from forge.session.claude.paths import resolve_claude_project_root
-
-        transcript_root = resolve_claude_project_root(parent_state)
-        inferred_path = get_transcript_path(transcript_root, confirmed.claude_session_id)
-        if inferred_path.is_file():
-            transcript_path = inferred_path
+    transcript_path, artifacts_path = resolve_transfer_transcript_source(parent_state, forge_root)
 
     token_estimate = None
     if transcript_path and transcript_path.is_file():
@@ -1181,12 +1215,13 @@ def assemble_transfer_context(
     if schema_marker != "full":
         body = _append_runtime_hints_if_needed(body, target_runtime)
 
+    recorded_depth = len(lineage) if depth is None else depth
     content = (
         _build_frontmatter(
             parent_name=parent_name,
             strategy=strategy.value,
             schema=schema_marker,
-            depth=depth,
+            depth=recorded_depth,
             lineage=lineage,
             transcript_artifact=artifacts_path,
             token_estimate=token_estimate,

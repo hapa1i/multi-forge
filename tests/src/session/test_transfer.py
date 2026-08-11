@@ -29,8 +29,10 @@ from forge.session.transfer import (
     _validate_decision_citations,
     assemble_transfer_context,
     estimate_transcript_tokens,
+    parse_lineage_depth,
     parse_transfer_frontmatter,
     resolve_lineage,
+    resolve_transfer_transcript_source,
 )
 
 # -----------------------------------------------------------------------------
@@ -315,6 +317,113 @@ class TestResolveLineage:
 
         lineage = resolve_lineage("a", depth=2, get_session=get_session)
         assert lineage == ["a", "b"]
+
+    def test_all_traverses_to_terminal_ancestor(self) -> None:
+        sessions: dict[str, Any] = {
+            "a": _mock_session("b"),
+            "b": _mock_session("c"),
+            "c": _mock_session(None),
+        }
+        get_session = cast("type[SessionState | None]", lambda name: sessions.get(name))
+
+        lineage = resolve_lineage("a", depth=None, get_session=get_session)
+
+        assert lineage == ["a", "b", "c"]
+
+    @pytest.mark.parametrize("depth", [0, -1])
+    def test_rejects_non_positive_depth(self, depth: int) -> None:
+        with pytest.raises(ValueError, match="positive integer or 'all'"):
+            resolve_lineage("parent", depth=depth, get_session=lambda _name: None)
+
+    def test_all_rejects_cyclic_lineage(self) -> None:
+        sessions: dict[str, Any] = {
+            "a": _mock_session("b"),
+            "b": _mock_session("a"),
+        }
+        get_session = cast("type[SessionState | None]", lambda name: sessions.get(name))
+
+        with pytest.raises(ValueError, match="cycle at 'a'"):
+            resolve_lineage("a", depth=None, get_session=get_session)
+
+
+class TestParseLineageDepth:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(1, 1), ("2", 2), ("all", None), ("ALL", None)],
+    )
+    def test_accepts_positive_integer_or_all(self, value: str | int, expected: int | None) -> None:
+        assert parse_lineage_depth(value) == expected
+
+    @pytest.mark.parametrize("value", ["0", "-1", "many"])
+    def test_rejects_invalid_values(self, value: str) -> None:
+        with pytest.raises(ValueError, match="positive integer or 'all'"):
+            parse_lineage_depth(value)
+
+
+class TestResolveTransferTranscriptSource:
+    @staticmethod
+    def _state(tmp_path: Path) -> SessionState:
+        from forge.session.models import create_session_state
+
+        return create_session_state(name="parent", worktree_path=str(tmp_path))
+
+    def test_copied_artifact_takes_precedence_over_confirmed_path(self, tmp_path: Path) -> None:
+        state = self._state(tmp_path)
+        copied = tmp_path / ".forge" / "artifacts" / "parent" / "transcripts" / "copied.jsonl"
+        copied.parent.mkdir(parents=True)
+        copied.write_text("copied")
+        confirmed = tmp_path / "confirmed.jsonl"
+        confirmed.write_text("confirmed")
+        copied_rel = ".forge/artifacts/parent/transcripts/copied.jsonl"
+        state.confirmed.artifacts["transcripts"] = [{"copied_path": copied_rel}]
+        state.confirmed.transcript_path = str(confirmed)
+
+        transcript_path, artifact_path = resolve_transfer_transcript_source(state, tmp_path)
+
+        assert transcript_path == copied
+        assert artifact_path == copied_rel
+
+    def test_recorded_copied_artifact_does_not_fall_through_when_missing(self, tmp_path: Path) -> None:
+        state = self._state(tmp_path)
+        confirmed = tmp_path / "confirmed.jsonl"
+        confirmed.write_text("confirmed")
+        copied_rel = ".forge/artifacts/parent/transcripts/missing.jsonl"
+        state.confirmed.artifacts["transcripts"] = [{"copied_path": copied_rel}]
+        state.confirmed.transcript_path = str(confirmed)
+
+        transcript_path, artifact_path = resolve_transfer_transcript_source(state, tmp_path)
+
+        assert transcript_path == tmp_path / copied_rel
+        assert not transcript_path.exists()
+        assert artifact_path == copied_rel
+
+    def test_confirmed_path_is_the_first_fallback(self, tmp_path: Path) -> None:
+        state = self._state(tmp_path)
+        confirmed = tmp_path / "confirmed.jsonl"
+        confirmed.write_text("confirmed")
+        state.confirmed.transcript_path = str(confirmed)
+
+        transcript_path, artifact_path = resolve_transfer_transcript_source(state, tmp_path)
+
+        assert transcript_path == confirmed
+        assert artifact_path is None
+
+    def test_live_claude_transcript_is_the_final_fallback(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        state = self._state(tmp_path)
+        state.confirmed.claude_session_id = "parent-uuid"
+        live = tmp_path / "live.jsonl"
+        live.write_text("live")
+        monkeypatch.setattr("forge.session.transfer.resolve_claude_project_root", lambda _state: tmp_path)
+        monkeypatch.setattr("forge.session.transfer.get_transcript_path", lambda _root, _session_id: live)
+
+        transcript_path, artifact_path = resolve_transfer_transcript_source(state, tmp_path)
+
+        assert transcript_path == live
+        assert artifact_path is None
 
 
 # -----------------------------------------------------------------------------

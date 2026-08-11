@@ -1,6 +1,6 @@
 # Strip inherited Forge headers checklist
 
-Current focus: review and merge D020 independently before activating the next Wave 6 member.
+Current focus: closed after PR #164 (`26ab5f29`).
 
 - [x] Activate D020 from merged `main` on `agent/d020-inherited-forge-headers`.
 - [x] Add a marked regression proving a direct child retains inherited Forge-owned headers on merged `main`; the
@@ -16,3 +16,4 @@ Current focus: review and merge D020 independently before activating the next Wa
   graph pass).
 - [x] Record implementation outcome, verification, and deferred boundaries.
 - [x] Open independent draft PR #164 without activating the next Wave 6 member.
+- [x] Complete independent review and merge D020 before activating the next ordered member (PR #164, `26ab5f29`).

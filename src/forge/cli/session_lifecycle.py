@@ -95,7 +95,7 @@ from forge.session.prev_sessions import (
     notes_for_snapshot,
     notes_has_user_content,
 )
-from forge.session.transfer import ResumeStrategy
+from forge.session.transfer import ResumeStrategy, parse_lineage_depth
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -1151,9 +1151,9 @@ def start(
 @click.option(
     "--depth",
     "-d",
-    type=int,
-    default=1,
-    help="Lineage traversal depth (only with --fresh, 1=parent only)",
+    type=str,
+    default="1",
+    help="Lineage traversal depth (only with --fresh; positive integer or all, default: 1)",
 )
 # Value asymmetry with `session fork`'s --resume-mode ({transfer, native-relocate}): resume
 # stays in the same directory, so the full conversation is reachable via Claude's --fork-session
@@ -1196,7 +1196,7 @@ def resume(
     child_name: str | None,
     strategy: str,
     drop_last: int | None,
-    depth: int,
+    depth: str,
     resume_mode: str | None,
     review: bool,
     force: bool,
@@ -1228,6 +1228,8 @@ def resume(
         print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
 
+    _strategy_explicit = ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
+    _depth_explicit = ctx.get_parameter_source("depth") == click.core.ParameterSource.COMMANDLINE
     _drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
     rewind_requested = strategy == ResumeStrategy.REWIND.value
     if _drop_last_explicit and not rewind_requested:
@@ -1359,6 +1361,13 @@ def resume(
         enforce_target_project_compatibility(Path(target_forge_root))
         sys.exit(run_codex_resume(ctx, name, task, manifest))
 
+    if not fresh and _strategy_explicit:
+        print_error("--strategy requires --fresh")
+        sys.exit(1)
+    if not fresh and _depth_explicit:
+        print_error("--depth requires --fresh")
+        sys.exit(1)
+
     if task is not None:
         print_error("--task is only supported for Codex sessions")
         sys.exit(1)
@@ -1487,13 +1496,18 @@ def resume(
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             )
         else:
+            try:
+                parsed_depth = parse_lineage_depth(depth)
+            except ValueError as e:
+                print_error(str(e))
+                sys.exit(1)
             _resume_fresh(
                 manager=manager,
                 parent=name,
                 parent_state=manifest,
                 child_name=child_name,
                 strategy=strategy,
-                depth=depth,
+                depth=parsed_depth,
                 routing=routing,
                 direct=direct,
                 review=review,
@@ -1804,7 +1818,7 @@ def _resume_fresh(
     parent_state: SessionState,
     child_name: str | None,
     strategy: str,
-    depth: int,
+    depth: int | None,
     routing: ResolvedRouting | None,
     direct: bool,
     review: bool = False,
@@ -1848,6 +1862,9 @@ def _resume_fresh(
     except ForgeSessionError as e:
         handle_session_error(e)
         return
+    except ValueError as e:
+        print_error(str(e))
+        sys.exit(1)
 
     console.print(f"[dim]Context assembled: {transfer_result.context_file_rel}[/dim]")
     if transfer_result.warnings:
@@ -1873,7 +1890,8 @@ def _resume_fresh(
         )
 
     console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
-    console.print(f"[dim]Strategy: {strategy}, Depth: {depth}[/dim]")
+    depth_label = "all" if depth is None else str(depth)
+    console.print(f"[dim]Strategy: {strategy}, Depth: {depth_label}[/dim]")
     console.print()
 
     # Launch Claude as a NEW session (not resuming parent's conversation)
