@@ -41,8 +41,9 @@ No proxy-trust rule, identifier derivation, general custom-header policy, or con
 
 - The retained regression failed on merged `main` at `55fcda59` because all four inherited Forge-owned lines remained
   (`1 failed`).
-- The D020 regression plus reactive-env unit slice passes (`84 passed`).
-- The full regression target passes and collects the new marked guard (`726 passed`).
+- The two D020 regressions plus reactive-env unit slice pass (`85 passed`); the review-added case pins removal of an
+  all-Forge-only custom-header variable rather than accepting an empty value.
+- The full regression target passes and collects both marked guards (`727 passed`).
 - The targeted proxy-correlation integration canary passes, including both real Claude custom-header variants
   (`6 passed`).
 - Full pre-commit passes after mdformat normalized the edited board Markdown.

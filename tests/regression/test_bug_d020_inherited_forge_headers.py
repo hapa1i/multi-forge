@@ -40,3 +40,13 @@ def test_direct_child_strips_inherited_forge_headers() -> None:
         "X-User: keep",
         "malformed-user-line",
     ]
+
+
+def test_direct_child_removes_header_var_when_only_forge_headers_remain() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        env = build_claude_env(
+            extra_vars={ANTHROPIC_CUSTOM_HEADERS_VAR: f"{FORGE_RUN_ID_HEADER}: run_stale"},
+            direct=True,
+        )
+
+    assert ANTHROPIC_CUSTOM_HEADERS_VAR not in env

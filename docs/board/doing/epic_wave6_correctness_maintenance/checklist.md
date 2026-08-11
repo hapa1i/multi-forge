@@ -7,7 +7,7 @@ Current focus: reproduce and ship D020 without activating or absorbing any later
 - [x] Retain a fail-first D020 regression before changing production code (`1 failed` on merged `main` at `55fcda59`).
 - [x] Strip inherited Forge-owned headers for direct children while preserving unrelated user headers.
 - [x] Preserve freshly derived correlation headers for proven Forge proxies.
-- [x] Run the reactive-env unit slice (`84 passed`), full regression suite (`726 passed`), and targeted correlation
+- [x] Run the reactive-env unit slice (`85 passed`), full regression suite (`727 passed`), and targeted correlation
   integration canary (`6 passed`).
 - [x] Run pre-commit after its expected mdformat normalization pass.
 - [x] Run final board integrity checks (284 files, 719 relative links, 12 changed-file fragments, and the 12-member lane

@@ -8,8 +8,9 @@ Current focus: review and merge D020 independently before activating the next Wa
 - [x] Move inherited-header filtering before the proven-proxy gate.
 - [x] Preserve unrelated user headers and malformed unrelated lines.
 - [x] Preserve fresh run/root/session/command headers for proven Forge proxies.
-- [x] Run the focused reactive-env unit and D020 regression tests (`84 passed`).
-- [x] Run `make test-regression` (`726 passed`) and the targeted proxy-correlation integration canary (`6 passed`).
+- [x] Run the focused reactive-env unit and D020 regression tests (`85 passed`), including the review-added
+  all-Forge-lines-to-absent-variable case.
+- [x] Run `make test-regression` (`727 passed`) and the targeted proxy-correlation integration canary (`6 passed`).
 - [x] Run `make pre-commit` after its expected mdformat normalization pass.
 - [x] Run final board integrity checks (284 files, 719 relative links, 12 changed-file fragments, and the 12-member lane
   graph pass).
