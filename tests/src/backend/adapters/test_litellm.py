@@ -5,6 +5,7 @@ API keys itself - that's done by _ensure_dependency_backend() which checks
 BackendDependency.required_env_vars before calling the adapter.
 """
 
+import signal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -181,6 +182,7 @@ class TestLiteLLMAdapterStart:
         with (
             patch("subprocess.Popen") as mock_popen,
             patch.object(adapter, "_wait_for_health", return_value=False),
+            patch("os.killpg", side_effect=ProcessLookupError) as mock_kill_group,
         ):
             mock_proc = MagicMock()
             mock_proc.pid = 12345
@@ -190,7 +192,29 @@ class TestLiteLLMAdapterStart:
                 adapter.start("litellm-4000", config_path, 4000)
 
             assert "failed to start" in str(exc_info.value).lower()
-            mock_proc.kill.assert_called_once()
+            mock_kill_group.assert_called_once_with(12345, signal.SIGKILL)
+            mock_proc.kill.assert_not_called()
+
+    def test_start_reports_failed_health_group_cleanup(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify a failed health cleanup remains a typed, actionable start error."""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("model_list: []")
+        adapter = LiteLLMAdapter()
+
+        with (
+            patch("subprocess.Popen") as mock_popen,
+            patch.object(adapter, "_wait_for_health", return_value=False),
+            patch("os.killpg", side_effect=PermissionError("not authorized")),
+        ):
+            mock_popen.return_value.pid = 12345
+
+            with pytest.raises(BackendStartError, match="cleanup failed.*not authorized"):
+                adapter.start("litellm-4000", config_path, 4000)
 
     def test_start_creates_log_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify start creates log directory if needed."""

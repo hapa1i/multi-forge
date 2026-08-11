@@ -713,6 +713,31 @@ def test_delete_adapter_config_stops_matching_processes_first(
     assert not config_path.parent.exists()
 
 
+def test_delete_adapter_config_reports_stop_failures_and_retains_config(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    config_path = _write_litellm_config(forge_home)
+    store = _write_backend_registry(
+        forge_home,
+        _managed_process(pid=12345),
+        _managed_process("litellm-4001", port=4001, pid=12346),
+    )
+
+    with patch(
+        "forge.backend.adapters.litellm.os.killpg",
+        side_effect=[PermissionError("not authorized"), None],
+    ):
+        result = runner.invoke(main, _backend_args("delete", "litellm", "--yes"))
+
+    assert result.exit_code == 1
+    assert "litellm-4000: not authorized" in result.output
+    assert "Stopped managed processes: litellm-4001" in result.output
+    assert "Deleted" not in result.output
+    assert set(store.read().processes) == {"litellm-4000"}
+    assert config_path.exists()
+
+
 def test_backend_group_help_defines_id_spaces(runner: CliRunner) -> None:
     result = runner.invoke(main, _backend_args("--help"))
 

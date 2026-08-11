@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
+from forge.backend import BackendStartError
 from forge.backend.adapters.litellm import LiteLLMAdapter
 from forge.backend.registry import ManagedBackendProcess
 from forge.core.invoker import ClaudeHeadlessInvoker, HeadlessRequest
@@ -86,6 +87,18 @@ def _wait_for(path: Path, process: subprocess.Popen[str] | None = None, timeout:
             pytest.fail(f"detached process exited before {path.name}: stdout={stdout!r}, stderr={stderr!r}")
         if time.monotonic() >= deadline:
             pytest.fail(f"timed out waiting for {path.name}")
+        time.sleep(0.01)
+
+
+def _wait_for_group_exit(process_group_id: int, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            os.killpg(process_group_id, 0)
+        except ProcessLookupError:
+            return
+        if time.monotonic() >= deadline:
+            pytest.fail(f"timed out waiting for process group {process_group_id} to exit")
         time.sleep(0.01)
 
 
@@ -166,6 +179,26 @@ def test_litellm_stop_reaches_workers_in_the_detached_group(tmp_path: Path) -> N
         group.process.wait(timeout=5)
         _wait_for(group.parent_stopped)
         _wait_for(group.child_stopped)
+    finally:
+        _force_cleanup(group)
+
+
+def test_failed_litellm_start_kills_the_detached_group(tmp_path: Path) -> None:
+    group = _spawn_detached_group(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("model_list: []\n", encoding="utf-8")
+    adapter = LiteLLMAdapter()
+    try:
+        with (
+            patch("forge.backend.adapters.litellm.subprocess.Popen", return_value=group.process),
+            patch("forge.backend.adapters.litellm.get_forge_home", return_value=tmp_path),
+            patch.object(adapter, "_wait_for_health", return_value=False),
+            pytest.raises(BackendStartError, match="failed to start"),
+        ):
+            adapter.start("litellm-test", config_path, 4000)
+
+        group.process.wait(timeout=5)
+        _wait_for_group_exit(group.process.pid)
     finally:
         _force_cleanup(group)
 

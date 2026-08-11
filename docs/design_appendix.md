@@ -214,11 +214,13 @@ managed-process view. `start` stays config-oriented: it accepts local backend in
 `--port`. `stop` is process-oriented: it accepts managed process ids such as `litellm-4000`, or `--all` for every
 registered local managed process; local backend ids and bare adapters are rejected with a process-id recovery tip, and
 remote backend operands keep the intentional no-lifecycle capability error. Local LiteLLM processes lead the detached
-process group created at startup, so stop signals that complete owned group rather than only the leader. The registry
-row is removed only after the adapter reports successful teardown; authorization or other signal failures leave the row
-intact for an operator retry. `create` and `delete` remain local adapter/config operations because built-in remote
-backend instances are not user-created durable state. `delete <adapter>` may stop matching managed processes before
-removing the config, but `delete <adapter> --port <port>` is no longer a managed-process spelling.
+process group created at startup, so failed startup health kills the complete group and stop signals the complete group
+rather than only the leader. The registry row is removed only after the adapter reports successful teardown;
+authorization or other signal failures leave the row intact for an operator retry. `create` and `delete` remain local
+adapter/config operations because built-in remote backend instances are not user-created durable state.
+`delete <adapter>` may stop matching managed processes before removing the config, but any required stop failure retains
+the config, omits the success claim, and exits nonzero. `delete <adapter> --port <port>` is no longer a managed-process
+spelling.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 

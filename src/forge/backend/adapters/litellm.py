@@ -110,9 +110,14 @@ class LiteLLMAdapter(BackendAdapter):
         # Wait for health (timeout 10s)
         if not self._wait_for_health(port, timeout=10):
             try:
-                proc.kill()
-            except OSError:
-                pass  # Process already exited
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # The complete process group has already exited.
+            except OSError as exc:
+                raise BackendStartError(
+                    f"LiteLLM failed to start on port {port}; process-group cleanup failed: {exc}\n"
+                    f"Check logs: {log_file}"
+                ) from exc
             raise BackendStartError(f"LiteLLM failed to start on port {port}\nCheck logs: {log_file}")
 
         return ManagedBackendProcess(

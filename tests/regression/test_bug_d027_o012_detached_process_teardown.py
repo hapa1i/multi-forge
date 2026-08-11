@@ -7,10 +7,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from click.testing import CliRunner
 
-from forge.backend import BackendManager
+from forge.backend import BackendManager, BackendStartError
 from forge.backend.adapters.litellm import LiteLLMAdapter
-from forge.backend.registry import BackendRegistry, BackendRegistryStore, ManagedBackendProcess
+from forge.backend.registry import (
+    BackendRegistry,
+    BackendRegistryStore,
+    ManagedBackendProcess,
+)
+from forge.cli.main import main
 from forge.core.invoker import ClaudeHeadlessInvoker, HeadlessRequest
 
 pytestmark = pytest.mark.regression
@@ -93,6 +99,45 @@ def test_d027_missing_process_group_is_unregistered(tmp_path: Path) -> None:
         manager.stop_backend("litellm-4000")
 
     assert "litellm-4000" not in store.read().processes
+
+
+def test_d027_delete_stop_failure_retains_config_and_reports_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    config_path = tmp_path / "backends" / "litellm" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("model_list: []\n", encoding="utf-8")
+    store = BackendRegistryStore(tmp_path / "backends" / "index.json")
+    store.write(BackendRegistry(processes={"litellm-4000": _managed_process()}))
+
+    with patch("forge.backend.adapters.litellm.os.killpg", side_effect=PermissionError("not authorized")):
+        result = CliRunner().invoke(main, ["model", "backend", "delete", "litellm", "--yes"])
+
+    assert result.exit_code == 1
+    assert "litellm-4000: not authorized" in result.output
+    assert "Deleted" not in result.output
+    assert config_path.exists()
+    assert "litellm-4000" in store.read().processes
+
+
+def test_d027_failed_health_cleanup_kills_the_owned_process_group(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("model_list: []\n", encoding="utf-8")
+    proc = MagicMock(pid=12345)
+    adapter = LiteLLMAdapter()
+
+    with (
+        patch("forge.backend.adapters.litellm.subprocess.Popen", return_value=proc),
+        patch.object(adapter, "_wait_for_health", return_value=False),
+        patch("forge.backend.adapters.litellm.os.killpg") as kill_group,
+        pytest.raises(BackendStartError, match="failed to start"),
+    ):
+        adapter.start("litellm-4000", config_path, 4000)
+
+    kill_group.assert_called_once_with(12345, signal.SIGKILL)
+    proc.kill.assert_not_called()
 
 
 def test_o012_single_shot_cancellation_terminates_and_reaps_child_group() -> None:
