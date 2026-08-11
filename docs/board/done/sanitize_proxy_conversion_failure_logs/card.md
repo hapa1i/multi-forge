@@ -1,6 +1,6 @@
 # Sanitize proxy conversion-failure logs
 
-**Epic**: [`epic_proxy_conversion_failure_handling`](../../doing/epic_proxy_conversion_failure_handling/card.md).
+**Epic**: [`epic_proxy_conversion_failure_handling`](../epic_proxy_conversion_failure_handling/card.md).
 
 **Lane**: `done/` -- shipped in PR #161 (`8088ceae`).
 

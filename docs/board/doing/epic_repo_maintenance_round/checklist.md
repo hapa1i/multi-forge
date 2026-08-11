@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: independently review and merge verified O007, then close the proxy-conversion child epic.
+Current focus: recheck and admit the next bounded MEDIUM set without activating implementation.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -132,9 +132,9 @@ Current focus: independently review and merge verified O007, then close the prox
 - [x] Start `fix/fail-non-streaming-response-conversion`, close D053, activate O007, and create its execution checklist.
 - [x] Retain O007's initial and authentication-retry false-success regressions on merged `main`.
 - [x] Implement and verify truthful non-streaming conversion-failure client/accounting behavior.
-- [ ] Independently review and merge O007, then close the proxy-conversion child epic.
-- [ ] Compact the oldest change-log tail before recording the next MEDIUM admission, preserving dates, goals, decisions,
-  verification, and deferred items.
+- [x] Independently review and merge O007, then close the proxy-conversion child epic (PR #162, `31a0832f`).
+- [x] Compact the oldest change-log tail before recording the next MEDIUM admission, preserving dates, goals, decisions,
+  verification, and deferred items (July 10--17 compacted; approximately 20.6k tokens / 1.35k lines remain).
 - [ ] Recheck and admit the remaining MEDIUM correctness rows and later-wave findings against their entry conditions
   before activating their implementation cards.
 

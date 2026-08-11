@@ -2,8 +2,7 @@
 
 **Epic**: [`epic_proxy_conversion_failure_handling`](../epic_proxy_conversion_failure_handling/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `fix/fail-non-streaming-response-conversion`; pending independent
-review and merge.
+**Lane**: `done/` -- shipped in PR #162 (`31a0832f`) after independent review.
 
 **Finding**: O007 (Wave 5 MEDIUM).
 
@@ -78,4 +77,6 @@ unit suite passes 8,954 tests with one skip and 122 deselections, the full regre
 hermetic translated-proxy Docker slice passes all three healthy-route cases after rebuilding its images. The first
 pre-commit run passed every code, type, and secret-scanning hook before mdformat normalized the edited board Markdown.
 An explicit new-file pass then caught and corrected the regression fixture's generator annotation; final all-files and
-new-file passes plus board links, stale-lane, change-log size, and diff checks pass.
+new-file passes plus board links, stale-lane, change-log size, and diff checks pass. Independent review's
+malformed-usage concern is retained by the fourth regression, and all five GitHub checks passed. Shipped in PR #162
+(`31a0832f`).

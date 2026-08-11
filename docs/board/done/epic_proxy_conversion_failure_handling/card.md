@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D053 shipped in PR #161 (`8088ceae`); O007 is implemented and verified on
-`fix/fail-non-streaming-response-conversion`, pending independent review and merge.
+**Lane**: `done/` -- D053 shipped in PR #161 (`8088ceae`) and O007 shipped in PR #162 (`31a0832f`); both retained
+regression boundaries are verified.
 
 ## Goal
 
@@ -45,7 +45,7 @@ non-streaming translated path; streaming conversion has its own in-band error-ev
 | 2     | O007    | [`fail_non_streaming_response_conversion`](../fail_non_streaming_response_conversion/card.md)         | client status and cost/metrics failure semantics |
 
 D053 shipped first as a log-only correction at both converter catch-alls and established a safe diagnostic boundary
-before O007 changes the non-streaming exception flow. O007 remains a separate member because replacing a successful
+before O007 changed the non-streaming exception flow. O007 remained a separate member because replacing a successful
 assistant response with an HTTP failure changes the external wire and accounting contract.
 
 ## Shared Constraints
@@ -64,6 +64,6 @@ assistant response with an HTTP failure changes the external wire and accounting
 
 ## Closeout
 
-Close this epic only after both members ship independently, the review ledger records their dispositions, and retained
-regressions cover safe conversion-failure logs plus truthful non-streaming client/accounting outcomes. Other MEDIUM rows
-remain with the parent maintenance epic.
+Both members shipped independently, the review ledger records their dispositions, and retained regressions cover safe
+conversion-failure logs plus truthful non-streaming client/accounting outcomes. Other MEDIUM rows remain with the parent
+maintenance epic.

@@ -1,6 +1,6 @@
 # Fail non-streaming response conversion checklist
 
-Current focus: obtain independent review and merge without weakening D053.
+Current focus: closed after independent review and merge in PR #162 (`31a0832f`).
 
 - [x] Close D053 after independent review and merge in PR #161 (`8088ceae`).
 - [x] Activate O007 from merged `main` on `fix/fail-non-streaming-response-conversion`.
@@ -18,3 +18,4 @@ Current focus: obtain independent review and merge without weakening D053.
   regression, and three Docker cases passed; one unit skip and 122 deselections).
 - [x] Run `make pre-commit`, board-link checks, change-log size, and `git diff --check`.
 - [x] Record implementation outcome, verification, and deferred boundaries without closing the child epic before merge.
+- [x] Resolve independent review, pass GitHub checks, and merge in PR #162 (`31a0832f`).

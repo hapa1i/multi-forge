@@ -39,10 +39,10 @@ record merged in PR #147 (`92b981a5`), and all seven members shipped independent
 child epic is closed. D035, D036, O037, O038, and O042 form the first separately reproduced MEDIUM set under
 [`epic_proxy_diagnostic_data_hygiene`](done/epic_proxy_diagnostic_data_hygiene/card.md); all three members shipped in
 PRs #157--#159 and the child epic is closed. O007 and D053 form the next reproduced MEDIUM set under
-[`epic_proxy_conversion_failure_handling`](doing/epic_proxy_conversion_failure_handling/card.md); its admission record
-merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 is implemented and verified on its own
-execution branch pending independent review. Other MEDIUM rows still require separate admission. O003 already shipped in
-Wave 3 and is not part of the Wave 5 set.
+[`epic_proxy_conversion_failure_handling`](done/epic_proxy_conversion_failure_handling/card.md); its admission record
+merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 shipped in PR #162 (`31a0832f`). The
+child epic is closed. Other MEDIUM rows still require separate admission. O003 already shipped in Wave 3 and is not part
+of the Wave 5 set.
 
 ### Finding fields
 
@@ -645,10 +645,10 @@ characterizations and was removed after evidence capture. The recheck confirmed 
 converter seam: provider exception rendering reaches ordinary logs, while non-streaming conversion failure is returned
 and accounted as success. No implementation member was activated during admission.
 
-| Order | Finding | Reproduced boundary                                                                  | Accepted member                                                                                  |
-| ----- | ------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| 1     | D053    | non-streaming and streaming conversion ERRORs render provider canaries and traceback | [`sanitize_proxy_conversion_failure_logs`](done/sanitize_proxy_conversion_failure_logs/card.md)  |
-| 2     | O007    | invalid non-streaming response returns HTTP 200 and records `failed=false`           | [`fail_non_streaming_response_conversion`](doing/fail_non_streaming_response_conversion/card.md) |
+| Order | Finding | Reproduced boundary                                                                  | Accepted member                                                                                 |
+| ----- | ------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 1     | D053    | non-streaming and streaming conversion ERRORs render provider canaries and traceback | [`sanitize_proxy_conversion_failure_logs`](done/sanitize_proxy_conversion_failure_logs/card.md) |
+| 2     | O007    | invalid non-streaming response returns HTTP 200 and records `failed=false`           | [`fail_non_streaming_response_conversion`](done/fail_non_streaming_response_conversion/card.md) |
 
 D053 goes first as a log-only correction that establishes safe failure metadata without changing wire behavior. O007
 then changes the non-streaming client/accounting contract on its own review boundary, retaining observed provider usage
@@ -670,9 +670,8 @@ while reporting a stable HTTP failure. Remaining MEDIUM rows are not admitted by
   review boundaries.
 - **[Proxy diagnostic data hygiene epic](done/epic_proxy_diagnostic_data_hygiene/card.md):** all three members shipped
   independently in PRs #157--#159 with retained ordinary-log, structured-event, and request-ID regressions.
-- **[Proxy conversion failure handling epic](doing/epic_proxy_conversion_failure_handling/card.md):** D053's
-  log-confidentiality correction shipped in PR #161; O007's later client/accounting boundary is implemented and verified
-  pending independent review.
+- **[Proxy conversion failure handling epic](done/epic_proxy_conversion_failure_handling/card.md):** D053's
+  log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

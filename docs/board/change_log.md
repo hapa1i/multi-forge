@@ -40,6 +40,8 @@ discarding the completed provider attempt's usage, cost, or trace evidence.
   and exception text out of client content and ordinary logs. Malformed usage degrades to zero-token accounting without
   bypassing reported cost or trace recording. Successful, streaming/SSE, `ToolCallError`, and passthrough behavior
   remains unchanged.
+- Closed the two-member proxy-conversion epic after synchronizing its shipped member paths and review-ledger
+  dispositions.
 
 **Verification**: Three original O007 tests failed on `8088ceae`, covering the converter, initial route, and
 authentication-retry route. A fourth review-discovered malformed-usage regression failed against the initial
@@ -47,7 +49,9 @@ implementation. After hardening, 117 focused tests, 8,954 unit tests (one skip, 
 three translated-proxy Docker cases pass. The first pre-commit run passed every code, type, and secret-scanning hook
 before mdformat normalized the edited board Markdown. An explicit new-file pass then caught and corrected the regression
 fixture's generator annotation; final all-files and new-file passes plus board-link, stale-lane, size, and diff checks
-pass. Independent review and merge remain pending.
+pass. Independent review and all five GitHub checks passed. Shipped in PR #162 (`31a0832f`). Post-merge closeout
+compacted the July 10--17 tail from 23,306 tokens / 1,596 lines to about 20.6k / 1.35k; Markdown, 131-path/7-fragment
+link, stale-lane, and diff checks pass.
 
 ### Sanitize proxy conversion-failure logs
 
@@ -1104,314 +1108,66 @@ report-only user content, and provide scope-correct recovery without adopting or
 Docker lifecycle (`1 passed, 19 deselected`); `uv build`; `make pre-commit`; QA parser v1.0.31 / 592 assertions;
 walkthrough parser v1.0.5 / 108 assertions; `git diff --check`. The card remains in `doing/` for human review.
 
-## 2026-07-17
-
-### Cross-runtime skill packages closeout
-
-**Goal**: Close the shipped cross-runtime skill package card after PR #107 passed human review and merged to `main`.
-
-**Key changes**:
-
-- Moved the card and preserved checklist from `doing/` to `done/`, repointed inbound board references, and recorded the
-  merge boundary.
-- Promoted the reviewed runtime-selection, compiler-source, package-ledger, symlink-ownership, and cache-lifetime
-  invariants to durable implementation notes.
-
-**Verification**: PR #107 merged as `d2a94bf7`; board-path and unchecked-closeout scans, `make pre-commit-md`, and
-`git diff --check` passed.
-
-### Cross-runtime skill boundary hardening
-
-**Goal**: Close fail-open source, ownership, teardown, and probe-evidence paths found during the second review without
-moving the card out of its review hold.
-
-**Key changes**:
-
-- Batch disable now exits nonzero after any failed row, and complete uninstall preserves tracking and `$FORGE_HOME` when
-  tracked teardown cannot complete.
-- Skill loading rejects symlinked roots and applies checkout Git eligibility before discovery, reads, or caching.
-  Tracking strictly cross-validates package ownership against the canonical file ledger, and status treats dangling
-  tracked leaf symlinks as missing.
-- Neutral invocation policy is typed-only, packaged executables honor their entry point, negative Codex probes require
-  successful turns plus exact command/exit evidence, Codex model-family selection is host-authoritative, and lifecycle
-  help names exact tracking-row discovery.
-
-**Verification**: affected suite (`381 passed`); unit (`8,158 passed`, one skipped); regression (`521 passed`); targeted
-Docker lifecycle (`2 passed`); `uv build`, pre-commit, Markdown, and diff checks passed; QA parser v1.0.30 / 589
-assertions; strengthened real-Codex stages 40 and 50 passed on codex-cli 0.144.5.
-
-### Cross-runtime skill review remediation
-
-**Goal**: Close the review-found ownership, duplicate-classification, status, compiler-boundary, and clean-package gaps
-without weakening the one-visible-Codex-scope contract or moving the card out of review hold.
-
-**Key changes**:
-
-- Automatic re-enable now refreshes the union of detected and managed runtimes; explicit narrowing emits preservation
-  rows and retains omitted package files/tracking. Cross-scope duplicates use validated Forge provenance, consistent
-  path normalization, and executable scope-aware recovery instead of untracked-file advice. User-scope planning also
-  blocks on tracked project/local packages outside the current directory chain.
-- Status is safe outside projects, policy conflicts no longer advertise ineffective `--force`, cache failures map to
-  retryable installer errors, and typed/Claude frontmatter conflicts fail at manifest load.
-- Runtime package roots and descendant directories must remain real entries. Status rejects symlink substitution, and
-  enable, sync, apply, rollback, and disable revalidate before mutation instead of following links into sibling content.
-- Added Claude-worker, smoke-script, HOME-isolation, genuine v1, and lifecycle regressions; replaced mutable checkout
-  packaging simulation with an offline-built, target-installed wheel covering both runtime outputs; synchronized QA and
-  operator docs.
-
-**Verification**: review suite (`302 passed`), symlink-boundary suite (`216 passed`), full regression (`515 passed`),
-and `make test-unit` (`8134 passed, 1 skipped, 117 deselected`); targeted Docker lifecycle (`2 passed`); `uv build`;
-`make pre-commit`; `make pre-commit-md`; QA v1.0.28 / 585 assertions; walkthrough-state (`93 passed`);
-`git diff --check`. The card remains in `doing/`, and no proposed lesson was promoted to `impl_notes.md`.
-
-## 2026-07-16
-
-### Cross-runtime skill packages (implementation complete; review hold)
-
-**Goal**: Compile, install, and operate Forge skills natively under Claude Code and Codex without duplicating the
-authoring source or weakening runtime ownership boundaries.
-
-**Key changes**:
-
-- Added a typed neutral skill manifest/compiler, Claude and Codex adapters, whole-tree validation, and content-addressed
-  package caching. Five portable skills now ship for both runtimes; six remain explicitly Claude-only.
-- Added runtime skill-scope capabilities, scope × runtime × profile planning, Codex user/project targets, duplicate
-  safety, and schema-v2 package tracking across enable, status, sync, disable, copy, and symlink lifecycles.
-- Made apply failures retryable by restoring newly created files, Claude settings, ownership sidecars, and tracking
-  state; hardened source/cache/reference/script boundaries found by adversarial review.
-- Synchronized architecture, CLI, end-user, manual-testing, QA, walkthrough, authoring, and downstream board guidance.
-
-**Verification**: adversarial acceptance (`142 passed`); `make test-unit` (`8099 passed, 1 skipped, 117 deselected`);
-Docker installer integration (`20 passed`); seven-stage real Codex probe plus compiled user/project smoke (`8/8` each);
-clean wheel project/Codex and sdist user/all-runtime lifecycles, including Claude (`11/11`) and Codex (`8/8`) smoke;
-`make pre-commit`; package and token-limit inspection. The card remains in `doing/` for the requested review, and no
-proposed lesson was promoted to `impl_notes.md`.
-
-### GPT-5.6 catalog and Sol proxy defaults
-
-**Goal**: Add GPT-5.6 Sol, Terra, and Luna and promote Sol across Forge's bundled OpenAI defaults.
-
-**Key changes**:
-
-- Added the three canonical catalog profiles plus base/provider aliases, kept GPT-5.5 compatible, left haiku on GPT-5.4
-  Mini, and moved OpenAI sonnet/opus and workflow provider references to Sol.
-- Updated all six affected OpenAI proxy templates and the fresh local LiteLLM adapter routes; existing user-owned proxy,
-  backend, and custom-template snapshots remain unchanged and now have an explicit upgrade path.
-- Synchronized bundled multi-model skills, CLI help, and user docs; added drift guards for executable workflow examples;
-  documented intelligence scores as coarse peer buckets; and added hermetic LiteLLM Responses routing plus live
-  OpenRouter coverage for the exact Sol slug.
-
-**Verification**: focused implementation suite (`611 passed`) and review follow-up suite (`554 passed`);
-`make test-unit` (`7936 passed, 1 skipped, 117 deselected`); targeted LiteLLM/OpenRouter integration (`2 passed`);
-`make pre-commit`; `uv build`; separate wheel and sdist clean installs, full-profile extension enables, doctor checks,
-and packaged catalog/template/backend/skill assertions. Additional live probes found environment limits rather than code
-failures: the direct OpenAI key returned 401 for GPT-5.6, and remote LiteLLM credentials were absent.
-
-### Memory-passport CLI preflight cleanup
-
-**Goal**: Consolidate repeated document-target preflight without changing leaf-specific mutation or output contracts.
-
-**Key changes**:
-
-- Added a structured private resolver for project root, compatibility, path safety, and file checks while keeping each
-  leaf's wording and rendering; removed dead `ExecutionContext.from_cwd()` `ForgeOpError` wrappers and superseded weak
-  tests with exact stream, precedence, and no-mutation characterization.
-
-**Verification**: PR #105 merged at `9288bed2`; focused CLI suites (`228 passed`); `make test-unit`
-(`7907 passed, 1 skipped, 117 deselected`); `make pre-commit`; post-merge `make pre-commit-md`; `git diff --check`.
-
-## 2026-07-15
-
-### Existing shadow-only reserved-target hotfix
-
-**Goal**: Prevent ordinary re-track of a hand-authored shadow-only passport from materializing an OKF-reserved file.
-
-**Key changes**:
-
-- Existing-shadow re-track now applies generic path safety followed by logical and resolved reserved-basename checks
-  before shadow creation or passport mutation; regressions cover direct `log.md`, resolved aliases, and error ordering.
-
-**Verification**: `make test-unit` (`7886 passed, 1 skipped, 117 deselected`); `make test-regression` (`514 passed`);
-`make pre-commit`; `git diff --check`.
-
-### okf_compatible_memory_passports remediation
-
-**Goal**: Close the verified post-closeout parser, reserved-target, host-walkthrough, and atomic-mode gaps without
-expanding the passport compatibility contract.
-
-**Key changes**:
-
-- Unified read/mutation delimiter selection and pinned the three-delimiter corruption case; blank intent now fails at
-  both CLI and synthesis boundaries.
-- Case-folded logical/resolved reserved official and proposal-shadow targets, blocked hand-authored reserved shadows at
-  discovery, and made the walkthrough's envelope verifier host-stdlib-only.
-- Added opt-in mode preservation to the shared atomic writer, migrated passport and Codex config rewrites, consolidated
-  mutation apply paths, and avoided discarded work on unchanged re-track flows. The non-identical CLI preflight cleanup
-  remains a proposed follow-up.
-
-**Verification**: remediation commit `58b7e97`; `make test-unit` (`7884 passed, 1 skipped, 117 deselected`);
-`make test-regression` (`513 passed`); handoff integration (`10 passed`); installer asset/mode integration
-(`2 passed, 16 deselected`); `make pre-commit`; `git diff --check`; `uv build`; isolated wheel and sdist full-profile
-installs plus delimiter, reserved-path, blank-intent, and packaged-walkthrough smokes.
-
-## 2026-07-14
-
-### okf_compatible_memory_passports original closeout (superseded by 2026-07-15 remediation)
-
-**Goal**: Make newly tracked and explicitly upgraded Forge Markdown memory docs recognizable as OKF v0.1 concept
-documents without weakening Forge's passport write policy or claiming bundle conformance.
-
-**Key changes**:
-
-- Added creation-only `type`/`title`/`description` envelopes and an explicit idempotent `forge memory passport upgrade`
-  path that preserves the raw legacy passport value; ordinary re-track remains non-migrating, and Forge still generates
-  no `resource`, `tags`, or `timestamp`.
-- Split permissive frontmatter reads from strict mutation parsing, made unsafe shapes fail byte-identically, preserved
-  file modes, and preflighted effective passports and logical/resolved path rules before official or shadow writes.
-- Synchronized architecture, CLI, end-user, QA, walkthrough, packaging, and board guidance; proposed the reusable
-  mutation-boundary lessons through `.forge/memory/shadow_impl_notes.md` for human review.
-
-**Verification**: implementation commit `fae54345`; `make test-unit` (`7846 passed, 1 skipped, 117 deselected`);
-`make test-regression` (`507 passed`); required handoff integration (`10 passed`) and installer asset integration
-(`1 passed, 17 deselected`); `make pre-commit`; `git diff --check`; `uv build`; separate isolated wheel and sdist
-full-profile enables, packaged-asset inspection, legacy-upgrade/idempotence checks, and empty-writer refusal smokes.
-
-## 2026-07-13
-
-### epic_global_forge_runtime closeout
-
-**Goal**: Close the global Forge runtime epic with its shipped hook ownership, binary-resolution, migration, and
-execution-environment contracts reflected consistently in code, docs, and the board.
-
-**Key changes**:
-
-- Verified all five epic seams and reconciled the normative install, dispatcher, recovery, status-line, and sidecar
-  documentation with the shipped model.
-- Added the terminal `retired/` lane and retired unshipped T2 as superseded; the narrower GUI-safe status-line concern
-  remains a standalone proposed follow-up.
-- Moved the epic to `done/`, corrected stale member state, and repointed every inbound board link.
-
-**Verification**: PR #99 merged at `168b7db7`; focused hook/runtime suite (`285 passed, 1 skipped`); merged-main Docker
-installer suite (`17 passed`); closeout doctor/dispatcher tests (`86 passed`); pre-commit checks; relative-link and
-stale-lane sweeps; `git diff --check`.
-
-## 2026-07-12
-
-### forge_project_compat_mutator_sweep closeout
-
-**Goal**: Finish `.forge/project.toml` enforcement across every classified project-state mutator without gating unowned
-global runtime state.
-
-**Key changes**:
-
-- Enforced the target state owner's Forge root across explicit session, policy, transfer, memory, search, cleanup, and
-  direct-command mutations; hooks diagnose without changing their wire, while detached writers and queue work refuse
-  through bounded background contracts.
-- Made managed worktree refusal atomic, including pre-destroy validation of stale roots, the exact replacement commit,
-  and branch safety; retained post-create checks and surfaced incomplete rollback instead of hiding state loss.
-- Kept proxy/backend registries and proven-stale derived-index repair narrowly exempt, added per-root partial cleanup
-  reporting, and documented that `forge clean --yes --json` exits 1 when failures or compatibility skips are present.
-- Moved the card to `done/`, repointed the epic and T7/T8 references, and promoted the reviewed ownership, posture,
-  background-refusal, and exemption invariants to `impl_notes.md`.
-
-**Verification**: PR #98 merged at `aa45114d`; `make test-unit` (`7724 passed, 1 skipped, 117 deselected`);
-`make pre-commit`; required targeted integration suites (`151 passed`) plus focused compatibility/fork regressions
-(`35 passed`). The real Claude-to-Codex bridge command was invoked but failed at its Codex readiness gate before the
-bridge body ran because isolated `CODEX_HOME` requires `CODEX_API_KEY`; host Codex preflight was ready, the no-skip test
-stayed intact, and no product change is pending on that result.
-
-### forge_dev_runtime_override closeout
-
-**Goal**: Close T8 after PR #97 merged and hand the global-runtime epic its final coordinator closeout.
-
-**Key changes**:
-
-- Moved `forge_dev_runtime_override` from `doing/` to `done/`, preserved its implementation checklist, and repointed the
-  epic and status-line follow-up links.
-- Recorded T8 as shipped via PR #97 and left the epic in `doing/` with no active member; its five seam boxes,
-  durable-doc verification, inbound-link sweep, and lane move are now actionable as a separate epic closeout.
-- Kept the already-reviewed durable override and launcher-recording lessons in `impl_notes.md`; no additional promotion
-  was needed at lane closeout.
-
-**Verification**: PR #97 merged at `46ff9ef6`; `make pre-commit-md`; post-merge relative-link and stale-status sweep;
-`git diff --check`.
-
-### forge_dev_runtime_override implementation and branch verification
-
-**Goal**: Let contributors run unreleased checkout hook code explicitly without sticky-pointing global dispatcher
-metadata at a project venv.
-
-**Key changes**:
-
-- Added the process-scoped `FORGE_DEV=<absolute-checkout-root>` dispatcher branch after the no-op gate and handler
-  validation; invalid or unlaunchable checkout targets fail with exit 127 and never fall back to the global resolver.
-- Replaced implicit launcher recording with the reviewed four-step transition table, preserving custom stable launchers
-  while excluding lexically classified venv launchers and migrating legacy sticky metadata on enable/sync.
-- Added doctor validity/effectiveness diagnostics, managed Claude/Codex env-propagation coverage, and the Public
-  env-vocabulary plus architecture, CLI, contributor, and end-user hook documentation.
-
-**Verification**: focused dispatcher/doctor/installer/env/golden suite (`308 passed`); Docker installer integration
-(`17 passed`); wheel + sdist build and isolated `uv tool` enable/sync/doctor check; live checkout dispatcher smoke
-(valid exit 0, invalid exit 127 without fallback); `make pre-commit` clean. The active T8 checklist keeps the
-command-level evidence; shipment/lane closeout remains post-merge.
-
-## 2026-07-11
-
-### forge_hook_migration_cleanup closeout
-
-**Goal**: Close T6 after PR #96 merged and leave the global-runtime epic at an explicit no-active-member cursor.
-
-**Key changes**:
-
-- Moved `forge_hook_migration_cleanup` from `doing/` to `done/`, preserved its implementation checklist, and repointed
-  its epic links.
-- Recorded T6 as shipped in the epic while leaving the epic seam boxes open until epic closeout; T8 remains parked
-  pending a separate activation decision.
-- Promoted the reviewed registry-activation and selected-root migration-ordering invariant to `impl_notes.md`.
-
-**Verification**: PR #96 merged at `93312179`; `make pre-commit-md`; post-merge relative-link and stale-lane sweep;
-`git diff --check`.
-
-## 2026-07-10
-
-### forge_hook_migration_cleanup implementation
-
-**Goal**: Give pre-user-scope installations an explicit, reviewable migration to one dispatcher-backed runtime source
-without silently mutating or activating other tracked checkouts.
-
-**Key changes**:
-
-- Added tracked-root candidate reporting plus `forge extension cleanup-project` preview/`--yes`; user enable/sync never
-  reads the registry or another root, while explicit cleanup validates one selected root, removes legacy state first,
-  installs user runtime hooks, scans for duplicates, and enrolls that root last with `backfill` provenance.
-- Restricted automatic Claude cleanup to canonical tracked entries or a frozen additive released-shape inventory,
-  reconciled `.forge-added`/installation ownership, migrated balanced project Codex blocks with backups and re-trust
-  guidance, and retained ambiguous/manual state as an operation-scoped blocker.
-- Added independent doctor/status-line cleanup state (`HOOK!`) without broadening genuine `HOOKx2`, and synchronized
-  architecture, CLI, Day-1/recovery, QA, and isolated walkthrough guidance.
-
-**Verification**: focused migration suite (`320 passed`); CLI command/output/vocabulary guards (`68 passed`);
-`make test-unit` (`7556 passed, 1 skipped, 116 deselected`); installer Docker suite (`16 passed`) plus final targeted
-migration-and-disable rerun; real-Claude migration (`1 passed, 2 deselected`) with user-dispatcher SessionStart/Stop
-effects; isolated walkthrough migration exercise; `make pre-commit`.
-
-### forge_hook_sidecar_resolution closeout
-
-**Goal**: Close T10 after PR #94 restored Forge runtime hooks inside Claude sidecars.
-
-**Key changes**:
-
-- Shipped fresh canonical hook staging in the persisted sidecar user scope, idempotent entrypoint auth merging, and an
-  image PATH that resolves bare hook and project status-line commands without mutating project `.claude` settings.
-- Persisted deferred work through a host-drainable queue with host-path normalization and container-side drain
-  suppression; retained the stale-image skew guard and PATH breadth as explicit follow-ups.
-- Moved `forge_hook_sidecar_resolution` from `doing/` to `done/`, repointed its epic links, and advanced the epic cursor
-  to T6 with T8 parked.
-
-**Verification**: `make test-unit` (`7517 passed, 1 skipped, 116 deselected`);
-`./scripts/test-integration.sh tests/integration/sidecar/test_sidecar_hook_inject.py -v` (`3 passed`);
-`make pre-commit`; PR #94 GitHub checks (test, pre-commit, CodeQL analyses); `make pre-commit-md`; post-merge board
-link/stale-reference scan.
+## 2026-07-10 -- 2026-07-17 (compacted)
+
+Global-runtime closeout, cross-runtime skill packaging, model-catalog refresh, and memory-passport hardening. Detailed
+execution history remains in the matching done cards and PRs; this summary preserves the goals, decisions, verification
+anchors, and deferred items.
+
+- **Cross-runtime skill packages (07-16--07-17):** compiled one typed neutral skill source into native Claude and Codex
+  packages, with five portable skills and six explicit Claude-only skills; added runtime/scope/profile planning,
+  content-addressed caching, schema-v2 ownership tracking, rollback, duplicate classification, and clean wheel/sdist
+  lifecycles. Review hardening made explicit runtime narrowing preserve omitted packages, rejected symlinked roots and
+  descendants, cross-validated canonical file ledgers, required successful exact-evidence Codex probes, and kept model
+  family selection host-authoritative. Durable selection, compiler, ownership, symlink, and cache invariants were
+  promoted at closeout. Verification peaked at 381 affected, 8,158 unit (one skip), and 521 regression tests, plus two
+  Docker lifecycle cases, real-Codex stages, QA v1.0.30/589 assertions, builds, and pre-commit. Shipped in PR #107
+  (d2a94bf7).
+- **GPT-5.6 catalog and Sol defaults (07-16):** added Sol, Terra, and Luna profiles and aliases, promoted Sol across
+  bundled OpenAI defaults/templates and fresh LiteLLM routes, preserved existing user-owned snapshots, and synchronized
+  workflows, skills, docs, and package assets. Verification covered 611 focused tests, 8k-scale unit runs, two targeted
+  provider integrations, builds, clean wheel/sdist installs, and pre-commit. Live direct OpenAI validation remained
+  environment-limited by a 401 key response, and remote LiteLLM credentials were unavailable.
+- **Memory-passport CLI preflight (07-16):** consolidated project-root, compatibility, path-safety, and file preflight
+  behind a structured private resolver while preserving leaf wording, rendering, mutation, and stream precedence.
+  Focused CLI (228), unit (7,907 with one skip), pre-commit, Markdown, and diff checks passed. Shipped in PR #105
+  (9288bed2).
+- **OKF-compatible memory passports (07-14--07-15):** added creation-only OKF v0.1 concept envelopes and an explicit
+  idempotent passport upgrade while keeping ordinary re-track non-migrating and avoiding bundle-conformance claims.
+  Remediation unified delimiter parsing, rejected blank intent and unsafe frontmatter, case-folded logical/resolved
+  reserved targets, preserved modes through atomic writes, and blocked existing shadow-only reserved paths before any
+  mutation. The proposed non-identical CLI preflight cleanup shipped separately in PR #105. Verification across commits
+  fae54345 and 58b7e97 included 7.8k-scale unit runs, 500-plus regressions, handoff/installer integration, builds,
+  isolated wheel/sdist enables, packaged walkthrough smokes, pre-commit, and diff checks. The reviewed mutation-boundary
+  lessons remain proposed in `.forge/memory/shadow_impl_notes.md` pending promotion.
+- **Global Forge runtime epic (07-13):** closed the five shipped hook-ownership, binary-resolution, migration, and
+  execution-environment seams; synchronized normative docs and inbound links; added the retired lane and retired
+  unshipped T2 as superseded. GUI-safe status-line reachability remained a standalone proposed follow-up. PR #99
+  (168b7db7), 285 focused tests (one skip), 17 Docker installer cases, 86 closeout checks, pre-commit, link, lane, and
+  diff sweeps verified the closeout.
+- **Project compatibility mutator sweep (07-12):** enforced each target state owner's Forge root across session, policy,
+  transfer, memory, search, cleanup, hook, and detached-writer mutations while retaining narrow global registry and
+  proven-stale index exemptions. Managed-worktree refusal became atomic, and partial cleanup reports compatibility skips
+  truthfully. PR #98 (aa45114d), 7,724 unit tests (one skip), 151 targeted integrations, 35 focused regressions, and
+  pre-commit passed. The real Claude-to-Codex bridge stopped at an isolated CODEX_HOME key-readiness gate; host
+  preflight was healthy and no product change remained pending.
+- **Checkout runtime override (07-12):** added process-scoped FORGE_DEV checkout dispatch with fail-closed
+  invalid-target exit 127, preserved stable custom launchers through a four-step recording transition, diagnosed
+  override validity/effectiveness, and synchronized public environment guidance. PR #97 (46ff9ef6), 308 focused tests,
+  17 Docker cases, wheel/sdist and uv-tool smokes, live valid/invalid dispatcher checks, pre-commit, Markdown, link, and
+  lane checks verified implementation and closeout.
+- **Hook migration cleanup (07-10--07-11):** added explicit preview/apply cleanup for pre-user-scope installations,
+  selected one tracked root without implicitly mutating others, migrated canonical Claude/Codex ownership with backup
+  and re-trust guidance, enrolled the root last with backfill provenance, and surfaced independent cleanup state without
+  broadening genuine double-hook diagnostics. PR #96 (93312179), 320 migration tests, 68 CLI guards, 7,556 unit tests
+  (one skip), Docker and real-Claude migration coverage, an isolated walkthrough, pre-commit, Markdown, link, lane, and
+  diff checks verified implementation and closeout. T8 remained parked at that closeout and shipped separately the next
+  day.
+- **Sidecar hook resolution (07-10):** restored Forge runtime hooks inside Claude sidecars through canonical persisted
+  hook staging, idempotent entrypoint auth merging, image PATH resolution, and a host-drainable deferred queue with path
+  normalization and container drain suppression. Stale-image skew and PATH breadth remained explicit follow-ups.
+  Verification included 7,517 unit tests (one skip), three targeted sidecar integrations, pre-commit, all PR #94 GitHub
+  checks, Markdown, and post-merge link/lane scans.
 
 ## 2026-07-01 -- 2026-07-08 (compacted)
 
