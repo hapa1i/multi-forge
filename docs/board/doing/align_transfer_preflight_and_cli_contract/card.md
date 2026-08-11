@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- draft PR #165 is open from `agent/align-transfer-preflight-cli-contract`; the merged-main
-fail-first gate is satisfied and the implementation awaits independent review and merge.
+**Lane**: `doing/` -- PR #165 is open from `agent/align-transfer-preflight-cli-contract`; the merged-main fail-first
+gate is satisfied and the implementation awaits independent review and merge.
 
 **Findings**: D023, D028, and O022.
 
@@ -48,13 +48,17 @@ Unbounded traversal also rejects a cyclic lineage instead of looping. Explicit s
 ordinary Claude reattach after runtime dispatch, preserving Codex's existing unsupported-flag errors and native/rewind
 ignore semantics.
 
+Review found that lineage validation's new `ValueError` escaped the §3.12 typed-exception contract through transfer
+regeneration and Codex transfer assembly. Both ops now translate assembly `ValueError` to `ForgeOpError` with the
+original cause preserved; state-corruption classifications still pass through unchanged.
+
 ## Verification
 
-The retained nine-case regression passes. Focused transfer/resume-path and resume/fork/Codex/rewind CLI slices pass
-(`130 + 192` tests), as do all 9 targeted Docker session integration cases and all 736 marked regressions. Final
-pre-commit and explicit new-file hooks pass after their formatting normalization. All 719 relative links across 285
-board Markdown files resolve, the changed-document fragments resolve, the 12-member Wave 6 lane graph remains 1 `done` /
-1 `doing` / 10 `todo`, and the board size and diff checks pass.
+The retained thirteen-case regression passes. Focused transfer/resume-path and resume/fork/Codex/rewind CLI slices pass
+(`134 + 192` tests), as do 132 review-focused ops/CLI tests, all 9 targeted Docker session integration cases, and all
+740 marked regressions. Final pre-commit and explicit new-file hooks pass after their formatting normalization. All 719
+relative links across 285 board Markdown files resolve, the changed-document fragments resolve, the 12-member Wave 6
+lane graph remains 1 `done` / 1 `doing` / 10 `todo`, and the board size and diff checks pass.
 
 ## Compatibility and Exclusions
 

@@ -275,16 +275,19 @@ def regenerate_transfer(
         except ForgeSessionError:
             return None
 
-    result = assemble_transfer_context(
-        parent_name=parent,
-        parent_state=parent_state,
-        forge_root=forge_root,
-        strategy=resume_strategy,
-        depth=eff_depth,
-        get_session=_get,
-        child_name=None,  # parent cache only -- children/* stay frozen
-        target_runtime=eff_target_runtime,
-    )
+    try:
+        result = assemble_transfer_context(
+            parent_name=parent,
+            parent_state=parent_state,
+            forge_root=forge_root,
+            strategy=resume_strategy,
+            depth=eff_depth,
+            get_session=_get,
+            child_name=None,  # parent cache only -- children/* stay frozen
+            target_runtime=eff_target_runtime,
+        )
+    except ValueError as e:
+        raise ForgeOpError(str(e)) from e
     return RegenerateResult(
         parent=parent,
         strategy=resume_strategy.value,

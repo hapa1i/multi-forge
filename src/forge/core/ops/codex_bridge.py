@@ -186,17 +186,20 @@ def assemble_codex_transfer(
             return None
 
     transfer_root = output_root if output_root is not None else forge_root
-    transfer = assemble_transfer_context(
-        parent_name=parent,
-        parent_state=parent_state,
-        forge_root=forge_root,
-        output_root=output_root,
-        strategy=resume_strategy,
-        depth=depth,
-        get_session=_get,
-        child_name=child,
-        target_runtime="codex",
-    )
+    try:
+        transfer = assemble_transfer_context(
+            parent_name=parent,
+            parent_state=parent_state,
+            forge_root=forge_root,
+            output_root=output_root,
+            strategy=resume_strategy,
+            depth=depth,
+            get_session=_get,
+            child_name=child,
+            target_runtime="codex",
+        )
+    except ValueError as e:
+        raise ForgeOpError(str(e)) from e
     composed = compose_child_context(transfer_root, parent, child)
     frontmatter, body, _ = parse_transfer_frontmatter(composed)
     # schema=="full" is stamped only for a successful ai-curated body (design appendix

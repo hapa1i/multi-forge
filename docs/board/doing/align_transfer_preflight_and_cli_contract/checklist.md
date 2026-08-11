@@ -1,6 +1,6 @@
 # Align transfer preflight and CLI contract checklist
 
-Current focus: complete independent review and merge draft PR #165 without activating the next Wave 6 member.
+Current focus: complete independent review and merge PR #165 without activating the next Wave 6 member.
 
 ## Activation and prior-member closeout
 
@@ -40,13 +40,22 @@ Current focus: complete independent review and merge draft PR #165 without activ
 | Non-fresh shaping flags    | Existing Claude session plus explicit strategy/depth              | Rejects before reattach; omitted defaults still reattach      | `tests/regression/test_bug_d023_d028_o022_transfer_contract.py` |
 | Resolver precedence        | Copied, missing-copied, confirmed, and live sources               | Preserves assembler precedence for every preflight consumer   | `tests/src/session/test_transfer.py`                            |
 | Unbounded lineage safety   | Terminal and cyclic ancestry graphs                               | Traverses a finite lineage fully and rejects cycles           | `tests/src/session/test_transfer.py`                            |
+| Typed ops boundary         | Cyclic and non-positive depth through regenerate and Codex ops    | Raises `ForgeOpError` with the `ValueError` retained as cause | `tests/regression/test_bug_d023_d028_o022_transfer_contract.py` |
+
+## Review follow-up
+
+- [x] Reproduce raw cyclic-lineage `ValueError` at both command-core assembly boundaries (`2 failed` on PR #165 head
+  `ab60f86d`).
+- [x] Translate assembly validation failures to `ForgeOpError` in transfer regeneration and Codex transfer assembly
+  without masking state-corruption classifications.
+- [x] Retain cyclic and non-positive depth coverage at both ops boundaries (`4 passed`).
 
 ## Verification and closeout
 
-- [x] Run the focused transfer, resume-path, resume-CLI, fork-CLI, and retained regression slices (`130 + 192 passed`).
+- [x] Run the focused transfer, resume-path, resume-CLI, fork-CLI, and retained regression slices (`134 + 192 passed`).
 - [x] Run `./scripts/test-integration.sh tests/src/session/test_resume_integration.py` (`9 passed`).
-- [x] Run `make test-regression` (`736 passed`) and final `make pre-commit`; explicitly pass both new files through all
-  applicable hooks.
+- [x] Run the review-focused ops/CLI slice (`132 passed`), `make test-regression` (`740 passed`), and final
+  `make pre-commit`; explicitly pass both new files through all applicable hooks.
 - [x] Record implementation outcome, verification, and compatibility boundaries.
 - [x] Run board relative-link, fragment, lane-graph, size, and diff checks (285 files, 719 relative links, 12-member
   graph: 1 `done` / 1 `doing` / 10 `todo`).

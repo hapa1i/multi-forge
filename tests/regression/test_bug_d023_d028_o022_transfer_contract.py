@@ -10,6 +10,10 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.core.ops.codex_bridge import assemble_codex_transfer
+from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session import ForgeOpError
+from forge.core.ops.transfer import regenerate_transfer
 from forge.session import SessionManager, SessionStore
 from forge.session.exceptions import ContextBudgetExceededError, SessionNotFoundError
 from forge.session.prev_sessions import generated_path
@@ -63,6 +67,21 @@ def _seed_fallback_transcript(
     state.confirmed.transcript_path = str(transcript)
     store.write(state)
     return project, manager, store
+
+
+def _execution_context(project: Path) -> ExecutionContext:
+    return ExecutionContext(
+        cwd=project,
+        worktree_root=project,
+        project_root=project,
+        forge_root=project,
+    )
+
+
+def _seed_cyclic_lineage(project: Path) -> None:
+    manager = SessionManager()
+    _start_session(manager, project, "left", parent="right")
+    _start_session(manager, project, "right", parent="left")
 
 
 def test_d023_manager_preflights_confirmed_transcript_fallback(
@@ -184,6 +203,60 @@ def test_d028_positive_integer_depth_remains_compatible(
     assert child.confirmed.derivation is not None
     assert child.confirmed.derivation.lineage == ["parent", "root"]
     assert child.confirmed.derivation.depth == 2
+
+
+@pytest.mark.parametrize(
+    ("depth", "cyclic", "message"),
+    [(0, False, "positive integer"), (3, True, "lineage contains a cycle")],
+)
+def test_d028_regenerate_wraps_lineage_validation_as_op_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    depth: int,
+    cyclic: bool,
+    message: str,
+) -> None:
+    project = _project(tmp_path, monkeypatch)
+    if cyclic:
+        _seed_cyclic_lineage(project)
+    else:
+        _start_session(SessionManager(), project, "left")
+
+    with pytest.raises(ForgeOpError, match=message) as exc_info:
+        regenerate_transfer(ctx=_execution_context(project), parent="left", depth=depth)
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert not generated_path(project, "left").exists()
+
+
+@pytest.mark.parametrize(
+    ("depth", "cyclic", "message"),
+    [(0, False, "positive integer"), (3, True, "lineage contains a cycle")],
+)
+def test_d028_codex_assembly_wraps_lineage_validation_as_op_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    depth: int,
+    cyclic: bool,
+    message: str,
+) -> None:
+    project = _project(tmp_path, monkeypatch)
+    if cyclic:
+        _seed_cyclic_lineage(project)
+    else:
+        _start_session(SessionManager(), project, "left")
+
+    with pytest.raises(ForgeOpError, match=message) as exc_info:
+        assemble_codex_transfer(
+            ctx=_execution_context(project),
+            parent="left",
+            child="codex-child",
+            strategy="minimal",
+            depth=depth,
+        )
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert not generated_path(project, "left").exists()
 
 
 @pytest.mark.parametrize(
