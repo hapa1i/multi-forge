@@ -381,7 +381,7 @@ def test_stop_process_id_stops_process_and_keeps_config(
     config_path = _write_litellm_config(forge_home)
     store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-4000"))
 
     assert result.exit_code == 0
@@ -392,13 +392,29 @@ def test_stop_process_id_stops_process_and_keeps_config(
     assert config_path.exists()
 
 
+def test_stop_process_failure_keeps_registry_ownership(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    config_path = _write_litellm_config(forge_home)
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
+
+    with patch("forge.backend.adapters.litellm.os.killpg", side_effect=PermissionError("not authorized")):
+        result = runner.invoke(main, _backend_args("stop", "litellm-4000"))
+
+    assert result.exit_code == 1
+    assert "litellm-4000: not authorized" in result.output
+    assert set(store.read().processes) == {"litellm-4000"}
+    assert config_path.exists()
+
+
 def test_stop_multiple_process_ids_continues_after_failure(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
-    with patch("forge.backend.adapters.litellm.os.kill"):
+    with patch("forge.backend.adapters.litellm.os.killpg"):
         result = runner.invoke(main, _backend_args("stop", "litellm-4000", "missing-9999"))
 
     assert result.exit_code == 1
@@ -419,7 +435,7 @@ def test_stop_all_yes_stops_every_process_and_keeps_configs(
         _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
 
     assert result.exit_code == 0
@@ -438,7 +454,7 @@ def test_stop_all_unregisters_pidless_process(
 ) -> None:
     store = _write_backend_registry(forge_home, _managed_process(pid=None))
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
 
     assert result.exit_code == 0
@@ -477,7 +493,7 @@ def test_stop_rejects_local_source_without_stopping_shared_process(
 ) -> None:
     store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-openai-local"))
 
     assert result.exit_code == 1
@@ -493,7 +509,7 @@ def test_stop_rejects_bare_adapter_without_legacy_port_resolution(
 ) -> None:
     store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm"))
 
     assert result.exit_code == 1
@@ -686,7 +702,7 @@ def test_delete_adapter_config_stops_matching_processes_first(
         _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
-    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+    with patch("forge.backend.adapters.litellm.os.killpg") as kill:
         result = runner.invoke(main, _backend_args("delete", "litellm", "--yes"))
 
     assert result.exit_code == 0

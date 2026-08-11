@@ -1,9 +1,8 @@
 # Align transfer preflight and CLI contract
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- PR #165 is open from `agent/align-transfer-preflight-cli-contract`; the merged-main fail-first
-gate is satisfied and the implementation awaits independent review and merge.
+**Lane**: `done/` -- shipped in PR #165 (`b3150184`) on 2026-08-11.
 
 **Findings**: D023, D028, and O022.
 
@@ -59,6 +58,8 @@ The retained thirteen-case regression passes. Focused transfer/resume-path and r
 740 marked regressions. Final pre-commit and explicit new-file hooks pass after their formatting normalization. All 719
 relative links across 285 board Markdown files resolve, the changed-document fragments resolve, the 12-member Wave 6
 lane graph remains 1 `done` / 1 `doing` / 10 `todo`, and the board size and diff checks pass.
+
+Independent review completed and PR #165 merged as `b3150184`.
 
 ## Compatibility and Exclusions
 

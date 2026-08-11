@@ -100,7 +100,9 @@ and probe the upstream endpoint without printing secret values. Remote backends 
 `litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM backends can be started by backend
 name or by the `litellm --port <port>` adapter form. Stop live local backend processes by the managed process id shown
 in `forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered managed
-process with `forge model backend stop --all`.
+process with `forge model backend stop --all`. Forge signals the complete detached LiteLLM process group. If the group
+cannot be signalled, stop exits nonzero and retains its managed-process row so the ownership and retry target are not
+lost.
 
 The local LiteLLM backends (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`, and
 `codex-responses-local`) all share one adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every

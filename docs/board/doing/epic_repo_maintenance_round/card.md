@@ -2,8 +2,8 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
-handed 34 still-live correctness rows to the active Wave 6 child epic. D020 shipped first; D023/D028/O022 are the sole
-active member. Remaining Wave 6/7 rows require their separate entry-condition checks.
+handed 34 still-live correctness rows to the active Wave 6 child epic. D020 and D023/D028/O022 shipped first; D027/O012
+are the sole active member. Remaining Wave 6/7 rows require their separate entry-condition checks.
 
 ## Goal
 

@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-11
 
+### Harden detached process teardown
+
+**Goal/outcome**: Close both ownership gaps for Forge-created detached process groups without changing ordinary backend
+or headless result contracts.
+
+**Key changes**:
+
+- Changed LiteLLM stop from leader-only signaling to the recorded process group and allowed signal failures to abort
+  registry removal; already-missing groups still unregister cleanly.
+- Added single-shot `BaseException` cleanup through the shared terminate/reap helper before re-raising cancellation,
+  with mocked regressions and real parent/worker process-group integration coverage.
+
+**Verification**: Three fail-first cases failed on `b3150184` while two compatibility controls passed. The 124-test
+backend/invoker slice, 8,972 unit tests (one existing platform skip, 122 deselected), 745 regressions, 8 backend CLI
+integration tests, and 2 real-process teardown integrations pass. A real Codex smoke stopped at preflight because no
+Codex credential is configured and launched no subprocess. Final pre-commit and board link/lane checks pass.
+
 ### Strip inherited Forge headers from direct children
 
 **Goal/outcome**: Prevent direct children from forwarding stale internal correlation identifiers inherited from a

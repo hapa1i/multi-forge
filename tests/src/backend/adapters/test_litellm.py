@@ -76,8 +76,8 @@ class TestLiteLLMAdapterHealthCheck:
 class TestLiteLLMAdapterStop:
     """Tests for stop method."""
 
-    def test_sends_sigterm_to_pid(self) -> None:
-        """Verify stop sends SIGTERM to process."""
+    def test_sends_sigterm_to_process_group(self) -> None:
+        """Verify stop sends SIGTERM to the detached process group."""
         adapter = LiteLLMAdapter()
         process = ManagedBackendProcess(
             process_id="litellm-4000",
@@ -86,7 +86,7 @@ class TestLiteLLMAdapterStop:
             pid=12345,
         )
 
-        with patch("os.kill") as mock_kill:
+        with patch("os.killpg") as mock_kill:
             adapter.stop(process)
             mock_kill.assert_called_once_with(12345, 15)  # 15 = SIGTERM
 
@@ -100,7 +100,7 @@ class TestLiteLLMAdapterStop:
             pid=None,
         )
 
-        with patch("os.kill") as mock_kill:
+        with patch("os.killpg") as mock_kill:
             adapter.stop(process)
             mock_kill.assert_not_called()
 
@@ -114,9 +114,23 @@ class TestLiteLLMAdapterStop:
             pid=12345,
         )
 
-        with patch("os.kill", side_effect=ProcessLookupError):
+        with patch("os.killpg", side_effect=ProcessLookupError):
             # Should not raise
             adapter.stop(process)
+
+    def test_surfaces_permission_error(self) -> None:
+        """Verify stop reports an existing group it is not authorized to signal."""
+        adapter = LiteLLMAdapter()
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
+            adapter_type="litellm",
+            port=4000,
+            pid=12345,
+        )
+
+        with patch("os.killpg", side_effect=PermissionError("not authorized")):
+            with pytest.raises(PermissionError, match="not authorized"):
+                adapter.stop(process)
 
 
 class TestLiteLLMAdapterStart:

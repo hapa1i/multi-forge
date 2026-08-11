@@ -889,9 +889,10 @@ under it, not under the unrelated draining CLI.
 **JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
 never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.
 
-**Child process lifecycle:** Parallel fan-out (panel runner) spawns N `claude -p` processes. If the parent is killed
-(Ctrl+C), children must be terminated via process group signal (`os.killpg`). All child processes must have timeouts
-(the `timeout_seconds` parameter in `run_claude_session()`).
+**Child process lifecycle:** The shared headless invoker gives every single-shot or fan-out worker its own process
+group. On synchronous cancellation, single-shot execution terminates and reaps its current group before re-raising;
+fan-out terminates all owned groups before joining worker threads. Process-group signals (`os.killpg`) must reach
+runtime-spawned descendants, and all child processes must have timeouts (the `timeout_seconds` request field).
 
 **Skill script dependency tiers:** Skills are compiled into self-contained packages and installed by copy or by links to
 the stable compiled cache; they are not Python packages. A packaged-script capability resolves the executable from the

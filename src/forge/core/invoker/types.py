@@ -72,10 +72,11 @@ class HeadlessRequest:
 
 @dataclass
 class HeadlessResult:
-    """Raw outcome of one job. The invoker never raises -- spawn-level failures
-    (missing binary, OS error) land in ``error``; a non-zero exit leaves ``error``
-    ``None`` so the caller applies its own formatting. ``run_id``/``parent``/``root``
-    are surfaced from the job's ``env`` for usage attribution."""
+    """Raw outcome of one job. Ordinary spawn failures (missing binary, OS error)
+    land in ``error``; synchronous cancellation is re-raised after child cleanup. A
+    non-zero exit leaves ``error`` ``None`` so the caller applies its own formatting.
+    ``run_id``/``parent``/``root`` are surfaced from the job's ``env`` for usage
+    attribution."""
 
     label: str | None
     stdout: str
@@ -117,7 +118,7 @@ class HeadlessInvoker(Protocol):
     (Phase 4d), ``CodexHeadlessInvoker`` (Phase 5)."""
 
     def run(self, request: HeadlessRequest) -> HeadlessResult:
-        """Run one job single-shot."""
+        """Run one job single-shot; re-raise cancellation after child cleanup."""
         ...
 
     def run_parallel(self, requests: list[HeadlessRequest]) -> list[HeadlessResult]:

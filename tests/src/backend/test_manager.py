@@ -1,6 +1,7 @@
 """Tests for backend manager."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -190,6 +191,29 @@ class TestBackendManager:
         assert adapter.stop_called
         registry = store.read()
         assert "mock-4000" not in registry.processes
+
+    def test_stop_backend_preserves_registry_when_adapter_raises(self, tmp_path: Path) -> None:
+        """Verify failed teardown retains the manager's ownership record."""
+        store = BackendRegistryStore(tmp_path / "backends" / "index.json")
+        existing = ManagedBackendProcess(
+            process_id="mock-4000",
+            adapter_type="mock",
+            port=4000,
+            pid=12345,
+            status="healthy",
+        )
+        store.write(BackendRegistry(processes={"mock-4000": existing}))
+
+        manager = BackendManager(store)
+        adapter = MockAdapter()
+        manager.register_adapter("mock", adapter)
+
+        with patch.object(adapter, "stop", side_effect=PermissionError("not authorized")) as stop:
+            with pytest.raises(PermissionError, match="not authorized"):
+                manager.stop_backend("mock-4000")
+
+        stop.assert_called_once_with(existing)
+        assert "mock-4000" in store.read().processes
 
     def test_stop_backend_raises_for_unknown(self, tmp_path: Path) -> None:
         """Verify stop_backend raises for unknown backend."""
