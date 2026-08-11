@@ -1,9 +1,9 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--4, the bounded Wave 5 HIGH child epic, and the first two bounded MEDIUM child epics are closed. The O007/D053
-proxy-conversion set shipped independently in PRs #161--#162; remaining MEDIUM rows require separate recheck and
-admission.
+Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
+handed 34 still-live correctness rows to a parked Wave 6 child epic. Remaining Wave 6/7 rows require their separate
+entry-condition checks.
 
 ## Goal
 
@@ -74,53 +74,56 @@ shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is 
 [`epic_proxy_diagnostic_data_hygiene`](../../done/epic_proxy_diagnostic_data_hygiene/card.md) and shipped independently
 in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
-O007 shipped independently in PRs #161--#162; remaining MEDIUM rows still require separate recheck and admission.
+O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
+34 live rows into parked [`epic_wave6_correctness_maintenance`](../../todo/epic_wave6_correctness_maintenance/card.md),
+where every member remains gated on a fail-first execution-branch reproduction.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
 
-| Wave | Findings        | Member                                                                                                              |
-| ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 1    | D001            | [`preserve_policy_intent_on_enable`](../../done/preserve_policy_intent_on_enable/card.md)                           |
-| 1    | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md)                       |
-| 1    | D005            | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)                         |
-| 1C   | D005            | [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md)     |
-| 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)                           |
-| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md)                 |
-| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../done/repair_sidecar_shadow_drain_routing/card.md)                     |
-| 3    | D011            | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) |
-| 3    | O006            | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   |
-| 3    | D008            | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   |
-| 3    | D009            | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           |
-| 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         |
-| 3    | D021            | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
-| 3    | D022            | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               |
-| 3    | D010            | [`align_incognito_worktree_guard`](../../done/align_incognito_worktree_guard/card.md)                               |
-| 4    | D013–D014       | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md)                       |
-| 4    | D012            | [`preserve_install_settings_baseline`](../../done/preserve_install_settings_baseline/card.md)                       |
-| 4    | D019            | [`preserve_legacy_settings_user_edits`](../../done/preserve_legacy_settings_user_edits/card.md)                     |
-| 5    | D015            | [`unify_downstream_retention`](../../done/unify_downstream_retention/card.md)                                       |
-| 5    | O002            | [`preserve_proxy_ownership_on_stop_failure`](../../done/preserve_proxy_ownership_on_stop_failure/card.md)           |
-| 5    | D016            | [`stabilize_proxy_create_smoke_json`](../../done/stabilize_proxy_create_smoke_json/card.md)                         |
-| 5    | D017            | [`align_search_corruption_failures`](../../done/align_search_corruption_failures/card.md)                           |
-| 5    | O001            | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                                       |
-| 5    | O004            | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
-| 5    | D018            | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
-| 5M   | O037–O038, O042 | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md)                 |
-| 5M   | D035            | [`make_tool_events_metadata_only`](../../done/make_tool_events_metadata_only/card.md)                               |
-| 5M   | D036            | [`validate_proxy_request_ids`](../../done/validate_proxy_request_ids/card.md)                                       |
-| 5M   | O007            | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
-| 6    | D053            | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
-| 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
-| 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
-| 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |
-| 7    | O051            | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                                 |
-| 7    | O052            | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)                         |
-| 7    | O092            | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                                 |
-| 7    | O092            | [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md)                 |
-| 7    | O093            | [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md)                 |
-| 7    | O092, O096      | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)                         |
-| 7    | O096            | [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md)               |
+| Wave | Findings            | Member                                                                                                              |
+| ---- | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1    | D001                | [`preserve_policy_intent_on_enable`](../../done/preserve_policy_intent_on_enable/card.md)                           |
+| 1    | D002–D004, O028     | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md)                       |
+| 1    | D005                | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)                         |
+| 1C   | D005                | [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md)     |
+| 2    | D006, U002–U003     | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)                           |
+| 2    | D007, D024          | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md)                 |
+| 2    | D039                | [`repair_sidecar_shadow_drain_routing`](../../done/repair_sidecar_shadow_drain_routing/card.md)                     |
+| 3    | D011                | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) |
+| 3    | O006                | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   |
+| 3    | D008                | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   |
+| 3    | D009                | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           |
+| 3    | O003                | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         |
+| 3    | D021                | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
+| 3    | D022                | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               |
+| 3    | D010                | [`align_incognito_worktree_guard`](../../done/align_incognito_worktree_guard/card.md)                               |
+| 4    | D013–D014           | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md)                       |
+| 4    | D012                | [`preserve_install_settings_baseline`](../../done/preserve_install_settings_baseline/card.md)                       |
+| 4    | D019                | [`preserve_legacy_settings_user_edits`](../../done/preserve_legacy_settings_user_edits/card.md)                     |
+| 5    | D015                | [`unify_downstream_retention`](../../done/unify_downstream_retention/card.md)                                       |
+| 5    | O002                | [`preserve_proxy_ownership_on_stop_failure`](../../done/preserve_proxy_ownership_on_stop_failure/card.md)           |
+| 5    | D016                | [`stabilize_proxy_create_smoke_json`](../../done/stabilize_proxy_create_smoke_json/card.md)                         |
+| 5    | D017                | [`align_search_corruption_failures`](../../done/align_search_corruption_failures/card.md)                           |
+| 5    | O001                | [`forward_litellm_user_agent`](../../done/forward_litellm_user_agent/card.md)                                       |
+| 5    | O004                | [`relay_anthropic_response_headers`](../../done/relay_anthropic_response_headers/card.md)                           |
+| 5    | D018                | [`make_statusline_sources_segment_lazy`](../../done/make_statusline_sources_segment_lazy/card.md)                   |
+| 5M   | O037–O038, O042     | [`remove_proxy_converter_plaintext_logs`](../../done/remove_proxy_converter_plaintext_logs/card.md)                 |
+| 5M   | D035                | [`make_tool_events_metadata_only`](../../done/make_tool_events_metadata_only/card.md)                               |
+| 5M   | D036                | [`validate_proxy_request_ids`](../../done/validate_proxy_request_ids/card.md)                                       |
+| 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
+| 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
+| 6    | 34 correctness rows | [`epic_wave6_correctness_maintenance`](../../todo/epic_wave6_correctness_maintenance/card.md)                       |
+| 7    | O047–O048           | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
+| 7    | O049                | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
+| 7    | O050                | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |
+| 7    | O051                | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                                 |
+| 7    | O052                | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)                         |
+| 7    | O092                | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                                 |
+| 7    | O092                | [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md)                 |
+| 7    | O093                | [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md)                 |
+| 7    | O092, O096          | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)                         |
+| 7    | O096                | [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md)               |
 
 ## Execution Waves
 

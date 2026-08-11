@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: recheck and admit the next bounded MEDIUM set without activating implementation.
+Current focus: Wave 5 is closed; its 34-row correctness handoff is accepted and parked in Wave 6 with no active member.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -135,7 +135,10 @@ Current focus: recheck and admit the next bounded MEDIUM set without activating 
 - [x] Independently review and merge O007, then close the proxy-conversion child epic (PR #162, `31a0832f`).
 - [x] Compact the oldest change-log tail before recording the next MEDIUM admission, preserving dates, goals, decisions,
   verification, and deferred items (July 10--17 compacted; approximately 20.6k tokens / 1.35k lines remain).
-- [ ] Recheck and admit the remaining MEDIUM correctness rows and later-wave findings against their entry conditions
-  before activating their implementation cards.
+- [x] Close the open-ended Wave 5 admission boundary on `246aaff1`: recheck 36 CLI/proxy/runtime candidate rows, reject
+  D033/O020 with two passing behavior controls, and park the 34 live rows under `epic_wave6_correctness_maintenance`
+  without activating implementation.
+- [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
+  before activating any additional implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
