@@ -2,9 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D020 shipped in PR #164; D023/D028/O022 are active on
-`agent/align-transfer-preflight-cli-contract` in PR #165; the other 10 members remain parked in `todo/` behind their
-fail-first reproduction gates.
+**Lane**: `doing/` -- D020 and D023/D028/O022 shipped in PRs #164--#165; D027/O012 are active on
+`agent/harden-detached-process-teardown`; the other 9 members remain parked in `todo/` behind their fail-first
+reproduction gates.
 
 ## Goal
 
@@ -28,20 +28,20 @@ before production code changes.
 
 ## Members and Sequence
 
-| Order | Findings                         | Member                                                                                              | Review boundary                               |
-| ----- | -------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| 1     | D020                             | [`strip_direct_child_forge_headers`](../../done/strip_direct_child_forge_headers/card.md)           | outbound correlation-header trust             |
-| 2     | D023, D028, O022                 | [`align_transfer_preflight_and_cli_contract`](../align_transfer_preflight_and_cli_contract/card.md) | transfer source/depth/reattach semantics      |
-| 3     | D027, O012                       | [`harden_detached_process_teardown`](../../todo/harden_detached_process_teardown/card.md)           | detached process-group ownership              |
-| 4     | O014, O026                       | [`close_proxy_failure_lifecycles`](../../todo/close_proxy_failure_lifecycles/card.md)               | proxy registry and stream cleanup             |
-| 5     | D029, O025                       | [`complete_proxy_instance_config_wiring`](../../todo/complete_proxy_instance_config_wiring/card.md) | template-to-instance field preservation       |
-| 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../../todo/restore_proxy_request_semantics/card.md)             | tier authority and translated request shape   |
-| 7     | O013, O034                       | [`align_policy_routing_context`](../../todo/align_policy_routing_context/card.md)                   | policy routing/session selector consistency   |
-| 8     | D031                             | [`exclude_interactive_usage_cost`](../../todo/exclude_interactive_usage_cost/card.md)               | two-plane interactive exclusion               |
-| 9     | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                       | CLI exit, stream, editor, and status behavior |
-| 10    | D034, D037, D038, O027           | [`harden_command_state_boundaries`](../../todo/harden_command_state_boundaries/card.md)             | hook silence and strict durable-state reads   |
-| 11    | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](../../todo/preserve_session_launch_preconditions/card.md) | launch preflight, rollback, and fail-open     |
-| 12    | O036                             | [`harden_walkthrough_sandbox_provenance`](../../todo/harden_walkthrough_sandbox_provenance/card.md) | sandbox provenance before code execution      |
+| Order | Findings                         | Member                                                                                                      | Review boundary                               |
+| ----- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 1     | D020                             | [`strip_direct_child_forge_headers`](../../done/strip_direct_child_forge_headers/card.md)                   | outbound correlation-header trust             |
+| 2     | D023, D028, O022                 | [`align_transfer_preflight_and_cli_contract`](../../done/align_transfer_preflight_and_cli_contract/card.md) | transfer source/depth/reattach semantics      |
+| 3     | D027, O012                       | [`harden_detached_process_teardown`](../harden_detached_process_teardown/card.md)                           | detached process-group ownership              |
+| 4     | O014, O026                       | [`close_proxy_failure_lifecycles`](../../todo/close_proxy_failure_lifecycles/card.md)                       | proxy registry and stream cleanup             |
+| 5     | D029, O025                       | [`complete_proxy_instance_config_wiring`](../../todo/complete_proxy_instance_config_wiring/card.md)         | template-to-instance field preservation       |
+| 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../../todo/restore_proxy_request_semantics/card.md)                     | tier authority and translated request shape   |
+| 7     | O013, O034                       | [`align_policy_routing_context`](../../todo/align_policy_routing_context/card.md)                           | policy routing/session selector consistency   |
+| 8     | D031                             | [`exclude_interactive_usage_cost`](../../todo/exclude_interactive_usage_cost/card.md)                       | two-plane interactive exclusion               |
+| 9     | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                               | CLI exit, stream, editor, and status behavior |
+| 10    | D034, D037, D038, O027           | [`harden_command_state_boundaries`](../../todo/harden_command_state_boundaries/card.md)                     | hook silence and strict durable-state reads   |
+| 11    | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](../../todo/preserve_session_launch_preconditions/card.md)         | launch preflight, rollback, and fail-open     |
+| 12    | O036                             | [`harden_walkthrough_sandbox_provenance`](../../todo/harden_walkthrough_sandbox_provenance/card.md)         | sandbox provenance before code execution      |
 
 The sequence starts with isolated trust and transfer contracts, then process/proxy lifecycle, proxy request semantics,
 operator read paths, and session launch safety. O036 remains independent because it changes a bundled shell safety

@@ -19,8 +19,8 @@ covers it) stays in this base; only the predicate and the fallback derivation ar
 hooks. A runtime whose ``_is_recoverable_format_rejection`` always returns ``False``
 (Codex) never enters that branch, so it needs no ``_on_format_rejection``.
 
-The invoker never raises: spawn-level failures (missing binary, OS error) land in
-``HeadlessResult.error``.
+The invoker envelopes ordinary spawn/runtime failures in ``HeadlessResult``. Synchronous
+cancellation is different: it terminates and reaps the owned child group, then re-raises.
 """
 
 from __future__ import annotations
@@ -192,9 +192,9 @@ class _HeadlessLifecycleBase:
         """Run one already-shaped job single-shot.
 
         The request's ``argv``/``env`` are pre-built by the caller; this is a pure
-        runner (no routing). Captures stdout/stderr and never raises. Like the
-        parallel path, the child runs in its own process group so timeouts reap
-        tool subprocesses spawned by the runtime.
+        runner (no routing). Captures stdout/stderr and envelopes ordinary failures.
+        Like the parallel path, the child runs in its own process group so timeouts
+        and synchronous cancellation reap tool subprocesses spawned by the runtime.
         """
         start = time.monotonic()
         ident = _identity(request.env)
@@ -269,6 +269,10 @@ class _HeadlessLifecycleBase:
                 error=str(e),
                 **ident,
             )
+        except BaseException:
+            if proc is not None:
+                _terminate_and_reap([proc])
+            raise
         self._emit(request, result)
         return result
 

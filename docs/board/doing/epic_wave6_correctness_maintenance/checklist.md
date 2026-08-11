@@ -1,6 +1,6 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: reproduce and ship D023/D028/O022 without activating or absorbing any later member.
+Current focus: reproduce and ship D027/O012 without activating or absorbing any later member.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -17,6 +17,10 @@ Current focus: reproduce and ship D023/D028/O022 without activating or absorbing
 - [x] Close D020 and activate only D023/D028/O022 on `agent/align-transfer-preflight-cli-contract`.
 - [x] Retain D023/D028/O022 fail-first regressions on merged `main` (`7 failed, 2 passed` on `26ab5f29`).
 - [x] Implement and verify the shared transfer-source, depth, and non-fresh flag contracts.
-- [ ] Review and merge D023/D028/O022 independently before activating the next ordered member.
-- [ ] Keep the remaining 10 members in `todo/` behind their own fail-first gates.
+- [x] Review and merge D023/D028/O022 independently before activating the next ordered member (PR #165, `b3150184`).
+- [x] Close D023/D028/O022 and activate only D027/O012 on `agent/harden-detached-process-teardown`.
+- [x] Retain D027/O012 fail-first regressions on merged `main` at `b3150184` (`3 failed, 2 passed`).
+- [x] Implement and verify detached backend and single-shot headless process-group teardown.
+- [ ] Review and merge D027/O012 independently before activating the next ordered member.
+- [ ] Keep the remaining 9 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

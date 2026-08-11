@@ -1114,17 +1114,21 @@ def delete_cmd(adapter: str, yes: bool) -> None:
         return
 
     stopped = []
+    stop_failed = False
     registry = store.read()
     for process in list(registry.processes.values()):
         if process.adapter_type == adapter:
             try:
                 _stop_managed_process(process)
                 stopped.append(process.process_id)
-            except Exception:
-                pass
+            except Exception as e:
+                print_error(f"{process.process_id}: {e}")
+                stop_failed = True
 
     if stopped:
         console.print(f"Stopped managed processes: {', '.join(stopped)}")
+    if stop_failed:
+        sys.exit(1)
 
     shutil.rmtree(backend_dir)
     console.print(f"[green]Deleted[/green] backend config for '{adapter}'")

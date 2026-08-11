@@ -70,7 +70,7 @@ class BackendAdapter(ABC):
 
     @abstractmethod
     def stop(self, process: ManagedBackendProcess) -> None:
-        """Stop backend (best effort).
+        """Stop backend, raising when owned teardown cannot be completed.
 
         Args:
             process: Managed backend process to stop
@@ -163,13 +163,14 @@ class BackendManager:
         return BackendEnsureResult(process=process, source="start")
 
     def stop_backend(self, process_id: str) -> None:
-        """Stop backend and remove from registry.
+        """Stop backend and remove it from the registry after successful teardown.
 
         Args:
             process_id: Managed process ID
 
         Raises:
             ValueError: If managed process not found
+            OSError: If the adapter cannot complete the owned process teardown
         """
         registry = self.registry_store.read()
         process = registry.processes.get(process_id)

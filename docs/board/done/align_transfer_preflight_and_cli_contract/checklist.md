@@ -1,6 +1,6 @@
 # Align transfer preflight and CLI contract checklist
 
-Current focus: complete independent review and merge PR #165 without activating the next Wave 6 member.
+Current focus: closed after PR #165 (`b3150184`).
 
 ## Activation and prior-member closeout
 
@@ -60,3 +60,4 @@ Current focus: complete independent review and merge PR #165 without activating 
 - [x] Run board relative-link, fragment, lane-graph, size, and diff checks (285 files, 719 relative links, 12-member
   graph: 1 `done` / 1 `doing` / 10 `todo`).
 - [x] Open independent draft PR #165 without activating the next Wave 6 member.
+- [x] Complete independent review and merge before activating the next Wave 6 member (PR #165, `b3150184`).

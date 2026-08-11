@@ -11,6 +11,7 @@ so this adapter just passes through whatever is in os.environ.
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -109,9 +110,14 @@ class LiteLLMAdapter(BackendAdapter):
         # Wait for health (timeout 10s)
         if not self._wait_for_health(port, timeout=10):
             try:
-                proc.kill()
-            except OSError:
-                pass  # Process already exited
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # The complete process group has already exited.
+            except OSError as exc:
+                raise BackendStartError(
+                    f"LiteLLM failed to start on port {port}; process-group cleanup failed: {exc}\n"
+                    f"Check logs: {log_file}"
+                ) from exc
             raise BackendStartError(f"LiteLLM failed to start on port {port}\nCheck logs: {log_file}")
 
         return ManagedBackendProcess(
@@ -124,18 +130,24 @@ class LiteLLMAdapter(BackendAdapter):
         )
 
     def stop(self, process: ManagedBackendProcess) -> None:
-        """Stop LiteLLM backend (best effort).
+        """Signal the detached LiteLLM process group to stop.
 
         Args:
             process: Managed backend process to stop
+
+        Raises:
+            OSError: If the owned process group exists but cannot be signalled.
         """
         if process.pid is None:
             return
 
         try:
-            os.kill(process.pid, 15)  # SIGTERM
-        except (ProcessLookupError, PermissionError):
-            pass
+            # ``start()`` makes this PID the leader of a new session/process group.
+            # Address the recorded group id directly: its leader may already have
+            # exited while a worker still owns the port.
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass  # The complete process group has already exited.
 
     def health_check(self, process: ManagedBackendProcess) -> bool:
         """Check if LiteLLM backend is healthy.
