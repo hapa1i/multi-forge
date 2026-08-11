@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/align-transfer-preflight-cli-contract`; the merged-main fail-first gate is
-satisfied and the implementation awaits independent review and merge.
+**Lane**: `doing/` -- draft PR #165 is open from `agent/align-transfer-preflight-cli-contract`; the merged-main
+fail-first gate is satisfied and the implementation awaits independent review and merge.
 
 **Findings**: D023, D028, and O022.
 

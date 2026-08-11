@@ -1,6 +1,6 @@
 # Align transfer preflight and CLI contract checklist
 
-Current focus: complete validation and open the independent D023/D028/O022 draft PR.
+Current focus: complete independent review and merge draft PR #165 without activating the next Wave 6 member.
 
 ## Activation and prior-member closeout
 
@@ -50,4 +50,4 @@ Current focus: complete validation and open the independent D023/D028/O022 draft
 - [x] Record implementation outcome, verification, and compatibility boundaries.
 - [x] Run board relative-link, fragment, lane-graph, size, and diff checks (285 files, 719 relative links, 12-member
   graph: 1 `done` / 1 `doing` / 10 `todo`).
-- [ ] Open an independent draft PR without activating the next Wave 6 member.
+- [x] Open independent draft PR #165 without activating the next Wave 6 member.

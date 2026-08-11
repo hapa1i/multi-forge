@@ -3,8 +3,8 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- D020 shipped in PR #164; D023/D028/O022 are active on
-`agent/align-transfer-preflight-cli-contract`; the other 10 members remain parked in `todo/` behind their fail-first
-reproduction gates.
+`agent/align-transfer-preflight-cli-contract` in draft PR #165; the other 10 members remain parked in `todo/` behind
+their fail-first reproduction gates.
 
 ## Goal
 
