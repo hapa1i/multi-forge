@@ -18,6 +18,8 @@ from forge.session.effective import compute_effective_intent
 from forge.session.models import VerificationConfig, create_session_state
 from forge.session.store import SessionStore
 
+pytestmark = pytest.mark.regression
+
 
 def test_d033_cancel_verification_survives_malformed_unrelated_override(
     tmp_path: Path,
