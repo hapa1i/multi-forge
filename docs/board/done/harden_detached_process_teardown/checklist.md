@@ -1,6 +1,6 @@
 # Harden detached process teardown checklist
 
-Current focus: complete final quality and board gates, then prepare independent review.
+Current focus: closed after independent review and merge in PR #166 (`5b50acc8`).
 
 ## Activation and prior-member closeout
 
@@ -34,7 +34,7 @@ Current focus: complete final quality and board gates, then prepare independent 
   credential-blocked Codex smoke attempt.
 - [x] Run `make test-unit` (`8,974 passed`, one existing platform skip, 122 deselected) and `make test-regression`
   (`747 passed`).
-- [x] Run `make pre-commit` and final board integrity checks (286 files, 719 relative links, 12-member graph: 2 `done` /
-  1 `doing` / 9 `todo`).
+- [x] Run `make pre-commit` and final board integrity checks (286 files, 719 relative links, post-merge 12-member graph:
+  3 `done` / 0 `doing` / 9 `todo`).
 - [x] Record fail-first evidence, implementation outcome, verification, and compatibility boundaries.
-- [ ] Open an independent draft PR without activating the next Wave 6 member.
+- [x] Open independent draft PR #166 and merge it as `5b50acc8` without activating the next Wave 6 member.

@@ -45,9 +45,9 @@ PRs #157--#159 and the child epic is closed. O007 and D053 form the next reprodu
 merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 shipped in PR #162 (`31a0832f`). The
 child epic is closed. Wave 5 is closed at 13 shipped findings: its bounded HIGH set plus D035, D036, O037, O038, O042,
 and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and assigned 34 still-live correctness rows
-to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). D020 shipped in PR #164,
-D023/D028/O022 shipped in PR #165, and D027/O012 are the sole active member. O003 already shipped in Wave 3 and is not
-part of the Wave 5 set. Other MEDIUM/LOW rows still require their separately defined Wave 6/7 admission gates.
+to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). D020, D023/D028/O022, and
+D027/O012 shipped in PRs #164--#166; no Wave 6 member is active. O003 already shipped in Wave 3 and is not part of the
+Wave 5 set. Other MEDIUM/LOW rows still require their separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -678,15 +678,16 @@ The controls live in `tests/regression/test_bug_d033_cancel_verification_escape_
 the caller catches the non-strict conversion error and falls back to raw intent. O020 must not be implemented from the
 old row.
 
-Current source still contains the cited boundary for the other 34 rows. They are accepted and parked as Wave 6 work;
-each member's implementation entry remains blocked on its own fail-first regression or equivalent executable
+At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
+Six findings across the first three members have since shipped; the remaining 28 stay parked, and each remaining
+member's implementation entry remains blocked on its own fail-first regression or equivalent executable
 characterization:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | D020                             | [`strip_direct_child_forge_headers`](done/strip_direct_child_forge_headers/card.md)                   |
 | D023, D028, O022                 | [`align_transfer_preflight_and_cli_contract`](done/align_transfer_preflight_and_cli_contract/card.md) |
-| D027, O012                       | [`harden_detached_process_teardown`](doing/harden_detached_process_teardown/card.md)                  |
+| D027, O012                       | [`harden_detached_process_teardown`](done/harden_detached_process_teardown/card.md)                   |
 | O014, O026                       | [`close_proxy_failure_lifecycles`](todo/close_proxy_failure_lifecycles/card.md)                       |
 | D029, O025                       | [`complete_proxy_instance_config_wiring`](todo/complete_proxy_instance_config_wiring/card.md)         |
 | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](todo/restore_proxy_request_semantics/card.md)                     |
@@ -697,9 +698,9 @@ characterization:
 | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](todo/preserve_session_launch_preconditions/card.md)         |
 | O036                             | [`harden_walkthrough_sandbox_provenance`](todo/harden_walkthrough_sandbox_provenance/card.md)         |
 
-This handoff closes Wave 5 at 13/13 admitted findings. It does not claim the 34 Wave 6 behaviors are fixed, activate a
-parked member, or admit policy-internal, durable-state-only, performance, docs, duplication, dead-code, structural, or
-explicitly unverified rows outside this screen.
+This handoff closed Wave 5 at 13/13 admitted findings. At admission, it did not claim any of the 34 Wave 6 behaviors
+were fixed, activate a parked member, or admit policy-internal, durable-state-only, performance, docs, duplication,
+dead-code, structural, or explicitly unverified rows outside this screen.
 
 ### Suggested coordination boundaries
 
@@ -720,8 +721,9 @@ explicitly unverified rows outside this screen.
 - **[Proxy conversion failure handling epic](done/epic_proxy_conversion_failure_handling/card.md):** D053's
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 34 source-reconfirmed
-  CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; D020 and D023/D028/O022 shipped in PRs
-  #164--#165, D027/O012 are active, and D033/O020 are rejected by executable current-behavior controls.
+  CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; six findings across D020, D023/D028/O022,
+  and D027/O012 shipped in PRs #164--#166, no member is active, and D033/O020 are rejected by executable
+  current-behavior controls.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

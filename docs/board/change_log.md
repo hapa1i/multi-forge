@@ -43,7 +43,8 @@ or headless result contracts.
 review guards then failed on `a4071346`. The 128-test backend/invoker slice, 8,974 unit tests (one existing platform
 skip, 122 deselected), 747 regressions, 8 backend CLI integration tests, and 3 real-process teardown integrations pass.
 A real Codex smoke stopped at preflight because no Codex credential is configured and launched no subprocess. Final
-pre-commit and board link/lane checks pass.
+pre-commit and board link/lane checks pass. All five GitHub checks passed, and the member shipped in PR #166
+(`5b50acc8`).
 
 ### Strip inherited Forge headers from direct children
 

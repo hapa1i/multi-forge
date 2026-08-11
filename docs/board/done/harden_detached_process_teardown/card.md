@@ -1,9 +1,8 @@
 # Harden detached process teardown
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/harden-detached-process-teardown` from merged `main` at `b3150184`; production
-changes remain blocked on retained fail-first regressions.
+**Lane**: `done/` -- shipped in PR #166 (`5b50acc8`) after independent review.
 
 **Findings**: D027 and O012.
 
@@ -63,8 +62,8 @@ configured; no subprocess launched. The hermetic real-process integration exerci
 external authentication.
 
 Final pre-commit passes after its expected Markdown normalization. All 719 relative links across 286 board Markdown
-files have existing targets, changed-document fragments resolve, and the 12-member Wave 6 lane graph is 2 `done` / 1
-`doing` / 9 `todo`; size and diff checks pass.
+files have existing targets, changed-document fragments resolve, and the post-merge 12-member Wave 6 lane graph is 3
+`done` / 0 `doing` / 9 `todo`; size and diff checks pass. All five GitHub checks passed before merge.
 
 ## Compatibility and Exclusions
 

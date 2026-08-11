@@ -2,8 +2,8 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
-handed 34 still-live correctness rows to the active Wave 6 child epic. D020 and D023/D028/O022 shipped first; D027/O012
-are the sole active member. Remaining Wave 6/7 rows require their separate entry-condition checks.
+handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Six findings across its first three members have
+shipped, and no member is currently active. Remaining Wave 6/7 rows require their separate entry-condition checks.
 
 ## Goal
 
@@ -75,8 +75,9 @@ shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is 
 in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
-34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where D020 is
-active and every later member remains gated on a fail-first execution-branch reproduction.
+34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where six
+findings across the first three members shipped in PRs #164--#166 and the remaining nine members stay gated on a
+fail-first execution-branch reproduction.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.

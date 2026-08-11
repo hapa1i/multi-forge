@@ -2,9 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D020 and D023/D028/O022 shipped in PRs #164--#165; D027/O012 are active on
-`agent/harden-detached-process-teardown`; the other 9 members remain parked in `todo/` behind their fail-first
-reproduction gates.
+**Lane**: `doing/` -- 6 of 34 findings across 3 of 12 members shipped in PRs #164--#166; no member is active while the
+other 9 remain parked in `todo/` behind their fail-first reproduction gates.
 
 ## Goal
 
@@ -32,7 +31,7 @@ before production code changes.
 | ----- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | 1     | D020                             | [`strip_direct_child_forge_headers`](../../done/strip_direct_child_forge_headers/card.md)                   | outbound correlation-header trust             |
 | 2     | D023, D028, O022                 | [`align_transfer_preflight_and_cli_contract`](../../done/align_transfer_preflight_and_cli_contract/card.md) | transfer source/depth/reattach semantics      |
-| 3     | D027, O012                       | [`harden_detached_process_teardown`](../harden_detached_process_teardown/card.md)                           | detached process-group ownership              |
+| 3     | D027, O012                       | [`harden_detached_process_teardown`](../../done/harden_detached_process_teardown/card.md)                   | detached process-group ownership              |
 | 4     | O014, O026                       | [`close_proxy_failure_lifecycles`](../../todo/close_proxy_failure_lifecycles/card.md)                       | proxy registry and stream cleanup             |
 | 5     | D029, O025                       | [`complete_proxy_instance_config_wiring`](../../todo/complete_proxy_instance_config_wiring/card.md)         | template-to-instance field preservation       |
 | 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../../todo/restore_proxy_request_semantics/card.md)                     | tier authority and translated request shape   |
