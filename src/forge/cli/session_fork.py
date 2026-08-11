@@ -89,6 +89,10 @@ from forge.session.launch import (
 from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
 )
+from forge.session.transfer import (
+    estimate_transcript_tokens,
+    resolve_transfer_transcript_source,
+)
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -638,11 +642,6 @@ def fork(
 
     if (is_cross_dir or resume_mode == "transfer") and strategy == "full" and not direct:
         try:
-            from forge.session.artifacts import (
-                latest_transcript_artifact_path,
-                resolve_artifact_path,
-            )
-
             parent_state = manager.get_session(parent, forge_root=_fr)
             # --proxy override > parent's proxy for budget check
             if _preflight_routing:
@@ -652,11 +651,8 @@ def fork(
                 preflight_ref = child_template
             context_limit_preflight = _resolve_context_limit(preflight_ref)
             if context_limit_preflight is not None:
-                from forge.session.transfer import estimate_transcript_tokens
-
                 artifact_root = _resolve_session_artifact_root(manager=manager, state=parent_state)
-                copied_path = latest_transcript_artifact_path(parent_state)
-                transcript_path = resolve_artifact_path(artifact_root, copied_path)
+                transcript_path, _artifact_path = resolve_transfer_transcript_source(parent_state, artifact_root)
                 if transcript_path is not None and transcript_path.is_file():
                     token_est = estimate_transcript_tokens(transcript_path)
                     if token_est > context_limit_preflight:

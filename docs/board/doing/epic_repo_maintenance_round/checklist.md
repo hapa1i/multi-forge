@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; Wave 6 is active with D020 as its only implementation member in `doing/`.
+Current focus: Wave 5 is closed; Wave 6 has shipped D020 and is executing only D023/D028/O022.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -139,7 +139,8 @@ Current focus: Wave 5 is closed; Wave 6 is active with D020 as its only implemen
   D033/O020 with two passing behavior controls, and park the 34 live rows under `epic_wave6_correctness_maintenance`
   without activating implementation.
 - [x] Activate the Wave 6 epic and D020 on `agent/d020-inherited-forge-headers`; keep the other 11 members parked.
-- [ ] Ship D020 independently before activating the next ordered Wave 6 member.
+- [x] Ship D020 independently before activating the next ordered Wave 6 member (PR #164, `26ab5f29`).
+- [ ] Ship D023/D028/O022 independently before activating the next ordered Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

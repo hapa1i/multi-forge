@@ -25,7 +25,6 @@ from forge.install.project_compat import (
 from .artifacts import (
     ADOPT_ARTIFACT_REASON,
     latest_transcript_artifact_path,
-    resolve_artifact_path,
 )
 from .claude.paths import (
     get_transcript_path,
@@ -68,6 +67,7 @@ from .transfer import (
     assemble_transfer_context,
     estimate_transcript_tokens,
     parse_transfer_context_strategy,
+    resolve_transfer_transcript_source,
 )
 
 logger = logging.getLogger(__name__)
@@ -755,7 +755,7 @@ class SessionManager:
         *,
         child_name: str | None = None,
         strategy: str = "structured",
-        depth: int = 1,
+        depth: int | None = 1,
         context_limit: int | None = None,
         token_estimate_multiplier: float = 1.0,
         resume_mode: str = "transfer",
@@ -778,7 +778,7 @@ class SessionManager:
             parent_name: Parent session name to derive from.
             child_name: Name for the child session (auto-generated if None).
             strategy: Context assembly strategy (minimal/structured/full/ai-curated).
-            depth: How many ancestors to traverse (1 = parent only).
+            depth: How many ancestors to traverse (1 = parent only, None = all).
             context_limit: Context limit for budget check (required for full strategy).
             token_estimate_multiplier: Optional model-specific multiplier for heuristic budget checks.
             resume_mode: "transfer" (assemble context file) or "native" (skip assembly).
@@ -890,8 +890,10 @@ class SessionManager:
         resume_strategy = parse_transfer_context_strategy(strategy)
 
         if resume_strategy == ResumeStrategy.FULL and context_limit is not None:
-            copied_path = latest_transcript_artifact_path(parent_state)
-            transcript_path = resolve_artifact_path(parent_artifact_root, copied_path)
+            transcript_path, _artifact_path = resolve_transfer_transcript_source(
+                parent_state,
+                parent_artifact_root,
+            )
             if transcript_path is not None and transcript_path.is_file():
                 token_estimate = estimate_transcript_tokens(
                     transcript_path,
@@ -936,7 +938,7 @@ class SessionManager:
             inherited_proxy=inherited_proxy,
             resume_mode="transfer",
             strategy=resume_strategy.value,
-            depth=depth,
+            depth=len(transfer_result.lineage) if depth is None else depth,
             resumed_at=timestamp,
             lineage=transfer_result.lineage,
             context_file=transfer_result.context_file_rel,
