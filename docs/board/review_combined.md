@@ -45,9 +45,9 @@ PRs #157--#159 and the child epic is closed. O007 and D053 form the next reprodu
 merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 shipped in PR #162 (`31a0832f`). The
 child epic is closed. Wave 5 is closed at 13 shipped findings: its bounded HIGH set plus D035, D036, O037, O038, O042,
 and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and assigned 34 still-live correctness rows
-to the parked [`epic_wave6_correctness_maintenance`](todo/epic_wave6_correctness_maintenance/card.md). O003 already
-shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their separately defined Wave
-6/7 admission gates.
+to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md), whose first D020 member is
+active. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their
+separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -684,7 +684,7 @@ characterization:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| D020                             | [`strip_direct_child_forge_headers`](todo/strip_direct_child_forge_headers/card.md)                   |
+| D020                             | [`strip_direct_child_forge_headers`](doing/strip_direct_child_forge_headers/card.md)                  |
 | D023, D028, O022                 | [`align_transfer_preflight_and_cli_contract`](todo/align_transfer_preflight_and_cli_contract/card.md) |
 | D027, O012                       | [`harden_detached_process_teardown`](todo/harden_detached_process_teardown/card.md)                   |
 | O014, O026                       | [`close_proxy_failure_lifecycles`](todo/close_proxy_failure_lifecycles/card.md)                       |
@@ -719,9 +719,9 @@ explicitly unverified rows outside this screen.
   independently in PRs #157--#159 with retained ordinary-log, structured-event, and request-ID regressions.
 - **[Proxy conversion failure handling epic](done/epic_proxy_conversion_failure_handling/card.md):** D053's
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
-- **[Wave 6 correctness maintenance epic](todo/epic_wave6_correctness_maintenance/card.md):** 34 source-reconfirmed
-  CLI/proxy/runtime rows are accepted and parked behind member-specific fail-first gates; D033 and O020 are rejected by
-  executable current-behavior controls and are not implementation work.
+- **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 34 source-reconfirmed
+  CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; D020 is active, while D033 and O020 are
+  rejected by executable current-behavior controls and are not implementation work.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

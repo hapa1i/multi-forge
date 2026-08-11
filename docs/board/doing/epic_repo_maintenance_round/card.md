@@ -2,8 +2,8 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
-handed 34 still-live correctness rows to a parked Wave 6 child epic. Remaining Wave 6/7 rows require their separate
-entry-condition checks.
+handed 34 still-live correctness rows to the active Wave 6 child epic, where D020 is the first member. Remaining Wave
+6/7 rows require their separate entry-condition checks.
 
 ## Goal
 
@@ -75,8 +75,8 @@ shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is 
 in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
-34 live rows into parked [`epic_wave6_correctness_maintenance`](../../todo/epic_wave6_correctness_maintenance/card.md),
-where every member remains gated on a fail-first execution-branch reproduction.
+34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where D020 is
+active and every later member remains gated on a fail-first execution-branch reproduction.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
@@ -113,7 +113,7 @@ order.
 | 5M   | D036                | [`validate_proxy_request_ids`](../../done/validate_proxy_request_ids/card.md)                                       |
 | 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
-| 6    | 34 correctness rows | [`epic_wave6_correctness_maintenance`](../../todo/epic_wave6_correctness_maintenance/card.md)                       |
+| 6    | 34 correctness rows | [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md)                               |
 | 7    | O047–O048           | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049                | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050                | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

@@ -681,7 +681,7 @@ class TestCorrelationHeaders:
         assert f"{self._CMD_H}: review" in env[self._H]
 
     def test_no_session_header_for_non_proven_target(self) -> None:
-        # The whole correlation block no-ops for an unproven target -> no session header.
+        # An unproven target receives no freshly derived session header.
         vars_ = self._marker_vars()
         vars_[FORGE_SESSION_VAR] = "s"
         env = build_claude_env(extra_vars=vars_, base_url="http://evil.example:9999")
