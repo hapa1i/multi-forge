@@ -41,6 +41,10 @@ from forge.core.reactive.env import (
     FORGE_RUN_ID_VAR,
 )
 
+_PROCESS_GROUP_TERM_TIMEOUT_SECONDS = 5.0
+_PROCESS_GROUP_KILL_TIMEOUT_SECONDS = 2.0
+_PROCESS_GROUP_POLL_INTERVAL_SECONDS = 0.05
+
 
 @dataclass(frozen=True)
 class ParseHints:
@@ -123,25 +127,67 @@ def _record_worker_upstream(attribution: Attribution, result: HeadlessResult, st
     )
 
 
-def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
-    """Terminate and reap the given children. SIGTERM -> wait -> SIGKILL."""
-    for proc in procs:
-        if proc.poll() is None:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            except (OSError, ProcessLookupError):
-                pass
-    for proc in procs:
+def _process_group_exists(process_group_id: int) -> bool:
+    """Return whether a process group still has members."""
+    try:
+        os.kill(-process_group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _wait_for_process_group_exit(
+    proc: subprocess.Popen[str],
+    process_group_id: int,
+    timeout_seconds: float,
+) -> bool:
+    """Reap the direct child while waiting for its complete process group to exit."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
         try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                proc.wait(timeout=2)
-            except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                pass
+            proc.poll()
         except OSError:
             pass
+        if not _process_group_exists(process_group_id):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(_PROCESS_GROUP_POLL_INTERVAL_SECONDS, remaining))
+
+
+def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
+    """Terminate and reap complete child groups. SIGTERM -> group wait -> SIGKILL."""
+    signalled: list[tuple[subprocess.Popen[str], int]] = []
+    for proc in procs:
+        # Every owned child starts a new session, so its PID remains the group id
+        # even if the leader exits before cleanup reaches it. Prefer the live lookup
+        # while available, then retain the stable session-leader id as the fallback.
+        process_group_id = proc.pid
+        leader_running = proc.poll() is None
+        if leader_running:
+            try:
+                process_group_id = os.getpgid(proc.pid)
+            except OSError:
+                pass
+        elif not _process_group_exists(process_group_id):
+            continue
+        try:
+            os.killpg(process_group_id, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            continue
+        signalled.append((proc, process_group_id))
+
+    for proc, process_group_id in signalled:
+        if _wait_for_process_group_exit(proc, process_group_id, _PROCESS_GROUP_TERM_TIMEOUT_SECONDS):
+            continue
+        try:
+            os.killpg(process_group_id, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            continue
+        _wait_for_process_group_exit(proc, process_group_id, _PROCESS_GROUP_KILL_TIMEOUT_SECONDS)
 
 
 class _HeadlessLifecycleBase:

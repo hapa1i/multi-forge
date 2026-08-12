@@ -154,7 +154,7 @@ def test_o012_single_shot_cancellation_terminates_and_reaps_child_group() -> Non
 
     assert exc_info.value is interrupt
     kill_group.assert_called_once_with(54321, signal.SIGTERM)
-    proc.wait.assert_called_once_with(timeout=5)
+    assert proc.poll.call_count >= 2  # initial liveness check plus group-wait reaping
 
 
 def test_o012_normal_single_shot_exit_does_not_signal_child() -> None:
