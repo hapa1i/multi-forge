@@ -43,6 +43,10 @@ _PASSTHROUGH_TIMEOUT = httpx.Timeout(600.0, connect=10.0)
 
 _DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 
+_UPSTREAM_STREAM_ERROR_BODY = (
+    b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}'
+)
+
 
 def build_upstream_headers(inbound: Mapping[str, str], api_key: str) -> dict[str, str]:
     """Build upstream headers: injected credential + forwarded Anthropic API flags.
@@ -193,17 +197,35 @@ async def forward(
             _safe_on_complete(on_complete, {}, None, True, request_id)
             return Response(
                 status_code=502,
-                content=b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}',
+                content=_UPSTREAM_STREAM_ERROR_BODY,
                 media_type="application/json",
                 headers=forge_headers,
             )
 
         if resp.status_code != 200:
-            body = await resp.aread()
-            logger.warning("[%s] passthrough upstream %s", request_id, resp.status_code)
-            await stream_cm.__aexit__(None, None, None)
-            await client_cm.__aexit__(None, None, None)
+            read_failed = False
+            try:
+                body = await resp.aread()
+            except httpx.HTTPError as e:
+                read_failed = True
+                body = b""
+                logger.warning("[%s] passthrough upstream error body read failed: %s", request_id, e)
+            finally:
+                try:
+                    await stream_cm.__aexit__(None, None, None)
+                finally:
+                    await client_cm.__aexit__(None, None, None)
+
             _safe_on_complete(on_complete, {}, None, True, request_id)
+            if read_failed:
+                return Response(
+                    status_code=502,
+                    content=_UPSTREAM_STREAM_ERROR_BODY,
+                    media_type="application/json",
+                    headers=forge_headers,
+                )
+
+            logger.warning("[%s] passthrough upstream %s", request_id, resp.status_code)
             return Response(
                 status_code=resp.status_code,
                 content=body,

@@ -50,8 +50,10 @@ proxy:
 > overlay -> env). Users only edit the proxy overlay. `validate_user_config()` enforces this by rejecting proxy-owned
 > and template-owned keys in `~/.forge/config.yaml`.
 
-**Note:** Provider/base_url/template are set when the proxy is created. The per-proxy overlay only tunes defaults
-**within** that proxy's routing scope.
+**Note:** Creation fixes provider/base_url/template; the per-proxy overlay tunes only routing-scope defaults.
+
+Failed starts restore the pre-start registry row. Config-only starts keep a pid-less `stopped` row. Cleanup changes only
+the attempt's unchanged `starting` row, preserving concurrent replacements.
 
 ### A.2 Proxy templates vs user-defined proxies (§3.6.5)
 
@@ -649,11 +651,13 @@ logging:
 | `logging.requests.stream_chunks`           | bool (default `false`)                       | Opt-in per-chunk debug dumps; off even at `log_level=debug`                                       |
 | `logging.requests.stream_chunk_max_bytes`  | int (default `0` = small cap)                | Truncate each dumped chunk                                                                        |
 
-`src/forge/proxy/response_headers.py` owns the response-metadata boundary shared by Anthropic and Responses raw
-transports. It relays every upstream header except the case-insensitive fixed security/framing denylist and extension
-fields named by `Connection`; upstream Forge-owned cost/resolution/correlation fields are also excluded. The helper
-stamps Forge's request id and applies Forge-owned overlays with case-insensitive replacement. The transport modules
-retain ownership of response bodies, SSE chunks, accounting callbacks, and stream teardown.
+`src/forge/proxy/response_headers.py` owns raw response metadata. It excludes security/framing, `Connection` extensions,
+and Forge cost/resolution/correlation fields; stamps request ids; and applies overlays case-insensitively. Transports
+own bodies, SSE chunks, accounting, and teardown.
+
+Raw transports read non-200 bodies before closing stream and client. A read `httpx.HTTPError` records one failure and
+returns the stable 502 body, never partial content. Other exceptions propagate after cleanup without completion.
+Readable errors preserve status, body, and safe headers.
 
 Override reasoning reuses `tier_overrides.<tier>.reasoning_effort` (§A.1). Normal `forge proxy set` edits
 intercept/audit fields and warns that full-body audit writes redacted structure to downstream telemetry. Audit/provider

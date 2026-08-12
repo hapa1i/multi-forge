@@ -333,6 +333,56 @@ async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
     }
 
 
+@pytest.mark.asyncio
+async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_failure(monkeypatch):
+    class _ReadErrorStream(_FakeStream):
+        exit_count = 0
+
+        def __init__(self):
+            super().__init__(status_code=429, chunks=(b"provider-secret",))
+
+        async def __aexit__(self, *exc):
+            self.exit_count += 1
+            return False
+
+        async def aread(self) -> bytes:
+            raise rp.httpx.ReadError("injected body read failure")
+
+    class _ReadErrorClient(_FakeAsyncClient):
+        def __init__(self):
+            self.stream_cm = _ReadErrorStream()
+            self.exit_count = 0
+
+        async def __aexit__(self, *exc):
+            self.exit_count += 1
+            return False
+
+        def stream(self, method, url, headers=None, json=None):
+            return self.stream_cm
+
+    client = _ReadErrorClient()
+    monkeypatch.setattr(rp.httpx, "AsyncClient", lambda **_kwargs: client)
+    completed: list[tuple[dict, int | None, bool, str | None]] = []
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi", "stream": True},
+        query_string="",
+        inbound_headers={},
+        base_url="https://upstream.test",
+        api_key="K",
+        request_id="req-read-error",
+        on_complete=lambda usage, cost, failed, error: completed.append((usage, cost, failed, error)),
+    )
+
+    assert resp.status_code == 502
+    assert b"provider-secret" not in bytes(resp.body)
+    assert client.stream_cm.exit_count == 1
+    assert client.exit_count == 1
+    assert completed == [({}, None, True, "upstream_error")]
+
+
 # ── forward(): bodyless + non-{id} surface (b) ──────────────────────────────────────
 
 
