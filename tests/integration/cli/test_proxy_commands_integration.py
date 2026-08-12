@@ -669,6 +669,38 @@ class TestProxyCreateNoStart:
         assert check.returncode == 0
         assert "litellm-openai" in check.stdout
 
+    def test_create_preserves_custom_template_tool_and_cache_fields(self, mock_claude_workspace: ContainerLike) -> None:
+        """Custom template fields survive the real CLI creation and reload path."""
+        custom_template = """\
+proxy:
+  family: anthropic
+  preferred_provider: openrouter
+  backend: openrouter
+  default_port: 8095
+  tool_prefixes_to_ignore:
+    - mcp__*
+  openrouter:
+    tiers:
+      haiku: anthropic/claude-haiku-4.5
+      sonnet: anthropic/claude-sonnet-5
+      opus: anthropic/claude-opus-5
+    prompt_caching: auto_inject
+    auto_cache_min_tokens: 4096
+"""
+        mock_claude_workspace.mkdir("$HOME/.forge/templates", parents=True)
+        mock_claude_workspace.write_file("$HOME/.forge/templates/wiring-test.yaml", custom_template)
+
+        result = mock_claude_workspace.exec("forge proxy create wiring-test --name wired --no-start")
+
+        assert result.returncode == 0, f"Create failed: {result.stdout}\n{result.stderr}"
+        check = mock_claude_workspace.exec(
+            '/forge/.venv/bin/python -c "from forge.config.loader import load_config; '
+            "c=load_config(proxy_id='wired'); p=c.proxy.get_provider(); "
+            'print(c.proxy.tool_prefixes_to_ignore, p.prompt_caching, p.auto_cache_min_tokens)"'
+        )
+        assert check.returncode == 0, f"Reload failed: {check.stdout}\n{check.stderr}"
+        assert "['mcp__*'] auto_inject 4096" in check.stdout
+
     def test_create_then_list_shows_proxy(self, mock_claude_workspace: ContainerLike) -> None:
         """WORKFLOW TEST: Create followed by list should show the new proxy.
 

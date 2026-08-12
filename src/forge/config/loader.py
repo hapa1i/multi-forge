@@ -35,6 +35,8 @@ from forge.backend.sources import (
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
     PROXY_BLOCK_FIELDS,
+    PROXY_PROVIDER_DIRECT_FIELDS,
+    PROXY_SHARED_NON_BLOCK_FIELDS,
     ForgeConfig,
     ProviderConfig,
     ProxyConfig,
@@ -452,18 +454,14 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
             port=data_map.get("port", 0),
             upstream_base_url=data_map.get("upstream_base_url", ""),
             tiers=tiers,
-            backend=data_map.get("backend", ""),
-            family=data_map.get("family", ""),
             tier_overrides=tier_overrides,
-            model_alternatives=data_map.get("model_alternatives", {}),
-            default_tier=data_map.get("default_tier", "sonnet"),
             provider_settings=data_map.get("provider_settings", {}),
-            prompt_caching=data_map.get("prompt_caching", "passthrough"),
-            auto_cache_min_tokens=data_map.get("auto_cache_min_tokens", 1024),
             created_at=data_map.get("created_at"),
             updated_at=data_map.get("updated_at"),
-            # Shared blocks flow through the PROXY_BLOCK_FIELDS declaration; absent
-            # keys fall to the dataclass defaults (the single source of defaults).
+            # Direct shared/provider fields and shared blocks flow through their
+            # declarations; absent keys use the dataclass defaults.
+            **{name: data_map[name] for name in PROXY_SHARED_NON_BLOCK_FIELDS if name in data_map},
+            **{name: data_map[name] for name in PROXY_PROVIDER_DIRECT_FIELDS if name in data_map},
             **{name: data_map[name] for name in PROXY_BLOCK_FIELDS if name in data_map},
         )
     except (AttributeError, KeyError, TypeError) as e:
@@ -552,21 +550,17 @@ def _proxy_instance_to_forge_config(
     provider_config = ProviderConfig(
         tiers=proxy_config.tiers,
         tier_overrides=proxy_config.tier_overrides,
-        model_alternatives=proxy_config.model_alternatives,
         base_url=proxy_config.upstream_base_url,
         openai_api_mode=proxy_config.provider_settings.get("openai_api_mode", "auto"),
-        prompt_caching=proxy_config.prompt_caching,
-        auto_cache_min_tokens=proxy_config.auto_cache_min_tokens,
         error_hints=proxy_config.provider_settings.get("error_hints", False),
+        **{name: getattr(proxy_config, name) for name in PROXY_PROVIDER_DIRECT_FIELDS},
     )
 
     proxy_server_config = ProxyConfig(
-        family=proxy_config.family,
         preferred_provider=proxy_config.provider,
-        backend=proxy_config.backend,
         active_template=proxy_config.template,
-        default_tier=proxy_config.default_tier,
         default_port=proxy_config.port,
+        **{name: getattr(proxy_config, name) for name in PROXY_SHARED_NON_BLOCK_FIELDS},
         **{name: getattr(proxy_config, name) for name in PROXY_BLOCK_FIELDS},
     )
 

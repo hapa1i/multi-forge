@@ -488,6 +488,7 @@ tiers:
   opus: openai/gpt-5.6-sol
 
 default_tier: sonnet
+tool_prefixes_to_ignore: []
 
 tier_overrides:
   sonnet:
@@ -511,6 +512,10 @@ costs:
 **What you'll typically edit:** `default_tier`, `tier_overrides`, and sometimes `provider_settings`. Leave
 `proxy_format`, `template`, `provider`, `backend`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
 unless you know what you're doing — those are set from the template/backend catalog at creation.
+
+Custom templates may also set `tool_prefixes_to_ignore`, `prompt_caching`, and `auto_cache_min_tokens`. Forge copies
+those values into each new proxy; existing `proxy.yaml` files remain user-owned snapshots and keep compatibility
+defaults when the keys are absent.
 
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.

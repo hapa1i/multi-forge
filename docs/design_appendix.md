@@ -46,14 +46,14 @@ proxy:
 2. Per-tier override (`proxy.<provider>.tier_overrides.<tier>.*`)
 3. Model catalog default (built-in per-model defaults)
 
-> **Implementation note:** Internally, config is layered (base defaults -> proxy defaults -> template overlay -> proxy
-> overlay -> env). Users only edit the proxy overlay. `validate_user_config()` enforces this by rejecting proxy-owned
-> and template-owned keys in `~/.forge/config.yaml`.
+> **Implementation note:** Config layers base -> proxy defaults -> template -> instance -> env. Users edit the instance;
+> global config rejects proxy/template keys.
 
-**Note:** Creation fixes provider/base_url/template; the per-proxy overlay tunes only routing-scope defaults.
+Creation copies template `tool_prefixes_to_ignore` and provider `prompt_caching`/`auto_cache_min_tokens` into user-owned
+`proxy.yaml`; runtime never re-merges the template. Provider/base_url/template stay fixed.
 
-Failed starts restore the pre-start registry row. Config-only starts keep a pid-less `stopped` row. Cleanup changes only
-the attempt's unchanged `starting` row, preserving concurrent replacements.
+Failed starts restore the prior registry row; config-only starts keep a pid-less `stopped` row. Cleanup changes only an
+unchanged `starting` row, preserving concurrent replacements.
 
 ### A.2 Proxy templates vs user-defined proxies (§3.6.5)
 
