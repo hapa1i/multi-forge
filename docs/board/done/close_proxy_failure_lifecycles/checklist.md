@@ -1,6 +1,6 @@
 # Close proxy failure lifecycles checklist
 
-Current focus: complete final quality and board gates, then prepare independent review.
+Current focus: closed after independent review and merge in PR #167 (`33e3db7f`).
 
 ## Activation and prior-member closeout
 
@@ -37,4 +37,4 @@ Current focus: complete final quality and board gates, then prepare independent 
   12-member graph: 3 `done` / 1 `doing` / 8 `todo`); size and diff checks pass.
 - [x] Synchronize the design appendix and end-user proxy lifecycle contracts.
 - [x] Record fail-first evidence, implementation outcome, verification, and compatibility boundaries.
-- [ ] Open an independent draft PR without activating the next Wave 6 member.
+- [x] Open independent draft PR #167 and merge it as `33e3db7f` without activating the next Wave 6 member.

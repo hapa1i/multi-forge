@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; Wave 6 has shipped its first 6 findings across 3 members and is executing only
-O014/O026.
+Current focus: Wave 5 is closed; Wave 6 has shipped its first 8 findings across 4 members and has no active member.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -144,7 +143,9 @@ O014/O026.
 - [x] Ship D023/D028/O022 independently before activating the next ordered Wave 6 member (PR #165, `b3150184`).
 - [x] Ship D027/O012 independently before activating the next ordered Wave 6 member (PR #166, `5b50acc8`).
 - [x] Activate only O014/O026 from merged `main` at `4774f69e` on `agent/close-proxy-failure-lifecycles`.
-- [ ] Ship O014/O026 independently before activating the next ordered Wave 6 member.
+- [x] Ship O014/O026 independently before activating the next ordered Wave 6 member (PR #167, `33e3db7f`).
+- [ ] Activate only D029/O025 from merged `main`, then retain its fail-first execution-base reproduction before
+  production changes.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

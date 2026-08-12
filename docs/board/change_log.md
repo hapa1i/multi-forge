@@ -42,7 +42,8 @@ transport read fails.
 **Verification**: Four fail-first cases failed on `4774f69e` while two compatibility controls passed. The 193-test
 focused slice, 814 proxy units, 8,981 unit tests (one existing platform skip, 122 deselected), 753 regressions, and 5
 targeted Docker integrations pass. Full pre-commit plus board link/lane, size, and diff checks pass; design and end-user
-lifecycle contracts are synchronized. The untracked regression/checklist also pass an explicit new-file hook run.
+lifecycle contracts are synchronized. The untracked regression/checklist also pass an explicit new-file hook run. Both
+GitHub workflows passed, and the member shipped in PR #167 (`33e3db7f`).
 
 ## 2026-08-11
 

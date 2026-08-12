@@ -1,9 +1,8 @@
 # Close proxy failure lifecycles
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/close-proxy-failure-lifecycles` from merged `main` at `4774f69e`; production
-changes remain blocked on retained fail-first regressions.
+**Lane**: `done/` -- shipped in PR #167 (`33e3db7f`) after independent review.
 
 **Findings**: O014 and O026.
 
@@ -50,8 +49,8 @@ Five targeted Docker integrations pass, covering real create/start/list/stop and
 relay. Design and end-user proxy contracts now record failed-start ownership and non-200 read-failure behavior.
 
 Full pre-commit and an explicit new-file pass both succeed. All 720 local links across 287 board Markdown files have
-existing targets, changed-document fragments resolve, and the 12-member Wave 6 lane graph is 3 `done` / 1 `doing` / 8
-`todo`; size and diff checks pass.
+existing targets, changed-document fragments resolve, and the post-merge 12-member Wave 6 lane graph is 4 `done` / 0
+`doing` / 8 `todo`; size and diff checks pass. Both GitHub workflows passed before merge.
 
 ## Compatibility and Exclusions
 
