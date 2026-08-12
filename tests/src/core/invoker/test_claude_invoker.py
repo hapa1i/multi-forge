@@ -102,20 +102,22 @@ class TestRunParallel:
         assert out[0].returncode == 1
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=999)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_timeout_kills_process_group(self, mock_popen, mock_killpg, _getpgid):
+    def test_timeout_kills_process_group(self, mock_popen, mock_killpg, _group_exists, _getpgid):
         proc = _mock_proc(communicate_side_effect=subprocess.TimeoutExpired(cmd="claude", timeout=1))
-        proc.poll.return_value = 0  # cleanup sees it exited; only the _run_one SIGTERM fires
+        proc.poll.return_value = None
         mock_popen.return_value = proc
         out = ClaudeHeadlessInvoker().run_parallel([_req(timeout=1)])
         assert out[0].timed_out is True and out[0].success is False
         assert any(call.args == (999, signal.SIGTERM) for call in mock_killpg.call_args_list)
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=777)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_cancellation_sigterms_children_before_join(self, mock_popen, mock_killpg, _getpgid):
+    def test_cancellation_sigterms_children_before_join(self, mock_popen, mock_killpg, _group_exists, _getpgid):
         """On a main-thread cancellation (KeyboardInterrupt) mid-fan-out, children are
         SIGTERMed BEFORE the blocking executor join -- not after workers drain their
         per-worker timeout. Regression guard for the `with ThreadPoolExecutor` ordering
@@ -175,9 +177,16 @@ class TestRunParallel:
         assert not watchdog_fired.is_set()  # killpg, not the failsafe, unblocked the workers
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=888)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_cancellation_reaps_child_registered_after_cleanup(self, mock_popen, mock_killpg, _getpgid):
+    def test_cancellation_reaps_child_registered_after_cleanup(
+        self,
+        mock_popen,
+        mock_killpg,
+        _group_exists,
+        _getpgid,
+    ):
         """If cleanup starts while Popen is still returning, the worker reaps its child.
 
         This guards the narrow race where a process exists but has not yet been
@@ -231,18 +240,25 @@ class TestRunParallel:
         proc.communicate.assert_not_called()
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", side_effect=lambda pid: pid)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_cancellation_reaps_retry_child_registered_after_cleanup(self, mock_popen, mock_killpg, _getpgid):
+    def test_cancellation_reaps_retry_child_registered_after_cleanup(
+        self,
+        mock_popen,
+        mock_killpg,
+        _group_exists,
+        _getpgid,
+    ):
         """The JSON-flag retry spawn is covered by the same cancellation guard as the
         primary spawn (the E3 fix). If _cleanup's one-shot snapshot is taken after the
         primary append but before the retry child is registered, the worker reaps the
         retry child itself -- otherwise shutdown(wait=True) would hang on it.
 
         Deterministic: the retry Popen blocks until an ObservedLock sees _cleanup
-        acquire children_lock (the 3rd acquisition: worker early-check, primary append,
-        then cleanup), so the snapshot excludes the retry; a watchdog failsafe keeps a
-        regression from hanging the suite. getpgid is identity so pgid == pid.
+        acquire children_lock (the 4th acquisition: worker early-check, primary append,
+        primary retirement, then cleanup), so the snapshot excludes the retry; a watchdog
+        failsafe keeps a regression from hanging the suite. getpgid is identity so pgid == pid.
         """
         hj.reset_json_capability_cache()
         real_lock = threading.Lock()
@@ -257,7 +273,7 @@ class TestRunParallel:
             def __enter__(self):
                 real_lock.acquire()
                 self.entries += 1
-                if self.entries == 3:  # #1 worker early-check, #2 primary append, #3 cleanup
+                if self.entries == 4:  # early-check, primary append/retire, then cleanup
                     cleanup_has_lock.set()
                 return self
 
@@ -321,9 +337,10 @@ class TestRun:
         assert out.run_id == "run_s"
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=333)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_single_shot_timeout_kills_process_group(self, mock_popen, mock_killpg, _getpgid):
+    def test_single_shot_timeout_kills_process_group(self, mock_popen, mock_killpg, _group_exists, _getpgid):
         proc = _mock_proc(communicate_side_effect=subprocess.TimeoutExpired(cmd="claude", timeout=1))
         proc.poll.return_value = None
         mock_popen.return_value = proc

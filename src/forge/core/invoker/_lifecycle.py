@@ -25,6 +25,7 @@ cancellation is different: it terminates and reaps the owned child group, then r
 
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import subprocess
@@ -40,6 +41,8 @@ from forge.core.reactive.env import (
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
 )
+
+logger = logging.getLogger(__name__)
 
 _PROCESS_GROUP_TERM_TIMEOUT_SECONDS = 5.0
 _PROCESS_GROUP_KILL_TIMEOUT_SECONDS = 2.0
@@ -141,15 +144,17 @@ def _process_group_exists(process_group_id: int) -> bool:
 def _wait_for_process_group_exit(
     proc: subprocess.Popen[str],
     process_group_id: int,
-    timeout_seconds: float,
+    deadline: float,
 ) -> bool:
-    """Reap the direct child while waiting for its complete process group to exit."""
-    deadline = time.monotonic() + timeout_seconds
+    """Reap the direct child while waiting until a shared group-cleanup deadline."""
+    poll_error_reported = False
     while True:
         try:
             proc.poll()
-        except OSError:
-            pass
+        except OSError as e:
+            if not poll_error_reported:
+                logger.debug("Could not poll process-group leader %s during cleanup: %s", proc.pid, e)
+                poll_error_reported = True
         if not _process_group_exists(process_group_id):
             return True
         remaining = deadline - time.monotonic()
@@ -158,13 +163,31 @@ def _wait_for_process_group_exit(
         time.sleep(min(_PROCESS_GROUP_POLL_INTERVAL_SECONDS, remaining))
 
 
+def _signal_process_group(process_group_id: int, sig: signal.Signals) -> bool:
+    """Signal an owned process group, reporting failures except an already-missing group."""
+    try:
+        os.killpg(process_group_id, sig)
+    except ProcessLookupError:
+        return False
+    except OSError as e:
+        # Cleanup remains best-effort so it cannot replace the original worker
+        # result or cancellation, but degradation must retain operator evidence.
+        logger.warning("Could not send %s to owned process group %s: %s", sig.name, process_group_id, e)
+        return False
+    return True
+
+
 def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
-    """Terminate and reap complete child groups. SIGTERM -> group wait -> SIGKILL."""
+    """Terminate active owned groups under one SIGTERM -> SIGKILL deadline per phase.
+
+    Callers must retire completed fan-out children promptly; a bare numeric PGID is
+    not an ownership token after its original process-group lifetime ends.
+    """
     signalled: list[tuple[subprocess.Popen[str], int]] = []
     for proc in procs:
-        # Every owned child starts a new session, so its PID remains the group id
-        # even if the leader exits before cleanup reaches it. Prefer the live lookup
-        # while available, then retain the stable session-leader id as the fallback.
+        # Every owned child starts a new session, so PGID == PID. While the caller
+        # retains active ownership, that PID remains the group identifier even if
+        # the leader exits before cleanup reaches a surviving descendant.
         process_group_id = proc.pid
         leader_running = proc.poll() is None
         if leader_running:
@@ -174,20 +197,24 @@ def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
                 pass
         elif not _process_group_exists(process_group_id):
             continue
-        try:
-            os.killpg(process_group_id, signal.SIGTERM)
-        except (OSError, ProcessLookupError):
-            continue
-        signalled.append((proc, process_group_id))
+        if _signal_process_group(process_group_id, signal.SIGTERM):
+            signalled.append((proc, process_group_id))
 
+    term_deadline = time.monotonic() + _PROCESS_GROUP_TERM_TIMEOUT_SECONDS
+    survivors: list[tuple[subprocess.Popen[str], int]] = []
     for proc, process_group_id in signalled:
-        if _wait_for_process_group_exit(proc, process_group_id, _PROCESS_GROUP_TERM_TIMEOUT_SECONDS):
-            continue
-        try:
-            os.killpg(process_group_id, signal.SIGKILL)
-        except (OSError, ProcessLookupError):
-            continue
-        _wait_for_process_group_exit(proc, process_group_id, _PROCESS_GROUP_KILL_TIMEOUT_SECONDS)
+        if not _wait_for_process_group_exit(proc, process_group_id, term_deadline):
+            survivors.append((proc, process_group_id))
+
+    kill_signalled = [
+        (proc, process_group_id)
+        for proc, process_group_id in survivors
+        if _signal_process_group(process_group_id, signal.SIGKILL)
+    ]
+    kill_deadline = time.monotonic() + _PROCESS_GROUP_KILL_TIMEOUT_SECONDS
+    for proc, process_group_id in kill_signalled:
+        if not _wait_for_process_group_exit(proc, process_group_id, kill_deadline):
+            logger.warning("Owned process group %s survived SIGKILL cleanup", process_group_id)
 
 
 class _HeadlessLifecycleBase:
@@ -259,6 +286,9 @@ class _HeadlessLifecycleBase:
             )
             stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
             returncode = proc.returncode if proc.returncode is not None else -1
+            # communicate() reaped the leader. Retire the Popen ownership token
+            # before format hooks or result parsing can raise cancellation.
+            proc = None
             # Retry-once backstop: a format flag passed the capability gate but the CLI rejected it.
             if self._is_recoverable_format_rejection(returncode, stderr, hints):
                 run_argv, hints = self._on_format_rejection(request)
@@ -274,6 +304,7 @@ class _HeadlessLifecycleBase:
                 )
                 stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                 returncode = proc.returncode if proc.returncode is not None else -1
+                proc = None
             result = self._build_result(
                 request,
                 stdout=stdout,
@@ -354,6 +385,35 @@ def run_grouped_parallel(
             snapshot = list(children)
         _terminate_and_reap(snapshot)
 
+    def _register_child(proc: subprocess.Popen[str]) -> bool:
+        """Track a live child and report whether cancellation already took its snapshot."""
+        with children_lock:
+            children.append(proc)
+            return cleanup_started
+
+    def _release_child(proc: subprocess.Popen[str], *, terminate_owned_group: bool = False) -> None:
+        """Retire worker ownership, optionally terminating its group first."""
+        with children_lock:
+            registered_index = next((idx for idx, child in enumerate(children) if child is proc), None)
+            if registered_index is None:
+                return
+            children.pop(registered_index)
+            cleanup_active = cleanup_started
+
+        if cleanup_active:
+            # Either _cleanup() retained this child in its snapshot, or registration
+            # observed cancellation and the worker already ran the race-path teardown.
+            return
+        if terminate_owned_group:
+            _terminate_and_reap([proc])
+            return
+        try:
+            leader_running = proc.poll() is None
+        except OSError:
+            leader_running = True
+        if leader_running:
+            _terminate_and_reap([proc])
+
     def _run_one(invoker: _HeadlessLifecycleBase, request: HeadlessRequest) -> HeadlessResult:
         start = time.monotonic()
         ident = _identity(request.env)
@@ -383,9 +443,7 @@ def run_grouped_parallel(
                 env=request.env,
                 start_new_session=True,
             )
-            with children_lock:
-                children.append(proc)
-                should_cancel = cleanup_started
+            should_cancel = _register_child(proc)
 
             if should_cancel:
                 # Cleanup may have started after Popen returned but before the child
@@ -405,6 +463,12 @@ def run_grouped_parallel(
             else:
                 stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                 returncode = proc.returncode if proc.returncode is not None else -1
+                # A cleanup snapshot can land in the narrow interval after
+                # communicate() reaps the leader and before this locked release.
+                # Do not guard cleanup on returncode: an exited leader may still
+                # have live descendants in its owned process group.
+                _release_child(proc)
+                proc = None
                 # Retry-once backstop: format flag rejected despite the capability latch. The
                 # original process already exited; spawn the unflagged retry as a TRACKED child
                 # (own process group + registered in `children`, with `proc` reassigned to it)
@@ -423,9 +487,7 @@ def run_grouped_parallel(
                         env=request.env,
                         start_new_session=True,
                     )
-                    with children_lock:
-                        children.append(proc)
-                        retry_should_cancel = cleanup_started
+                    retry_should_cancel = _register_child(proc)
                     if retry_should_cancel:
                         # Same race as the primary spawn (above): _cleanup() takes a
                         # one-shot snapshot of `children`, so if it ran between this
@@ -446,6 +508,8 @@ def run_grouped_parallel(
                         )
                     stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                     returncode = proc.returncode if proc.returncode is not None else -1
+                    _release_child(proc)
+                    proc = None
                 result = invoker._build_result(
                     request,
                     stdout=stdout,
@@ -456,12 +520,11 @@ def run_grouped_parallel(
                     hints=hints,
                 )
         except subprocess.TimeoutExpired:
-            try:
-                if proc is not None:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                    proc.wait(timeout=5)
-            except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                pass
+            if proc is not None:
+                # Claim teardown while unregistering. The outer cleanup snapshot
+                # owns it instead if cancellation already crossed that boundary.
+                _release_child(proc, terminate_owned_group=True)
+                proc = None
             result = HeadlessResult(
                 label=request.label,
                 stdout="",
@@ -491,6 +554,9 @@ def run_grouped_parallel(
                 error=str(e),
                 **ident,
             )
+        finally:
+            if proc is not None:
+                _release_child(proc)
         invoker._emit(request, result)
         return result
 
