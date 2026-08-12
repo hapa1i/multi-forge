@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -547,6 +547,11 @@ def start_proxy(
 
     store = ProxyRegistryStore()
     registry = store.read()  # May raise ProxyRegistryCorruptedError
+    prior_proxy = (
+        replace(registry.proxies[proxy_id])
+        if skip_proxy_file and proxy_id is not None and proxy_id in registry.proxies
+        else None
+    )
 
     # 1) Reuse a registered healthy proxy.
     #    Skip template-wide reuse when an explicit upstream URL is requested,
@@ -700,14 +705,16 @@ def start_proxy(
 
     store.update(timeout_s=5.0, mutate=_register_starting)
 
-    proc, stderr_capture = _spawn_proxy_process(
-        template=template,
-        host=host,
-        port=spawn_port,
-        proxy_id=actual_proxy_id,
-        provider=cfg.proxy.preferred_provider,
-    )
+    proc: subprocess.Popen[bytes] | None = None
+    stderr_capture: Path | None = None
     try:
+        proc, stderr_capture = _spawn_proxy_process(
+            template=template,
+            host=host,
+            port=spawn_port,
+            proxy_id=actual_proxy_id,
+            provider=cfg.proxy.preferred_provider,
+        )
         _wait_until_healthy(
             base_url=base_url,
             expected_template=template,
@@ -717,9 +724,10 @@ def start_proxy(
             expected_proxy_id=actual_proxy_id,
         )
     except Exception:
-        _terminate_process(proc)
+        if proc is not None:
+            _terminate_process(proc)
         # Clean up stderr capture on failure
-        if stderr_capture.exists():
+        if stderr_capture is not None and stderr_capture.exists():
             try:
                 stderr_capture.unlink()
             except Exception:
@@ -731,12 +739,24 @@ def start_proxy(
             if proxy_dir.exists():
                 shutil.rmtree(proxy_dir, ignore_errors=True)
 
-        def _remove_failed(r: ProxyRegistry) -> None:
-            r.proxies.pop(actual_proxy_id, None)
+        def _restore_failed_start(r: ProxyRegistry) -> None:
+            # Do not overwrite a concurrent actor that replaced this attempt's
+            # starting row while startup cleanup was in progress. ProxyEntry's
+            # dataclass value equality across the registry round-trip is the
+            # load-bearing comparison here; object identity would never match.
+            if r.proxies.get(actual_proxy_id) != starting_proxy:
+                return
+            if prior_proxy is not None:
+                r.proxies[actual_proxy_id] = prior_proxy
+            elif skip_proxy_file:
+                r.proxies[actual_proxy_id] = replace(starting_proxy, status="stopped")
+            else:
+                r.proxies.pop(actual_proxy_id, None)
 
-        store.update(timeout_s=5.0, mutate=_remove_failed)
+        store.update(timeout_s=5.0, mutate=_restore_failed_start)
         raise
 
+    assert proc is not None  # successful _spawn_proxy_process() is the only path out of the try block
     healthy_proxy = ProxyEntry(
         proxy_id=actual_proxy_id,
         template=template,

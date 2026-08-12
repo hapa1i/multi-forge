@@ -332,11 +332,29 @@ async def _forward_streaming(
         )
 
     if resp.status_code != 200:
-        upstream_body = await resp.aread()
-        logger.warning("[%s] responses passthrough upstream %s", request_id, resp.status_code)
-        await stream_cm.__aexit__(None, None, None)
-        await client_cm.__aexit__(None, None, None)
+        read_failed = False
+        try:
+            upstream_body = await resp.aread()
+        except httpx.HTTPError as e:
+            read_failed = True
+            upstream_body = b""
+            logger.warning("[%s] responses passthrough upstream error body read failed: %s", request_id, e)
+        finally:
+            try:
+                await stream_cm.__aexit__(None, None, None)
+            finally:
+                await client_cm.__aexit__(None, None, None)
+
         _safe_on_complete(on_complete, {}, None, True, "upstream_error", request_id)
+        if read_failed:
+            return Response(
+                status_code=502,
+                content=_ERROR_BODY,
+                media_type="application/json",
+                headers=merge_response_headers({"X-Request-ID": request_id}, extra_response_headers),
+            )
+
+        logger.warning("[%s] responses passthrough upstream %s", request_id, resp.status_code)
         return Response(
             status_code=resp.status_code,
             content=upstream_body,

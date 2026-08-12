@@ -12,7 +12,7 @@ import yaml
 
 from forge.config.loader import get_proxy_file_path, load_proxy_instance_config
 from forge.proxy.ports import NoAvailablePortError
-from forge.proxy.proxies import ProxyRegistryStore
+from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import (
     ProxyIdentityMismatchError,
     ProxyNotResponsesCapableError,
@@ -712,6 +712,190 @@ class TestSkipProxyFile:
 
         assert result.source == "spawn"
         assert not create_called["called"], "create_proxy_file should not be called with skip_proxy_file=True"
+
+    @pytest.mark.parametrize("prior_status", ["stopped", "unhealthy"])
+    def test_failed_restart_restores_existing_registry_entry(
+        self,
+        prior_status,
+        tmp_path,
+        orch_stubs,
+        orch_registry,
+        orch_health,
+        orchestrator,
+        monkeypatch,
+    ) -> None:
+        prior = ProxyEntry(
+            proxy_id="existing-proxy",
+            template="litellm-openai",
+            base_url="http://localhost:8123",
+            port=8123,
+            pid=None,
+            created_at="2026-08-01T00:00:00+00:00",
+            last_seen_at="2026-08-02T00:00:00+00:00",
+            status=prior_status,
+        )
+        orch_registry.write(ProxyRegistry(proxies={prior.proxy_id: prior}))
+        orch_health(False)
+        monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _port: False)
+        monkeypatch.setattr(
+            orchestrator,
+            "_spawn_proxy_process",
+            lambda **_kwargs: (_Proc(), tmp_path / "stderr.log"),
+        )
+        monkeypatch.setattr(orchestrator, "_terminate_process", lambda _proc: None)
+
+        def _fail_health(**_kwargs):
+            raise ProxyStartError("injected startup failure")
+
+        monkeypatch.setattr(orchestrator, "_wait_until_healthy", _fail_health)
+
+        with pytest.raises(ProxyStartError, match="injected startup failure"):
+            start_proxy(
+                template=prior.template,
+                proxy_id=prior.proxy_id,
+                port=prior.port,
+                skip_proxy_file=True,
+            )
+
+        assert orch_registry.read().proxies[prior.proxy_id] == prior
+
+    def test_failed_config_only_restart_retains_stopped_entry(
+        self,
+        tmp_path,
+        orch_stubs,
+        orch_registry,
+        orch_health,
+        orchestrator,
+        monkeypatch,
+    ) -> None:
+        orch_health(False)
+        monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _port: False)
+        monkeypatch.setattr(orchestrator, "now_iso", lambda: "2026-08-12T00:00:00+00:00")
+        monkeypatch.setattr(
+            orchestrator,
+            "_spawn_proxy_process",
+            lambda **_kwargs: (_Proc(), tmp_path / "stderr.log"),
+        )
+        monkeypatch.setattr(orchestrator, "_terminate_process", lambda _proc: None)
+
+        def _fail_health(**_kwargs):
+            raise ProxyStartError("injected startup failure")
+
+        monkeypatch.setattr(orchestrator, "_wait_until_healthy", _fail_health)
+
+        with pytest.raises(ProxyStartError, match="injected startup failure"):
+            start_proxy(
+                template="litellm-openai",
+                proxy_id="config-only",
+                port=8124,
+                skip_proxy_file=True,
+            )
+
+        assert orch_registry.read().proxies["config-only"] == ProxyEntry(
+            proxy_id="config-only",
+            template="litellm-openai",
+            base_url="http://localhost:8124",
+            port=8124,
+            pid=None,
+            created_at="2026-08-12T00:00:00+00:00",
+            last_seen_at=None,
+            status="stopped",
+        )
+
+    def test_failed_restart_restores_ownership_when_spawn_raises(
+        self,
+        orch_stubs,
+        orch_registry,
+        orch_health,
+        orchestrator,
+        monkeypatch,
+    ) -> None:
+        prior = ProxyEntry(
+            proxy_id="existing-proxy",
+            template="litellm-openai",
+            base_url="http://localhost:8123",
+            port=8123,
+            pid=None,
+            created_at="2026-08-01T00:00:00+00:00",
+            last_seen_at=None,
+            status="stopped",
+        )
+        orch_registry.write(ProxyRegistry(proxies={prior.proxy_id: prior}))
+        orch_health(False)
+        monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _port: False)
+
+        def _fail_spawn(**_kwargs):
+            raise ProxyStartError("injected spawn failure")
+
+        monkeypatch.setattr(orchestrator, "_spawn_proxy_process", _fail_spawn)
+
+        with pytest.raises(ProxyStartError, match="injected spawn failure"):
+            start_proxy(
+                template=prior.template,
+                proxy_id=prior.proxy_id,
+                port=prior.port,
+                skip_proxy_file=True,
+            )
+
+        assert orch_registry.read().proxies[prior.proxy_id] == prior
+
+    def test_failed_restart_does_not_clobber_concurrent_registry_replacement(
+        self,
+        tmp_path,
+        orch_stubs,
+        orch_registry,
+        orch_health,
+        orchestrator,
+        monkeypatch,
+    ) -> None:
+        prior = ProxyEntry(
+            proxy_id="existing-proxy",
+            template="litellm-openai",
+            base_url="http://localhost:8123",
+            port=8123,
+            pid=None,
+            created_at="2026-08-01T00:00:00+00:00",
+            last_seen_at=None,
+            status="stopped",
+        )
+        concurrent = ProxyEntry(
+            proxy_id=prior.proxy_id,
+            template=prior.template,
+            base_url=prior.base_url,
+            port=prior.port,
+            pid=9999,
+            created_at="2026-08-12T00:01:00+00:00",
+            last_seen_at="2026-08-12T00:01:01+00:00",
+            status="healthy",
+        )
+        orch_registry.write(ProxyRegistry(proxies={prior.proxy_id: prior}))
+        orch_health(False)
+        monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _port: False)
+        monkeypatch.setattr(
+            orchestrator,
+            "_spawn_proxy_process",
+            lambda **_kwargs: (_Proc(), tmp_path / "stderr.log"),
+        )
+        monkeypatch.setattr(
+            orchestrator,
+            "_terminate_process",
+            lambda _proc: orch_registry.write(ProxyRegistry(proxies={concurrent.proxy_id: concurrent})),
+        )
+
+        def _fail_health(**_kwargs):
+            raise ProxyStartError("injected startup failure")
+
+        monkeypatch.setattr(orchestrator, "_wait_until_healthy", _fail_health)
+
+        with pytest.raises(ProxyStartError, match="injected startup failure"):
+            start_proxy(
+                template=prior.template,
+                proxy_id=prior.proxy_id,
+                port=prior.port,
+                skip_proxy_file=True,
+            )
+
+        assert orch_registry.read().proxies[prior.proxy_id] == concurrent
 
 
 # ---------------------------------------------------------------------------

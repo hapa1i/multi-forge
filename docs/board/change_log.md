@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-12
+
+### Close proxy failure lifecycles
+
+**Goal/outcome**: Preserve proxy ownership after failed restarts and close both upstream contexts when a non-200 HTTP
+transport read fails.
+
+**Key changes**:
+
+- Failed restarts now restore the prior registry entry, or retain config-only ownership as `stopped`, without
+  overwriting a concurrent replacement.
+- Anthropic and Responses raw transports now close stream/client contexts, report failure once, and return their stable
+  HTTP 502 body when a non-200 body cannot be read; ordinary non-200 relay remains unchanged.
+
+**Verification**: Four fail-first cases failed on `4774f69e` while two compatibility controls passed. The 193-test
+focused slice, 814 proxy units, 8,981 unit tests (one existing platform skip, 122 deselected), 753 regressions, and 5
+targeted Docker integrations pass. Full pre-commit plus board link/lane, size, and diff checks pass; design and end-user
+lifecycle contracts are synchronized. The untracked regression/checklist also pass an explicit new-file hook run.
+
 ## 2026-08-11
 
 ### Harden detached process teardown

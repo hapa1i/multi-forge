@@ -217,6 +217,9 @@ rerunning the command remains possible and failure never prints `Deleted`. Delet
 default-detaching an adopted process, or using `--no-kill` intentionally leaves the process alive and succeeds.
 Multi-delete continues other targets, then exits non-zero if any required stop failed.
 
+**Ownership is also retained on start failure.** A failed `forge proxy start <proxy_id>` restores the proxy's prior
+registry row, or records a config-only proxy as `stopped`, so it remains visible to `proxy list` and can be retried.
+
 **Auto-start from a template.** `--proxy` (on `forge session start/resume/fork` and `forge claude start`) and
 `--supervisor-proxy` (on `forge session start/fork` and `forge policy supervisor set`) accept a **template name** as
 well as a running proxy id. If no proxy is running for that name, Forge starts one from the matching template -- no
