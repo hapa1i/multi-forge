@@ -36,6 +36,8 @@ from forge.config.loader import (
 )
 from forge.config.schema import (
     PROXY_BLOCK_FIELDS,
+    PROXY_PROVIDER_DIRECT_FIELDS,
+    PROXY_SHARED_NON_BLOCK_FIELDS,
     BackendDependency,
     ProxyInstanceConfig,
     TierModels,
@@ -250,20 +252,17 @@ def create_proxy_file(
         template=template,
         template_digest=template_digest,
         provider=provider_name,
-        backend=cfg.proxy.backend,
         proxy_endpoint=base_url,
         port=port,
         upstream_base_url=resolved_upstream,
         tiers=tiers,
-        family=cfg.proxy.family,
         tier_overrides=tier_overrides,
-        model_alternatives=provider.model_alternatives,
-        default_tier=cfg.proxy.default_tier or "sonnet",
         provider_settings=provider_settings,
         created_at=now_iso(),
-        # Every shared block copies from the template via one declaration. This
-        # closes the drop class that previously lost provider_trace/logging here,
-        # and newly carries template-declared costs (spend caps) into the proxy.
+        # Direct proxy/provider fields and shared blocks each have one transport
+        # declaration; tier values stay explicit because CLI overrides transform them.
+        **{name: getattr(cfg.proxy, name) for name in PROXY_SHARED_NON_BLOCK_FIELDS},
+        **{name: getattr(provider, name) for name in PROXY_PROVIDER_DIRECT_FIELDS},
         **{name: getattr(cfg.proxy, name) for name in PROXY_BLOCK_FIELDS},
     )
 

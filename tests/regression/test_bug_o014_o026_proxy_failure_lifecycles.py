@@ -9,7 +9,9 @@ from typing import Any
 import httpx
 import pytest
 
-from forge.proxy import passthrough, proxy_orchestrator, responses_passthrough
+import forge.proxy.passthrough as passthrough
+import forge.proxy.responses_passthrough as responses_passthrough
+from forge.proxy import proxy_orchestrator
 from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import ProxyStartError
 

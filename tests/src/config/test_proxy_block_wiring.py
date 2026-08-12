@@ -1,9 +1,8 @@
-"""Live-read wiring tests for the shared per-proxy config blocks.
+"""Live-read wiring tests for shared per-proxy configuration.
 
-PROXY_BLOCK_FIELDS is the single declaration driving both loader hops, both
-dataclasses' coercion, and template -> proxy.yaml creation. These tests pin the
-live-read path (a schema-only test passes while the runtime drops the block --
-the provider_trace bug class) and force coverage to grow with the registry.
+The field registries drive both loader hops and template -> proxy.yaml creation.
+These tests pin the live-read path (a schema-only test can pass while runtime
+drops a field) and force coverage to grow with each registry.
 """
 
 from __future__ import annotations
@@ -19,7 +18,10 @@ from forge.config.loader import (
 )
 from forge.config.schema import (
     PROXY_BLOCK_FIELDS,
+    PROXY_PROVIDER_DIRECT_FIELDS,
+    PROXY_PROVIDER_TRANSFORMED_FIELDS,
     PROXY_SHARED_NON_BLOCK_FIELDS,
+    ProviderConfig,
     ProxyConfig,
     ProxyInstanceConfig,
 )
@@ -51,6 +53,19 @@ _BLOCK_MARKERS: dict[str, object] = {
     "logging": {"requests": {"enabled": "on", "max_file_mb": 4}},
 }
 
+_SHARED_NON_BLOCK_MARKERS: dict[str, object] = {
+    "backend": "openrouter",
+    "default_tier": "opus",
+    "family": "anthropic",
+    "tool_prefixes_to_ignore": ["mcp__*"],
+}
+
+_PROVIDER_DIRECT_MARKERS: dict[str, object] = {
+    "model_alternatives": {"opus": {"claude-opus-4-8": "anthropic/claude-opus-4-8"}},
+    "prompt_caching": "auto_inject",
+    "auto_cache_min_tokens": 4096,
+}
+
 
 def _assert_markers(proxy_cfg) -> None:
     assert proxy_cfg.costs.caps.per_day == 12.5
@@ -69,6 +84,11 @@ def test_markers_cover_every_registered_block() -> None:
     assert set(_BLOCK_MARKERS) == set(PROXY_BLOCK_FIELDS)
 
 
+def test_markers_cover_every_direct_field_registry() -> None:
+    assert set(_SHARED_NON_BLOCK_MARKERS) == set(PROXY_SHARED_NON_BLOCK_FIELDS)
+    assert set(_PROVIDER_DIRECT_MARKERS) == set(PROXY_PROVIDER_DIRECT_FIELDS)
+
+
 def test_every_block_survives_both_hops_to_forge_config() -> None:
     """The live-read path: dict -> ProxyInstanceConfig -> ForgeConfig.proxy."""
     instance = load_proxy_instance_config_from_dict({**_VALID_PROXY, **_BLOCK_MARKERS})
@@ -78,12 +98,35 @@ def test_every_block_survives_both_hops_to_forge_config() -> None:
     _assert_markers(forge_config.proxy)
 
 
+def test_every_direct_field_survives_both_hops_to_forge_config() -> None:
+    instance = load_proxy_instance_config_from_dict(
+        {**_VALID_PROXY, **_SHARED_NON_BLOCK_MARKERS, **_PROVIDER_DIRECT_MARKERS}
+    )
+    forge_config = _proxy_instance_to_forge_config(instance)
+    provider = forge_config.proxy.get_provider()
+
+    for name, marker in _SHARED_NON_BLOCK_MARKERS.items():
+        assert getattr(instance, name) == marker
+        assert getattr(forge_config.proxy, name) == marker
+    for name, marker in _PROVIDER_DIRECT_MARKERS.items():
+        assert getattr(instance, name) == marker
+        assert getattr(provider, name) == marker
+
+
 def test_absent_blocks_fall_to_dataclass_defaults() -> None:
     """Defaults have one source: the dataclass fields, not per-hop .get() fallbacks."""
     instance = load_proxy_instance_config_from_dict(dict(_VALID_PROXY))
 
     defaults = ProxyInstanceConfig(**{**_VALID_PROXY, "tiers": instance.tiers})
     for name in PROXY_BLOCK_FIELDS:
+        assert getattr(instance, name) == getattr(defaults, name)
+
+
+def test_absent_direct_fields_fall_to_dataclass_defaults() -> None:
+    instance = load_proxy_instance_config_from_dict(dict(_VALID_PROXY))
+    defaults = ProxyInstanceConfig(**{**_VALID_PROXY, "tiers": instance.tiers})
+
+    for name in (*PROXY_SHARED_NON_BLOCK_FIELDS, *PROXY_PROVIDER_DIRECT_FIELDS):
         assert getattr(instance, name) == getattr(defaults, name)
 
 
@@ -102,17 +145,16 @@ def test_every_shared_field_is_registered_or_explicitly_transported() -> None:
     """Bidirectional drift guard: the dataclass intersection is a closed set.
 
     The registered->fields check above cannot see a field added to BOTH
-    dataclasses but omitted from the registry -- both loader hops would silently
-    drop it to its default (the provider_trace bug class B2 exists to close).
+    dataclasses but omitted from the registries -- creation and both loader hops
+    would silently drop it to its default.
     """
     shared = {f.name for f in dataclasses.fields(ProxyConfig)} & {
         f.name for f in dataclasses.fields(ProxyInstanceConfig)
     }
     unregistered = _unregistered_shared_fields(shared)
     assert not unregistered, (
-        f"Shared proxy field(s) {sorted(unregistered)} are not in PROXY_BLOCK_COERCERS: "
-        "register a coercer (both loader hops then transport the field), or add it to "
-        "PROXY_SHARED_NON_BLOCK_FIELDS only if each hop already passes it explicitly."
+        f"Shared proxy field(s) {sorted(unregistered)} have no transport: "
+        "register a block coercer or an unchanged field in PROXY_SHARED_NON_BLOCK_FIELDS"
     )
     # The exemption set may not go stale (names both dataclasses no longer share)
     # or shadow registry entries (a field must have exactly one transport story).
@@ -123,6 +165,28 @@ def test_every_shared_field_is_registered_or_explicitly_transported() -> None:
 def test_unregistered_shared_field_is_flagged() -> None:
     """The guard's set logic reports exactly the unaccounted-for member."""
     assert _unregistered_shared_fields({"costs", "backend", "new_block"}) == {"new_block"}
+
+
+def _unregistered_provider_fields(shared: set[str]) -> set[str]:
+    return shared - set(PROXY_PROVIDER_DIRECT_FIELDS) - PROXY_PROVIDER_TRANSFORMED_FIELDS
+
+
+def test_every_provider_instance_shared_field_has_a_transport_story() -> None:
+    shared = {f.name for f in dataclasses.fields(ProviderConfig)} & {
+        f.name for f in dataclasses.fields(ProxyInstanceConfig)
+    }
+    unregistered = _unregistered_provider_fields(shared)
+    assert not unregistered, (
+        f"Provider/instance field(s) {sorted(unregistered)} have no transport: "
+        "copy unchanged via PROXY_PROVIDER_DIRECT_FIELDS or declare an explicit transform"
+    )
+    assert set(PROXY_PROVIDER_DIRECT_FIELDS) <= shared
+    assert PROXY_PROVIDER_TRANSFORMED_FIELDS <= shared
+    assert not set(PROXY_PROVIDER_DIRECT_FIELDS) & PROXY_PROVIDER_TRANSFORMED_FIELDS
+
+
+def test_unregistered_provider_field_is_flagged() -> None:
+    assert _unregistered_provider_fields({"tiers", "prompt_caching", "new_provider_field"}) == {"new_provider_field"}
 
 
 def test_invalid_wire_shape_message_unchanged() -> None:

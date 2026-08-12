@@ -1,6 +1,6 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: O014/O026 shipped; keep D029/O025 parked until its own fail-first activation begins.
+Current focus: reproduce and ship D029/O025 without activating or absorbing any later member.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -28,5 +28,9 @@ Current focus: O014/O026 shipped; keep D029/O025 parked until its own fail-first
 - [x] Implement and verify failed-restart ownership plus non-200 body-read cleanup in both passthrough transports.
 - [x] Review and merge O014/O026 independently before activating the next ordered member (PR #167, `33e3db7f`).
 - [x] Keep the remaining 8 members in `todo/` through the O014/O026 merge; no later member is active.
-- [ ] Activate only D029/O025 from merged `main` and retain its fail-first reproduction before production changes.
+- [x] Activate only D029/O025 from merged `main` at `7c76a099` on `agent/complete-proxy-instance-config-wiring`.
+- [x] Retain D029/O025 fail-first regressions before production changes (`3 failed, 2 passed` on `7c76a099`).
+- [x] Implement and verify template-to-instance-to-runtime tool-ignore and prompt-cache wiring.
+- [ ] Review and merge D029/O025 independently before activating the next ordered member.
+- [ ] Keep the remaining 7 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

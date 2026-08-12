@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-12
 
+### Complete proxy instance config wiring
+
+**Goal/outcome**: Preserve template tool-ignore and prompt-cache settings through proxy creation and runtime reload.
+
+**Key changes**:
+
+- Added `tool_prefixes_to_ignore` to the user-owned proxy instance schema and copied it from templates alongside the
+  selected provider's prompt-cache policy and threshold.
+- Replaced hand-maintained direct copies with closed field registries while keeping tier construction and CLI override
+  merging explicit transforms; absent keys retain compatibility defaults.
+
+**Verification**: Three fail-first cases failed on `7c76a099` while two controls passed. The 1,015-test config/proxy
+slice, 8,986 unit tests (one existing platform skip, 122 deselected), 758 regressions, 6 Docker proxy-creation
+integrations, and pre-commit pass. The 288-file/713-link board audit has no missing targets and confirms the Wave 6 lane
+split at 4 done/1 doing/7 todo. Design and end-user ownership contracts are synchronized.
+
 ### Close proxy failure lifecycles
 
 **Goal/outcome**: Preserve proxy ownership after failed restarts and close both upstream contexts when a non-200 HTTP

@@ -661,12 +661,23 @@ PROXY_BLOCK_COERCERS: dict[str, Callable[[Any], Any]] = {
 }
 PROXY_BLOCK_FIELDS: tuple[str, ...] = tuple(PROXY_BLOCK_COERCERS)
 
-# Shared non-block fields both proxy dataclasses carry; each loader hop transports
-# these explicitly (loader.py hop 1 and hop 2). Any OTHER field added to both
-# dataclasses must join PROXY_BLOCK_COERCERS, or both hops silently drop it to its
-# default -- tests/src/config/test_proxy_block_wiring.py enforces the exact-set
-# equality, making the intersection the closed contract rather than a convention.
-PROXY_SHARED_NON_BLOCK_FIELDS: frozenset[str] = frozenset({"backend", "default_tier", "family"})
+# Shared non-block fields both proxy dataclasses carry unchanged. This declaration
+# drives template -> instance creation plus both loader hops. Any OTHER field added
+# to both dataclasses must join this set or PROXY_BLOCK_COERCERS; the structural
+# tests make the dataclass intersection a closed contract.
+PROXY_SHARED_NON_BLOCK_FIELDS: frozenset[str] = frozenset(
+    {"backend", "default_tier", "family", "tool_prefixes_to_ignore"}
+)
+
+# Same-name provider fields copied unchanged through ProxyInstanceConfig. ``tiers``
+# and ``tier_overrides`` are deliberately excluded: creation rebuilds tiers and
+# merges CLI overrides, so their transformed transport remains explicit.
+PROXY_PROVIDER_DIRECT_FIELDS: tuple[str, ...] = (
+    "model_alternatives",
+    "prompt_caching",
+    "auto_cache_min_tokens",
+)
+PROXY_PROVIDER_TRANSFORMED_FIELDS: frozenset[str] = frozenset({"tier_overrides", "tiers"})
 
 
 def _coerce_proxy_blocks(cfg: Any) -> None:
@@ -787,6 +798,7 @@ class ProxyInstanceConfig:
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)
     default_tier: str = "sonnet"
+    tool_prefixes_to_ignore: list[str] = field(default_factory=list)
 
     provider_settings: dict[str, Any] = field(default_factory=dict)
 
