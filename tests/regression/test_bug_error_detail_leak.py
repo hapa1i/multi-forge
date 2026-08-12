@@ -219,3 +219,85 @@ def test_bug_streaming_error_no_provider_detail() -> None:
     assert secret_detail not in body
     assert "api.internal-llm" not in body
     assert re.search(r"Streaming request failed \[req_[a-f0-9]{12}\]", body)
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "public_error"),
+    [
+        ("resolution", "retention policy resolution failed; inspect proxy logs"),
+        ("enforcement", "downstream retention enforcement failed; inspect proxy logs"),
+    ],
+)
+def test_bug_codeql_32_retention_failure_no_exception_detail(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+    public_error: str,
+) -> None:
+    """The public runtime-status response must not expose retention exceptions."""
+    from fastapi.testclient import TestClient
+
+    import forge.proxy.server as server
+    from forge.core.telemetry import downstream, downstream_retention
+    from forge.core.telemetry.downstream_retention import (
+        DownstreamRetentionPolicy,
+        DownstreamRetentionResolution,
+    )
+
+    secret_detail = "Traceback: PermissionError at /srv/internal/tenant-secret/downstream.jsonl"
+    resolution = DownstreamRetentionResolution(
+        configured=None,
+        effective=DownstreamRetentionPolicy(14, 512),
+        source="default",
+    )
+
+    def fail_with_secret(*_args, **_kwargs):
+        raise RuntimeError(secret_detail)
+
+    monkeypatch.setattr(server, "_downstream_pruned", False)
+    monkeypatch.setattr(server, "_downstream_retention_resolution", None)
+    monkeypatch.setattr(server, "_downstream_prune_error", None)
+    if failure_stage == "resolution":
+        monkeypatch.setattr(downstream_retention, "resolve_downstream_retention", fail_with_secret)
+    else:
+        monkeypatch.setattr(downstream_retention, "resolve_downstream_retention", lambda: resolution)
+        monkeypatch.setattr(downstream, "prune_downstream_records", fail_with_secret)
+
+    server._maybe_prune_downstream_records()
+
+    provider = SimpleNamespace(tiers=SimpleNamespace(haiku="m1", sonnet="m2", opus="m3"))
+    proxy = SimpleNamespace(
+        get_provider=lambda _name=None: provider,
+        default_tier="sonnet",
+        wire_shape="openai_translated",
+        intercept=None,
+        audit=None,
+    )
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server.config, "proxy", proxy)
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(server, "get_context_window", lambda _model: 200_000)
+    monkeypatch.setattr(
+        server.client_factory,
+        "get_default_hyperparams_for_tier",
+        lambda **_kwargs: SimpleNamespace(model_dump=lambda **_options: {}),
+    )
+    monkeypatch.setattr(
+        "forge.proxy.proxy_identity.get_proxy_identity",
+        lambda **_kwargs: SimpleNamespace(
+            proxy_id="p1",
+            template="litellm-openai",
+            port=8084,
+            base_url="http://localhost:8084",
+            source="registry",
+            status="running",
+        ),
+    )
+
+    response = TestClient(server.app).get("/")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["downstream_retention"]["prune_error"] == public_error
+    assert secret_detail not in json.dumps(body)
+    assert "/srv/internal/tenant-secret" not in json.dumps(body)

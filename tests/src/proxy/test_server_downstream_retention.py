@@ -114,21 +114,22 @@ def test_maybe_prune_reports_partial_enforcement(
     with caplog.at_level(logging.WARNING):
         server._maybe_prune_downstream_records()
 
-    assert server._downstream_prune_error == "could not remove old shard"
+    assert server._downstream_prune_error == "downstream retention enforcement failed; inspect proxy logs"
+    assert "could not remove old shard" in caplog.text
     assert "only partially enforced" in caplog.text
     assert "retention_days=14, max_total_mb=512" in caplog.text
 
 
 def test_status_section_marks_prune_failure_degraded() -> None:
     server._downstream_retention_resolution = _resolution()
-    server._downstream_prune_error = "could not remove old shard"
+    server._downstream_prune_error = "downstream retention enforcement failed; inspect proxy logs"
 
     section, degraded = server._downstream_retention_status_section()
 
     assert degraded is True
     assert section["degraded"] is True
     assert section["pruning_enabled"] is True
-    assert section["prune_error"] == "could not remove old shard"
+    assert section["prune_error"] == "downstream retention enforcement failed; inspect proxy logs"
 
 
 def test_maybe_prune_resolution_failure_is_best_effort(
@@ -145,7 +146,8 @@ def test_maybe_prune_resolution_failure_is_best_effort(
     with caplog.at_level(logging.WARNING):
         server._maybe_prune_downstream_records()
 
-    assert server._downstream_prune_error == "could not resolve policy: injected resolver fault"
+    assert server._downstream_prune_error == "retention policy resolution failed; inspect proxy logs"
+    assert "injected resolver fault" in caplog.text
     assert "telemetry/downstream" in caplog.text
     assert "automatic pruning was skipped" in caplog.text
 

@@ -228,6 +228,8 @@ _downstream_pruned = False
 _request_logs_pruned = False
 _downstream_retention_resolution: Any | None = None
 _downstream_prune_error: str | None = None
+_DOWNSTREAM_RETENTION_RESOLUTION_ERROR = "retention policy resolution failed; inspect proxy logs"
+_DOWNSTREAM_RETENTION_ENFORCEMENT_ERROR = "downstream retention enforcement failed; inspect proxy logs"
 
 
 def _maybe_prune_downstream_records() -> None:
@@ -243,7 +245,7 @@ def _maybe_prune_downstream_records() -> None:
     try:
         resolution = resolve_downstream_retention()
     except Exception as e:
-        _downstream_prune_error = f"could not resolve policy: {e}"
+        _downstream_prune_error = _DOWNSTREAM_RETENTION_RESOLUTION_ERROR
         logger.warning(
             "Downstream retention could not resolve a policy; automatic pruning was skipped for %s: %s",
             get_forge_home() / "telemetry" / "downstream",
@@ -300,16 +302,17 @@ def _maybe_prune_downstream_records() -> None:
             max_total_mb=policy.max_total_mb,
         )
         if result is not None and result.errors:
-            _downstream_prune_error = "; ".join(result.errors)
+            prune_detail = "; ".join(result.errors)
+            _downstream_prune_error = _DOWNSTREAM_RETENTION_ENFORCEMENT_ERROR
             logger.warning(
                 "Downstream retention was only partially enforced for %s with retention_days=%s, max_total_mb=%s: %s",
                 downstream_dir,
                 policy.retention_days,
                 policy.max_total_mb,
-                _downstream_prune_error,
+                prune_detail,
             )
     except Exception as e:
-        _downstream_prune_error = str(e)
+        _downstream_prune_error = _DOWNSTREAM_RETENTION_ENFORCEMENT_ERROR
         logger.warning(
             "Downstream retention could not be enforced for %s with retention_days=%s, max_total_mb=%s: %s",
             downstream_dir,

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import signal
+import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from click.testing import CliRunner
@@ -148,13 +149,14 @@ def test_o012_single_shot_cancellation_terminates_and_reaps_child_group() -> Non
         patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=proc),
         patch("forge.core.invoker._lifecycle.os.getpgid", return_value=54321),
         patch("forge.core.invoker._lifecycle.os.killpg") as kill_group,
+        patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False),
         pytest.raises(KeyboardInterrupt) as exc_info,
     ):
         ClaudeHeadlessInvoker().run(_headless_request())
 
     assert exc_info.value is interrupt
     kill_group.assert_called_once_with(54321, signal.SIGTERM)
-    proc.wait.assert_called_once_with(timeout=5)
+    assert proc.poll.call_count >= 2  # initial liveness check plus group-wait reaping
 
 
 def test_o012_normal_single_shot_exit_does_not_signal_child() -> None:
@@ -171,3 +173,47 @@ def test_o012_normal_single_shot_exit_does_not_signal_child() -> None:
     assert result.stdout == "ok"
     kill_group.assert_not_called()
     proc.wait.assert_not_called()
+
+
+def test_o012_completed_single_shot_drops_group_ownership_before_result_building() -> None:
+    interrupt = KeyboardInterrupt()
+    proc = _headless_process()
+    invoker = ClaudeHeadlessInvoker()
+
+    with (
+        patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=proc),
+        patch.object(invoker, "_build_result", side_effect=interrupt),
+        patch("forge.core.invoker._lifecycle.os.getpgid", return_value=54321),
+        patch("forge.core.invoker._lifecycle.os.killpg") as kill_group,
+        patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False) as group_exists,
+        pytest.raises(KeyboardInterrupt) as exc_info,
+    ):
+        invoker.run(_headless_request())
+
+    assert exc_info.value is interrupt
+    group_exists.assert_not_called()
+    kill_group.assert_not_called()
+
+
+def test_o012_grouped_timeout_attempts_group_teardown_only_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    proc = _headless_process()
+    proc.communicate.side_effect = subprocess.TimeoutExpired(cmd=["claude"], timeout=1)
+    proc.returncode = None
+    proc.poll.return_value = None
+
+    monkeypatch.setattr("forge.core.invoker._lifecycle._PROCESS_GROUP_TERM_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setattr("forge.core.invoker._lifecycle._PROCESS_GROUP_KILL_TIMEOUT_SECONDS", 0.0)
+
+    with (
+        patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=proc),
+        patch("forge.core.invoker._lifecycle.os.getpgid", return_value=54321),
+        patch("forge.core.invoker._lifecycle.os.killpg") as kill_group,
+        patch("forge.core.invoker._lifecycle._process_group_exists", return_value=True),
+    ):
+        result = ClaudeHeadlessInvoker().run_parallel([_headless_request()])[0]
+
+    assert result.timed_out
+    assert kill_group.call_args_list == [
+        call(54321, signal.SIGTERM),
+        call(54321, signal.SIGKILL),
+    ]

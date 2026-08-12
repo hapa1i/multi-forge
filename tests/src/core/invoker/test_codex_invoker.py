@@ -197,11 +197,12 @@ class TestCodexResultBuilding:
 
 class TestCodexLifecycleHooks:
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=321)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
-    def test_timeout_kills_process_group(self, mock_popen, mock_killpg, _getpgid):
+    def test_timeout_kills_process_group(self, mock_popen, mock_killpg, _group_exists, _getpgid):
         proc = _mock_proc(communicate_side_effect=subprocess.TimeoutExpired(cmd="codex", timeout=1))
-        proc.poll.return_value = 0
+        proc.poll.return_value = None
         mock_popen.return_value = proc
         out = CodexHeadlessInvoker().run_parallel([_codex_req(timeout=1)])
         assert out[0].timed_out is True and out[0].success is False

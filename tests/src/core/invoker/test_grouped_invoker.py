@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import signal
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -9,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.invoker import _lifecycle as lifecycle
 from forge.core.invoker._lifecycle import (
     ParseHints,
     _HeadlessLifecycleBase,
@@ -68,6 +70,65 @@ def _proc(stdout: str, *, returncode: int = 0) -> MagicMock:
     return proc
 
 
+class TestProcessGroupCleanup:
+    def test_term_grace_deadline_is_shared_across_groups(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        clock = [0.0]
+        first = _proc("", returncode=-signal.SIGTERM)
+        second = _proc("", returncode=-signal.SIGTERM)
+        first.pid = 41001
+        second.pid = 41002
+        first.poll.return_value = None
+        second.poll.return_value = None
+        signals: list[tuple[int, signal.Signals, float]] = []
+
+        monkeypatch.setattr(lifecycle, "_PROCESS_GROUP_TERM_TIMEOUT_SECONDS", 5.0)
+        monkeypatch.setattr(lifecycle, "_PROCESS_GROUP_KILL_TIMEOUT_SECONDS", 0.0)
+        monkeypatch.setattr(lifecycle, "_PROCESS_GROUP_POLL_INTERVAL_SECONDS", 0.5)
+        monkeypatch.setattr(lifecycle, "_process_group_exists", lambda _pgid: True)
+        monkeypatch.setattr(lifecycle.os, "getpgid", lambda pid: pid)
+        monkeypatch.setattr(lifecycle.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+        monkeypatch.setattr(lifecycle.os, "killpg", lambda pgid, sig: signals.append((pgid, sig, clock[0])))
+
+        lifecycle._terminate_and_reap([first, second])
+
+        kill_times = [at for _pgid, sig, at in signals if sig == signal.SIGKILL]
+        assert kill_times == [5.0, 5.0]
+
+    def test_signal_failure_is_reported(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        proc = _proc("")
+        proc.pid = 42001
+        proc.poll.return_value = None
+        monkeypatch.setattr(lifecycle.os, "getpgid", lambda pid: pid)
+        monkeypatch.setattr(lifecycle.os, "killpg", MagicMock(side_effect=PermissionError("not authorized")))
+
+        with caplog.at_level(logging.WARNING, logger="forge.core.invoker._lifecycle"):
+            lifecycle._terminate_and_reap([proc])
+
+        assert "Could not send SIGTERM to owned process group 42001: not authorized" in caplog.text
+
+    def test_group_surviving_sigkill_is_reported(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        proc = _proc("")
+        proc.pid = 43001
+        proc.poll.return_value = None
+        monkeypatch.setattr(lifecycle, "_PROCESS_GROUP_TERM_TIMEOUT_SECONDS", 0.0)
+        monkeypatch.setattr(lifecycle, "_PROCESS_GROUP_KILL_TIMEOUT_SECONDS", 0.0)
+        monkeypatch.setattr(lifecycle, "_process_group_exists", lambda _pgid: True)
+        monkeypatch.setattr(lifecycle.os, "getpgid", lambda pid: pid)
+        monkeypatch.setattr(lifecycle.os, "killpg", lambda _pgid, _sig: None)
+
+        with caplog.at_level(logging.WARNING, logger="forge.core.invoker._lifecycle"):
+            lifecycle._terminate_and_reap([proc])
+
+        assert "Owned process group 43001 survived SIGKILL cleanup" in caplog.text
+
+
 class TestGroupedParallel:
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_uses_each_paired_invoker_hooks_and_preserves_input_order(self, mock_popen):
@@ -96,6 +157,23 @@ class TestGroupedParallel:
         ]
         assert [result.label for result in claude.emitted] == ["c0", "c1"]
         assert [result.label for result in codex.emitted] == ["x0", "x1"]
+
+    @patch("forge.core.invoker._lifecycle._process_group_exists")
+    @patch("forge.core.invoker._lifecycle.os.killpg")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_completed_worker_is_removed_before_cleanup_can_probe_a_reused_pgid(
+        self,
+        mock_popen,
+        mock_killpg,
+        mock_group_exists,
+    ):
+        mock_popen.return_value = _proc("done")
+
+        result = run_grouped_parallel([(_TestInvoker("claude"), _request("w0"))])
+
+        assert result[0].success
+        mock_group_exists.assert_not_called()
+        mock_killpg.assert_not_called()
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     @patch("forge.core.invoker._lifecycle.ThreadPoolExecutor", wraps=ThreadPoolExecutor)
@@ -135,12 +213,14 @@ class TestGroupedParallel:
         assert max_live == 5
 
     @patch("forge.core.invoker._lifecycle.os.getpgid", side_effect=lambda pid: pid)
+    @patch("forge.core.invoker._lifecycle._process_group_exists", return_value=False)
     @patch("forge.core.invoker._lifecycle.os.killpg")
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_interrupt_reaps_both_runtimes_and_suppresses_never_started_emission(
         self,
         mock_popen,
         mock_killpg,
+        _group_exists,
         _mock_getpgid,
     ):
         claude = _TestInvoker("claude")
