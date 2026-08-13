@@ -1,6 +1,6 @@
 # Harden proxy boundary failures checklist
 
-Current focus: open the independent draft PR without activating another Wave 6 member.
+Current focus: review and merge D054/D055 in draft PR #171 without activating another Wave 6 member.
 
 ## Activation and admission
 
@@ -29,4 +29,4 @@ Current focus: open the independent draft PR without activating another Wave 6 m
 - [x] Run targeted Docker proxy integration coverage required for proxy-runtime changes (`2 passed`).
 - [x] Run full pre-commit, the explicit new-file hook, and board link/lane/size/diff checks (291 files, 718 relative
   links, zero missing targets, 6 `done` / 1 `doing` / 6 `todo`, and document sizes below their caps).
-- [ ] Open an independent draft PR without activating another Wave 6 member.
+- [x] Open independent draft PR #171 without activating another Wave 6 member.

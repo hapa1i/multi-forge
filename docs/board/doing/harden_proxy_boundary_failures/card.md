@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- accepted and activated on `agent/harden-proxy-boundary-failures` from merged `main` at `22071fcd`.
+**Lane**: `doing/` -- implemented and verified on `agent/harden-proxy-boundary-failures` from merged `main` at
+`22071fcd`; draft PR #171 is ready for independent review.
 
 **Findings**: D054 and D055.
 

@@ -2,9 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- 14 of 36 findings across 6 of 13 members shipped in PRs #164--#170. D054/D055 are the sole active
-member; the remaining 6 members stay parked in `todo/`. PR #169 (`ece999d4`) hardened O012 escalation and
-retention-status error sanitization without adding a finding to this admission set.
+**Lane**: `doing/` -- 14 of 36 findings across 6 of 13 members shipped in PRs #164--#170. D054/D055 are implemented and
+verified as the sole active member in draft PR #171; the remaining 6 members stay parked in `todo/`. PR #169
+(`ece999d4`) hardened O012 escalation and retention-status error sanitization without adding a finding to this admission
+set.
 
 ## Goal
 
