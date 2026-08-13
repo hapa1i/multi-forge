@@ -425,11 +425,12 @@ class TestSessionShow:
     """Tests for 'forge session show' command."""
 
     def test_show_no_session(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should show message when no session specified and no FORGE_SESSION."""
+        """Missing human selector is an error when FORGE_SESSION is absent."""
         result = runner.invoke(main, ["session", "show"])
 
-        assert result.exit_code == 0
-        assert "No session specified" in result.output
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "No session specified" in result.stderr
 
     def test_show_named_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should show detailed session info by name."""

@@ -498,6 +498,12 @@ class TestDetectProxyMalformedResponse:
     These tests verify graceful handling of invalid responses.
     """
 
+    def test_malformed_base_url_returns_not_proxy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Malformed URL syntax is an unconfigured proxy, not a status-line crash."""
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://[")
+
+        assert detect_proxy() == (False, None, False)
+
     def test_proxy_returns_non_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When proxy returns non-JSON, falls back to registry lookup."""
         monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:8085")

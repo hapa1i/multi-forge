@@ -53,11 +53,12 @@ class TestSessionShow:
     """Tests for 'forge session show' command."""
 
     def test_show_no_args_no_env_shows_message(self, mock_claude_workspace: ContainerLike) -> None:
-        """Without name or FORGE_SESSION, shows guidance message."""
+        """Without name or FORGE_SESSION, fails with guidance on stderr."""
         result = mock_claude_workspace.exec("cd /workspace && forge session show")
 
-        assert result.returncode == 0
-        assert "No session specified" in result.stdout
+        assert result.returncode == 1
+        assert result.stdout == ""
+        assert "No session specified" in result.stderr
 
     def test_show_with_forge_session_env(self, mock_claude_workspace: ContainerLike) -> None:
         """FORGE_SESSION env var resolves the session."""

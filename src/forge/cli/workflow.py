@@ -103,7 +103,7 @@ def _run_preflight(
         data: dict[str, Any] = {"preflight_errors": errors}
         if warnings:
             data["routing_warnings"] = warnings
-        click.echo(json.dumps(data))
+        click.echo(json.dumps(data), err=True)
     else:
         print_error("Workflow preflight failed:")
         for err in errors:

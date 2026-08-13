@@ -254,6 +254,38 @@ class TestStatusLineInputContract:
         result = mock_claude_workspace.exec("echo '{}' | forge status-line")
         assert result.returncode == 0
 
+    def test_non_object_json_is_bounded(self, mock_claude_workspace: ContainerLike) -> None:
+        """A valid JSON scalar must not escape the fail-open status-line boundary."""
+        mock_claude_workspace.write_file("/tmp/status-line-input.json", "null")
+
+        result = mock_claude_workspace.exec("forge status-line < /tmp/status-line-input.json")
+
+        assert result.returncode == 0
+        assert "Invalid input" in result.stdout
+        assert "Traceback" not in result.stderr
+
+    def test_null_workspace_falls_back(self, mock_claude_workspace: ContainerLike) -> None:
+        """A wrong-typed workspace is treated as missing workspace data."""
+        mock_claude_workspace.write_json("/tmp/status-line-input.json", {"workspace": None})
+
+        result = mock_claude_workspace.exec("forge status-line < /tmp/status-line-input.json")
+
+        assert result.returncode == 0
+        assert result.stdout.strip()
+        assert "Traceback" not in result.stderr
+
+    def test_malformed_proxy_url_falls_back(self, mock_claude_workspace: ContainerLike) -> None:
+        """Malformed proxy URL syntax does not break status-line rendering."""
+        mock_claude_workspace.write_json("/tmp/status-line-input.json", {})
+
+        result = mock_claude_workspace.exec(
+            "env ANTHROPIC_BASE_URL='http://[' forge status-line < /tmp/status-line-input.json"
+        )
+
+        assert result.returncode == 0
+        assert result.stdout.strip()
+        assert "Traceback" not in result.stderr
+
     def test_handles_minimal_input(self, mock_claude_workspace: ContainerLike) -> None:
         """Should handle minimal Claude Code input with model dict."""
         input_data = {"model": {"display_name": "Claude"}}

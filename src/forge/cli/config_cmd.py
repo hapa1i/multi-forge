@@ -12,8 +12,6 @@ which is a partial-lifecycle exception with no `reset`.
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,6 +24,7 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
+from forge.cli.editor import resolve_editor_argv
 from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
 from forge.runtime_config import (
@@ -305,13 +304,7 @@ def edit_cmd() -> None:
     console = Console(width=200)
 
     config_path = ensure_config()
-    editor = os.environ.get("EDITOR", "vim")
-
-    if not shutil.which(editor):
-        print_error(
-            f"Editor '{editor}' not found. Set $EDITOR to an available editor.",
-        )
-        sys.exit(1)
+    editor_argv = resolve_editor_argv()
 
     # Copy to temp file for safe editing
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -320,7 +313,7 @@ def edit_cmd() -> None:
 
     success = False
     try:
-        result = subprocess.run([editor, str(tmp_path)])
+        result = subprocess.run([*editor_argv, str(tmp_path)])
         if result.returncode != 0:
             print_error(f"Editor exited with code {result.returncode}")
             err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")

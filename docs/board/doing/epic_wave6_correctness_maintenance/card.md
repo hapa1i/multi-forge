@@ -2,9 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- 19 of 36 findings across 9 of 13 members shipped in PRs #164--#173. The remaining 17 findings
-across 4 members stay parked in `todo/`; no member is active. PR #169 (`ece999d4`) hardened O012 escalation and
-retention-status error sanitization without adding a finding to this admission set.
+**Lane**: `doing/` -- 19 of 36 findings across 9 of 13 members shipped in PRs #164--#173. The D032/D041/O005/O031--O033
+member is implemented and verified on `agent/align-cli-failure-surfaces`, pending independent review; the remaining 11
+findings across 3 members stay parked in `todo/`. PR #169 (`ece999d4`) hardened O012 escalation and retention-status
+error sanitization without adding a finding to this admission set.
 
 ## Goal
 
@@ -43,7 +44,7 @@ Both are independently reproduced and share one proxy load/start failure boundar
 | 7     | D054, D055                       | [`harden_proxy_boundary_failures`](../../done/harden_proxy_boundary_failures/card.md)                       | proxy config and process-start boundaries     |
 | 8     | O013, O034                       | [`align_policy_routing_context`](../../done/align_policy_routing_context/card.md)                           | policy routing/session selector consistency   |
 | 9     | D031                             | [`exclude_interactive_usage_cost`](../../done/exclude_interactive_usage_cost/card.md)                       | two-plane interactive exclusion               |
-| 10    | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                               | CLI exit, stream, editor, and status behavior |
+| 10    | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../align_cli_failure_surfaces/card.md)                                       | CLI exit, stream, editor, and status behavior |
 | 11    | D034, D037, D038, O027           | [`harden_command_state_boundaries`](../../todo/harden_command_state_boundaries/card.md)                     | hook silence and strict durable-state reads   |
 | 12    | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](../../todo/preserve_session_launch_preconditions/card.md)         | launch preflight, rollback, and fail-open     |
 | 13    | O036                             | [`harden_walkthrough_sandbox_provenance`](../../todo/harden_walkthrough_sandbox_provenance/card.md)         | sandbox provenance before code execution      |

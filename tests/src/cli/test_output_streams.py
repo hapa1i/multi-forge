@@ -102,6 +102,24 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
+def test_bare_root_help_is_a_stderr_usage_error() -> None:
+    """A missing root command follows Click's no-args usage-error contract."""
+    result = CliRunner().invoke(main, [])
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "Usage:" in result.stderr
+
+
+def test_selectorless_human_session_show_is_stderr_only() -> None:
+    """Human ``session show`` requires a selector or ambient session."""
+    result = CliRunner().invoke(main, ["session", "show"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "No session specified" in result.stderr
+
+
 @pytest.mark.parametrize(
     "args",
     [

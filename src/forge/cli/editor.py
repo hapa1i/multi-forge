@@ -1,7 +1,7 @@
-"""Shared $EDITOR launcher for editable transfer/context files.
+"""Shared $EDITOR parsing and launch support for CLI edit surfaces.
 
-Extracted from ``session_lifecycle`` so both ``forge session resume --review``
-and ``forge session transfer edit`` use one editor-launch path with the same
+Configuration editors share shell-style argv parsing, while ``forge session
+resume --review`` and ``forge session transfer edit`` also share the
 git-commit-style abort behavior: a non-zero editor exit aborts and leaves the
 file untouched.
 """
@@ -20,21 +20,32 @@ from rich.console import Console
 from forge.cli.output import print_error, print_tip
 
 
-def open_in_editor(file_path: Path, *, console: Console, abort_tip: str | None = None) -> None:
-    """Open ``file_path`` in $EDITOR, aborting on a non-zero editor exit.
-
-    Git-commit-style: a non-zero editor exit prints the optional ``abort_tip``
-    and exits with the editor's return code, leaving the file as the user left
-    it. Exits 1 when $EDITOR is empty or its program is not on PATH.
-    """
+def resolve_editor_argv() -> list[str]:
+    """Return shell-style $EDITOR arguments after validating the executable."""
     editor = os.environ.get("EDITOR", "vim")
-    editor_argv = shlex.split(editor)
+    try:
+        editor_argv = shlex.split(editor)
+    except ValueError as e:
+        print_error(f"Invalid $EDITOR value: {e}")
+        sys.exit(1)
     if not editor_argv:
         print_error("$EDITOR is empty. Set $EDITOR to an available editor.")
         sys.exit(1)
     if not shutil.which(editor_argv[0]):
         print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
         sys.exit(1)
+    return editor_argv
+
+
+def open_in_editor(file_path: Path, *, console: Console, abort_tip: str | None = None) -> None:
+    """Open ``file_path`` in $EDITOR, aborting on a non-zero editor exit.
+
+    Git-commit-style: a non-zero editor exit prints the optional ``abort_tip``
+    and exits with the editor's return code, leaving the file as the user left
+    it. Exits 1 when $EDITOR is malformed or empty, or its program is not on
+    PATH.
+    """
+    editor_argv = resolve_editor_argv()
 
     result = subprocess.run([*editor_argv, str(file_path)])
     if result.returncode != 0:

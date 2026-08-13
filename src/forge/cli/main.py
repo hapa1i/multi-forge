@@ -407,7 +407,7 @@ def _auto_clean_sessions_best_effort() -> None:
 @click.group(
     cls=AliasGroup,
     context_settings={"help_option_names": ["-h", "--help"]},
-    invoke_without_command=True,
+    no_args_is_help=True,
 )
 @click.version_option(None, "-V", "--version", package_name="multi-forge", prog_name="forge")
 @click.pass_context
@@ -424,10 +424,6 @@ def main(ctx: click.Context) -> None:
         from forge.core.logging import configure_debug_logging
 
         configure_debug_logging(component=ctx.invoked_subcommand or "forge", subdirectory="cli")
-
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-        return
 
     # Process pending-work queue opportunistically on CLI startup
     # Skip for exempt subcommands (hooks, status-line) to preserve low latency
