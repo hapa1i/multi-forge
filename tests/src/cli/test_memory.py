@@ -717,14 +717,13 @@ class TestMemoryTrack:
         assert reserved.read_bytes() == before_reserved
         assert after_shadows == before_shadows
 
-    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt"])
-    def test_existing_legacy_passport_retrack_does_not_generate_envelope(
+    def test_existing_non_markdown_passport_retrack_does_not_generate_envelope(
         self,
         runner: CliRunner,
         seeded_session: tuple[Path, str],
-        path: str,
     ) -> None:
         forge_root = seeded_session[0]
+        path = "docs/legacy.txt"
         doc = forge_root / path
         doc.write_text("# Legacy\n", encoding="utf-8")
         from forge.session.passport import (

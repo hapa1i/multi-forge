@@ -497,8 +497,8 @@ class TestRunVerificationCheck:
 class TestCancelVerificationCommand:
     """Tests for %cancel-verification direct command."""
 
-    def test_no_session_found(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Should skip (fail-open) when no session can be resolved."""
+    def test_no_session_is_silent(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Should no-op silently when no session can be resolved."""
         monkeypatch.chdir(tmp_path)
         (tmp_path / ".claude").mkdir()
 
@@ -507,10 +507,8 @@ class TestCancelVerificationCommand:
         result = runner.invoke(hooks, ["user-prompt-submit"], input=data)
 
         assert result.exit_code == 0
-        output = json.loads(result.output)
-        # With per-session dirs, no resolvable session → skip (fail-open)
-        assert output["action"] == "skip"
-        assert output["reason"] == "no_session"
+        assert result.stdout == ""
+        assert result.stderr == ""
 
     def test_no_verification_configured(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should return error when no verification configured."""

@@ -1,9 +1,8 @@
 # Align CLI failure surfaces
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation and verification are complete on `agent/align-cli-failure-surfaces` from merged
-`main` at `13ecef87`; independent review and merge remain.
+**Lane**: `done/` -- shipped in PR #174 (`095fcd90`).
 
 **Findings**: D032, D041, O005, O031, O032, and O033.
 

@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Align CLI failure surfaces
+
+**Goal/outcome**: Make high-frequency command and status-line failures predictable without changing successful output.
+
+**Key changes**:
+
+- Status-line input parsing now fails open for malformed top-level, workspace, and proxy-URL data; missing-command and
+  JSON workflow-preflight failures use non-zero, stderr-only contracts.
+- Proxy, template, runtime-config, and Claude-preset editors now share shell-style `$EDITOR` argv parsing while
+  preserving validation and recovery behavior.
+
+**Verification**: The retained artifact produced 19 failures and 4 controls on `13ecef87`; 809 focused tests, 9,005 unit
+tests (one skip, 122 deselected), 844 regressions, 19 targeted Docker integrations, QA/package checks, pre-commit, and
+board integrity checks pass. Shipped in PR #174 (`095fcd90`).
+
 ### Exclude interactive usage cost on both planes
 
 **Goal/outcome**: Keep the reserved interactive harness route out of Forge-added cost if it later gains both a usage

@@ -14,7 +14,6 @@ Uses dacite for deserialization (consistent with BackendRegistryStore).
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -35,8 +34,6 @@ from .exceptions import (
 from .extractor import SearchDocumentMeta
 from .index_state import SEARCH_INDEX_DIR
 
-logger = logging.getLogger(__name__)
-
 # File and schema constants
 DOCUMENTS_FILENAME = "documents.json"
 DOCUMENT_STORE_VERSION = 1
@@ -56,6 +53,13 @@ def get_project_documents_store_path(forge_root: Path) -> Path:
 
 def _handle_document_store_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
     raise SchemaVersionError(str(path), DOCUMENT_STORE_VERSION, version)
+
+
+def _raise_document_store_corruption(path: str, reason: str) -> NoReturn:
+    raise SearchDocumentStoreCorruptedError(
+        path,
+        f"{reason}. Run 'forge search rebuild-index' to fix.",
+    )
 
 
 class SearchDocumentStore:
@@ -119,18 +123,15 @@ class SearchDocumentStore:
 
         raw_docs = data.get("documents", [])
         if not isinstance(raw_docs, list):
-            logger.warning(
-                "Document store %s has non-list 'documents' field (got %s), treating as empty",
+            _raise_document_store_corruption(
                 path_str,
-                type(raw_docs).__name__,
+                f"'documents' is {type(raw_docs).__name__}, expected list",
             )
-            return []
 
         documents: list[SearchDocumentMeta] = []
-        path_str = str(self._store_path)
         for i, raw in enumerate(raw_docs):
             if not isinstance(raw, dict):
-                raise SearchDocumentStoreCorruptedError(path_str, f"entry {i} is {type(raw).__name__}, expected dict")
+                _raise_document_store_corruption(path_str, f"entry {i} is {type(raw).__name__}, expected object")
             try:
                 doc = dacite.from_dict(
                     data_class=SearchDocumentMeta,
@@ -139,7 +140,10 @@ class SearchDocumentStore:
                 )
                 documents.append(doc)
             except (dacite.DaciteError, KeyError, TypeError) as e:
-                raise SearchDocumentStoreCorruptedError(path_str, f"entry {i} deserialization error: {e}") from e
+                raise SearchDocumentStoreCorruptedError(
+                    path_str,
+                    f"entry {i} deserialization error: {e}. Run 'forge search rebuild-index' to fix.",
+                ) from e
 
         return documents
 

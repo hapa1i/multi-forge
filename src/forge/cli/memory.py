@@ -294,10 +294,11 @@ def track_cmd(
 
     try:
         resolved_pp, warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
+        if warnings:
+            write_passport(abs_path, resolved_pp, logical_path=path)
     except PassportError as e:
         raise click.ClickException(str(e)) from e
     if warnings:
-        write_passport(abs_path, resolved_pp)
         for w in warnings:
             console.print(f"[yellow]Warning:[/yellow] {w}")
         console.print(f"Passport updated in [cyan]{path}[/cyan]. Future sessions will use the new values.")
@@ -351,7 +352,7 @@ def _track_existing_shadow_only(
         if has_flags:
             resolved_pp, pp_warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
             if pp_warnings:
-                prepared = prepare_passport_write(abs_path, resolved_pp)
+                prepared = prepare_passport_write(abs_path, resolved_pp, logical_path=path)
     except PassportError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -422,8 +423,9 @@ def _track_propose(
         raise click.ClickException(collision)
 
     # Prepare the complete effective passport before materializing the shadow.
-    # For existing passports this deliberately omits ``okf_path`` so re-track
-    # never validates, repairs, or adds an outer envelope.
+    # Existing passports omit ``okf_path`` so re-track does not apply the
+    # lowercase-.md policy, repair fields, or add an outer envelope. The shared
+    # preparer still rejects reserved logical or resolved basenames before a write.
     # For existing passports, pass strategy only when the user explicitly provided --strategy
     # so the passport's own strategy is preserved by default.
     pp_warnings: list[str]
@@ -438,7 +440,7 @@ def _track_propose(
                 writers=writers,
             )
             if pp_warnings:
-                prepared = prepare_passport_write(abs_path, resolved_pp)
+                prepared = prepare_passport_write(abs_path, resolved_pp, logical_path=path)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
         result_kind = "updated" if pp_warnings else "unchanged"
@@ -451,7 +453,7 @@ def _track_propose(
                 shadow_path=shadow_path,
                 writers=writers,
             )
-            prepared = prepare_passport_write(abs_path, resolved_pp)
+            prepared = prepare_passport_write(abs_path, resolved_pp, logical_path=path)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
         result_kind = "converted"

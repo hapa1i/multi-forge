@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, get_args, get_origin
+import types
+from typing import Any, Union, get_args, get_origin
 
 
 def unwrap_optional(tp: Any) -> Any:
@@ -11,14 +12,12 @@ def unwrap_optional(tp: Any) -> Any:
     Returns the original type unchanged if it is not Optional.
     """
     origin = get_origin(tp)
-    if origin is None:
+    if origin is not Union and origin is not types.UnionType:
         return tp
 
-    # Handle Union types (Optional is Union[T, None])
     args = get_args(tp)
-    if args:
-        non_none = [a for a in args if a is not type(None)]
-        if len(non_none) == 1:
-            return non_none[0]
+    non_none = [arg for arg in args if arg is not type(None)]
+    if type(None) in args and len(non_none) == 1:
+        return non_none[0]
 
     return tp

@@ -63,18 +63,13 @@ class TestSearchDocumentStoreRead:
         with pytest.raises(SchemaVersionError):
             store.read()
 
-    def test_non_list_documents_returns_empty_with_warning(
-        self, store: SearchDocumentStore, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Non-list 'documents' field returns [] and logs a warning."""
+    def test_non_list_documents_raises_corruption(self, store: SearchDocumentStore) -> None:
+        """Non-list 'documents' field is durable-state corruption."""
         store.store_path.parent.mkdir(parents=True, exist_ok=True)
         store.store_path.write_text(json.dumps({"schema_version": DOCUMENT_STORE_VERSION, "documents": "not a list"}))
-        import logging
 
-        with caplog.at_level(logging.WARNING):
-            docs = store.read()
-        assert docs == []
-        assert any("non-list" in record.message for record in caplog.records)
+        with pytest.raises(SearchDocumentStoreCorruptedError):
+            store.read()
 
 
 class TestSearchDocumentStoreWrite:

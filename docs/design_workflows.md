@@ -1112,11 +1112,12 @@ deferred.
 
 New tracking and explicit upgrade require a logical project-relative path ending exactly in `.md`. Logical and resolved
 official basenames are compared case-insensitively against the OKF-reserved `index.md` and `log.md` names before any
-official or shadow write. Proposal shadow paths use the same logical/resolved reserved-name guard, including custom
-git-tracked shadows; they do not use the official document's `.md` envelope-generation check. Existing legacy passports
-on reserved or non-Markdown paths remain readable, removable, and re-trackable without envelope generation. Discovery
-skips a hand-authored shadow-only passport whose write target is reserved, so bypassing CLI authoring cannot route the
-memory writer into an OKF index or log.
+passport mutation or shadow write. Proposal shadow paths use the same logical/resolved reserved-name guard, including
+custom git-tracked shadows; they do not use the official document's `.md` envelope-generation check. Existing legacy
+passports on reserved paths remain readable and removable, and a flag-free `track` remains a byte-identical no-op, but a
+re-track that would rewrite the passport is rejected. Legacy non-Markdown passports remain readable, removable, and
+re-trackable without envelope generation. Discovery skips a hand-authored shadow-only passport whose write target is
+reserved, so bypassing CLI authoring cannot route the memory writer into an OKF index or log.
 
 ---
 

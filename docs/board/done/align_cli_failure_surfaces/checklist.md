@@ -1,7 +1,7 @@
 # Align CLI failure surfaces checklist
 
-Current focus: implementation and all verification gates are complete; obtain independent review and merge without
-activating another Wave 6 member.
+Current focus: complete -- shipped in PR #174 (`095fcd90`); the remaining three Wave 6 members stayed parked through
+merge.
 
 ## Activation
 
@@ -38,7 +38,7 @@ activating another Wave 6 member.
 - [x] Record the human-mode workflow preflight stream split as separately gated D056 rather than widening O033.
 - [x] Run board link/lane/size and diff checks (295 Markdown files, 723 relative links, 2 changed-document fragments, no
   missing targets, 9 done / 1 doing / 3 todo, 741 checklist tokens, and a clean diff check).
-- [ ] Open an independent PR and merge before activating another Wave 6 member.
+- [x] Review and merge independently in PR #174 (`095fcd90`) before activating another Wave 6 member.
 
 ## Acceptance tests
 

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from forge.session.passport import synthesize_passport, write_passport
+from forge.session.passport import (
+    serialize_passport,
+    synthesize_passport,
+    write_passport,
+)
 from forge.session.project_memory import (
     check_shadow_path_collision_in_roots,
     is_under_scan_roots,
@@ -87,7 +91,11 @@ def test_scan_ignores_okf_only_docs_and_bundle_index(tmp_path):
 
 
 def test_scan_keeps_legacy_reserved_passport_compatibility(tmp_path):
-    _write_doc(tmp_path, "docs/index.md")
+    path = tmp_path / "docs/index.md"
+    path.parent.mkdir(parents=True)
+    passport = synthesize_passport(strategy="generic", update_mode="direct", writers="all-sessions")
+    path.write_text(f"---\n{serialize_passport(passport)}---\n# Body\n", encoding="utf-8")
+
     assert [doc.path for doc in scan_passported_docs(tmp_path, ["docs/"], "any-session")] == ["docs/index.md"]
 
 
