@@ -1,9 +1,8 @@
 # Exclude interactive usage cost on both planes
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `agent/exclude-interactive-usage-cost` from merged `main` at
-`7280d177`; under independent review in PR #173 while the remaining four Wave 6 members stay parked.
+**Lane**: `done/` -- shipped in PR #173 (`a55ab218`).
 
 **Finding**: D031.
 

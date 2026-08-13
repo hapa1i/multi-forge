@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Exclude interactive usage cost on both planes
+
+**Goal/outcome**: Keep the reserved interactive harness route out of Forge-added cost if it later gains both a usage
+emitter and proxy run-tree correlation.
+
+**Key changes**:
+
+- Included event roots now exclude interactive events before the exact-cost query, and mixed-root results remove only
+  run IDs proven interactive from dollar-bearing and presence-only records.
+- Cost-only children without usage events remain included. The shipped path is latent contract hardening rather than a
+  correction to observed live spend because neither interactive precondition is currently emitted.
+
+**Verification**: The retained artifact produced 3 failures and 3 controls on `7280d177`; 223 focused tests, 9,001 unit
+tests (one skip, 122 deselected), 821 regressions, one targeted Docker integration, pre-commit, and board integrity
+checks pass. Shipped in PR #173 (`a55ab218`).
+
 ### Align policy routing context
 
 **Goal/outcome**: Make supervisor routing comparisons and policy-shadow reads use the session state that actually

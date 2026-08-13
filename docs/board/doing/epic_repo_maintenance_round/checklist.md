@@ -157,6 +157,7 @@ pending independent review.
 - [x] Activate only O013/O034 from merged `main` at `f6df4a40`; keep the remaining five Wave 6 members parked.
 - [x] Ship O013/O034 independently in PR #172 (`366c216a`) before activating another Wave 6 member.
 - [x] Activate only D031 from merged `main` at `7280d177`; keep the remaining four Wave 6 members parked.
+- [x] Ship D031 independently in PR #173 (`a55ab218`) before activating another Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

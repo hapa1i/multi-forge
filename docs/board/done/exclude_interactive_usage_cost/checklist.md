@@ -1,7 +1,7 @@
 # Exclude interactive usage cost checklist
 
-Current focus: D031 is implemented and verified on `agent/exclude-interactive-usage-cost`; prepare it for independent
-review without activating another Wave 6 member.
+Current focus: complete -- shipped in PR #173 (`a55ab218`); the remaining four Wave 6 members stayed parked through
+merge.
 
 ## Activation
 

@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: D031 is implemented and verified on `agent/exclude-interactive-usage-cost`; keep the remaining 4 members
-parked through independent review.
+Current focus: PR #173 is merged; keep the remaining 4 members parked until the next accepted member is activated from
+merged `main`.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -57,6 +57,6 @@ parked through independent review.
 - [x] Retain D031 fail-first regressions before production changes (`3 failed, 3 passed` on `7280d177`).
 - [x] Implement and verify the two-plane interactive-cost exclusion (`223` focused, `821` regression, `9001` unit, and
   `1` targeted integration test passed).
-- [ ] Review and merge D031 independently before activating another member.
+- [x] Review and merge D031 independently in PR #173 (`a55ab218`) before activating another member.
 - [x] Keep the remaining 4 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.
