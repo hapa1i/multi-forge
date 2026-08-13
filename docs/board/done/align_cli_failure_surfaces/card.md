@@ -1,6 +1,6 @@
 # Align CLI failure surfaces
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #174 (`095fcd90`).
 

@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: independently review and merge O036 after implementation and package verification on
-`agent/harden-walkthrough-sandbox-provenance`.
+Current focus: complete -- all 36 accepted findings shipped across 13 independent members, and the terminal board ledger
+is synchronized.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -86,5 +86,5 @@ Current focus: independently review and merge O036 after implementation and pack
 - [x] Retain O036 fail-first regressions before production changes (`3 failed, 1 passed` on `88ac88c5`) and verify the
   corrected wrapper in a built wheel (`4` retained, `98` focused, `898` regression, `9004` unit, and `1` targeted Docker
   integration test passed).
-- [ ] Review and merge O036 independently before closing this epic.
-- [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.
+- [x] Review and merge O036 independently in PR #177 (`3026b14a`) before closing this epic.
+- [x] Close this bounded epic at 36/36 findings across 13/13 members after synchronizing the parent and review ledger.

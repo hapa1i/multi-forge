@@ -1,6 +1,6 @@
 # Strip inherited Forge headers from direct children
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #164 (`26ab5f29`) on 2026-08-11.
 

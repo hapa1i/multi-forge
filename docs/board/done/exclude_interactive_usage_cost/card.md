@@ -1,6 +1,6 @@
 # Exclude interactive usage cost on both planes
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #173 (`a55ab218`).
 

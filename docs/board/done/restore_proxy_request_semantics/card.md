@@ -1,6 +1,6 @@
 # Restore proxy request semantics
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #170 (`acae1b9e`) after implementation and verification on
 `agent/restore-proxy-request-semantics` from merged `main` at `7f705aad`.

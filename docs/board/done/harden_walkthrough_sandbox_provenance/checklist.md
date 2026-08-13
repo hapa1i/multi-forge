@@ -1,7 +1,6 @@
 # Harden walkthrough sandbox provenance checklist
 
-Current focus: implementation and behavioral verification are complete; finish independent review and merge before
-closing this member and Wave 6.
+Current focus: complete -- O036 shipped independently and its member and bounded Wave 6 epic are closed.
 
 ## Phase 1: Activation and evidence
 
@@ -39,5 +38,5 @@ closing this member and Wave 6.
   a clean diff check).
 - [x] Synchronize the bundled skill safety model; no normative design or end-user update is required because the fix
   restores its documented wrapper boundary without changing CLI or setup behavior.
-- [ ] Review and merge independently; then add the change-log entry, move this member and the completed Wave 6 epic to
-  `done/`, and update parent/review links.
+- [x] Review and merge independently in PR #177 (`3026b14a`); add the change-log entry, move this member and the
+  completed Wave 6 epic to `done/`, and update parent/review links.

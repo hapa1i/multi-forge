@@ -1,10 +1,9 @@
 # Harden walkthrough sandbox provenance
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation and verification are complete on `agent/harden-walkthrough-sandbox-provenance` from
-merged production code at `88ac88c5` after the PR #176 bookkeeping closeout at `180c2bba`; independent review and merge
-remain before Wave 6 closeout.
+**Lane**: `done/` -- shipped independently in PR #177 (`3026b14a`) from merged production code at `88ac88c5` after the
+PR #176 bookkeeping closeout at `180c2bba`.
 
 **Finding**: O036.
 
@@ -51,3 +50,4 @@ Do not change the default test-repo location, the six safety checks, or setup/re
 - Full pre-commit and the 298-file/723-link board audit pass with no missing targets. The bundled skill safety model is
   synchronized; no normative design or end-user update is required because the correction restores the documented
   wrapper boundary without changing CLI or setup behavior.
+- PR #177 merged at `3026b14a` with all five GitHub checks passing.

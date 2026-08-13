@@ -1,6 +1,6 @@
 # Harden detached process teardown
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #166 (`5b50acc8`) after independent review; process-group escalation and ownership
 retirement were hardened in follow-up PR #169 (`ece999d4`).

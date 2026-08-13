@@ -1,10 +1,11 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
-handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Thirty-five findings across its first twelve
-members shipped in PRs #164--#176; O036 is implementation-complete and pending independent review. PR #169 added bounded
-O012 and retention-status hardening without changing that finding count.
+Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
+closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
+verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
+added bounded O012 and retention-status hardening without changing that finding count. D056 remains outside the closed
+admission and awaits its own execution gate.
 
 ## Goal
 
@@ -76,10 +77,9 @@ shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is 
 in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
-34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where
-thirty-five findings across the first twelve members shipped in PRs #164--#176. Follow-up verification admitted
-D054/D055 into a shipped Wave 6 member. D056 is recorded separately and awaits its own execution gate; O036 is
-implementation-complete and pending independent review.
+34 live rows into [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md).
+Follow-up verification expanded that bounded admission with D054/D055, and all 36 findings shipped across 13 independent
+members in PRs #164--#168 and #170--#177. D056 is recorded separately and awaits its own execution gate.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
@@ -116,7 +116,7 @@ order.
 | 5M   | D036                | [`validate_proxy_request_ids`](../../done/validate_proxy_request_ids/card.md)                                       |
 | 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
-| 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md)                               |
+| 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
 | 7    | O047–O048           | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049                | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050                | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Close Wave 6 correctness maintenance
+
+**Goal/outcome**: Prove walkthrough sandbox provenance before target-controlled shell execution and close the bounded
+Wave 6 correctness-maintenance admission.
+
+**Key changes**:
+
+- The walkthrough wrapper now resolves the target canonically before denylist comparison and verifies its marker and
+  required structure before sourcing its environment file.
+- O036 closed the admission at 36/36 findings across 13 independent members. D056 and later Wave 6/7 work remain behind
+  separate entry gates.
+
+**Verification**: The retained O036 artifact produced 3 failures and 1 control on `88ac88c5`; 98 focused tests, 898
+regressions, 9,004 unit tests (one skip, 122 deselected), the clean-wheel check, one targeted Docker integration,
+pre-commit, and the 298-file/723-link board audit pass. Shipped in PR #177 (`3026b14a`) with all five GitHub checks
+passing.
+
 ### Preserve session launch preconditions
 
 **Goal/outcome**: Validate launch prerequisites before durable mutation and keep fallback or post-launch failures from

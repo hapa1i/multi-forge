@@ -1,6 +1,6 @@
 # Align transfer preflight and CLI contract
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #165 (`b3150184`) on 2026-08-11.
 

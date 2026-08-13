@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; 35 of 36 Wave 6 findings have shipped, and O036 is implementation-complete pending
-independent review.
+Current focus: the bounded Wave 6 correctness-maintenance admission is closed at 36/36 findings across 13 members. D056
+and the remaining separately gated Wave 6/7 rows await their own entry gates; no additional implementation card is
+active.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -172,8 +173,10 @@ independent review.
 - [x] Close PR #176 bookkeeping and activate only O036 on `agent/harden-walkthrough-sandbox-provenance` from merged
   production code at `88ac88c5`.
 - [x] Implement and verify O036 from its retained fail-first artifact without activating another maintenance member.
+- [x] Review and merge O036 independently in PR #177 (`3026b14a`).
+- [x] Close O036 and the bounded Wave 6 correctness-maintenance epic at 36/36 findings across 13/13 members.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
-- [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
-  before activating any additional implementation cards.
+- [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW findings, plus Wave 7 structural findings,
+  against their entry conditions before activating any additional implementation cards.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
