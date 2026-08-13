@@ -65,3 +65,5 @@ Completed in PR #148 (`8b997e6a`).
 - [x] Obtain independent review and resolve its required fail-on-base evidence correction and bounded follow-ups.
 - [x] Merge, then synchronize the review ledger, change log, card, and epic cursors before activating O002 (PR #148,
   `8b997e6a`).
+- [x] Sanitize public retention resolver/pruner failure detail while preserving diagnostic logs in follow-up PR #169
+  (`ece999d4`, CodeQL alert 32).

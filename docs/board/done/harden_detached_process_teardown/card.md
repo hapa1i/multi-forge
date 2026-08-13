@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `done/` -- shipped in PR #166 (`5b50acc8`) after independent review.
+**Lane**: `done/` -- shipped in PR #166 (`5b50acc8`) after independent review; process-group escalation and ownership
+retirement were hardened in follow-up PR #169 (`ece999d4`).
 
 **Findings**: D027 and O012.
 
@@ -60,6 +61,12 @@ integration tests, and 3 real-process teardown integrations proving stop, failed
 The real Codex single-shot smoke was attempted but stopped at its environment preflight because no Codex credential is
 configured; no subprocess launched. The hermetic real-process integration exercises the changed shared lifecycle without
 external authentication.
+
+Post-merge follow-up PR #169 made the shared helper wait for the complete process group, not only its leader, before
+escalating to `SIGKILL`. Cleanup phases share bounded deadlines, signal/poll failures retain log evidence, completed
+fan-out and single-shot children relinquish numeric PGID ownership before later hooks can raise, and a grouped timeout
+claims exactly one teardown cycle. Real descendants that ignore `SIGTERM` and deterministic stale-ownership controls pin
+the correction.
 
 Final pre-commit passes after its expected Markdown normalization. All 719 relative links across 286 board Markdown
 files have existing targets, changed-document fragments resolve, and the post-merge 12-member Wave 6 lane graph is 3

@@ -38,3 +38,5 @@ Current focus: closed after independent review and merge in PR #166 (`5b50acc8`)
   3 `done` / 0 `doing` / 9 `todo`).
 - [x] Record fail-first evidence, implementation outcome, verification, and compatibility boundaries.
 - [x] Open independent draft PR #166 and merge it as `5b50acc8` without activating the next Wave 6 member.
+- [x] Harden complete-group escalation, stale PGID ownership retirement, cleanup evidence, and single-attempt grouped
+  timeout teardown in follow-up PR #169 (`ece999d4`).

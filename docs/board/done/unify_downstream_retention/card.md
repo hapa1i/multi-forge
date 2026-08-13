@@ -4,7 +4,8 @@
 
 **Decision**: [`downstream_retention_ownership`](../downstream_retention_ownership/card.md) (DG3; D015).
 
-**Lane**: `done/` -- shipped in PR #148 (`8b997e6a`) after independent review.
+**Lane**: `done/` -- shipped in PR #148 (`8b997e6a`) after independent review; public retention-status failures were
+sanitized in follow-up PR #169 (`ece999d4`, CodeQL alert 32).
 
 ## Goal
 
@@ -45,3 +46,7 @@ following-release rejection of proxy-local keys retires this limitation.
 ## Verification
 
 Run focused config/telemetry/proxy tests, targeted proxy integration tests, and `make pre-commit`.
+
+Post-merge follow-up PR #169 retained detailed resolver/pruner exceptions in server logs but replaced public `GET /`
+status detail with stable resolution/enforcement recovery messages. Resolver, enforcement, partial-prune, and ordinary
+healthy controls pin the CodeQL alert 32 correction without changing retention ownership or startup availability.

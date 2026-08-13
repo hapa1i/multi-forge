@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-13
+
+### Harden process cleanup and retention status
+
+**Goal/outcome**: Complete detached-group escalation and keep retention failures actionable without exposing internal
+exception detail through public proxy status.
+
+**Key changes**:
+
+- Wait for complete owned process groups under shared grace deadlines, escalate surviving descendants to `SIGKILL`,
+  retain cleanup-failure evidence, and retire completed child ownership before later hooks can raise.
+- Publish stable retention resolution/enforcement recovery messages while keeping detailed resolver and pruner failures
+  in server logs, closing CodeQL alert 32.
+
+**Verification**: The retained real-process regression proves a `SIGTERM`-ignoring descendant is killed; stale-PGID and
+single-attempt timeout controls cover the ownership edges. The 106-test invoker slice, 8,990 unit tests (one existing
+platform skip, 122 deselected), 764 regressions, 4 targeted Docker integrations, and pre-commit pass. Shipped in PR #169
+(`ece999d4`).
+
 ## 2026-08-12
 
 ### Complete proxy instance config wiring

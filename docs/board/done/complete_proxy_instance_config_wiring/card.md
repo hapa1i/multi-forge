@@ -1,9 +1,9 @@
 # Complete proxy instance config wiring
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `agent/complete-proxy-instance-config-wiring` from merged `main` at
-`7c76a099`; awaiting an independent draft PR.
+**Lane**: `done/` -- shipped in PR #168 (`9b18edc3`) after implementation and verification on
+`agent/complete-proxy-instance-config-wiring` from merged `main` at `7c76a099`.
 
 **Findings**: D029 and O025.
 

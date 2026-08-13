@@ -1,6 +1,6 @@
 # Complete proxy instance config wiring checklist
 
-Current focus: open the independently verified D029/O025 draft PR without activating the next member.
+Current focus: closed after merge in PR #168 (`9b18edc3`) without activating the next member.
 
 ## Activation and prior-member closeout
 
@@ -31,4 +31,4 @@ Current focus: open the independently verified D029/O025 draft PR without activa
 - [x] Run pre-commit and final board integrity, lane, link, size, and diff checks (288 files, 713 local links, zero
   missing targets; Wave 6 lanes 4 done/1 doing/7 todo).
 - [x] Synchronize design/end-user contracts and record the implementation evidence.
-- [ ] Open an independent draft PR without activating the next Wave 6 member.
+- [x] Open and merge independent PR #168 (`9b18edc3`) without activating the next Wave 6 member.
