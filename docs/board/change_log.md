@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Harden command and state boundaries
+
+**Goal/outcome**: Keep direct-command no-ops silent and reject malformed or reserved durable state at shared validation
+boundaries.
+
+**Key changes**:
+
+- Five no-session direct commands now emit nothing, and every passport create/update path rejects reserved basenames
+  before writing while preserving the intentionally informative `%plan` and `%policy check` outcomes.
+- Search stores now reject wrong container and element shapes with rebuild guidance, and Optional unwrapping is limited
+  to actual unions with `None`.
+
+**Verification**: The retained artifact produced 21 failures and 5 controls on `095fcd90`; 681 focused tests, 9,004 unit
+tests (one skip, 122 deselected), 872 regressions, 24 targeted Docker integrations, pre-commit, and board integrity
+checks pass. Shipped in PR #175 (`967d9cae`).
+
 ### Align CLI failure surfaces
 
 **Goal/outcome**: Make high-frequency command and status-line failures predictable without changing successful output.

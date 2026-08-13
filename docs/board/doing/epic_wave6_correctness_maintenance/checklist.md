@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: D034/D037/D038/O027 implementation and every verification gate are complete on
-`agent/harden-command-state-boundaries`; obtain independent review while keeping the remaining 2 members parked.
+Current focus: PR #175 is merged; keep the remaining 2 members parked until the next accepted member is activated from
+merged `main`.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -72,4 +72,5 @@ Current focus: D034/D037/D038/O027 implementation and every verification gate ar
 - [x] Implement and verify silent no-session hooks, reserved passport mutations, strict search-store shapes, and
   Union-only Optional unwrapping (`681` focused, `872` regression, `9004` unit, and `24` targeted Docker integration
   tests passed).
+- [x] Review and merge D034/D037/D038/O027 independently in PR #175 (`967d9cae`) before activating another member.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.
