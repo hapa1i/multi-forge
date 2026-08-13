@@ -3,7 +3,7 @@
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `doing/` -- implemented and verified on `agent/exclude-interactive-usage-cost` from merged `main` at
-`7280d177`; awaiting independent review while the remaining four Wave 6 members stay parked.
+`7280d177`; under independent review in PR #173 while the remaining four Wave 6 members stay parked.
 
 **Finding**: D031.
 

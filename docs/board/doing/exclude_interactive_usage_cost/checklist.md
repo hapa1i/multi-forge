@@ -35,7 +35,7 @@ review without activating another Wave 6 member.
 - [x] Run board link/lane/size and diff checks (293 Markdown files, 718 relative links and 2 changed-document fragments
   with none missing, Wave 6 at 8 done / 1 doing / 4 todo, the active-checklist size check passed, and clean
   `git diff --check`).
-- [ ] Open an independent PR before activating another Wave 6 member.
+- [x] Open draft PR #173 for independent review before activating another Wave 6 member.
 
 ## Acceptance tests
 
