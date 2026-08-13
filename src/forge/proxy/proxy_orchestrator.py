@@ -1331,18 +1331,30 @@ def _spawn_proxy_process(
     import tempfile
 
     stderr_fd, stderr_path = tempfile.mkstemp(suffix=".log", prefix=f"forge_proxy_{proxy_id}_")
+    stderr_capture = Path(stderr_path)
 
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=stderr_fd,
-        env=env,
-    )
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr_fd,
+            env=env,
+        )
+    except OSError as e:
+        try:
+            os.close(stderr_fd)
+        except OSError as cleanup_error:
+            logger.warning("Failed to close proxy stderr capture after spawn failure: %s", cleanup_error)
+        try:
+            stderr_capture.unlink(missing_ok=True)
+        except OSError as cleanup_error:
+            logger.warning("Failed to remove proxy stderr capture after spawn failure: %s", cleanup_error)
+        raise ProxyStartError(f"Failed to start proxy process: {e}") from e
 
-    # Close the fd (process has it open)
+    # The child inherited the descriptor during Popen; only the parent copy closes here.
     os.close(stderr_fd)
 
-    return proc, Path(stderr_path)
+    return proc, stderr_capture
 
 
 def _wait_until_healthy(
