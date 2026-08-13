@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: PR #171 is merged; keep the remaining 6 members parked until the next accepted member is activated from
-merged `main`.
+Current focus: retain O013/O034 fail-first regressions on `agent/align-policy-routing-context`; keep the remaining 5
+members parked.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -47,5 +47,10 @@ merged `main`.
 - [x] Retain D054/D055 fail-first regressions before production changes (`24 failed, 2 passed` on `22071fcd`).
 - [x] Implement and verify proxy direct-field validation plus atomic typed spawn failure.
 - [x] Review and merge D054/D055 independently in PR #171 (`5cd268c1`) before activating another member.
-- [ ] Keep the remaining 6 members in `todo/` behind their own fail-first gates.
+- [x] Keep the remaining 6 members in `todo/` through the D054/D055 merge.
+- [x] Activate only O013/O034 on `agent/align-policy-routing-context` from merged `main` at `f6df4a40`.
+- [x] Retain O013/O034 fail-first regressions before production changes (`6 failed, 10 passed` on `f6df4a40`).
+- [x] Implement and verify confirmed current-proxy identity plus one shadow-session resolver.
+- [ ] Review and merge O013/O034 independently before activating another member.
+- [x] Keep the remaining 5 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

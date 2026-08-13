@@ -142,9 +142,8 @@ def supervisor_set(
         supervisor_proxy = resolved_proxy_id
 
     current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
-    current_proxy_id = None
-    if manifest.intent.proxy and hasattr(manifest.intent.proxy, "proxy_id"):
-        current_proxy_id = manifest.intent.proxy.proxy_id  # type: ignore[union-attr]
+    current_launch = manifest.confirmed.launch
+    current_proxy_id = current_launch.proxy_id if current_launch else None
     current_direct = not bool(manifest.intent.proxy)
 
     sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or policy_forge_root)
