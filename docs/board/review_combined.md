@@ -48,9 +48,9 @@ and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and
 to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Thirty-five findings across
 D020, D023/D028/O022, D027/O012, O014/O026, D029/O025, D030/O008/O015/O035, D054/D055, O013/O034, D031, and
 D032/D041/O005/O031--O033, D034/D037/D038/O027, and O011/O017/O021/O023/O029/O030 shipped in PRs #164--#176; PR #169
-subsequently hardened O012 and retention-status failure reporting without adding a finding. O036 remains parked. O003
-already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their separately
-defined Wave 6/7 admission gates.
+subsequently hardened O012 and retention-status failure reporting without adding a finding. O036 is
+implementation-complete and pending independent review. O003 already shipped in Wave 3 and is not part of the Wave 5
+set. Other MEDIUM/LOW rows still require their separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -685,7 +685,8 @@ the caller catches the non-strict conversion error and falls back to raw intent.
 old row.
 
 At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
-Thirty-five findings across the first twelve members have since shipped, and O036 remains parked:
+Thirty-five findings across the first twelve members have since shipped, and O036 is implementation-complete pending
+independent review:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -701,7 +702,7 @@ Thirty-five findings across the first twelve members have since shipped, and O03
 | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](done/align_cli_failure_surfaces/card.md)                               |
 | D034, D037, D038, O027           | [`harden_command_state_boundaries`](done/harden_command_state_boundaries/card.md)                     |
 | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](done/preserve_session_launch_preconditions/card.md)         |
-| O036                             | [`harden_walkthrough_sandbox_provenance`](todo/harden_walkthrough_sandbox_provenance/card.md)         |
+| O036                             | [`harden_walkthrough_sandbox_provenance`](doing/harden_walkthrough_sandbox_provenance/card.md)        |
 
 This handoff closed Wave 5 at 13/13 admitted findings. At admission, it did not claim any of the 34 Wave 6 behaviors
 were fixed, activate a parked member, or admit policy-internal, durable-state-only, performance, docs, duplication,
@@ -727,7 +728,8 @@ dead-code, structural, or explicitly unverified rows outside this screen.
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 36 verified
   CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; thirty-five findings across the first
-  twelve members shipped in PRs #164--#176, and D033/O020 are rejected by executable current-behavior controls.
+  twelve members shipped in PRs #164--#176, O036 is implementation-complete pending review, and D033/O020 are rejected
+  by executable current-behavior controls.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

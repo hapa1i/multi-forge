@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Safety wrapper for Forge walkthrough commands.
-# Sources env.sh, verifies isolation through 6 gates, cd's to test repo, runs the command.
+# Resolves and validates the target before sourcing env.sh, verifies isolation through 6 gates,
+# cd's to the test repo, and runs the command.
 #
 # Usage:
 #   bash run-in-repo.sh forge session list           # cd's to test repo automatically
@@ -33,7 +34,7 @@ if [ "${FORGE_TEST_REPO+set}" = "set" ] && [ -z "$FORGE_TEST_REPO" ]; then
     exit 1
 fi
 FORGE_TEST_REPO="${FORGE_TEST_REPO:-${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough/test-repo}"
-FORGE_TEST_REPO="$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$FORGE_TEST_REPO")"
+FORGE_TEST_REPO="$(python3 -c 'import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))' "$FORGE_TEST_REPO")"
 
 # --- Denylist: refuse obviously dangerous values ---
 check_safe_path() {
@@ -71,9 +72,6 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-
 # --- Gate 2: marker file exists ---
 MARKER_FILE="$FORGE_TEST_REPO/.forge-walkthrough-marker"
 if [ ! -f "$MARKER_FILE" ]; then
@@ -82,6 +80,23 @@ if [ ! -f "$MARKER_FILE" ]; then
     echo "  Refusing to run commands -- your real system may be at risk." >&2
     exit 1
 fi
+
+# --- Gate 6: structure check ---
+if [ ! -d "$FORGE_TEST_REPO/.forge/walkthrough" ]; then
+    echo "ERROR: Expected directory missing: $FORGE_TEST_REPO/.forge/walkthrough/" >&2
+    echo "  The test repo structure is incomplete. Run setup-test-repo.sh." >&2
+    exit 1
+fi
+
+if [ ! -f "$FORGE_TEST_REPO/CLAUDE.md" ]; then
+    echo "ERROR: Expected file missing: $FORGE_TEST_REPO/CLAUDE.md" >&2
+    echo "  This doesn't look like a forge walkthrough test repo." >&2
+    exit 1
+fi
+
+# Source target-controlled code only after proving the walkthrough marker and structure.
+# shellcheck source=/dev/null
+source "$ENV_FILE"
 
 # --- Gate 3: FORGE_HOME isolation ---
 EXPECTED_FORGE_HOME="$FORGE_TEST_REPO/.forge-home"
@@ -110,19 +125,6 @@ if [ "${CODEX_HOME:-}" != "$EXPECTED_CODEX_HOME" ]; then
     echo "  Expected: $EXPECTED_CODEX_HOME" >&2
     echo "  Actual:   ${CODEX_HOME:-<unset>}" >&2
     echo "  Did you source env.sh?" >&2
-    exit 1
-fi
-
-# --- Gate 6: structure check ---
-if [ ! -d "$FORGE_TEST_REPO/.forge/walkthrough" ]; then
-    echo "ERROR: Expected directory missing: $FORGE_TEST_REPO/.forge/walkthrough/" >&2
-    echo "  The test repo structure is incomplete. Run setup-test-repo.sh." >&2
-    exit 1
-fi
-
-if [ ! -f "$FORGE_TEST_REPO/CLAUDE.md" ]; then
-    echo "ERROR: Expected file missing: $FORGE_TEST_REPO/CLAUDE.md" >&2
-    echo "  This doesn't look like a forge walkthrough test repo." >&2
     exit 1
 fi
 
