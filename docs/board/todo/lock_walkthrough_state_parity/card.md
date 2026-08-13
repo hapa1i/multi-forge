@@ -1,6 +1,6 @@
 # Lock walkthrough and QA state-script parity
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `todo/` -- accepted Wave 7 bundled-skill maintenance work.
 
@@ -18,7 +18,7 @@ through its state-machine suite. Installed skill packages must remain executable
 environment, so replacing one copy with a package import is not a safe simplification. Authority:
 [`docs/design_appendix.md` "D. Interactive Manual Testing"](../../../design_appendix.md#d-interactive-manual-testing)
 and
-[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test-smoke-test-forgewalkthrough-forgeqa).
+[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test--smoke-test-forgewalkthrough-forgeqa).
 
 ## Acceptance Criteria
 

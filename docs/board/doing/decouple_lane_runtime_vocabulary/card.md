@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 refactor work.
+**Lane**: `doing/` -- active on `refactor/decouple-lane-runtime-vocabulary` from preparation commit `095d8eeb`.
 
 **Finding**: O043.
 
@@ -24,6 +24,21 @@ On `5777192a`, `lanes.py` imports `RUNTIMES` only for membership checks, while `
 - Lane validation uses the neutral runtime-ID set and retains an exact parity guard against registered agent runtimes.
 - Importing `forge.core.lanes` does not initialize `forge.core.runtime` or the LLM/preflight stack.
 - Run `tests/src/core/test_lanes.py`, consumer-lane tests, and a fresh-process import assertion/measurement.
+
+## Branch Result
+
+`runtime_execution` now classifies agent runtimes through `AGENT_RUNTIME_IDS`; the existing registry parity assertion
+remains the authority for vocabulary drift. A subprocess regression pins the import boundary in a fresh interpreter. The
+fresh import initialized no `forge.core.runtime`, `forge.core.llm`, or `forge.core.auth` modules and measured
+approximately 55 ms cumulatively, down from the approximately 317 ms activation baseline.
+
+Verification on the branch covers 49 focused lane assertions, 568 broader lane-consumer assertions, 9,005 unit tests
+(one skip, 122 deselected), and 898 regressions. This import-only refactor changes neither a consumer binding nor a
+runtime dispatch path, so the real-Codex consumer integration smokes are not applicable.
+
+Full pre-commit passes after Markdown normalization. The board audit resolves all 852 local paths and all 55 fragments
+from the 44 changed board documents; the Wave 7 graph is exactly one `doing/` member and 33 `todo/` members with valid
+epic backlinks. Four unrelated fragment references in untouched historical cards remain pre-existing.
 
 ## Exclusions
 

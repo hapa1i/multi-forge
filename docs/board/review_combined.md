@@ -50,9 +50,9 @@ D054/D055, and all 36 findings across 13 members shipped independently in PRs #1
 subsequently hardened O012 and retention-status failure reporting without adding a finding. The bounded Wave 6 child
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` admitted 31 verified findings as 34 parked members under
-[`epic_wave7_refactor_and_deletion`](todo/epic_wave7_refactor_and_deletion/card.md); no implementation member was
-activated. D056 and other correctness, security, performance, test-policy, output, and documentation rows still require
-their separately defined Wave 6 gates.
+[`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
+implementation; order-1 O043 subsequently became the sole active member. D056 and other correctness, security,
+performance, test-policy, output, and documentation rows still require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -715,7 +715,7 @@ duplication, dead-code, structural, or explicitly unverified rows outside its sc
 The structural/deletion candidates were rechecked after Wave 6 on merged `main` at `5777192a`. The screen covered
 O043--O073 and O092--O099 as candidate rows, then checked the remaining live ledger for structurally misclassified work.
 It admitted 31 verified finding rows as 34 parked implementation members under
-[`epic_wave7_refactor_and_deletion`](todo/epic_wave7_refactor_and_deletion/card.md). No implementation branch or member
+[`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). No implementation branch or member
 was activated.
 
 The admission corrects the original report rather than treating it as a command:
@@ -761,9 +761,10 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
 - **[Wave 6 correctness maintenance epic](done/epic_wave6_correctness_maintenance/card.md):** all 36 verified
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
-- **[Wave 7 refactor and deletion epic](todo/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 parked members. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their
-  verified scope, and O092's unverified tail is not an executable deletion set.
+- **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
+  are split into 34 members; only order-1 O043 is active and the other 33 are parked. O062/O063/O093 are rejected as
+  written, O067/O095 are admitted only in their verified scope, and O092's unverified tail is not an executable deletion
+  set.
 
 ## Strengths (preserve these)
 

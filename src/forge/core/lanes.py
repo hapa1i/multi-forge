@@ -27,8 +27,7 @@ from forge.backend.sources import (
     get_model_source,
     resolve_model_source_id,
 )
-from forge.core.runtime.registry import RUNTIMES
-from forge.core.runtime_vocab import CORE_LLM_RUNTIME
+from forge.core.runtime_vocab import AGENT_RUNTIME_IDS, CORE_LLM_RUNTIME
 
 ExecutionKind = Literal["single_shot", "tool_agent"]
 CapabilityFloor = ExecutionKind
@@ -45,7 +44,7 @@ class Lane:
     """A concrete ``(runtime, backend, model)`` placement.
 
     Transport is intentionally absent (derived at dispatch). Construction
-    validates the runtime (``RUNTIMES`` / ``core_llm``) and normalizes
+    validates the runtime (``AGENT_RUNTIME_IDS`` / ``core_llm``) and normalizes
     ``backend_id`` to its canonical ``ModelSource`` id (template aliases are
     accepted), so alias and canonical lanes compare equal. ``model`` must be
     non-empty; anything unknown raises ``LaneError``.
@@ -98,12 +97,13 @@ class Consumer:
 def runtime_execution(runtime_id: str) -> ExecutionKind:
     """Return a lane runtime's execution capability.
 
-    ``core_llm`` is ``single_shot``; every agent runtime in ``RUNTIMES`` is a
-    ``tool_agent``. Raises ``LaneError`` for an unknown runtime.
+    ``core_llm`` is ``single_shot``; every id in the dependency-light agent
+    runtime vocabulary is a ``tool_agent``. Raises ``LaneError`` for an unknown
+    runtime. The vocabulary is drift-guarded against the runtime registry.
     """
     if runtime_id == CORE_LLM_RUNTIME:
         return "single_shot"
-    if runtime_id not in RUNTIMES:
+    if runtime_id not in AGENT_RUNTIME_IDS:
         raise LaneError(f"Unknown runtime: {runtime_id!r}")
     return "tool_agent"
 
