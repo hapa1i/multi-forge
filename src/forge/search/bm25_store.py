@@ -208,7 +208,10 @@ class BM25IndexStore:
                 tokenizer_id=stored_tokenizer,
             )
         except (TypeError, ValueError) as e:
-            raise BM25IndexCorruptedError(path_str, f"invalid data: {e}") from e
+            raise BM25IndexCorruptedError(
+                path_str,
+                f"invalid data: {e}. Run 'forge search rebuild-index' to fix.",
+            ) from e
 
         n_keys = len(index_data.doc_keys)
         n_lens = len(index_data.doc_lens)

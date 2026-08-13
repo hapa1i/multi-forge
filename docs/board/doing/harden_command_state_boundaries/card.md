@@ -34,4 +34,6 @@ standards.
 
 ## Compatibility and Exclusions
 
-Do not change valid passport frontmatter, search schema versions, override merge semantics, or hook block payloads.
+Do not change valid passport frontmatter, search schema versions, override merge semantics, or hook block payloads. The
+informative no-session/no-input blocks from `%plan` and `%policy check` remain intentionally unchanged; D034 is limited
+to the five cited handlers whose no-session outcome is a silent no-op.

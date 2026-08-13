@@ -31,15 +31,17 @@ activating another Wave 6 member.
 ## Verification and closeout
 
 - [x] Run focused hook, passport, search, override, and regression tests (`681 passed`; the final retained finding slice
-  passed `27` tests, and the post-review passport slice passed `370`).
+  passed `28` tests, and the post-review passport slice passed `370`).
 - [x] Run the targeted search and prompt-dispatcher Docker integration tests (`24 passed`).
-- [x] Run the full regression (`871 passed`) and unit (`9004 passed, 1 skipped, 122 deselected`) suites.
+- [x] Run the full regression (`872 passed`) and unit (`9004 passed, 1 skipped, 122 deselected`) suites.
 - [x] Run `make pre-commit` after the final code and documentation diff (all hooks passed after the expected formatter
   normalization pass).
 - [x] Synchronize the CLI reference, normative workflow design, and end-user memory guide for reserved passport
   mutations; no other architecture or file ownership changed.
 - [x] Run final board integrity and diff checks (10 changed Markdown files, 2 added local links, no missing targets,
   Wave 6 member graph at 10 done / 1 doing / 2 todo, no stale todo link, and a clean diff check).
+- [x] Resolve review feedback by adding rebuild guidance to the BM25 scalar-conversion fallback; retain and document the
+  intentional `%plan` / `%policy check` informative-block asymmetry outside D034's five silent no-op handlers.
 - [ ] Record verification in `docs/board/change_log.md`, update epic counts and links, and move this card to `done/`.
 - [ ] Review and merge this member independently before activating the next ordered Wave 6 member.
 

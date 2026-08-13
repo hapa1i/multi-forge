@@ -103,6 +103,16 @@ def test_bm25_store_rejects_wrong_container_or_element_type(
         store.read()
 
 
+def test_bm25_scalar_conversion_error_includes_rebuild_guidance(tmp_path: Path) -> None:
+    store = BM25IndexStore(store_path=tmp_path / "bm25_index.json")
+    payload = _valid_bm25_payload()
+    payload["avgdl"] = "not-a-number"
+    _write_json(store.store_path, payload)
+
+    with pytest.raises(BM25IndexCorruptedError, match="rebuild-index"):
+        store.read()
+
+
 def test_malformed_bm25_element_reaches_cli_corruption_guidance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

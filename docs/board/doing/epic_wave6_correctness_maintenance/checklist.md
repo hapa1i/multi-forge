@@ -70,6 +70,6 @@ Current focus: D034/D037/D038/O027 implementation and every verification gate ar
 - [x] Retain fail-first regressions for the hook-silence, reserved-passport, strict-search-read, and Optional-unwrapping
   boundaries before production changes (`21 failed, 5 passed` on production code at `095fcd90`).
 - [x] Implement and verify silent no-session hooks, reserved passport mutations, strict search-store shapes, and
-  Union-only Optional unwrapping (`681` focused, `871` regression, `9004` unit, and `24` targeted Docker integration
+  Union-only Optional unwrapping (`681` focused, `872` regression, `9004` unit, and `24` targeted Docker integration
   tests passed).
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.
