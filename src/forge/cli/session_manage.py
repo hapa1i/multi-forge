@@ -887,8 +887,8 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
     # For --json/--field, fall through to get_session_context() which builds
     # env-derived context so scripted callers always get a usable shape.
     if session_id is None and not os.environ.get("FORGE_SESSION") and not (as_json or field_path):
-        console.print("[dim]No session specified. Use a name or launch through Forge.[/dim]")
-        return
+        print_error("No session specified. Use a name or launch through Forge.")
+        sys.exit(1)
 
     try:
         ctx = get_session_context(session_id)

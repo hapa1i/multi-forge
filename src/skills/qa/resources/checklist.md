@@ -6,14 +6,15 @@
 
 <!-- test-count: 625 -->
 
-<!-- last-updated: 2026-08-09 -->
+<!-- last-updated: 2026-08-13 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-08-09 (status-line QA now verifies that a `path,branch` layout stays independent of unavailable
-proxy/session inputs). Earlier 2026-08-09: proxy QA added safe Anthropic passthrough response metadata and translated
+**Last updated**: 2026-08-13 (workflow QA now captures preflight failure JSON from stderr while preserving the nonzero
+exit checks). Earlier 2026-08-09: status-line QA verifies that a `path,branch` layout stays independent of unavailable
+proxy/session inputs. Earlier 2026-08-09: proxy QA added safe Anthropic passthrough response metadata and translated
 requests with an explicit Claude Code User-Agent. Earlier 2026-08-08: search QA added consistent corrupt query/status
 failures in human/JSON modes with empty stdout and actionable stderr. Earlier 2026-08-08: proxy QA added one-result
 create/smoke JSON and refused adopted-kill ownership preservation. Earlier 2026-08-08: proxy/config QA added fail-closed

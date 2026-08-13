@@ -196,8 +196,12 @@ def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
 
     # Normalize scheme-less URLs (e.g., "localhost:8085" → "http://localhost:8085")
     normalized = base_url if "://" in base_url else f"http://{base_url}"
-    parsed = urlparse(normalized)
-    if not parsed.hostname:
+    try:
+        parsed = urlparse(normalized)
+        if not parsed.hostname:
+            return False, None, False
+    except ValueError as e:
+        logger.debug("Invalid ANTHROPIC_BASE_URL %r: %s", base_url, e)
         return False, None, False
 
     # Try live proxy query first (authoritative)
@@ -1691,6 +1695,12 @@ def status_line() -> None:
     except json.JSONDecodeError:
         click.echo(f"{RED}[Error: Invalid JSON]{RESET}", color=True)
         return
+
+    if not isinstance(data, dict):
+        click.echo(f"{RED}[Error: Invalid input]{RESET}", color=True)
+        return
+    if not isinstance(data.get("workspace"), dict):
+        data["workspace"] = {}
 
     logger.debug("env: FORGE_HOME=%s", os.environ.get("FORGE_HOME", "<unset>"))
     logger.debug("env: ANTHROPIC_BASE_URL=%s", os.environ.get("ANTHROPIC_BASE_URL", "<unset>"))

@@ -60,8 +60,9 @@ class TestCrossProjectHints:
         result = runner.invoke(main, ["session", "resume", "cross-sess"])
 
         assert result.exit_code == 1
-        assert "not found in current project" in result.output
-        assert "nested-sub" in result.output
+        assert result.stdout == ""
+        assert "not found in current project" in result.stderr
+        assert "nested-sub" in result.stderr
 
     def test_cross_project_hint_does_not_wrap_target_path(self, temp_env: Path, tmp_path: Path) -> None:
         """Cross-project hints should keep the target path intact on narrow terminals."""
@@ -70,7 +71,7 @@ class TestCrossProjectHints:
 
         with output.open("w", encoding="utf-8") as handle:
             narrow_console = Console(file=handle, width=40, force_terminal=False)
-            with patch.object(session_cli, "console", narrow_console):
+            with patch.object(session_cli, "err_console", narrow_console):
                 hinted = session_cli._hint_cross_project_session("cross-sess", str(temp_env))
 
         rendered = output.read_text(encoding="utf-8")
@@ -85,8 +86,9 @@ class TestCrossProjectHints:
         result = runner.invoke(main, ["session", "fork", "cross-sess", "--name", "child"])
 
         assert result.exit_code == 1
-        assert "not found in current project" in result.output
-        assert "nested-sub" in result.output
+        assert result.stdout == ""
+        assert "not found in current project" in result.stderr
+        assert "nested-sub" in result.stderr
 
     def test_show_cross_project_resolves(self, runner: CliRunner, temp_env: Path) -> None:
         """Show from wrong forge_root should resolve cross-project and succeed."""
@@ -105,8 +107,9 @@ class TestCrossProjectHints:
         result = runner.invoke(main, ["session", "shell", "cross-sess"])
 
         assert result.exit_code == 1
-        assert "not found in current project" in result.output
-        assert "nested-sub" in result.output
+        assert result.stdout == ""
+        assert "not found in current project" in result.stderr
+        assert "nested-sub" in result.stderr
 
 
 class TestCrossProjectResolution:

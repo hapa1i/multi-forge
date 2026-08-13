@@ -36,6 +36,7 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
+from forge.cli.editor import resolve_editor_argv
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.proxy_audit import audit_cmd
 from forge.config.loader import (
@@ -899,11 +900,7 @@ def edit_cmd(proxy_id: str) -> None:
         )
         sys.exit(1)
 
-    editor = os.environ.get("EDITOR", "vim")
-
-    if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
-        sys.exit(1)
+    editor_argv = resolve_editor_argv()
 
     # Copy to temp file for safe editing
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -912,7 +909,7 @@ def edit_cmd(proxy_id: str) -> None:
 
     success = False
     try:
-        result = subprocess.run([editor, str(tmp_path)])
+        result = subprocess.run([*editor_argv, str(tmp_path)])
         if result.returncode != 0:
             print_error(f"Editor exited with code {result.returncode}")
             err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
@@ -1921,10 +1918,7 @@ def template_edit_cmd(name: str) -> None:
     # The user file is only created/updated after successful validation.
     seed_content = user_path.read_text(encoding="utf-8") if not first_edit else read_shipped_template(name)
 
-    editor = os.environ.get("EDITOR", "vim")
-    if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
-        sys.exit(1)
+    editor_argv = resolve_editor_argv()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
         tmp.write(seed_content)
@@ -1932,7 +1926,7 @@ def template_edit_cmd(name: str) -> None:
 
     success = False
     try:
-        result = subprocess.run([editor, str(tmp_path)])
+        result = subprocess.run([*editor_argv, str(tmp_path)])
         if result.returncode != 0:
             print_error(f"Editor exited with code {result.returncode}")
             err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")

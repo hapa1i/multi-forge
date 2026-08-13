@@ -17,6 +17,7 @@ import click
 import httpx
 from rich.console import Console
 
+from forge.cli.editor import resolve_editor_argv
 from forge.cli.output import err_console, print_error, print_error_with_tip
 from forge.core.models.direct_model import (
     apply_direct_model_env,
@@ -325,7 +326,6 @@ def preset_edit() -> None:
     Validates JSON before saving.
     """
     import json
-    import shutil
     import tempfile
 
     from forge.install.preset import ensure_preset, get_preset_path
@@ -333,10 +333,7 @@ def preset_edit() -> None:
     preset_path = get_preset_path()
     ensure_preset()
 
-    editor = os.environ.get("EDITOR", "vim")
-    if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
-        sys.exit(1)
+    editor_argv = resolve_editor_argv()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
         tmp.write(preset_path.read_text(encoding="utf-8"))
@@ -344,7 +341,7 @@ def preset_edit() -> None:
 
     success = False
     try:
-        result = subprocess.run([editor, str(tmp_path)])
+        result = subprocess.run([*editor_argv, str(tmp_path)])
         if result.returncode != 0:
             print_error(f"Editor exited with code {result.returncode}")
             err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")

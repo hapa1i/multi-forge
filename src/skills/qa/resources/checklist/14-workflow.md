@@ -320,7 +320,7 @@ jq -e '.[] | select(.name == "codex")
   /tmp/forge-workflow-codex-model.json
 
 if FORGE_HOME="$tmp_home" forge workflow analyze -p "This must not spawn." \
-  --models codex --json > /tmp/forge-workflow-codex-cold.json; then
+  --models codex --json 2> /tmp/forge-workflow-codex-cold.json; then
   echo "ERROR: cold Codex workflow unexpectedly succeeded" >&2
   exit 1
 fi
@@ -328,7 +328,7 @@ jq -e 'any(.preflight_errors[]; test("forge runtime preflight codex"))' \
   /tmp/forge-workflow-codex-cold.json
 
 if FORGE_HOME="$tmp_home" forge workflow panel -p "This must not spawn." \
-  --models codex --context resume:uuid-for-qa --json > /tmp/forge-workflow-codex-resume.json; then
+  --models codex --context resume:uuid-for-qa --json 2> /tmp/forge-workflow-codex-resume.json; then
   echo "ERROR: Codex resume-context workflow unexpectedly succeeded" >&2
   exit 1
 fi

@@ -10,10 +10,10 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 155 severity-ranked findings: 1 CRITICAL, 21 HIGH, 97 MEDIUM, and 36 LOW, plus unranked U001. The
+**Inventory:** 158 severity-ranked findings: 1 CRITICAL, 21 HIGH, 100 MEDIUM, and 36 LOW, plus unranked U001. The
 original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and follow-up
-reviews admitted D045, D046, D051, and D053 as MEDIUM plus D047--D050 and D052 as LOW from 2026-08-05 through
-2026-08-10. Three Opus claims were refuted and five were adjusted during the merge audit. D033 and O020 remain in the
+reviews admitted D045, D046, D051, and D053--D056 as MEDIUM plus D047--D050 and D052 as LOW from 2026-08-05 through
+2026-08-13. Three Opus claims were refuted and five were adjusted during the merge audit. D033 and O020 remain in the
 ranked ledger for stable-ID provenance but were terminally rejected by the 2026-08-11 Wave 5 closeout; inventory counts
 are historical rows, not live-work counts.
 
@@ -48,8 +48,9 @@ and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and
 to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Nineteen findings across
 D020, D023/D028/O022, D027/O012, O014/O026, D029/O025, D030/O008/O015/O035, D054/D055, O013/O034, and D031 shipped in
 PRs #164--#173; PR #169 subsequently hardened O012 and retention-status failure reporting without adding a finding. The
-remaining 17 findings across four members stay parked. O003 already shipped in Wave 3 and is not part of the Wave 5 set.
-Other MEDIUM/LOW rows still require their separately defined Wave 6/7 admission gates.
+D032/D041/O005/O031--O033 member is implemented and verified pending independent review; the remaining 11 findings
+across three members stay parked. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW
+rows still require their separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -219,6 +220,7 @@ implementation outcome below records its completed code and regression work.
 | D053 | MED      | R     | Non-streaming and streaming response-conversion catch-alls interpolate exception text into ordinary ERROR logs and render full tracebacks. Provider validation and shape failures can embed `input_value` snippets or other provider output outside the explicit raw-content plane. *Runtime-reproduced with distinct provider-controlled canaries in both handlers; the streaming client event remained generic, while non-streaming client semantics are tracked by O007.*                                                   | appendix §A.11 no-plaintext posture                      | `proxy/converters.py:781-785,1303-1309`                                                                 |
 | D054 | MED      | R     | Strict template and instance loading preserve malformed values for the four directly transported proxy fields. `tool_prefixes_to_ignore=42` raises when request conversion iterates it, while `auto_cache_min_tokens="4096"` raises during the prompt-cache threshold comparison; `model_alternatives` and `prompt_caching` share the same unvalidated boundary. *Runtime-reproduced at both reported consumers; adjacent field shapes source-confirmed.*                                                                      | coding_standards boundary validation; appendix §A.1      | `config/dataclass_utils.py:76`; `config/schema.py:701-712`; `proxy/converters.py:304,371`               |
 | D055 | MED      | R     | `_spawn_proxy_process` creates its stderr tempfile before `Popen` but closes the descriptor only after a successful spawn. An injected `OSError` leaves the descriptor open and path present, then escapes the documented `ProxyStartError` boundary used by CLI/start callers. The code predates PR #167. *Runtime-reproduced with a real tempfile and injected spawn failure.*                                                                                                                                               | coding_standards cleanup/typed failures; appendix §A.1   | `proxy/proxy_orchestrator.py:1333-1352`                                                                 |
+| D056 | MED      | R     | Human workflow preflight failures send the `Error:` header to stderr but detail bullets and recovery tips to stdout, splitting one exit-1 diagnostic across streams. O033 covers JSON mode only, so this sibling requires its own execution gate. *Runtime-reproduced with an injected preflight failure: stderr contained only the header while stdout contained the error and tips.*                                                                                                                                         | §4 CLI failure-stream contract; cli_style_guidelines     | `cli/workflow.py:108-123`                                                                               |
 
 ### Implementation Outcomes
 
@@ -683,8 +685,8 @@ the caller catches the non-strict conversion error and falls back to raw intent.
 old row.
 
 At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
-Nineteen findings across the first nine members have since shipped; the other 17 findings across four members stay
-parked:
+Nineteen findings across the first nine members have since shipped. The D032/D041/O005/O031--O033 member is implemented
+and verified pending independent review; the other 11 findings across three members stay parked:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -697,7 +699,7 @@ parked:
 | D054, D055                       | [`harden_proxy_boundary_failures`](done/harden_proxy_boundary_failures/card.md)                       |
 | O013, O034                       | [`align_policy_routing_context`](done/align_policy_routing_context/card.md)                           |
 | D031                             | [`exclude_interactive_usage_cost`](done/exclude_interactive_usage_cost/card.md)                       |
-| D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](todo/align_cli_failure_surfaces/card.md)                               |
+| D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](doing/align_cli_failure_surfaces/card.md)                              |
 | D034, D037, D038, O027           | [`harden_command_state_boundaries`](todo/harden_command_state_boundaries/card.md)                     |
 | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](todo/preserve_session_launch_preconditions/card.md)         |
 | O036                             | [`harden_walkthrough_sandbox_provenance`](todo/harden_walkthrough_sandbox_provenance/card.md)         |
@@ -726,7 +728,8 @@ dead-code, structural, or explicitly unverified rows outside this screen.
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 36 verified
   CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; nineteen findings across the first nine
-  members shipped in PRs #164--#173, and D033/O020 are rejected by executable current-behavior controls.
+  members shipped in PRs #164--#173, the D032/D041/O005/O031--O033 member is implemented and verified pending review,
+  and D033/O020 are rejected by executable current-behavior controls.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

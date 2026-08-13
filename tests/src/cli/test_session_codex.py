@@ -654,9 +654,10 @@ class TestResumeCodexDispatch:
         result = runner.invoke(main, ["session", "resume", "impl"])
 
         assert result.exit_code == 1
-        assert "session 'impl' not found in current project" in result.output
-        assert "exists in:" in result.output
-        assert "Run the command from that directory instead." in result.output
+        assert result.stdout == ""
+        assert "session 'impl' not found in current project" in result.stderr
+        assert "exists in:" in result.stderr
+        assert "Run the command from that directory instead." in result.stderr
 
     @pytest.mark.parametrize(
         ("extra_args", "flag_label"),

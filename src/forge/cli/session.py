@@ -469,23 +469,23 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
         entry = IndexStore().get_session(name, forge_root=None)
         other_root = entry.forge_root or entry.worktree_path
         if other_root and other_root != forge_root:
-            print_error(f"session '{name}' not found in current project")
-            print_tip(f"Session '{name}' exists in:", console=console)
-            console.print(
+            print_error(f"session '{name}' not found in current project", console=err_console)
+            print_tip(f"Session '{name}' exists in:", console=err_console)
+            err_console.print(
                 Text(display_path(other_root), style="dim", no_wrap=True),
                 soft_wrap=True,
             )
-            console.print("[dim]Run the command from that directory instead.[/dim]")
+            err_console.print("[dim]Run the command from that directory instead.[/dim]")
             return True
     except AmbiguousSessionError as e:
-        print_error(f"session '{name}' not found in current project")
-        print_tip(f"Session '{name}' exists in multiple projects:", console=console)
+        print_error(f"session '{name}' not found in current project", console=err_console)
+        print_tip(f"Session '{name}' exists in multiple projects:", console=err_console)
         for root in e.forge_roots:
-            console.print(
+            err_console.print(
                 Text(f"  - {display_path(root)}", style="dim", no_wrap=True),
                 soft_wrap=True,
             )
-        console.print("[dim]Run the command from the target project directory.[/dim]")
+        err_console.print("[dim]Run the command from the target project directory.[/dim]")
         return True
     except (SessionNotFoundError, OSError):
         # SessionNotFoundError: not in any project. OSError: index file unreadable.

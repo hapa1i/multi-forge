@@ -417,6 +417,13 @@ class TestQaWorkflowChecklist:
         step = content.split("### 14.10", 1)[1].split("\n### ", 1)[0]
         assert "```bash" not in step
 
+    def test_codex_preflight_failure_probes_capture_stderr_json(self):
+        review_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "14-workflow.md"
+        content = review_md.read_text()
+        step = content.split("### 14.13", 1)[1].split("\n---", 1)[0]
+        assert "--models codex --json 2> /tmp/forge-workflow-codex-cold.json" in step
+        assert "--context resume:uuid-for-qa --json 2> /tmp/forge-workflow-codex-resume.json" in step
+
 
 class TestConsensusSkill:
     def test_skill_exists(self):

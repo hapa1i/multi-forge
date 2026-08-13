@@ -124,7 +124,8 @@ def test_workflow_json_preflight_reports_missing_claude_cli(monkeypatch):
         )
 
     assert result.exit_code == 1
-    data = json.loads(result.output)
+    assert result.stdout == ""
+    data = json.loads(result.stderr)
     assert "claude CLI not found in PATH" in data["preflight_errors"][0]
     mock_run.assert_not_called()
 

@@ -3,8 +3,9 @@
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
 handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Nineteen findings across its first nine members
-shipped in PRs #164--#173; the other 17 findings across four members remain parked behind their entry-condition checks.
-PR #169 added bounded O012 and retention-status hardening without changing that finding count.
+shipped in PRs #164--#173. The D032/D041/O005/O031--O033 member is implemented and verified pending independent review;
+the other 11 findings across three members remain parked behind their entry-condition checks. PR #169 added bounded O012
+and retention-status hardening without changing that finding count.
 
 ## Goal
 
@@ -13,7 +14,7 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D055, for a current total of 157 ranked findings
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D056, for a current total of 158 ranked findings
 plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
@@ -77,8 +78,10 @@ in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
 34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where nineteen
-findings across the first nine members shipped in PRs #164--#173. Follow-up verification admitted D054/D055 after the
-initial handoff; the remaining four members stay gated on fail-first execution-branch reproductions.
+findings across the first nine members shipped in PRs #164--#173. Follow-up verification admitted D054/D055 into a
+shipped Wave 6 member. D056 is recorded separately and awaits its own execution gate; the six-finding CLI
+failure-surfaces member is active, and the remaining three members stay gated on fail-first execution-branch
+reproductions.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.

@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: PR #173 is merged; keep the remaining 4 members parked until the next accepted member is activated from
-merged `main`.
+Current focus: D032/D041/O005/O031--O033 are implemented and behaviorally verified on
+`agent/align-cli-failure-surfaces`, pending independent review; keep the remaining 3 members parked.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -59,4 +59,10 @@ merged `main`.
   `1` targeted integration test passed).
 - [x] Review and merge D031 independently in PR #173 (`a55ab218`) before activating another member.
 - [x] Keep the remaining 4 members in `todo/` behind their own fail-first gates.
+- [x] Activate only D032/D041/O005/O031--O033 on `agent/align-cli-failure-surfaces` from merged `main` at `13ecef87`.
+- [x] Retain fail-first regressions for every CLI/status/editor failure surface (`19 failed, 4 passed` on `13ecef87`).
+- [x] Implement and verify the status-line, exit/stream, and shared editor-argv contracts (`809` focused, `844`
+  regression, `9005` unit, and `19` targeted Docker integration tests passed).
+- [ ] Review and merge this member independently before activating another member.
+- [x] Keep the remaining 3 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.
