@@ -1,6 +1,6 @@
 # Harden proxy boundary failures checklist
 
-Current focus: review and merge D054/D055 in draft PR #171 without activating another Wave 6 member.
+Current focus: closed after merge in PR #171 (`5cd268c1`) without activating another Wave 6 member.
 
 ## Activation and admission
 
@@ -30,3 +30,4 @@ Current focus: review and merge D054/D055 in draft PR #171 without activating an
 - [x] Run full pre-commit, the explicit new-file hook, and board link/lane/size/diff checks (291 files, 718 relative
   links, zero missing targets, 6 `done` / 1 `doing` / 6 `todo`, and document sizes below their caps).
 - [x] Open independent draft PR #171 without activating another Wave 6 member.
+- [x] Review and merge PR #171 (`5cd268c1`) before activating another Wave 6 member.

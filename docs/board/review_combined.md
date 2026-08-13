@@ -45,12 +45,11 @@ PRs #157--#159 and the child epic is closed. O007 and D053 form the next reprodu
 merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 shipped in PR #162 (`31a0832f`). The
 child epic is closed. Wave 5 is closed at 13 shipped findings: its bounded HIGH set plus D035, D036, O037, O038, O042,
 and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and assigned 34 still-live correctness rows
-to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Fourteen findings across
-D020, D023/D028/O022, D027/O012, O014/O026, D029/O025, and D030/O008/O015/O035 shipped in PRs #164--#170; PR #169
-subsequently hardened O012 and retention-status failure reporting without adding a finding. The remaining 20 findings
-across six members stay parked. Follow-up D054/D055 are implemented and verified as the sole active Wave 6 member in
-draft PR #171. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require
-their separately defined Wave 6/7 admission gates.
+to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Sixteen findings across
+D020, D023/D028/O022, D027/O012, O014/O026, D029/O025, D030/O008/O015/O035, and D054/D055 shipped in PRs #164--#171; PR
+#169 subsequently hardened O012 and retention-status failure reporting without adding a finding. The remaining 20
+findings across six members stay parked. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other
+MEDIUM/LOW rows still require their separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -684,8 +683,8 @@ the caller catches the non-strict conversion error and falls back to raw intent.
 old row.
 
 At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
-Fourteen findings across the first six members have since shipped. Follow-up D054/D055 are implemented and verified as
-the sole active member in draft PR #171; the other 20 findings across six members stay parked:
+Sixteen findings across the first seven members have since shipped; the other 20 findings across six members stay
+parked:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -695,7 +694,7 @@ the sole active member in draft PR #171; the other 20 findings across six member
 | O014, O026                       | [`close_proxy_failure_lifecycles`](done/close_proxy_failure_lifecycles/card.md)                       |
 | D029, O025                       | [`complete_proxy_instance_config_wiring`](done/complete_proxy_instance_config_wiring/card.md)         |
 | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](done/restore_proxy_request_semantics/card.md)                     |
-| D054, D055                       | [`harden_proxy_boundary_failures`](doing/harden_proxy_boundary_failures/card.md)                      |
+| D054, D055                       | [`harden_proxy_boundary_failures`](done/harden_proxy_boundary_failures/card.md)                       |
 | O013, O034                       | [`align_policy_routing_context`](todo/align_policy_routing_context/card.md)                           |
 | D031                             | [`exclude_interactive_usage_cost`](todo/exclude_interactive_usage_cost/card.md)                       |
 | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](todo/align_cli_failure_surfaces/card.md)                               |
@@ -726,9 +725,8 @@ dead-code, structural, or explicitly unverified rows outside this screen.
 - **[Proxy conversion failure handling epic](done/epic_proxy_conversion_failure_handling/card.md):** D053's
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 36 verified
-  CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; fourteen findings across the first six
-  members shipped in PRs #164--#170, D054/D055 are implemented and verified in draft PR #171, and D033/O020 are rejected
-  by executable current-behavior controls.
+  CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; sixteen findings across the first seven
+  members shipped in PRs #164--#171, and D033/O020 are rejected by executable current-behavior controls.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

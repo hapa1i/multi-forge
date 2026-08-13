@@ -1,6 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; Wave 6 is reviewing only follow-up D054/D055 in draft PR #171.
+Current focus: Wave 5 is closed; Wave 6 has shipped 16 findings across 7 members and is ready to activate its next
+parked member from merged `main`.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -152,7 +153,7 @@ Current focus: Wave 5 is closed; Wave 6 is reviewing only follow-up D054/D055 in
 - [x] Ship D030/O008/O015/O035 independently in PR #170 (`acae1b9e`) before activating the next Wave 6 member.
 - [x] Verify and admit D054/D055 as a new Wave 6 proxy-boundary member on merged `main` at `22071fcd`.
 - [x] Activate only D054/D055 on `agent/harden-proxy-boundary-failures`; keep the six parked members gated.
-- [ ] Ship D054/D055 independently in PR #171 before activating another Wave 6 member.
+- [x] Ship D054/D055 independently in PR #171 (`5cd268c1`) before activating another Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

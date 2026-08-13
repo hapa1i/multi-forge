@@ -1,9 +1,9 @@
 # Harden proxy boundary failures
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `agent/harden-proxy-boundary-failures` from merged `main` at
-`22071fcd`; draft PR #171 is ready for independent review.
+**Lane**: `done/` -- shipped in PR #171 (`5cd268c1`) after implementation and verification on
+`agent/harden-proxy-boundary-failures` from merged `main` at `22071fcd`.
 
 **Findings**: D054 and D055.
 

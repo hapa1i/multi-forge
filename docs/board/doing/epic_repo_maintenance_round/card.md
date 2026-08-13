@@ -2,10 +2,9 @@
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
-handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Fourteen findings across its first six members
-shipped in PRs #164--#170. Follow-up D054/D055 are implemented and verified as the sole active member in draft PR #171;
-the other six remain parked behind their entry-condition checks. PR #169 added bounded O012 and retention-status
-hardening without changing that finding count.
+handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Sixteen findings across its first seven members
+shipped in PRs #164--#171; the other 20 findings across six members remain parked behind their entry-condition checks.
+PR #169 added bounded O012 and retention-status hardening without changing that finding count.
 
 ## Goal
 
@@ -77,9 +76,9 @@ shipped independently in PRs #148--#154. The first bounded Wave 5 MEDIUM set is 
 in PRs #157--#159. The next bounded MEDIUM set closed under
 [`epic_proxy_conversion_failure_handling`](../../done/epic_proxy_conversion_failure_handling/card.md) after D053 and
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
-34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where fourteen
-findings across the first six members shipped in PRs #164--#170. Follow-up verification admitted D054/D055 as the sole
-active member; the remaining six members stay gated on fail-first execution-branch reproductions.
+34 live rows into [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md), where sixteen
+findings across the first seven members shipped in PRs #164--#171. Follow-up verification admitted D054/D055 after the
+initial handoff; the remaining six members stay gated on fail-first execution-branch reproductions.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.

@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Harden proxy boundary failures
+
+**Goal/outcome**: Reject malformed transported proxy fields before request handling and make process-spawn failure
+atomic and typed.
+
+**Key changes**:
+
+- Added shared load-boundary validation for the four directly transported proxy fields while preserving valid values and
+  absent-key defaults.
+- Failed proxy spawn now closes and removes its stderr capture and raises `ProxyStartError` with the original cause.
+
+**Verification**: The 26-case retained regression, 253 focused tests, 9,001 unit tests (one skip, 122 deselected), 799
+regressions, 2 targeted Docker integrations, pre-commit, and board integrity checks pass. Shipped in PR #171
+(`5cd268c1`).
+
 ### Restore proxy request semantics
 
 **Goal/outcome**: Keep proxy-owned tier and translated request constraints stable across initial calls, authentication
