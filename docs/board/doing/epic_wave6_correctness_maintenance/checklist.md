@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: independently review and merge O011/O017/O021/O023/O029/O030 after implementation verification on
-`agent/preserve-session-launch-preconditions`; keep O036 parked.
+Current focus: independently review and merge O036 after implementation and package verification on
+`agent/harden-walkthrough-sandbox-provenance`.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -80,5 +80,11 @@ Current focus: independently review and merge O011/O017/O021/O023/O029/O030 afte
 - [x] Implement and verify launch cleanup, rewind rollback, JSON rejection scoping, pre-mutation UUID/name validation,
   and best-effort confirmation (`168` focused, `894` regression, `9004` unit, and `48` targeted integration tests
   passed).
-- [ ] Review and merge O011/O017/O021/O023/O029/O030 independently before activating O036.
+- [x] Review and merge O011/O017/O021/O023/O029/O030 independently in PR #176 (`88ac88c5`) before activating O036.
+- [x] Close PR #176 bookkeeping and activate only O036 on `agent/harden-walkthrough-sandbox-provenance` from merged
+  production code at `88ac88c5`.
+- [x] Retain O036 fail-first regressions before production changes (`3 failed, 1 passed` on `88ac88c5`) and verify the
+  corrected wrapper in a built wheel (`4` retained, `98` focused, `898` regression, `9004` unit, and `1` targeted Docker
+  integration test passed).
+- [ ] Review and merge O036 independently before closing this epic.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

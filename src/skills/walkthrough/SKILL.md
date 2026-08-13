@@ -583,7 +583,7 @@ Tip: "For a quick non-interactive check, use `/forge:smoke-test`. For the full Q
 
 Every command in the walkthrough passes through a path denylist and these numbered gates:
 
-- **Denylist** -- refuses FORGE_TEST_REPO = empty, `/`, `$HOME`, `/Users`, `/tmp`, `/var`, etc.
+- **Denylist** -- resolves symlinks and refuses FORGE_TEST_REPO = empty, `/`, `$HOME`, `/Users`, `/tmp`, `/var`, etc.
 
 1. **Gate 1** -- env.sh exists (test repo not deleted)
 2. **Gate 2** -- marker file exists (this is actually a test repo)
@@ -591,6 +591,9 @@ Every command in the walkthrough passes through a path denylist and these number
 4. **Gate 4** -- CLAUDE_HOME points to `$FORGE_TEST_REPO/.claude-user`
 5. **Gate 5** -- CODEX_HOME points to `$FORGE_TEST_REPO/.codex-user`
 6. **Gate 6** -- `.forge/walkthrough/` and `CLAUDE.md` establish the expected test-repo structure
+
+Gates 1, 2, and 6 prove the target before its `env.sh` can execute. Gates 3--5 then verify the isolated homes exported
+by that environment.
 
 Any gate failure = loud error message + exit 1. No silent fallthrough.
 

@@ -1,7 +1,6 @@
 # Preserve session launch preconditions checklist
 
-Current focus: implementation and behavioral verification are complete; finish branch gates and independent review while
-O036 remains parked.
+Current focus: complete -- shipped in PR #176 (`88ac88c5`); O036 stayed parked through merge.
 
 ## Phase 1: Activation and evidence
 
@@ -41,7 +40,7 @@ O036 remains parked.
   Wave 6 at 11 done / 1 doing / 1 todo members, no stale lane references, and a clean diff check).
 - [x] Review normative design and end-user docs; no synchronization is required because this member restores existing
   launch-ordering and best-effort contracts without changing architecture, ownership, or CLI surface.
-- [ ] Record verification in `docs/board/change_log.md`, update epic counts and links, and move this card to `done/`.
-- [ ] Review and merge independently before activating O036.
+- [x] Record verification in `docs/board/change_log.md`, update epic counts and links, and move this card to `done/`.
+- [x] Review and merge independently in PR #176 (`88ac88c5`) before activating O036.
 
-O036 remains parked until this member merges and its bookkeeping closes on `main`.
+O036 remained parked until this member merged and its bookkeeping closed on `main`.
