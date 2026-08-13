@@ -33,8 +33,8 @@ closing this member and Wave 6.
 - [x] Run the focused walkthrough and retained regression slices (`4` retained and `98` focused tests passed).
 - [x] Build the sdist/wheel, compare the bundled wrapper byte-for-byte with source, and run it from a clean temporary
   wheel install.
-- [x] Run the targeted packaged-extension Docker integration (`1 passed, 22 deselected`), full regression (`898
-  passed`), and unit (`9004 passed, 1 skipped, 122 deselected`) gates.
+- [x] Run the targeted packaged-extension Docker integration (`1 passed, 22 deselected`), full regression
+  (`898 passed`), and unit (`9004 passed, 1 skipped, 122 deselected`) gates.
 - [x] Run full pre-commit and final board integrity checks (298 Markdown files, 723 local links, no missing targets, and
   a clean diff check).
 - [x] Synchronize the bundled skill safety model; no normative design or end-user update is required because the fix
