@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-14
+
+### Decouple lane runtime vocabulary
+
+**Goal/outcome**: Restore the documented import-light lane vocabulary boundary without changing runtime classification
+or dispatch behavior.
+
+**Key changes**:
+
+- Lane validation now uses `AGENT_RUNTIME_IDS`, with the existing exact registry-parity test retaining authority over
+  deliberate runtime-ID duplication.
+- A fresh-interpreter regression rejects initialization of the runtime, LLM, and auth module trees when importing
+  `forge.core.lanes`; the measured cumulative import fell from approximately 317 ms to 55 ms.
+
+**Verification**: 49 focused lane assertions, 568 broader lane-consumer assertions, 9,005 unit tests (one skip, 122
+deselected), 898 regressions, full pre-commit, and board integrity checks pass. PR #178 merged as `30f930b0` with all
+five GitHub checks passing. No Forge workflow command was used.
+
 ## 2026-08-13
 
 ### Admit Wave 7 refactor and deletion

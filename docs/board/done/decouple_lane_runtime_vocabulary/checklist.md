@@ -1,7 +1,6 @@
 # Decouple lane runtime vocabulary checklist
 
-Current focus: the import-boundary implementation and branch gates are complete. Keep the card in `doing/` until the
-branch is reviewed and merged.
+Current focus: complete -- O043 shipped independently in PR #178 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -38,5 +37,6 @@ branch is reviewed and merged.
 - [x] Run `make pre-commit` after the final branch edits.
 - [x] Resolve branch-local board links/fragments and run `git diff --check`: 852 local targets and all 55 fragments in
   44 changed board documents resolve; the 34-member lane/backlink graph is exact.
-- [ ] After review and merge, update the epic, parent, review ledger, and change log with the shipped outcome; move this
-  member to `done/` and repoint inbound links without activating order 2.
+- [x] After review and merge, update the epic, parent, review ledger, and change log with the shipped outcome; move this
+  member to `done/` and repoint inbound links without activating order 2. The final audit resolves 853 local paths and
+  three changed-document fragments; the lane graph is one done, zero doing, and 33 todo members.

@@ -1,8 +1,8 @@
 # Decouple lane runtime vocabulary
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/decouple-lane-runtime-vocabulary` from preparation commit `095d8eeb`.
+**Lane**: `done/` -- shipped independently in PR #178 (`30f930b0`) from preparation commit `095d8eeb`.
 
 **Finding**: O043.
 
@@ -25,7 +25,7 @@ On `5777192a`, `lanes.py` imports `RUNTIMES` only for membership checks, while `
 - Importing `forge.core.lanes` does not initialize `forge.core.runtime` or the LLM/preflight stack.
 - Run `tests/src/core/test_lanes.py`, consumer-lane tests, and a fresh-process import assertion/measurement.
 
-## Branch Result
+## Implementation Outcome
 
 `runtime_execution` now classifies agent runtimes through `AGENT_RUNTIME_IDS`; the existing registry parity assertion
 remains the authority for vocabulary drift. A subprocess regression pins the import boundary in a fresh interpreter. The
@@ -39,6 +39,13 @@ runtime dispatch path, so the real-Codex consumer integration smokes are not app
 Full pre-commit passes after Markdown normalization. The board audit resolves all 852 local paths and all 55 fragments
 from the 44 changed board documents; the Wave 7 graph is exactly one `doing/` member and 33 `todo/` members with valid
 epic backlinks. Four unrelated fragment references in untouched historical cards remain pre-existing.
+
+PR #178 merged at `30f930b0` with all five GitHub checks passing. The change restores the documented pure lane/runtime
+vocabulary boundary without changing architecture ownership, CLI behavior, or end-user configuration, so no normative
+design or end-user documentation update is required.
+
+The post-merge closeout resolves all 853 local paths across 328 board Markdown files and all three fragments from
+changed documents. The Wave 7 graph is one `done/`, zero `doing/`, and 33 `todo/` members with valid epic backlinks.
 
 ## Exclusions
 

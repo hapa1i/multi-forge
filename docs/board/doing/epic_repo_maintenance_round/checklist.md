@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: execute only Wave 7 order 1, O043, on `refactor/decouple-lane-runtime-vocabulary`. The other 33 Wave 7
-members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate Wave 6 gates.
+Current focus: O043 shipped independently in PR #178; land its closeout before activating order-2 O044. The other 33
+Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate Wave 6
+gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -183,6 +184,6 @@ members remain parked, and D056 plus remaining correctness/test-policy/output/do
   output, and documentation findings before admitting any of them.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
-- [ ] Ship O043 independently and close its member before activating Wave 7 order 2.
+- [x] Ship O043 independently and close its member before activating Wave 7 order 2.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

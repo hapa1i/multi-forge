@@ -51,8 +51,9 @@ subsequently hardened O012 and retention-status failure reporting without adding
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; order-1 O043 subsequently became the sole active member. D056 and other correctness, security,
-performance, test-policy, output, and documentation rows still require their separately defined Wave 6 gates.
+implementation; order-1 O043 subsequently shipped independently in PR #178, and the other 33 members remain parked. D056
+and other correctness, security, performance, test-policy, output, and documentation rows still require their separately
+defined Wave 6 gates.
 
 ### Finding fields
 
@@ -395,6 +396,12 @@ implementation outcome below records its completed code and regression work.
   deselected), 701 regressions, final pre-commit, and board checks passed. Review added safe exception-class metadata
   and admitted provider-side catch-all rendering separately as D053. It shipped in PR #157 (`a2fb0638`). See
   [`remove_proxy_converter_plaintext_logs`](done/remove_proxy_converter_plaintext_logs/card.md).
+- **O043 â€” resolved 2026-08-13:** lane runtime classification now uses the import-light `AGENT_RUNTIME_IDS` vocabulary
+  while an exact parity test keeps it synchronized with the runtime registry. A fresh-interpreter regression proves that
+  importing `forge.core.lanes` initializes no `forge.core.runtime`, `forge.core.llm`, or `forge.core.auth` modules; the
+  measured cumulative import fell from approximately 317 ms to 55 ms. Runtime IDs, lane defaults, classification, and
+  dispatch behavior are unchanged. It shipped in PR #178 (`30f930b0`) with all five GitHub checks passing. See
+  [`decouple_lane_runtime_vocabulary`](done/decouple_lane_runtime_vocabulary/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -762,9 +769,9 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 members; only order-1 O043 is active and the other 33 are parked. O062/O063/O093 are rejected as
-  written, O067/O095 are admitted only in their verified scope, and O092's unverified tail is not an executable deletion
-  set.
+  are split into 34 members; order-1 O043 shipped independently in PR #178 and the other 33 are parked. O062/O063/O093
+  are rejected as written, O067/O095 are admitted only in their verified scope, and O092's unverified tail is not an
+  executable deletion set.
 
 ## Strengths (preserve these)
 
