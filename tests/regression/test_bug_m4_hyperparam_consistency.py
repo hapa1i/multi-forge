@@ -152,14 +152,14 @@ async def test_litellm_tier_override_consistent(
 
 
 @pytest.mark.asyncio
-async def test_litellm_env_overrides_consistent(
+async def test_litellm_uncontracted_tier_env_does_not_override_consistent_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LiteLLM with env var overrides: get_client and runtime truth agree."""
+    """Undocumented tier env vars do not alter either client or runtime truth."""
     monkeypatch.setenv("LITELLM_HAIKU_REASONING_EFFORT", "low")
     monkeypatch.setenv("LITELLM_HAIKU_VERBOSITY", "low")
 
     hp = await _assert_consistency(monkeypatch, "litellm", "haiku", "openai/gpt-4o-mini", _Config())
 
-    assert hp.reasoning_effort == "low"
-    assert hp.verbosity == "low"
+    assert hp.reasoning_effort is None
+    assert hp.verbosity is None

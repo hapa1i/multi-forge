@@ -1,7 +1,7 @@
 """Tier-aware client factory for proxy model routing.
 
 Creates and caches LLM client instances keyed by (model_name, tier),
-with resolved hyperparameters from env vars, tier overrides, and provider config.
+with resolved hyperparameters from proxy tier overrides and provider config.
 Actual credential fetching is delegated to core.llm.CredentialManager.
 """
 
@@ -96,7 +96,7 @@ class TierClientFactory:
 
     Features:
     - Automatic model type detection
-    - Tier-specific hyperparameter resolution (env > tier_override > config)
+    - Tier-specific hyperparameter resolution (tier_override > provider config/catalog)
     - Unified caching with configurable TTL
     - Retry on authentication failure
     - Thread-safe client management
@@ -383,9 +383,9 @@ class TierClientFactory:
         get_default_hyperparams_for_tier() (runtime truth reporting).
 
         Priority chain per field:
-        - max_tokens: env ({PREFIX}_{TIER}_MAX_TOKENS) > provider config (tokens.override), capped by catalog
-        - reasoning/verbosity/thinking: env > tier_override > provider config
-        - temperature: tier_override > provider config override > provider config default
+        - max_tokens: model catalog
+        - reasoning/verbosity/thinking: tier_override > provider/model defaults
+        - temperature: tier_override > provider/model defaults
         - top_p: provider config only
 
         Fields left as None fall through to core.llm's own defaults.
@@ -394,50 +394,29 @@ class TierClientFactory:
 
         if provider == ModelProvider.LITELLM:
             provider_cfg = config.proxy.litellm
-            env_prefix = "LITELLM"
         elif provider == ModelProvider.OPENROUTER:
             provider_cfg = config.proxy.openrouter
-            env_prefix = "OPENROUTER"
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-        tier_upper = tier.upper()
         tier_override = provider_cfg.tier_overrides.get(tier)
 
-        # max_tokens: env > catalog cap (lenient for OpenRouter's open model space)
-        tier_max_tokens = os.getenv(f"{env_prefix}_{tier_upper}_MAX_TOKENS")
-        requested_max_tokens = int(tier_max_tokens) if tier_max_tokens else None
+        # The model catalog owns the default cap (lenient for OpenRouter's open model space).
         catalog_strict = provider != ModelProvider.OPENROUTER
-        max_tokens_override = _enforce_max_output_tokens_cap(model_name, requested_max_tokens, strict=catalog_strict)
+        max_tokens_override = _enforce_max_output_tokens_cap(model_name, None, strict=catalog_strict)
 
-        # reasoning_effort: env > tier_override
-        tier_reasoning: str | None
-        tier_reasoning_env = os.getenv(f"{env_prefix}_{tier_upper}_REASONING_EFFORT")
-        if tier_reasoning_env:
-            tier_reasoning = tier_reasoning_env
-        elif tier_override and tier_override.reasoning_effort is not None:
+        if tier_override and tier_override.reasoning_effort is not None:
             tier_reasoning = tier_override.reasoning_effort
         else:
             tier_reasoning = None
 
-        # verbosity: env > tier_override
-        tier_verbosity: str | None
-        tier_verbosity_env = os.getenv(f"{env_prefix}_{tier_upper}_VERBOSITY")
-        if tier_verbosity_env:
-            tier_verbosity = tier_verbosity_env
-        elif tier_override and tier_override.verbosity is not None:
+        if tier_override and tier_override.verbosity is not None:
             tier_verbosity = tier_override.verbosity
         else:
             tier_verbosity = None
 
-        # thinking: env > tier_override
-        tier_thinking_type = os.getenv(f"{env_prefix}_{tier_upper}_THINKING_TYPE")
-        if tier_thinking_type:
-            tier_thinking: dict[str, str | int] | None = {
-                "type": tier_thinking_type,
-                "budget_tokens": int(os.getenv(f"{env_prefix}_{tier_upper}_THINKING_BUDGET_TOKENS", "1024")),
-            }
-        elif tier_override and tier_override.thinking_budget_tokens is not None:
+        tier_thinking: dict[str, str | int] | None
+        if tier_override and tier_override.thinking_budget_tokens is not None:
             if tier_override.thinking_budget_tokens <= 0:
                 tier_thinking = None
             else:

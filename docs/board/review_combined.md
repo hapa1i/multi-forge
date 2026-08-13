@@ -47,9 +47,10 @@ child epic is closed. Wave 5 is closed at 13 shipped findings: its bounded HIGH 
 and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and assigned 34 still-live correctness rows
 to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Ten findings across D020,
 D023/D028/O022, D027/O012, O014/O026, and D029/O025 shipped in PRs #164--#168; PR #169 subsequently hardened O012 and
-retention-status failure reporting without adding a finding. The remaining 24 findings across seven members stay parked.
-O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their separately
-defined Wave 6/7 admission gates.
+retention-status failure reporting without adding a finding. D030/O008/O015/O035 are implemented and verified on their
+execution branch but remain active until independent review and merge; the remaining 20 findings across six members stay
+parked. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their
+separately defined Wave 6/7 admission gates.
 
 ### Finding fields
 
@@ -681,8 +682,8 @@ the caller catches the non-strict conversion error and falls back to raw intent.
 old row.
 
 At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
-Ten findings across the first five members have since shipped; the other 24 findings across seven members stay parked
-behind their own fail-first regression or equivalent executable characterization:
+Ten findings across the first five members have since shipped; D030/O008/O015/O035 are implemented and verified on the
+sole active execution branch, and the other 20 findings across six members stay parked:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -691,7 +692,7 @@ behind their own fail-first regression or equivalent executable characterization
 | D027, O012                       | [`harden_detached_process_teardown`](done/harden_detached_process_teardown/card.md)                   |
 | O014, O026                       | [`close_proxy_failure_lifecycles`](done/close_proxy_failure_lifecycles/card.md)                       |
 | D029, O025                       | [`complete_proxy_instance_config_wiring`](done/complete_proxy_instance_config_wiring/card.md)         |
-| D030, O008, O015, O035           | [`restore_proxy_request_semantics`](todo/restore_proxy_request_semantics/card.md)                     |
+| D030, O008, O015, O035           | [`restore_proxy_request_semantics`](doing/restore_proxy_request_semantics/card.md)                    |
 | O013, O034                       | [`align_policy_routing_context`](todo/align_policy_routing_context/card.md)                           |
 | D031                             | [`exclude_interactive_usage_cost`](todo/exclude_interactive_usage_cost/card.md)                       |
 | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](todo/align_cli_failure_surfaces/card.md)                               |
@@ -723,7 +724,8 @@ dead-code, structural, or explicitly unverified rows outside this screen.
   log-confidentiality correction and O007's later client/accounting boundary shipped independently in PRs #161--#162.
 - **[Wave 6 correctness maintenance epic](doing/epic_wave6_correctness_maintenance/card.md):** 34 source-reconfirmed
   CLI/proxy/runtime rows are accepted behind member-specific fail-first gates; ten findings across the first five
-  members shipped in PRs #164--#168, and D033/O020 are rejected by executable current-behavior controls.
+  members shipped in PRs #164--#168, D030/O008/O015/O035 are implemented and verified pending review, and D033/O020 are
+  rejected by executable current-behavior controls.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

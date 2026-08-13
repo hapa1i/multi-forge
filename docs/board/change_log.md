@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Restore proxy request semantics
+
+**Goal/outcome**: Keep proxy-owned tier and translated request constraints stable across initial calls, authentication
+refresh, reasoning overrides, and both OpenAI client shapes.
+
+**Key changes**:
+
+- Removed undocumented tier-hyperparameter environment precedence while retaining the separately parked `_MODEL`
+  fallback, and made authentication retry rebuild the resolved tier.
+- Reasoning pins now remove incompatible sampling keys with key-name-only audit metadata. Anthropic `any` now remains
+  required through the converter, core adapter, Chat Completions, and GPT Responses paths.
+
+**Verification**: The final regression artifact collects six fail-first cases and three controls on `7f705aad`; D030 is
+parametrized for both providers, the count includes the later adapter seam, and the configured-but-satisfied
+reasoning-floor case adds the third control. The separate GPT Responses seam also failed before correction. The 204-test
+focused slice, 9,001 unit tests (one platform skip, 122 deselected), 773 regressions, and 4 translated-proxy Docker
+integrations pass. The first integration-file run exposed and corrected an older cumulative-event-count order dependency
+before the 4-test rerun passed. Normative and end-user proxy contracts are synchronized. Final all-files and explicit
+new-file hooks plus the 289-file/713-link board audit pass with no missing or stale lane targets; the Wave 6 lane graph
+remains 5 `done` / 1 `doing` / 6 `todo`.
+
 ### Harden process cleanup and retention status
 
 **Goal/outcome**: Complete detached-group escalation and keep retention failures actionable without exposing internal

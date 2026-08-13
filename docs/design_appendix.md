@@ -46,8 +46,8 @@ proxy:
 2. Per-tier override (`proxy.<provider>.tier_overrides.<tier>.*`)
 3. Model catalog default (built-in per-model defaults)
 
-> **Implementation note:** Config layers base -> proxy defaults -> template -> instance -> env. Users edit the instance;
-> global config rejects proxy/template keys.
+> **Implementation note:** Config-file layers are base -> proxy defaults -> template -> instance. Tier hyperparameters
+> stop at the instance/catalog chain; documented environment resolution remains boundary-specific.
 
 Creation copies template `tool_prefixes_to_ignore` and provider `prompt_caching`/`auto_cache_min_tokens` into user-owned
 `proxy.yaml`; runtime never re-merges the template. Provider/base_url/template stay fixed.
@@ -691,7 +691,8 @@ Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `re
 - `drift`: `dimension` (`system_prompt` | `tool_surface`), `previous_hash`, `current_hash`, `route`.
 - `mutation`: `mode: override`, `blocked`, `system_prompt_hash_before/after`, and `mutations[]`. Each mutation records
   `{target, action, ...}` plus hashes, lengths, and budgets only: `augment_len`, `cache_invalidation_expected`,
-  `pattern_hash`, `stripped_count`, `effort_floor`, `budget_before/after`.
+  `pattern_hash`, `stripped_count`, `effort_floor`, `budget_before/after`, and key-name-only
+  `removed_sampling_parameters`.
 
 Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
 `forge proxy audit show|diff` (§4.0) is the read surface.

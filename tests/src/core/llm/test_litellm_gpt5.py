@@ -1,6 +1,6 @@
 """Tests for GPT-5 Responses API support in LiteLLM client."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -269,6 +269,48 @@ class TestConvertToolsForResponses:
         result = LiteLLMClient._convert_tools_for_responses(tools)
 
         assert result == [{"type": "web_search"}]
+
+    @pytest.mark.parametrize("choice", ["none", "auto", "required"])
+    def test_string_tool_choice_conversion(self, choice):
+        assert LiteLLMClient._convert_tool_choice_for_responses(choice) == choice
+
+    def test_named_tool_choice_conversion(self):
+        choice = {"type": "function", "function": {"name": "search"}}
+
+        assert LiteLLMClient._convert_tool_choice_for_responses(choice) == {
+            "type": "function",
+            "name": "search",
+        }
+
+    def test_invalid_tool_choice_is_omitted(self):
+        assert LiteLLMClient._convert_tool_choice_for_responses({"type": "function"}) is None
+
+    @pytest.mark.asyncio
+    async def test_required_tool_choice_reaches_responses_api(self):
+        """Translated Anthropic `any` remains required on the GPT Responses path."""
+        client = LiteLLMClient(model="openai/gpt-5.5", provider="litellm_remote")
+        create = AsyncMock()
+        sdk_client = MagicMock()
+        sdk_client.responses.with_raw_response.create = create
+        tools = [{"type": "function", "function": {"name": "search", "parameters": {}}}]
+        params = ModelHyperparameters(extra={"openai": {"tool_choice": "required"}})
+
+        with (
+            patch.object(client, "_parse_responses_output", return_value=CompletionResponse(text="ok")),
+            patch.object(client, "_merge_response_metadata", side_effect=lambda completion, _headers: completion),
+        ):
+            raw_response = MagicMock()
+            raw_response.parse.return_value = object()
+            raw_response.headers = {}
+            create.return_value = raw_response
+            await client._complete_with_responses_api(
+                sdk_client,
+                [Message(role="user", content="search")],
+                params,
+                tools=tools,
+            )
+
+        assert create.await_args.kwargs["tool_choice"] == "required"
 
 
 class TestParseResponsesOutput:

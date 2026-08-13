@@ -1449,7 +1449,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             except AuthenticationError:
                 # Try refreshing credentials once
                 logger.warning(f"[{request_id}] Auth failed, refreshing credentials")
-                client = await client_factory.invalidate_and_retry(actual_model_id)
+                client = await client_factory.invalidate_and_retry(actual_model_id, tier=resolved_tier)
                 openai_response = await client.create_completion(openai_request_dict, request_id)
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
