@@ -1,6 +1,7 @@
 # Align policy routing context checklist
 
-Current focus: PR #172 is open for independent review; keep the remaining five Wave 6 members parked.
+Current focus: complete -- shipped in PR #172 (`366c216a`); the remaining five Wave 6 members stayed parked through
+merge.
 
 ## Activation
 

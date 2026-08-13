@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Align policy routing context
+
+**Goal/outcome**: Make supervisor routing comparisons and policy-shadow reads use the session state that actually
+governs their behavior.
+
+**Key changes**:
+
+- Supervisor setup now compares source routing with CLI-confirmed launch proxy identity instead of probing `ProxyIntent`
+  for a field it does not own.
+- Shadow `show` and `status` share explicit/current/sole-local name resolution and machine-readable stderr failures; the
+  former undocumented `shadow show <uuid>` input was intentionally narrowed to names.
+
+**Verification**: The retained artifact produced 6 failures and 10 controls on `f6df4a40`; 248 focused tests, 9,001 unit
+tests (one skip, 122 deselected), 815 regressions, 9 targeted Docker integrations, pre-commit, and board integrity
+checks pass. Shipped in PR #172 (`366c216a`).
+
 ### Harden proxy boundary failures
 
 **Goal/outcome**: Reject malformed transported proxy fields before request handling and make process-spawn failure

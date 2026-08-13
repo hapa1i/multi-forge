@@ -155,6 +155,7 @@ pending independent review.
 - [x] Activate only D054/D055 on `agent/harden-proxy-boundary-failures`; keep the six parked members gated.
 - [x] Ship D054/D055 independently in PR #171 (`5cd268c1`) before activating another Wave 6 member.
 - [x] Activate only O013/O034 from merged `main` at `f6df4a40`; keep the remaining five Wave 6 members parked.
+- [x] Ship O013/O034 independently in PR #172 (`366c216a`) before activating another Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

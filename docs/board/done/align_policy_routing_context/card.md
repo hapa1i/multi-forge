@@ -1,9 +1,8 @@
 # Align policy routing context
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `agent/align-policy-routing-context` from merged `main` at `f6df4a40`;
-awaiting independent review and merge in PR #172.
+**Lane**: `done/` -- shipped in PR #172 (`366c216a`).
 
 **Findings**: O013 and O034.
 
