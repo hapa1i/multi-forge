@@ -27,10 +27,10 @@ member therefore treats those hyperparameter reads as uncontracted bypasses rath
 The separate `_MODEL` lookup and fallback tier inference remain parked under Wave 7 O051; credential and connection
 environment precedence also remains unchanged.
 
-The retained regression produced five expected failures and two compatibility passes on `7f705aad`. Following O035 past
-the cited converter exposed a second live defect: the core adapter discarded every translated `tool_choice`, and the GPT
-Responses path did not re-emit it. Each seam received a failing check before its production correction; fixing only the
-cited `auto` literal would not have restored required-tool behavior.
+The final regression artifact produces six expected failures and three compatibility passes on `7f705aad`: D030 is
+parametrized for both providers, and the count includes the later adapter seam. A separate GPT Responses check also
+failed before correction. Following O035 past the cited converter showed that fixing only the `auto` literal would not
+have restored required-tool behavior.
 
 ## Implementation Outcome
 
