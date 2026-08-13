@@ -157,6 +157,36 @@ class TierOverrides:
         return getattr(self, tier.lower(), None)
 
 
+_VALID_PROMPT_CACHING_MODES = frozenset({"passthrough", "auto_inject"})
+
+
+def _validate_tool_prefixes_to_ignore(value: Any) -> None:
+    """Validate the shared template/instance tool-ignore shape."""
+    if not isinstance(value, list) or any(not isinstance(prefix, str) for prefix in value):
+        raise ValueError("Invalid tool_prefixes_to_ignore: must be a list of strings")
+
+
+def _validate_model_alternatives(value: Any) -> None:
+    """Validate the per-tier alias-to-backend model mapping."""
+    if not isinstance(value, dict):
+        raise ValueError("Invalid model_alternatives: must be a mapping of tier mappings")
+    for tier, alternatives in value.items():
+        if not isinstance(tier, str) or not isinstance(alternatives, dict):
+            raise ValueError("Invalid model_alternatives: must be a mapping of tier mappings")
+        if any(not isinstance(alias, str) or not isinstance(model, str) for alias, model in alternatives.items()):
+            raise ValueError("Invalid model_alternatives: aliases and backend models must be strings")
+
+
+def _validate_provider_direct_fields(config: Any) -> None:
+    """Validate provider fields copied unchanged into proxy instances."""
+    _validate_model_alternatives(config.model_alternatives)
+    if not isinstance(config.prompt_caching, str) or config.prompt_caching not in _VALID_PROMPT_CACHING_MODES:
+        allowed = ", ".join(sorted(_VALID_PROMPT_CACHING_MODES))
+        raise ValueError(f"Invalid prompt_caching: {config.prompt_caching!r} (must be one of: {allowed})")
+    if isinstance(config.auto_cache_min_tokens, bool) or not isinstance(config.auto_cache_min_tokens, int):
+        raise ValueError("Invalid auto_cache_min_tokens: must be an integer")
+
+
 @dataclass
 class ProviderConfig:
     """Configuration for a single LLM provider (Gemini, OpenAI, LiteLLM)."""
@@ -181,6 +211,9 @@ class ProviderConfig:
     # Error hint enrichment: append corrective hints to tool_result errors
     # before forwarding to the LLM, helping non-Claude models recover faster.
     error_hints: bool = False
+
+    def __post_init__(self) -> None:
+        _validate_provider_direct_fields(self)
 
 
 def _coerce_optional_usd_cap(name: str, value: Any) -> float | None:
@@ -736,6 +769,7 @@ class ProxyConfig:
         # Templates carry the shared per-proxy blocks plus default_tier/tier_overrides;
         # coerce + validate here so an invalid combo is rejected at 'forge proxy template
         # edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
+        _validate_tool_prefixes_to_ignore(self.tool_prefixes_to_ignore)
         _coerce_proxy_blocks(self)
         _validate_default_tier(self.default_tier)
         # Per-provider overrides: the constraint check skips tiers with no model, so empty/partial
@@ -842,6 +876,8 @@ class ProxyInstanceConfig:
         if not isinstance(self.backend, str):
             raise ValueError("proxy.backend must be a string")
 
+        _validate_tool_prefixes_to_ignore(self.tool_prefixes_to_ignore)
+        _validate_provider_direct_fields(self)
         _validate_default_tier(self.default_tier)
 
         _coerce_proxy_blocks(self)

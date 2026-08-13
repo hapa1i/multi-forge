@@ -1,7 +1,6 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: PR #170 is merged; keep the remaining 6 members parked until the next accepted member is activated from
-merged `main`.
+Current focus: open and review the independent D054/D055 draft PR; keep the remaining 6 members parked.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -42,5 +41,10 @@ merged `main`.
 - [x] Implement and verify tier authority, auth-retry tier identity, reasoning/sampling compatibility, and required-tool
   translation.
 - [x] Review and merge D030/O008/O015/O035 in PR #170 (`acae1b9e`) before activating the next member.
+- [x] Verify and admit follow-up D054/D055 as one new proxy-boundary member on merged `main` at `22071fcd`.
+- [x] Activate only D054/D055 on `agent/harden-proxy-boundary-failures`.
+- [x] Retain D054/D055 fail-first regressions before production changes (`24 failed, 2 passed` on `22071fcd`).
+- [x] Implement and verify proxy direct-field validation plus atomic typed spawn failure.
+- [ ] Review and merge D054/D055 independently before activating another member.
 - [ ] Keep the remaining 6 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

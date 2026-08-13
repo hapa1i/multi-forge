@@ -515,7 +515,9 @@ unless you know what you're doing — those are set from the template/backend ca
 
 Custom templates may also set `tool_prefixes_to_ignore`, `prompt_caching`, and `auto_cache_min_tokens`. Forge copies
 those values into each new proxy; existing `proxy.yaml` files remain user-owned snapshots and keep compatibility
-defaults when the keys are absent.
+defaults when the keys are absent. Tool-ignore entries must be strings, `model_alternatives` must contain
+string-to-string tier mappings, `prompt_caching` is `passthrough` or `auto_inject`, and `auto_cache_min_tokens` is an
+integer. Forge rejects malformed values when loading either a template or a proxy instance.
 
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.

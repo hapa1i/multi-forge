@@ -2,9 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- 14 of 34 findings across 6 of 12 members shipped in PRs #164--#170. The remaining 6 members stay
-parked in `todo/`; no member is active. PR #169 (`ece999d4`) hardened O012 escalation and retention-status error
-sanitization without adding a finding to this admission set.
+**Lane**: `doing/` -- 14 of 36 findings across 6 of 13 members shipped in PRs #164--#170. D054/D055 are the sole active
+member; the remaining 6 members stay parked in `todo/`. PR #169 (`ece999d4`) hardened O012 escalation and
+retention-status error sanitization without adding a finding to this admission set.
 
 ## Goal
 
@@ -26,6 +26,10 @@ assigns unadmitted verified MED/LOW bugs to Wave 6. Acceptance into this epic do
 contract: every member must retain a failing regression or equivalent executable characterization on its execution base
 before production code changes.
 
+After PR #170 merged, follow-up verification on `22071fcd` admitted D054/D055. D054 extends the directly transported
+proxy-field boundary completed in PR #168; D055 completes failed-start resource/error ownership adjacent to PR #167.
+Both are independently reproduced and share one proxy load/start failure boundary.
+
 ## Members and Sequence
 
 | Order | Findings                         | Member                                                                                                      | Review boundary                               |
@@ -36,12 +40,13 @@ before production code changes.
 | 4     | O014, O026                       | [`close_proxy_failure_lifecycles`](../../done/close_proxy_failure_lifecycles/card.md)                       | proxy registry and stream cleanup             |
 | 5     | D029, O025                       | [`complete_proxy_instance_config_wiring`](../../done/complete_proxy_instance_config_wiring/card.md)         | template-to-instance field preservation       |
 | 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../../done/restore_proxy_request_semantics/card.md)                     | tier authority and translated request shape   |
-| 7     | O013, O034                       | [`align_policy_routing_context`](../../todo/align_policy_routing_context/card.md)                           | policy routing/session selector consistency   |
-| 8     | D031                             | [`exclude_interactive_usage_cost`](../../todo/exclude_interactive_usage_cost/card.md)                       | two-plane interactive exclusion               |
-| 9     | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                               | CLI exit, stream, editor, and status behavior |
-| 10    | D034, D037, D038, O027           | [`harden_command_state_boundaries`](../../todo/harden_command_state_boundaries/card.md)                     | hook silence and strict durable-state reads   |
-| 11    | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](../../todo/preserve_session_launch_preconditions/card.md)         | launch preflight, rollback, and fail-open     |
-| 12    | O036                             | [`harden_walkthrough_sandbox_provenance`](../../todo/harden_walkthrough_sandbox_provenance/card.md)         | sandbox provenance before code execution      |
+| 7     | D054, D055                       | [`harden_proxy_boundary_failures`](../harden_proxy_boundary_failures/card.md)                               | proxy config and process-start boundaries     |
+| 8     | O013, O034                       | [`align_policy_routing_context`](../../todo/align_policy_routing_context/card.md)                           | policy routing/session selector consistency   |
+| 9     | D031                             | [`exclude_interactive_usage_cost`](../../todo/exclude_interactive_usage_cost/card.md)                       | two-plane interactive exclusion               |
+| 10    | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                               | CLI exit, stream, editor, and status behavior |
+| 11    | D034, D037, D038, O027           | [`harden_command_state_boundaries`](../../todo/harden_command_state_boundaries/card.md)                     | hook silence and strict durable-state reads   |
+| 12    | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](../../todo/preserve_session_launch_preconditions/card.md)         | launch preflight, rollback, and fail-open     |
+| 13    | O036                             | [`harden_walkthrough_sandbox_provenance`](../../todo/harden_walkthrough_sandbox_provenance/card.md)         | sandbox provenance before code execution      |
 
 The sequence starts with isolated trust and transfer contracts, then process/proxy lifecycle, proxy request semantics,
 operator read paths, and session launch safety. O036 remains independent because it changes a bundled shell safety
