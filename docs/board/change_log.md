@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Preserve session launch preconditions
+
+**Goal/outcome**: Validate launch prerequisites before durable mutation and keep fallback or post-launch failures from
+corrupting later session launches.
+
+**Key changes**:
+
+- Incognito and rewind failures now clean up derived state consistently, while JSON capability rejection and launch
+  confirmation remain narrowly scoped and best-effort.
+- Native fork UUIDs and resume names are validated before mutation; transfer and `--no-launch` paths remain UUID-free.
+
+**Verification**: The retained artifact produced 15 failures and 7 controls on `967d9cae`; 168 focused tests, 9,004 unit
+tests (one skip, 122 deselected), 894 regressions, 48 targeted integrations, pre-commit, and board integrity checks
+pass. Shipped in PR #176 (`88ac88c5`).
+
 ### Harden command and state boundaries
 
 **Goal/outcome**: Keep direct-command no-ops silent and reject malformed or reserved durable state at shared validation

@@ -2,9 +2,7 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation and verification are complete on `agent/preserve-session-launch-preconditions` from
-merged production code at `967d9cae` after the PR #175 bookkeeping closeout at `eaa4a7f3`; independent review and merge
-remain before closeout or O036 activation.
+**Lane**: `done/` -- shipped in PR #176 (`88ac88c5`).
 
 **Findings**: O011, O017, O021, O023, O029, and O030.
 
