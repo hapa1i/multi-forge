@@ -17,7 +17,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import click
 from rich.console import Console
@@ -135,7 +135,18 @@ def _resolve_session_for_display(
     return resolved.store, resolved.state
 
 
-def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionStore, SessionState]:
+def _exit_policy_session_json_error(error: str) -> NoReturn:
+    """Emit one machine-readable session-resolution error on stderr and exit."""
+    click.echo(json.dumps({"error": error}), err=True)
+    sys.exit(1)
+
+
+def _resolve_policy_session(
+    cwd: Path,
+    explicit: str | None,
+    *,
+    as_json: bool = False,
+) -> tuple[SessionStore, SessionState]:
     """Resolve the policy target session as (store, state), or exit(1) with an actionable error.
 
     Precedence: explicit --session > FORGE_SESSION > sole local session. The absent case
@@ -148,6 +159,12 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         try:
             return _resolve_session_for_display(explicit, cwd)
         except AmbiguousSessionError as exc:
+            if as_json:
+                roots = ", ".join(display_path(root) for root in exc.forge_roots)
+                _exit_policy_session_json_error(
+                    f"Session '{explicit}' exists in multiple projects: {roots}. "
+                    "Run the command from the target project directory."
+                )
             print_error(
                 f"Session '{explicit}' exists in multiple projects:",
                 console=err_console,
@@ -162,7 +179,10 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         except (StateCorruptedError, StateUnreadableError):
             raise  # corrupt index/manifest -> top-level reset handler
         except ForgeSessionError as exc:
-            print_error(f"Session '{explicit}' not found: {exc}", console=err_console)
+            error = f"Session '{explicit}' not found: {exc}"
+            if as_json:
+                _exit_policy_session_json_error(error)
+            print_error(error, console=err_console)
             sys.exit(1)
 
     name = os.environ.get(ENV_SESSION)
@@ -171,10 +191,18 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         if len(candidates) == 1:
             name = candidates[0]
         elif not candidates:
-            print_error(f"No session found in {display_path(cwd)}", console=err_console)
+            error = f"No session found in {display_path(cwd)}"
+            if as_json:
+                _exit_policy_session_json_error(error)
+            print_error(error, console=err_console)
             err_console.print("  Run 'forge session start' first to create a session.")
             sys.exit(1)
         else:
+            if as_json:
+                _exit_policy_session_json_error(
+                    f"Multiple sessions in {display_path(cwd)}; specify one with --session. "
+                    f"Sessions: {', '.join(candidates)}"
+                )
             print_error(
                 f"Multiple sessions in {display_path(cwd)}; specify one with --session.",
                 console=err_console,
@@ -193,7 +221,10 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest -> top-level reset handler, not a generic "no session"
     except Exception:
-        print_error(f"No session found in {display_path(cwd)}", console=err_console)
+        error = f"No session found in {display_path(cwd)}"
+        if as_json:
+            _exit_policy_session_json_error(error)
+        print_error(error, console=err_console)
         err_console.print("  Run 'forge session start' first to create a session.")
         sys.exit(1)
     return store, state
@@ -1526,21 +1557,12 @@ def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
         forge policy shadow show planner      # a named session
         forge policy shadow show --all --json
     """
-    from forge.core.ops.session_context import (
-        SessionContextError,
-        resolve_session_identifier,
-    )
     from forge.policy.semantic.shadow import read_done_records
     from forge.policy.semantic.shadow_runner import STATUS_DISAGREE
 
-    try:
-        session_name, forge_root = resolve_session_identifier(session)
-    except SessionContextError as e:
-        if as_json:
-            click.echo(json.dumps({"error": str(e)}), err=True)
-        else:
-            print_error_with_tip(str(e), "Run 'forge session list' to see sessions.")
-        sys.exit(1)
+    store, manifest = _resolve_policy_session(Path.cwd().resolve(), session, as_json=as_json)
+    session_name = manifest.name
+    forge_root = str(store.forge_root)
 
     records = read_done_records(forge_root, session_name)
     if not show_all:
@@ -1583,12 +1605,12 @@ def shadow_status_cmd(session: str | None, as_json: bool) -> None:
         STATUS_INCONCLUSIVE,
     )
 
-    # Resolve once via the policy-session path so the rate and the counts always
-    # describe the same session (resolve_session_identifier could diverge on $FORGE_SESSION).
+    # Resolve once through the shared policy-session path so the rate and counts
+    # always describe the same explicit/current/sole-local session as `show`.
     cwd = Path.cwd().resolve()
-    _, manifest = _resolve_policy_session(cwd, session)
+    store, manifest = _resolve_policy_session(cwd, session, as_json=as_json)
     session_name = manifest.name
-    forge_root = manifest.forge_root
+    forge_root = str(store.forge_root)
 
     sample_rate: float | None = None
     try:

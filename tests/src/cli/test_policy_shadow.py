@@ -1,14 +1,14 @@
 """Tests for ``forge policy shadow`` (show + group; the hidden run worker is covered
 by ``tests/src/policy/semantic/test_shadow_runner.py``).
 
-The command lazily imports ``resolve_session_identifier`` from
-``forge.core.ops.session_context``, so the resolver is patched at its source.
+Both read commands delegate session selection to the shared policy resolver.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -17,9 +17,12 @@ from forge.cli.main import main
 
 
 def _patch_resolver(monkeypatch, name: str = "planner", forge_root: str | None = None) -> None:
+    root = Path(forge_root or ".").resolve()
+    store = SimpleNamespace(forge_root=root)
+    manifest = SimpleNamespace(name=name, forge_root=str(root))
     monkeypatch.setattr(
-        "forge.core.ops.session_context.resolve_session_identifier",
-        lambda _s=None: (name, forge_root),
+        "forge.cli.policy._resolve_policy_session",
+        lambda _cwd, _explicit, **_kwargs: (store, manifest),
     )
 
 
@@ -46,15 +49,13 @@ def _write_pending(forge_root, cand_hash: str, *, session: str = "planner") -> N
 
 
 def _patch_status_session(monkeypatch, tmp_path, *, name: str = "planner", rate: float | None = 0.25) -> None:
-    """Patch the policy-session path `shadow status` resolves through.
-
-    `status` uses `_resolve_policy_session` + `compute_effective_intent` (not the
-    `resolve_session_identifier` that `show` uses), so patch those directly.
-    """
-    from types import SimpleNamespace
-
+    """Patch the shared policy-session path plus effective-intent lookup."""
+    store = SimpleNamespace(forge_root=Path(tmp_path).resolve())
     manifest = SimpleNamespace(name=name, forge_root=str(tmp_path))
-    monkeypatch.setattr("forge.cli.policy._resolve_policy_session", lambda _cwd, _explicit: (None, manifest))
+    monkeypatch.setattr(
+        "forge.cli.policy._resolve_policy_session",
+        lambda _cwd, _explicit, **_kwargs: (store, manifest),
+    )
 
     if rate is None:
 
@@ -87,7 +88,15 @@ def test_hidden_worker_refuses_incompatible_root_before_claim(tmp_path: Path) ->
     with patch("forge.policy.semantic.shadow_runner.run_shadow_for_session") as mock_run:
         result = CliRunner().invoke(
             main,
-            ["policy", "shadow", "run", "--session-name", "planner", "--root", str(tmp_path)],
+            [
+                "policy",
+                "shadow",
+                "run",
+                "--session-name",
+                "planner",
+                "--root",
+                str(tmp_path),
+            ],
         )
 
     assert result.exit_code == 1
@@ -113,7 +122,10 @@ def test_show_renders_disagreement_with_citations(monkeypatch, tmp_path) -> None
         frontier_verdict="divergent",
         frontier_confidence=0.9,
         frontier_violations=[
-            {"evidence": "wrote to a file outside the plan", "citations": ["Step 2: only touch src/bar.py"]}
+            {
+                "evidence": "wrote to a file outside the plan",
+                "citations": ["Step 2: only touch src/bar.py"],
+            }
         ],
     )
     _patch_resolver(monkeypatch, forge_root=str(tmp_path))
@@ -189,15 +201,15 @@ def test_show_all_keeps_uncited_for_inconclusive(monkeypatch, tmp_path) -> None:
 
 
 def test_show_not_found_exits_1(monkeypatch) -> None:
-    from forge.core.ops.session_context import SessionContextError
+    from forge.session.exceptions import SessionNotFoundError
 
-    def _raise(_s=None):  # noqa: ANN001
-        raise SessionContextError("no session 'ghost'")
+    def _raise(_name, _cwd):  # noqa: ANN001
+        raise SessionNotFoundError("ghost")
 
-    monkeypatch.setattr("forge.core.ops.session_context.resolve_session_identifier", _raise)
+    monkeypatch.setattr("forge.cli.policy._resolve_session_for_display", _raise)
     result = CliRunner().invoke(main, ["policy", "shadow", "show", "ghost"])
     assert result.exit_code == 1
-    assert "forge session list" in result.output
+    assert "Session 'ghost' not found" in result.output
 
 
 def test_status_json_shape(monkeypatch, tmp_path) -> None:
