@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; Wave 6 D032/D041/O005/O031--O033 are implemented and verified on
-`agent/align-cli-failure-surfaces`, pending independent review.
+Current focus: Wave 5 is closed; 25 of 36 Wave 6 findings have shipped, and the remaining three members are parked
+behind their entry-condition checks.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -160,6 +160,7 @@ Current focus: Wave 5 is closed; Wave 6 D032/D041/O005/O031--O033 are implemente
 - [x] Ship D031 independently in PR #173 (`a55ab218`) before activating another Wave 6 member.
 - [x] Activate only D032/D041/O005/O031--O033 from merged `main` at `13ecef87`; keep the remaining three Wave 6 members
   parked.
+- [x] Ship D032/D041/O005/O031--O033 independently in PR #174 (`095fcd90`) before activating another Wave 6 member.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
