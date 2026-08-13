@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from forge.cli import claude as claude_cli
 from forge.cli import config_cmd as config_cli
@@ -27,7 +27,9 @@ def _reset_runtime_config() -> Iterator[None]:
     reset_runtime_config()
 
 
-def _invoke_editor_surface(surface: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, list[list[str]]]:
+def _invoke_editor_surface(
+    surface: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Result, list[list[str]]]:
     calls: list[list[str]] = []
 
     def fake_which(command: str) -> str | None:
