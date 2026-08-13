@@ -1,6 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without activating any later member.
+Current focus: PR #170 is merged; keep the remaining 6 members parked until the next accepted member is activated from
+merged `main`.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -40,6 +41,6 @@ Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without act
   seam also failed).
 - [x] Implement and verify tier authority, auth-retry tier identity, reasoning/sampling compatibility, and required-tool
   translation.
-- [ ] Review and merge D030/O008/O015/O035 in PR #170 before activating the next ordered member.
+- [x] Review and merge D030/O008/O015/O035 in PR #170 (`acae1b9e`) before activating the next member.
 - [ ] Keep the remaining 6 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

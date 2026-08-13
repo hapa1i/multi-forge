@@ -45,8 +45,8 @@ reasoning-floor case adds the third control. The separate GPT Responses seam als
 focused slice, 9,001 unit tests (one platform skip, 122 deselected), 773 regressions, and 4 translated-proxy Docker
 integrations pass. The first integration-file run exposed and corrected an older cumulative-event-count order dependency
 before the 4-test rerun passed. Normative and end-user proxy contracts are synchronized. Final all-files and explicit
-new-file hooks plus the 289-file/713-link board audit pass with no missing or stale lane targets; the Wave 6 lane graph
-remains 5 `done` / 1 `doing` / 6 `todo`.
+new-file hooks plus the 289-file/713-link board audit pass with no missing or stale lane targets. Shipped in PR #170
+(`acae1b9e`).
 
 ### Harden process cleanup and retention status
 

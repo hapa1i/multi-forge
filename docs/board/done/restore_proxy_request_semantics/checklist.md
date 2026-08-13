@@ -1,6 +1,6 @@
 # Restore proxy request semantics checklist
 
-Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without activating the next member.
+Current focus: closed after merge in PR #170 (`acae1b9e`) without activating the next member.
 
 ## Activation and prior-member closeout
 
@@ -45,3 +45,4 @@ Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without act
 - [x] Run final pre-commit and board link/lane/size/diff checks (289 files, 713 relative links, zero missing/stale
   targets, 5 `done` / 1 `doing` / 6 `todo`, and 22,273 change-log tokens).
 - [x] Open independent draft PR #170 without activating the next Wave 6 member.
+- [x] Review and merge PR #170 (`acae1b9e`) before activating another Wave 6 member.

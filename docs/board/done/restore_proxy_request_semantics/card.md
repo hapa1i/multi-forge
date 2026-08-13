@@ -1,9 +1,9 @@
 # Restore proxy request semantics
 
-**Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
+**Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and verified on `agent/restore-proxy-request-semantics` from merged `main` at
-`7f705aad`; draft PR #170 is ready for independent review.
+**Lane**: `done/` -- shipped in PR #170 (`acae1b9e`) after implementation and verification on
+`agent/restore-proxy-request-semantics` from merged `main` at `7f705aad`.
 
 **Findings**: D030, O008, O015, and O035.
 
@@ -56,8 +56,8 @@ have restored required-tool behavior.
   dependency after the new request passed; the test now compares its own event delta, and the complete rerun is green.
 - Full pre-commit and the explicit new-file hook run passed. Their first passes caught optional-mock-call typing guards
   in the adapter unit and untracked regression, and normalized Markdown; the corrected reruns are green.
-- Board audit: 289 files, 713 relative links, no missing targets or stale lane references, and a Wave 6 split of 5
-  `done` / 1 `doing` / 6 `todo`. The change log is 22,273 tokens; size and diff checks pass.
+- Board audit: 289 files, 713 relative links, no missing targets or stale lane references. The change log is 22,273
+  tokens; size and diff checks pass. Shipped in PR #170 (`acae1b9e`).
 
 ## Acceptance Criteria
 
