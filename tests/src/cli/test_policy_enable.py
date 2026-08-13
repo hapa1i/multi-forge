@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock
 
 from click.testing import CliRunner
 from pytest import MonkeyPatch, fixture
 
 from forge.cli.main import main
+from forge.core.ops import policy as policy_ops
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import PolicyIntent, SupervisorConfig
@@ -32,10 +34,10 @@ class TestEnableRequiresBundle:
         assert result.exit_code == 1
         assert result.stdout == ""
         assert "No policy bundles specified." in err
-        # The recovery tip must name BOTH bundles, not degrade to one.
+        # The recovery tip must track every enableable bundle, not degrade to one.
         assert "Tip:" in err
-        assert "--bundle tdd" in err
-        assert "coding_standards" in err
+        for bundle in policy_ops.POLICY_BUNDLE_NAMES:
+            assert f"--bundle {bundle}" in err
 
     def test_help_lists_bundle_choices(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["policy", "enable", "--help"])
@@ -44,6 +46,21 @@ class TestEnableRequiresBundle:
         assert "--bundle" in result.output
         assert "tdd" in result.output
         assert "coding_standards" in result.output
+
+    def test_invalid_bundle_keeps_click_error_shape(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["policy", "enable", "--bundle", "unknown"])
+
+        assert result.exit_code == 2
+        assert "Invalid value for '--bundle'" in result.output
+
+    def test_invalid_fail_mode_keeps_click_error_shape(self, runner: CliRunner) -> None:
+        result = runner.invoke(
+            main,
+            ["policy", "enable", "--bundle", "tdd", "--fail-mode", "invalid"],
+        )
+
+        assert result.exit_code == 2
+        assert "Invalid value for '--fail-mode'" in result.output
 
 
 class TestPolicyEnable:
@@ -180,3 +197,86 @@ class TestPolicyEnable:
         assert policy.bundle_config == {}
         assert policy.supervisor is None
         assert policy.team_supervisor is None
+
+    def test_enable_uses_shared_activation_builder(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, _store = self._seed_target(tmp_path, monkeypatch)
+        builder = Mock(wraps=policy_ops.build_policy_activation)
+        monkeypatch.setattr(policy_ops, "build_policy_activation", builder)
+
+        result = runner.invoke(
+            main,
+            [
+                "policy",
+                "enable",
+                "--bundle",
+                "coding_standards",
+                "--bundle",
+                "tdd",
+                "--fail-mode",
+                "closed",
+                "--permissive",
+                "--session",
+                "worker",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        builder.assert_called_once_with(
+            enabled=True,
+            bundles=("coding_standards", "tdd"),
+            fail_mode="closed",
+            permissive=True,
+        )
+
+    def test_permissive_without_tdd_writes_no_bundle_config(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, store = self._seed_target(tmp_path, monkeypatch)
+
+        result = runner.invoke(
+            main,
+            [
+                "policy",
+                "enable",
+                "--bundle",
+                "coding_standards",
+                "--permissive",
+                "--session",
+                "worker",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        policy = store.read().intent.policy
+        assert policy is not None
+        assert policy.bundle_config == {}
+
+    def test_disable_uses_shared_builder_and_preserves_other_intent_fields(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, store = self._seed_target(tmp_path, monkeypatch)
+        state = store.read()
+        state.intent.policy = PolicyIntent(
+            enabled=True,
+            fail_mode="closed",
+            bundles=["tdd"],
+            bundle_config={"tdd": {"strict": False}},
+            supervisor=SupervisorConfig(resume_id="planner", direct=True),
+        )
+        store.write(state)
+        builder = Mock(wraps=policy_ops.build_policy_activation)
+        monkeypatch.setattr(policy_ops, "build_policy_activation", builder)
+
+        result = runner.invoke(main, ["policy", "disable", "--session", "worker"])
+
+        assert result.exit_code == 0, result.output
+        builder.assert_called_once_with(enabled=False)
+        policy = store.read().intent.policy
+        assert policy is not None
+        assert policy.enabled is False
+        assert policy.fail_mode == "closed"
+        assert policy.bundles == ["tdd"]
+        assert policy.bundle_config == {"tdd": {"strict": False}}
+        assert policy.supervisor == SupervisorConfig(resume_id="planner", direct=True)

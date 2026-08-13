@@ -51,9 +51,9 @@ subsequently hardened O012 and retention-status failure reporting without adding
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; order-1 O043 subsequently shipped independently in PR #178, and the other 33 members remain parked. D056
-and other correctness, security, performance, test-policy, output, and documentation rows still require their separately
-defined Wave 6 gates.
+implementation; order-1 O043 subsequently shipped independently in PR #178, order-2 O044 is now the sole active member,
+and the other 32 members remain parked. D056 and other correctness, security, performance, test-policy, output, and
+documentation rows still require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -750,8 +750,8 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
 ### Suggested coordination boundaries
 
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001â€“D005 and O028 shipped as three
-  independent members. O044 remains later bounded-maintenance work because terminal commands own intent while `%policy`
-  commands deliberately own overrides.
+  independent members. O044 is active as later bounded-maintenance work; terminal commands continue to own intent while
+  `%policy` commands continue to own overrides.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130â€“#132.
 - **[Durable-state/session epic](done/epic_session_durable_state_safety/card.md):** all eight Wave 3 members shipped
@@ -769,9 +769,9 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 members; order-1 O043 shipped independently in PR #178 and the other 33 are parked. O062/O063/O093
-  are rejected as written, O067/O095 are admitted only in their verified scope, and O092's unverified tail is not an
-  executable deletion set.
+  are split into 34 members; order-1 O043 shipped independently in PR #178, order-2 O044 is active, and the other 32 are
+  parked. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and O092's
+  unverified tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

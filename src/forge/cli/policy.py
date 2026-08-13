@@ -71,6 +71,11 @@ _CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
 _SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
 _SUPERVISOR_RUNTIME_CHOICES = click.Choice(list(supervisor_lane_runtimes()))
 _SUPERVISOR_BACKEND_CHOICES = click.Choice(list(supervisor_lane_backends()))
+_POLICY_BUNDLE_CHOICES = click.Choice(list(policy_ops.POLICY_BUNDLE_NAMES))
+_POLICY_FAIL_MODE_CHOICES = click.Choice(list(policy_ops.POLICY_FAIL_MODES))
+_POLICY_ENABLE_BUNDLE_TIP = (
+    "Use " + " and/or ".join(f"--bundle {bundle}" for bundle in policy_ops.POLICY_BUNDLE_NAMES) + "."
+)
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -293,12 +298,12 @@ def list_bundles(as_json: bool) -> None:
     "-b",
     "bundles",
     multiple=True,
-    type=click.Choice(["tdd", "coding_standards"]),
+    type=_POLICY_BUNDLE_CHOICES,
     help="Policy bundles to enable (can be repeated)",
 )
 @click.option(
     "--fail-mode",
-    type=click.Choice(["open", "closed"]),
+    type=_POLICY_FAIL_MODE_CHOICES,
     default="open",
     help="Behavior on policy errors (default: open)",
 )
@@ -317,13 +322,20 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         forge policy enable --bundle tdd --bundle coding_standards
         forge policy enable --bundle tdd --permissive
     """
-    if not bundles:
+    try:
+        activation = policy_ops.build_policy_activation(
+            enabled=True,
+            bundles=bundles,
+            fail_mode=fail_mode,
+            permissive=permissive,
+        )
+    except policy_ops.PolicyActivationInputError:
         # Fail loud, not a silent no-op: the CLI is the explicit surface and requires
         # the bundles to enable. The interactive `%policy enable` surface also requires
         # explicit bundles; its distinction is that it writes overrides rather than intent.
         print_error_with_tip(
             "No policy bundles specified.",
-            "Use --bundle tdd and/or --bundle coding_standards.",
+            _POLICY_ENABLE_BUNDLE_TIP,
             console=err_console,
         )
         sys.exit(1)
@@ -332,10 +344,6 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
     store, _ = _resolve_policy_session(cwd, session_name)
     _enforce_policy_store_compatibility(store)
 
-    bundle_config: dict[str, dict[str, object]] = {}
-    if permissive and "tdd" in bundles:
-        bundle_config["tdd"] = {"strict": False}
-
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
@@ -343,10 +351,10 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         if m.intent.policy is None:
             m.intent.policy = PolicyIntent()
 
-        m.intent.policy.enabled = True
-        m.intent.policy.fail_mode = fail_mode  # type: ignore[assignment]  # click Choice returns str, not Literal
-        m.intent.policy.bundles = list(bundles)
-        m.intent.policy.bundle_config = bundle_config
+        m.intent.policy.enabled = activation.enabled
+        m.intent.policy.fail_mode = activation.fail_mode
+        m.intent.policy.bundles = list(activation.bundles)
+        m.intent.policy.bundle_config = activation.bundle_config
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
@@ -354,8 +362,8 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         print_error(f"Failed to update session: {e}")
         sys.exit(1)
 
-    console.print(f"[green]Policy enabled[/green] with bundles: {', '.join(bundles)}")
-    console.print(f"  Fail mode: {fail_mode}")
+    console.print(f"[green]Policy enabled[/green] with bundles: {', '.join(activation.bundles)}")
+    console.print(f"  Fail mode: {activation.fail_mode}")
 
     from forge.install.hooks import has_forge_hook
 
@@ -369,15 +377,15 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             blank_before=False,
             console=console,
         )
-    if bundle_config:
-        for bundle, cfg in bundle_config.items():
+    if activation.bundle_config:
+        for bundle, cfg in activation.bundle_config.items():
             cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
             console.print(f"  {bundle}: {cfg_str}")
 
     from forge.policy.deterministic.registry import get_policy_ids_for_bundle
 
     rules = []
-    for bundle in bundles:
+    for bundle in activation.bundles:
         rules.extend(get_policy_ids_for_bundle(bundle))
 
     if rules:
@@ -390,6 +398,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
 @click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
 def disable(session_name: str | None) -> None:
     """Disable policy enforcement for the current session."""
+    activation = policy_ops.build_policy_activation(enabled=False)
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
     _enforce_policy_store_compatibility(store)
@@ -399,9 +408,9 @@ def disable(session_name: str | None) -> None:
             raise TypeError(f"Expected SessionState, got {type(m)}")
 
         if m.intent.policy:
-            m.intent.policy.enabled = False
+            m.intent.policy.enabled = activation.enabled
         else:
-            m.intent.policy = PolicyIntent(enabled=False)
+            m.intent.policy = PolicyIntent(enabled=activation.enabled)
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
