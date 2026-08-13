@@ -1,6 +1,6 @@
 # Replace unsafe index test fixtures
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `todo/` -- accepted Wave 7 durable-state fixture work.
 

@@ -1,6 +1,6 @@
 # Wire the transcript reindex guard
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O092
 subset).
@@ -18,7 +18,7 @@ deleting the unused intended optimization.
 
 On `5777192a`, `needs_reindex` is definition/test-only while Stop still re-extracts an unchanged snapshot. Its intended
 content/mtime guard is covered by `tests/src/search/test_index_state.py`. Authority:
-[`docs/design.md` "3.8 Session artifacts"](../../../design.md#38-session-artifacts-plans-transcripts).
+[`docs/design.md` "3.8 Session artifacts"](../../../design.md#38-session-artifacts-plans--transcripts).
 
 ## Acceptance Criteria
 

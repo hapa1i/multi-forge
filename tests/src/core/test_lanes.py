@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import builtins
+import subprocess
+import sys
 
 import pytest
 
@@ -73,6 +75,30 @@ def test_lane_runtime_vocab_matches_registry():
     assert LANE_RUNTIME_IDS == {CORE_LLM_RUNTIME} | set(RUNTIMES)
     for runtime_id in LANE_RUNTIME_IDS:
         runtime_execution(runtime_id)  # every vocab id is a runtime the resolver accepts
+
+
+def test_import_lanes_does_not_initialize_runtime_llm_or_auth():
+    """The pure lane layer must not pull in runtime, LLM, or auth modules."""
+    script = """
+import sys
+import forge.core.lanes
+
+blocked_roots = ("forge.core.runtime", "forge.core.llm", "forge.core.auth")
+loaded = sorted(
+    name
+    for name in sys.modules
+    if any(name == root or name.startswith(f"{root}.") for root in blocked_roots)
+)
+assert not loaded, loaded
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 # --- Lane construction validation ---

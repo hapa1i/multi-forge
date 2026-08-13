@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 is source-rechecked, split, and parked at 31 verified findings across 34 implementation members.
-D056 and remaining correctness/test-policy/output/docs rows retain separate Wave 6 gates; no additional implementation
-card is active.
+Current focus: execute only Wave 7 order 1, O043, on `refactor/decouple-lane-runtime-vocabulary`. The other 33 Wave 7
+members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate Wave 6 gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -182,7 +181,8 @@ card is active.
   fork/installer/status-line seams, and retire three superseded/invalidated cards without activating work.
 - [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW correctness, security, performance, test-policy,
   output, and documentation findings before admitting any of them.
-- [ ] After the Wave 7 admission changes are reviewed on the execution base, activate only order 1
+- [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
+- [ ] Ship O043 independently and close its member before activating Wave 7 order 2.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -4,9 +4,10 @@
 Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
 closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
-added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is now admitted and parked
-as 31 verified findings across 34 implementation members; no Wave 7 member is active. D056 and the other separately
-gated Wave 6 rows remain outside that admission.
+added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is admitted as 31 verified
+findings across 34 implementation members; its child epic and order-1 O043 member are active on
+`refactor/decouple-lane-runtime-vocabulary`, while the other 33 remain parked. D056 and the other separately gated Wave
+6 rows remain outside that admission.
 
 ## Goal
 
@@ -83,10 +84,10 @@ Follow-up verification expanded that bounded admission with D054/D055, and all 3
 members in PRs #164--#168 and #170--#177. D056 is recorded separately and awaits its own execution gate.
 
 A post-Wave 6 screen on merged `main` at `5777192a` admitted the verified refactor/deletion set under
-[`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md). It splits the old DG4
-umbrellas and the fork/installer/status-line structural rows into 34 ordered review boundaries, rejects O062/O063 and
-O093 as written, promotes only the verified O067/O095 subsets, and keeps correctness/test-policy/output/docs rows behind
-their Wave 6 gates. Admission did not activate an implementation branch or member.
+[`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md). It splits the old DG4 umbrellas and
+the fork/installer/status-line structural rows into 34 ordered review boundaries, rejects O062/O063 and O093 as written,
+promotes only the verified O067/O095 subsets, and keeps correctness/test-policy/output/docs rows behind their Wave 6
+gates. Admission did not activate an implementation branch or member.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
@@ -124,7 +125,7 @@ order.
 | 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
 | 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
-| 7    | 31 structural rows  | [`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md)                           |
+| 7    | 31 structural rows  | [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md)                                   |
 
 ## Execution Waves
 

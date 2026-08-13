@@ -1,6 +1,6 @@
 # Decompose the extension install transaction
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `todo/` -- accepted Wave 7 structural refactor work.
 
