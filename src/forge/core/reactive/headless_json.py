@@ -54,8 +54,9 @@ _json_output_unsupported = False
 # command line (e.g. a transient "API Error: 529 ... claude -p --output-format
 # json"), misfiring the retry -- which latches the JSON capability off process-wide
 # AND, on a proxied worker, re-runs the request for a duplicate proxy-side cost row.
-# Real rejections still carry one of the phrases below ("unknown option" covers the
-# regression fixture "error: unknown option '--output-format'").
+# Real rejections still carry both the flag token and one of the phrases below
+# ("unknown option" covers the regression fixture
+# "error: unknown option '--output-format'").
 _REJECTION_RE = re.compile(
     r"unknown option|unknown argument|unexpected argument|unrecognized|" r"invalid.{0,40}output-format|allowed choices",
     re.IGNORECASE,
@@ -98,7 +99,8 @@ def is_json_flag_rejection(returncode: int, stderr: str | None) -> bool:
     The retry-once trigger: a misdetection where the version gate allowed the flag
     but the CLI still refused it. A successful run (rc 0) is never a rejection.
     """
-    return returncode != 0 and bool(_REJECTION_RE.search(stderr or ""))
+    stderr_text = stderr or ""
+    return returncode != 0 and "--output-format" in stderr_text.lower() and bool(_REJECTION_RE.search(stderr_text))
 
 
 def mark_json_output_unsupported() -> None:

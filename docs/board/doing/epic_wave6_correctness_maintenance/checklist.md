@@ -1,7 +1,7 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: PR #175 is merged; keep the remaining 2 members parked until the next accepted member is activated from
-merged `main`.
+Current focus: independently review and merge O011/O017/O021/O023/O029/O030 after implementation verification on
+`agent/preserve-session-launch-preconditions`; keep O036 parked.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -73,4 +73,12 @@ merged `main`.
   Union-only Optional unwrapping (`681` focused, `872` regression, `9004` unit, and `24` targeted Docker integration
   tests passed).
 - [x] Review and merge D034/D037/D038/O027 independently in PR #175 (`967d9cae`) before activating another member.
+- [x] Close PR #175 bookkeeping and activate only O011/O017/O021/O023/O029/O030 from merged production code at
+  `967d9cae` on `agent/preserve-session-launch-preconditions`; keep O036 parked.
+- [x] Recheck the six launch-boundary findings and retain fail-first regressions before production changes
+  (`15 failed, 7 passed` on `967d9cae`).
+- [x] Implement and verify launch cleanup, rewind rollback, JSON rejection scoping, pre-mutation UUID/name validation,
+  and best-effort confirmation (`168` focused, `894` regression, `9004` unit, and `48` targeted integration tests
+  passed).
+- [ ] Review and merge O011/O017/O021/O023/O029/O030 independently before activating O036.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

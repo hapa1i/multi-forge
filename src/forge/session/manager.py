@@ -69,6 +69,7 @@ from .transfer import (
     parse_transfer_context_strategy,
     resolve_transfer_transcript_source,
 )
+from .validation import validate_name
 
 logger = logging.getLogger(__name__)
 
@@ -813,6 +814,7 @@ class SessionManager:
             child_name = self._generate_resume_name(parent_name, forge_root=parent_forge_root)
 
         assert child_name is not None  # narrowing: either provided or generated
+        validate_name(child_name)
 
         # See start_session: row-only residue must reach the transaction, not be
         # rejected here.
@@ -1066,6 +1068,7 @@ class SessionManager:
                         logger.debug("Could not remove orphaned retry context file %s", orphan_context, exc_info=True)
 
                 child_name = self._generate_resume_name(parent_name, forge_root=parent_forge_root)
+                validate_name(child_name)
                 child_state.name = child_name
                 if derivation is not None and derivation.resume_mode == "transfer":
                     ensure_child(Path(parent_forge_root), parent_name, child_name)
