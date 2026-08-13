@@ -3,7 +3,7 @@
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `doing/` -- implemented and verified on `agent/align-policy-routing-context` from merged `main` at `f6df4a40`;
-awaiting independent review and merge.
+awaiting independent review and merge in PR #172.
 
 **Findings**: O013 and O034.
 
@@ -56,4 +56,4 @@ implementations (O044).
 - Targeted non-slow supervisor integration slice: `9 passed, 1 deselected`.
 - Full pre-commit gate: all hooks passed after the expected Markdown normalization pass.
 - Board integrity: 292 Markdown files, 718 relative links with none missing, and the Wave 6 lane graph at 7 done / 1
-  doing / 5 todo; the active checklist is 670 tokens and `git diff --check` is clean.
+  doing / 5 todo; the active checklist is 680 tokens and `git diff --check` is clean.

@@ -1,6 +1,6 @@
 # Align policy routing context checklist
 
-Current focus: all implementation and repository gates are green; open the independent PR.
+Current focus: PR #172 is open for independent review; keep the remaining five Wave 6 members parked.
 
 ## Activation
 
@@ -31,8 +31,8 @@ Current focus: all implementation and repository gates are green; open the indep
 - [x] Confirm the implementation preserves the existing design/end-user contracts; no synchronization change is
   required.
 - [x] Run board link/lane/size and diff checks (292 Markdown files, 718 relative links with none missing, Wave 6 at 7
-  done / 1 doing / 5 todo, 670-token checklist, clean `git diff --check`).
-- [ ] Open an independent PR before activating another Wave 6 member.
+  done / 1 doing / 5 todo, 680-token checklist, clean `git diff --check`).
+- [x] Open PR #172 for independent review before activating another Wave 6 member.
 
 ## Acceptance tests
 
