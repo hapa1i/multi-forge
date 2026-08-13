@@ -501,6 +501,18 @@ class TestMutationFrontmatterSafety:
         assert doc.read_text() == original
         assert doc.read_text().count("---") == 2
 
+    def test_write_rejects_alias_resolving_to_reserved_target_without_okf_path(self, tmp_path: Path) -> None:
+        reserved = tmp_path / "index.md"
+        original = "# Reserved\n"
+        reserved.write_text(original)
+        alias = tmp_path / "concept.md"
+        alias.symlink_to(reserved)
+
+        with pytest.raises(PassportError, match="resolved target.*reserved"):
+            write_passport(alias, self._passport())
+
+        assert reserved.read_text() == original
+
     @pytest.mark.parametrize("yaml_block", ["", "# comment only\n"])
     def test_empty_and_comment_only_frontmatter_remain_writable(self, tmp_path: Path, yaml_block: str) -> None:
         doc = tmp_path / "doc.md"
@@ -801,6 +813,18 @@ class TestUpgradePassportEnvelope:
 
         with pytest.raises(PassportError, match="passport not found"):
             upgrade_passport_envelope(doc, logical_path="docs/doc.md")
+
+    def test_upgrade_rejects_alias_resolving_to_reserved_target(self, tmp_path: Path) -> None:
+        reserved = tmp_path / "log.md"
+        original = "---\nforge_memory:\n  version: 1\n  intent: Legacy\n---\n# Reserved\n"
+        reserved.write_text(original)
+        alias = tmp_path / "concept.md"
+        alias.symlink_to(reserved)
+
+        with pytest.raises(PassportError, match="resolved target.*reserved"):
+            upgrade_passport_envelope(alias, logical_path="docs/concept.md")
+
+        assert reserved.read_text() == original
 
     def test_upgrade_invalid_type_is_byte_identical(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"

@@ -664,8 +664,19 @@ def prepare_passport_write(
     passport: Passport,
     *,
     okf_path: str | None = None,
+    logical_path: str | None = None,
 ) -> PreparedPassportWrite:
-    """Validate and render a passport rewrite without touching the file."""
+    """Validate and render a passport rewrite without touching the file.
+
+    ``logical_path`` preserves an unresolved path spelling for update-only
+    reserved-name validation without opting into OKF envelope generation.
+    """
+    resolved_path = path.resolve()
+    if okf_path is None:
+        validate_okf_reserved_basenames(logical_path or str(path), resolved_path)
+    else:
+        validate_okf_memory_path(okf_path, resolved_path)
+
     parse_passport(_passport_to_dict(passport))
     text = path.read_text(encoding="utf-8")
     frontmatter, body = _extract_frontmatter_for_mutation(text)
@@ -674,7 +685,6 @@ def prepare_passport_write(
 
     added: tuple[str, ...] = ()
     if okf_path is not None:
-        validate_okf_memory_path(okf_path, path)
         added = _add_okf_envelope(frontmatter, body, passport, okf_path)
 
     frontmatter["forge_memory"] = _passport_to_dict(passport)
@@ -692,19 +702,21 @@ def write_passport(
     passport: Passport,
     *,
     okf_path: str | None = None,
+    logical_path: str | None = None,
 ) -> tuple[str, ...]:
     """Write or replace ``forge_memory`` frontmatter in a markdown file.
 
     Preserves non-``forge_memory`` frontmatter keys and markdown body.
     Uses atomic write (tempfile + rename) for crash safety.
+    ``logical_path`` retains the unresolved name for reserved-path validation.
     """
-    prepared = prepare_passport_write(path, passport, okf_path=okf_path)
+    prepared = prepare_passport_write(path, passport, okf_path=okf_path, logical_path=logical_path)
     return apply_prepared_passport_write(path, prepared)
 
 
 def upgrade_passport_envelope(path: Path, *, logical_path: str) -> tuple[str, ...]:
     """Add missing OKF fields while preserving the raw ``forge_memory`` mapping."""
-    validate_okf_memory_path(logical_path, path)
+    validate_okf_memory_path(logical_path, path.resolve())
     text = path.read_text(encoding="utf-8")
     frontmatter, body = _extract_frontmatter_for_mutation(text)
     if frontmatter is None or "forge_memory" not in frontmatter:

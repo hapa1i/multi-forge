@@ -11,7 +11,6 @@ locking, schema versioning, self-healing on missing file.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -25,8 +24,6 @@ from forge.core.state import (
 
 from .exceptions import ContentStoreCorruptedError, ContentStoreUnreadableError
 from .index_state import SEARCH_INDEX_DIR
-
-logger = logging.getLogger(__name__)
 
 # File and schema constants
 CONTENT_FILENAME = "content.json"
@@ -43,6 +40,13 @@ def _get_content_store_path(forge_root: Path) -> Path:
 
 def _handle_content_store_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
     raise SchemaVersionError(str(path), CONTENT_STORE_VERSION, version)
+
+
+def _raise_content_store_corruption(path: str, reason: str) -> NoReturn:
+    raise ContentStoreCorruptedError(
+        path,
+        f"{reason}. Run 'forge search rebuild-index' to fix.",
+    )
 
 
 class ContentStore:
@@ -103,12 +107,22 @@ class ContentStore:
 
         content = data.get("content", {})
         if not isinstance(content, dict):
-            logger.warning(
-                "Content store %s has non-dict 'content' field (got %s), treating as empty",
+            _raise_content_store_corruption(
                 path_str,
-                type(content).__name__,
+                f"'content' is {type(content).__name__}, expected object",
             )
-            return {}
+
+        for key, value in content.items():
+            if not isinstance(key, str):
+                _raise_content_store_corruption(
+                    path_str,
+                    f"content key is {type(key).__name__}, expected string",
+                )
+            if not isinstance(value, str):
+                _raise_content_store_corruption(
+                    path_str,
+                    f"content entry {key!r} is {type(value).__name__}, expected string",
+                )
 
         return content
 

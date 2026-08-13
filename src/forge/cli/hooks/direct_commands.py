@@ -22,8 +22,6 @@ from forge.session.hooks import resolve_session_store
 from forge.session.models import SessionState
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, SessionStore
 
-from ._helpers import _output_json
-
 
 def _parse_direct_command(prompt: str) -> tuple[str, list[str]] | None:
     """Parse `%<cmd> [subcmd] [args...]` direct command.
@@ -556,7 +554,6 @@ def _handle_policy_status() -> None:
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
-        _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
 
     try:
@@ -694,7 +691,6 @@ def _handle_policy_enable(argv: list[str]) -> None:
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
-        _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
     if not _guard_direct_project_mutation(store):
         return
@@ -742,7 +738,6 @@ def _handle_policy_disable() -> None:
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
-        _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
     if not _guard_direct_project_mutation(store):
         return
@@ -788,7 +783,6 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
-        _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
 
     try:
@@ -1312,7 +1306,6 @@ def _handle_cmd_cancel_verification() -> None:
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
-        _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
     if not _guard_direct_project_mutation(store):
         return

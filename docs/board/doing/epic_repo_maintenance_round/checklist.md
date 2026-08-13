@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; 25 of 36 Wave 6 findings have shipped, and the remaining three members are parked
-behind their entry-condition checks.
+Current focus: Wave 5 is closed; 25 of 36 Wave 6 findings have shipped, D034/D037/D038/O027 await independent review
+after completing implementation and verification, and the remaining two members are parked behind their entry-condition
+checks.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -161,6 +162,9 @@ behind their entry-condition checks.
 - [x] Activate only D032/D041/O005/O031--O033 from merged `main` at `13ecef87`; keep the remaining three Wave 6 members
   parked.
 - [x] Ship D032/D041/O005/O031--O033 independently in PR #174 (`095fcd90`) before activating another Wave 6 member.
+- [x] Close PR #174 bookkeeping and activate only D034/D037/D038/O027 on `agent/harden-command-state-boundaries` from
+  merged production code at `095fcd90`.
+- [x] Implement and verify D034/D037/D038/O027 without activating either remaining Wave 6 member.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.

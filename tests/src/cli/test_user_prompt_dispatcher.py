@@ -57,7 +57,6 @@ def _seed_missing_worktree_session(
         ("%help", True),
         ("%session list", True),
         ("%plan", True),
-        ("%cancel-verification", True),
         ("  %help", True),  # Leading whitespace stripped, then recognized
         ("hello world", False),
         ("what is %help?", False),  # % not at start (after strip)

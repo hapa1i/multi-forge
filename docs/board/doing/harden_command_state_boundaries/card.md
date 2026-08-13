@@ -2,7 +2,9 @@
 
 **Epic**: [`epic_wave6_correctness_maintenance`](../../doing/epic_wave6_correctness_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 6 work; parked pending fail-first regressions.
+**Lane**: `doing/` -- implementation and verification are complete on `agent/harden-command-state-boundaries` from
+merged production code at `095fcd90` after the PR #174 bookkeeping closeout at `e7ee8f15`; independent review and merge
+remain.
 
 **Findings**: D034, D037, D038, and O027.
 
@@ -13,9 +15,12 @@ rather than allowing internal output or raw type errors downstream.
 
 ## Evidence and Authority
 
-On `246aaff1`, five direct-command no-session paths emit an internal third JSON shape; passport updates omit the
-reserved path guard; search stores treat wrong top-level shapes as empty; and `unwrap_optional(list[str])` incorrectly
-returns `str`. The two-outcome hook and strict-read contracts are in
+Rechecked on merged production code at `095fcd90`: five direct-command no-session paths still emit an internal third
+JSON shape; passport updates still omit the reserved path guard; document/content stores still treat wrong field
+containers as empty; content/BM25 element types still reach downstream code; and `unwrap_optional(list[str])` still
+returns `str`. O027's helper defect is live, but the original downstream claim was too broad: current override consumers
+only use the result for nested-dataclass/dict routing, so list-valued overrides retain their existing behavior. The
+two-outcome hook and strict-read contracts are in
 [`docs/design.md` §3.11](../../../design.md#311-direct-commands-userpromptsubmit-dispatcher) and the developer coding
 standards.
 

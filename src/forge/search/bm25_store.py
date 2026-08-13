@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from forge.core.state import (
     SchemaVersionError,
@@ -69,6 +69,13 @@ def _get_bm25_index_path(forge_root: Path) -> Path:
 
 def _handle_bm25_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
     raise SchemaVersionError(str(path), BM25_INDEX_VERSION, version)
+
+
+def _raise_bm25_corruption(path: str, reason: str) -> NoReturn:
+    raise BM25IndexCorruptedError(
+        path,
+        f"{reason}. Run 'forge search rebuild-index' to fix.",
+    )
 
 
 class BM25IndexStore:
@@ -136,12 +143,65 @@ class BM25IndexStore:
                 f"current is '{TOKENIZER_ID}'. Run 'forge search rebuild-index' to fix.",
             )
 
+        raw_doc_keys = data.get("doc_keys", [])
+        if not isinstance(raw_doc_keys, list):
+            _raise_bm25_corruption(path_str, f"doc_keys is {type(raw_doc_keys).__name__}, expected list")
+        for i, key in enumerate(raw_doc_keys):
+            if not isinstance(key, str):
+                _raise_bm25_corruption(path_str, f"doc_keys entry {i} is {type(key).__name__}, expected string")
+
+        raw_doc_lens = data.get("doc_lens", [])
+        if not isinstance(raw_doc_lens, list):
+            _raise_bm25_corruption(path_str, f"doc_lens is {type(raw_doc_lens).__name__}, expected list")
+        for i, doc_len in enumerate(raw_doc_lens):
+            if type(doc_len) is not int:
+                _raise_bm25_corruption(
+                    path_str,
+                    f"doc_lens entry {i} is {type(doc_len).__name__}, expected integer",
+                )
+
+        raw_term_freqs = data.get("term_freqs", [])
+        if not isinstance(raw_term_freqs, list):
+            _raise_bm25_corruption(path_str, f"term_freqs is {type(raw_term_freqs).__name__}, expected list")
+        for i, term_freq in enumerate(raw_term_freqs):
+            if not isinstance(term_freq, dict):
+                _raise_bm25_corruption(
+                    path_str,
+                    f"term_freqs entry {i} is {type(term_freq).__name__}, expected object",
+                )
+            for term, count in term_freq.items():
+                if not isinstance(term, str):
+                    _raise_bm25_corruption(
+                        path_str,
+                        f"term_freqs entry {i} key is {type(term).__name__}, expected string",
+                    )
+                if type(count) is not int:
+                    _raise_bm25_corruption(
+                        path_str,
+                        f"term_freqs entry {i} value for {term!r} is {type(count).__name__}, expected integer",
+                    )
+
+        raw_doc_freqs = data.get("doc_freqs", {})
+        if not isinstance(raw_doc_freqs, dict):
+            _raise_bm25_corruption(path_str, f"doc_freqs is {type(raw_doc_freqs).__name__}, expected object")
+        for term, count in raw_doc_freqs.items():
+            if not isinstance(term, str):
+                _raise_bm25_corruption(
+                    path_str,
+                    f"doc_freqs key is {type(term).__name__}, expected string",
+                )
+            if type(count) is not int:
+                _raise_bm25_corruption(
+                    path_str,
+                    f"doc_freqs value for {term!r} is {type(count).__name__}, expected integer",
+                )
+
         try:
             index_data = BM25IndexData(
-                doc_keys=data.get("doc_keys", []),
-                doc_lens=data.get("doc_lens", []),
-                term_freqs=data.get("term_freqs", []),
-                doc_freqs=data.get("doc_freqs", {}),
+                doc_keys=cast(list[str], raw_doc_keys),
+                doc_lens=cast(list[int], raw_doc_lens),
+                term_freqs=cast(list[dict[str, int]], raw_term_freqs),
+                doc_freqs=cast(dict[str, int], raw_doc_freqs),
                 avgdl=float(data.get("avgdl", 0.0)),
                 k1=float(data.get("k1", 1.5)),
                 b=float(data.get("b", 0.75)),

@@ -66,11 +66,12 @@ class TestContentStoreRead:
         with pytest.raises(ContentStoreCorruptedError):
             store.read_all()
 
-    def test_non_dict_content_returns_empty(self, store_path: Path) -> None:
+    def test_non_dict_content_raises_corruption(self, store_path: Path) -> None:
         store_path.parent.mkdir(parents=True, exist_ok=True)
         store_path.write_text(json.dumps({"schema_version": CONTENT_STORE_VERSION, "content": "not a dict"}))
         store = ContentStore(store_path=store_path)
-        assert store.read_all() == {}
+        with pytest.raises(ContentStoreCorruptedError):
+            store.read_all()
 
 
 # ---------------------------------------------------------------------------
