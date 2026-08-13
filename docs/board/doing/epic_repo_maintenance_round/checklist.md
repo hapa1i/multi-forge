@@ -1,8 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: the bounded Wave 6 correctness-maintenance admission is closed at 36/36 findings across 13 members. D056
-and the remaining separately gated Wave 6/7 rows await their own entry gates; no additional implementation card is
-active.
+Current focus: Wave 7 is source-rechecked, split, and parked at 31 verified findings across 34 implementation members.
+D056 and remaining correctness/test-policy/output/docs rows retain separate Wave 6 gates; no additional implementation
+card is active.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -176,7 +176,13 @@ active.
 - [x] Review and merge O036 independently in PR #177 (`3026b14a`).
 - [x] Close O036 and the bounded Wave 6 correctness-maintenance epic at 36/36 findings across 13/13 members.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
-- [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW findings, plus Wave 7 structural findings,
-  against their entry conditions before activating any additional implementation cards.
+- [x] Recheck the Wave 7 structural/deletion candidates on merged `main` at `5777192a`; reject O062/O063/O093 as
+  written, promote only verified O067/O095 subsets, and keep all unverified symbols excluded.
+- [x] Park 34 ordered implementation members under `epic_wave7_refactor_and_deletion`, split the DG4 umbrellas and large
+  fork/installer/status-line seams, and retire three superseded/invalidated cards without activating work.
+- [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW correctness, security, performance, test-policy,
+  output, and documentation findings before admitting any of them.
+- [ ] After the Wave 7 admission changes are reviewed on the execution base, activate only order 1
+  `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

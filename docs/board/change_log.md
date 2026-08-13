@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-13
 
+### Admit Wave 7 refactor and deletion
+
+**Goal/outcome**: Turn the residual structural/deletion ledger into an evidence-backed execution sequence without
+starting implementation or absorbing separately gated correctness work.
+
+**Key changes**:
+
+- The post-Wave 6 screen admitted 31 verified findings as 34 parked members, split compatibility migrations from
+  deletion and decomposed the fork, installer, and status-line work at existing seams.
+- O062/O063/O093 were rejected as written, O067/O095 were admitted only in verified scope, three broad or invalidated
+  placeholders were retired, and unverified plus Wave 6 correctness/test-policy/output/docs rows remain excluded.
+
+**Verification**: 58 focused lane, review-parser, model-mapping, and SSE characterization tests pass; fresh-process
+import timing confirms O043's heavy registry edge. `make pre-commit-md`, the 326-file/852-link board audit, 55 changed
+fragment checks, the 34-member lane graph, and `git diff --check` pass. No Forge workflow command was used.
+
 ### Close Wave 6 correctness maintenance
 
 **Goal/outcome**: Prove walkthrough sandbox provenance before target-controlled shell execution and close the bounded

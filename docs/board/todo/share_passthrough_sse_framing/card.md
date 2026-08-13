@@ -1,0 +1,30 @@
+# Share passthrough SSE framing
+
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+
+**Lane**: `todo/` -- accepted Wave 7 proxy refactor work.
+
+**Finding**: O067, promoted from unverified during Wave 7 admission.
+
+## Goal
+
+Use one tolerant incremental SSE data-line framer in Anthropic and Responses usage accumulators while retaining their
+different event merge rules.
+
+## Evidence and Authority
+
+On `5777192a`, both `feed` methods retain the same byte-buffer, newline, `data:`, `[DONE]`, and JSON-tolerance loop;
+their `_merge` methods intentionally parse different protocols. Split-chunk and garbage fixtures passed in the 23-test
+admission slice. Authority: provider wire compatibility under
+[`docs/developer/coding_standards.md` "System boundaries"](../../../developer/coding_standards.md#system-boundaries-external-data).
+
+## Acceptance Criteria
+
+- One incremental framer owns chunk buffering and tolerant JSON event delivery.
+- Each transport retains its own first/final-event and usage merge semantics; framing errors remain fail-open.
+- Run both full passthrough unit files, conversion/accounting regressions, and targeted streaming integration tests.
+
+## Exclusions
+
+Do not merge `_merge`, normalize provider events, buffer complete streams, change forwarding chunks, or alter completion
+callback timing.

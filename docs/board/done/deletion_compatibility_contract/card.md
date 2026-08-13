@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG4).
 
-**Lane**: `done/` -- approved on 2026-08-04; admitted work is parked in the implementation members below.
+**Lane**: `done/` -- approved on 2026-08-04; the post-Wave 6 screen split admitted work under the parked
+[`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md).
 
 ## Problem
 
@@ -73,22 +74,22 @@ encodes an intended optimization or safety invariant; wiring it may be the right
 
 ### Verified primary rows
 
-| Finding / surface                                                 | Disposition                   | Compatibility and test requirement                                                                                                                                                                                                                                                |
-| ----------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| O047 `forge.proxy.model_spec`                                     | Delete                        | No production, docs, resource, or extension importer was found; remove its self-only tests and confirm live model detection covers the intended cases.                                                                                                                            |
-| O048 `AbstractLLMClient`                                          | Delete                        | No implementation inherits from it; update stale type comments and test the actual adapter protocol.                                                                                                                                                                              |
-| O048 `ToolCallError` and two handlers                             | Delete after characterization | No production path raises it, but a metrics test synthesizes it. Move failure-metric coverage to a reachable exception before removing the exception and handlers.                                                                                                                |
-| O049 `ProviderConfig.enable_preamble`                             | Deprecate, then delete        | It is accepted user-owned provider config. Stop generating it, accept-and-warn for one compatibility window, then reject it.                                                                                                                                                      |
-| O049 `ProviderConfig.openai_api_mode`                             | Deprecate, then delete        | It is copied through templates and instance config but has no consumer. Remove template emission and use the same accept/warn window before schema rejection.                                                                                                                     |
-| O049 `SessionConfig.manifest_filename`                            | Deprecate, then delete        | `MANIFEST_FILENAME` is authoritative. Preserve config-file readability during the warning window; never imply the path is configurable.                                                                                                                                           |
-| O049 `MemoryIntent.generated_file`                                | Migrate, then delete          | It is persisted in strict session manifests. Add a schema migration/tolerant decode that removes the inert key before deleting the field.                                                                                                                                         |
-| O050 `IndexStore.add_session`, `add_from_state`, `remove_session` | Replace                       | They are extensively used as unsafe test-fixture shortcuts and can bypass row/manifest transactions. Production and regression fixtures must use transaction-safe builders; retain only private lock-local helpers needed by `create_session_txn`/`delete_session_txn`.           |
-| O051 `_get_tier_for_model` environment shim                       | Replace                       | Remove nonexistent legacy env lookup and false “auto-detected” logging. Callers must pass an explicit resolved tier or use one named default at the routing boundary. Characterize cache keys and auth-retry coupling.                                                            |
-| O052 corruption-classification retry                              | Delete                        | The second identical index lookup cannot discover the commented manifest condition. Preserve corruption propagation with direct tests, then remove the retry.                                                                                                                     |
-| O093 `map_model_name`                                             | Keep; verify further          | The deletion claim is contradicted by a live caller: explicit backend requests consume its result at `server.py:555-558`, and routing tests cover pass-through/mapping. Characterize explicit-backend routes before considering simplification; no deletion card is admitted now. |
-| O096 `restore_settings_backup`                                    | Delete                        | Only its direct tests call it; no CLI recovery path or supported export was found. Remove the tests with the unused feature.                                                                                                                                                      |
-| O096 `check_scalar_conflict`                                      | Delete                        | Same test-only/internal disposition as `restore_settings_backup`; retain merge-conflict coverage on the live merge path.                                                                                                                                                          |
-| O096 `session_fork` `elif proxy_name` branch                      | Delete                        | `proxy_name` always initializes `_preflight_routing` before this branch, making it unreachable. Preserve routing-summary tests for proxy, inherited, and direct modes.                                                                                                            |
+| Finding / surface                                                 | Disposition                   | Compatibility and test requirement                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O047 `forge.proxy.model_spec`                                     | Delete                        | No production, docs, resource, or extension importer was found; remove its self-only tests and confirm live model detection covers the intended cases.                                                                                                                  |
+| O048 `AbstractLLMClient`                                          | Delete                        | No implementation inherits from it; update stale type comments and test the actual adapter protocol.                                                                                                                                                                    |
+| O048 `ToolCallError` and two handlers                             | Delete after characterization | No production path raises it, but a metrics test synthesizes it. Move failure-metric coverage to a reachable exception before removing the exception and handlers.                                                                                                      |
+| O049 `ProviderConfig.enable_preamble`                             | Deprecate, then delete        | It is accepted user-owned provider config. Stop generating it, accept-and-warn for one compatibility window, then reject it.                                                                                                                                            |
+| O049 `ProviderConfig.openai_api_mode`                             | Deprecate, then delete        | It is copied through templates and instance config but has no consumer. Remove template emission and use the same accept/warn window before schema rejection.                                                                                                           |
+| O049 `SessionConfig.manifest_filename`                            | Deprecate, then delete        | `MANIFEST_FILENAME` is authoritative. Preserve config-file readability during the warning window; never imply the path is configurable.                                                                                                                                 |
+| O049 `MemoryIntent.generated_file`                                | Migrate, then delete          | It is persisted in strict session manifests. Add a schema migration/tolerant decode that removes the inert key before deleting the field.                                                                                                                               |
+| O050 `IndexStore.add_session`, `add_from_state`, `remove_session` | Replace                       | They are extensively used as unsafe test-fixture shortcuts and can bypass row/manifest transactions. Production and regression fixtures must use transaction-safe builders; retain only private lock-local helpers needed by `create_session_txn`/`delete_session_txn`. |
+| O051 `_get_tier_for_model` environment shim                       | Replace                       | Remove nonexistent legacy env lookup and false “auto-detected” logging. Callers must pass an explicit resolved tier or use one named default at the routing boundary. Characterize cache keys and auth-retry coupling.                                                  |
+| O052 corruption-classification retry                              | Delete                        | The second identical index lookup cannot discover the commented manifest condition. Preserve corruption propagation with direct tests, then remove the retry.                                                                                                           |
+| O093 `map_model_name`                                             | Keep; verified 2026-08-13     | The deletion claim is contradicted by live behavior: explicit backend requests consume its result, fresh-config mapping and OpenRouter pass-through/alias tests pass, and the completed investigation found no deletion or simplification to admit.                     |
+| O096 `restore_settings_backup`                                    | Delete                        | Only its direct tests call it; no CLI recovery path or supported export was found. Remove the tests with the unused feature.                                                                                                                                            |
+| O096 `check_scalar_conflict`                                      | Delete                        | Same test-only/internal disposition as `restore_settings_backup`; retain merge-conflict coverage on the live merge path.                                                                                                                                                |
+| O096 `session_fork` `elif proxy_name` branch                      | Delete                        | `proxy_name` always initializes `_preflight_routing` before this branch, making it unreachable. Preserve routing-summary tests for proxy, inherited, and direct modes.                                                                                                  |
 
 ### O092 split
 
@@ -117,20 +118,22 @@ one mode destination removes the dead parsed value without deleting the explicit
 
 ## Implementation Members
 
-The accepted cleanup is split into narrowly scoped members rather than a bulk sweep:
+The initial accepted cleanup was deliberately parked in broad placeholders pending a current-source screen. That screen
+completed on 2026-08-13 and the executable sequence now lives under
+[`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md). In particular:
 
-- [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md) (O047–O048);
-- [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md) (O049);
-- [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md) (O050);
-- [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md) (O051);
-- [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md) (O052);
-- [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md) and
-  [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md) (admitted O092
-  subsets);
-- [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md) (O093;
-  investigation, not deletion);
-- [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md) and
-  [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md) (O096).
+- O049 is split into user-config deprecation and durable-manifest migration;
+- O050 is split into safe fixture migration and only-then public mutator deletion;
+- O092 is split by subsystem and compatibility class; and
+- O096's fork branch is folded into the fork-execution extraction where its reachability proof belongs.
+
+The former O092 umbrella is a retired
+[`remove_verified_internal_zero_callers`](../../retired/remove_verified_internal_zero_callers/card.md) reference, and
+the fork-only placeholder is a retired
+[`remove_unreachable_fork_routing_branch`](../../retired/remove_unreachable_fork_routing_branch/card.md) reference. The
+O093 investigation completed during admission and is retired as
+[`characterize_explicit_backend_mapping`](../../retired/characterize_explicit_backend_mapping/card.md): current tests
+prove the mapping behavior is live, so no replacement deletion member exists.
 
 The accepted rubric should be added to `docs/developer/coding_standards.md` when the decision is approved. No production
 symbol or serialized field is removed by this decision card.

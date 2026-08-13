@@ -4,8 +4,9 @@
 Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
 closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
-added bounded O012 and retention-status hardening without changing that finding count. D056 remains outside the closed
-admission and awaits its own execution gate.
+added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is now admitted and parked
+as 31 verified findings across 34 implementation members; no Wave 7 member is active. D056 and the other separately
+gated Wave 6 rows remain outside that admission.
 
 ## Goal
 
@@ -81,6 +82,12 @@ O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246
 Follow-up verification expanded that bounded admission with D054/D055, and all 36 findings shipped across 13 independent
 members in PRs #164--#168 and #170--#177. D056 is recorded separately and awaits its own execution gate.
 
+A post-Wave 6 screen on merged `main` at `5777192a` admitted the verified refactor/deletion set under
+[`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md). It splits the old DG4
+umbrellas and the fork/installer/status-line structural rows into 34 ordered review boundaries, rejects O062/O063 and
+O093 as written, promotes only the verified O067/O095 subsets, and keeps correctness/test-policy/output/docs rows behind
+their Wave 6 gates. Admission did not activate an implementation branch or member.
+
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
 
@@ -117,16 +124,7 @@ order.
 | 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
 | 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
-| 7    | O047–O048           | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
-| 7    | O049                | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
-| 7    | O050                | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |
-| 7    | O051                | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                                 |
-| 7    | O052                | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)                         |
-| 7    | O092                | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                                 |
-| 7    | O092                | [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md)                 |
-| 7    | O093                | [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md)                 |
-| 7    | O092, O096          | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)                         |
-| 7    | O096                | [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md)               |
+| 7    | 31 structural rows  | [`epic_wave7_refactor_and_deletion`](../../todo/epic_wave7_refactor_and_deletion/card.md)                           |
 
 ## Execution Waves
 
@@ -138,7 +136,7 @@ The ordering constraint is:
 2. ship policy and supervision correctness;
 3. ship Stop/artifact, session/state, installer, and CLI/proxy correctness in dependency order;
 4. process bounded MED/LOW maintenance findings; and
-5. refactor or delete only after behavior and compatibility are characterized.
+5. execute the parked Wave 7 sequence only after behavior and compatibility are characterized.
 
 New member cards must name their finding IDs and wave. Create a child epic only when multiple independently shippable
 members share a contract or sequencing decision that would otherwise drift.
