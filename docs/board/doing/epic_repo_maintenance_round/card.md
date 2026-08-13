@@ -3,9 +3,9 @@
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
 Waves 1--5 are closed. Wave 5 contains 13 shipped findings; its closeout audit rejected stale claims D033/O020 and
 handed 34 still-live correctness rows to the ongoing Wave 6 child epic. Ten findings across its first five members have
-shipped in PRs #164--#168; D030/O008/O015/O035 are implemented and verified as the sole active member pending
-pre-commit/review, while the other six remain parked behind their entry-condition checks. PR #169 added bounded O012 and
-retention-status hardening without changing that finding count.
+shipped in PRs #164--#168; D030/O008/O015/O035 are implemented and verified as the sole active member in draft PR #170,
+while the other six remain parked behind their entry-condition checks. PR #169 added bounded O012 and retention-status
+hardening without changing that finding count.
 
 ## Goal
 

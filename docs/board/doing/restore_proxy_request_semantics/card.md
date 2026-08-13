@@ -3,7 +3,7 @@
 **Epic**: [`epic_wave6_correctness_maintenance`](../epic_wave6_correctness_maintenance/card.md).
 
 **Lane**: `doing/` -- implemented and verified on `agent/restore-proxy-request-semantics` from merged `main` at
-`7f705aad`; ready for independent review.
+`7f705aad`; draft PR #170 is ready for independent review.
 
 **Findings**: D030, O008, O015, and O035.
 

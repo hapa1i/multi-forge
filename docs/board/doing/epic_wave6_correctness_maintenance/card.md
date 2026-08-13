@@ -3,9 +3,9 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- 10 of 34 findings across 5 of 12 members shipped in PRs #164--#168. D030/O008/O015/O035 are
-implemented and verified as the sole active member on `agent/restore-proxy-request-semantics`; pre-commit and
-independent review remain. The other 6 members stay parked in `todo/`. PR #169 (`ece999d4`) subsequently hardened O012
-escalation and retention-status error sanitization without adding a finding to this admission set.
+implemented and verified as the sole active member in draft PR #170; independent review and merge remain. The other 6
+members stay parked in `todo/`. PR #169 (`ece999d4`) subsequently hardened O012 escalation and retention-status error
+sanitization without adding a finding to this admission set.
 
 ## Goal
 

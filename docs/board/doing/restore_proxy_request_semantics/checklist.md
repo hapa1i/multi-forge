@@ -1,6 +1,6 @@
 # Restore proxy request semantics checklist
 
-Current focus: open the independently reviewable D030/O008/O015/O035 PR without activating the next member.
+Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without activating the next member.
 
 ## Activation and prior-member closeout
 
@@ -44,4 +44,4 @@ Current focus: open the independently reviewable D030/O008/O015/O035 PR without 
 - [x] Run full unit (`9001 passed, 1 skipped, 122 deselected`) and marked regression (`773 passed`) gates.
 - [x] Run final pre-commit and board link/lane/size/diff checks (289 files, 713 relative links, zero missing/stale
   targets, 5 `done` / 1 `doing` / 6 `todo`, and 22,273 change-log tokens).
-- [ ] Open an independent PR without activating the next Wave 6 member.
+- [x] Open independent draft PR #170 without activating the next Wave 6 member.
