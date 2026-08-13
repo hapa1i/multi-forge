@@ -528,6 +528,10 @@ per-tier because each model has different limits and optimal defaults.
 
 **Example:** If a request includes `temperature=0.5`, it overrides the proxy's `tier_overrides.opus.temperature`.
 
+Tier hyperparameters do not have an environment-variable override layer. Environment variables remain supported for
+documented credentials and connection values, such as `OPENROUTER_API_KEY` and `LITELLM_BASE_URL`; use the proxy file
+for tier defaults.
+
 Provider, upstream URL, and template are fixed at creation. The proxy file only tunes defaults **within** that proxy's
 routing scope.
 
@@ -701,12 +705,17 @@ exception: it ships with `intercept.mode: inspect`.) Useful when you want local 
 Two settings, kept separate:
 
 - **`wire_shape`** — how requests reach the upstream. `openai_translated` (default) is translated and **drops thinking
-  blocks** (inspectable but lossy). `anthropic_passthrough` forwards the raw Anthropic request and **preserves thinking
-  blocks byte-for-byte** (signature-safe; required for control/override). The shipped `anthropic-passthrough` template
-  uses it.
+  blocks** (inspectable but lossy), but preserves tool-selection intent: Anthropic `any` requires a tool call, `auto`
+  remains optional, and named/disabled choices remain named/disabled. `anthropic_passthrough` forwards the raw Anthropic
+  request and **preserves thinking blocks byte-for-byte** (signature-safe; required for control/override). The shipped
+  `anthropic-passthrough` template uses it.
 - **`intercept.mode`** — `passthrough` (default, no inspection), `inspect` (observe: hashes + drift + redacted audit
   metadata), or `override` (inspect plus apply prompt augment/guards and a reasoning-effort floor). `override` requires
   `wire_shape: anthropic_passthrough`.
+
+If an override reasoning floor enables or raises `thinking`, Forge removes `temperature`, `top_p`, and `top_k` from that
+request because Anthropic rejects them together. The audit mutation records only which keys were removed, not their
+values. Requests whose thinking budget already satisfies the floor are not changed.
 
 Anthropic passthrough also preserves safe upstream response metadata. Retry guidance and Anthropic rate-limit headers
 reach the client on both successful and failed requests, including responses to streaming requests. Forge removes

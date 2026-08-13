@@ -1,6 +1,6 @@
 # Wave 6 correctness maintenance checklist
 
-Current focus: D029/O025 are closed; activate only D030/O008/O015/O035 from this merged-main cursor.
+Current focus: review and merge D030/O008/O015/O035 in draft PR #170 without activating any later member.
 
 - [x] Merge the Wave 5 closeout and Wave 6 handoff in PR #163 (`55fcda59`).
 - [x] Activate this epic and D020 from merged `main` on `agent/d020-inherited-forge-headers`.
@@ -34,5 +34,12 @@ Current focus: D029/O025 are closed; activate only D030/O008/O015/O035 from this
 - [x] Review and merge D029/O025 independently before activating the next ordered member (PR #168, `9b18edc3`).
 - [x] Record PR #169 (`ece999d4`) as post-merge O012 and retention-status hardening without changing the admitted
   finding count.
-- [ ] Keep the remaining 7 members in `todo/` behind their own fail-first gates.
+- [x] Activate only D030/O008/O015/O035 from merged `main` at `7f705aad` on `agent/restore-proxy-request-semantics`.
+- [x] Retain D030/O008/O015/O035 fail-first regressions before production changes (the final artifact collects
+  `6 failed, 3 passed` on `7f705aad`, including the adapter seam and satisfied-floor control; the separate GPT Responses
+  seam also failed).
+- [x] Implement and verify tier authority, auth-retry tier identity, reasoning/sampling compatibility, and required-tool
+  translation.
+- [ ] Review and merge D030/O008/O015/O035 in PR #170 before activating the next ordered member.
+- [ ] Keep the remaining 6 members in `todo/` behind their own fail-first gates.
 - [ ] Close this epic only after every accepted member ships and the review ledger records each outcome.

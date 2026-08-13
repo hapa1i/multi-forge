@@ -589,7 +589,9 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
     # Note: Vertex has a different `tool_config`, this mapping might be approximate
     if request.tool_choice:
         choice_type = request.tool_choice.get("type")
-        if choice_type == "any" or choice_type == "auto":
+        if choice_type == "any":
+            openai_request["tool_choice"] = "required"
+        elif choice_type == "auto":
             openai_request["tool_choice"] = "auto"
         elif choice_type == "tool" and "name" in request.tool_choice:
             openai_request["tool_choice"] = {

@@ -278,6 +278,11 @@ def apply_override(
     )
     if pinned:
         raw_body["thinking"] = new_thinking
+        removed_sampling_parameters = sorted(
+            parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
+        )
+        for parameter in removed_sampling_parameters:
+            raw_body.pop(parameter)
         mutations.append(
             {
                 "target": "thinking",
@@ -285,6 +290,7 @@ def apply_override(
                 "effort_floor": reasoning_floor_effort,
                 "budget_before": budget_before,
                 "budget_after": budget_after,
+                "removed_sampling_parameters": removed_sampling_parameters,
             }
         )
 

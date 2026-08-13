@@ -15,6 +15,8 @@ pytestmark = pytest.mark.integration
 
 def _read_tool_event_records(forge_home: Path) -> list[dict]:
     event_files = list((forge_home / "logs" / "tool_events").glob("*_proxy.*.jsonl"))
+    if not event_files:
+        return []
     assert len(event_files) == 1
     return [json.loads(line) for line in event_files[0].read_text(encoding="utf-8").splitlines()]
 
@@ -53,6 +55,44 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
     assert upstream_request["headers"]["User-Agent"] == inbound_user_agent[:256]
 
 
+def test_anthropic_any_reaches_responses_api_as_required(
+    proxy_server_fake_litellm_openai: tuple[str, FakeOpenAIUpstream],
+) -> None:
+    """Required tool use survives both proxy translation seams."""
+    proxy_base_url, fake_upstream = proxy_server_fake_litellm_openai
+    fake_upstream.requests.clear()
+
+    with httpx.Client(timeout=30) as client:
+        response = client.post(
+            f"{proxy_base_url}/v1/messages",
+            json={
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 16,
+                "messages": [{"role": "user", "content": "Read the file"}],
+                "tools": [
+                    {
+                        "name": "Read",
+                        "description": "Read a file",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"file_path": {"type": "string"}},
+                            "required": ["file_path"],
+                        },
+                    }
+                ],
+                "tool_choice": {"type": "any"},
+            },
+            headers={"x-api-key": "test"},
+        )
+
+    assert response.status_code == 200, response.text[:500]
+    assert len(fake_upstream.requests) == 1
+    upstream_request = fake_upstream.requests[0]
+    assert upstream_request["path"] == "/v1/responses"
+    assert upstream_request["body"]["tool_choice"] == "required"
+    assert upstream_request["body"]["tools"][0]["name"] == "Read"
+
+
 def test_translated_converter_logs_keep_payload_canaries_out(
     proxy_server_fake_litellm_openai: tuple[str, FakeOpenAIUpstream],
     module_forge_home: Path,
@@ -67,6 +107,7 @@ def test_translated_converter_logs_keep_payload_canaries_out(
         "stop": "O037_E2E_STOP_CANARY",
     }
     fake_upstream.requests.clear()
+    prior_tool_event_count = len(_read_tool_event_records(module_forge_home))
 
     with httpx.Client(timeout=30) as client:
         response = client.post(
@@ -105,7 +146,7 @@ def test_translated_converter_logs_keep_payload_canaries_out(
     converter_log = log_files[0].read_text(encoding="utf-8")
     assert "Tool schema received:" in converter_log
     assert "Intermediate OpenAI request prepared:" in converter_log
-    tool_events = _read_tool_event_records(module_forge_home)
+    tool_events = _read_tool_event_records(module_forge_home)[prior_tool_event_count:]
     schema_events = [event for event in tool_events if event["metadata"]["event"] == "schema_observed"]
     assert len(schema_events) == 1
     assert schema_events[0]["metadata"] == {

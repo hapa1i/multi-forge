@@ -257,6 +257,20 @@ class LiteLLMClient:
         return responses_tools
 
     @staticmethod
+    def _convert_tool_choice_for_responses(tool_choice: Any) -> str | dict[str, str] | None:
+        """Convert Chat Completions tool choice to the Responses API shape."""
+        if tool_choice in ("none", "auto", "required"):
+            return tool_choice
+        if not isinstance(tool_choice, dict) or tool_choice.get("type") != "function":
+            return None
+
+        function = tool_choice.get("function")
+        name = function.get("name") if isinstance(function, dict) else tool_choice.get("name")
+        if not isinstance(name, str) or not name:
+            return None
+        return {"type": "function", "name": name}
+
+    @staticmethod
     def _parse_responses_output(response: Any, model: str) -> CompletionResponse:
         """Parse Responses API output into canonical CompletionResponse.
 
@@ -413,6 +427,10 @@ class LiteLLMClient:
 
         if tools:
             request_params["tools"] = self._convert_tools_for_responses(tools)
+
+        tool_choice = self._convert_tool_choice_for_responses(hyperparams.extra.get("openai", {}).get("tool_choice"))
+        if tool_choice is not None:
+            request_params["tool_choice"] = tool_choice
 
         # Forward extra_headers (e.g., User-Agent from incoming Claude Code request)
         extra_headers = hyperparams.extra.get("openai", {}).get("extra_headers")

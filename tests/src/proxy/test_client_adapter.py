@@ -407,6 +407,65 @@ class TestProviderMetaThreading:
 
 
 # ---------------------------------------------------------------------------
+# tool_choice forwarding tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tool_choice",
+    [
+        "none",
+        "auto",
+        "required",
+        {"type": "function", "function": {"name": "Read"}},
+    ],
+)
+async def test_create_completion_forwards_tool_choice(tool_choice: object) -> None:
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(return_value=CompletionResponse(text="ok"))
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "tool_choice": tool_choice,
+        },
+        request_id="req-tool-choice",
+    )
+
+    await_args = mock_complete.await_args
+    assert await_args is not None
+    hyperparams = await_args.kwargs["hyperparams"]
+    assert hyperparams.extra["openai"]["tool_choice"] == tool_choice
+
+
+@pytest.mark.asyncio
+async def test_streaming_completion_forwards_required_tool_choice() -> None:
+    adapter = _make_adapter_with_mock_client()
+    captured_hyperparams = []
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        captured_hyperparams.append(kwargs["hyperparams"])
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    async for _chunk in adapter.create_streaming_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "tool_choice": "required",
+        },
+        request_id="req-stream-tool-choice",
+    ):
+        pass
+
+    assert captured_hyperparams[0].extra["openai"]["tool_choice"] == "required"
+
+
+# ---------------------------------------------------------------------------
 # User-Agent forwarding tests
 # ---------------------------------------------------------------------------
 

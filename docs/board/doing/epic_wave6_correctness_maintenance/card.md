@@ -2,9 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- 10 of 34 findings across 5 of 12 members shipped in PRs #164--#168. The remaining 24 findings
-across 7 members remain parked in `todo/`; D030/O008/O015/O035 are next but inactive until their execution branch
-retains its fail-first evidence. PR #169 (`ece999d4`) subsequently hardened O012 escalation and retention-status error
+**Lane**: `doing/` -- 10 of 34 findings across 5 of 12 members shipped in PRs #164--#168. D030/O008/O015/O035 are
+implemented and verified as the sole active member in draft PR #170; independent review and merge remain. The other 6
+members stay parked in `todo/`. PR #169 (`ece999d4`) subsequently hardened O012 escalation and retention-status error
 sanitization without adding a finding to this admission set.
 
 ## Goal
@@ -36,7 +36,7 @@ before production code changes.
 | 3     | D027, O012                       | [`harden_detached_process_teardown`](../../done/harden_detached_process_teardown/card.md)                   | detached process-group ownership              |
 | 4     | O014, O026                       | [`close_proxy_failure_lifecycles`](../../done/close_proxy_failure_lifecycles/card.md)                       | proxy registry and stream cleanup             |
 | 5     | D029, O025                       | [`complete_proxy_instance_config_wiring`](../../done/complete_proxy_instance_config_wiring/card.md)         | template-to-instance field preservation       |
-| 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../../todo/restore_proxy_request_semantics/card.md)                     | tier authority and translated request shape   |
+| 6     | D030, O008, O015, O035           | [`restore_proxy_request_semantics`](../restore_proxy_request_semantics/card.md)                             | tier authority and translated request shape   |
 | 7     | O013, O034                       | [`align_policy_routing_context`](../../todo/align_policy_routing_context/card.md)                           | policy routing/session selector consistency   |
 | 8     | D031                             | [`exclude_interactive_usage_cost`](../../todo/exclude_interactive_usage_cost/card.md)                       | two-plane interactive exclusion               |
 | 9     | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](../../todo/align_cli_failure_surfaces/card.md)                               | CLI exit, stream, editor, and status behavior |

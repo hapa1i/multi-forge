@@ -281,7 +281,7 @@ async def test_auth_retry_conversion_failure_matches_initial_failure(
 
     await _assert_route_failure(server, captures, caplog)
 
-    captures["invalidate_and_retry"].assert_awaited_once_with("openai/gpt-5.5")
+    captures["invalidate_and_retry"].assert_awaited_once_with("openai/gpt-5.5", tier="sonnet")
 
 
 @pytest.mark.asyncio

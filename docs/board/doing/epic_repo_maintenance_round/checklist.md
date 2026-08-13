@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; Wave 6 has shipped its first 10 findings across 5 members. D030/O008/O015/O035 are next
-but remain parked until activation from merged `main`.
+Current focus: Wave 5 is closed; Wave 6 has shipped its first 10 findings across 5 members and is reviewing only
+D030/O008/O015/O035 in draft PR #170.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -149,6 +149,8 @@ but remain parked until activation from merged `main`.
 - [x] Ship D029/O025 independently before activating the next ordered Wave 6 member (PR #168, `9b18edc3`).
 - [x] Record PR #169 (`ece999d4`) as bounded post-merge O012 and retention-status hardening without changing the Wave 6
   finding count.
+- [x] Activate only D030/O008/O015/O035 from merged `main` at `7f705aad` on `agent/restore-proxy-request-semantics`.
+- [ ] Ship D030/O008/O015/O035 independently in PR #170 before activating the next ordered Wave 6 member.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.
 

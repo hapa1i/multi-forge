@@ -263,6 +263,11 @@ class CoreLLMClientAdapter:
             if key in openai_request and openai_request[key] is not None:
                 hyperparams_data[key] = openai_request[key]
 
+        tool_choice = openai_request.get("tool_choice")
+        if isinstance(tool_choice, (str, dict)):
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["tool_choice"] = tool_choice
+
         # Forward User-Agent to upstream if server injected it
         user_agent = openai_request.get("_user_agent")
         if isinstance(user_agent, str) and user_agent:
@@ -328,6 +333,11 @@ class CoreLLMClientAdapter:
         for key in ("temperature", "top_p", "reasoning_effort", "verbosity"):
             if key in openai_request and openai_request[key] is not None:
                 hyperparams_data[key] = openai_request[key]
+
+        tool_choice = openai_request.get("tool_choice")
+        if isinstance(tool_choice, (str, dict)):
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["tool_choice"] = tool_choice
 
         # Forward User-Agent to upstream if server injected it
         user_agent = openai_request.get("_user_agent")

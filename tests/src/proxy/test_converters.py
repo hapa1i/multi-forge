@@ -307,7 +307,7 @@ class TestConvertAnthropicToOpenai:
     def test_tool_choice_any(self) -> None:
         request = _make_request(tools=[_make_tool()], tool_choice={"type": "any"})
         result = convert_anthropic_to_openai(request, provider="litellm")
-        assert result["tool_choice"] == "auto"
+        assert result["tool_choice"] == "required"
 
     def test_tool_choice_specific_tool(self) -> None:
         request = _make_request(
