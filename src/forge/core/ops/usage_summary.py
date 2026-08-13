@@ -615,12 +615,21 @@ def _join_session_cost(
     so no orphaned snapshot survives to double-count.
 
     ``exclude_interactive`` drops the harness channel (``route="claude_interactive"``)
-    -- the load-bearing no-blend rule for ``forge +$Y``. ``trusted_only`` keeps only
+    before root lookup and removes its run ids from mixed-root results -- the
+    load-bearing no-blend rule for ``forge +$Y``. ``trusted_only`` keeps only
     ``reported``/``gateway_calculated`` event cost (``forge +$Y``); the activity table
     passes False to preserve its "reported-or-estimated, best-effort" semantics. The
     cost-plane figures are always reported (the writer only sums reported micros).
     """
-    roots = {e.root_run_id for e in events if e.root_run_id}
+    excluded_run_ids: set[str] = set()
+    in_scope_events = events
+    if exclude_interactive:
+        excluded_run_ids = {e.run_id for e in events if e.route == ROUTE_CLAUDE_INTERACTIVE}
+        # Route is authoritative on the event plane. Run identity is used only to
+        # remove the corresponding records returned by the root-addressed cost plane.
+        in_scope_events = [e for e in events if e.route != ROUTE_CLAUDE_INTERACTIVE]
+
+    roots = {e.root_run_id for e in in_scope_events if e.root_run_id}
     per_run: dict[str, int] = {}
     runs_with_records: set[str] = set()
     if roots:
@@ -628,17 +637,20 @@ def _join_session_cost(
             from forge.proxy.cost_logger import sum_reported_cost_by_root
 
             join = sum_reported_cost_by_root(roots, since=since)
-            per_run = join.per_run
-            runs_with_records = join.runs_with_records
+            # The cost plane is root-addressed, so a mixed root returns interactive
+            # siblings too. Remove only runs proven interactive; do not intersect with
+            # known event ids because cancelled children can have cost without an event.
+            per_run = {run: micros for run, micros in join.per_run.items() if run not in excluded_run_ids}
+            runs_with_records = join.runs_with_records - excluded_run_ids
         except Exception as e:  # best-effort: a cost-plane read failure falls back to event cost
             logger.debug("4g cost-plane root join failed; using event cost: %s", e)
 
-    run_to_command = {e.run_id: e.command for e in events if e.run_id}
+    run_to_command = {e.run_id: e.command for e in in_scope_events if e.run_id}
     # Fan-out parentage: a verb whose DIRECT children produced cost records is superseded
     # by those exact records. Derived from worker events (parent_run_id == the verb's run,
     # set by build_claude_env and threaded onto the worker event), so suppression stays
     # per-subtree -- never whole-root.
-    producer_parents = {e.parent_run_id for e in events if e.run_id in runs_with_records and e.parent_run_id}
+    producer_parents = {e.parent_run_id for e in in_scope_events if e.run_id in runs_with_records and e.parent_run_id}
 
     by_command: dict[str, int] = {}
     estimated_commands: set[str] = set()
@@ -659,9 +671,7 @@ def _join_session_cost(
             by_command[cmd] = by_command.get(cmd, 0) + micros
 
     # Event-sourced residual for runs the cost plane did NOT supersede.
-    for event in events:
-        if exclude_interactive and event.route == ROUTE_CLAUDE_INTERACTIVE:
-            continue
+    for event in in_scope_events:
         superseded = event.run_id in runs_with_records or (
             event.measurement_source == "verb_snapshot_estimated" and event.run_id in producer_parents
         )
