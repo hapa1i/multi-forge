@@ -168,12 +168,20 @@ def _infer_launch_confirmation(
     except ImportError:
         return
 
-    # Prefer persisted launch root; fall back to computed root
-    if manifest.confirmed.claude_project_root:
-        transcript_path = get_transcript_path(manifest.confirmed.claude_project_root, session_id)
-    else:
-        transcript_path = get_transcript_path(resolve_claude_project_root(manifest), session_id)
-    if not transcript_path.is_file():
+    try:
+        # Prefer persisted launch root; fall back to computed root.
+        if manifest.confirmed.claude_project_root:
+            transcript_path = get_transcript_path(manifest.confirmed.claude_project_root, session_id)
+        else:
+            transcript_path = get_transcript_path(resolve_claude_project_root(manifest), session_id)
+        if not transcript_path.is_file():
+            return
+    except Exception:
+        logger.debug(
+            "Skipping launch confirmation: session %r transcript lookup failed",
+            manifest.name,
+            exc_info=True,
+        )
         return
 
     def _mutate(state: SessionState) -> None:
@@ -188,13 +196,18 @@ def _infer_launch_confirmation(
     # Entering store.update() would make the lock layer recreate the session dir
     # to hold its lockfile (file_lock mkdir-parents), resurrecting a deleted
     # session as a lock-only directory.
-    if not store.exists():
-        logger.debug("Skipping launch confirmation: session %r manifest already removed", manifest.name)
-        return
-
     try:
+        if not store.exists():
+            logger.debug("Skipping launch confirmation: session %r manifest already removed", manifest.name)
+            return
         store.update(timeout_s=5.0, mutate=_mutate)
     except SessionFileNotFoundError:
         # Deleted in the narrow window between the exists() check and the locked
         # read; degrade quietly (no traceback).
         logger.debug("Skipping launch confirmation: session %r manifest removed mid-run", manifest.name)
+    except Exception:
+        logger.debug(
+            "Skipping launch confirmation: session %r manifest update failed",
+            manifest.name,
+            exc_info=True,
+        )

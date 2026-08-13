@@ -1,7 +1,7 @@
 # Harden command and state boundaries checklist
 
-Current focus: implementation and every verification gate are complete; obtain independent review and merge without
-activating another Wave 6 member.
+Current focus: complete -- shipped in PR #175 (`967d9cae`); the remaining two Wave 6 members stayed parked through
+merge.
 
 ## Phase 1: Activation and evidence
 
@@ -42,8 +42,8 @@ activating another Wave 6 member.
   Wave 6 member graph at 10 done / 1 doing / 2 todo, no stale todo link, and a clean diff check).
 - [x] Resolve review feedback by adding rebuild guidance to the BM25 scalar-conversion fallback; retain and document the
   intentional `%plan` / `%policy check` informative-block asymmetry outside D034's five silent no-op handlers.
-- [ ] Record verification in `docs/board/change_log.md`, update epic counts and links, and move this card to `done/`.
-- [ ] Review and merge this member independently before activating the next ordered Wave 6 member.
+- [x] Record verification in `docs/board/change_log.md`, update epic counts and links, and move this card to `done/`.
+- [x] Review and merge this member independently in PR #175 (`967d9cae`) before activating the next ordered Wave 6
+  member.
 
-No production implementation begins until every live finding has a retained fail-first reproduction. The two later Wave
-6 members remain parked and are outside this branch.
+No later member was activated before this member merged.

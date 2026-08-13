@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 5 is closed; 25 of 36 Wave 6 findings have shipped, D034/D037/D038/O027 await independent review
-after completing implementation and verification, and the remaining two members are parked behind their entry-condition
-checks.
+Current focus: Wave 5 is closed; 29 of 36 Wave 6 findings have shipped, O011/O017/O021/O023/O029/O030 are active, and
+O036 remains parked behind its entry-condition checks.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -165,6 +164,11 @@ checks.
 - [x] Close PR #174 bookkeeping and activate only D034/D037/D038/O027 on `agent/harden-command-state-boundaries` from
   merged production code at `095fcd90`.
 - [x] Implement and verify D034/D037/D038/O027 without activating either remaining Wave 6 member.
+- [x] Ship D034/D037/D038/O027 independently in PR #175 (`967d9cae`) before activating another Wave 6 member.
+- [x] Close PR #175 bookkeeping and activate only O011/O017/O021/O023/O029/O030 on
+  `agent/preserve-session-launch-preconditions` from merged production code at `967d9cae`.
+- [x] Implement and verify O011/O017/O021/O023/O029/O030 without activating O036.
+- [ ] Review and merge O011/O017/O021/O023/O029/O030 independently before activating O036.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
 - [ ] Recheck the remaining Wave 6 MEDIUM/LOW findings and Wave 7 structural findings against their entry conditions
   before activating any additional implementation cards.

@@ -828,7 +828,7 @@ def fork_claude_session(
         )
     except ForgeOpError as e:
         presenter.on_launch_error(e)
-        if plan.incognito and preferences.use_sidecar:
+        if plan.incognito:
             _run_incognito_cleanup(manager, manifest, presenter)
         return ClaudeForkResult(
             exit_code=1,

@@ -675,6 +675,28 @@ def fork(
             handle_session_error(e)
             return
 
+    # Only launched native paths consume the parent's Claude UUID. Transfer
+    # launches seed a fresh child UUID, while --no-launch only prepares state.
+    # Validate before proxy startup and fork_session(), which may create a child
+    # manifest, branch, or worktree.
+    parent_session_id: str | None = None
+    requires_parent_uuid = not no_launch and resume_mode != "transfer" and not (is_cross_dir and resume_mode is None)
+    if requires_parent_uuid:
+        try:
+            parent_for_uuid = manager.get_session(parent, forge_root=_fr)
+        except SessionNotFoundError:
+            if not _hint_cross_project_session(parent, _fr):
+                print_error(f"session '{parent}' not found")
+            sys.exit(1)
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
+        parent_session_id = parent_for_uuid.confirmed.claude_session_id
+        if not parent_session_id:
+            print_error("Parent session has no UUID")
+            err_console.print("The parent session may not have been started yet.")
+            sys.exit(1)
+
     # Preflight supervisor proxy BEFORE fork_session() to avoid half-created state
     if supervisor_proxy:
         from forge.policy.semantic.supervisor import ensure_supervisor_proxy
@@ -806,11 +828,8 @@ def fork(
         console.print("[yellow]  (will auto-delete on exit)[/yellow]")
     console.print()
 
-    parent_session_id = parent_manifest.confirmed.claude_session_id
-    if not parent_session_id:
-        print_error("Parent session has no UUID")
-        err_console.print("The parent session may not have been started yet.")
-        sys.exit(1)
+    if parent_session_id is None:
+        parent_session_id = parent_manifest.confirmed.claude_session_id
 
     use_sidecar, mounts, image = _get_launch_preferences(fork_manifest)
     _apply_and_persist_direct_model_override(
@@ -858,6 +877,7 @@ def fork(
     # (inspectable, editable, survives /compact); native-relocate is byte-faithful but opaque,
     # lost on /compact, and its historical tool paths still point at the parent checkout.
     if native_relocate:
+        assert parent_session_id is not None  # UUID preflight above covers every launched native-relocate path
         from forge.session.claude import (
             RelocateConflictError,
             RelocateSameDirError,
@@ -936,6 +956,7 @@ def fork(
         launch_fork_session = True
 
     elif rewind_active:
+        assert parent_session_id is not None  # rewind is a launched native-relocate path
         assert drop_last is not None
         from forge.session.claude.paths import (
             resolve_claude_project_root as _resolve_fork_root,

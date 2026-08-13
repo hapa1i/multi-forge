@@ -45,10 +45,10 @@ PRs #157--#159 and the child epic is closed. O007 and D053 form the next reprodu
 merged in PR #160 (`cf77c175`), D053 shipped in PR #161 (`8088ceae`), and O007 shipped in PR #162 (`31a0832f`). The
 child epic is closed. Wave 5 is closed at 13 shipped findings: its bounded HIGH set plus D035, D036, O037, O038, O042,
 and O007. A closeout audit on `246aaff1` rejected stale claims D033 and O020 and assigned 34 still-live correctness rows
-to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Twenty-five findings across
+to [`epic_wave6_correctness_maintenance`](doing/epic_wave6_correctness_maintenance/card.md). Twenty-nine findings across
 D020, D023/D028/O022, D027/O012, O014/O026, D029/O025, D030/O008/O015/O035, D054/D055, O013/O034, D031, and
-D032/D041/O005/O031--O033 shipped in PRs #164--#174; PR #169 subsequently hardened O012 and retention-status failure
-reporting without adding a finding. D034/D037/D038/O027 are active; the remaining 7 findings across two members stay
+D032/D041/O005/O031--O033, and D034/D037/D038/O027 shipped in PRs #164--#175; PR #169 subsequently hardened O012 and
+retention-status failure reporting without adding a finding. O011/O017/O021/O023/O029/O030 are active, and O036 remains
 parked. O003 already shipped in Wave 3 and is not part of the Wave 5 set. Other MEDIUM/LOW rows still require their
 separately defined Wave 6/7 admission gates.
 
@@ -685,8 +685,8 @@ the caller catches the non-strict conversion error and falls back to raw intent.
 old row.
 
 At admission, current source still contained the cited boundary for the other 34 rows. All were accepted as Wave 6 work.
-Twenty-five findings across the first ten members have since shipped; D034/D037/D038/O027 are active and the other 7
-findings across two members stay parked:
+Twenty-nine findings across the first eleven members have since shipped; O011/O017/O021/O023/O029/O030 are
+implementation-complete and pending independent review, and O036 remains parked:
 
 | Findings                         | Wave 6 member                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -700,8 +700,8 @@ findings across two members stay parked:
 | O013, O034                       | [`align_policy_routing_context`](done/align_policy_routing_context/card.md)                           |
 | D031                             | [`exclude_interactive_usage_cost`](done/exclude_interactive_usage_cost/card.md)                       |
 | D032, D041, O005, O031--O033     | [`align_cli_failure_surfaces`](done/align_cli_failure_surfaces/card.md)                               |
-| D034, D037, D038, O027           | [`harden_command_state_boundaries`](doing/harden_command_state_boundaries/card.md)                    |
-| O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](todo/preserve_session_launch_preconditions/card.md)         |
+| D034, D037, D038, O027           | [`harden_command_state_boundaries`](done/harden_command_state_boundaries/card.md)                     |
+| O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](doing/preserve_session_launch_preconditions/card.md)        |
 | O036                             | [`harden_walkthrough_sandbox_provenance`](todo/harden_walkthrough_sandbox_provenance/card.md)         |
 
 This handoff closed Wave 5 at 13/13 admitted findings. At admission, it did not claim any of the 34 Wave 6 behaviors
