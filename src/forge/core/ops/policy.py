@@ -1,15 +1,18 @@
-"""Shared policy operations for supervisor lifecycle mutations."""
+"""Shared policy activation rules and supervisor lifecycle operations."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import cast, get_args
 
 import forge.policy.semantic.supervisor as supervisor_semantic
 from forge.core.lanes import Consumer, LaneError
+from forge.policy.deterministic.registry import BUNDLES
 from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
 from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
+from forge.policy.types import FailMode
 from forge.session import SessionStore
 from forge.session.consumer_lanes import (
     clear_consumer_lane,
@@ -21,9 +24,16 @@ from forge.session.consumer_lanes import (
 from forge.session.effective import compute_effective_intent
 from forge.session.models import LaneRecord, SessionState, SupervisorConfig
 
+POLICY_BUNDLE_NAMES: tuple[str, ...] = tuple(BUNDLES)
+POLICY_FAIL_MODES: tuple[str, ...] = get_args(FailMode)
+
 
 class PolicyOpError(RuntimeError):
     """Raised when a policy operation cannot complete."""
+
+
+class PolicyActivationInputError(PolicyOpError):
+    """Raised when policy activation or deactivation inputs are invalid."""
 
 
 class SupervisorInputError(PolicyOpError):
@@ -68,6 +78,20 @@ class SupervisorPlanUnavailableError(PolicyOpError):
 
 
 @dataclass(frozen=True)
+class PolicyActivationValues:
+    """Validated values for one surface-owned policy write.
+
+    The builder freshly allocates ``bundle_config`` for each result. Current callers hand that dict by reference to one
+    surface writer, so callers must treat it as immutable after construction; ``frozen=True`` is not a recursive freeze.
+    """
+
+    enabled: bool
+    bundles: tuple[str, ...] = ()
+    fail_mode: FailMode = "open"
+    bundle_config: dict[str, dict[str, object]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class SupervisorSetResult:
     config: SupervisorConfig
     lane_record: LaneRecord | None
@@ -89,6 +113,42 @@ class SupervisorCascadeResult:
     enabled: bool
     config: SupervisorConfig
     source_desc: str | None
+
+
+def build_policy_activation(
+    *,
+    enabled: bool,
+    bundles: Sequence[str] = (),
+    fail_mode: str = "open",
+    permissive: bool = False,
+) -> PolicyActivationValues:
+    """Validate and construct the values written by a policy activation surface."""
+    bundle_names = tuple(bundles)
+
+    if not enabled:
+        if bundle_names or fail_mode != "open" or permissive:
+            raise PolicyActivationInputError("policy deactivation cannot include activation options")
+        return PolicyActivationValues(enabled=False)
+
+    if not bundle_names:
+        raise PolicyActivationInputError("at least one policy bundle is required")
+
+    unknown = tuple(dict.fromkeys(bundle for bundle in bundle_names if bundle not in POLICY_BUNDLE_NAMES))
+    if unknown:
+        raise PolicyActivationInputError(f"unknown policy bundle: {', '.join(unknown)}")
+    if fail_mode not in POLICY_FAIL_MODES:
+        raise PolicyActivationInputError(f"fail mode must be one of {', '.join(POLICY_FAIL_MODES)}, got {fail_mode!r}")
+
+    bundle_config: dict[str, dict[str, object]] = {}
+    if permissive and "tdd" in bundle_names:
+        bundle_config["tdd"] = {"strict": False}
+
+    return PolicyActivationValues(
+        enabled=True,
+        bundles=bundle_names,
+        fail_mode=cast(FailMode, fail_mode),
+        bundle_config=bundle_config,
+    )
 
 
 def supervisor_set(

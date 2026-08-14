@@ -9,11 +9,13 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
+from forge.core.ops import policy as policy_ops
 from forge.session import IndexStore, SessionStore, create_session_state
 
 
@@ -851,12 +853,15 @@ class TestGuardCommands:
     def test_guard_enable_sets_overrides(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """%policy enable tdd sets policy overrides, not intent (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
+        builder = Mock(wraps=policy_ops.build_policy_activation)
+        monkeypatch.setattr(policy_ops, "build_policy_activation", builder)
 
         runner = CliRunner()
         payload = {"prompt": "%policy enable tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
+        builder.assert_called_once_with(enabled=True, bundles=["tdd"], fail_mode="open", permissive=False)
         out = json.loads(result.output)
         assert out["decision"] == "block"
         assert "enabled" in out["reason"].lower()
@@ -885,7 +890,7 @@ class TestGuardCommands:
 
         updated = store.read()
         policy_overrides = updated.overrides.get("policy", {})
-        assert set(policy_overrides["bundles"]) == {"tdd", "coding_standards"}
+        assert policy_overrides["bundles"] == ["tdd", "coding_standards"]
 
     def test_guard_enable_with_fail_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """%policy enable tdd --fail-mode closed sets fail_mode override (M7 regression)."""
@@ -907,12 +912,15 @@ class TestGuardCommands:
     def test_guard_disable_sets_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """%policy disable sets policy.enabled=False as override (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
+        builder = Mock(wraps=policy_ops.build_policy_activation)
+        monkeypatch.setattr(policy_ops, "build_policy_activation", builder)
 
         runner = CliRunner()
         payload = {"prompt": "%policy disable", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
+        builder.assert_called_once_with(enabled=False)
         out = json.loads(result.output)
         assert out["decision"] == "block"
         assert "disabled" in out["reason"].lower()
@@ -967,6 +975,55 @@ class TestGuardCommands:
         out = json.loads(result.output)
         assert out["decision"] == "block"
         assert "usage" in out["reason"].lower()
+        for bundle in policy_ops.POLICY_BUNDLE_NAMES:
+            assert f"--bundle {bundle}" in out["reason"]
+
+    def test_guard_enable_unknown_bundle_keeps_usage_shape_without_mutation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = self._make_session(tmp_path, monkeypatch)
+        before = store.manifest_path.read_bytes()
+
+        payload = {"prompt": "%policy enable unknown", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "usage" in out["reason"].lower()
+        assert store.manifest_path.read_bytes() == before
+
+    def test_guard_enable_invalid_fail_mode_keeps_default_open(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = self._make_session(tmp_path, monkeypatch)
+
+        payload = {
+            "prompt": "%policy enable tdd --fail-mode invalid",
+            "transcript_path": "",
+        }
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "fail_mode: open" in out["reason"]
+        assert store.read().overrides["policy"]["fail_mode"] == "open"
+
+    def test_guard_permissive_without_tdd_writes_no_bundle_config_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = self._make_session(tmp_path, monkeypatch)
+
+        payload = {
+            "prompt": "%policy enable coding_standards --permissive",
+            "transcript_path": "",
+        }
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["reason"].endswith("(permissive)")
+        assert "bundle_config" not in store.read().overrides["policy"]
 
 
 class TestSplitDiffPerFile:

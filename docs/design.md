@@ -1284,10 +1284,12 @@ Forge implements "Shared" operations once in a UI-agnostic command-core layer an
 **Contract:** ops contain pure logic (no Click, no printing, no hook JSON). They return structured data and raise typed
 exceptions on failure.
 
-`core/ops/policy.py` owns the semantic supervisor lifecycle mutations shared by `forge policy supervisor ...` and
-`%policy supervisor ...` (set/off/on/remove/reload/cascade); the terminal CLI and hook responder own only rendering,
-exit codes, and JSON response shape. This avoids duplicating business logic between terminal and in-session entry
-points.
+`core/ops/policy.py` owns the registry-derived activation vocabulary, validation, and typed values shared by terminal
+`forge policy enable|disable` and direct `%policy enable|disable`. The terminal surface still writes policy intent while
+the direct surface writes session overrides; their session resolution, mutations, rendering, exit codes, and JSON shape
+remain surface-owned. The module also owns the semantic supervisor lifecycle mutations shared by
+`forge policy supervisor ...` and `%policy supervisor ...` (set/off/on/remove/reload/cascade), with each surface owning
+its renderer. This keeps shared rules UI-free without collapsing distinct state owners.
 
 ### 3.13 Async work queue
 

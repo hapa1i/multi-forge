@@ -22,6 +22,12 @@ from forge.session.hooks import resolve_session_store
 from forge.session.models import SessionState
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, SessionStore
 
+_POLICY_ENABLE_BUNDLE_USAGE = " ".join(
+    f"--bundle {bundle}" if index == 0 else f"[--bundle {bundle}]"
+    for index, bundle in enumerate(policy_ops.POLICY_BUNDLE_NAMES)
+)
+_POLICY_ENABLE_USAGE = f"Usage: %policy enable {_POLICY_ENABLE_BUNDLE_USAGE} [--permissive]"
+
 
 def _parse_direct_command(prompt: str) -> tuple[str, list[str]] | None:
     """Parse `%<cmd> [subcmd] [args...]` direct command.
@@ -656,12 +662,12 @@ def _handle_policy_enable(argv: list[str]) -> None:
         arg = argv[i]
         if arg in ("--bundle", "-b") and i + 1 < len(argv):
             bundle = argv[i + 1]
-            if bundle in ("tdd", "coding_standards"):
+            if bundle in policy_ops.POLICY_BUNDLE_NAMES:
                 bundles.append(bundle)
             i += 2
         elif arg in ("--fail-mode",) and i + 1 < len(argv):
             fm = argv[i + 1]
-            if fm in ("open", "closed"):
+            if fm in policy_ops.POLICY_FAIL_MODES:
                 fail_mode = fm
             i += 2
         elif arg == "--permissive":
@@ -669,24 +675,27 @@ def _handle_policy_enable(argv: list[str]) -> None:
             i += 1
         else:
             # Try to interpret as a bundle name directly
-            if arg in ("tdd", "coding_standards"):
+            if arg in policy_ops.POLICY_BUNDLE_NAMES:
                 bundles.append(arg)
             i += 1
 
-    if not bundles:
+    try:
+        activation = policy_ops.build_policy_activation(
+            enabled=True,
+            bundles=bundles,
+            fail_mode=fail_mode,
+            permissive=permissive,
+        )
+    except policy_ops.PolicyActivationInputError:
         click.echo(
             json.dumps(
                 {
                     "decision": "block",
-                    "reason": "Usage: %policy enable --bundle tdd [--bundle coding_standards] [--permissive]",
+                    "reason": _POLICY_ENABLE_USAGE,
                 }
             )
         )
         return
-
-    bundle_config: dict[str, dict[str, object]] = {}
-    if permissive and "tdd" in bundles:
-        bundle_config["tdd"] = {"strict": False}
 
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
@@ -704,11 +713,11 @@ def _handle_policy_enable(argv: list[str]) -> None:
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
-        set_override(m.overrides, "policy.enabled", True)
-        set_override(m.overrides, "policy.bundles", bundles)
-        set_override(m.overrides, "policy.fail_mode", fail_mode)
-        if bundle_config:
-            set_override(m.overrides, "policy.bundle_config", bundle_config)
+        set_override(m.overrides, "policy.enabled", activation.enabled)
+        set_override(m.overrides, "policy.bundles", list(activation.bundles))
+        set_override(m.overrides, "policy.fail_mode", activation.fail_mode)
+        if activation.bundle_config:
+            set_override(m.overrides, "policy.bundle_config", activation.bundle_config)
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
@@ -721,7 +730,10 @@ def _handle_policy_enable(argv: list[str]) -> None:
         json.dumps(
             {
                 "decision": "block",
-                "reason": f"Policy enabled with bundles: {', '.join(bundles)} (fail_mode: {fail_mode}){mode_note}",
+                "reason": (
+                    f"Policy enabled with bundles: {', '.join(activation.bundles)} "
+                    f"(fail_mode: {activation.fail_mode}){mode_note}"
+                ),
             }
         )
     )
@@ -735,6 +747,7 @@ def _handle_policy_disable() -> None:
     """
     from forge.session.models import SessionState
 
+    activation = policy_ops.build_policy_activation(enabled=False)
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
@@ -751,7 +764,7 @@ def _handle_policy_disable() -> None:
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
-        set_override(m.overrides, "policy.enabled", False)
+        set_override(m.overrides, "policy.enabled", activation.enabled)
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
