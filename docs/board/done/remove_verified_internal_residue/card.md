@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/remove-verified-internal-residue` from order-6 closeout commit `4f167379`.
+**Lane**: `done/` -- shipped independently in PR #184 (`95488c10`) from order-6 closeout commit `4f167379`.
 
 **Findings**: O098 and the verified `caps.py` branch subset of O092.
 
@@ -35,6 +35,17 @@ bounded sequencing exception, not authorization for a broader dead-code sweep.
   behavior; add a regression proving non-object JSON is still rejected by the state reader.
 - Re-run repository import, patch-target, entry-point, documentation, and resource searches immediately before deletion;
   run focused session/telemetry tests, targeted session integration, and full project gates.
+
+## Implementation Outcome
+
+The verified residue was removed without changing public commands or runtime behavior. Session lifecycle and management
+modules no longer advertise stale re-export metadata, the zero-caller summary helper is gone, and `session_fork` imports
+the rewind helper from its defining module. Cap-state loading now relies on the shared JSON object boundary instead of
+rechecking an unreachable non-dict branch; a regression pins rejection of non-object JSON at that boundary.
+
+Verification covered 508 focused tests, 23 targeted Docker session-lifecycle integrations, 9,113 unit tests with one
+skip and 122 deselections, 898 regressions, full pre-commit, and board-integrity checks. PR #184 merged as `95488c10`.
+No Forge workflow command was used.
 
 ## Exclusions
 

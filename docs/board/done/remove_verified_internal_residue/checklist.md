@@ -1,7 +1,7 @@
 # Remove verified internal residue checklist
 
-Current focus: remove only the O098/session-summary/cap-guard residue on `refactor/remove-verified-internal-residue`
-from order-6 closeout commit `4f167379`; keep orders 8--35 parked.
+Current focus: complete -- the O098/session-summary/cap-guard residue shipped independently in PR #184; orders 8--35
+remain parked while the post-merge correctness findings are addressed.
 
 ## Phase 1 -- Recheck compatibility and activate
 
@@ -32,5 +32,5 @@ from order-6 closeout commit `4f167379`; keep orders 8--35 parked.
   `make pre-commit`.
 - [x] Resolve all 859 relative links across 336 board Markdown files and changed-file fragments; verify the
   6-done/1-doing/28-parked Wave 7 graph and run `git diff --check`.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 8 parked until
-  the closeout lands.
+- [x] After review and merge, record PR #184 (`95488c10`), move this member to `done/`, verify the final
+  7-done/0-doing/28-parked graph, and leave order 8 parked while the post-merge correctness findings are addressed.

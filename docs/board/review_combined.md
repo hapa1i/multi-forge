@@ -51,10 +51,10 @@ subsequently hardened O012 and retention-status failure reporting without adding
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` initially admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; orders 1--6 subsequently shipped independently in PRs #178--#183. A post-order-6 audit promoted O098 and
-the verified cap-state branch subset of O092 as one bounded member, so Wave 7 now contains 32 findings across 35
-members; order 7 is active and 28 remain parked. D056 and other correctness, security, performance, test-policy, output,
-and documentation rows still require their separately defined Wave 6 gates.
+implementation. A post-order-6 audit promoted O098 and the verified cap-state branch subset of O092 as one bounded
+member, so Wave 7 now contains 32 findings across 35 members; orders 1--7 shipped independently in PRs #178--#184 and 28
+remain parked. D056 and other correctness, security, performance, test-policy, output, and documentation rows still
+require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -780,9 +780,9 @@ synonym for “everything left.”
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
-  are split into 35 members; orders 1--6 shipped independently in PRs #178--#183, order-7 O098/O092 is active, and 28
-  are parked. O062/O063/O093 are rejected as written, O067/O095/O098 and the cap-state O092 branch are admitted only in
-  their verified scope, and O092's unverified tail is not an executable deletion set.
+  are split into 35 members; orders 1--7 shipped independently in PRs #178--#184 and 28 are parked. O062/O063/O093 are
+  rejected as written, O067/O095/O098 and the cap-state O092 branch are admitted only in their verified scope, and
+  O092's unverified tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

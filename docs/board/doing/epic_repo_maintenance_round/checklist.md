@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: execute only Wave 7 order-5 O065/O069 on `refactor/centralize-install-path-authority`. Orders 1--4 are
-closed, the other 29 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows
-retain separate Wave 6 gates.
+Current focus: Wave 7 orders 1--7 shipped independently in PRs #178--#184. Keep orders 8--35 parked while the post-merge
+correctness findings are addressed outside the structural-refactor sequence.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -197,5 +196,6 @@ retain separate Wave 6 gates.
 - [x] Ship O064 independently in PR #183 (`cd3e50e8`) and close its member before activating Wave 7 order 7.
 - [x] Branch from order-6's pushed closeout (`4f167379`) and activate only `remove_verified_internal_residue`, the
   explicitly admitted O098/O092 subset; keep orders 8--35 parked.
+- [x] Ship the O098/O092 subset independently in PR #184 (`95488c10`) and close its member before selecting order 8.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

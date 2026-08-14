@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Remove verified internal residue
+
+**Goal/outcome**: Remove the admitted session metadata, zero-caller summary helper, and redundant cap-state guard
+without changing public commands or runtime behavior.
+
+**Key changes**:
+
+- Session modules no longer advertise stale re-export metadata, and `session_fork` imports its rewind helper directly
+  from the owner.
+- Cap-state loading relies on the shared JSON object boundary, with non-object rejection pinned at that boundary.
+
+**Verification**: 508 focused tests, 23 targeted Docker integrations, 9,113 unit tests (one skip, 122 deselected), 898
+regressions, full pre-commit, and board-integrity checks pass. PR #184 merged as `95488c10`. No Forge workflow command
+was used.
+
 ### Centralize CLI metric formatting
 
 **Goal/outcome**: Give token and USD presentation one UI-free authority while preserving each CLI surface's named
