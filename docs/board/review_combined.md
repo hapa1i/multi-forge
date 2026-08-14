@@ -720,6 +720,13 @@ shipped independently; O036 closed the set in PR #177 (`3026b14a`):
 | O011, O017, O021, O023, O029--30 | [`preserve_session_launch_preconditions`](done/preserve_session_launch_preconditions/card.md)         |
 | O036                             | [`harden_walkthrough_sandbox_provenance`](done/harden_walkthrough_sandbox_provenance/card.md)         |
 
+Post-merge review on 2026-08-14 verified five follow-up defects in PRs #170, #172, #176, #177, and #180. They are new
+edge cases in the shipped implementations rather than original findings left unresolved: filtered required/named tool
+selection, positional shadow recovery guidance, rollback-deletion failure visibility, post-source walkthrough-root
+reassignment, and non-IANA process `TZ` forms. The original finding counts and dispositions remain closed; the bounded
+corrections are tracked by [`correct_post_merge_review_findings`](doing/correct_post_merge_review_findings/card.md)
+before Wave 7 resumes.
+
 This handoff closed Wave 5 at 13/13 admitted findings. Its bounded Wave 6 child epic is now closed at 36/36 findings
 across 13/13 members. Neither admission claims D056 or policy-internal, durable-state-only, performance, docs,
 duplication, dead-code, structural, or explicitly unverified rows outside its screen.

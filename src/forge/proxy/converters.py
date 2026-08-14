@@ -46,6 +46,10 @@ logger = logging.getLogger(__name__)
 _OnCompleteCallback = Callable[[Dict[str, Any], bool, Optional[str]], None]
 
 
+class RequestConversionError(ValueError):
+    """The translated request cannot preserve the client's declared intent."""
+
+
 # Tool parameters that non-Claude models compulsively fill with empty values.
 # Stripped before forwarding to Claude Code to prevent validation errors.
 _STRIP_EMPTY_PARAMS: dict[str, dict[str, tuple[Any, ...]]] = {
@@ -519,6 +523,7 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
     if system_text:
         openai_request["system_prompt"] = system_text
 
+    retained_tool_names: set[str] = set()
     if request.tools:
         openai_tools = []
         ignored_tool_names = []
@@ -576,6 +581,7 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
                     },
                 }
             )
+            retained_tool_names.add(tool.name)
 
         if openai_tools:
             openai_request["tools"] = openai_tools
@@ -590,13 +596,22 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
     if request.tool_choice:
         choice_type = request.tool_choice.get("type")
         if choice_type == "any":
+            if not retained_tool_names:
+                raise RequestConversionError(
+                    "tool_choice 'any' requires at least one available tool after proxy filtering"
+                )
             openai_request["tool_choice"] = "required"
         elif choice_type == "auto":
             openai_request["tool_choice"] = "auto"
         elif choice_type == "tool" and "name" in request.tool_choice:
+            selected_tool = request.tool_choice["name"]
+            if not isinstance(selected_tool, str) or selected_tool not in retained_tool_names:
+                raise RequestConversionError(
+                    f"tool_choice names unavailable tool {selected_tool!r} after proxy filtering"
+                )
             openai_request["tool_choice"] = {
                 "type": "function",
-                "function": {"name": request.tool_choice["name"]},
+                "function": {"name": selected_tool},
             }
         else:  # Includes 'none' or other types
             openai_request["tool_choice"] = "none"

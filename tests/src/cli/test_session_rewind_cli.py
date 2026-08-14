@@ -261,6 +261,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
         mock_manager.fork_session.return_value = (parent, fork_state)
+        mock_manager.delete_session.side_effect = OSError("cleanup denied")
         result = runner.invoke(
             main,
             [
@@ -281,6 +282,9 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
     assert "Rewind code-delta unavailable; falling back to plain native resume." in result.output
     assert "Plain native-relocate fallback could not copy the full parent transcript (disk full)" in result.output
     assert "Rewind fallback could not prepare a resumable transcript in the fork worktree." in result.output
+    assert "Cleanup also failed for created session 'fork-child': cleanup denied." in result.output
+    assert "forge session delete fork-child --yes --force --keep-transcripts" in result.output
+    assert "--keep-worktree" not in result.output
     mock_invoke.assert_not_called()
     mock_manager.delete_session.assert_called_once_with(
         "fork-child",

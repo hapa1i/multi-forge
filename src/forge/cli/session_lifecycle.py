@@ -135,6 +135,37 @@ def _is_resumable_session(state: SessionState) -> bool:
     return bool(state.confirmed.claude_session_id and _has_resumable_claude_session(state))
 
 
+def _rollback_created_session(
+    *,
+    manager: SessionManager,
+    session_name: str,
+    forge_root: str | None,
+    delete_worktree: bool,
+    error: str,
+    tip: str,
+    log_context: str,
+) -> tuple[str, str]:
+    """Delete a failed child or add explicit recovery when that rollback also fails."""
+    try:
+        manager.delete_session(
+            session_name,
+            delete_worktree=delete_worktree,
+            delete_transcripts=False,
+            force=True,
+            forge_root=forge_root,
+        )
+    except Exception as exc:
+        logger.debug("%s rollback delete failed", log_context, exc_info=True)
+        failure = str(exc) or type(exc).__name__
+        keep_worktree = " --keep-worktree" if not delete_worktree else ""
+        command = f"forge session delete {session_name} --yes --force --keep-transcripts{keep_worktree}"
+        return (
+            f"{error} Cleanup also failed for created session '{session_name}': {failure}.",
+            f"Run '{command}' after resolving the cleanup error. {tip}",
+        )
+    return error, tip
+
+
 def _has_resumable_transcript(state: SessionState) -> bool:
     """Whether we can infer an existing Claude conversation from transcript state."""
     session_id = state.confirmed.claude_session_id

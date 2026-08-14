@@ -37,6 +37,7 @@ def _write_env(target: Path, *, exported_target: Path, sentinel: Path | None = N
         lines.append(f"printf 'sourced\\n' > {shlex.quote(str(sentinel))}")
     lines.extend(
         [
+            f"export FORGE_TEST_REPO={shlex.quote(str(exported_target))}",
             f"export FORGE_HOME={shlex.quote(str(exported_target / '.forge-home'))}",
             f"export CLAUDE_HOME={shlex.quote(str(exported_target / '.claude-user'))}",
             f"export CODEX_HOME={shlex.quote(str(exported_target / '.codex-user'))}",
@@ -104,6 +105,44 @@ def test_symlink_alias_to_denylisted_home_is_rejected(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "denylisted path" in result.stderr
     assert not command_sentinel.exists()
+
+
+def test_env_cannot_replace_validated_target_with_denylisted_home(tmp_path: Path) -> None:
+    """A marked target's env file cannot redirect later gates and command execution."""
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "marked-target"
+    target.mkdir()
+    (target / ".forge-walkthrough-marker").write_text("forge-walkthrough-marker\n", encoding="utf-8")
+    (target / "CLAUDE.md").write_text("# walkthrough target\n", encoding="utf-8")
+    _write_env(target, exported_target=home)
+    command_sentinel = tmp_path / "command-ran"
+
+    result = _run(target, home, "touch", str(command_sentinel))
+
+    assert result.returncode == 1
+    assert "env.sh changed FORGE_TEST_REPO after validation" in result.stderr
+    assert str(target.resolve()) in result.stderr
+    assert str(home.resolve()) in result.stderr
+    assert not command_sentinel.exists()
+
+
+def test_safe_symlink_alias_remains_compatible(tmp_path: Path) -> None:
+    """Equivalent canonical roots pass even when env.sh retains a safe alias."""
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough-repo"
+    target.mkdir()
+    (target / ".forge-walkthrough-marker").write_text("forge-walkthrough-marker\n", encoding="utf-8")
+    (target / "CLAUDE.md").write_text("# walkthrough target\n", encoding="utf-8")
+    alias = tmp_path / "walkthrough-alias"
+    alias.symlink_to(target, target_is_directory=True)
+    _write_env(target, exported_target=alias)
+
+    result = _run(alias, home, "pwd")
+
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()).resolve() == target.resolve()
 
 
 def test_generated_walkthrough_repo_still_exports_isolated_homes(tmp_path: Path) -> None:

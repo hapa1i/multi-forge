@@ -3,7 +3,7 @@
 import re
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import TZPATH, ZoneInfo
 
 import pytest
 
@@ -205,10 +205,13 @@ class TestLocalPeriodBounds:
             datetime(2026, 3, 31, 10, 30, tzinfo=UTC),
         )
 
-    def test_absolute_path_tz_falls_back_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("TZ", "/usr/share/zoneinfo/Europe/Berlin")
+    def test_absolute_path_tz_uses_the_requested_zone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        zone_path = next(candidate for root in TZPATH if (candidate := Path(root) / "America" / "New_York").is_file())
+        monkeypatch.setenv("TZ", str(zone_path))
 
-        assert isinstance(timestamps_module._local_timezone(), tzinfo)
+        timezone = timestamps_module._local_timezone()
+
+        assert datetime(2026, 8, 14, tzinfo=timezone).utcoffset() == -timedelta(hours=4)
 
     def test_all_sentinel_belongs_to_callers(self) -> None:
         with pytest.raises(ValueError, match="Unknown local period"):

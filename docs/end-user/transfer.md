@@ -68,7 +68,8 @@ transcript plus a code-delta prompt for the dropped tail. Same-directory resume 
 truncated UUID `<R>`, not the parent's UUID. For `forge session fork`, rewind requires `--worktree` or `--into`;
 same-dir and sidecar rewind forks are rejected. If code-delta curation fails, Forge falls back to plain native
 resume/native-relocate with a note. If the dropped window has no code-edit tool calls, Forge writes a deterministic
-no-code-delta context and does not call the curation model.
+no-code-delta context and does not call the curation model. If Forge cannot remove a child after transcript preparation
+or relocation fails, the error names the retained session and prints an exact `forge session delete` recovery command.
 
 ## Hand a plan to Codex (cross-runtime)
 
@@ -139,4 +140,7 @@ ledger row (no ambient run tree).
   Curation is best-effort; the deterministic body still ships.
 - **`rewind` printed "code-delta unavailable"** — the truncated transcript was not launched. Forge fell back to plain
   native resume/native-relocate so the child still starts with the full parent conversation.
+- **Rewind or native-relocate reported a cleanup failure** — the named child remains recorded. Resolve the deletion
+  error, then run the printed `forge session delete ... --yes --force --keep-transcripts` command; same-directory resume
+  also includes `--keep-worktree`.
 - **Codex isn't ready** — run `forge runtime preflight codex` for the blocking reason (install / authenticate `codex`).

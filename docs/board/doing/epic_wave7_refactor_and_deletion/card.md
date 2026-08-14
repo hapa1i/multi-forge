@@ -3,7 +3,8 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--7 shipped independently in PRs #178--#184; the other 28 members remain parked while
-post-merge correctness findings are addressed outside this structural-refactor sequence.
+[`correct_post_merge_review_findings`](../correct_post_merge_review_findings/card.md) is addressed outside this
+structural-refactor sequence.
 
 ## Goal
 

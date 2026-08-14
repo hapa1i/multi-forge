@@ -592,8 +592,9 @@ Every command in the walkthrough passes through a path denylist and these number
 5. **Gate 5** -- CODEX_HOME points to `$FORGE_TEST_REPO/.codex-user`
 6. **Gate 6** -- `.forge/walkthrough/` and `CLAUDE.md` establish the expected test-repo structure
 
-Gates 1, 2, and 6 prove the target before its `env.sh` can execute. Gates 3--5 then verify the isolated homes exported
-by that environment.
+Gates 1, 2, and 6 prove the target before its `env.sh` can execute. The canonical target is retained independently while
+the environment loads; an unset or canonically different post-source `FORGE_TEST_REPO` is rejected. Gates 3--5 and the
+final `cd` derive only from that retained root, while equivalent safe symlink aliases remain valid.
 
 Any gate failure = loud error message + exit 1. No silent fallthrough.
 

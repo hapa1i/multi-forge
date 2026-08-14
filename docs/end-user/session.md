@@ -975,6 +975,9 @@ forge telemetry activity my-feature --period all   # full history
 forge telemetry activity my-feature --json    # machine-readable
 ```
 
+`today`, `week`, and `month` use the same process-local calendar as telemetry costs and traces, including IANA,
+absolute/colon TZif, and POSIX-rule `TZ` forms.
+
 It renders two panes. **Operation outcomes** shows upstream outcomes such as policy checks, supervisor fail-open/no-call
 results, memory writer, supervisor shadow drain, shadow curation, workflow worker failures, transfer curation, and
 action tagging. **Model calls** shows the model-call/spend side: calls, workers, attempts, tokens, cost, legacy error

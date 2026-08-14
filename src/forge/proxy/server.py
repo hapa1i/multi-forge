@@ -61,6 +61,7 @@ from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import ModelProvider, TierClientFactory
 from forge.proxy.converters import (
+    RequestConversionError,
     convert_anthropic_to_openai,
     convert_openai_to_anthropic,
     convert_openai_to_anthropic_sse,
@@ -965,7 +966,14 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             f"messages={num_messages}, tools={num_tools}, stream={request_data.stream}"
         )
 
-        openai_request_dict = convert_anthropic_to_openai(request_data, provider=provider_name)
+        try:
+            openai_request_dict = convert_anthropic_to_openai(request_data, provider=provider_name)
+        except RequestConversionError as exc:
+            logger.info("[%s] Invalid translated request: %s", request_id, exc)
+            raise HTTPException(
+                status_code=400,
+                detail={"type": "invalid_request_error", "message": str(exc)},
+            ) from exc
 
         openai_request_dict["model"] = actual_model_id
 

@@ -14,6 +14,7 @@ from typing import Any, AsyncGenerator
 import pytest
 
 from forge.proxy.converters import (
+    RequestConversionError,
     _should_ignore_tool,
     convert_anthropic_to_openai,
     convert_openai_to_anthropic,
@@ -358,6 +359,37 @@ class TestConvertAnthropicToOpenai:
         tool_names = [t["function"]["name"] for t in result["tools"]]
         assert "Read" in tool_names
         assert "mcp__slack__send" not in tool_names
+
+    def test_required_choice_rejects_when_filter_removes_every_tool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A required call cannot survive without an available tool."""
+        import forge.config as config_module
+
+        mock_proxy = type("P", (), {"tool_prefixes_to_ignore": ["mcp__*"]})()
+        mock_config = type("C", (), {"proxy": mock_proxy})()
+        monkeypatch.setattr(config_module, "config", mock_config)
+        request = _make_request(
+            tools=[_make_tool("mcp__slack__send")],
+            tool_choice={"type": "any"},
+        )
+
+        with pytest.raises(RequestConversionError, match="requires at least one available tool"):
+            convert_anthropic_to_openai(request, provider="litellm")
+
+    def test_named_choice_rejects_when_filter_removes_selected_tool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A retained sibling tool cannot satisfy a removed named selection."""
+        import forge.config as config_module
+
+        mock_proxy = type("P", (), {"tool_prefixes_to_ignore": ["mcp__*"]})()
+        mock_config = type("C", (), {"proxy": mock_proxy})()
+        monkeypatch.setattr(config_module, "config", mock_config)
+        monkeypatch.setattr("forge.proxy.converters.asyncio.create_task", lambda coro: coro.close())
+        request = _make_request(
+            tools=[_make_tool("Read"), _make_tool("mcp__slack__send")],
+            tool_choice={"type": "tool", "name": "mcp__slack__send"},
+        )
+
+        with pytest.raises(RequestConversionError, match="names unavailable tool 'mcp__slack__send'"):
+            convert_anthropic_to_openai(request, provider="litellm")
 
     def test_mixed_content_text_and_tool_result(self) -> None:
         """Message with both text and tool_result blocks splits correctly."""

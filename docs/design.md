@@ -1023,16 +1023,14 @@ Claude's `--fork-session`.
 | Transfer               | `transfer`        | selected value | no, generated context     | yes             |
 | Rewind                 | `native-relocate` | `rewind`       | yes, prefix `1..T-N`      | yes, code-delta |
 
-The null-strategy native rows are a writer convention, not a schema guard: strict manifest reads tolerate
-`native-relocate` with non-null `strategy` and `context_file`. The shipped `rewind` strategy uses that extension point:
-it writes a fresh truncated Claude JSONL under a rewind-owned UUID and launches `--resume <R> --fork-session` together
-with a generated code-delta prompt file. A live Slice-1 probe on Claude Code 2.1.197 confirmed the filename stem may be
-`R` while embedded JSONL `sessionId` remains the parent UUID; no envelope rewrite is required. The slow real-Claude gate
-`tests/integration/docker/test_rewind_native_contract.py` extends that probe to the full rewind shape: a fresh `<R>`
-stem holding a truncated clean-prefix JSONL resumes across CWD and stays unmutated under `--fork-session`. If code-delta
-curation fails or returns unusable output, Forge removes the temporary `<R>.jsonl`, falls back to plain native resume /
-native-relocate, and tells the user that the code delta is unavailable. When rewind does send dropped-window content to
-the curation model, Forge emits the same style of privacy warning as `ai-curated`.
+Null strategy on native rows is a writer convention, not a schema guard: strict reads tolerate `native-relocate` with
+non-null `strategy` and `context_file`. `rewind` writes truncated Claude JSONL under a fresh UUID and launches
+`--resume <R> --fork-session` with a code-delta prompt. A Claude Code 2.1.197 probe and
+`tests/integration/docker/test_rewind_native_contract.py` confirm that `<R>` may retain the parent's embedded
+`sessionId`, resume across CWD, and stay unmutated; no envelope rewrite is needed. Unusable code-delta curation removes
+the temporary JSONL, falls back to plain native resume/native-relocate, and reports the fallback; dropped-window
+curation emits the `ai-curated` privacy warning. Failed child rollback reports its session and failure, then prints a
+transcript-preserving delete command that preserves shared worktrees.
 
 **Context budget enforcement:** Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails
 fast** before spawning Claude when the parent transcript exceeds the proxy context window, naming
@@ -1334,12 +1332,10 @@ Operation outcomes (policy checks, including no-call fail-opens) write to `~/.fo
 | `telemetry/audit_state/<proxy_id>.json`    | Audit drift detector in proxy-id sidecars | Writable sidecar drift baseline                             |
 | `usage/events/<month>_<pid>.jsonl`         | Legacy usage emitters                     | Transitional session activity/read-surface attribution      |
 
-Timestamp reads cross one boundary in `core.state.timestamps`. `parse_iso` requires timezone-aware ISO8601 by default
-and normalizes valid offsets to UTC; compatibility readers use `try_parse_iso` and must opt into naive-as-UTC handling
-explicitly where an established durable format already permits it. Malformed/non-string fallbacks remain caller-owned.
-`local_period_bounds` resolves today/week/month in the host's transition-aware local timezone, while each CLI owns its
-existing `all` sentinel. Relative-time presentation selects either compact or full-word style without changing those
-parsing and fallback policies.
+`core.state.timestamps` owns timestamp reads: strict `parse_iso` normalizes zoned ISO8601 to UTC; `try_parse_iso`
+explicitly permits naive-as-UTC. Callers own malformed/non-string fallback. `local_period_bounds` resolves local
+today/week/month; each CLI owns `all`. `TZ` accepts IANA, absolute/colon TZif, and POSIX forms, falling back to
+`/etc/localtime`; relative display selects compact/full-word styles.
 
 Downstream attempts are the proxy-spend source of truth. **Forge is not a cost oracle:** it records only route-reported
 cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its reporter/confidence, and records
@@ -1708,9 +1704,9 @@ durable observation point and a signature-safe control point.
 1. **Wire shape** (`wire_shape` on the proxy config) — how the request reaches the upstream:
 
    - `openai_translated` (default): `convert_anthropic_to_openai` → upstream → `convert_openai_to_anthropic`. **Strips
-     `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy). Anthropic tool-choice
-     intent remains exact: `any` → OpenAI `required`, `auto` → `auto`, named `tool` → named function, and `none` →
-     `none`, including the GPT Responses API client path.
+     `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy). Tool choice maps `any` →
+     `required`, `auto` → `auto`, named → named function, and `none` → `none` across GPT Responses; impossible filtered
+     required/named choices return HTTP 400 before upstream acquisition.
    - `anthropic_passthrough`: forwards the raw Anthropic body unchanged and streams the response back unchanged.
      **Preserves thinking blocks byte-for-byte** (signature-safe). Shipped as the `anthropic-passthrough` template
      (`provider: litellm` is a credential slot only; `wire_shape` is the wire truth, and `GET /` labels it so).

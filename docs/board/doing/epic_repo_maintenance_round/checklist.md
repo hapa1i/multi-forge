@@ -197,5 +197,10 @@ correctness findings are addressed outside the structural-refactor sequence.
 - [x] Branch from order-6's pushed closeout (`4f167379`) and activate only `remove_verified_internal_residue`, the
   explicitly admitted O098/O092 subset; keep orders 8--35 parked.
 - [x] Ship the O098/O092 subset independently in PR #184 (`95488c10`) and close its member before selecting order 8.
+- [x] Keep Wave 7 order 8 parked and activate `correct_post_merge_review_findings` for the five verified defects from
+  the review of PRs #170--#180.
+- [x] Implement the walkthrough, proxy, timezone, rollback, and shadow-guidance corrections with focused, full,
+  integration, package, and documentation coverage.
+- [ ] Review and merge the corrective member, close its board record, and only then select Wave 7 order 8.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

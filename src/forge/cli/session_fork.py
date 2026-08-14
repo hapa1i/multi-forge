@@ -33,6 +33,7 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _render_sidecar_launch,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
+    _rollback_created_session,
     _warn_before_claude_launch,
 )
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
@@ -901,32 +902,28 @@ def fork(
             # relocate refused to clobber, and the native-relocate cleanup branch would otherwise
             # delete that exact file. The fork never launched, so it owns no transcript to clean.
             # owns_worktree-aware deletion keeps an --into target.
-            try:
-                manager.delete_session(
-                    fork_name,
-                    delete_worktree=True,
-                    delete_transcripts=False,
-                    force=True,
-                    forge_root=fork_manifest.forge_root,
-                )
-            except Exception:
-                logger.debug("native-relocate rollback delete failed", exc_info=True)
             if isinstance(exc, RelocateSameDirError):
-                print_error_with_tip(
+                error = (
                     "--resume-mode native-relocate requires a different CWD than the parent; "
-                    "the fork resolves to the parent's own Claude project dir.",
-                    "Fork into a fresh --worktree, or use the default transfer mode.",
+                    "the fork resolves to the parent's own Claude project dir."
                 )
+                tip = "Fork into a fresh --worktree, or use the default transfer mode."
             elif isinstance(exc, RelocateConflictError):
-                print_error_with_tip(
-                    f"The destination worktree already holds a different transcript for parent '{parent}'.",
-                    "Fork into a fresh worktree, or use the default transfer mode.",
-                )
+                error = f"The destination worktree already holds a different transcript for parent '{parent}'."
+                tip = "Fork into a fresh worktree, or use the default transfer mode."
             else:
-                print_error_with_tip(
-                    f"Could not relocate the parent transcript for native resume: {exc}",
-                    "Use the default transfer mode, or fork into a fresh worktree.",
-                )
+                error = f"Could not relocate the parent transcript for native resume: {exc}"
+                tip = "Use the default transfer mode, or fork into a fresh worktree."
+            error, tip = _rollback_created_session(
+                manager=manager,
+                session_name=fork_name,
+                forge_root=fork_manifest.forge_root,
+                delete_worktree=True,
+                error=error,
+                tip=tip,
+                log_context="native-relocate",
+            )
+            print_error_with_tip(error, tip)
             sys.exit(1)
 
         console.print(
@@ -976,20 +973,16 @@ def fork(
         for warning in _rewind_artifacts.warnings:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
         if not _rewind_artifacts.resume_transcript_ready:
-            try:
-                manager.delete_session(
-                    fork_name,
-                    delete_worktree=True,
-                    delete_transcripts=False,
-                    force=True,
-                    forge_root=fork_manifest.forge_root,
-                )
-            except Exception:
-                logger.debug("rewind fallback rollback delete failed", exc_info=True)
-            print_error_with_tip(
-                "Rewind fallback could not prepare a resumable transcript in the fork worktree.",
-                "Use the default transfer fork, or retry after fixing Claude transcript store access.",
+            error, tip = _rollback_created_session(
+                manager=manager,
+                session_name=fork_name,
+                forge_root=fork_manifest.forge_root,
+                delete_worktree=True,
+                error="Rewind fallback could not prepare a resumable transcript in the fork worktree.",
+                tip="Use the default transfer fork, or retry after fixing Claude transcript store access.",
+                log_context="rewind fallback",
             )
+            print_error_with_tip(error, tip)
             sys.exit(1)
 
         _rewind_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()

@@ -624,6 +624,9 @@ forge telemetry costs reset                   # Wipe ALL cost + usage telemetry 
 forge telemetry costs reset --dry-run         # Preview what would be removed, delete nothing
 ```
 
+`today`, `week`, and `month` are local-calendar windows. Forge honors a process `TZ` supplied as an IANA key, an
+absolute or colon-prefixed TZif path, or a POSIX rule string; invalid values fall back to `/etc/localtime`.
+
 `forge telemetry costs reset` deletes legacy cost logs, downstream/upstream telemetry shards, spend-cap snapshots,
 sidecar audit drift state, **and** the usage-attribution ledger (`forge telemetry activity`/`forge +$Y` data) under
 `~/.forge/`. It also clears the derived status-line cost and supervisor-health caches so status-line segments recompute
@@ -708,9 +711,11 @@ Two settings, kept separate:
 
 - **`wire_shape`** — how requests reach the upstream. `openai_translated` (default) is translated and **drops thinking
   blocks** (inspectable but lossy), but preserves tool-selection intent: Anthropic `any` requires a tool call, `auto`
-  remains optional, and named/disabled choices remain named/disabled. `anthropic_passthrough` forwards the raw Anthropic
-  request and **preserves thinking blocks byte-for-byte** (signature-safe; required for control/override). The shipped
-  `anthropic-passthrough` template uses it.
+  remains optional, and named/disabled choices remain named/disabled. If `tool_prefixes_to_ignore` removes every
+  required tool or the specifically named tool, Forge returns HTTP 400 `invalid_request_error` instead of sending an
+  unsatisfiable upstream request. `anthropic_passthrough` forwards the raw Anthropic request and **preserves thinking
+  blocks byte-for-byte** (signature-safe; required for control/override). The shipped `anthropic-passthrough` template
+  uses it.
 - **`intercept.mode`** — `passthrough` (default, no inspection), `inspect` (observe: hashes + drift + redacted audit
   metadata), or `override` (inspect plus apply prompt augment/guards and a reasoning-effort floor). `override` requires
   `wire_shape: anthropic_passthrough`.
