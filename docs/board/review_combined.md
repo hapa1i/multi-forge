@@ -51,9 +51,9 @@ subsequently hardened O012 and retention-status failure reporting without adding
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; orders 1--3 subsequently shipped independently in PRs #178--#180, order-4 O066/O092 is now the sole
-active member, and the other 30 members remain parked. D056 and other correctness, security, performance, test-policy,
-output, and documentation rows still require their separately defined Wave 6 gates.
+implementation; orders 1--4 subsequently shipped independently in PRs #178--#181, and the other 30 members remain
+parked. D056 and other correctness, security, performance, test-policy, output, and documentation rows still require
+their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -775,9 +775,9 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 members; orders 1--3 shipped independently in PRs #178--#180, order-4 O066/O092 is active, and the
-  other 30 are parked. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and
-  O092's unverified tail is not an executable deletion set.
+  are split into 34 members; orders 1--4 shipped independently in PRs #178--#181, and the other 30 are parked.
+  O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and O092's unverified
+  tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

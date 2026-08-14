@@ -18,7 +18,7 @@ executable deletion list.
 The admitted subsets now live with their actual compatibility and subsystem owners:
 
 - factory cache methods: [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md);
-- dead git-root exception: [`unify_git_root_discovery`](../../doing/unify_git_root_discovery/card.md);
+- dead git-root exception: [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md);
 - session helpers: [`remove_dead_session_helpers`](../../todo/remove_dead_session_helpers/card.md);
 - verdict wrapper: [`deprecate_supervisor_verdict_wrapper`](../../todo/deprecate_supervisor_verdict_wrapper/card.md);
 - transcript guard: [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md);

@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Unify git-root discovery
+
+**Goal/outcome**: Use one filesystem git-root walk while preserving optional and strict caller contracts and keeping
+Git-backed repository identity separate.
+
+**Key changes**:
+
+- `core.paths.find_git_root` now owns `.git` directory and worktree-marker traversal; the Claude adapter retains its cwd
+  default and exact `FileNotFoundError` behavior.
+- The definition-only `ProjectRootNotFoundError` is removed, and filesystem marker discovery remains distinct from
+  Git-subprocess checkout, logical-repository, worktree-membership, and bare-repository semantics.
+
+**Verification**: 182 focused tests, 3 targeted Docker session integrations, 9,065 unit tests (one skip, 122
+deselected), 898 regressions, full pre-commit, and board integrity checks pass. PR #181 merged as `a8cff31f` with all
+five GitHub checks passing. No Forge workflow command was used.
+
 ### Centralize timestamp primitives
 
 **Goal/outcome**: Use one timestamp and local-period boundary while retaining each caller's explicit compatibility and

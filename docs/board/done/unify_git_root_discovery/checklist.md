@@ -1,7 +1,6 @@
 # Unify git-root discovery contracts checklist
 
-Current focus: share only parent-walk traversal on `refactor/unify-git-root-discovery` from order-3 closeout commit
-`9817cad3`; preserve the optional and strict caller contracts and keep order 5 parked.
+Current focus: complete -- O066/O092 shipped independently in PR #181 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -33,5 +32,6 @@ Current focus: share only parent-walk traversal on `refactor/unify-git-root-disc
 - [x] Run `make test-unit` (9,065 passed, 1 skipped), `make test-regression` (898 passed), and `make pre-commit`.
 - [x] Resolve all 854 board links and changed-document fragments, verify the 3-done/1-doing/30-todo Wave 7 graph and all
   34 member backlinks, and run `git diff --check`.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 5 parked until
-  the closeout lands.
+- [x] After review and merge, record PR #181 (`a8cff31f`), move this member to `done/`, and leave order 5 parked until
+  the closeout lands. The final audit resolves all 854 local path links across 332 board Markdown files and both
+  fragments from the nine changed board documents; the Wave 7 graph is four done, zero doing, and 30 todo members.

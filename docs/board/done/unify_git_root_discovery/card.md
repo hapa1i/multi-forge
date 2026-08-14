@@ -1,8 +1,8 @@
 # Unify git-root discovery contracts
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/unify-git-root-discovery` from order-3 closeout commit `9817cad3`.
+**Lane**: `done/` -- shipped independently in PR #181 (`a8cff31f`) from order-3 closeout commit `9817cad3`.
 
 **Findings**: O066 and O092's `ProjectRootNotFoundError` subset.
 
@@ -45,6 +45,11 @@ integration tests are deselected by the unit target. `make pre-commit` and `git 
 checks 332 Markdown files and 854 local path links, including 9 changed board documents and 4 changed-document fragment
 links; all targets and fragments resolve, all 34 Wave 7 members link back to the epic, and the graph remains 3 done, 1
 doing, and 30 todo.
+
+PR #181 merged as `a8cff31f` with all five GitHub checks passing. The post-merge closeout leaves orders 5--34 parked
+until the epic explicitly selects the next member. All 854 local path links across 332 board Markdown files and both
+fragments from the nine changed board documents resolve; the Wave 7 graph is four `done/`, zero `doing/`, and 30 `todo/`
+members with valid epic backlinks.
 
 ## Exclusions
 

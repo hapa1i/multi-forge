@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--3 shipped independently in PRs #178--#180; order-4 O066/O092 is active on
-`refactor/unify-git-root-discovery`, and the other 30 members remain parked.
+**Lane**: `doing/` -- orders 1--4 shipped independently in PRs #178--#181; no member is active while the order-4
+closeout lands, and the other 30 members remain parked.
 
 ## Goal
 
@@ -48,7 +48,7 @@ runs last so it lands on the smallest stable surface.
 | 1     | O043             | [`decouple_lane_runtime_vocabulary`](../../done/decouple_lane_runtime_vocabulary/card.md)               | import-only runtime vocabulary                       |
 | 2     | O044             | [`share_policy_activation_rules`](../../done/share_policy_activation_rules/card.md)                     | shared validation, distinct state owners             |
 | 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../../done/centralize_time_parsing_and_periods/card.md)         | timestamp/period primitives with explicit styles     |
-| 4     | O066, O092       | [`unify_git_root_discovery`](../unify_git_root_discovery/card.md)                                       | optional vs strict git-root contracts                |
+| 4     | O066, O092       | [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md)                               | optional vs strict git-root contracts                |
 | 5     | O065, O069       | [`centralize_install_path_authority`](../../todo/centralize_install_path_authority/card.md)             | lower-layer path and ownership policy                |
 | 6     | O064             | [`centralize_cli_metric_formatting`](../../todo/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
 | 7     | O071             | [`remove_stale_dependencies`](../../todo/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
