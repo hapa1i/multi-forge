@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--7 shipped independently in PRs #178--#184. Keep orders 8--35 parked while the post-merge
-correctness findings are addressed outside the structural-refactor sequence.
+Current focus: Wave 7 orders 1--7 and the PR #185 corrective member are closed. Keep orders 8--35 parked until the next
+member is explicitly selected.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -201,6 +201,6 @@ correctness findings are addressed outside the structural-refactor sequence.
   the review of PRs #170--#180.
 - [x] Implement the walkthrough, proxy, timezone, rollback, and shadow-guidance corrections with focused, full,
   integration, package, and documentation coverage.
-- [ ] Review and merge the corrective member, close its board record, and only then select Wave 7 order 8.
+- [x] Merge the corrective member in PR #185 (`8ccbf387`) and close its board record without activating Wave 7 order 8.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -724,8 +724,8 @@ Post-merge review on 2026-08-14 verified five follow-up defects in PRs #170, #17
 edge cases in the shipped implementations rather than original findings left unresolved: filtered required/named tool
 selection, positional shadow recovery guidance, rollback-deletion failure visibility, post-source walkthrough-root
 reassignment, and non-IANA process `TZ` forms. The original finding counts and dispositions remain closed; the bounded
-corrections are tracked by [`correct_post_merge_review_findings`](doing/correct_post_merge_review_findings/card.md)
-before Wave 7 resumes.
+corrections shipped in PR #185 (`8ccbf387`) through
+[`correct_post_merge_review_findings`](done/correct_post_merge_review_findings/card.md).
 
 This handoff closed Wave 5 at 13/13 admitted findings. Its bounded Wave 6 child epic is now closed at 36/36 findings
 across 13/13 members. Neither admission claims D056 or policy-internal, durable-state-only, performance, docs,

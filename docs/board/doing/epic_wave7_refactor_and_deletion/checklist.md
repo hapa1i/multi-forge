@@ -1,8 +1,8 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 7 shipped in PR #184 (`95488c10`). Keep orders 8--35 in `todo/` while
-[`correct_post_merge_review_findings`](../correct_post_merge_review_findings/card.md) is addressed outside this
-structural-refactor sequence.
+Current focus: order 7 and the bounded
+[`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
+PR #185. Keep orders 8--35 in `todo/`; order 8 is next but not active.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -40,7 +40,7 @@ structural-refactor sequence.
 - [x] Create `refactor/remove-verified-internal-residue` from `4f167379`; activate only order 7 and retain command,
   output, state-reader, and compatibility behavior plus 28 parked members.
 - [x] Ship order 7 independently in PR #184 (`95488c10`) and close its member before selecting order 8.
-- [ ] Wait for the corrective member to merge and close before selecting or activating order 8.
+- [x] Close the corrective member after PR #185 (`8ccbf387`) before selecting or activating order 8.
 
 Orders 8--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
 gated Wave 6 finding.

@@ -1,7 +1,7 @@
 # Correct post-merge review findings checklist
 
-Current focus: implementation and primary verification are complete on `fix/post-wave-review-findings`; finish the
-review-strength and board-integrity amendments before opening the PR.
+Current focus: complete -- the five post-merge corrections shipped in PR #185 (`8ccbf387`) and Wave 7 order 8 remains
+parked pending explicit selection.
 
 ## Evidence and implementation
 
@@ -38,5 +38,5 @@ review-strength and board-integrity amendments before opening the PR.
 - [x] Run final Markdown, link/lane, pre-commit, and diff checks after board synchronization (338 board documents, 871
   relative links, none missing; three active cards, including the two coordinating epics; all hooks pass).
 - [x] Open draft PR #185 without activating Wave 7 order 8.
-- [ ] After merge, add the compact change-log outcome, move this card to `done/`, repoint links, and only then select
-  the next Wave 7 member.
+- [x] After PR #185 merged as `8ccbf387`, add the compact change-log outcome, move this card to `done/`, and repoint all
+  inbound links without activating Wave 7 order 8.

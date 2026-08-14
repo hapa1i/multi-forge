@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Close post-merge correctness gaps
+
+**Goal/outcome**: Correct five verified edge cases from the review of PRs #170--#180 before resuming Wave 7 cleanup.
+
+**Key changes**:
+
+- Retained the canonical walkthrough root after environment loading, rejected impossible filtered tool selection, and
+  honored IANA, TZif-path, and POSIX-rule process timezones.
+- Surfaced failed child rollback with exact cleanup guidance, corrected positional shadow-session recovery, and kept
+  optional `tool_choice:auto`/`none` behavior outside this unreproduced scope.
+
+**Verification**: 230 focused and 71 review-strength tests, 9,115 unit tests (one skip, 122 deselected), 906
+regressions, 28 targeted Docker integrations, full pre-commit, build and clean-wheel smoke, and board-integrity checks
+pass. PR #185 merged as `8ccbf387` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Remove verified internal residue
 
 **Goal/outcome**: Remove the admitted session metadata, zero-caller summary helper, and redundant cap-state guard

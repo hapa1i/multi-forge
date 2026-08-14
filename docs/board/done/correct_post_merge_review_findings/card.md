@@ -1,9 +1,8 @@
 # Correct post-merge review findings
 
-**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- implementation and primary verification are complete on `fix/post-wave-review-findings`; review
-and merge gate Wave 7 order 8.
+**Lane**: `done/` -- shipped in PR #185 (`8ccbf387`) before Wave 7 order 8.
 
 **Related shipped members**:
 
@@ -63,4 +62,5 @@ Authority comes from the bundled walkthrough safety contract, translated proxy r
 Primary verification passes: 230 focused tests; 9,115 unit tests with one skip and 122 deselected; 906 regressions; five
 targeted proxy/rewind Docker integrations; 23 session-lifecycle Docker integrations; full pre-commit; sdist/wheel build;
 and the clean-wheel LiteLLM runtime smoke. The review-strength amendment passes 71 focused tests; final pre-commit,
-Markdown, diff, and board-link checks pass across 338 board documents and 871 relative links.
+Markdown, diff, and board-link checks pass across 338 board documents and 871 relative links. PR #185 merged as
+`8ccbf387` with all five GitHub checks passing.
