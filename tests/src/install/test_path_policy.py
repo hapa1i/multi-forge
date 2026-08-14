@@ -7,7 +7,10 @@ from pathlib import Path
 import pytest
 
 from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
-from forge.install.exceptions import NestedClaudeDirectoryError, PathBoundaryViolationError
+from forge.install.exceptions import (
+    NestedClaudeDirectoryError,
+    PathBoundaryViolationError,
+)
 from forge.install.models import Installation, InstalledSkillPackage, InstallScope
 from forge.install.path_policy import (
     UnsupportedRuntimeSkillScope,

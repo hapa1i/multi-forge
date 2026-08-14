@@ -6,8 +6,8 @@ Current focus: move pure path/ownership policy below installer and runtime remov
 ## Phase 1 -- Characterize and activate
 
 - [x] Close order 4 on `main` at `56d32945`, branch from that exact commit, and activate only order-5 O065/O069.
-- [x] Recheck the preserve-leaf canonicalizers: `skill_planning._absolute_path` and
-  `unmanaged.canonical_package_path` remain byte-equivalent.
+- [x] Recheck the preserve-leaf canonicalizers: `skill_planning._absolute_path` and `unmanaged.canonical_package_path`
+  remain byte-equivalent.
 - [x] Recheck the inversion: `RuntimeRemovalExecutor` still receives target-root, generic boundary, tracked-file
   boundary, and Codex config-scope policy from `Installer` through four callables.
 - [x] Retain whole-path project/dispatcher canonicalizers, the standalone bundled hook copy, fail-closed cleanup,
@@ -34,6 +34,9 @@ Current focus: move pure path/ownership policy below installer and runtime remov
 - [x] Build the wheel and verify project enable/status/sync plus Codex runtime-disable from an isolated wheel install;
   post-disable status retained only `claude_code` packages and reported no unmanaged packages.
 - [x] Run `make test-unit` (9,064 passed, one skipped), `make test-regression` (898 passed), and `make pre-commit`.
+- [x] Restore the preserve-leaf and legacy-row rationale at its new owner, remove the stale unmanaged-module export,
+  repair 11 component-integration failures through the environment-backed target source, and record migration of the
+  remaining namespace-specific test patches as an order-32 prerequisite.
 - [x] Resolve board links/fragments, verify the 4-done/1-doing/29-parked Wave 7 graph, and run `git diff --check`.
 - [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 6 parked until
   the closeout lands.

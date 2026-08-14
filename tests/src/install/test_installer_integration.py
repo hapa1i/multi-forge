@@ -104,10 +104,20 @@ def mock_forge_home(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def installer(mock_repo: Path, mock_claude_home: Path, mock_forge_home: Path):
+def installer(
+    mock_repo: Path,
+    mock_claude_home: Path,
+    mock_forge_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Create an Installer pointing to mock directories."""
     import contextlib
     from unittest.mock import patch
+
+    # This fixture intentionally uses a different path than the autouse
+    # CLAUDE_HOME. Configure the resolver's source instead of patching one of
+    # several imported get_target_root/get_claude_home bindings.
+    monkeypatch.setenv("CLAUDE_HOME", str(mock_claude_home))
 
     tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
 
@@ -132,14 +142,6 @@ def installer(mock_repo: Path, mock_claude_home: Path, mock_forge_home: Path):
             patch(
                 "forge.install.installer.get_extensions_root",
                 return_value=repo / "src",
-            ),
-            patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ),
-            patch(
-                "forge.install.installer.get_claude_home",
-                return_value=claude_home,
             ),
             patch(
                 "forge.install.installer.get_forge_source_root",

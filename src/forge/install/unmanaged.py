@@ -1009,7 +1009,6 @@ __all__ = [
     "RootKind",
     "SkillScanRoot",
     "UnmanagedSkillPackage",
-    "canonical_package_path",
     "cleanup_proof_fingerprint",
     "codex_skill_visibility_roots",
     "revalidate_cleanup_candidate",

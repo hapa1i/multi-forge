@@ -97,6 +97,9 @@ def validate_path_within_boundary(
 ) -> None:
     """Require the path entry itself to remain within an expected boundary."""
 
+    # Resolve the parent and append the leaf lexically so validation checks a
+    # symlink's location rather than its target. The same expression works for
+    # missing leaves while still canonicalizing symlinks in the parent chain.
     resolved_path = path.parent.resolve() / path.name
     resolved_boundary = boundary.resolve()
     if not resolved_path.is_relative_to(resolved_boundary):
@@ -145,7 +148,12 @@ def tracked_file_boundary(
     scope: InstallScope,
     project_root: Path | None,
 ) -> Path:
-    """Return a tracked file's reviewed runtime boundary."""
+    """Return a tracked file's reviewed runtime boundary.
+
+    Legacy rows have no package grouping and remain constrained to the
+    historical Claude target. A v2 package row narrows the file to the
+    reviewed runtime root and its exact package directory.
+    """
 
     target_key = str(target)
     package_matches = [package for package in installation.skill_packages if target_key in package.file_paths]

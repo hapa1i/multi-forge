@@ -21,10 +21,21 @@ rollback semantics; “split the method” is unsafe unless the existing fault m
 [`docs/design_appendix.md` "C. Install Model Reference"](../../../design_appendix.md#c-install-model-reference) and
 [`docs/design.md` "5.1 Extensions install model"](../../../design.md#51-extensions-install-model).
 
+Order-5 review also found 21 patches of the installer module's `get_target_root` binding across eight test files. The
+component integration helper caused 11 failures once planning reached lower path policy and was repaired on order 5 by
+configuring its isolated `CLAUDE_HOME` source instead. Twenty installer-binding patches remain across seven files;
+nineteen patch only that binding, while the QA2 stale-symlink regression already needs a second patch at the lower
+path-policy binding. Runtime removal holds a third binding. The repeated setup therefore meets the shared-fixture
+threshold in the
+[`testing_guidelines.md` monkeypatch policy](../../../developer/testing_guidelines.md#monkeypatch-policy).
+
 ## Acceptance Criteria
 
 - Extract typed phase inputs/results for file application, settings ownership, stale reconciliation, Codex apply, and
   final installation assembly without reordering their side effects.
+- Before extracting phases, replace repeated direct target-root patches with a shared fixture that configures one
+  isolated environment-backed Claude target; migrate the existing sites and prove installer, path-policy legacy-row
+  fallback, and runtime-removal execution all resolve that same root without namespace-specific patches.
 - Every existing injected failure retains its exact filesystem, sidecar, Codex config, and tracking outcome; add a
   phase-order/fault table to the execution checklist before code changes.
 - Planning remains side-effect free; conflicts still stop before materialization; tracking commits last.
