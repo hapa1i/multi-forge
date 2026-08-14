@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import click
 from rich.console import Console
@@ -27,6 +27,7 @@ from forge.core.ops import (
     show_provider_trace,
 )
 from forge.core.ops.context import ExecutionContext
+from forge.core.state import local_period_bounds, try_parse_iso
 
 console = Console(width=200)
 
@@ -36,26 +37,14 @@ def _period_bounds(period: str) -> tuple[datetime | None, datetime | None]:
 
     ``all`` returns ``(None, None)`` so the op reads every retained shard.
     """
-    now_local = datetime.now().astimezone()
-    now_utc = datetime.now(timezone.utc)
-    if period == "today":
-        start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-        return start, now_utc
-    if period == "week":
-        midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        start = (midnight - timedelta(days=midnight.weekday())).astimezone(timezone.utc)
-        return start, now_utc
-    if period == "month":
-        start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-        return start, now_utc
-    return None, None
+    if period == "all":
+        return None, None
+    return local_period_bounds(period)
 
 
 def _short_time(ts: str) -> str:
-    try:
-        return datetime.fromisoformat(ts.rstrip("Z") + "+00:00").astimezone().strftime("%m-%d %H:%M")
-    except (ValueError, TypeError):
-        return ts or "-"
+    parsed = try_parse_iso(ts, assume_naive_utc=True)
+    return parsed.astimezone().strftime("%m-%d %H:%M") if parsed is not None else ts or "-"
 
 
 def _status_cell(final_usage_seen: bool, client_disconnected: bool, local_usage_status: str) -> str:

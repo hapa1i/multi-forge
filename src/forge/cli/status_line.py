@@ -1067,12 +1067,12 @@ def _format_reset_countdown(resets_at: Any, now: float | None = None) -> str | N
     if isinstance(resets_at, (int, float)):
         epoch = float(resets_at)
     elif isinstance(resets_at, str):
-        try:
-            from datetime import datetime
+        from forge.core.state import try_parse_iso
 
-            epoch = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
-        except ValueError:
+        parsed = try_parse_iso(resets_at)
+        if parsed is None:
             return None
+        epoch = parsed.timestamp()
     if epoch is None:
         return None
     remaining = epoch - now

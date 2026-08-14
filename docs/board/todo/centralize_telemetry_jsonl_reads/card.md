@@ -6,7 +6,7 @@
 
 **Finding**: O056.
 
-**Depends on**: [`centralize_time_parsing_and_periods`](../centralize_time_parsing_and_periods/card.md).
+**Depends on**: [`centralize_time_parsing_and_periods`](../../doing/centralize_time_parsing_and_periods/card.md).
 
 ## Goal
 

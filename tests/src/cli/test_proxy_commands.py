@@ -11,10 +11,16 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.cli.proxy import _format_relative_time as _format_proxy_relative_time
 from forge.cli.proxy import _ProxyInfo
 from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import ProxyStartResult
 from forge.session.identity import make_scoped_key
+
+
+def test_proxy_relative_time_keeps_compact_compatibility_contract() -> None:
+    assert _format_proxy_relative_time("not-a-date") == "not-a-date"
+    assert _format_proxy_relative_time("2999-01-01T00:00:00") == "just now"
 
 
 @pytest.fixture

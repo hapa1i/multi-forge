@@ -126,6 +126,9 @@ class TestIsFresh:
     def test_invalid_timestamp(self):
         assert _is_fresh({"checked_at": "not-a-date"}, throttle_seconds=60) is False
 
+    def test_naive_timestamp_is_not_interpreted_in_host_timezone(self):
+        assert _is_fresh({"checked_at": "2999-01-01T00:00:00"}, throttle_seconds=60) is False
+
 
 # --- _classify_event ---
 

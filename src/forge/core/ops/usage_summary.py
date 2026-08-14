@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from forge.core.run_id import derive_provider_session_id
+from forge.core.state import try_parse_iso
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     read_downstream_records_with_stats,
@@ -1218,12 +1219,9 @@ def _entry_in_window(evaluated_at: object, since: datetime) -> bool:
     """Whether a decision entry is at/after ``since``. Undateable entries are kept."""
     if not isinstance(evaluated_at, str) or not evaluated_at:
         return True
-    try:
-        ts = datetime.fromisoformat(evaluated_at.replace("Z", "+00:00"))
-    except ValueError:
+    ts = try_parse_iso(evaluated_at, assume_naive_utc=True)
+    if ts is None:
         return True
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
     bound = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
     return ts >= bound
 

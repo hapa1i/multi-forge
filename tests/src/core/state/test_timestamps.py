@@ -1,12 +1,23 @@
 """Tests for core.state.timestamps module."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
-from forge.core.state import iso_to_timestamp, now_iso, parse_iso, utc_timestamp_z
+from forge.core.state import (
+    RelativeTimeStyle,
+    format_compact_duration,
+    format_relative_time,
+    iso_to_timestamp,
+    local_period_bounds,
+    now_iso,
+    parse_iso,
+)
+from forge.core.state import timestamps as timestamps_module
+from forge.core.state import try_parse_iso, utc_timestamp_z
 
 
 class TestNowIso:
@@ -91,6 +102,10 @@ class TestParseIso:
         assert "timezone" in str(exc_info.value).lower()
         assert "naive" in str(exc_info.value).lower()
 
+    def test_can_explicitly_assume_naive_value_is_utc(self) -> None:
+        result = parse_iso("2024-01-15T10:30:00", assume_naive_utc=True)
+        assert result == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+
     def test_roundtrip_with_now_iso(self) -> None:
         """parse_iso can parse output of now_iso."""
         original = now_iso()
@@ -128,3 +143,178 @@ class TestIsoToTimestamp:
         earlier = iso_to_timestamp("2024-01-15T10:00:00+00:00")
         later = iso_to_timestamp("2024-01-15T11:00:00+00:00")
         assert earlier < later
+
+
+class TestTryParseIso:
+    """Tests for best-effort external timestamp parsing."""
+
+    @pytest.mark.parametrize("value", [None, 7, {}, "not-a-date"])
+    def test_invalid_or_non_string_value_returns_none(self, value: object) -> None:
+        assert try_parse_iso(value) is None
+
+    def test_naive_value_is_rejected_by_default(self) -> None:
+        assert try_parse_iso("2024-01-15T10:30:00") is None
+
+    def test_naive_value_requires_explicit_utc_compatibility_policy(self) -> None:
+        assert try_parse_iso("2024-01-15T10:30:00", assume_naive_utc=True) == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+
+    def test_non_utc_offset_is_normalized(self) -> None:
+        assert try_parse_iso("2024-01-15T10:30:00-04:00") == datetime(2024, 1, 15, 14, 30, tzinfo=UTC)
+
+    def test_production_fromisoformat_call_is_confined_to_shared_parser(self) -> None:
+        repo_root = Path(__file__).resolve().parents[4]
+        matches = [
+            path.relative_to(repo_root)
+            for path in (repo_root / "src" / "forge").rglob("*.py")
+            if "datetime.fromisoformat(" in path.read_text(encoding="utf-8")
+        ]
+        assert matches == [Path("src/forge/core/state/timestamps.py")]
+
+
+class TestLocalPeriodBounds:
+    """Tests for one local-calendar period calculation policy."""
+
+    def test_today_week_and_month_keep_dst_boundary_offsets(self) -> None:
+        berlin = ZoneInfo("Europe/Berlin")
+        now = datetime(2026, 3, 31, 12, 30, tzinfo=berlin)
+
+        assert local_period_bounds("today", now=now) == (
+            datetime(2026, 3, 30, 22, tzinfo=UTC),
+            datetime(2026, 3, 31, 10, 30, tzinfo=UTC),
+        )
+        assert local_period_bounds("week", now=now) == (
+            datetime(2026, 3, 29, 22, tzinfo=UTC),
+            datetime(2026, 3, 31, 10, 30, tzinfo=UTC),
+        )
+        assert local_period_bounds("month", now=now) == (
+            datetime(2026, 2, 28, 23, tzinfo=UTC),
+            datetime(2026, 3, 31, 10, 30, tzinfo=UTC),
+        )
+
+    def test_default_resolves_transition_aware_tz_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, timezone: tzinfo | None = None) -> "FrozenDateTime":
+                return cls(2026, 3, 31, 12, 30, tzinfo=timezone)
+
+        monkeypatch.setenv("TZ", "Europe/Berlin")
+        monkeypatch.setattr(timestamps_module, "datetime", FrozenDateTime)
+
+        assert local_period_bounds("month") == (
+            datetime(2026, 2, 28, 23, tzinfo=UTC),
+            datetime(2026, 3, 31, 10, 30, tzinfo=UTC),
+        )
+
+    def test_absolute_path_tz_falls_back_without_raising(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TZ", "/usr/share/zoneinfo/Europe/Berlin")
+
+        assert isinstance(timestamps_module._local_timezone(), tzinfo)
+
+    def test_all_sentinel_belongs_to_callers(self) -> None:
+        with pytest.raises(ValueError, match="Unknown local period"):
+            local_period_bounds("all", now=datetime(2026, 1, 1, tzinfo=UTC))
+
+    def test_supplied_now_must_be_timezone_aware(self) -> None:
+        with pytest.raises(ValueError, match="timezone-aware"):
+            local_period_bounds("today", now=datetime(2026, 1, 1))
+
+    def test_production_calendar_math_is_confined_to_shared_primitive(self) -> None:
+        repo_root = Path(__file__).resolve().parents[4]
+        matches = [
+            path.relative_to(repo_root)
+            for path in (repo_root / "src" / "forge").rglob("*.py")
+            if "midnight.weekday()" in path.read_text(encoding="utf-8")
+        ]
+        assert matches == [Path("src/forge/core/state/timestamps.py")]
+
+
+class TestRelativeTime:
+    """Tests for shared elapsed-time classification and named render styles."""
+
+    NOW = datetime(2024, 1, 15, 12, tzinfo=UTC)
+
+    @pytest.mark.parametrize(
+        ("seconds", "expected"),
+        [(3, "3s"), (300, "5m"), (8_100, "2h 15m"), (97_200, "1d 3h")],
+    )
+    def test_compact_duration_matches_proxy_register(self, seconds: float, expected: str) -> None:
+        assert format_compact_duration(seconds) == expected
+
+    @pytest.mark.parametrize(
+        ("timestamp", "expected"),
+        [
+            ("2024-01-15T11:59:30Z", "just now"),
+            ("2024-01-15T13:58:30+02:00", "1 min ago"),
+            ("2024-01-15T10:00:00+00:00", "2 hours ago"),
+            ("2024-01-13T12:00:00Z", "2 days ago"),
+            ("2024-01-01T12:00:00Z", "2 weeks ago"),
+        ],
+    )
+    def test_full_word_style(self, timestamp: str, expected: str) -> None:
+        assert (
+            format_relative_time(
+                timestamp,
+                style=RelativeTimeStyle.FULL_WORDS,
+                invalid="unknown",
+                now=self.NOW,
+            )
+            == expected
+        )
+
+    def test_compact_style_keeps_secondary_units(self) -> None:
+        assert (
+            format_relative_time(
+                "2024-01-15T09:44:30Z",
+                style=RelativeTimeStyle.COMPACT,
+                invalid="bad",
+                now=self.NOW,
+            )
+            == "2h 15m ago"
+        )
+
+    def test_future_value_is_just_now_in_both_styles(self) -> None:
+        future = (self.NOW + timedelta(minutes=5)).isoformat()
+        for style in RelativeTimeStyle:
+            assert format_relative_time(future, style=style, invalid="bad", now=self.NOW) == "just now"
+
+    def test_invalid_fallback_is_caller_owned(self) -> None:
+        assert (
+            format_relative_time(
+                "not-a-date",
+                style=RelativeTimeStyle.FULL_WORDS,
+                invalid="unknown",
+                now=self.NOW,
+            )
+            == "unknown"
+        )
+
+    def test_naive_policy_is_caller_owned(self) -> None:
+        naive = "2024-01-15T11:55:00"
+        assert (
+            format_relative_time(
+                naive,
+                style=RelativeTimeStyle.FULL_WORDS,
+                invalid="unknown",
+                now=self.NOW,
+            )
+            == "unknown"
+        )
+        assert (
+            format_relative_time(
+                naive,
+                style=RelativeTimeStyle.COMPACT,
+                invalid=naive,
+                assume_naive_utc=True,
+                now=self.NOW,
+            )
+            == "5m ago"
+        )
+
+    def test_supplied_now_must_be_timezone_aware(self) -> None:
+        with pytest.raises(ValueError, match="timezone-aware"):
+            format_relative_time(
+                "2024-01-15T11:55:00Z",
+                style=RelativeTimeStyle.COMPACT,
+                invalid="bad",
+                now=datetime(2024, 1, 15, 12),
+            )

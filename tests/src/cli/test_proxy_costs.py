@@ -42,6 +42,23 @@ def _patch_cost_logs(monkeypatch, records: list[dict[str, Any]], *, skipped_lega
     )
 
 
+def test_all_period_keeps_unbounded_cost_reader_sentinel(monkeypatch) -> None:
+    from forge.proxy.cost_logger import CostLogReadResult
+
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def read_costs(*args: object, **kwargs: object) -> CostLogReadResult:
+        calls.append((args, kwargs))
+        return CostLogReadResult(records=[], skipped_legacy_schema=0)
+
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs_with_stats", read_costs)
+
+    result = CliRunner().invoke(main, _costs_args("show", "--period", "all", "--json"))
+
+    assert result.exit_code == 0
+    assert calls == [((), {})]
+
+
 class TestFormatUsd:
     def test_normal_dollar_amount(self) -> None:
         assert _format_usd(1_500_000) == "$1.50"

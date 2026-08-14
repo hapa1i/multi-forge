@@ -25,7 +25,7 @@ from forge.core.reactive.session_runner import (
     run_claude_session,
 )
 from forge.core.reactive.structured_output import extract_json_from_response
-from forge.core.state import now_iso
+from forge.core.state import now_iso, try_parse_iso
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.policy.team.prompts import (
     IDLE_TAGGER_PROMPT,
@@ -156,12 +156,11 @@ def _is_fresh(entry: dict[str, Any], throttle_seconds: int) -> bool:
     checked_at = entry.get("checked_at")
     if not checked_at:
         return False
-    try:
-        checked_time = datetime.fromisoformat(checked_at.replace("Z", "+00:00"))
-        age = (datetime.now(timezone.utc) - checked_time).total_seconds()
-        return age < throttle_seconds
-    except (ValueError, TypeError):
+    checked_time = try_parse_iso(checked_at)
+    if checked_time is None:
         return False
+    age = (datetime.now(timezone.utc) - checked_time).total_seconds()
+    return age < throttle_seconds
 
 
 def _classify_event(

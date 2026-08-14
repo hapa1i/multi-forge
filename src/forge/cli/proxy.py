@@ -55,6 +55,11 @@ from forge.config.loader import (
 )
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
+from forge.core.state import (
+    RelativeTimeStyle,
+    format_compact_duration,
+)
+from forge.core.state import format_relative_time as format_relative_timestamp
 from forge.core.state.exceptions import StateCorruptedError
 from forge.proxy.proxies import (
     CLI_LOCK_TIMEOUT_S,
@@ -1461,17 +1466,7 @@ def _format_tokens(n: int) -> str:
 
 def _format_duration(seconds: float) -> str:
     """Format duration as human-readable (3s, 5m, 2h 15m, 1d 3h)."""
-    if seconds < 60:
-        return f"{seconds:.0f}s"
-    if seconds < 3600:
-        return f"{seconds / 60:.0f}m"
-    if seconds < 86400:
-        hours = int(seconds // 3600)
-        mins = int((seconds % 3600) // 60)
-        return f"{hours}h {mins}m"
-    days = int(seconds // 86400)
-    hours = int((seconds % 86400) // 3600)
-    return f"{days}d {hours}h"
+    return format_compact_duration(seconds)
 
 
 def _format_latency(ms: float) -> str:
@@ -1481,19 +1476,12 @@ def _format_latency(ms: float) -> str:
 
 def _format_relative_time(iso_str: str) -> str:
     """Format ISO timestamp as relative time ('12s ago', '5m ago')."""
-    from datetime import datetime, timezone
-
-    try:
-        dt = datetime.fromisoformat(iso_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        delta = datetime.now(timezone.utc) - dt
-        secs = delta.total_seconds()
-        if secs < 0:
-            return "just now"
-        return f"{_format_duration(secs)} ago"
-    except (ValueError, TypeError):
-        return iso_str
+    return format_relative_timestamp(
+        iso_str,
+        style=RelativeTimeStyle.COMPACT,
+        invalid=iso_str,
+        assume_naive_utc=True,
+    )
 
 
 @dataclass

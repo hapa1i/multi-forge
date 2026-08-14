@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.cli.session import _format_relative_time as _format_session_relative_time
 from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
@@ -24,6 +25,12 @@ from tests.src.cli.session_command_support import (
     _seed_scoped_duplicate_sessions,
     successful_claude_launch,
 )
+
+
+def test_session_relative_time_keeps_strict_invalid_contract() -> None:
+    assert _format_session_relative_time("not-a-date") == "unknown"
+    assert _format_session_relative_time("2026-01-01T00:00:00") == "unknown"
+    assert _format_session_relative_time("2999-01-01T00:00:00Z") == "just now"
 
 
 def _seed_missing_worktree_session(project: Path, name: str = "degraded") -> Path:

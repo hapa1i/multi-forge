@@ -6,8 +6,8 @@ closeout audit rejected stale claims D033/O020 and handed 34 still-live correctn
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
 added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is admitted as 31 verified
 findings across 34 implementation members; orders 1 and 2, O043 and O044, shipped independently in PRs #178 and #179,
-while the other 32 remain parked and no member is active during closeout. D056 and the other separately gated Wave 6
-rows remain outside that admission.
+order-3 O060/O061/O094 is active on `refactor/centralize-time-parsing-and-periods`, and the other 31 remain parked. D056
+and the other separately gated Wave 6 rows remain outside that admission.
 
 ## Goal
 

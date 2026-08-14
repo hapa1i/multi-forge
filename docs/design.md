@@ -1338,6 +1338,13 @@ Operation outcomes (policy checks, including no-call fail-opens) write to `~/.fo
 | `telemetry/audit_state/<proxy_id>.json`    | Audit drift detector in proxy-id sidecars | Writable sidecar drift baseline                             |
 | `usage/events/<month>_<pid>.jsonl`         | Legacy usage emitters                     | Transitional session activity/read-surface attribution      |
 
+Timestamp reads cross one boundary in `core.state.timestamps`. `parse_iso` requires timezone-aware ISO8601 by default
+and normalizes valid offsets to UTC; compatibility readers use `try_parse_iso` and must opt into naive-as-UTC handling
+explicitly where an established durable format already permits it. Malformed/non-string fallbacks remain caller-owned.
+`local_period_bounds` resolves today/week/month in the host's transition-aware local timezone, while each CLI owns its
+existing `all` sentinel. Relative-time presentation selects either compact or full-word style without changing those
+parsing and fallback policies.
+
 Downstream attempts are the proxy-spend source of truth. **Forge is not a cost oracle:** it records only route-reported
 cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its reporter/confidence, and records
 `cost_micros:null`/`confidence="unavailable"` otherwise; no local price catalog infers dollars from tokens. Nullable

@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- O043 and O044 shipped independently in PRs #178 and #179; no member is active while the O044
-closeout lands, and the other 32 members remain parked.
+**Lane**: `doing/` -- O043 and O044 shipped independently in PRs #178 and #179; order-3 O060/O061/O094 is active on
+`refactor/centralize-time-parsing-and-periods`, and the other 31 members remain parked.
 
 ## Goal
 
@@ -47,7 +47,7 @@ runs last so it lands on the smallest stable surface.
 | ----- | ---------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1     | O043             | [`decouple_lane_runtime_vocabulary`](../../done/decouple_lane_runtime_vocabulary/card.md)               | import-only runtime vocabulary                       |
 | 2     | O044             | [`share_policy_activation_rules`](../../done/share_policy_activation_rules/card.md)                     | shared validation, distinct state owners             |
-| 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../../todo/centralize_time_parsing_and_periods/card.md)         | timestamp/period primitives with explicit styles     |
+| 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../centralize_time_parsing_and_periods/card.md)                 | timestamp/period primitives with explicit styles     |
 | 4     | O066, O092       | [`unify_git_root_discovery`](../../todo/unify_git_root_discovery/card.md)                               | optional vs strict git-root contracts                |
 | 5     | O065, O069       | [`centralize_install_path_authority`](../../todo/centralize_install_path_authority/card.md)             | lower-layer path and ownership policy                |
 | 6     | O064             | [`centralize_cli_metric_formatting`](../../todo/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
