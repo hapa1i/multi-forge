@@ -41,7 +41,6 @@ from forge.cli.status_line import (
     format_rate_limits,
     format_sidecar,
     format_token_breakdown,
-    format_tokens,
     format_verification,
     get_context_display,
     get_line_change_values,
@@ -1443,22 +1442,6 @@ class TestGetContextDisplay:
 
         visible = _ANSI_RE.sub("", result)
         assert visible == "---"
-
-
-class TestFormatTokens:
-    """Tests for compact token number formatting."""
-
-    def test_millions(self):
-        assert format_tokens(1_500_000) == "1.5M"
-
-    def test_thousands(self):
-        assert format_tokens(12_500) == "12.5K"
-
-    def test_small(self):
-        assert format_tokens(42) == "42"
-
-    def test_exact_million(self):
-        assert format_tokens(1_000_000) == "1.0M"
 
 
 class TestRenderCategories:

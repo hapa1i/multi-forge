@@ -24,6 +24,13 @@ from typing import Any, NamedTuple
 
 import click
 
+from forge.core.metric_formatting import (
+    TokenDisplayPolicy,
+    UsdDisplayPolicy,
+    format_token_count,
+    format_usd,
+    format_usd_micros,
+)
 from forge.core.tiers import detect_tier_word
 from forge.core.transcript import resolve_entry_role
 
@@ -709,28 +716,6 @@ def get_context_display(
         return f"{color}{bar} {percent}%{BOLD}{alert_str}{RESET}"
 
 
-def _fmt_dollars(cost_usd: float) -> str:
-    """Format a USD amount: sub-cent as ``Nc``, else ``$X.XX`` (no color)."""
-    if cost_usd < 0.01:
-        return f"{int(cost_usd * 100)}c"
-    return f"${cost_usd:.2f}"
-
-
-def _fmt_cap_money(usd: float) -> str:
-    """Format a spend-cap amount, preserving precision below one cent.
-
-    Caps can legitimately be tiny (smoke-test caps of ``$0.0005``), so unlike
-    ``_fmt_dollars`` — which collapses any sub-cent value to ``0c`` and would
-    render ``$0.0005/$0.001`` as the misleading ``0c/0c`` — this keeps four
-    decimals below a cent so the two amounts stay distinguishable.
-    """
-    if usd >= 0.01:
-        return f"${usd:.2f}"
-    if usd <= 0:
-        return "$0.00"
-    return f"${usd:.4f}"
-
-
 def _format_duration(cost_data: dict[str, Any]) -> str | None:
     """Format session duration (colored), or None if absent. Unrelated to billing."""
     duration_ms = (cost_data or {}).get("total_duration_ms", 0)
@@ -758,15 +743,13 @@ def get_session_metrics(
     metrics: list[str] = []
 
     if is_proxy and proxy_cost_usd > 0:
-        if proxy_cost_usd < 0.01:
-            cost_str = f"~{int(proxy_cost_usd * 10000) / 100}c"
-        else:
-            cost_str = f"~${proxy_cost_usd:.2f}"
+        cost_str = f"~{format_usd(proxy_cost_usd, policy=UsdDisplayPolicy.STATUS_FRACTIONAL_CENTS)}"
         metrics.append(f"{METRICS_COLOR}{cost_str}{RESET}")
     elif not is_proxy:
         cost_usd = (cost_data or {}).get("total_cost_usd", 0)
         if cost_usd > 0:
-            metrics.append(f"{METRICS_COLOR}{_fmt_dollars(cost_usd)}{RESET}")
+            cost_str = format_usd(cost_usd, policy=UsdDisplayPolicy.STATUS_WHOLE_CENTS)
+            metrics.append(f"{METRICS_COLOR}{cost_str}{RESET}")
 
     duration = _format_duration(cost_data)
     if duration:
@@ -899,15 +882,6 @@ def _visible_width(text: str) -> int:
         if w > 0:
             prev_cp = cp
     return width
-
-
-def format_tokens(count: int) -> str:
-    """Format token count compactly: 1.2M / 12.5K / 42."""
-    if count >= 1_000_000:
-        return f"{count / 1_000_000:.1f}M"
-    if count >= 1000:
-        return f"{count / 1000:.1f}K"
-    return str(count)
 
 
 def format_breadcrumb(manifest: dict[str, Any], is_authoritative: bool) -> str | None:
@@ -1195,7 +1169,8 @@ def format_billing_cost(
     elif billing_mode == "ambiguous":
         cost_usd = (cost_data or {}).get("total_cost_usd", 0) or 0
         if cost_usd > 0:
-            parts.append(f"{METRICS_COLOR}\u2248{_fmt_dollars(cost_usd)}{RESET}")
+            cost_str = format_usd(cost_usd, policy=UsdDisplayPolicy.STATUS_WHOLE_CENTS)
+            parts.append(f"{METRICS_COLOR}\u2248{cost_str}{RESET}")
 
     duration = _format_duration(cost_data)
     if duration:
@@ -1328,7 +1303,9 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
         return None
     pct, marker, cur, lim = binding
     color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
-    return f"{DIM}cap:{RESET}{color}{marker} {_fmt_cap_money(cur)}/{_fmt_cap_money(lim)} ({int(pct)}%){RESET}"
+    current = format_usd(cur, policy=UsdDisplayPolicy.SPEND_CAP)
+    limit = format_usd(lim, policy=UsdDisplayPolicy.SPEND_CAP)
+    return f"{DIM}cap:{RESET}{color}{marker} {current}/{limit} ({int(pct)}%){RESET}"
 
 
 _LAUNCH_KEY_LABELS = {
@@ -1382,7 +1359,8 @@ def format_forge_cost(micros: int | None) -> str | None:
     """
     if micros is None or micros <= 0:
         return None
-    return f"{DIM}forge{RESET} {METRICS_COLOR}+{_fmt_dollars(micros / 1_000_000)}{RESET}"
+    cost = format_usd_micros(micros, policy=UsdDisplayPolicy.STATUS_WHOLE_CENTS)
+    return f"{DIM}forge{RESET} {METRICS_COLOR}+{cost}{RESET}"
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
@@ -1391,11 +1369,14 @@ def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens:
         return None
     parts: list[str] = []
     if input_tokens > 0:
-        parts.append(f"{DIM}{TOKEN_INPUT_LABEL}{RESET}{METRICS_COLOR}{format_tokens(input_tokens)}{RESET}")
+        tokens = format_token_count(input_tokens, policy=TokenDisplayPolicy.UPPER_TENTHS)
+        parts.append(f"{DIM}{TOKEN_INPUT_LABEL}{RESET}{METRICS_COLOR}{tokens}{RESET}")
     if output_tokens > 0:
-        parts.append(f"{DIM}{TOKEN_OUTPUT_LABEL}{RESET}{METRICS_COLOR}{format_tokens(output_tokens)}{RESET}")
+        tokens = format_token_count(output_tokens, policy=TokenDisplayPolicy.UPPER_TENTHS)
+        parts.append(f"{DIM}{TOKEN_OUTPUT_LABEL}{RESET}{METRICS_COLOR}{tokens}{RESET}")
     if cached_tokens > 0:
-        parts.append(f"{DIM}{TOKEN_CACHE_LABEL}{RESET}{METRICS_COLOR}{format_tokens(cached_tokens)}{RESET}")
+        tokens = format_token_count(cached_tokens, policy=TokenDisplayPolicy.UPPER_TENTHS)
+        parts.append(f"{DIM}{TOKEN_CACHE_LABEL}{RESET}{METRICS_COLOR}{tokens}{RESET}")
     return " ".join(parts) if parts else None
 
 

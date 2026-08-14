@@ -524,11 +524,13 @@ whole value is ledger-derived). Source combines legacy `UsageEvent.status`/`fail
 policy outcomes, so timeout/subprocess failures, proxy lookup fail-opens, depth skips, and parse fail-opens all
 contribute to the streak when recorded.
 
-**Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
-configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
-(no transcript scan, git subprocess, or proxy-field access it would otherwise trigger). Forge-unique segments read
-**effective** session state (`apply_overrides(intent, overrides)`), so a `%policy`/`%supervisor` override changes
-posture without an intent edit.
+**Rendering.** `where` (`path`, `branch`) leads concatenated; other segments are separator-joined in configured order.
+Lazy `RenderContext.cached_property` derivations prevent inactive-segment I/O. Forge-unique segments read **effective**
+session state (`apply_overrides(intent, overrides)`), so `%policy`/`%supervisor` overrides change posture without intent
+edits.
+
+Human token/USD strings use explicit `forge.core.metric_formatting` policies: whole-cent direct cost, fractional-cent
+proxy cost, and four-decimal tiny caps. Context size stays separate.
 
 **Labeling:** Proxy info is authoritative for routing. Session info is authoritative for workflow.
 

@@ -193,5 +193,7 @@ retain separate Wave 6 gates.
 - [x] Ship O066/O092 independently and close its member before activating Wave 7 order 5.
 - [x] Branch from order-4's pushed closeout (`56d32945`) and activate only `centralize_install_path_authority`.
 - [x] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
+- [x] Branch from order-5's pushed closeout (`62055bab`) and activate only `centralize_cli_metric_formatting`.
+- [ ] Ship O064 independently and close its member before activating Wave 7 order 7.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

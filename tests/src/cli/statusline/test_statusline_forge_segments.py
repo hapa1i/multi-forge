@@ -503,7 +503,7 @@ class TestSpendCapFormat:
         assert "cap:d" in out and "$3.20/$5.00" in out and "(64%)" in out
 
     def test_sub_cent_caps_keep_precision(self):
-        # Regression: _fmt_dollars collapsed sub-cent amounts to "0c", so a tiny
+        # Regression: UsdDisplayPolicy.STATUS_WHOLE_CENTS collapses sub-cent amounts to "0c", so a tiny
         # smoke cap rendered as the misleading "cap:d 0c/0c (50%)". Caps can be
         # legitimately sub-cent, so the binding amounts must stay distinguishable.
         out = _plain(format_spend_cap({"daily": {"current_usd": 0.0005, "limit_usd": 0.001, "percent": 50.0}}) or "")
@@ -558,7 +558,7 @@ class TestFormatForgeCost:
     def test_dollars_and_subcent(self):
         assert _plain(format_forge_cost(40_000) or "") == "forge +$0.04"
         assert _plain(format_forge_cost(1_234_567) or "") == "forge +$1.23"
-        # Reuses _fmt_dollars, which collapses sub-cent to "Nc".
+        # Uses UsdDisplayPolicy.STATUS_WHOLE_CENTS, which collapses sub-cent to "Nc".
         assert _plain(format_forge_cost(4_000) or "") == "forge +0c"
 
     def test_distinct_from_native_cost_prefix(self):

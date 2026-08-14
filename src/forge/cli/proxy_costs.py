@@ -15,31 +15,16 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.cli.output import print_tip
+from forge.core.metric_formatting import (
+    TokenDisplayPolicy,
+    UsdDisplayPolicy,
+    format_token_count,
+    format_usd_micros,
+)
 from forge.core.paths import display_path, get_forge_home
 from forge.core.state import local_period_bounds
 
 console = Console()
-
-
-def _format_usd(micros: int) -> str:
-    usd = micros / 1_000_000
-    if usd >= 1.0:
-        return f"${usd:,.2f}"
-    if usd >= 0.01:
-        return f"${usd:.2f}"
-    if usd >= 0.0001:
-        return f"${usd:.4f}"
-    if usd > 0:
-        return f"${usd:.6f}"
-    return "$0.00"
-
-
-def _format_tokens(n: int) -> str:
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)
 
 
 def _reported_micros(record: dict, key: str = "cost_micros") -> int | None:
@@ -281,10 +266,10 @@ def _display_by_verb(
     total_detail = f"{total_requests} requests"
     if unavailable_requests:
         total_detail += f" ({unavailable_requests} cost unavailable)"
-    table.add_row("Total", _format_usd(total_cost), total_detail, "")
+    table.add_row("Total", format_usd_micros(total_cost, policy=UsdDisplayPolicy.COST_DETAIL), total_detail, "")
     table.add_row(
         "Interactive",
-        _format_usd(interactive_cost),
+        format_usd_micros(interactive_cost, policy=UsdDisplayPolicy.COST_DETAIL),
         "unattributed",
         "~",
     )
@@ -294,7 +279,11 @@ def _display_by_verb(
         detail = f"{info['invocations']} run{'s' if info['invocations'] != 1 else ''}"
         if info["request_count"]:
             detail += f", {info['request_count']} reqs"
-        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        cost_cell = (
+            format_usd_micros(info["cost_micros"], policy=UsdDisplayPolicy.COST_DETAIL)
+            if info["reported"]
+            else "unavailable"
+        )
         table.add_row(verb, cost_cell, detail, "~" if info["reported"] else "")
 
     console.print(table)
@@ -326,8 +315,15 @@ def _display_by_model(
 
     for model in sorted(model_costs, key=lambda m: model_costs[m]["cost_micros"], reverse=True):
         info = model_costs[model]
-        tokens = f"{_format_tokens(info['input_tokens'])} in, {_format_tokens(info['output_tokens'])} out"
-        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        tokens = (
+            f"{format_token_count(info['input_tokens'], policy=TokenDisplayPolicy.UPPER_TENTHS)} in, "
+            f"{format_token_count(info['output_tokens'], policy=TokenDisplayPolicy.UPPER_TENTHS)} out"
+        )
+        cost_cell = (
+            format_usd_micros(info["cost_micros"], policy=UsdDisplayPolicy.COST_DETAIL)
+            if info["reported"]
+            else "unavailable"
+        )
         table.add_row(model, cost_cell, tokens)
 
     console.print(table)

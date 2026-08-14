@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--5 shipped independently in PRs #178--#182; no member is active while the order-5
-closeout lands, and the other 29 members remain parked.
+**Lane**: `doing/` -- orders 1--5 shipped independently in PRs #178--#182; order-6 O064 is active on
+`refactor/centralize-cli-metric-formatting`, and the other 28 members remain parked.
 
 ## Goal
 
@@ -50,7 +50,7 @@ runs last so it lands on the smallest stable surface.
 | 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../../done/centralize_time_parsing_and_periods/card.md)         | timestamp/period primitives with explicit styles     |
 | 4     | O066, O092       | [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md)                               | optional vs strict git-root contracts                |
 | 5     | O065, O069       | [`centralize_install_path_authority`](../../done/centralize_install_path_authority/card.md)             | lower-layer path and ownership policy                |
-| 6     | O064             | [`centralize_cli_metric_formatting`](../../todo/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
+| 6     | O064             | [`centralize_cli_metric_formatting`](../centralize_cli_metric_formatting/card.md)                       | named token/currency presentation policies           |
 | 7     | O071             | [`remove_stale_dependencies`](../../todo/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
 | 8     | O099 subset      | [`share_proxy_transport_test_fakes`](../../todo/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
 | 9     | O073             | [`lock_walkthrough_state_parity`](../../todo/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |

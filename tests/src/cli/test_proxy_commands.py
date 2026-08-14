@@ -2142,6 +2142,9 @@ class TestProxyMetrics:
         assert "42" in result.output  # total_requests
         assert "sonnet" in result.output
         assert "opus" in result.output
+        assert "100.0K" in result.output
+        assert "25.0K" in result.output
+        assert "60.0K" in result.output
 
     def test_metrics_json_output(self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._setup_registry_with_proxy()

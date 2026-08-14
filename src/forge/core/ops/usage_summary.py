@@ -28,6 +28,12 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from forge.core.metric_formatting import (
+    TokenDisplayPolicy,
+    UsdDisplayPolicy,
+    format_token_count,
+    format_usd_micros,
+)
 from forge.core.run_id import derive_provider_session_id
 from forge.core.state import try_parse_iso
 from forge.core.telemetry.downstream import (
@@ -366,11 +372,13 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
         # verb-snapshot estimates); when no snapshot estimate is mixed in (cost-plane-exact
         # and/or runtime-reported) it is dropped. `forge telemetry costs show` stays authoritative.
         prefix = "~" if summary.cost_estimated else ""
-        parts.append(f"{prefix}${summary.total_cost_micro_usd / 1_000_000:.2f}")
+        cost = format_usd_micros(summary.total_cost_micro_usd, policy=UsdDisplayPolicy.FIXED_CENTS)
+        parts.append(f"{prefix}{cost}")
 
     tokens = summary.total_input_tokens + summary.total_output_tokens
     if tokens:
-        parts.append(f"{_fmt_tokens(tokens)} tok")
+        formatted_tokens = format_token_count(tokens, policy=TokenDisplayPolicy.ACTIVITY_COMPACT)
+        parts.append(f"{formatted_tokens} tok")
 
     workflows = sum(c.calls for c in summary.commands if c.command in _WORKFLOW_COMMANDS)
     if workflows:
@@ -1224,11 +1232,3 @@ def _entry_in_window(evaluated_at: object, since: datetime) -> bool:
         return True
     bound = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
     return ts >= bound
-
-
-def _fmt_tokens(n: int) -> str:
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.0f}k"
-    return str(n)

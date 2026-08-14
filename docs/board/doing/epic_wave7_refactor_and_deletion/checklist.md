@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 5 shipped independently in PR #182 (`1a450143`). Keep orders 6--34 in `todo/` until this closeout
-is committed; order 6, O064, is the next eligible member.
+Current focus: execute order 6, O064, from order-5 closeout commit `62055bab`. Keep orders 7--34 in `todo/` until order
+6 ships and the epic selects the next member.
 
 - [x] Commit the bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -29,6 +29,11 @@ is committed; order 6, O064, is the next eligible member.
   core-path tests.
 - [x] Complete order 5's focused, integration, package, full, pre-commit, and board-integrity gates.
 - [x] Close order 5 independently before selecting or activating order 6.
+- [x] Create `refactor/centralize-cli-metric-formatting` from `62055bab`; activate only O064 and retain all shipped
+  human formatting plus 28 parked members.
+- [x] Share only numeric presentation primitives with explicit policies; preserve every human string and JSON number.
+- [x] Complete order 6's focused, integration, full, pre-commit, and board-integrity gates.
+- [ ] Close order 6 independently before selecting or activating order 7.
 
-Orders 6--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
+Orders 7--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
 Wave 6 finding.
