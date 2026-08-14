@@ -49,11 +49,12 @@ to [`epic_wave6_correctness_maintenance`](done/epic_wave6_correctness_maintenanc
 D054/D055, and all 36 findings across 13 members shipped independently in PRs #164--#168 and #170--#177. PR #169
 subsequently hardened O012 and retention-status failure reporting without adding a finding. The bounded Wave 6 child
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
-`5777192a` admitted 31 verified findings as 34 parked members under
+`5777192a` initially admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; orders 1--5 subsequently shipped independently in PRs #178--#182, order-6 O064 is now the sole active
-member, and the other 28 members remain parked. D056 and other correctness, security, performance, test-policy, output,
-and documentation rows still require their separately defined Wave 6 gates.
+implementation; orders 1--6 subsequently shipped independently in PRs #178--#183. A post-order-6 audit promoted O098 and
+the verified cap-state branch subset of O092 as one bounded member, so Wave 7 now contains 32 findings across 35
+members; no member is active while the closeout lands, and 29 remain parked. D056 and other correctness, security,
+performance, test-policy, output, and documentation rows still require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -727,21 +728,23 @@ duplication, dead-code, structural, or explicitly unverified rows outside its sc
 
 The structural/deletion candidates were rechecked after Wave 6 on merged `main` at `5777192a`. The screen covered
 O043--O073 and O092--O099 as candidate rows, then checked the remaining live ledger for structurally misclassified work.
-It admitted 31 verified finding rows as 34 parked implementation members under
+It initially admitted 31 verified finding rows as 34 parked implementation members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). No implementation branch or member
-was activated.
+was activated. After order 6, a repository-wide residue audit verified O098 and the `caps.py` non-dict branch from O092;
+the user admitted that bounded subset as one new member, bringing the current graph to 32 findings and 35 members.
 
 The admission corrects the original report rather than treating it as a command:
 
-| Finding scope | Admission result                                                                                                                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| O062          | Rejected. The current result types have different lifecycle/consumer contracts; a common base would add coupling.                                                                                    |
-| O063          | Rejected. Only the tiny write/update shape matches; registry read, error, version, and stale-process semantics differ.                                                                               |
-| O067          | Verified and admitted. Incremental SSE framing is still identical; transport-owned merge behavior stays separate.                                                                                    |
-| O093          | Rejected as deletion/simplification. Explicit-backend mapping is consumed and test-pinned; its completed investigation card is retired, not shipped.                                                 |
-| O095          | Narrowed and admitted only for worker parsing and optional JSON metadata. Repeated Click option declarations remain local.                                                                           |
-| O092          | Split by symbol/compatibility owner. Defensive cap parsing, converter candidates, and the unnamed tail remain excluded; the re-export/config warning windows do not authorize same-release deletion. |
-| O068--O070    | Split at existing preflight/execution, install path/transaction, and status source/render seams; no card authorizes a monolithic rewrite.                                                            |
+| Finding scope | Admission result                                                                                                                                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O062          | Rejected. The current result types have different lifecycle/consumer contracts; a common base would add coupling.                                                                                                            |
+| O063          | Rejected. Only the tiny write/update shape matches; registry read, error, version, and stale-process semantics differ.                                                                                                       |
+| O067          | Verified and admitted. Incremental SSE framing is still identical; transport-owned merge behavior stays separate.                                                                                                            |
+| O093          | Rejected as deletion/simplification. Explicit-backend mapping is consumed and test-pinned; its completed investigation card is retired, not shipped.                                                                         |
+| O095          | Narrowed and admitted only for worker parsing and optional JSON metadata. Repeated Click option declarations remain local.                                                                                                   |
+| O092          | Split by symbol/compatibility owner. The redundant cap-state non-dict branch is now verified and admitted; converter candidates and the unnamed tail remain excluded, and warning windows still block same-release deletion. |
+| O098          | Verified and admitted with the adjacent zero-caller session summary helper after import, patch-target, entry-point, documentation, resource, and history checks found no compatibility consumer.                             |
+| O068--O070    | Split at existing preflight/execution, install path/transaction, and status source/render seams; no card authorizes a monolithic rewrite.                                                                                    |
 
 Fresh-process import timing confirmed O043's heavyweight edge (about 317 ms cumulative for `forge.core.lanes` versus 20
 ms for `forge.core.runtime_vocab`). Focused characterization passed 58 tests: 23 cover fresh-config and explicit-backend
@@ -749,9 +752,11 @@ model mapping plus split-chunk/garbage handling in both SSE accumulators, while 
 worker parsers. No Forge workflow command or external model call was used.
 
 The admission explicitly does **not** absorb remaining correctness work. D040, D042--D052, D056, O045--O046, O072,
-O074--O091, O097, and O098 retain separate Wave 6 verification/entry gates as applicable; rows still marked unverified
-remain ineligible. O099's transcript-selector subset was already closed by D007/D024. These exclusions make the Wave 7
-child epic an executable refactor/deletion sequence rather than a synonym for “everything left.”
+O074--O091, and O097 retain separate Wave 6 verification/entry gates as applicable; rows still marked unverified remain
+ineligible. O099's transcript-selector subset was already closed by D007/D024. O098 and only the verified cap-state
+branch moved through a later bounded exception; O084, converter/Gemini residue, release-gated deletions, and the unnamed
+tail remain outside. These exclusions make the Wave 7 child epic an executable refactor/deletion sequence rather than a
+synonym for “everything left.”
 
 ### Suggested coordination boundaries
 
@@ -774,10 +779,10 @@ child epic an executable refactor/deletion sequence rather than a synonym for �
 - **[Wave 6 correctness maintenance epic](done/epic_wave6_correctness_maintenance/card.md):** all 36 verified
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
-- **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 members; orders 1--5 shipped independently in PRs #178--#182, order-6 O064 is active, and the other
-  28 are parked. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and O092's
-  unverified tail is not an executable deletion set.
+- **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
+  are split into 35 members; orders 1--6 shipped independently in PRs #178--#183, no member is active during closeout,
+  and 29 are parked. O062/O063/O093 are rejected as written, O067/O095/O098 and the cap-state O092 branch are admitted
+  only in their verified scope, and O092's unverified tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Centralize CLI metric formatting
+
+**Goal/outcome**: Give token and USD presentation one UI-free authority while preserving each CLI surface's named
+rounding, precision, suffix, and sub-cent policy.
+
+**Key changes**:
+
+- Proxy metrics, cost reporting, activity summaries, and status-line rendering now select explicit shared token and
+  currency policies; JSON values and all shipped human strings remain unchanged.
+- Golden tests pin the distinct presentation contracts, including lowercase activity thousands, adaptive cost detail,
+  fixed-cent session summaries, and whole- versus fractional-cent status metrics.
+
+**Verification**: 648 focused tests, 17 targeted Docker status-line integrations, 9,109 unit tests (one skip, 122
+deselected), 898 regressions, full pre-commit, and board-integrity checks pass. PR #183 merged as `cd3e50e8`. No Forge
+workflow command was used.
+
 ### Centralize installer path authority
 
 **Goal/outcome**: Give installer planning and runtime-scoped removal one lower-layer authority for target mapping, path
@@ -37,7 +53,7 @@ boundaries, tracked ownership, and preserve-the-leaf package canonicalization.
 - `install.path_policy` now owns the shared pure path decisions, and `RuntimeRemovalExecutor` no longer receives four
   installer-owned policy callbacks.
 - Fail-closed symlink, legacy-row, runtime-scope, and unmanaged-package behavior remains unchanged; duplicate CLI
-  git-root cases were removed, and the remaining target-root test-fixture cleanup is assigned to Wave 7 order 32.
+  git-root cases were removed, and the remaining target-root test-fixture cleanup is assigned to Wave 7 order 33.
 
 **Verification**: 347 focused tests, 23 targeted Docker installer integrations, 14 component installer integrations,
 9,064 unit tests (one skip, 122 deselected), 898 regressions, clean-wheel lifecycle checks, full pre-commit, and board

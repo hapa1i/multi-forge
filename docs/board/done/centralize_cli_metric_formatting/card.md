@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/centralize-cli-metric-formatting` from order-5 closeout commit `62055bab`.
+**Lane**: `done/` -- shipped independently in PR #183 (`cd3e50e8`) from order-5 closeout commit `62055bab`.
 
 **Finding**: O064.
 
@@ -27,6 +27,11 @@ create UX drift. The unchanged proxy, cost, activity, and status-line characteri
 - Golden tests pin every existing human output before helper replacement; JSON numeric fields remain numeric and
   byte-compatible.
 - Run proxy, proxy-cost, activity/usage-summary, and status-line unit suites.
+
+PR #183 merged as `cd3e50e8`. Focused coverage passed 648 tests, targeted Docker status-line coverage passed 17 tests,
+the full unit suite passed 9,109 tests with one skip and 122 deselections, and all 898 regressions plus pre-commit and
+board-integrity gates passed. The post-merge closeout admits one independently verified residue member as the new order
+7; the Wave 7 graph is six `done/`, zero member `doing/`, and 29 `todo/` cards.
 
 ## Exclusions
 

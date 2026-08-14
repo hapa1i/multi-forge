@@ -1,7 +1,6 @@
 # Centralize CLI metric formatting policies checklist
 
-Current focus: share numeric presentation primitives on `refactor/centralize-cli-metric-formatting` from order-5
-closeout commit `62055bab`; preserve every shipped human string and keep orders 7--34 parked.
+Current focus: complete -- O064 shipped independently in PR #183 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -32,5 +31,5 @@ closeout commit `62055bab`; preserve every shipped human string and keep orders 
   `make pre-commit`.
 - [x] Resolve all 855 local paths across 334 board Markdown files and all three fragments from the eight changed board
   documents; verify the 5-done/1-doing/28-parked Wave 7 graph with valid backlinks; run `git diff --check`.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 7 parked until
-  the closeout lands.
+- [x] After review and merge, record PR #183 (`cd3e50e8`), move this member to `done/`, and admit the independently
+  verified residue member without activating it. The Wave 7 graph is six done, zero member doing, and 29 todo cards.

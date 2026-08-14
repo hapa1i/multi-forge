@@ -178,8 +178,8 @@ retain separate Wave 6 gates.
 - [x] Record human workflow preflight stream splitting as D056, outside the active member and behind its own entry gate.
 - [x] Recheck the Wave 7 structural/deletion candidates on merged `main` at `5777192a`; reject O062/O063/O093 as
   written, promote only verified O067/O095 subsets, and keep all unverified symbols excluded.
-- [x] Park 34 ordered implementation members under `epic_wave7_refactor_and_deletion`, split the DG4 umbrellas and large
-  fork/installer/status-line seams, and retire three superseded/invalidated cards without activating work.
+- [x] Park the ordered implementation members under `epic_wave7_refactor_and_deletion`, split the DG4 umbrellas and
+  large fork/installer/status-line seams, and retire three superseded/invalidated cards without activating work.
 - [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW correctness, security, performance, test-policy,
   output, and documentation findings before admitting any of them.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
@@ -194,6 +194,8 @@ retain separate Wave 6 gates.
 - [x] Branch from order-4's pushed closeout (`56d32945`) and activate only `centralize_install_path_authority`.
 - [x] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
 - [x] Branch from order-5's pushed closeout (`62055bab`) and activate only `centralize_cli_metric_formatting`.
-- [ ] Ship O064 independently and close its member before activating Wave 7 order 7.
+- [x] Ship O064 independently in PR #183 (`cd3e50e8`) and close its member before activating Wave 7 order 7.
+- [ ] Branch from order-6's pushed closeout and activate only `remove_verified_internal_residue`, the explicitly
+  admitted O098/O092 subset; keep orders 8--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

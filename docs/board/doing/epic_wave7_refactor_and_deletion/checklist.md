@@ -1,9 +1,9 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: execute order 6, O064, from order-5 closeout commit `62055bab`. Keep orders 7--34 in `todo/` until order
-6 ships and the epic selects the next member.
+Current focus: order 6 shipped independently in PR #183 (`cd3e50e8`). Keep orders 7--35 in `todo/` until this closeout
+is committed; order 7, the explicitly admitted O098/O092 residue subset, is the next eligible member.
 
-- [x] Commit the bounded admission and 34-member sequence on `main` (`095d8eeb`).
+- [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
 - [x] Move this epic and only `decouple_lane_runtime_vocabulary` to `doing/`; repair every inbound board link.
 - [x] Retain O043 runtime classification and registry-vocabulary parity while removing the heavyweight import edge.
@@ -33,7 +33,9 @@ Current focus: execute order 6, O064, from order-5 closeout commit `62055bab`. K
   human formatting plus 28 parked members.
 - [x] Share only numeric presentation primitives with explicit policies; preserve every human string and JSON number.
 - [x] Complete order 6's focused, integration, full, pre-commit, and board-integrity gates.
-- [ ] Close order 6 independently before selecting or activating order 7.
+- [x] Close order 6 independently in PR #183 (`cd3e50e8`) before selecting or activating order 7.
+- [x] Admit the mechanically verified O098/session-summary/cap-guard subset as a bounded, non-overlapping order-7
+  sequencing exception; retain O084, converter/Gemini candidates, release-gated deletions, and the unnamed tail outside.
 
-Orders 7--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
-Wave 6 finding.
+Orders 7--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
+gated Wave 6 finding.

@@ -4,10 +4,11 @@
 Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
 closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
-added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is admitted as 31 verified
-findings across 34 implementation members; orders 1--5 shipped independently in PRs #178--#182, order-6 O064 is active
-on `refactor/centralize-cli-metric-formatting`, and the other 28 remain parked. D056 and the other separately gated Wave
-6 rows remain outside that admission.
+added bounded O012 and retention-status hardening without changing that finding count. Wave 7 now contains 32 verified
+findings across 35 implementation members; orders 1--6 shipped independently in PRs #178--#183, no member is active
+while the order-6 closeout lands, and the other 29 remain parked. The user admitted O098 and the verified cap-state
+subset of O092 as one bounded, non-overlapping sequencing exception; D056 and the other separately gated Wave 6 rows
+remain outside that admission.
 
 ## Goal
 
