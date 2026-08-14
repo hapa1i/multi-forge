@@ -1,8 +1,8 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 7 and the bounded
+Current focus: orders 1--8 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #185. Order 8 is active on `refactor/remove-stale-dependencies`; keep orders 9--35 in `todo/`.
+PR #186. Keep orders 9--35 in `todo/`; order 9 is next but not active.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -43,8 +43,8 @@ PR #185. Order 8 is active on `refactor/remove-stale-dependencies`; keep orders 
 - [x] Close the corrective member after PR #185 (`8ccbf387`) before selecting or activating order 8.
 - [x] Create `refactor/remove-stale-dependencies` from `5bd69ef5`, activate only O071, and retain runtime dependency
   ownership plus 27 parked members.
-- [ ] Remove only the verified redundant `python-dotenv` dev edge, retain Starlette's live `httpx2` dependency, complete
-  package/full/board verification, and ship order 8 before selecting order 9.
+- [x] Remove only the verified redundant `python-dotenv` dev edge, retain Starlette's live `httpx2` dependency, complete
+  package/full/board verification, and ship order 8 in PR #186 (`19dcf9cb`) before selecting order 9.
 
-Orders 8--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
+Orders 9--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
 gated Wave 6 finding.

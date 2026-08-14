@@ -1,7 +1,7 @@
 # Remove a redundant dependency declaration checklist
 
-Current focus: active as Wave 7 order 8 in draft PR #186 on `refactor/remove-stale-dependencies`; keep orders 9--35
-parked.
+Current focus: complete -- the verified O071 subset shipped in PR #186 (`19dcf9cb`); order 9 remains parked pending
+explicit selection.
 
 ## Activation and evidence
 
@@ -35,4 +35,5 @@ parked.
 - [x] Run full pre-commit, Markdown, dependency-tree, board-size, board-link/lane, and diff checks.
 - [x] Record the verified outcome and adjusted O071 disposition without activating order 9.
 - [x] Open draft PR #186 without activating order 9.
-- [ ] After merge, add the change-log entry, move this card to `done/`, and only then select order 9.
+- [x] After PR #186 merged as `19dcf9cb`, add the change-log entry, move this card to `done/`, verify the final
+  8-done/0-doing/27-parked Wave 7 graph, and leave order 9 parked pending explicit selection.

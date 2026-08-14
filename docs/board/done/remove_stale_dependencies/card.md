@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active as Wave 7 order 8 in draft PR #186 on `refactor/remove-stale-dependencies` from `5bd69ef5`.
+**Lane**: `done/` -- the verified O071 subset shipped in PR #186 (`19dcf9cb`) on 2026-08-15.
 
 **Finding**: O071.
 

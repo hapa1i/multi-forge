@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-15
+
+### Remove redundant development dependency metadata
+
+**Goal/outcome**: Remove the duplicate dev `python-dotenv` floor without weakening runtime or test dependencies.
+
+**Key changes**:
+
+- Removed only the redundant dev-group `python-dotenv>=1.2.1` edge; runtime still requires `>=1.2.2`, with no package or
+  version churn in the lockfile.
+- Rejected O071's stale `httpx2` claim after Starlette source, repository history, and a warnings-as-errors control
+  proved it is a live test-client dependency.
+
+**Verification**: 17 focused tests, 9,115 unit tests (one skip, 122 deselected), 906 regressions, build and clean-wheel
+smoke, full pre-commit, and board-integrity checks pass. PR #186 merged as `19dcf9cb` with all five GitHub checks
+passing. No Forge workflow command was used.
+
 ## 2026-08-14
 
 ### Close post-merge correctness gaps

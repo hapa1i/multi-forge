@@ -5,11 +5,11 @@ Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. 
 closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
 added bounded O012 and retention-status hardening without changing that finding count. Wave 7 now contains 32 verified
-findings across 35 implementation members; orders 1--7 shipped independently in PRs #178--#184, and the other 28
-remained parked after [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md)
-shipped five verified post-merge corrections in PR #185. Order 8 is now active, leaving 27 parked members. The user
-admitted O098 and the verified cap-state subset of O092 as one bounded, non-overlapping sequencing exception; D056 and
-the other separately gated Wave 6 rows remain outside that admission.
+findings across 35 implementation members. Orders 1--7 shipped independently in PRs #178--#184, and order 8 shipped in
+PR #186. Twenty-seven members remain parked after
+[`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) shipped five verified
+post-merge corrections in PR #185. The user admitted O098 and the verified cap-state subset of O092 as one bounded,
+non-overlapping sequencing exception; D056 and the other separately gated Wave 6 rows remain outside that admission.
 
 ## Goal
 

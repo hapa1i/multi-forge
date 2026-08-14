@@ -2,10 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--7 shipped independently in PRs #178--#184, and the bounded
+**Lane**: `doing/` -- orders 1--7 shipped independently in PRs #178--#184, and order 8 shipped in PR #186. The bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
-Order 8, [`remove_stale_dependencies`](../remove_stale_dependencies/card.md), is active; the other 27 members remain
-parked.
+The other 27 members remain parked; order 9 is next but not active.
 
 ## Goal
 
@@ -58,7 +57,7 @@ runs last so it lands on the smallest stable surface.
 | 5     | O065, O069       | [`centralize_install_path_authority`](../../done/centralize_install_path_authority/card.md)             | lower-layer path and ownership policy                |
 | 6     | O064             | [`centralize_cli_metric_formatting`](../../done/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
 | 7     | O098, O092       | [`remove_verified_internal_residue`](../../done/remove_verified_internal_residue/card.md)               | verified session metadata and cap-state residue      |
-| 8     | O071             | [`remove_stale_dependencies`](../remove_stale_dependencies/card.md)                                     | package metadata and clean-wheel proof               |
+| 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
 | 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../todo/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
 | 10    | O073             | [`lock_walkthrough_state_parity`](../../todo/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
 | 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
