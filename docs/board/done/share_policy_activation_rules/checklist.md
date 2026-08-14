@@ -1,7 +1,6 @@
 # Share policy activation rules checklist
 
-Current focus: implementation and required verification are complete on the execution branch; keep O044 in `doing/`
-through review and merge, then perform the board-only closeout before activating order 3.
+Current focus: complete -- O044 shipped independently in PR #179 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -49,5 +48,6 @@ through review and merge, then perform the board-only closeout before activating
 - [x] Resolve board links/fragments and run `git diff --check`: all 853 local links across 329 board Markdown files and
   all three fragments from the seven changed board documents resolve. The 34-member Wave 7 graph is exactly one `done/`,
   one `doing/`, and 32 `todo/` members with valid epic backlinks.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 3 parked until
-  the closeout lands.
+- [x] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 3 parked until
+  the closeout lands. The final audit resolves 854 local links across 330 board Markdown files and all three fragment
+  links from changed documents; the Wave 7 graph is two done, zero doing, and 32 todo members.

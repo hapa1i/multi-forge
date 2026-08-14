@@ -1,8 +1,8 @@
 # Share policy activation rules without merging state owners
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/share-policy-activation-rules` from O043 closeout commit `2a08f009`.
+**Lane**: `done/` -- shipped independently in PR #179 (`435f2bac`) from O043 closeout commit `2a08f009`.
 
 **Finding**: O044.
 
@@ -26,7 +26,7 @@ validation/value construction is safe to consolidate. The unchanged characteriza
 - Terminal commands still persist intent; `%policy` still persists overrides; each retains its output and error shape.
 - Add an exact behavior matrix and run policy CLI/direct-command unit plus targeted hook integration tests.
 
-## Implementation Status
+## Implementation Outcome
 
 `build_policy_activation` now derives bundle and fail-mode choices from their policy authorities, validates activation
 inputs, and returns typed activation/deactivation values. Both terminal and direct-command handlers call it, but their
@@ -37,6 +37,13 @@ Verification on the branch covers 125 focused tests, 22 targeted Docker hook int
 122 deselected), and 898 regressions. Full pre-commit passes after Markdown normalization. `docs/design.md` records the
 command-core boundary; `docs/end-user/policy.md` already documents the unchanged commands, options, and distinct state
 owners, so it needs no edit.
+
+PR #179 merged at `435f2bac` with all five GitHub checks passing. The terminal path still writes only policy intent,
+while the direct-command path still writes only session overrides and retains its existing bundle-config handoff.
+
+The post-merge closeout resolves all 854 local links across 330 board Markdown files and all three fragment links from
+changed documents. The Wave 7 graph is two `done/`, zero `doing/`, and 32 `todo/` members with valid epic backlinks; the
+adjacent policy-check vocabulary literals remain a standalone parked follow-up.
 
 ## Exclusions
 

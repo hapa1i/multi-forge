@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Share policy activation rules
+
+**Goal/outcome**: Share policy activation vocabulary and validation without merging terminal intent writes with direct
+session-override writes.
+
+**Key changes**:
+
+- A UI-free command-core helper now derives bundle names and fail modes from their authorities and returns typed
+  activation or deactivation values, including TDD permissive configuration.
+- Both policy surfaces use the shared rules while retaining their state owners, syntax, errors, output, and mutable
+  bundle-config handoff. Adjacent policy-check vocabulary remains a standalone parked follow-up.
+
+**Verification**: 125 focused tests, 22 targeted Docker hook integrations, 9,022 unit tests (one skip, 122 deselected),
+898 regressions, full pre-commit, and board integrity checks pass. PR #179 merged as `435f2bac` with all five GitHub
+checks passing. No Forge workflow command was used.
+
 ### Decouple lane runtime vocabulary
 
 **Goal/outcome**: Restore the documented import-light lane vocabulary boundary without changing runtime classification

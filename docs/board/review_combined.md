@@ -51,9 +51,9 @@ subsequently hardened O012 and retention-status failure reporting without adding
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
-implementation; order-1 O043 subsequently shipped independently in PR #178, order-2 O044 is now the sole active member,
-and the other 32 members remain parked. D056 and other correctness, security, performance, test-policy, output, and
-documentation rows still require their separately defined Wave 6 gates.
+implementation; orders 1 and 2, O043 and O044, subsequently shipped independently in PRs #178 and #179, and the other 32
+members remain parked. D056 and other correctness, security, performance, test-policy, output, and documentation rows
+still require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -402,6 +402,12 @@ implementation outcome below records its completed code and regression work.
   measured cumulative import fell from approximately 317 ms to 55 ms. Runtime IDs, lane defaults, classification, and
   dispatch behavior are unchanged. It shipped in PR #178 (`30f930b0`) with all five GitHub checks passing. See
   [`decouple_lane_runtime_vocabulary`](done/decouple_lane_runtime_vocabulary/card.md).
+- **O044 â€” resolved 2026-08-14:** terminal and direct policy activation now share registry-backed bundle vocabulary,
+  fail-mode validation, and typed activation values through a UI-free command-core helper. Terminal commands still own
+  durable policy intent, while direct `%policy` commands still own session overrides and retain their distinct parsing,
+  errors, output, and mutable bundle-config handoff. The 125 focused tests, 22 targeted Docker hook integrations, 9,022
+  unit tests (one skip, 122 deselected), 898 regressions, full pre-commit, and all five GitHub checks passed. It shipped
+  in PR #179 (`435f2bac`). See [`share_policy_activation_rules`](done/share_policy_activation_rules/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -750,7 +756,7 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
 ### Suggested coordination boundaries
 
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001â€“D005 and O028 shipped as three
-  independent members. O044 is active as later bounded-maintenance work; terminal commands continue to own intent while
+  independent members. Later bounded-maintenance O044 shipped in PR #179; terminal commands continue to own intent while
   `%policy` commands continue to own overrides.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130â€“#132.
@@ -769,8 +775,8 @@ child epic an executable refactor/deletion sequence rather than a synonym for â€
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 31 verified structural rows
-  are split into 34 members; order-1 O043 shipped independently in PR #178, order-2 O044 is active, and the other 32 are
-  parked. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and O092's
+  are split into 34 members; orders 1 and 2, O043 and O044, shipped independently in PRs #178 and #179, and the other 32
+  are parked. O062/O063/O093 are rejected as written, O067/O095 are admitted only in their verified scope, and O092's
   unverified tail is not an executable deletion set.
 
 ## Strengths (preserve these)

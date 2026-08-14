@@ -1,8 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: execute only Wave 7 order-2 O044 on `refactor/share-policy-activation-rules`. O043 is closed, the other
-32 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate Wave 6
-gates.
+Current focus: O044 shipped independently in PR #179; land its closeout before activating order-3 O060/O061/O094. The
+other 32 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate
+Wave 6 gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -186,6 +186,6 @@ gates.
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.
 - [x] Branch from O043's pushed closeout (`2a08f009`) and activate only `share_policy_activation_rules`.
-- [ ] Ship O044 independently and close its member before activating Wave 7 order 3.
+- [x] Ship O044 independently and close its member before activating Wave 7 order 3.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
