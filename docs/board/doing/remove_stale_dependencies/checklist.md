@@ -1,6 +1,7 @@
 # Remove a redundant dependency declaration checklist
 
-Current focus: active as Wave 7 order 8 on `refactor/remove-stale-dependencies`; keep orders 9--35 parked.
+Current focus: active as Wave 7 order 8 in draft PR #186 on `refactor/remove-stale-dependencies`; keep orders 9--35
+parked.
 
 ## Activation and evidence
 
@@ -33,5 +34,5 @@ Current focus: active as Wave 7 order 8 on `refactor/remove-stale-dependencies`;
 - [x] Run full unit (9,115 passed, one expected skip) and regression (906 passed) suites.
 - [x] Run full pre-commit, Markdown, dependency-tree, board-size, board-link/lane, and diff checks.
 - [x] Record the verified outcome and adjusted O071 disposition without activating order 9.
-- [ ] Open an independent PR without activating order 9.
+- [x] Open draft PR #186 without activating order 9.
 - [ ] After merge, add the change-log entry, move this card to `done/`, and only then select order 9.
