@@ -190,3 +190,6 @@ def test_o034_shadow_reads_report_ambiguous_session_cleanly(
     assert "Multiple sessions" in error
     assert "alpha" in error
     assert "beta" in error
+    assert "--session" not in error
+    assert "SESSION argument" in error
+    assert f"forge policy shadow {command} alpha" in error

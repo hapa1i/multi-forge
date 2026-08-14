@@ -10,6 +10,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from forge.config.schema import TierOverride, TierOverrides
 from forge.core.llm.errors import AuthenticationError
@@ -198,6 +199,7 @@ class _ProxyConfigForServer:
     preferred_provider = "litellm"
     default_tier = "sonnet"
     backend = ""
+    tool_prefixes_to_ignore = ["mcp__*"]
 
     def get_provider(self, name: str | None = None) -> _ProviderConfigForServer:
         return _ProviderConfigForServer()
@@ -313,3 +315,43 @@ async def test_o035_required_tool_choice_reaches_the_upstream_client(monkeypatch
     assert await_args is not None
     hyperparameters = await_args.kwargs["hyperparams"]
     assert hyperparameters.extra["openai"]["tool_choice"] == "required"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_o035_unsatisfiable_required_tool_choice_returns_400_before_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    stream: bool,
+) -> None:
+    """Filtering every required tool is a client error for both response modes."""
+    import forge.proxy.server as server
+
+    get_client = AsyncMock()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server.config, "proxy", _ProxyConfigForServer())
+    monkeypatch.setattr(server.client_factory, "get_client", get_client)
+    monkeypatch.setattr(server.client_factory, "detect_provider_for_model", lambda *_: SimpleNamespace(value="openai"))
+    request = MessagesRequest(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[Message(role="user", content="use the tool")],
+        tools=[
+            ToolDefinition(
+                name="mcp__only",
+                description="Filtered tool",
+                input_schema=ToolInputSchema(properties={}),
+            )
+        ],
+        tool_choice={"type": "any"},
+        stream=stream,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await server.create_message(request, cast(Any, _RawRequest()))
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "type": "invalid_request_error",
+        "message": "tool_choice 'any' requires at least one available tool after proxy filtering",
+    }
+    get_client.assert_not_awaited()

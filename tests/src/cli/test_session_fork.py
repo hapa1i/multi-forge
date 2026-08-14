@@ -1137,6 +1137,7 @@ class TestSessionFork:
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
+            mock_manager.delete_session.side_effect = OSError("cleanup denied")
             result = runner.invoke(
                 main,
                 [
@@ -1155,6 +1156,9 @@ class TestSessionFork:
         # Clean exit (SystemExit), not an uncaught PermissionError traceback.
         assert isinstance(result.exception, SystemExit)
         assert "Could not relocate" in result.output
+        assert "Cleanup also failed for created session 'fork-child': cleanup denied." in result.output
+        assert "forge session delete fork-child --yes --force --keep-transcripts" in result.output
+        assert "--keep-worktree" not in result.output
         mock_manager.delete_session.assert_called_once()
         assert mock_manager.delete_session.call_args.kwargs["delete_transcripts"] is False
 

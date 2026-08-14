@@ -10,7 +10,9 @@ import os
 from datetime import UTC, datetime, timedelta, tzinfo
 from enum import StrEnum
 from pathlib import Path
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
+
+from dateutil.tz import gettz
 
 
 class RelativeTimeStyle(StrEnum):
@@ -23,13 +25,15 @@ class RelativeTimeStyle(StrEnum):
 def _local_timezone() -> tzinfo:
     """Resolve the host timezone with transition rules when the platform exposes them.
 
-    ``TZ`` is interpreted only as an IANA key. Absolute paths and POSIX rule strings
-    fall back to ``/etc/localtime`` rather than being interpreted directly.
+    ``TZ`` accepts the process-local forms supported by POSIX environments: IANA
+    keys, absolute or colon-prefixed TZif paths, and POSIX rule strings. Invalid
+    values fall back to ``/etc/localtime``.
     """
     if timezone_name := os.environ.get("TZ"):
         try:
-            return ZoneInfo(timezone_name)
-        except (ZoneInfoNotFoundError, ValueError):
+            if timezone := gettz(timezone_name):
+                return timezone
+        except (OSError, ValueError):
             pass
 
     try:

@@ -151,10 +151,11 @@ def _resolve_policy_session(
     explicit: str | None,
     *,
     as_json: bool = False,
+    positional_session_command: str | None = None,
 ) -> tuple[SessionStore, SessionState]:
     """Resolve the policy target session as (store, state), or exit(1) with an actionable error.
 
-    Precedence: explicit --session > FORGE_SESSION > sole local session. The absent case
+    Precedence: explicit CLI session > FORGE_SESSION > sole local session. The absent case
     (zero local sessions) and the ambiguous case (multiple, none selected) produce distinct
     messages so the caller isn't told "No session found" when several exist.
     """
@@ -203,18 +204,19 @@ def _resolve_policy_session(
             err_console.print("  Run 'forge session start' first to create a session.")
             sys.exit(1)
         else:
+            if positional_session_command is None:
+                selection = "specify one with --session"
+                recovery_command = f"forge policy <command> --session {candidates[0]}"
+            else:
+                selection = "specify one as the SESSION argument"
+                recovery_command = f"{positional_session_command} {candidates[0]}"
+            error = f"Multiple sessions in {display_path(cwd)}; {selection}."
             if as_json:
-                _exit_policy_session_json_error(
-                    f"Multiple sessions in {display_path(cwd)}; specify one with --session. "
-                    f"Sessions: {', '.join(candidates)}"
-                )
-            print_error(
-                f"Multiple sessions in {display_path(cwd)}; specify one with --session.",
-                console=err_console,
-            )
+                _exit_policy_session_json_error(f"{error} Sessions: {', '.join(candidates)}. Run '{recovery_command}'.")
+            print_error(error, console=err_console)
             err_console.print("  Sessions: " + ", ".join(candidates))
             print_tip(
-                f"Run 'forge policy <command> --session {candidates[0]}'.",
+                f"Run '{recovery_command}'.",
                 blank_before=False,
                 console=err_console,
             )
@@ -1569,7 +1571,12 @@ def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
     from forge.policy.semantic.shadow import read_done_records
     from forge.policy.semantic.shadow_runner import STATUS_DISAGREE
 
-    store, manifest = _resolve_policy_session(Path.cwd().resolve(), session, as_json=as_json)
+    store, manifest = _resolve_policy_session(
+        Path.cwd().resolve(),
+        session,
+        as_json=as_json,
+        positional_session_command="forge policy shadow show",
+    )
     session_name = manifest.name
     forge_root = str(store.forge_root)
 
@@ -1617,7 +1624,12 @@ def shadow_status_cmd(session: str | None, as_json: bool) -> None:
     # Resolve once through the shared policy-session path so the rate and counts
     # always describe the same explicit/current/sole-local session as `show`.
     cwd = Path.cwd().resolve()
-    store, manifest = _resolve_policy_session(cwd, session, as_json=as_json)
+    store, manifest = _resolve_policy_session(
+        cwd,
+        session,
+        as_json=as_json,
+        positional_session_command="forge policy shadow status",
+    )
     session_name = manifest.name
     forge_root = str(store.forge_root)
 

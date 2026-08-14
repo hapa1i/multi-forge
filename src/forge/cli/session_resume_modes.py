@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
 
@@ -15,8 +14,6 @@ from forge.session.context_limit import _resolve_context_limit
 from forge.session.launch import _combine_prompt_files
 
 from .session_rewind import _prepare_rewind_launch_artifacts
-
-logger = logging.getLogger(__name__)
 
 
 def _resume_fresh_rewind(
@@ -39,6 +36,7 @@ def _resume_fresh_rewind(
         _resolve_manifest_prompt_file,
         _resume_launch_preferences_for_op,
         _resume_routing_for_op,
+        _rollback_created_session,
     )
 
     if routing:
@@ -80,20 +78,16 @@ def _resume_fresh_rewind(
         console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     if not rewind_artifacts.resume_transcript_ready:
-        try:
-            manager.delete_session(
-                child_manifest.name,
-                delete_worktree=False,
-                delete_transcripts=False,
-                force=True,
-                forge_root=child_manifest.forge_root,
-            )
-        except Exception:
-            logger.debug("rewind resume fallback rollback delete failed", exc_info=True)
-        print_error_with_tip(
-            "Rewind fallback could not prepare a resumable transcript.",
-            "Retry after fixing Claude transcript store access, or use a non-rewind fresh strategy.",
+        error, tip = _rollback_created_session(
+            manager=manager,
+            session_name=child_manifest.name,
+            forge_root=child_manifest.forge_root,
+            delete_worktree=False,
+            error="Rewind fallback could not prepare a resumable transcript.",
+            tip="Retry after fixing Claude transcript store access, or use a non-rewind fresh strategy.",
+            log_context="rewind resume fallback",
         )
+        print_error_with_tip(error, tip)
         sys.exit(1)
 
     console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
