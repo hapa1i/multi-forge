@@ -1,7 +1,7 @@
 # Remove verified internal residue checklist
 
-Current focus: remove only the O098/session-summary/cap-guard residue on
-`refactor/remove-verified-internal-residue` from order-6 closeout commit `4f167379`; keep orders 8--35 parked.
+Current focus: remove only the O098/session-summary/cap-guard residue on `refactor/remove-verified-internal-residue`
+from order-6 closeout commit `4f167379`; keep orders 8--35 parked.
 
 ## Phase 1 -- Recheck compatibility and activate
 
@@ -11,8 +11,8 @@ Current focus: remove only the O098/session-summary/cap-guard residue on
   re-exports but left this metadata behind.
 - [x] Recheck rewind-helper ownership: `session_rewind` defines both helpers, direct tests already import from it, and
   only `session_fork` reaches `_prepare_rewind_launch_artifacts` indirectly through `session_lifecycle`.
-- [x] Recheck the cap-state contract: `core.state.read_json` rejects every non-object value with
-  `StateCorruptedError`, before `load_cap_state` can reach its repeated non-dict branch.
+- [x] Recheck the cap-state contract: `core.state.read_json` rejects every non-object value with `StateCorruptedError`,
+  before `load_cap_state` can reach its repeated non-dict branch.
 - [x] Retain O084, converter/Gemini candidates, release-gated deletions, O092's unnamed tail, command registration,
   session output, cap schema checks, and tolerant-reader policy outside this member.
 

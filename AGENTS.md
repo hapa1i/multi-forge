@@ -36,6 +36,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
 - `./scripts/test-integration.sh <path-or-pytest-args>` runs targeted integration tests with the same Docker/LiteLLM
   prerequisites; paths, `-k`, and other pytest flags pass through.
+- `./scripts/test-wheel-runtime.sh` builds and installs a clean wheel with dependencies resolved outside `uv.lock`, then
+  smoke-tests packaged LiteLLM start/health/stop; run it when the LiteLLM compatibility ceiling or Forge-owned proxy
+  dependency set changes.
 - `make test-regression` runs regression tests.
 - `make test` runs the full test suite.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
@@ -70,7 +73,15 @@ For auth, proxy, and workflow changes, test the no-`.env` path explicitly: crede
 variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
 and workflow preflight should fail fast when required auth or proxies are missing. Remember that proxy health only
 confirms the local proxy process is reachable; use `forge proxy start <proxy_id> --smoke-test` to verify upstream LLM
-connectivity after first setup, credential changes, or proxy auth changes.
+connectivity after first setup, credential changes, or proxy auth changes. For create-path changes, also verify
+`forge proxy create <template> --json --smoke-test`: it emits one result object, and a failed probe exits non-zero while
+retaining the created, reused, or adopted proxy for inspection and retry.
+
+For downstream-telemetry retention or config-ownership changes, inspect configured, effective, and source state with
+`forge config show --json`; preview legacy proxy-key migration with `forge config migrate-retention [--json]`, apply it
+with `--yes`, and restart running proxies. Without an explicit global policy, conflicting or unreadable legacy inputs
+must disable pruning and block migration instead of selecting a value. Apply writes the global policy before removing
+still-matching legacy keys, and normal proxy startup must not rewrite user-owned proxy files.
 
 For workflow-worker or review-engine changes, run `forge workflow list-models --available --json`, refresh Codex
 readiness with `forge runtime preflight codex`, then exercise `forge workflow panel -p "<review prompt>" -m codex` and
@@ -97,7 +108,9 @@ not source ids or adapter names.
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
 `forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
 `forge session memory report [session] [--latest|--all|--json]`, and `forge telemetry activity [session]`; `forge usage`
-is removed, and `forge telemetry costs show` remains the authoritative proxy-scoped spend view. For rewind
+is removed, and `forge telemetry costs show` remains the authoritative proxy-scoped spend view. For fresh-transfer
+ancestry changes, verify `forge session resume <parent> --fresh --depth <N|all>`; explicit uses of `--strategy` or
+`--depth` require `--fresh`, `N` must be positive, and `all` follows lineage to the terminal ancestor. For rewind
 launch-strategy changes, verify `forge session resume <parent> --fresh --strategy rewind --drop-last N` and
 `forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N`; `rewind` is not a
 `forge session transfer regenerate` strategy.
