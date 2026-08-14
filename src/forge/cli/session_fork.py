@@ -29,7 +29,6 @@ from forge.cli.session import (  # noqa: E402
 from forge.cli.session_lifecycle import (  # noqa: E402
     _persist_fork_transfer_derivation,
     _post_exit_render,
-    _prepare_rewind_launch_artifacts,
     _print_branch_exists_tip,
     _render_sidecar_launch,
     _resolve_manifest_prompt_file,
@@ -40,6 +39,7 @@ from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E40
 from forge.cli.session_model_pin import (  # noqa: E402
     _apply_and_persist_direct_model_override,
 )
+from forge.cli.session_rewind import _prepare_rewind_launch_artifacts  # noqa: E402
 from forge.cli.session_supervisor_options import (
     supervisor_option_error,
     supervisor_options,

@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- parked as Wave 7 order 7 until the order-6 closeout lands.
+**Lane**: `doing/` -- active on `refactor/remove-verified-internal-residue` from order-6 closeout commit `4f167379`.
 
 **Findings**: O098 and the verified `caps.py` branch subset of O092.
 

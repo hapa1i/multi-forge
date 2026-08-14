@@ -195,7 +195,7 @@ retain separate Wave 6 gates.
 - [x] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
 - [x] Branch from order-5's pushed closeout (`62055bab`) and activate only `centralize_cli_metric_formatting`.
 - [x] Ship O064 independently in PR #183 (`cd3e50e8`) and close its member before activating Wave 7 order 7.
-- [ ] Branch from order-6's pushed closeout and activate only `remove_verified_internal_residue`, the explicitly
-  admitted O098/O092 subset; keep orders 8--35 parked.
+- [x] Branch from order-6's pushed closeout (`4f167379`) and activate only `remove_verified_internal_residue`, the
+  explicitly admitted O098/O092 subset; keep orders 8--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

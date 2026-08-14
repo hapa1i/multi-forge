@@ -14,7 +14,7 @@ Commands for managing Claude Code sessions:
 
 Lifecycle commands (start, resume, fork, incognito) live in session_lifecycle.py.
 Management commands (delete, list, clean, show, etc.) live in session_manage.py.
-Both are re-exported here so ``patch("forge.cli.session.XXX")`` keeps working.
+They are imported below for Click registration; implementation helpers stay in their owning modules.
 """
 
 from __future__ import annotations

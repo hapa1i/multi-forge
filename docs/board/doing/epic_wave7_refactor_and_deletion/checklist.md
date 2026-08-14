@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 6 shipped independently in PR #183 (`cd3e50e8`). Keep orders 7--35 in `todo/` until this closeout
-is committed; order 7, the explicitly admitted O098/O092 residue subset, is the next eligible member.
+Current focus: execute order 7, the explicitly admitted O098/O092 residue subset, from order-6 closeout commit
+`4f167379`. Keep orders 8--35 in `todo/` until order 7 ships and the epic selects the next member.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -36,6 +36,8 @@ is committed; order 7, the explicitly admitted O098/O092 residue subset, is the 
 - [x] Close order 6 independently in PR #183 (`cd3e50e8`) before selecting or activating order 7.
 - [x] Admit the mechanically verified O098/session-summary/cap-guard subset as a bounded, non-overlapping order-7
   sequencing exception; retain O084, converter/Gemini candidates, release-gated deletions, and the unnamed tail outside.
+- [x] Create `refactor/remove-verified-internal-residue` from `4f167379`; activate only order 7 and retain command,
+  output, state-reader, and compatibility behavior plus 28 parked members.
 
-Orders 7--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
+Orders 8--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
 gated Wave 6 finding.

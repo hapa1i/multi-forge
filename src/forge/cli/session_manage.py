@@ -1,8 +1,7 @@
 """Session management commands: delete, list, clean, show, shell, set, reset.
 
-Split from session.py for file-size compliance. All public and private
-names are re-exported by session.py so that ``patch("forge.cli.session.XXX")``
-continues to work.
+Split from session.py for file-size compliance. Imported there for Click registration; implementation helpers remain
+owned here.
 """
 
 from __future__ import annotations
@@ -66,29 +65,6 @@ from forge.session.plan_resolution import (  # noqa: E402
     resolve_plan_info,
     resolve_plan_launch_root,
 )
-
-__all__ = [
-    # Click commands
-    "delete",
-    "list_sessions",
-    "clean",
-    "show",
-    "shell",
-    "set_override",
-    "reset",
-    # Private helpers (needed for re-export to forge.cli.session namespace)
-    "_delete_single_session",
-    "_print_session_list_tips",
-    "_clean_sessions_dry_run",
-    "_build_show_json",
-    "_empty_show_plan_json",
-    "_build_show_plan_json",
-    "_print_session_summary",
-    "_print_plan_info",
-    "_print_session_detail",
-    "_flatten_overrides",
-    "_format_value",
-]
 
 
 @session.command()
@@ -1254,17 +1230,6 @@ def reset(key: str | None, clear_all: bool, session_name: str | None) -> None:
     except ForgeOpError as e:
         print_error(f"{e}")
         sys.exit(1)
-
-
-def _print_session_summary(state: SessionState) -> None:
-    """Print a brief session summary."""
-    console.print(f"[green]{state.name}[/green]", end="")
-
-    parts = [_template_display_label(state.intent.proxy.template) if state.intent.proxy else "direct"]
-    console.print(f" ({', '.join(parts)})")
-
-    if state.worktree:
-        console.print(f"  [dim]{display_path(state.worktree.path)}[/dim]")
 
 
 def _print_plan_info(plan_info: PlanInfo, *, current_forge_root: str, current_launch_root: str | None) -> None:

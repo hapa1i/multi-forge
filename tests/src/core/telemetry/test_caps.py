@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from forge.core.state import StateUnreadableError
+from forge.core.state import StateCorruptedError, StateUnreadableError
 from forge.core.telemetry import caps
 from forge.core.telemetry.caps import (
     CapState,
@@ -37,6 +37,15 @@ def test_cap_state_round_trips() -> None:
 
 def test_load_missing_cap_state_returns_none() -> None:
     assert load_cap_state("missing") is None
+
+
+def test_load_rejects_non_object_state() -> None:
+    path = cap_state_path("proxy-a")
+    path.parent.mkdir(parents=True)
+    path.write_text("[]")
+
+    with pytest.raises(StateCorruptedError, match="expected JSON object"):
+        load_cap_state("proxy-a")
 
 
 def test_load_rejects_newer_schema() -> None:
