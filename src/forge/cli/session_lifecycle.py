@@ -1,8 +1,7 @@
 """Session lifecycle commands: start, resume, fork, incognito.
 
-Split from session.py for file-size compliance. All public and private
-names are re-exported by session.py so that ``patch("forge.cli.session.XXX")``
-continues to work.
+Split from session.py for file-size compliance. Imported there for Click registration; implementation helpers remain
+owned here.
 """
 
 from __future__ import annotations
@@ -110,50 +109,10 @@ from forge.cli.session_resume_modes import (  # noqa: E402
     _resume_fresh_native,
     _resume_fresh_rewind,
 )
-from forge.cli.session_rewind import (  # noqa: E402
-    _persist_rewind_derivation,
-    _prepare_rewind_launch_artifacts,
-)
 from forge.cli.session_supervisor_options import (  # noqa: E402
     supervisor_option_error,
     supervisor_options,
 )
-
-__all__ = [
-    # Public functions
-    "launch_new_session",
-    # Click commands
-    "start",
-    "resume",
-    "incognito",
-    # Private helpers (needed for re-export to forge.cli.session namespace)
-    "_launch_in_place",
-    "_reconnect_in_place",
-    "_launch_as_child",
-    "_resume_fresh",
-    "_resume_fresh_rewind",
-    "_resume_fresh_native",
-    "_pick_session",
-    "_print_context_path",
-    "_print_post_exit_tip",
-    "_resume_tip_command",
-    "_print_branch_exists_tip",
-    "_execute_resume_launch_plan",
-    "_get_resume_launch_preferences",
-    "_resume_launch_preferences_for_op",
-    "_resume_routing_for_op",
-    "_has_confirmed_claude_session",
-    "_is_resumable_session",
-    "_has_resumable_transcript",
-    "_has_resumable_claude_session",
-    "_get_deferred_same_dir_fork_resume_id",
-    "_resolve_manifest_prompt_file",
-    "_persist_fork_transfer_derivation",
-    "_persist_rewind_derivation",
-    "_prepare_rewind_launch_artifacts",
-    "_warn_if_hooks_missing",
-    "_warn_if_version_outdated",
-]
 
 
 def _has_confirmed_claude_session(state: SessionState) -> bool:

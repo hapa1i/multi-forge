@@ -36,8 +36,6 @@ def load_cap_state(proxy_id: str) -> CapState | None:
     if not path.exists():
         return None
     raw = read_json(path)
-    if not isinstance(raw, dict):
-        raise ValueError(f"Invalid cap state at {path}: expected object")
     version = raw.get("schema_version")
     if version != CAP_STATE_SCHEMA_VERSION:
         raise ValueError(f"Unsupported cap state schema_version={version!r} at {path}")
