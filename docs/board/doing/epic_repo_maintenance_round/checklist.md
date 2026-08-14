@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: order-3 O060/O061/O094 shipped independently in PR #180; land its closeout before activating order 4. The
-other 31 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate
+Current focus: execute only Wave 7 order-4 O066/O092 on `refactor/unify-git-root-discovery`. Orders 1--3 are closed, the
+other 30 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate
 Wave 6 gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
@@ -189,5 +189,7 @@ Wave 6 gates.
 - [x] Ship O044 independently and close its member before activating Wave 7 order 3.
 - [x] Branch from O044's pushed closeout (`ef9c27c1`) and activate only `centralize_time_parsing_and_periods`.
 - [x] Ship O060/O061/O094 independently and close its member before activating Wave 7 order 4.
+- [x] Branch from order-3's pushed closeout (`9817cad3`) and activate only `unify_git_root_discovery`.
+- [ ] Ship O066/O092 independently and close its member before activating Wave 7 order 5.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

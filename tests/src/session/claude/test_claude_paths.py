@@ -168,8 +168,22 @@ class TestFindProjectRoot:
 
     def test_raises_when_no_git(self, tmp_path: Path) -> None:
         """Should raise FileNotFoundError when no .git found."""
-        with pytest.raises(FileNotFoundError, match="No git repository found"):
+        with pytest.raises(FileNotFoundError) as exc_info:
             find_project_root(str(tmp_path))
+        assert str(exc_info.value) == f"No git repository found at or above '{tmp_path}'"
+
+    def test_delegates_to_shared_optional_walker(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        expected = tmp_path / "checkout"
+        calls: list[Path] = []
+
+        def shared_walker(start: Path) -> Path | None:
+            calls.append(start)
+            return expected
+
+        monkeypatch.setattr("forge.session.claude.paths.find_git_root", shared_walker)
+
+        assert find_project_root(str(tmp_path / "nested")) == expected
+        assert calls == [tmp_path / "nested"]
 
     def test_defaults_to_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should default to current working directory."""

@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 3 shipped independently in PR #180 (`659d4966`). Keep orders 4--34 in `todo/` until this closeout
-is committed; order 4, O066/O092, is the next eligible member.
+Current focus: execute order 4, O066/O092, from order-3 closeout commit `9817cad3`. Keep orders 5--34 in `todo/` until
+order 4 ships and the epic selects the next member.
 
 - [x] Commit the bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -18,6 +18,11 @@ is committed; order 4, O066/O092, is the next eligible member.
   explicit timestamp compatibility policies and 31 parked members.
 - [x] Complete order 3's focused, full, pre-commit, and board-integrity gates.
 - [x] Close order 3 independently before selecting or activating order 4.
+- [x] Create `refactor/unify-git-root-discovery` from `9817cad3`; activate only O066/O092 and retain the optional/strict
+  contracts, distinct Git-subprocess ownership, and 30 parked members.
+- [x] Share only parent traversal, remove the definition-only exception, and retain exact strict-wrapper behavior.
+- [x] Complete order 4's focused, integration, full, pre-commit, and board-integrity gates.
+- [ ] Close order 4 independently before selecting or activating order 5.
 
-Orders 4--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
+Orders 5--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
 Wave 6 finding.

@@ -1,9 +1,8 @@
 # Design Appendix (Reference Details)
 
-**Companion to [design.md](design.md).** Precision reference material extracted to keep the main doc focused on
-architectural narrative. Each section notes its origin for cross-referencing.
-
-Memory-passport ownership is defined in [design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports).
+**Companion to [design.md](design.md).** Detailed schemas and operational references extracted from the main narrative.
+Path identity remains in [design.md's project identity model](design.md#project-identity-model); memory-passport
+ownership is in [design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports).
 
 ---
 
