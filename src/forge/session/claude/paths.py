@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from forge.core.paths import find_git_root
 from forge.session.models import SessionState
 
 
@@ -155,7 +156,7 @@ def resolve_claude_project_root(state: SessionState) -> str:
 
 
 def find_project_root(start_path: str | None = None) -> Path:
-    """Find the git repository root by walking up the directory tree.
+    """Strictly find the git checkout root containing ``start_path``.
 
     Handles both regular git repositories (where .git is a directory)
     and git worktrees (where .git is a file pointing to the main repo).
@@ -173,23 +174,10 @@ def find_project_root(start_path: str | None = None) -> Path:
         >>> find_project_root("/home/user/project/src/module")
         PosixPath('/home/user/project')
     """
-    if start_path is None:
-        current = Path.cwd().resolve()
-    else:
-        current = Path(start_path).resolve()
-
-    while current != current.parent:
-        git_path = current / ".git"
-
-        # In worktrees, .git is a FILE; in main checkout, it's a DIRECTORY
-        if git_path.exists():
-            return current
-
-        current = current.parent
-
-    if (current / ".git").exists():
-        return current
-
+    start = Path.cwd() if start_path is None else Path(start_path)
+    root = find_git_root(start)
+    if root is not None:
+        return root
     raise FileNotFoundError(f"No git repository found at or above '{start_path or os.getcwd()}'")
 
 

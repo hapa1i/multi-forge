@@ -37,9 +37,7 @@ def find_git_root(start: Path) -> Path | None:
             return current
         current = current.parent
 
-    if (current / ".git").exists():
-        return current
-    return None
+    return current if (current / ".git").exists() else None
 
 
 def get_forge_home() -> Path:

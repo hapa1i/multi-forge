@@ -65,14 +65,7 @@ wiring remains internal vocabulary. The classification table lives in
 
 #### Project identity model
 
-Forge has four scoping levels. They must be explicitly defined to avoid path confusion:
-
-```text
-project_root    (logical repo -- git identity, shared across worktrees)
-  +-- checkout_root    (this worktree -- git rev-parse --show-toplevel)
-       +-- forge_root      (enabled project/local extension root with .forge/ state)
-            +-- working_dir    (launch CWD -- for managed sessions, equals forge_root)
-```
+Path scopes nest as logical repo -> checkout -> Forge project -> working directory.
 
 | Level             | Identity source                                  | Stored as       | Purpose                                               |
 | ----------------- | ------------------------------------------------ | --------------- | ----------------------------------------------------- |
@@ -80,6 +73,9 @@ project_root    (logical repo -- git identity, shared across worktrees)
 | **Checkout**      | `git rev-parse --show-toplevel`                  | `checkout_root` | Worktree targeting for `--into`, relative_path anchor |
 | **Forge Project** | Successful project/local extension enable        | `forge_root`    | Session root, artifact root, state scoping anchor     |
 | **Working Dir**   | Launch CWD (= `forge_root` for managed sessions) | implicit        | Managed sessions always launch from `forge_root`      |
+
+`core.paths.find_git_root` owns optional filesystem `.git` discovery; Claude's `find_project_root` retains its strict
+`FileNotFoundError`. Git-subprocess helpers keep checkout/logical identity and bare/worktree behavior.
 
 **Four foundational rules (normative):**
 

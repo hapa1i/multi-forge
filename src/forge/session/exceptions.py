@@ -197,14 +197,6 @@ class ClaudeInvocationError(ForgeSessionError):
         super().__init__(msg)
 
 
-class ProjectRootNotFoundError(ForgeSessionError):
-    """Raised when no git repository can be found."""
-
-    def __init__(self, path: str) -> None:
-        self.path = path
-        super().__init__(f"no git repository found at or above '{path}'")
-
-
 class ForgeNotEnabledError(ForgeSessionError):
     """Raised when session start is attempted without a Forge project.
 
