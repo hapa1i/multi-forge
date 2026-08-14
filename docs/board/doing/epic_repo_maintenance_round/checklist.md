@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--7 and the PR #185 corrective member are closed. Keep orders 8--35 parked until the next
-member is explicitly selected.
+Current focus: Wave 7 orders 1--7 and the PR #185 corrective member are closed. Order 8 is active; keep orders 9--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -202,5 +202,7 @@ member is explicitly selected.
 - [x] Implement the walkthrough, proxy, timezone, rollback, and shadow-guidance corrections with focused, full,
   integration, package, and documentation coverage.
 - [x] Merge the corrective member in PR #185 (`8ccbf387`) and close its board record without activating Wave 7 order 8.
+- [x] Branch from the corrective closeout (`5bd69ef5`) and activate only order 8 `remove_stale_dependencies`.
+- [ ] Ship the verified O071 `python-dotenv` subset independently and close its member before selecting Wave 7 order 9.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
