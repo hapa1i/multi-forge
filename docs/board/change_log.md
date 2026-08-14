@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Centralize timestamp primitives
+
+**Goal/outcome**: Use one timestamp and local-period boundary while retaining each caller's explicit compatibility and
+presentation policy.
+
+**Key changes**:
+
+- Strict and tolerant ISO parsing now normalize valid offsets through `core.state.timestamps`; compatibility readers
+  explicitly select naive-as-UTC behavior, and direct production `datetime.fromisoformat` calls are eliminated.
+- One transition-aware local-calendar primitive serves four period callers, while named compact and full-word styles
+  preserve the proxy and session relative-time contracts.
+
+**Verification**: 721 focused tests, 7 targeted Docker proxy integrations, 9,064 unit tests (one skip, 122 deselected),
+898 regressions, full pre-commit, and board integrity checks pass. PR #180 merged as `659d4966` with all five GitHub
+checks passing. No Forge workflow command was used.
+
 ### Share policy activation rules
 
 **Goal/outcome**: Share policy activation vocabulary and validation without merging terminal intent writes with direct

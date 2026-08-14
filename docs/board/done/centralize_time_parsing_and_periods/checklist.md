@@ -1,7 +1,6 @@
 # Centralize timestamp, period, and relative-time primitives checklist
 
-Current focus: verification complete on `refactor/centralize-time-parsing-and-periods`; keep order 4 parked until this
-member is reviewed, merged, and closed independently.
+Current focus: complete -- O060/O061/O094 shipped independently in PR #180 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -35,5 +34,6 @@ member is reviewed, merged, and closed independently.
 - [x] Resolve board links/fragments and run `git diff --check`: all 854 local path links across 331 board Markdown files
   and all five fragments from the eight changed board documents resolve. The Wave 7 graph is two `done/`, one `doing/`,
   and 31 `todo/` members with valid epic backlinks.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 4 parked until
-  the closeout lands.
+- [x] After review and merge, record PR #180 (`659d4966`), move this member to `done/`, and leave order 4 parked until
+  the closeout lands. The final audit resolves all 854 local path links across 331 board Markdown files and all five
+  fragments from the nine changed board documents; the Wave 7 graph is three done, zero doing, and 31 todo members.

@@ -1,8 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: execute only Wave 7 order-3 O060/O061/O094 on `refactor/centralize-time-parsing-and-periods`. O043 and
-O044 are closed, the other 31 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs
-rows retain separate Wave 6 gates.
+Current focus: order-3 O060/O061/O094 shipped independently in PR #180; land its closeout before activating order 4. The
+other 31 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate
+Wave 6 gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -188,6 +188,6 @@ rows retain separate Wave 6 gates.
 - [x] Branch from O043's pushed closeout (`2a08f009`) and activate only `share_policy_activation_rules`.
 - [x] Ship O044 independently and close its member before activating Wave 7 order 3.
 - [x] Branch from O044's pushed closeout (`ef9c27c1`) and activate only `centralize_time_parsing_and_periods`.
-- [ ] Ship O060/O061/O094 independently and close its member before activating Wave 7 order 4.
+- [x] Ship O060/O061/O094 independently and close its member before activating Wave 7 order 4.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

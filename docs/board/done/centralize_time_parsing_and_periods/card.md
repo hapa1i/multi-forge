@@ -1,8 +1,8 @@
 # Centralize timestamp, period, and relative-time primitives
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/centralize-time-parsing-and-periods` from O044 closeout commit `ef9c27c1`.
+**Lane**: `done/` -- shipped independently in PR #180 (`659d4966`) from O044 closeout commit `ef9c27c1`.
 
 **Findings**: O060, O061, and O094.
 
@@ -52,6 +52,11 @@ gate also repaired one stale test invocation of the removed `forge proxy costs s
 Full pre-commit passes after import and Markdown normalization. The board audit resolves all 854 local path links across
 331 board Markdown files and all five fragment links from the eight changed board documents. The Wave 7 graph is two
 `done/`, one `doing/`, and 31 `todo/` members with valid epic backlinks; `git diff --check` passes.
+
+PR #180 merged at `659d4966` with all five GitHub checks passing. The post-merge closeout leaves orders 4--34 parked
+until the epic explicitly selects the next member. All 854 local path links across 331 board Markdown files and all five
+fragments from the nine changed board documents resolve; the Wave 7 graph is three `done/`, zero `doing/`, and 31
+`todo/` members with valid epic backlinks.
 
 ## Exclusions
 

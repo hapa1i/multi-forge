@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: execute order 3, O060/O061/O094, from O044 closeout commit `ef9c27c1`. Keep orders 4--34 in `todo/` until
-order 3 ships and the epic selects the next member.
+Current focus: order 3 shipped independently in PR #180 (`659d4966`). Keep orders 4--34 in `todo/` until this closeout
+is committed; order 4, O066/O092, is the next eligible member.
 
 - [x] Commit the bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -17,7 +17,7 @@ order 3 ships and the epic selects the next member.
 - [x] Create `refactor/centralize-time-parsing-and-periods` from `ef9c27c1`; activate only O060/O061/O094 and retain the
   explicit timestamp compatibility policies and 31 parked members.
 - [x] Complete order 3's focused, full, pre-commit, and board-integrity gates.
-- [ ] Close order 3 independently before selecting or activating order 4.
+- [x] Close order 3 independently before selecting or activating order 4.
 
 Orders 4--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
 Wave 6 finding.
