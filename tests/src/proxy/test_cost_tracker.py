@@ -29,6 +29,20 @@ class TestParseRecordGuard:
         # the bug present. The direct call is what proves the guard exists.
         assert CostTracker._parse_record(bad_line) is None
 
+    @pytest.mark.parametrize(
+        "timestamp",
+        ["2026-06-01T00:00:00", "2026-05-31T20:00:00-04:00", "2026-06-01T00:00:00Z"],
+    )
+    def test_parse_record_uses_explicit_utc_compatibility_policy(self, timestamp: str) -> None:
+        line = json.dumps({"ts": timestamp, "cost_micros": 1, "proxy_id": "p"})
+        record = CostTracker._parse_record(line)
+        assert record is not None
+        assert record.month_key == "2026-06"
+
+    def test_parse_record_skips_invalid_timestamp(self) -> None:
+        line = json.dumps({"ts": "not-a-date", "cost_micros": 1, "proxy_id": "p"})
+        assert CostTracker._parse_record(line) is None
+
 
 class TestCostTrackerBasic:
     def test_no_caps_never_exceeded(self):

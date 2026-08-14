@@ -36,7 +36,17 @@ from .lock import (
 from .retention import PruneJsonlShardsResult, prune_jsonl_shards
 
 # Timestamp utilities
-from .timestamps import iso_to_timestamp, now_iso, parse_iso, utc_timestamp_z
+from .timestamps import (
+    RelativeTimeStyle,
+    format_compact_duration,
+    format_relative_time,
+    iso_to_timestamp,
+    local_period_bounds,
+    now_iso,
+    parse_iso,
+    try_parse_iso,
+    utc_timestamp_z,
+)
 
 # Versioned JSON store utilities
 from .versioned_store import read_versioned_json_object
@@ -70,7 +80,12 @@ __all__ = [
     "now_iso",
     "utc_timestamp_z",
     "parse_iso",
+    "try_parse_iso",
     "iso_to_timestamp",
+    "local_period_bounds",
+    "RelativeTimeStyle",
+    "format_compact_duration",
+    "format_relative_time",
     # Versioned JSON stores
     "read_versioned_json_object",
     # Exceptions

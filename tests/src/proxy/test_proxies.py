@@ -329,6 +329,32 @@ def test_is_orphaned_starting_recent_entry() -> None:
     assert _is_orphaned_starting(entry) is False
 
 
+def test_is_orphaned_starting_explicitly_assumes_naive_utc() -> None:
+    entry = ProxyEntry(
+        proxy_id="proxy_naive",
+        template="t",
+        base_url="http://localhost:8085",
+        port=8085,
+        pid=None,
+        created_at="2999-01-01T00:00:00",
+        status="starting",
+    )
+    assert _is_orphaned_starting(entry) is False
+
+
+def test_is_orphaned_starting_invalid_timestamp_is_stale() -> None:
+    entry = ProxyEntry(
+        proxy_id="proxy_invalid",
+        template="t",
+        base_url="http://localhost:8085",
+        port=8085,
+        pid=None,
+        created_at="not-a-date",
+        status="starting",
+    )
+    assert _is_orphaned_starting(entry) is True
+
+
 def test_is_orphaned_starting_no_timestamp() -> None:
     """An entry with no created_at is treated as orphaned."""
     entry = ProxyEntry(

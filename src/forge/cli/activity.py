@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import click
 from rich.console import Console
@@ -27,6 +27,7 @@ from forge.core.ops.usage_summary import (
     build_session_activity_summary,
     format_failing_open,
 )
+from forge.core.state import local_period_bounds
 
 console = Console()
 _SESSION_LIST_TIP = "Run 'forge session list' to see sessions."
@@ -80,17 +81,12 @@ def activity_cmd(session: str | None, as_json: bool, period: str) -> None:
     _render(summary, period=period)
 
 
-def _period_start(period: str) -> datetime | None:
+def _period_start(period: str, *, now: datetime | None = None) -> datetime | None:
     """Return the UTC lower bound for a named local-calendar period."""
-    now_local = datetime.now()
-    if period == "today":
-        return now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-    if period == "week":
-        local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return (local_midnight - timedelta(days=local_midnight.weekday())).astimezone(timezone.utc)
-    if period == "month":
-        return now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-    return None
+    if period == "all":
+        return None
+    start, _ = local_period_bounds(period, now=now)
+    return start
 
 
 def _render(summary: SessionActivitySummary, *, period: str) -> None:

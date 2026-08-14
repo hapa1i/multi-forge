@@ -54,6 +54,11 @@ class TestThrottleCacheCheck:
         cache._cache["key1"] = {"checked_at": "not-a-timestamp", "verdict": "aligned"}
         assert cache.check("key1") is None
 
+    def test_naive_timestamp_is_rejected(self):
+        cache = ThrottleCache(ttl_seconds=30)
+        cache._cache["key1"] = {"checked_at": "2999-01-01T00:00:00", "verdict": "aligned"}
+        assert cache.check("key1") is None
+
     def test_missing_checked_at_returns_none(self):
         cache = ThrottleCache(ttl_seconds=30)
         cache._cache["key1"] = {"verdict": "aligned"}

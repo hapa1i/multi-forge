@@ -1074,6 +1074,13 @@ class TestResetCountdown:
         epoch = 1767225600
         assert _format_reset_countdown("2026-01-01T00:00:00Z", now=epoch - 3600) == "1h"
 
+    def test_non_utc_offset_is_normalized(self):
+        epoch = 1767225600
+        assert _format_reset_countdown("2026-01-01T01:00:00+01:00", now=epoch - 3600) == "1h"
+
+    def test_naive_iso_string_is_rejected(self):
+        assert _format_reset_countdown("2026-01-01T00:00:00", now=0.0) is None
+
     def test_unparseable_returns_none(self):
         assert _format_reset_countdown("not-a-date", now=0.0) is None
 

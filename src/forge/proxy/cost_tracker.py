@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from forge.core.state import decode_json_object
+from forge.core.state import decode_json_object, try_parse_iso
 from forge.core.telemetry.caps import (
     CapState,
     cap_state_path,
@@ -205,9 +205,8 @@ class CostTracker:
         if cost_micros <= 0:
             return None
 
-        try:
-            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-        except (ValueError, TypeError):
+        ts = try_parse_iso(ts_str, assume_naive_utc=True)
+        if ts is None:
             return None
 
         month_key = ts.strftime("%Y-%m")

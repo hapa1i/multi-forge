@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from forge.core.state import now_iso
+from forge.core.state import now_iso, try_parse_iso
 
 _log = logging.getLogger(__name__)
 
@@ -70,26 +70,25 @@ class ThrottleCache:
         if checked_at is None:
             return None
 
-        try:
-            checked_time = datetime.fromisoformat(checked_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            age_seconds = (now - checked_time).total_seconds()
-
-            if age_seconds < self._ttl_seconds:
-                _log.debug("Cache hit for %s (age: %.1fs)", key, age_seconds)
-                return entry
-
-            _log.debug(
-                "Cache expired for %s (age: %.1fs > %ds)",
-                key,
-                age_seconds,
-                self._ttl_seconds,
-            )
+        checked_time = try_parse_iso(checked_at)
+        if checked_time is None:
+            _log.warning("Invalid cache timestamp for %s: %r", key, checked_at)
             return None
 
-        except (ValueError, TypeError) as e:
-            _log.warning("Invalid cache timestamp for %s: %s", key, e)
-            return None
+        now = datetime.now(timezone.utc)
+        age_seconds = (now - checked_time).total_seconds()
+
+        if age_seconds < self._ttl_seconds:
+            _log.debug("Cache hit for %s (age: %.1fs)", key, age_seconds)
+            return entry
+
+        _log.debug(
+            "Cache expired for %s (age: %.1fs > %ds)",
+            key,
+            age_seconds,
+            self._ttl_seconds,
+        )
+        return None
 
     def update(self, key: str, **values: Any) -> None:
         """Add or update a cache entry.

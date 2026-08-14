@@ -14,7 +14,7 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object, utc_timestamp_z
+from forge.core.state import decode_json_object, try_parse_iso, utc_timestamp_z
 from forge.core.telemetry.jsonl_io import append_jsonl_record
 
 logger = logging.getLogger(__name__)
@@ -193,9 +193,8 @@ def read_upstream_outcomes(
                         continue
                     if period_start or period_end:
                         ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError, AttributeError):
+                        ts = try_parse_iso(ts_str, assume_naive_utc=True)
+                        if ts is None:
                             continue
                         if period_start and ts < period_start:
                             continue

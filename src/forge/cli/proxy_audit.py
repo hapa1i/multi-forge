@@ -8,30 +8,14 @@ already redacted, so no secrets or message text are ever printed.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
 
 import click
 from rich.console import Console
 from rich.table import Table
 
+from forge.core.state import local_period_bounds, try_parse_iso
+
 console = Console(width=200)
-
-
-def _period_bounds(period: str) -> tuple[datetime, datetime]:
-    """Compute UTC start/end for a named period using the local timezone."""
-    now_local = datetime.now().astimezone()
-    now_utc = datetime.now(timezone.utc)
-    if period == "today":
-        start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-        return start, now_utc
-    if period == "week":
-        midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        start = (midnight - timedelta(days=midnight.weekday())).astimezone(timezone.utc)
-        return start, now_utc
-    if period == "month":
-        start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-        return start, now_utc
-    return datetime.min.replace(tzinfo=timezone.utc), now_utc
 
 
 def _short_hash(value: str | None) -> str:
@@ -39,10 +23,8 @@ def _short_hash(value: str | None) -> str:
 
 
 def _short_time(ts: str) -> str:
-    try:
-        return datetime.fromisoformat(ts.rstrip("Z") + "+00:00").astimezone().strftime("%m-%d %H:%M")
-    except (ValueError, TypeError):
-        return ts or "-"
+    parsed = try_parse_iso(ts, assume_naive_utc=True)
+    return parsed.astimezone().strftime("%m-%d %H:%M") if parsed is not None else ts or "-"
 
 
 @click.group("audit", context_settings={"help_option_names": ["-h", "--help"]})
@@ -74,7 +56,7 @@ def audit_show_cmd(proxy_id: str | None, period: str, limit: int, as_json: bool)
     if period == "all":
         records = read_audit_logs(proxy_id=proxy_id)
     else:
-        start, end = _period_bounds(period)
+        start, end = local_period_bounds(period)
         records = read_audit_logs(start, end, proxy_id=proxy_id)
 
     records = records[-limit:]
@@ -210,7 +192,7 @@ def audit_diff_cmd(proxy_id: str | None, period: str, limit: int, as_json: bool)
     if period == "all":
         records = read_audit_logs(proxy_id=proxy_id)
     else:
-        start, end = _period_bounds(period)
+        start, end = local_period_bounds(period)
         records = read_audit_logs(start, end, proxy_id=proxy_id)
     changes = [r for r in records if r.get("record_type") in ("drift", "mutation")][-limit:]
 

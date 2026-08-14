@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -32,7 +31,8 @@ from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session_routing import ResolvedRouting
 from forge.core.ops import claude_session as claude_session_ops
 from forge.core.paths import display_path
-from forge.core.state import parse_iso
+from forge.core.state import RelativeTimeStyle
+from forge.core.state import format_relative_time as format_relative_timestamp
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
     ActiveSessionEntry,
@@ -138,28 +138,11 @@ def _session_list_location(entry: SessionIndexEntry) -> str:
 
 def _format_relative_time(iso_timestamp: str) -> str:
     """Format an ISO timestamp as a human-readable relative time."""
-    try:
-        dt = parse_iso(iso_timestamp)
-        now = datetime.now(UTC)
-        delta = now - dt
-
-        seconds = delta.total_seconds()
-        if seconds < 60:
-            return "just now"
-        elif seconds < 3600:
-            minutes = int(seconds / 60)
-            return f"{minutes} min{'s' if minutes != 1 else ''} ago"
-        elif seconds < 86400:
-            hours = int(seconds / 3600)
-            return f"{hours} hour{'s' if hours != 1 else ''} ago"
-        elif seconds < 604800:
-            days = int(seconds / 86400)
-            return f"{days} day{'s' if days != 1 else ''} ago"
-        else:
-            weeks = int(seconds / 604800)
-            return f"{weeks} week{'s' if weeks != 1 else ''} ago"
-    except (ValueError, TypeError):
-        return "unknown"
+    return format_relative_timestamp(
+        iso_timestamp,
+        style=RelativeTimeStyle.FULL_WORDS,
+        invalid="unknown",
+    )
 
 
 def _get_session_type(

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from forge.core.run_id import derive_provider_session_id
+from forge.core.state import try_parse_iso
 from forge.proxy.cost_logger import read_cost_logs
 from forge.proxy.provider_trace_logger import ProviderTraceRecord, read_provider_traces
 
@@ -274,7 +275,4 @@ def _lookup_cost_confidence(rec: ProviderTraceRecord) -> str | None:
 
 
 def _parse_iso(ts_str: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-    except (ValueError, TypeError, AttributeError):
-        return None
+    return try_parse_iso(ts_str, assume_naive_utc=True)

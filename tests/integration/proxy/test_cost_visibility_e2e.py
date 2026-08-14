@@ -375,7 +375,7 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     assert request_records, f"No cost records for proxy_id={proxy.proxy_id}"
     assert any(r.get("cost_micros", 0) > 0 for r in request_records)
 
-    costs = CliRunner().invoke(main, ["proxy", "costs", "show", proxy.proxy_id, "--period", "today", "--json"])
+    costs = CliRunner().invoke(main, ["telemetry", "costs", "show", proxy.proxy_id, "--period", "today", "--json"])
     assert costs.exit_code == 0, costs.output
     summary = json.loads(costs.output)
     assert summary["by_verb"]["panel"]["cost_micros"] > 0

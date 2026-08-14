@@ -8,7 +8,7 @@ attribution). "Interactive" cost is computed as the residual.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import click
 from rich.console import Console
@@ -16,30 +16,9 @@ from rich.table import Table
 
 from forge.cli.output import print_tip
 from forge.core.paths import display_path, get_forge_home
+from forge.core.state import local_period_bounds
 
 console = Console()
-
-
-def _local_period_bounds(period: str) -> tuple[datetime, datetime]:
-    """Compute UTC start/end for a named period using local timezone."""
-    now_local = datetime.now().astimezone()
-    now_utc = datetime.now(timezone.utc)
-
-    if period == "today":
-        local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        start = local_midnight.astimezone(timezone.utc)
-        return start, now_utc
-    elif period == "week":
-        local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        week_start = local_midnight - timedelta(days=local_midnight.weekday())
-        start = week_start.astimezone(timezone.utc)
-        return start, now_utc
-    elif period == "month":
-        local_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        start = local_month_start.astimezone(timezone.utc)
-        return start, now_utc
-    else:
-        return datetime.min.replace(tzinfo=timezone.utc), now_utc
 
 
 def _format_usd(micros: int) -> str:
@@ -134,16 +113,17 @@ def show_cmd(
     """
     from forge.proxy.cost_logger import read_cost_logs_with_stats
 
-    start, end = _local_period_bounds(period)
     if period == "all":
+        start = None
         cost_read = read_cost_logs_with_stats()
     else:
+        start, end = local_period_bounds(period)
         cost_read = read_cost_logs_with_stats(period_start=start, period_end=end)
     request_records = cost_read.records
 
     if proxy_id:
         request_records = [r for r in request_records if r.get("proxy_id") == proxy_id]
-    verb_records = _verb_records_from_request_records(request_records, period_start=None if period == "all" else start)
+    verb_records = _verb_records_from_request_records(request_records, period_start=start)
 
     if as_json:
         _output_json(

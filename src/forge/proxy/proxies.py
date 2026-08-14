@@ -27,6 +27,7 @@ from forge.core.state import (
     atomic_write_json,
     file_lock_for_target,
     read_versioned_json_object,
+    try_parse_iso,
 )
 
 _log = logging.getLogger(__name__)
@@ -54,17 +55,13 @@ def _is_orphaned_starting(entry: ProxyEntry) -> bool:
     if entry.created_at is None:
         # No timestamp — can't determine age, treat as stale (defensive).
         return True
-    try:
-        created = datetime.fromisoformat(entry.created_at)
-        # Ensure timezone-aware comparison
-        now = datetime.now(timezone.utc)
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-        age_s = (now - created).total_seconds()
-        return age_s > STARTING_STALENESS_THRESHOLD_S
-    except (ValueError, TypeError):
+    created = try_parse_iso(entry.created_at, assume_naive_utc=True)
+    if created is None:
         # Unparseable timestamp — treat as stale.
         return True
+    now = datetime.now(timezone.utc)
+    age_s = (now - created).total_seconds()
+    return age_s > STARTING_STALENESS_THRESHOLD_S
 
 
 class ProxyRegistryCorruptedError(StateCorruptedError):
