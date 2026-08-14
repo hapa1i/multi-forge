@@ -1,7 +1,6 @@
 # Centralize installer path and ownership authority checklist
 
-Current focus: move pure path/ownership policy below installer and runtime removal on
-`refactor/centralize-install-path-authority` from order-4 closeout commit `56d32945`; keep orders 6--34 parked.
+Current focus: complete -- O065/O069 shipped independently in PR #182 and its Wave 7 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -38,5 +37,6 @@ Current focus: move pure path/ownership policy below installer and runtime remov
   repair 11 component-integration failures through the environment-backed target source, and record migration of the
   remaining namespace-specific test patches as an order-32 prerequisite.
 - [x] Resolve board links/fragments, verify the 4-done/1-doing/29-parked Wave 7 graph, and run `git diff --check`.
-- [ ] After review and merge, record the shipped outcome, move this member to `done/`, and leave order 6 parked until
-  the closeout lands.
+- [x] After review and merge, record PR #182 (`1a450143`), move this member to `done/`, and leave order 6 parked until
+  the closeout lands. All five GitHub checks and the 14-test component integration rerun pass; the Wave 7 graph is five
+  done, zero member doing, and 29 todo cards.

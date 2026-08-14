@@ -6,7 +6,7 @@
 
 **Finding**: O069's `Installer.init` subset.
 
-**Depends on**: [`centralize_install_path_authority`](../../doing/centralize_install_path_authority/card.md).
+**Depends on**: [`centralize_install_path_authority`](../../done/centralize_install_path_authority/card.md).
 
 ## Goal
 

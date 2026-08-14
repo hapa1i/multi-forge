@@ -1,8 +1,8 @@
 # Centralize installer path and ownership authority
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/centralize-install-path-authority` from order-4 closeout commit `56d32945`.
+**Lane**: `done/` -- shipped independently in PR #182 (`1a450143`) from order-4 closeout commit `56d32945`.
 
 **Findings**: O065's exact preserve-the-leaf duplicate and O069's runtime-removal callback inversion.
 
@@ -32,6 +32,10 @@ tests. Authority:
 - Remove the duplicate `TestFindGitRoot` block from `tests/src/cli/test_extension_enable.py`; retain the canonical core
   cases and the extension detector/CLI behavior tests.
 - Run installer/unmanaged/runtime-removal units and the required targeted installer integration suite.
+
+PR #182 merged as `1a450143` with all five GitHub checks passing. The component installer integration rerun passed all
+14 tests after its environment-backed target repair. The post-merge closeout leaves orders 6--34 parked until the epic
+explicitly selects the next member; the Wave 7 graph is five `done/`, zero member `doing/`, and 29 `todo/` cards.
 
 ## Exclusions
 

@@ -192,6 +192,6 @@ retain separate Wave 6 gates.
 - [x] Branch from order-3's pushed closeout (`9817cad3`) and activate only `unify_git_root_discovery`.
 - [x] Ship O066/O092 independently and close its member before activating Wave 7 order 5.
 - [x] Branch from order-4's pushed closeout (`56d32945`) and activate only `centralize_install_path_authority`.
-- [ ] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
+- [x] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

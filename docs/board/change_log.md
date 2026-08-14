@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-14
 
+### Centralize installer path authority
+
+**Goal/outcome**: Give installer planning and runtime-scoped removal one lower-layer authority for target mapping, path
+boundaries, tracked ownership, and preserve-the-leaf package canonicalization.
+
+**Key changes**:
+
+- `install.path_policy` now owns the shared pure path decisions, and `RuntimeRemovalExecutor` no longer receives four
+  installer-owned policy callbacks.
+- Fail-closed symlink, legacy-row, runtime-scope, and unmanaged-package behavior remains unchanged; duplicate CLI
+  git-root cases were removed, and the remaining target-root test-fixture cleanup is assigned to Wave 7 order 32.
+
+**Verification**: 347 focused tests, 23 targeted Docker installer integrations, 14 component installer integrations,
+9,064 unit tests (one skip, 122 deselected), 898 regressions, clean-wheel lifecycle checks, full pre-commit, and board
+integrity checks pass. PR #182 merged as `1a450143` with all five GitHub checks passing. No Forge workflow command was
+used.
+
 ### Unify git-root discovery
 
 **Goal/outcome**: Use one filesystem git-root walk while preserving optional and strict caller contracts and keeping
