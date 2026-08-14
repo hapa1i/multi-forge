@@ -9,10 +9,7 @@ from typing import Any
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.cli.proxy_costs import (
-    _format_usd,
-    _verb_cost_reported,
-)
+from forge.cli.proxy_costs import _verb_cost_reported
 from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 
@@ -57,26 +54,6 @@ def test_all_period_keeps_unbounded_cost_reader_sentinel(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert calls == [((), {})]
-
-
-class TestFormatUsd:
-    def test_normal_dollar_amount(self) -> None:
-        assert _format_usd(1_500_000) == "$1.50"
-
-    def test_large_amount_with_comma(self) -> None:
-        assert _format_usd(1_234_567_890) == "$1,234.57"
-
-    def test_cents(self) -> None:
-        assert _format_usd(50_000) == "$0.05"
-
-    def test_sub_cent(self) -> None:
-        assert _format_usd(500) == "$0.0005"
-
-    def test_sub_microdollar(self) -> None:
-        assert _format_usd(3) == "$0.000003"
-
-    def test_zero(self) -> None:
-        assert _format_usd(0) == "$0.00"
 
 
 def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
@@ -201,9 +178,9 @@ def test_costs_human_output_uses_stdout(monkeypatch) -> None:
         {
             "proxy_id": "p",
             "model": "m",
-            "cost_micros": 25_000,
-            "input_tokens": 10,
-            "output_tokens": 5,
+            "cost_micros": 500,
+            "input_tokens": 12_500,
+            "output_tokens": 1_500_000,
         },
     ]
     _patch_cost_logs(monkeypatch, request_records)
@@ -212,6 +189,8 @@ def test_costs_human_output_uses_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0, result.output
     assert "By Model" in result.stdout
+    assert "$0.0005" in result.stdout
+    assert "12.5K in, 1.5M out" in result.stdout
     assert result.stderr == ""
 
 

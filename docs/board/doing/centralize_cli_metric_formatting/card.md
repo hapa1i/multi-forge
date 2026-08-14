@@ -1,0 +1,34 @@
+# Centralize CLI metric formatting policies
+
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+
+**Lane**: `doing/` -- active on `refactor/centralize-cli-metric-formatting` from order-5 closeout commit `62055bab`.
+
+**Finding**: O064.
+
+## Goal
+
+Replace ad hoc token and currency helpers with shared primitives that require callers to choose a named presentation
+policy.
+
+## Evidence and Authority
+
+Rechecked on `62055bab`: proxy metrics, cost tables, and status-line tokens still use uppercase suffixes with tenths,
+while the activity summary intentionally rounds thousands to lowercase `k`. Currency still has six reviewed policies:
+adaptive two-to-six-decimal cost detail, four-decimal sub-cent activity detail, fixed-cent session summaries, whole- or
+fractional-cent status metrics, and four-decimal tiny-cap precision. Collapsing these into one hard-coded format would
+create UX drift. The unchanged proxy, cost, activity, and status-line characterization passes 600 tests. Authority:
+[`docs/developer/cli_style_guidelines.md`](../../../developer/cli_style_guidelines.md) and
+[`docs/design_appendix.md` "A.8 Status line guidance"](../../../design_appendix.md#a8-status-line-guidance-3611).
+
+## Acceptance Criteria
+
+- Shared numeric primitives expose explicit compact/detail and precision policies; no caller depends on hidden defaults.
+- Golden tests pin every existing human output before helper replacement; JSON numeric fields remain numeric and
+  byte-compatible.
+- Run proxy, proxy-cost, activity/usage-summary, and status-line unit suites.
+
+## Exclusions
+
+Do not align user-visible strings merely for consistency, rename request counts, or absorb O084's separate CLI behavior
+decision.

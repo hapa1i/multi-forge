@@ -53,6 +53,7 @@ from forge.config.loader import (
     template_exists,
     validate_template_name,
 )
+from forge.core.metric_formatting import TokenDisplayPolicy, format_token_count
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
 from forge.core.state import (
@@ -1455,15 +1456,6 @@ def validate_cmd(proxy_id: str) -> None:
 # --- Metrics ---
 
 
-def _format_tokens(n: int) -> str:
-    """Format token count with K/M suffix for readability."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)
-
-
 def _format_duration(seconds: float) -> str:
     """Format duration as human-readable (3s, 5m, 2h 15m, 1d 3h)."""
     return format_compact_duration(seconds)
@@ -1547,18 +1539,22 @@ def _display_metrics(
         console.print(f"  Failures     {failures:>10,}")
 
     console.print("\n  [bold]Tokens[/bold]")
-    console.print(f"    Input      {_format_tokens(tokens.get('input', 0)):>10}")
-    console.print(f"    Output     {_format_tokens(tokens.get('output', 0)):>10}")
+    console.print(
+        f"    Input      {format_token_count(tokens.get('input', 0), policy=TokenDisplayPolicy.UPPER_TENTHS):>10}"
+    )
+    console.print(
+        f"    Output     {format_token_count(tokens.get('output', 0), policy=TokenDisplayPolicy.UPPER_TENTHS):>10}"
+    )
     cached = tokens.get("cached", 0)
     cache_str = f"  ({cache_rate:.1f}% hit rate)" if cached > 0 else ""
-    console.print(f"    Cached     {_format_tokens(cached):>10}{cache_str}")
+    console.print(f"    Cached     {format_token_count(cached, policy=TokenDisplayPolicy.UPPER_TENTHS):>10}{cache_str}")
 
     failed_in = tokens.get("failed_input", 0)
     failed_out = tokens.get("failed_output", 0)
     if failed_in > 0 or failed_out > 0:
         console.print("\n  [bold]Failed Tokens[/bold]")
-        console.print(f"    Input      {_format_tokens(failed_in):>10}")
-        console.print(f"    Output     {_format_tokens(failed_out):>10}")
+        console.print(f"    Input      {format_token_count(failed_in, policy=TokenDisplayPolicy.UPPER_TENTHS):>10}")
+        console.print(f"    Output     {format_token_count(failed_out, policy=TokenDisplayPolicy.UPPER_TENTHS):>10}")
 
     by_tier = metrics.get("by_tier", {})
     if by_tier:
@@ -1574,9 +1570,9 @@ def _display_metrics(
             tier_table.add_row(
                 tier,
                 f"{data.get('requests', 0):,}",
-                _format_tokens(data.get("input_tokens", 0)),
-                _format_tokens(data.get("output_tokens", 0)),
-                _format_tokens(data.get("cached_tokens", 0)),
+                format_token_count(data.get("input_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
+                format_token_count(data.get("output_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
+                format_token_count(data.get("cached_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
                 _format_latency(data.get("avg_latency_ms", 0)),
             )
         console.print(tier_table)
@@ -1595,9 +1591,9 @@ def _display_metrics(
             model_table.add_row(
                 model,
                 f"{data.get('requests', 0):,}",
-                _format_tokens(data.get("input_tokens", 0)),
-                _format_tokens(data.get("output_tokens", 0)),
-                _format_tokens(data.get("cached_tokens", 0)),
+                format_token_count(data.get("input_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
+                format_token_count(data.get("output_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
+                format_token_count(data.get("cached_tokens", 0), policy=TokenDisplayPolicy.UPPER_TENTHS),
                 _format_latency(data.get("avg_latency_ms", 0)),
             )
         console.print(model_table)

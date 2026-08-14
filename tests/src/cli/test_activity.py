@@ -186,7 +186,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
             forge_root_run_id="run_join",
             input_tokens=10,
             output_tokens=5,
-            cost_micros=10_000,
+            cost_micros=1_200,
             failed=True,
         )
     )
@@ -198,6 +198,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     assert "memory-writer" in human.output
     assert "memory_writer.run" in human.output
     assert "matched" in human.output
+    assert "$0.0012" in human.output
 
     machine = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert machine.exit_code == 0
@@ -208,6 +209,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     assert row["join_state"] == "matched"
     assert row["attempts"] == 1
     assert row["errors"] == 1
+    assert row["cost_micro_usd"] == 1_200
 
 
 def test_human_render_shows_failing_open(monkeypatch) -> None:

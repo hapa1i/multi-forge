@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.cli.output import print_error_with_tip
+from forge.core.metric_formatting import UsdDisplayPolicy, format_usd_micros
 from forge.core.ops.session_context import (
     SessionContextError,
     resolve_session_identifier,
@@ -189,7 +190,11 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
             if model_row.cost_micro_usd is None:
                 cost = "-"
             else:
-                cost = f"{'~' if model_row.cost_estimated else ''}{_fmt_usd(model_row.cost_micro_usd)}"
+                formatted_cost = format_usd_micros(
+                    model_row.cost_micro_usd,
+                    policy=UsdDisplayPolicy.ACTIVITY_DETAIL,
+                )
+                cost = f"{'~' if model_row.cost_estimated else ''}{formatted_cost}"
             # T5/WS3: the lane the row's usage events ran on. "-" for a downstream-only row
             # (no usage-event source); "mixed" when the command's events disagree.
             if not model_row.runtime and not model_row.billing_mode:
@@ -228,7 +233,11 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
     if summary.total_cost_micro_usd is None:
         total_cost = "n/a"
     else:
-        total_cost = f"{'~' if summary.cost_estimated else ''}{_fmt_usd(summary.total_cost_micro_usd)}"
+        formatted_cost = format_usd_micros(
+            summary.total_cost_micro_usd,
+            policy=UsdDisplayPolicy.ACTIVITY_DETAIL,
+        )
+        total_cost = f"{'~' if summary.cost_estimated else ''}{formatted_cost}"
     console.print(
         f"\n[dim]Total:[/dim] {summary.total_events} events · "
         f"{summary.total_input_tokens}/{summary.total_output_tokens} tok · {total_cost}"
@@ -262,12 +271,3 @@ def _legacy_schema_note(skipped: int) -> str | None:
         return None
     plural = "" if skipped == 1 else "s"
     return f"skipped {skipped} downstream telemetry record{plural} from an older Forge schema in this window"
-
-
-def _fmt_usd(micros: int | None) -> str:
-    if micros is None:
-        return "-"
-    dollars = micros / 1_000_000
-    if dollars and abs(dollars) < 0.01:
-        return f"${dollars:.4f}"
-    return f"${dollars:.2f}"

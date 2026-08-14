@@ -1471,9 +1471,11 @@ coverage.
 
 ## 4. CLI and command surfaces
 
-The `forge` CLI is the user-facing entry point for sessions, proxies, transfer, memory, policy, workflows, search,
-configuration, and internal hook/status commands. Command-core operations live in `src/forge/core/ops/` and keep shared
-business logic UI-agnostic for terminal commands and `%` direct commands.
+`forge` exposes sessions, proxies, transfer, memory, policy, workflows, search, configuration, and internal hook/status
+commands. Shared UI-agnostic operations live in `src/forge/core/ops/`.
+
+`forge.core.metric_formatting` owns human token/USD strings. Callers select named policies; JSON stays numeric, and
+status-line context size stays separate.
 
 **Command-shape policy:** Forge uses explicit verbs. Non-leaf groups print help when invoked without a subcommand; leaf
 commands should perform the sensible action when optional arguments are omitted. Removed commands, options, and
