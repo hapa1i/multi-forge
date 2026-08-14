@@ -66,6 +66,7 @@ from forge.install.ownership import (
     managed_runtime_ids,
     module_values,
 )
+from forge.install.path_policy import validate_codex_config_scope
 from forge.install.project_compat import (
     ProjectCompatibilityError,
     enforce_project_compatibility,
@@ -1390,7 +1391,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, runtimes: tuple[str, ...
 
         if runtime_ids is None:
             installer = Installer(scope=install_scope, project_root=project_root)
-            installer.validate_codex_config_scope(existing)
+            validate_codex_config_scope(existing, scope=install_scope, project_root=project_root)
             removal_plan = None
             display_skill_packages = tuple(existing.skill_packages)
             display_files = tuple(existing.files)

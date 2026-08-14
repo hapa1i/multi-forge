@@ -17,7 +17,7 @@ from forge.cli.extensions import (
 )
 from forge.cli.extensions import console as extensions_console
 from forge.cli.extensions import extensions
-from forge.core.paths import find_git_root, get_forge_home
+from forge.core.paths import get_forge_home
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallModule, InstallScope
 from forge.install.ownership import attributed
@@ -137,24 +137,6 @@ def test_user_sync_preserves_recorded_global_launcher_when_run_from_venv(
     metadata = read_runtime_metadata()
     assert metadata is not None
     assert metadata["forge_binary_path"] == str(stable_forge)
-
-
-class TestFindGitRoot:
-    """Tests for the shared find_git_root helper."""
-
-    def test_finds_git_in_current_dir(self, tmp_path: Path) -> None:
-        (tmp_path / ".git").mkdir()
-        assert find_git_root(tmp_path) == tmp_path.resolve()
-
-    def test_finds_git_in_parent(self, tmp_path: Path) -> None:
-        (tmp_path / ".git").mkdir()
-        child = tmp_path / "src" / "deep"
-        child.mkdir(parents=True)
-        assert find_git_root(child) == tmp_path.resolve()
-
-    def test_returns_none_outside_git(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(Path, "home", lambda: tmp_path / "nonexistent")
-        assert find_git_root(tmp_path) is None
 
 
 class TestDetectGitProjectRoot:

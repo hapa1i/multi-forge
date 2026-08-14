@@ -63,6 +63,7 @@ def _run_init(env: dict[str, Path], installer: Installer, mode: InstallMode = In
     with (
         patch("forge.install.installer.get_forge_source_root", return_value=env["repo_root"]),
         patch("forge.install.installer.get_target_root", return_value=env["claude_home"]),
+        patch("forge.install.path_policy.get_target_root", return_value=env["claude_home"]),
     ):
         installer.init(
             profile=InstallProfile.MINIMAL,

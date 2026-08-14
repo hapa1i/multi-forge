@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 4 shipped independently in PR #181 (`a8cff31f`). Keep orders 5--34 in `todo/` until this closeout
-is committed; order 5, O065/O069, is the next eligible member.
+Current focus: execute order 5, O065/O069, from order-4 closeout commit `56d32945`. Keep orders 6--34 in `todo/` until
+order 5 ships and the epic selects the next member.
 
 - [x] Commit the bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -23,6 +23,12 @@ is committed; order 5, O065/O069, is the next eligible member.
 - [x] Share only parent traversal, remove the definition-only exception, and retain exact strict-wrapper behavior.
 - [x] Complete order 4's focused, integration, full, pre-commit, and board-integrity gates.
 - [x] Close order 4 independently before selecting or activating order 5.
+- [x] Create `refactor/centralize-install-path-authority` from `56d32945`; activate only O065/O069 and retain installer
+  transaction order, fail-closed boundaries, and 29 parked members.
+- [x] Move pure path/ownership policy below installer and runtime removal; remove only the duplicate CLI copies of the
+  core-path tests.
+- [x] Complete order 5's focused, integration, package, full, pre-commit, and board-integrity gates.
+- [ ] Close order 5 independently before selecting or activating order 6.
 
-Orders 5--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
+Orders 6--34 are intentionally parked. This checklist does not authorize parallel implementation or any separately gated
 Wave 6 finding.

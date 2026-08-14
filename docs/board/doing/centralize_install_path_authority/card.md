@@ -1,8 +1,8 @@
 # Centralize installer path and ownership authority
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 installer refactor work.
+**Lane**: `doing/` -- active on `refactor/centralize-install-path-authority` from order-4 closeout commit `56d32945`.
 
 **Findings**: O065's exact preserve-the-leaf duplicate and O069's runtime-removal callback inversion.
 
@@ -13,11 +13,13 @@ package-path canonicalizers.
 
 ## Evidence and Authority
 
-On `5777192a`, `skill_planning._absolute_path` and `unmanaged.canonical_package_path` have the same preserve-leaf
-algorithm. `RuntimeRemovalExecutor` receives four installer-owned path/ownership callables, making the lower module
-depend on higher-layer policy by injection. The CLI extension test file also repeats the canonical current-directory,
-parent-directory, and missing-root `find_git_root` cases from `tests/src/core/test_paths.py`; that duplicate block is
-test-organization cleanup for this path-ownership pass, not a second discovery contract. Authority:
+Rechecked on `56d32945`: `skill_planning._absolute_path` and `unmanaged.canonical_package_path` still have the same
+preserve-leaf algorithm. `RuntimeRemovalExecutor` still receives four installer-owned path/ownership callables, making
+the lower module depend on higher-layer policy by injection. The CLI extension test file also repeats the canonical
+current-directory, parent-directory, and missing-root `find_git_root` cases from `tests/src/core/test_paths.py`; that
+duplicate block is test-organization cleanup for this path-ownership pass, not a second discovery contract. The
+unchanged installer, runtime-removal, unmanaged-package, skill-planning, and extension characterization passes 348
+tests. Authority:
 [`docs/design.md` "3.5 File ownership boundaries"](../../../design.md#35-file-ownership-boundaries-normative) and
 [`docs/design_appendix.md` "C. Install Model Reference"](../../../design_appendix.md#c-install-model-reference).
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
-from forge.install import installer as installer_module
+from forge.install import path_policy as path_policy_module
 from forge.install import runtime_removal as runtime_removal_module
 from forge.install.codex_hooks import (
     CODEX_BLOCK_BEGIN,
@@ -996,7 +996,7 @@ def test_codex_scope_drift_blocks_codex_but_not_claude_removal(
         tracking_store=tracking,
     )
     monkeypatch.setattr(
-        installer_module,
+        path_policy_module,
         "get_codex_config_path",
         lambda _scope, _project_root: tmp_path / "drifted" / "config.toml",
     )

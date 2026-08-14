@@ -22,6 +22,7 @@ from typing import Literal
 from forge.core.paths import find_git_root, get_forge_home
 
 from .models import InstalledManifest, InstallScope
+from .path_policy import canonical_package_path, runtime_skill_root
 from .skill_compiler import (
     FORGE_PACKAGE_PRODUCER,
     FORGE_PACKAGE_SCHEMA_VERSION,
@@ -31,7 +32,6 @@ from .skill_planning import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
     forge_skill_name_universe,
-    runtime_skill_root,
 )
 from .tracking import TrackingStore
 
@@ -144,13 +144,6 @@ class _TreeProof:
     eligible: bool
     reason: str
     shape: PackageShape
-
-
-def canonical_package_path(path: Path) -> Path:
-    """Resolve parent components while preserving the final path entry."""
-
-    absolute = Path(os.path.abspath(path.expanduser()))
-    return absolute.parent.resolve() / absolute.name
 
 
 def scan_unmanaged_skill_packages(

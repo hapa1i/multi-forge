@@ -39,7 +39,6 @@ from .codex_hooks import (
     restore_codex_config_rollback_state,
 )
 from .exceptions import (
-    CodexConfigScopeMismatchError,
     ForgeInstallError,
     NoClaudeDirectoryError,
     NoForgeInstallationError,
@@ -82,6 +81,18 @@ from .ownership import (
 )
 from .ownership import managed_runtime_ids as owned_runtime_ids
 from .ownership import module_values
+from .path_policy import (
+    canonical_package_path,
+    get_runtime_skill_root,
+    get_target_root,
+    tracked_file_boundary,
+    tracked_skill_package_target,
+    validate_codex_config_scope,
+    validate_path_within_boundary,
+    validate_real_skill_package_directory,
+    validate_skill_package_file_path,
+    validate_tracked_skill_package_files,
+)
 from .runtime_removal import RuntimeRemovalExecutor, RuntimeRemovalPlan
 from .settings_merge import (
     backup_settings,
@@ -125,14 +136,12 @@ from .skill_planning import (
     SkillPlanAction,
     SkillPlanReason,
     plan_runtime_skills,
-    runtime_skill_root,
     scan_codex_skill_duplicates,
     select_skill_runtimes,
 )
 from .tracking import TrackingStore, compute_checksum
 from .unmanaged import (
     UnmanagedSkillPackage,
-    canonical_package_path,
     render_unmanaged_conflict_recovery,
     runtime_skill_scan_roots,
     scan_unmanaged_skill_packages,
@@ -258,46 +267,6 @@ def _codex_available() -> bool:
     return get_runtime("codex").is_installed()
 
 
-def get_target_root(scope: InstallScope, project_root: Path | None = None) -> Path:
-    """Get target directory for extensions.
-
-    Args:
-        scope: Installation scope.
-        project_root: Project root (required for PROJECT/LOCAL).
-
-    Returns:
-        Path to target .claude directory.
-
-    Raises:
-        ValueError: If project_root required but not provided.
-        NestedClaudeDirectoryError: If project_root is inside a .claude directory.
-    """
-    if scope == InstallScope.USER:
-        return get_claude_home()
-    else:
-        if project_root is None:
-            raise ValueError("project_root required for PROJECT/LOCAL scope")
-
-        # Guard against nested .claude directories (e.g., running from .claude/)
-        resolved = project_root.resolve()
-        if ".claude" in resolved.parts:
-            from .exceptions import NestedClaudeDirectoryError
-
-            raise NestedClaudeDirectoryError(str(project_root))
-
-        return project_root / ".claude"
-
-
-def _runtime_skill_root(runtime: str, scope: InstallScope, project_root: Path | None) -> Path:
-    return runtime_skill_root(
-        runtime,
-        scope,
-        user_home=Path.home(),
-        claude_home=get_claude_home(),
-        project_root=project_root,
-    )
-
-
 def _codex_scan_roots(project_root: Path | None, *, include_cwd: bool = True) -> tuple[Path, ...]:
     """Codex user/admin roots plus applicable CWD-to-repository project roots."""
 
@@ -355,13 +324,13 @@ def _tracked_codex_package_locations(
             ):
                 continue
             try:
-                target, expected_target = _tracked_skill_package_target(
+                target, expected_target = tracked_skill_package_target(
                     package,
                     scope,
                     project_root,
                     "classify managed Codex package",
                 )
-                _validate_tracked_skill_package_files(
+                validate_tracked_skill_package_files(
                     package,
                     target,
                     expected_target,
@@ -406,75 +375,6 @@ def _codex_package_scan_roots(
     return tuple(dict.fromkeys(roots))
 
 
-def _tracked_skill_package_target(
-    package: InstalledSkillPackage,
-    scope: InstallScope,
-    project_root: Path | None,
-    operation: str,
-) -> tuple[Path, Path]:
-    """Validate one tracked package location and return target/expected paths."""
-
-    runtime_root = _runtime_skill_root(package.runtime, scope, project_root)
-    expected_target = runtime_root / package.skill
-    validate_path_within_boundary(expected_target, runtime_root, operation)
-    target = Path(package.target_dir)
-    if not target.is_absolute():
-        raise PathBoundaryViolationError(str(target), str(expected_target), operation)
-    expected_location = expected_target.parent.resolve() / expected_target.name
-    target_location = target.parent.resolve() / target.name
-    if target_location != expected_location:
-        raise PathBoundaryViolationError(str(target), str(expected_target), operation)
-    _validate_real_skill_package_directory(target, expected_target, operation)
-    return target, expected_target
-
-
-def _validate_real_skill_package_directory(path: Path, expected_target: Path, operation: str) -> None:
-    """Require an existing package directory entry to be real, never a symlink."""
-
-    try:
-        mode = path.lstat().st_mode
-    except FileNotFoundError:
-        return
-    except OSError as e:
-        raise PathBoundaryViolationError(str(path), str(expected_target), operation) from e
-    if not stat.S_ISDIR(mode):
-        raise PathBoundaryViolationError(str(path), f"{expected_target} (real directory)", operation)
-
-
-def _validate_skill_package_file_path(
-    tracked_file: Path,
-    package_dir: Path,
-    expected_target: Path,
-    operation: str,
-) -> None:
-    """Validate one package file path without traversing substituted directories."""
-
-    if not tracked_file.is_absolute():
-        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation)
-    validate_path_within_boundary(tracked_file, expected_target, operation)
-    try:
-        relative = tracked_file.relative_to(package_dir)
-    except ValueError as e:
-        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation) from e
-    if not relative.parts or ".." in relative.parts:
-        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation)
-
-    current = package_dir
-    for component in relative.parts[:-1]:
-        current /= component
-        _validate_real_skill_package_directory(current, expected_target, operation)
-
-
-def _validate_tracked_skill_package_files(
-    package: InstalledSkillPackage,
-    package_dir: Path,
-    expected_target: Path,
-    operation: str,
-) -> None:
-    for tracked_file in package.file_paths:
-        _validate_skill_package_file_path(Path(tracked_file), package_dir, expected_target, operation)
-
-
 def _assert_tracked_skill_packages_syncable(
     installation: Installation,
     scope: InstallScope,
@@ -485,13 +385,13 @@ def _assert_tracked_skill_packages_syncable(
     invalid: list[str] = []
     for package in installation.skill_packages:
         try:
-            target, expected_target = _tracked_skill_package_target(
+            target, expected_target = tracked_skill_package_target(
                 package,
                 scope,
                 project_root,
                 "sync skill package",
             )
-            _validate_tracked_skill_package_files(package, target, expected_target, "sync skill package")
+            validate_tracked_skill_package_files(package, target, expected_target, "sync skill package")
         except (KeyError, PathBoundaryViolationError, ValueError):
             invalid.append(f"{package.runtime}/{package.skill}")
     if invalid:
@@ -525,7 +425,7 @@ def inspect_skill_package_status(
     sync_command = _extension_scope_command("sync", scope, project_root)
     for package in sorted(installation.skill_packages, key=lambda item: (item.runtime, item.skill)):
         try:
-            target, expected_target = _tracked_skill_package_target(
+            target, expected_target = tracked_skill_package_target(
                 package,
                 scope,
                 project_root,
@@ -547,7 +447,7 @@ def inspect_skill_package_status(
 
         target_present = target.is_dir() and (target / "SKILL.md").is_file()
         try:
-            _validate_tracked_skill_package_files(package, target, expected_target, "inspect skill package")
+            validate_tracked_skill_package_files(package, target, expected_target, "inspect skill package")
         except PathBoundaryViolationError:
             statuses.append(
                 SkillPackageStatus(
@@ -626,37 +526,6 @@ def inspect_skill_package_status(
             )
         )
     return tuple(statuses)
-
-
-def validate_path_within_boundary(
-    path: Path,
-    boundary: Path,
-    operation: str = "delete",
-) -> None:
-    """Validate that a path is within the expected boundary.
-
-    Security check to prevent malicious tracking file modifications
-    from causing deletion of arbitrary system files.
-
-    Args:
-        path: The path to validate.
-        boundary: The expected parent directory.
-        operation: Description of the operation (for error messages).
-
-    Raises:
-        PathBoundaryViolationError: If path is not within boundary.
-    """
-    # Always use parent.resolve() / name to get the absolute path of the entry
-    # itself, without following symlinks on the final component. This:
-    # 1. Handles symlinks correctly (checks location, not target)
-    # 2. Handles non-existent paths consistently (is_symlink() returns False
-    #    for non-existent paths, so we'd otherwise fall back to resolve())
-    # 3. Still canonicalizes any symlink directories in the parent chain
-    resolved_path = path.parent.resolve() / path.name
-    resolved_boundary = boundary.resolve()
-
-    if not resolved_path.is_relative_to(resolved_boundary):
-        raise PathBoundaryViolationError(str(path), str(boundary), operation)
 
 
 def find_claude_root(
@@ -1178,7 +1047,7 @@ class Installer:
                 raise ForgeInstallError(
                     f"Skill planner omitted target for eligible package {decision.runtime}/{decision.skill}"
                 )
-            _validate_real_skill_package_directory(
+            validate_real_skill_package_directory(
                 decision.target_dir,
                 decision.target_dir,
                 "write skill package",
@@ -1193,7 +1062,7 @@ class Installer:
                 ) from e
 
             cache_dir = compiled_skill_cache_dir(compiled)
-            runtime_root = _runtime_skill_root(decision.runtime, self._scope, self._project_root)
+            runtime_root = get_runtime_skill_root(decision.runtime, self._scope, self._project_root)
             file_plans: list[FilePlan] = []
             for package_file in compiled.files:
                 source_file = cache_dir.joinpath(*package_file.path.parts)
@@ -1201,7 +1070,7 @@ class Installer:
                 # Keep provenance metadata readable after a compiled-cache reset.
                 effective_mode = InstallMode.COPY if is_compiler_owned_file(package_file.path) else mode
                 validate_path_within_boundary(target_file, runtime_root, "write skill package")
-                _validate_skill_package_file_path(
+                validate_skill_package_file_path(
                     target_file,
                     decision.target_dir,
                     decision.target_dir,
@@ -1258,7 +1127,7 @@ class Installer:
                     target_dir = installed_package.target_dir
                     file_paths = sorted(installed_package.file_paths)
                 else:
-                    target = _runtime_skill_root(runtime, self._scope, self._project_root) / skill
+                    target = get_runtime_skill_root(runtime, self._scope, self._project_root) / skill
                     target_dir = str(target)
                     file_paths = sorted(
                         tracked_file.target_path
@@ -1773,8 +1642,8 @@ class Installer:
             package_dir = skill_package_dirs_by_file.get(file_plan.target_path)
             if package_dir is not None:
                 try:
-                    _validate_real_skill_package_directory(package_dir, package_dir, "write skill package")
-                    _validate_skill_package_file_path(target, package_dir, package_dir, "write skill package")
+                    validate_real_skill_package_directory(package_dir, package_dir, "write skill package")
+                    validate_skill_package_file_path(target, package_dir, package_dir, "write skill package")
                 except PathBoundaryViolationError as e:
                     self._raise_post_file_failure(
                         f"Refusing unsafe skill package write '{file_plan.target_path}'; tracking was not updated",
@@ -1941,7 +1810,13 @@ class Installer:
                 if existing_file.target_path not in planned_targets:
                     target = Path(existing_file.target_path)
                     try:
-                        boundary = self._tracked_file_boundary(existing, target, "remove stale file")
+                        boundary = tracked_file_boundary(
+                            existing,
+                            target,
+                            "remove stale file",
+                            scope=self._scope,
+                            project_root=self._project_root,
+                        )
                         validate_path_within_boundary(target, boundary, "remove stale file")
                     except PathBoundaryViolationError:
                         continue
@@ -2154,12 +2029,12 @@ class Installer:
             try:
                 package_dir = package_directories.get(str(target))
                 if package_dir is not None:
-                    _validate_real_skill_package_directory(
+                    validate_real_skill_package_directory(
                         package_dir,
                         package_dir,
                         "roll back partial extension file",
                     )
-                    _validate_skill_package_file_path(
+                    validate_skill_package_file_path(
                         target,
                         package_dir,
                         package_dir,
@@ -2183,8 +2058,8 @@ class Installer:
             try:
                 package_dir = package_directories.get(record.target_path)
                 if package_dir is not None:
-                    _validate_real_skill_package_directory(package_dir, package_dir, "roll back extension file")
-                    _validate_skill_package_file_path(
+                    validate_real_skill_package_directory(package_dir, package_dir, "roll back extension file")
+                    validate_skill_package_file_path(
                         target,
                         package_dir,
                         package_dir,
@@ -2250,42 +2125,6 @@ class Installer:
             installed_at=now_iso(),
             attribution=attributed(file_plan.module, file_plan.runtime),
         )
-
-    def _tracked_file_boundary(self, installation: Installation, target: Path, operation: str) -> Path:
-        """Return the runtime boundary for a tracked file and validate package ownership.
-
-        Legacy rows have no package grouping and remain constrained to the
-        historical Claude target.  A v2 package row narrows the file to the
-        reviewed runtime root and its exact package directory.
-        """
-
-        target_key = str(target)
-        package_matches = [package for package in installation.skill_packages if target_key in package.file_paths]
-        if not package_matches:
-            return get_target_root(self._scope, self._project_root)
-        if len(package_matches) != 1:
-            raise PathBoundaryViolationError(target_key, "one tracked skill package", operation)
-
-        package = package_matches[0]
-        try:
-            runtime_root = _runtime_skill_root(package.runtime, self._scope, self._project_root)
-        except (KeyError, ValueError) as e:
-            raise PathBoundaryViolationError(
-                target_key, f"known {self._scope.value} runtime skill root", operation
-            ) from e
-        try:
-            tracked_package_dir, expected_package_dir = _tracked_skill_package_target(
-                package,
-                self._scope,
-                self._project_root,
-                operation,
-            )
-        except (KeyError, ValueError) as e:
-            raise PathBoundaryViolationError(
-                target_key, f"known {self._scope.value} runtime skill root", operation
-            ) from e
-        _validate_skill_package_file_path(target, tracked_package_dir, expected_package_dir, operation)
-        return runtime_root
 
     @staticmethod
     def _is_forge_owned(target: Path, record: InstalledFile) -> bool:
@@ -2389,10 +2228,6 @@ class Installer:
             project_root=self._project_root,
             project_path=self._project_path_str,
             tracking=self._tracking,
-            get_target_root=get_target_root,
-            validate_path_within_boundary=validate_path_within_boundary,
-            tracked_file_boundary=self._tracked_file_boundary,
-            validate_codex_config_scope=self.validate_codex_config_scope,
         )
 
     def uninstall(self) -> None:
@@ -2401,13 +2236,19 @@ class Installer:
         if existing is None:
             raise NotInstalledError(self._scope.value)
 
-        self.validate_codex_config_scope(existing)
+        validate_codex_config_scope(existing, scope=self._scope, project_root=self._project_root)
 
         base_dir = get_target_root(self._scope, self._project_root)
         removals: list[tuple[InstalledFile, Path, Path]] = []
         for file_record in existing.files:
             target = Path(file_record.target_path)
-            boundary = self._tracked_file_boundary(existing, target, "delete file")
+            boundary = tracked_file_boundary(
+                existing,
+                target,
+                "delete file",
+                scope=self._scope,
+                project_root=self._project_root,
+            )
             validate_path_within_boundary(target, boundary, "delete file")
             removals.append((file_record, target, boundary))
 
@@ -2435,7 +2276,13 @@ class Installer:
 
         dirs_to_clean: set[tuple[Path, Path]] = set()
         for _file_record, target, boundary in removals:
-            self._tracked_file_boundary(existing, target, "delete file")
+            tracked_file_boundary(
+                existing,
+                target,
+                "delete file",
+                scope=self._scope,
+                project_root=self._project_root,
+            )
             if target.exists() or target.is_symlink():
                 target.unlink()
             parent = target.parent
@@ -2474,15 +2321,6 @@ class Installer:
         self._remove_codex_registration(existing)
 
         self._tracking.remove_installation(self._scope.value, self._project_path_str)
-
-    def validate_codex_config_scope(self, existing: Installation) -> None:
-        """Refuse a tracked Codex config outside the current scope mapping."""
-        if not existing.codex_config_path:
-            return
-        tracked = Path(existing.codex_config_path)
-        expected = get_codex_config_path(self._scope, self._project_root)
-        if tracked.resolve() != expected.resolve():
-            raise CodexConfigScopeMismatchError(str(tracked), str(expected))
 
     def _remove_codex_registration(self, existing: Installation) -> None:
         """Remove tracked Forge-managed Codex hooks after scope validation."""
