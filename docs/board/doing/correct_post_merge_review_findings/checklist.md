@@ -37,6 +37,6 @@ review-strength and board-integrity amendments before opening the PR.
   (`71 passed`).
 - [x] Run final Markdown, link/lane, pre-commit, and diff checks after board synchronization (338 board documents, 871
   relative links, none missing; three active cards, including the two coordinating epics; all hooks pass).
-- [ ] Open the corrective PR without activating Wave 7 order 8.
+- [x] Open draft PR #185 without activating Wave 7 order 8.
 - [ ] After merge, add the compact change-log outcome, move this card to `done/`, repoint links, and only then select
   the next Wave 7 member.
