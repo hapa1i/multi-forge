@@ -11,11 +11,11 @@ import pytest
 
 from forge.install.exceptions import TrackingCorruptedError
 from forge.install.models import Installation, InstalledManifest, InstalledSkillPackage
+from forge.install.path_policy import canonical_package_path
 from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
 from forge.install.tracking import TrackingStore
 from forge.install.unmanaged import (
     SkillScanRoot,
-    canonical_package_path,
     revalidate_cleanup_candidate,
     scan_unmanaged_skill_packages,
     scan_unmanaged_skill_state,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +34,12 @@ from .models import (
     UnattributedSurface,
 )
 from .ownership import attribution_pair
+from .path_policy import (
+    get_target_root,
+    tracked_file_boundary,
+    validate_codex_config_scope,
+    validate_path_within_boundary,
+)
 from .settings_merge import (
     cleanup_empty_settings,
     entries_to_added_structure,
@@ -55,11 +60,6 @@ from .settings_rollback import (
 from .tracking import TrackingStore
 
 logger = logging.getLogger(__name__)
-
-TargetRootResolver = Callable[[InstallScope, Path | None], Path]
-PathBoundaryValidator = Callable[[Path, Path, str], None]
-TrackedFileBoundaryResolver = Callable[[Installation, Path, str], Path]
-CodexConfigScopeValidator = Callable[[Installation], None]
 
 _CLAUDE_SETTINGS_MODULES = frozenset(
     {
@@ -228,7 +228,7 @@ def build_runtime_removal_plan(
 
 
 class RuntimeRemovalExecutor:
-    """Apply runtime-removal plans through installer-owned safety boundaries."""
+    """Apply runtime-removal plans through shared install safety boundaries."""
 
     def __init__(
         self,
@@ -237,19 +237,11 @@ class RuntimeRemovalExecutor:
         project_root: Path | None,
         project_path: str | None,
         tracking: TrackingStore,
-        get_target_root: TargetRootResolver,
-        validate_path_within_boundary: PathBoundaryValidator,
-        tracked_file_boundary: TrackedFileBoundaryResolver,
-        validate_codex_config_scope: CodexConfigScopeValidator,
     ) -> None:
         self._scope = scope
         self._project_root = project_root
         self._project_path = project_path
         self._tracking = tracking
-        self._get_target_root = get_target_root
-        self._validate_path_within_boundary = validate_path_within_boundary
-        self._tracked_file_boundary = tracked_file_boundary
-        self._validate_codex_config_scope = validate_codex_config_scope
 
     def plan(self, runtime_ids: tuple[str, ...]) -> RuntimeRemovalPlan:
         """Plan removal of the tracked surfaces owned by ``runtime_ids``."""
@@ -472,14 +464,20 @@ class RuntimeRemovalExecutor:
         removals: list[tuple[InstalledFile, Path, Path]] = []
         for file_record in plan.files:
             target = Path(file_record.target_path)
-            boundary = self._tracked_file_boundary(existing, target, "delete file")
-            self._validate_path_within_boundary(target, boundary, "delete file")
+            boundary = tracked_file_boundary(
+                existing,
+                target,
+                "delete file",
+                scope=self._scope,
+                project_root=self._project_root,
+            )
+            validate_path_within_boundary(target, boundary, "delete file")
             removals.append((file_record, target, boundary))
 
         settings_preflight: _RuntimeSettingsPreflight | None = None
         if plan.remove_claude_settings_ownership or plan.full_coverage:
             settings_path = get_settings_path(self._scope, self._project_root)
-            base_dir = self._get_target_root(self._scope, self._project_root)
+            base_dir = get_target_root(self._scope, self._project_root)
             try:
                 added_files = tuple(find_added_files(settings_path))
                 needs_settings_transition = bool(
@@ -489,9 +487,9 @@ class RuntimeRemovalExecutor:
                     or added_files
                 )
                 if needs_settings_transition:
-                    self._validate_path_within_boundary(settings_path, base_dir, "update settings")
+                    validate_path_within_boundary(settings_path, base_dir, "update settings")
                     for added_file in added_files:
-                        self._validate_path_within_boundary(
+                        validate_path_within_boundary(
                             added_file,
                             base_dir,
                             "update settings ownership",
@@ -500,7 +498,7 @@ class RuntimeRemovalExecutor:
                         Path(existing.settings_backup_path) if existing.settings_backup_path is not None else None
                     )
                     if baseline_path is not None:
-                        self._validate_path_within_boundary(
+                        validate_path_within_boundary(
                             baseline_path,
                             base_dir,
                             "read settings baseline",
@@ -525,7 +523,7 @@ class RuntimeRemovalExecutor:
 
         codex_preflight: CodexRuntimeRemovePlan | None = None
         if plan.remove_codex_block:
-            self._validate_codex_config_scope(existing)
+            validate_codex_config_scope(existing, scope=self._scope, project_root=self._project_root)
             tracked = Path(existing.codex_config_path)  # type: ignore[arg-type]
             codex_preflight = plan_codex_runtime_remove(tracked, get_builtin_codex_entries())
             if codex_preflight.action == "conflict":

@@ -1026,8 +1026,8 @@ and a current, executable installed dispatcher. `runtime_hooks` keeps `scopes` a
 
 ### C.1 Scope model
 
-`RuntimeSpec.skill_scopes` is separate from `install_scopes`; project participation does not imply a safe skill target
-at every Forge scope.
+`install.path_policy` owns these mappings and preserve-leaf boundary checks for installer and runtime removal.
+`RuntimeSpec.skill_scopes` remains separate from `install_scopes`.
 
 | Scope     | Claude skill target      | Codex skill target       | Claude settings                      |
 | --------- | ------------------------ | ------------------------ | ------------------------------------ |
@@ -1035,8 +1035,8 @@ at every Forge scope.
 | `project` | `<root>/.claude/skills/` | `<root>/.agents/skills/` | `<root>/.claude/settings.json`       |
 | `local`   | `<root>/.claude/skills/` | Unsupported              | `<root>/.claude/settings.local.json` |
 
-Claude supports all three skill scopes. Codex supports user/project only, so local never aliases project
-`.agents/skills/`; `$CODEX_HOME` remains its configuration/session home, not a skill root.
+Claude supports all three scopes; Codex supports user/project only. Local never aliases project `.agents/skills/`, and
+`$CODEX_HOME` is its configuration/session home, not a skill root.
 
 ### C.2 Installable modules + profiles
 

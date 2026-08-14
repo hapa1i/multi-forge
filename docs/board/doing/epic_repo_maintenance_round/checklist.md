@@ -1,8 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: order-4 O066/O092 shipped independently in PR #181; land its closeout before activating order 5. The
-other 30 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows retain separate
-Wave 6 gates.
+Current focus: execute only Wave 7 order-5 O065/O069 on `refactor/centralize-install-path-authority`. Orders 1--4 are
+closed, the other 29 Wave 7 members remain parked, and D056 plus remaining correctness/test-policy/output/docs rows
+retain separate Wave 6 gates.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -191,5 +191,7 @@ Wave 6 gates.
 - [x] Ship O060/O061/O094 independently and close its member before activating Wave 7 order 4.
 - [x] Branch from order-3's pushed closeout (`9817cad3`) and activate only `unify_git_root_discovery`.
 - [x] Ship O066/O092 independently and close its member before activating Wave 7 order 5.
+- [x] Branch from order-4's pushed closeout (`56d32945`) and activate only `centralize_install_path_authority`.
+- [ ] Ship O065/O069 independently and close its member before activating Wave 7 order 6.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

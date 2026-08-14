@@ -27,6 +27,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.install.path_policy import canonical_package_path
 from forge.install.project_compat import (
     ProjectCompatibilityError,
     ProjectCompatibilitySkip,
@@ -35,7 +36,6 @@ from forge.install.project_compat import (
 from forge.install.unmanaged import (
     SkillScanRoot,
     UnmanagedSkillPackage,
-    canonical_package_path,
     cleanup_proof_fingerprint,
     revalidate_cleanup_candidate,
     runtime_skill_scan_roots,

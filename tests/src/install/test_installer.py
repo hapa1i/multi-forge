@@ -16,7 +16,6 @@ from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 from forge.install.exceptions import (
     CodexConfigScopeMismatchError,
     ForgeInstallError,
-    NestedClaudeDirectoryError,
     NoClaudeDirectoryError,
     NoForgeInstallationError,
     NotInstalledError,
@@ -29,9 +28,7 @@ from forge.install.installer import (
     find_forge_installation,
     get_extensions_root,
     get_forge_source_root,
-    get_target_root,
     resolve_modules,
-    validate_path_within_boundary,
 )
 from forge.install.models import (
     FilePlan,
@@ -92,57 +89,6 @@ class TestResolveModules:
         modules = resolve_modules(InstallProfile.MINIMAL, with_modules={InstallModule.HOOKS})
         assert InstallModule.HOOKS in modules
         assert InstallModule.PERMISSIONS not in modules
-
-
-class TestGetTargetRoot:
-    """Tests for get_target_root function."""
-
-    def test_user_scope(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        """Should respect CLAUDE_HOME env var (isolation fixture sets it)."""
-        # The isolate_claude_home fixture sets CLAUDE_HOME to tmp_path/claude_home
-        target = get_target_root(InstallScope.USER)
-        # Should be the isolated path, not the real ~/.claude
-        assert target.name == "claude_home" or str(target).startswith(str(tmp_path))
-
-    def test_project_scope(self, tmp_path: Path) -> None:
-        target = get_target_root(InstallScope.PROJECT, project_root=tmp_path)
-        assert target == tmp_path / ".claude"
-
-    def test_local_scope(self, tmp_path: Path) -> None:
-        target = get_target_root(InstallScope.LOCAL, project_root=tmp_path)
-        assert target == tmp_path / ".claude"
-
-    def test_project_requires_root(self) -> None:
-        with pytest.raises(ValueError, match="project_root required"):
-            get_target_root(InstallScope.PROJECT)
-
-    def test_rejects_nested_claude_directory(self, tmp_path: Path) -> None:
-        """Guard against running from inside a .claude directory."""
-        nested_claude = tmp_path / "project" / ".claude"
-        nested_claude.mkdir(parents=True)
-
-        with pytest.raises(NestedClaudeDirectoryError) as exc_info:
-            get_target_root(InstallScope.PROJECT, project_root=nested_claude)
-
-        assert ".claude" in str(exc_info.value)
-        assert "nested" in str(exc_info.value).lower()
-
-    def test_rejects_deeply_nested_claude_directory(self, tmp_path: Path) -> None:
-        """Guard against running from subdirectory of .claude."""
-        nested_claude = tmp_path / "project" / ".claude" / "commands"
-        nested_claude.mkdir(parents=True)
-
-        with pytest.raises(NestedClaudeDirectoryError):
-            get_target_root(InstallScope.PROJECT, project_root=nested_claude)
-
-    def test_allows_normal_project_root(self, tmp_path: Path) -> None:
-        """Normal project roots (not inside .claude) should work."""
-        project = tmp_path / "my-project"
-        project.mkdir()
-
-        # Should not raise
-        target = get_target_root(InstallScope.PROJECT, project_root=project)
-        assert target == project / ".claude"
 
 
 class TestGetForgeSourceRoot:
@@ -1330,109 +1276,6 @@ class TestFindForgeInstallation:
         assert project_root == parent_project
 
 
-class TestValidatePathWithinBoundary:
-    """Tests for validate_path_within_boundary security function."""
-
-    def test_accepts_path_within_boundary(self, tmp_path: Path) -> None:
-        """Valid path within boundary should not raise."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        target = boundary / "commands" / "test.md"
-
-        # Should not raise
-        validate_path_within_boundary(target, boundary)
-
-    def test_accepts_nested_path(self, tmp_path: Path) -> None:
-        """Deeply nested path should be accepted."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        target = boundary / "a" / "b" / "c" / "d" / "file.txt"
-
-        # Should not raise
-        validate_path_within_boundary(target, boundary)
-
-    def test_rejects_path_outside_boundary(self, tmp_path: Path) -> None:
-        """Path outside boundary should raise PathBoundaryViolationError."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        target = tmp_path / "other" / "malicious.txt"
-
-        with pytest.raises(PathBoundaryViolationError) as exc_info:
-            validate_path_within_boundary(target, boundary, "delete")
-
-        assert "security violation" in str(exc_info.value)
-        assert "delete" in str(exc_info.value)
-
-    def test_rejects_system_path(self, tmp_path: Path) -> None:
-        """System paths like /etc should be rejected."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        target = Path("/etc/passwd")
-
-        with pytest.raises(PathBoundaryViolationError):
-            validate_path_within_boundary(target, boundary)
-
-    def test_rejects_parent_traversal(self, tmp_path: Path) -> None:
-        """Path with .. traversal escaping boundary should be rejected."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        # Try to escape using .. traversal
-        target = boundary / ".." / "escaped.txt"
-
-        with pytest.raises(PathBoundaryViolationError):
-            validate_path_within_boundary(target, boundary)
-
-    def test_handles_symlinks_inside_boundary(self, tmp_path: Path) -> None:
-        """Symlinks inside boundary should be accepted, regardless of target.
-
-        We care about the symlink's LOCATION (what we're deleting), not where it
-        points to. This allows uninstall to remove symlinks that point to the
-        Forge repo (outside .claude/).
-        """
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-
-        # Create a file outside boundary
-        outside_file = tmp_path / "outside.txt"
-        outside_file.write_text("outside")
-
-        # Create symlink inside boundary pointing outside
-        symlink = boundary / "sneaky_link"
-        symlink.symlink_to(outside_file)
-
-        # Should ACCEPT because the symlink itself is inside boundary
-        # (we're deleting the symlink, not following it to the target)
-        validate_path_within_boundary(symlink, boundary)  # Should not raise
-
-    def test_rejects_symlinks_outside_boundary(self, tmp_path: Path) -> None:
-        """Symlinks outside boundary should be rejected, even if target is inside."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-
-        # Create a file inside boundary
-        inside_file = boundary / "inside.txt"
-        inside_file.write_text("inside")
-
-        # Create symlink outside boundary pointing inside
-        symlink = tmp_path / "outside_link"
-        symlink.symlink_to(inside_file)
-
-        # Should reject because the symlink itself is outside boundary
-        with pytest.raises(PathBoundaryViolationError):
-            validate_path_within_boundary(symlink, boundary)
-
-    def test_error_includes_operation(self, tmp_path: Path) -> None:
-        """Error message should include the operation description."""
-        boundary = tmp_path / ".claude"
-        boundary.mkdir()
-        target = Path("/some/other/path")
-
-        with pytest.raises(PathBoundaryViolationError) as exc_info:
-            validate_path_within_boundary(target, boundary, "remove backup file")
-
-        assert "remove backup file" in str(exc_info.value)
-
-
 class TestInstallerCodexHooks:
     """Tests for Codex-owned hooks wiring (plan/init/uninstall/update)."""
 
@@ -1613,21 +1456,6 @@ class TestInstallerCodexHooks:
         self._run(installer, src, claude_home, method="uninstall")
 
         assert installer._tracking.get_installation("user", None) is None
-
-    def test_codex_scope_validator_preserves_project_root_error(self, tmp_path: Path) -> None:
-        installer = Installer(
-            scope=InstallScope.PROJECT,
-            tracking_store=TrackingStore(tracking_path=tmp_path / "installed.json"),
-        )
-        installation = Installation(
-            scope="project",
-            mode="copy",
-            profile="standard",
-            codex_config_path=str(tmp_path / "config.toml"),
-        )
-
-        with pytest.raises(ValueError, match="project_root required for project scope"):
-            installer.validate_codex_config_scope(installation)
 
     def test_uninstall_with_leftover_codex_command_still_warns_and_succeeds(
         self,

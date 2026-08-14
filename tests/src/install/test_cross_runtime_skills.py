@@ -43,10 +43,8 @@ from forge.install.skill_planning import (
     SkillCandidate,
     SkillPlanAction,
     SkillPlanReason,
-    UnsupportedRuntimeSkillScope,
     forge_skill_name_universe,
     plan_runtime_skills,
-    runtime_skill_root,
     scan_codex_skill_duplicates,
     select_skill_runtimes,
 )
@@ -220,44 +218,6 @@ def test_managed_empty_runtime_set_is_authoritative() -> None:
 
     assert selection.runtime_ids == ()
     assert selection.origin == RuntimeSelectionOrigin.MANAGED
-
-
-@pytest.mark.parametrize(
-    ("scope", "runtime", "expected"),
-    [
-        (InstallScope.USER, CLAUDE_CODE_RUNTIME, Path("/claude/skills")),
-        (InstallScope.PROJECT, CLAUDE_CODE_RUNTIME, Path("/project/.claude/skills")),
-        (InstallScope.LOCAL, CLAUDE_CODE_RUNTIME, Path("/project/.claude/skills")),
-        (InstallScope.USER, CODEX_RUNTIME, Path("/home/.agents/skills")),
-        (InstallScope.PROJECT, CODEX_RUNTIME, Path("/project/.agents/skills")),
-    ],
-)
-def test_runtime_skill_roots_match_reviewed_scope_contract(
-    scope: InstallScope,
-    runtime: str,
-    expected: Path,
-) -> None:
-    assert (
-        runtime_skill_root(
-            runtime,
-            scope,
-            user_home=Path("/home"),
-            claude_home=Path("/claude"),
-            project_root=Path("/project"),
-        )
-        == expected
-    )
-
-
-def test_codex_local_scope_has_no_target() -> None:
-    with pytest.raises(UnsupportedRuntimeSkillScope, match="does not support local"):
-        runtime_skill_root(
-            CODEX_RUNTIME,
-            InstallScope.LOCAL,
-            user_home=Path("/home"),
-            claude_home=Path("/claude"),
-            project_root=Path("/project"),
-        )
 
 
 def test_scope_runtime_profile_skill_matrix_is_explicit(tmp_path: Path) -> None:

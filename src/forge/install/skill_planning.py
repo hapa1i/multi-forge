@@ -20,7 +20,6 @@ reported to planning and are never removed or rewritten here.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -31,6 +30,7 @@ from forge.core.runtime import get_runtime, list_runtimes
 from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 
 from .models import PROFILE_RANK, InstallProfile, InstallScope
+from .path_policy import canonical_package_path, runtime_skill_root
 
 # Append-only inventory of package names emitted by Forge before unmanaged
 # package detection existed.  Runtime discovery roots are user-owned surfaces:
@@ -85,10 +85,6 @@ class SkillPlanReason(str, Enum):
     RUNTIME_UNAVAILABLE = "runtime_unavailable"
     DUPLICATE_SCAN_CHAIN = "duplicate_scan_chain"
     FORGE_MANAGED_SCOPE_DUPLICATE = "forge_managed_scope_duplicate"
-
-
-class UnsupportedRuntimeSkillScope(ValueError):
-    """Raised when a direct target lookup has no safe runtime/scope mapping."""
 
 
 @dataclass(frozen=True)
@@ -241,41 +237,6 @@ def select_skill_runtimes(
     )
 
 
-def runtime_skill_root(
-    runtime: str,
-    scope: InstallScope,
-    *,
-    user_home: Path,
-    claude_home: Path,
-    project_root: Path | None,
-) -> Path:
-    """Return the reviewed skill root for one runtime/scope pair.
-
-    Paths are composed lexically and no directory is created. In particular,
-    Codex skills never use ``CODEX_HOME`` and Codex local scope is rejected
-    rather than mapped to the shared project directory.
-    """
-
-    spec = get_runtime(runtime)
-    if scope.value not in spec.skill_scopes:
-        raise UnsupportedRuntimeSkillScope(f"runtime '{runtime}' does not support {scope.value} skill scope")
-
-    if runtime == CLAUDE_CODE_RUNTIME:
-        root = claude_home if scope == InstallScope.USER else _require_project_root(scope, project_root) / ".claude"
-        return root / "skills"
-    if runtime == CODEX_RUNTIME:
-        if scope == InstallScope.USER:
-            return user_home / ".agents" / "skills"
-        return _require_project_root(scope, project_root) / ".agents" / "skills"
-    raise ValueError(f"runtime '{runtime}' declares skill scopes but has no Forge target mapping")
-
-
-def _require_project_root(scope: InstallScope, project_root: Path | None) -> Path:
-    if project_root is None:
-        raise ValueError(f"project_root required for {scope.value} skill scope")
-    return project_root
-
-
 def scan_codex_skill_duplicates(
     skill: str,
     *,
@@ -294,11 +255,13 @@ def scan_codex_skill_duplicates(
     for compatibility with callers that inspect a single installation.
     """
 
-    managed = {_absolute_path(path) for path in managed_package_dirs}
-    current = managed if current_package_dirs is None else {_absolute_path(path) for path in current_package_dirs}
+    managed = {canonical_package_path(path) for path in managed_package_dirs}
+    current = (
+        managed if current_package_dirs is None else {canonical_package_path(path) for path in current_package_dirs}
+    )
     package_dirs: list[Path] = []
     for scan_root in scan_roots:
-        candidate = _absolute_path(scan_root / skill)
+        candidate = canonical_package_path(scan_root / skill)
         if candidate.is_dir() and (candidate / "SKILL.md").is_file():
             package_dirs.append(candidate)
     unique = tuple(sorted(set(package_dirs), key=str))
@@ -308,13 +271,6 @@ def scan_codex_skill_duplicates(
         forge_managed_duplicate_dirs=tuple(path for path in unique if path in managed and path not in current),
         untracked_package_dirs=tuple(path for path in unique if path not in managed and path not in current),
     )
-
-
-def _absolute_path(path: Path) -> Path:
-    """Canonicalize parent components while preserving the final entry itself."""
-
-    absolute = Path(os.path.abspath(path.expanduser()))
-    return absolute.parent.resolve() / absolute.name
 
 
 def plan_runtime_skills(
@@ -425,14 +381,14 @@ def plan_runtime_skills(
                 continue
 
             untracked_duplicate_dirs = {
-                _absolute_path(path)
+                canonical_package_path(path)
                 for path in (
                     *unmanaged_packages.get((runtime, candidate.name), ()),
                     *(untracked.get(candidate.name, ()) if runtime == CODEX_RUNTIME else ()),
                 )
             }
             forge_managed_duplicate_dirs = (
-                {_absolute_path(path) for path in managed_duplicates.get(candidate.name, ())}
+                {canonical_package_path(path) for path in managed_duplicates.get(candidate.name, ())}
                 if runtime == CODEX_RUNTIME
                 else set()
             )

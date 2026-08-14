@@ -605,7 +605,7 @@ To avoid writer conflicts:
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
   - per-proxy override files (if any)
-- Forge Installer writes:
+- Forge Installer writes after shared `install.path_policy` target and boundary validation:
   - `~/.forge/installed.json`
   - installed extension files + merged settings per chosen scope
 - Forge memory passport commands write:
