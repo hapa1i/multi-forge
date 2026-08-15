@@ -1,11 +1,10 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--12 and the bounded
+Current focus: orders 1--13 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189, order 11 shipped in PR #190, and order 12 shipped in PR #191. Order 13
-[`migrate_memory_intent_generated_file`](../migrate_memory_intent_generated_file/card.md) is active from `9a334b18`;
-keep orders 14--35 in `todo/`.
+shipped in PR #189, order 11 shipped in PR #190, order 12 shipped in PR #191, and order 13 shipped in PR #192; keep
+orders 14--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -77,6 +76,7 @@ keep orders 14--35 in `todo/`.
   activate only order 13.
 - [x] Migrate and delete only `MemoryIntent.generated_file` with strict-read and no-rewrite coverage before selecting
   order 14.
+- [x] Ship order 13 independently in PR #192 (`b7a8ad9e`) and close its member without activating order 14.
 
 Orders 14--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

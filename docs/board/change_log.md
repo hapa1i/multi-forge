@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-16
+
+### Migrate legacy memory-intent state
+
+**Goal/outcome**: Remove the behaviorless `MemoryIntent.generated_file` field without making Forge-authored legacy
+session manifests unreadable.
+
+**Key changes**:
+
+- Removed the field from current writes and added a narrow, no-rewrite compatibility pass for legacy
+  `intent.memory.generated_file` before strict decoding.
+- Kept malformed containers, unrelated unknown fields, the same key under overrides, and unsupported schema versions
+  strict, with byte-preservation coverage for successful and failed reads.
+
+**Verification**: 243 focused tests, 9,204 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
+session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #192 merged as
+`b7a8ad9e` with all five GitHub checks passing. No Forge workflow command was used.
+
 ## 2026-08-15
 
 ### Deprecate inert configuration fields

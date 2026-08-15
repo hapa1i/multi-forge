@@ -22,8 +22,8 @@ proxy/session configuration files.
 - Keep `MANIFEST_FILENAME` as the single durable path authority.
 
 `MemoryIntent.generated_file` is owned by
-[`migrate_memory_intent_generated_file`](../../doing/migrate_memory_intent_generated_file/card.md), because
-durable-state migration is independent of user-config deprecation.
+[`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md), because durable-state
+migration is independent of user-config deprecation.
 
 ## Evidence and Authority
 

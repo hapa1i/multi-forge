@@ -1,6 +1,6 @@
 # Migrate `MemoryIntent.generated_file` checklist
 
-Current focus: Wave 7 order 13 is active from `9a334b18`; keep orders 14--35 parked.
+Current focus: complete -- order 13 shipped in PR #192 (`b7a8ad9e`); order 14 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -41,4 +41,6 @@ Current focus: Wave 7 order 13 is active from `9a334b18`; keep orders 14--35 par
   path links across 346 board documents resolve, the Wave 7 graph is 12 `done` / 1 `doing` / 22 `todo`, and order 14
   remains parked.
 - [x] Open draft PR #192 for order 13.
-- [ ] After merge, close this member before selecting order 14.
+- [x] Close the member after PR #192 merged as `b7a8ad9e` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 879 local path links across 346 board documents resolve, the Wave 7 graph is 13
+  `done` / 0 `doing` / 22 `todo`, and the change log remains within budget at 26,616 tokens.

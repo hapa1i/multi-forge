@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `doing/` -- active on `refactor/migrate-memory-intent-generated-file` from `9a334b18`.
+**Lane**: `done/` -- shipped in PR #192 (`b7a8ad9e`) on 2026-08-16.
 
 **Finding**: O049's `MemoryIntent.generated_file` subset.
 
@@ -35,3 +35,13 @@ durable-state rule.
 ## Exclusions
 
 Do not loosen strict decoding generally, mutate manifests merely by reading them, or change memory-writer output paths.
+
+## Outcome
+
+Current manifests no longer serialize `MemoryIntent.generated_file`. The reader tolerates only the exact legacy
+`intent.memory.generated_file` path in its parsed payload and never rewrites during a read; malformed containers,
+unknown siblings, overrides, and newer schemas retain strict error behavior.
+
+PR #192 merged as `b7a8ad9e` after 243 focused tests, 9,204 unit tests (one skip, 122 deselected), 913 regressions, 23
+targeted Docker session-lifecycle tests, full pre-commit, design-size checks, and all five GitHub checks passed. No
+Forge workflow command was used.

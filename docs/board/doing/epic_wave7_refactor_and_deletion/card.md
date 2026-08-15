@@ -2,11 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--12 shipped independently in PRs #178--#184, #186--#188, and #190--#191; order 13
-[`migrate_memory_intent_generated_file`](../migrate_memory_intent_generated_file/card.md) is active from `9a334b18`, and
-22 members remain parked. The bounded
-[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
-before order 11; the earlier
+**Lane**: `doing/` -- orders 1--13 shipped independently in PRs #178--#184, #186--#188, and #190--#192; 22 members
+remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
+correction shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal
@@ -65,7 +63,7 @@ runs last so it lands on the smallest stable surface.
 | 10    | O073             | [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
 | 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../done/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
 | 12    | O049 config      | [`migrate_inert_config_fields`](../../done/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |
-| 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../migrate_memory_intent_generated_file/card.md)               | tolerant durable-manifest migration                  |
+| 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |
 | 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../todo/replace_unsafe_index_test_fixtures/card.md)           | transaction-safe test state construction             |
 | 15    | O050 API         | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                       | zero-caller unsafe public mutators                   |
 | 16    | O051             | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
