@@ -399,9 +399,11 @@ The session file has three sections:
 
 > Schema is intentionally strict: unknown fields and unknown override keys are rejected.
 
-The section containers are typed too: `intent` and `overrides` are required objects. A missing `confirmed` remains a
-legacy-compatible empty/default section, but when present it must be an object; null, list, and scalar values are
-manifest corruption. Strict reads surface that classification without rewriting the file.
+Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
+new writes omit it.
+
+`intent` and `overrides` are required objects. Missing `confirmed` defaults empty; when present, it must be an object.
+Other values are corruption, surfaced without rewriting.
 
 | Section         | Definition                    | Written by              | Semantics                                    |
 | --------------- | ----------------------------- | ----------------------- | -------------------------------------------- |

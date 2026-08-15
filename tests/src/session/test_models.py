@@ -791,7 +791,6 @@ class TestMemoryIntentWithMemoryWriter:
             "tags": [],
             "strategy": "summary",
             "max_chars": 6000,
-            "generated_file": None,
         }
         restored = dacite.from_dict(MemoryIntent, data, config=dacite.Config(strict=True))
         assert restored.auto_update is None

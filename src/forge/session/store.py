@@ -2,10 +2,10 @@
 
 Path: <forge_root>/.forge/sessions/<session_name>/forge.session.json
 
-Schema: v1 only (no migration).
+Schema: v1 only (no schema-version upgrade).
 
 Session manifests are treated as a strict contract:
-- No schema migration
+- Only explicitly retired fields are stripped from the in-memory read payload
 - No unknown field preservation
 - Invalid manifests fail fast on read
 
@@ -52,6 +52,22 @@ HOOK_LOCK_TIMEOUT_S = 0.2
 CLI_LOCK_TIMEOUT_S = 5.0
 
 _store_logger = logging.getLogger(__name__)
+
+
+def strip_removed_memory_generated_file(data: dict[str, Any]) -> None:
+    """Strip the inert ``intent.memory.generated_file`` from legacy manifests.
+
+    Only the exact Forge-authored path is changed when both containers are
+    objects. Malformed containers are left intact so the strict reader retains
+    its existing error classification. This mutates only the parsed read
+    payload; ``SessionStore.read`` never rewrites the manifest on disk.
+    """
+    intent = data.get("intent")
+    if not isinstance(intent, dict):
+        return
+    memory = intent.get("memory")
+    if isinstance(memory, dict):
+        memory.pop("generated_file", None)
 
 
 def strip_preview_memory_doc_lists(data: dict[str, Any], session_name: str = "") -> None:
@@ -192,7 +208,8 @@ class SessionStore:
     def read(self) -> SessionState:
         """Read and parse the session manifest.
 
-        Schema v1 only. No migration, no unknown field preservation.
+        Schema v1 only. Explicitly retired fields are stripped in memory before
+        strict decoding; other unknown fields are not preserved.
 
         Raises:
             SessionFileNotFoundError: If manifest doesn't exist.
@@ -219,6 +236,7 @@ class SessionStore:
         if not isinstance(data, dict):
             raise ManifestCorruptedError(str(self._manifest_path), f"expected a JSON object, got {type(data).__name__}")
 
+        strip_removed_memory_generated_file(data)
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
