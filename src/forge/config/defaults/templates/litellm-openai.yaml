@@ -25,5 +25,4 @@ proxy:
       opus:
         reasoning_effort: high
         verbosity: high
-    openai_api_mode: auto
     error_hints: true

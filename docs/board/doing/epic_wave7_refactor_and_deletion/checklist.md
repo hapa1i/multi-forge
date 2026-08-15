@@ -3,7 +3,9 @@
 Current focus: orders 1--11 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189, and order 11 shipped in PR #190; keep orders 12--35 in `todo/`.
+shipped in PR #189, and order 11 shipped in PR #190. Order 12
+[`migrate_inert_config_fields`](../migrate_inert_config_fields/card.md) is active from `c99be7a3`; keep orders 13--35 in
+`todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -67,6 +69,9 @@ shipped in PR #189, and order 11 shipped in PR #190; keep orders 12--35 in `todo
 - [x] Delete only the unreachable proxy surfaces after moving useful failure-metrics coverage to a reachable path;
   complete focused/full/integration/board verification while keeping order 12 parked.
 - [x] Ship order 11 independently in PR #190 (`ca2f289b`) and close its member before activating order 12.
+- [x] Close order 11 on pushed `main` at `c99be7a3`, create `refactor/migrate-inert-config-fields`, and activate only
+  order 12.
+- [ ] Reverify and ship O049's first-release config warning transition with clean-wheel proof before selecting order 13.
 
-Orders 12--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 13--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

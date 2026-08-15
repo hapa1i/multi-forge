@@ -1,6 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--11 and both bounded corrective members are closed through PR #190; keep orders 12--35
+Current focus: Wave 7 orders 1--11 and both bounded corrective members are closed through PR #190. Order 12
+[`migrate_inert_config_fields`](../migrate_inert_config_fields/card.md) is active from `c99be7a3`; keep orders 13--35
 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
@@ -223,5 +224,9 @@ parked.
 - [x] Remove only the reverified proxy types, handlers, and diagnostics after moving useful metrics coverage to a
   reachable failure; complete the order-11 verification while keeping orders 12--35 parked.
 - [x] Ship order 11 independently in PR #190 (`ca2f289b`) and close its member without activating order 12.
+- [x] Close PR #190 on `main` at `c99be7a3`, branch from that exact commit, and activate only order 12
+  `migrate_inert_config_fields`.
+- [ ] Ship the first-release accept-and-warn transition for the three O049 config fields while keeping orders 13--35
+  parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

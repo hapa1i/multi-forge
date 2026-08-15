@@ -246,6 +246,20 @@ class TestForgeConfigMethods:
         assert "session" in d
         assert d["session"]["default_tier"] == "sonnet"
 
+    def test_to_dict_omits_deprecated_compatibility_fields(self):
+        """New serialization does not author inert first-release compatibility keys."""
+        config = ForgeConfig()
+        config.session.manifest_filename = "custom.json"
+        config.proxy.litellm.enable_preamble = True
+        config.proxy.litellm.openai_api_mode = "responses"
+
+        data = config.to_dict()
+
+        assert "manifest_filename" not in data["session"]
+        for provider_name in ("gemini", "openai", "litellm", "openrouter"):
+            assert "enable_preamble" not in data["proxy"][provider_name]
+            assert "openai_api_mode" not in data["proxy"][provider_name]
+
     def test_from_dict(self):
         """from_dict creates config from dict."""
         data = {

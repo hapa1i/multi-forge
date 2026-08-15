@@ -21,7 +21,7 @@ Usage:
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -38,6 +38,14 @@ logger = logging.getLogger(__name__)
 # ~/.forge/config.yaml; a config can be coerced repeatedly within a process and per-coercion
 # warnings would spam).
 _warned_legacy_inject_key = False
+
+# First-release compatibility window for inert config fields. Raw config loaders
+# can distinguish explicit keys from omitted defaults; dataclass construction cannot.
+_warned_deprecated_config_fields: set[str] = set()
+PROVIDER_CONFIG_NAMES: tuple[str, ...] = ("gemini", "openai", "litellm", "openrouter")
+DEPRECATED_PROVIDER_CONFIG_FIELDS: frozenset[str] = frozenset({"enable_preamble", "openai_api_mode"})
+DEPRECATED_SESSION_CONFIG_FIELDS: frozenset[str] = frozenset({"manifest_filename"})
+DEPRECATED_PROXY_INSTANCE_PROVIDER_SETTINGS: frozenset[str] = frozenset({"openai_api_mode"})
 
 # --- CONSTANTS ---
 
@@ -99,6 +107,55 @@ def is_openai_model(model_name: str) -> bool:
         clean_name = clean_name[7:]
 
     return clean_name in {m.lower() for m in OPENAI_MODELS}
+
+
+def _warn_deprecated_config_field(path: str, field_name: str) -> None:
+    """Warn once for an explicitly present inert config field."""
+    if path in _warned_deprecated_config_fields:
+        return
+    _warned_deprecated_config_fields.add(path)
+
+    if field_name == "openai_api_mode":
+        action = "Remove it; Forge derives the provider API transport from the configured backend and wire_shape."
+    elif field_name == "manifest_filename":
+        action = "Remove it; session manifests always use forge.session.json via MANIFEST_FILENAME."
+    else:
+        action = "Remove it from the provider block."
+
+    logger.warning(
+        "Deprecated config key '%s' has no effect and is accepted only for the Forge 0.9.4 compatibility window. %s",
+        path,
+        action,
+    )
+
+
+def warn_deprecated_forge_config_fields(data: Mapping[str, Any]) -> None:
+    """Warn for explicit compatibility-only fields in a raw Forge/template mapping."""
+    proxy_data = data.get("proxy")
+    if isinstance(proxy_data, Mapping):
+        for provider_name in PROVIDER_CONFIG_NAMES:
+            provider_data = proxy_data.get(provider_name)
+            if not isinstance(provider_data, Mapping):
+                continue
+            for field_name in DEPRECATED_PROVIDER_CONFIG_FIELDS:
+                if field_name in provider_data:
+                    _warn_deprecated_config_field(f"proxy.{provider_name}.{field_name}", field_name)
+
+    session_data = data.get("session")
+    if isinstance(session_data, Mapping):
+        for field_name in DEPRECATED_SESSION_CONFIG_FIELDS:
+            if field_name in session_data:
+                _warn_deprecated_config_field(f"session.{field_name}", field_name)
+
+
+def warn_deprecated_proxy_instance_fields(data: Mapping[str, Any]) -> None:
+    """Warn for explicit compatibility-only fields in a raw proxy.yaml mapping."""
+    provider_settings = data.get("provider_settings")
+    if not isinstance(provider_settings, Mapping):
+        return
+    for field_name in DEPRECATED_PROXY_INSTANCE_PROVIDER_SETTINGS:
+        if field_name in provider_settings:
+            _warn_deprecated_config_field(f"provider_settings.{field_name}", field_name)
 
 
 # --- DATACLASSES ---
@@ -197,10 +254,10 @@ class ProviderConfig:
     base_url: str = ""
     cache_ttl: float = 3600.0
     top_p: float | None = None
+    # Deprecated compatibility inputs: raw loaders warn when explicitly present,
+    # serializers omit them, and neither field has runtime behavior.
     enable_preamble: bool = False
-
-    # LiteLLM-specific: API mode for OpenAI models
-    openai_api_mode: str = "auto"  # auto, responses, chat_completions
+    openai_api_mode: str = "auto"
 
     # Prompt caching mode (only affects Anthropic/Bedrock models via LiteLLM)
     # "passthrough": forward client cache_control unchanged (default)
@@ -794,6 +851,7 @@ class SessionConfig:
     """Session management configuration."""
 
     default_tier: str = "sonnet"
+    # Deprecated compatibility input; MANIFEST_FILENAME is the path authority.
     manifest_filename: str = "forge.session.json"
     forge_home: str = ""  # default: ~/.forge
 
@@ -952,14 +1010,23 @@ class ForgeConfig:
     # Future: mcp, policy, status
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert config to nested dict (for serialization)."""
+        """Convert config to nested dict without compatibility-only fields."""
         from dataclasses import asdict
 
-        return asdict(self)
+        data = asdict(self)
+        proxy_data = data["proxy"]
+        for provider_name in PROVIDER_CONFIG_NAMES:
+            provider_data = proxy_data[provider_name]
+            for field_name in DEPRECATED_PROVIDER_CONFIG_FIELDS:
+                provider_data.pop(field_name, None)
+        for field_name in DEPRECATED_SESSION_CONFIG_FIELDS:
+            data["session"].pop(field_name, None)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ForgeConfig":
         """Create config from nested dict."""
         from forge.config.dataclass_utils import dict_to_dataclass
 
+        warn_deprecated_forge_config_fields(data)
         return dict_to_dataclass(cls, data)

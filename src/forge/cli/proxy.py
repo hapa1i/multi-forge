@@ -1946,8 +1946,12 @@ def template_edit_cmd(name: str) -> None:
         # Validate template shape (ForgeConfig, not ProxyInstanceConfig)
         try:
             from forge.config.dataclass_utils import dict_to_dataclass
-            from forge.config.schema import ForgeConfig
+            from forge.config.schema import (
+                ForgeConfig,
+                warn_deprecated_forge_config_fields,
+            )
 
+            warn_deprecated_forge_config_fields(edited_data)
             dict_to_dataclass(ForgeConfig, edited_data, strict=True)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
             print_error(f"Invalid template configuration: {e}")

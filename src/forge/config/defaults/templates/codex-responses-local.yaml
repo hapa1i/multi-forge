@@ -24,4 +24,3 @@ proxy:
       haiku: openai/gpt-5.4-mini
       sonnet: openai/gpt-5.6-sol
       opus: openai/gpt-5.6-sol
-    openai_api_mode: auto

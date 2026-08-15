@@ -588,6 +588,17 @@ class TestTemplateFamilyMetadata:
             if template == "anthropic-passthrough":
                 assert "base_url" not in proxy["litellm"], template
 
+    def test_shipped_templates_do_not_emit_deprecated_config_fields(self):
+        """Built-in templates author only live provider configuration."""
+        for template in self._shipped_template_names():
+            data = yaml.safe_load(read_shipped_template(template))
+            proxy = data["proxy"]
+            for provider_name in ("gemini", "openai", "litellm", "openrouter"):
+                provider = proxy.get(provider_name, {})
+                assert "enable_preamble" not in provider, template
+                assert "openai_api_mode" not in provider, template
+            assert "manifest_filename" not in data.get("session", {}), template
+
 
 class TestProxyFileIO:
     """Tests for proxy file I/O functions."""
@@ -667,6 +678,28 @@ class TestProxyFileIO:
 
         assert data["backend"] == "openrouter"
         assert "source" not in data
+
+    def test_proxy_instance_config_writer_omits_deprecated_provider_setting(self, tmp_path, monkeypatch):
+        """Rewriting a readable legacy proxy file produces the current shape."""
+        from forge.config.loader import write_proxy_instance_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="litellm-openai",
+            template_digest="sha256:test",
+            provider="litellm",
+            proxy_endpoint="http://localhost:8089",
+            port=8089,
+            upstream_base_url="http://localhost:4000",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            provider_settings={"openai_api_mode": "responses", "error_hints": True},
+        )
+
+        data = yaml.safe_load(write_proxy_instance_config("legacy", config).read_text())
+
+        assert data["provider_settings"] == {"error_hints": True}
 
     def test_proxy_instance_config_round_trips_costs(self, tmp_path, monkeypatch):
         """Cost cap config survives write/load of proxy.yaml."""

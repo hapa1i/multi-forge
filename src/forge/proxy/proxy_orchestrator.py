@@ -222,10 +222,8 @@ def create_proxy_file(
         opus=_build_tier_override("opus"),
     )
 
-    # Build provider_settings from template (e.g., openai_api_mode, error_hints)
+    # Build provider settings that still affect request handling.
     provider_settings: dict[str, Any] = {}
-    if hasattr(provider, "openai_api_mode") and provider.openai_api_mode != "auto":
-        provider_settings["openai_api_mode"] = provider.openai_api_mode
     if hasattr(provider, "error_hints") and provider.error_hints:
         provider_settings["error_hints"] = True
 
