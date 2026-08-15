@@ -8,7 +8,7 @@
 
 **Finding**: O049's `MemoryIntent.generated_file` subset.
 
-**Coordinates with**: [`migrate_inert_config_fields`](../../doing/migrate_inert_config_fields/card.md) for O049
+**Coordinates with**: [`migrate_inert_config_fields`](../../done/migrate_inert_config_fields/card.md) for O049
 sequencing; the manifest migration is independently shippable.
 
 ## Goal

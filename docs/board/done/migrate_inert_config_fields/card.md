@@ -4,8 +4,8 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O049).
 
-**Lane**: `doing/` -- active on `refactor/migrate-inert-config-fields` from `c99be7a3`; this is the first-release
-warning phase, not deletion.
+**Lane**: `done/` -- shipped in PR #191 (`e0be9a60`) on 2026-08-15; this is the first-release warning phase, not
+deletion.
 
 **Findings**: O049's `ProviderConfig.enable_preamble`, `ProviderConfig.openai_api_mode`, and
 `SessionConfig.manifest_filename` subset only.
@@ -47,3 +47,15 @@ window.
 
 Do not change proxy instance field ownership, `MANIFEST_FILENAME`, strict session-manifest parsing, or unrelated
 provider compatibility fields.
+
+## Outcome
+
+Explicit compatibility keys remain readable and warn once per process, while new templates, config serialization, and
+proxy-instance writes omit them. Runtime transport selection still uses backend plus `wire_shape`, and session paths
+still use `MANIFEST_FILENAME`. A provider-registry parity test prevents the warning scan from missing a future
+`ProviderConfig` block during this window.
+
+PR #191 merged as `e0be9a60` after 438 focused tests, six O049 regressions, 9,197 unit tests (one skip, 122 deselected),
+913 regressions, 34 targeted Docker tests, build and clean-wheel verification, exact-wheel resource checks, full
+pre-commit, and all five GitHub checks passed. The final board audit resolves all 879 local path links across 345
+documents and confirms the 12-done/0-doing/23-todo Wave 7 graph. No Forge workflow command was used.

@@ -1,11 +1,9 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--11 and the bounded
+Current focus: orders 1--12 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189, and order 11 shipped in PR #190. Order 12
-[`migrate_inert_config_fields`](../migrate_inert_config_fields/card.md) is active from `c99be7a3`; keep orders 13--35 in
-`todo/`.
+shipped in PR #189, order 11 shipped in PR #190, and order 12 shipped in PR #191; keep orders 13--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -71,7 +69,8 @@ shipped in PR #189, and order 11 shipped in PR #190. Order 12
 - [x] Ship order 11 independently in PR #190 (`ca2f289b`) and close its member before activating order 12.
 - [x] Close order 11 on pushed `main` at `c99be7a3`, create `refactor/migrate-inert-config-fields`, and activate only
   order 12.
-- [ ] Reverify and ship O049's first-release config warning transition with clean-wheel proof before selecting order 13.
+- [x] Reverify and ship O049's first-release config warning transition with clean-wheel proof in PR #191 (`e0be9a60`)
+  before selecting order 13.
 
 Orders 13--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

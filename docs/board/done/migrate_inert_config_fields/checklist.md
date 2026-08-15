@@ -1,6 +1,6 @@
 # Retire inert configuration fields checklist
 
-Current focus: Wave 7 order 12 is active from `c99be7a3`; keep orders 13--35 parked.
+Current focus: complete -- order 12 shipped in PR #191 (`e0be9a60`); order 13 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -54,4 +54,6 @@ Current focus: Wave 7 order 12 is active from `c99be7a3`; keep orders 13--35 par
   is 11 `done` / 1 `doing` / 23 `todo`, no stale order-12/13 lane target remains, living docs stay below 30k tokens, and
   `git diff --check` passes.
 - [x] Open draft PR #191 for order 12.
-- [ ] After merge, close this member before selecting order 13.
+- [x] Close the member after PR #191 merged as `e0be9a60` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 879 local path links across 345 board documents resolve, the Wave 7 graph is 12
+  `done` / 0 `doing` / 23 `todo`, and order 13 remains parked.

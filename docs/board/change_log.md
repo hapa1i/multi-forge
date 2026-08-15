@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-15
 
+### Deprecate inert configuration fields
+
+**Goal/outcome**: Stop authoring three behaviorless user-config fields while preserving readable 0.9.4-era configuration
+through an explicit warning window.
+
+**Key changes**:
+
+- Raw template, global, and proxy-instance loaders now warn once for explicitly present compatibility keys; omission
+  stays silent, new serialization omits the keys, and runtime transport and manifest-path authorities remain unchanged.
+- The compatibility fields remain accepted for the release carrying the warning, and a schema parity guard keeps the
+  provider scan registry aligned with every `ProviderConfig` block.
+
+**Verification**: 438 focused tests, six O049 regressions, 9,197 unit tests (one skip, 122 deselected), 913 regressions,
+34 targeted Docker proxy tests, wheel/sdist build and clean-wheel smoke, exact-wheel resource checks, full pre-commit,
+and board-integrity checks pass. PR #191 merged as `e0be9a60` with all five GitHub checks passing. No Forge workflow
+command was used.
+
 ### Remove obsolete proxy abstractions
 
 **Goal/outcome**: Remove unsupported proxy surfaces after proving they had no production, resource, extension, or
