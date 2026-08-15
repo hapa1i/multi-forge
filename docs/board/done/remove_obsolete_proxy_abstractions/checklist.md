@@ -1,6 +1,6 @@
 # Remove obsolete proxy abstractions checklist
 
-Current focus: Wave 7 order 11 is active from `cc03a4e6`; keep orders 12--35 parked.
+Current focus: complete -- order 11 shipped in PR #190 (`ca2f289b`); order 12 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -45,4 +45,6 @@ Current focus: Wave 7 order 11 is active from `cc03a4e6`; keep orders 12--35 par
   `make pre-commit`.
 - [x] Run board link/lane/size and diff checks: all 885 local links across 344 Markdown files resolve, the Wave 7 graph
   is 10 done / 1 doing / 24 todo, and order 12 remains parked.
-- [ ] Open one draft PR for order 11; after merge, close this member before selecting order 12.
+- [x] Open draft PR #190 and merge order 11 as `ca2f289b` after all five GitHub checks pass.
+- [x] Complete the post-merge audit: all 879 local links across 344 board documents resolve, the Wave 7 graph is 11 done
+  / 0 doing / 24 todo, and order 12 remains parked.

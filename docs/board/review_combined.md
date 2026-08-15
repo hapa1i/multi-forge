@@ -52,9 +52,8 @@ epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set
 `5777192a` initially admitted 31 verified findings as 34 parked members under
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
 implementation. A post-order-6 audit promoted O098 and the verified cap-state branch subset of O092 as one bounded
-member, so Wave 7 now contains 32 findings across 35 members. Orders 1--10 shipped independently in PRs #178--#184 and
-#186--#188; [`remove_obsolete_proxy_abstractions`](doing/remove_obsolete_proxy_abstractions/card.md) is active as order
-11 from `cc03a4e6`, and 24 members remain parked. A bounded post-merge correction for explicitly empty `TZ` semantics
+member, so Wave 7 now contains 32 findings across 35 members. Orders 1--11 shipped independently in PRs #178--#184,
+#186--#188, and #190, and 24 members remain parked. A bounded post-merge correction for explicitly empty `TZ` semantics
 shipped in PR #189 without changing either count. D056 and other correctness, security, performance, test-policy,
 output, and documentation rows still require their separately defined Wave 6 gates.
 
@@ -789,12 +788,11 @@ synonym for “everything left.”
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
-  are split into 35 members. Orders 1--10 shipped independently in PRs #178--#184 and #186--#188; order 11
-  [`remove_obsolete_proxy_abstractions`](doing/remove_obsolete_proxy_abstractions/card.md) is active from `cc03a4e6`,
-  and 24 are parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md)
-  post-merge correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's
-  `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified
-  scope; and O092's unverified tail is not an executable deletion set.
+  are split into 35 members. Orders 1--11 shipped independently in PRs #178--#184, #186--#188, and #190, and 24 are
+  parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
+  correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's `httpx2`
+  half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified scope; and
+  O092's unverified tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

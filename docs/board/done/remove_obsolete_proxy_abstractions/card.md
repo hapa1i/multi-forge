@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O047–O048).
 
-**Lane**: `doing/` -- active on `refactor/remove-obsolete-proxy-abstractions` from `cc03a4e6`.
+**Lane**: `done/` -- shipped in PR #190 (`ca2f289b`) on 2026-08-15.
 
 **Findings**: O047, O048, and the `TierClientFactory.get_cache_status` / `clear_cache` subset of O092.
 
@@ -46,4 +46,6 @@ The former synthetic `ToolCallError` metric test now drives an ordinary client f
 API-error path and pins its sanitized 500 response plus total, error-type, tier, and model counters. Verification passes
 with 829 pre-deletion proxy characterization tests; 67 focused unit, 46 focused regression, and 808 post-deletion proxy
 tests; 9,193 full unit tests with one expected skip; all 907 regression tests; four hermetic Docker OpenAI-routing proxy
-tests; and the full pre-commit gate.
+tests; and the full pre-commit gate. PR #190 merged as `ca2f289b` after all five GitHub checks passed. The final
+closeout audit resolves all 879 local links across 344 board documents and confirms the 11-done/0-doing/24-todo Wave 7
+graph.

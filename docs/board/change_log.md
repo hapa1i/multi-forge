@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-15
 
+### Remove obsolete proxy abstractions
+
+**Goal/outcome**: Remove unsupported proxy surfaces after proving they had no production, resource, extension, or
+documentation consumers.
+
+**Key changes**:
+
+- Removed the test-only model-spec module, unused abstract client, unproduced tool-call exception and handlers, and two
+  zero-caller factory diagnostics while preserving the live adapter, streaming error, conversion, cache, and metrics
+  contracts.
+- Moved synthetic failure-metrics coverage to the reachable generic client-error path and pinned its sanitized response
+  plus total, error-type, tier, and model counters.
+
+**Verification**: 829 pre-deletion proxy tests, 808 post-deletion proxy tests, 9,193 unit tests (one skip), 907
+regressions, four hermetic Docker proxy tests, full pre-commit, and board-integrity checks pass. PR #190 merged as
+`ca2f289b` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Honor explicitly empty process timezone
 
 **Goal/outcome**: Restore process-local UTC period boundaries when `TZ` is explicitly empty without changing unset,
