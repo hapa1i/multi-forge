@@ -141,7 +141,6 @@ class MemoryIntent:
     tags: list[str] = field(default_factory=list)
     strategy: str = "summary"  # "summary", "full", or "off"
     max_chars: int = 6000
-    generated_file: str | None = None  # e.g., ".claude/forge.context.generated.md"
     auto_update: MemoryWriterConfig | None = None
 
 

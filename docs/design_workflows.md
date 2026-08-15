@@ -1264,4 +1264,8 @@ Safe to delete.
 stripped on read with a one-time `logger.warning()` per coding-standards §5. The field no longer exists on
 `MemoryIntent`.
 
+**Stale `generated_file` in manifests**: Forge-authored `intent.memory.generated_file` is stripped from the in-memory
+read payload without rewriting the manifest. It never selected a runtime output path, and new writes omit it; the same
+key outside `intent.memory` remains a strict schema error.
+
 ---

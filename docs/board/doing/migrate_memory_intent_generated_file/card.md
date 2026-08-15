@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `todo/` -- accepted Wave 7 durable-state migration work.
+**Lane**: `doing/` -- active on `refactor/migrate-memory-intent-generated-file` from `9a334b18`.
 
 **Finding**: O049's `MemoryIntent.generated_file` subset.
 
@@ -18,7 +18,8 @@ migration.
 
 ## Evidence and Authority
 
-On `5777192a`, `generated_file` is serialized in strict manifests but has no behavior consumer. `SessionStore.read`
+Rechecked on `9a334b18`: `generated_file` still appears only in the `MemoryIntent` declaration and one direct
+deserialization fixture; no source, resource, extension, CLI, or documentation path consumes it. `SessionStore.read`
 already strips two retired fields before strict dacite decoding, providing the established migration seam. Authority:
 [`docs/design.md` "3.3 Session file schema"](../../../design.md#33-session-file-schema-forgesessionjson) and DG4's
 durable-state rule.

@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--12 and both bounded corrective members are closed through PR #191; keep orders 13--35
-parked.
+Current focus: Wave 7 orders 1--12 and both bounded corrective members are closed through PR #191. Order 13
+[`migrate_memory_intent_generated_file`](../migrate_memory_intent_generated_file/card.md) is active from `9a334b18`;
+keep orders 14--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -227,5 +228,9 @@ parked.
   `migrate_inert_config_fields`.
 - [x] Ship the first-release accept-and-warn transition for the three O049 config fields in PR #191 (`e0be9a60`) while
   keeping orders 13--35 parked.
+- [x] Close PR #191 on `main` at `9a334b18`, branch from that exact commit, and activate only order 13
+  `migrate_memory_intent_generated_file`.
+- [ ] Ship the tolerant durable-manifest migration for O049's `MemoryIntent.generated_file` while keeping orders 14--35
+  parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

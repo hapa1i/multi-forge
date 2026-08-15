@@ -8,6 +8,7 @@ import os
 import time
 from multiprocessing import Event, Process, synchronize
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,6 +21,7 @@ from forge.session.exceptions import (
     SessionFileNotFoundError,
 )
 from forge.session.models import (
+    MemoryIntent,
     SessionState,
     create_session_state,
 )
@@ -247,6 +249,116 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy.supervisor is not None
         assert not hasattr(loaded.intent.policy.supervisor, "supervisor_runtime")  # field gone
         assert any("supervisor_runtime" in r.message for r in caplog.records)  # warned once
+
+
+class TestMemoryIntentGeneratedFileCompat:
+    """Narrow tolerant reads for Forge-authored legacy memory intent."""
+
+    @staticmethod
+    def _write_current_memory_manifest(
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> dict[str, Any]:
+        sample_manifest.intent.memory = MemoryIntent(auto_recall=True)
+        store.write(sample_manifest)
+        return json.loads(store.manifest_path.read_text())
+
+    def test_new_write_omits_removed_field(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+
+        assert "generated_file" not in data["intent"]["memory"]
+
+    def test_legacy_field_loads_without_rewriting_manifest(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+        data["intent"]["memory"]["generated_file"] = ".claude/forge.context.generated.md"
+        store.manifest_path.write_text(json.dumps(data, indent=2) + "\n")
+        original = store.manifest_path.read_bytes()
+
+        loaded = store.read()
+
+        assert loaded.intent.memory is not None
+        assert loaded.intent.memory.auto_recall is True
+        assert not hasattr(loaded.intent.memory, "generated_file")
+        assert store.manifest_path.read_bytes() == original
+
+    @pytest.mark.parametrize(
+        ("container", "error"),
+        [
+            pytest.param("intent", "intent must be an object", id="intent"),
+            pytest.param("memory", "deserialization error", id="memory"),
+        ],
+    )
+    def test_malformed_container_keeps_corruption_and_bytes(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        container: str,
+        error: str,
+    ) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+        if container == "intent":
+            data["intent"] = []
+        else:
+            data["intent"]["memory"] = []
+        store.manifest_path.write_text(json.dumps(data))
+        original = store.manifest_path.read_bytes()
+
+        with pytest.raises(ManifestCorruptedError, match=error):
+            store.read()
+
+        assert store.manifest_path.read_bytes() == original
+
+    def test_unknown_memory_sibling_remains_strict(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+        memory = data["intent"]["memory"]
+        memory["generated_file"] = ".claude/forge.context.generated.md"
+        memory["future_field"] = "must remain invalid"
+        store.manifest_path.write_text(json.dumps(data))
+        original = store.manifest_path.read_bytes()
+
+        with pytest.raises(ManifestCorruptedError, match="deserialization error"):
+            store.read()
+
+        assert store.manifest_path.read_bytes() == original
+
+    def test_override_path_is_not_a_legacy_exception(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+        data["overrides"] = {"memory": {"generated_file": "unexpected"}}
+        store.manifest_path.write_text(json.dumps(data))
+        original = store.manifest_path.read_bytes()
+
+        with pytest.raises(ManifestCorruptedError, match="overrides.memory.generated_file"):
+            store.read()
+
+        assert store.manifest_path.read_bytes() == original
+
+    def test_newer_schema_still_wins_without_rewriting_manifest(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        data = self._write_current_memory_manifest(store, sample_manifest)
+        data["schema_version"] = 999
+        data["intent"]["memory"]["generated_file"] = "legacy"
+        store.manifest_path.write_text(json.dumps(data))
+        original = store.manifest_path.read_bytes()
+
+        with pytest.raises(ManifestCorruptedError, match="incompatible schema version 999"):
+            store.read()
+
+        assert store.manifest_path.read_bytes() == original
 
 
 class TestEffortVocabularyValidation:
