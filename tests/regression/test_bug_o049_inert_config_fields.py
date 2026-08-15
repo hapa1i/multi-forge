@@ -70,6 +70,7 @@ def test_explicit_provider_fields_warn_even_at_old_defaults(caplog: pytest.LogCa
     assert "proxy.litellm.enable_preamble" in caplog.text
     assert "proxy.litellm.openai_api_mode" in caplog.text
     assert "has no effect" in caplog.text
+    assert "Config authored by Forge 0.9.4 or earlier" in caplog.text
     assert "Remove it" in caplog.text
 
 

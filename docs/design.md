@@ -664,10 +664,10 @@ To avoid writer conflicts:
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
-**Inert config transition.** Forge 0.9.4 accepts explicit `proxy.<provider>.enable_preamble`,
-`proxy.<provider>.openai_api_mode`, `session.manifest_filename`, and proxy-instance `provider_settings.openai_api_mode`
-for one warning window. Presence warns once per process; omission is silent and writers drop the keys. They are inert:
-backend and `wire_shape` select transport, and `MANIFEST_FILENAME` fixes manifest paths. A later release may reject them.
+**Inert config transition.** Config authored by Forge ≤0.9.4 remains readable for one release window. Explicit
+`proxy.<provider>.enable_preamble`, `proxy.<provider>.openai_api_mode`, `session.manifest_filename`, and proxy-instance
+`provider_settings.openai_api_mode` warn once per process; omission is silent and writers drop them. They are inert:
+backend and `wire_shape` select transport; `MANIFEST_FILENAME` fixes paths. Later releases may reject them.
 
 **CLI enforcement:** Enforced in the CLI: `forge proxy` edits proxy settings; `forge session` edits session settings.
 Session commands can't set proxy-owned keys.

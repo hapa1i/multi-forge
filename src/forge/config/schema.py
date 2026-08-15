@@ -123,7 +123,8 @@ def _warn_deprecated_config_field(path: str, field_name: str) -> None:
         action = "Remove it from the provider block."
 
     logger.warning(
-        "Deprecated config key '%s' has no effect and is accepted only for the Forge 0.9.4 compatibility window. %s",
+        "Deprecated config key '%s' has no effect. Config authored by Forge 0.9.4 or earlier remains readable for "
+        "one release window. %s",
         path,
         action,
     )

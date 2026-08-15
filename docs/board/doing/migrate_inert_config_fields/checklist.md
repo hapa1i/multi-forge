@@ -28,6 +28,9 @@ Current focus: Wave 7 order 12 is active from `c99be7a3`; keep orders 13--35 par
 - [x] Preserve backend/wire-shape routing, all nondeprecated provider settings, strict unknown-key validation, and
   `MANIFEST_FILENAME` path ownership.
 - [x] Document the warning window, removal action, and fixed manifest path in the end-user proxy/configuration guide.
+- [x] Correct review-found release provenance: the window protects config authored by Forge 0.9.4 or earlier; it is not
+  behavior shipped in the already released 0.9.4.
+- [x] Guard `PROVIDER_CONFIG_NAMES` against drift from the `ProviderConfig` fields on `ProxyConfig`.
 
 ## Acceptance tests
 
@@ -41,13 +44,14 @@ Current focus: Wave 7 order 12 is active from `c99be7a3`; keep orders 13--35 par
 
 ## Verification and closeout
 
-- [x] Run focused schema/loader/template/proxy-creation tests (`437 passed`) and the named O049 regression suite
+- [x] Run focused schema/loader/template/proxy-creation tests (`438 passed`) and the named O049 regression suite
   (`6 passed`).
 - [x] Build the 0.9.4 wheel/sdist, pass the clean-wheel LiteLLM runtime smoke, and verify the exact wheel's packaged
   `litellm-openai` template plus no-start proxy output omit deprecated keys while retaining `error_hints`.
-- [x] Run `make test-unit` (`9,196 passed`, `1 skipped`, `122 deselected`), `make test-regression` (`913 passed`), and
+- [x] Run `make test-unit` (`9,197 passed`, `1 skipped`, `122 deselected`), `make test-regression` (`913 passed`), and
   `make pre-commit`.
 - [x] Run board link/lane/size and diff checks: all 885 local links across 345 Markdown files resolve, the Wave 7 graph
   is 11 `done` / 1 `doing` / 23 `todo`, no stale order-12/13 lane target remains, living docs stay below 30k tokens, and
   `git diff --check` passes.
-- [ ] Open one draft PR for order 12; after merge, close this member before selecting order 13.
+- [x] Open draft PR #191 for order 12.
+- [ ] After merge, close this member before selecting order 13.
