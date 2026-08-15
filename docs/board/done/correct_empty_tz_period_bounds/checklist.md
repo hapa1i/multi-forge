@@ -1,6 +1,6 @@
 # Honor explicitly empty process timezone checklist
 
-Current focus: correct the verified empty-`TZ` regression from `459887fa` without activating Wave 7 order 11.
+Current focus: complete -- the empty-`TZ` correction shipped in PR #189 (`f0afc0c4`) without activating Wave 7 order 11.
 
 ## Evidence and implementation
 
@@ -29,4 +29,6 @@ Current focus: correct the verified empty-`TZ` regression from `459887fa` withou
   untouched by this branch and the other six cases pass.
 - [x] Run full `make pre-commit`, diff checks, and board link/lane verification (343 Markdown files, 880 local links,
   none missing; three active cards; Wave 7 remains 10 done / 0 doing / 25 todo).
-- [ ] Open one draft PR for the bounded correction; after merge, close this card before selecting Wave 7 order 11.
+- [x] Open draft PR #189, merge it as `f0afc0c4` after all five GitHub checks pass, and close this card without
+  activating Wave 7 order 11; the final closeout audit resolves all 879 local links across 343 board documents, leaves
+  only the two coordinating epics active, and preserves the 10-done/0-doing/25-todo Wave 7 graph.

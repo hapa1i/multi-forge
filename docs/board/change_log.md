@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-15
 
+### Honor explicitly empty process timezone
+
+**Goal/outcome**: Restore process-local UTC period boundaries when `TZ` is explicitly empty without changing unset,
+valid non-empty, or invalid non-empty timezone behavior.
+
+**Key changes**:
+
+- Empty `TZ` now selects `datetime.UTC` before dependency or filesystem resolution; unset and invalid values retain the
+  host-local fallback.
+- Host-independent regressions pin UTC identity and exact local-period bounds while retaining the four shared telemetry
+  consumers.
+
+**Verification**: 114 focused tests, 9,214 unit tests (one skip, 122 deselected), 907 regressions, six targeted Docker
+telemetry integrations, full pre-commit, and board-integrity checks pass. An extra cancelled-stream provider-trace test
+failed twice on an untouched lifecycle seam and was disclosed in the PR. PR #189 merged as `f0afc0c4` with all five
+GitHub checks passing. No Forge workflow command was used.
+
 ### Lock walkthrough and QA state-script parity
 
 **Goal/outcome**: Keep both installed skills self-contained while preventing their shared state machine from drifting

@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--10 and the PR #185 corrective member are closed through PR #188. The bounded
-[`correct_empty_tz_period_bounds`](../correct_empty_tz_period_bounds/card.md) correction is active from `459887fa`; keep
-orders 11--35 parked.
+Current focus: Wave 7 orders 1--10 and both bounded corrective members are closed through PR #189; keep orders 11--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -217,7 +216,7 @@ orders 11--35 parked.
 - [x] Ship order 10 independently in PR #188 (`b8e4b32c`) and close its member without activating Wave 7 order 11.
 - [x] Branch from the order-10 closeout (`459887fa`) and activate only `correct_empty_tz_period_bounds` for the verified
   empty-`TZ` regression.
-- [ ] Restore explicit empty-`TZ` UTC semantics with deterministic focused, full, integration, and board verification;
-  keep Wave 7 order 11 parked until the corrective PR merges.
+- [x] Restore explicit empty-`TZ` UTC semantics with deterministic focused, full, integration, and board verification;
+  ship PR #189 (`f0afc0c4`) and keep Wave 7 order 11 parked through the closeout.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -1,8 +1,8 @@
 # Honor explicitly empty process timezone
 
-**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active on `fix/empty-tz-period-bounds` from `459887fa`.
+**Lane**: `done/` -- shipped in PR #189 (`f0afc0c4`) from `459887fa`.
 
 **Related shipped members**:
 
@@ -21,9 +21,9 @@ forms, and invalid non-empty values.
 
 ## Evidence and authority
 
-- On a Berlin host, `TZ=''` makes Python's process timezone UTC, but `_local_timezone()` currently skips the empty value
-  and reads `/etc/localtime`; a `today` boundary consequently starts at `22:00Z` on the previous date instead of
-  `00:00Z`.
+- Before the fix, on a Berlin host, `TZ=''` made Python's process timezone UTC while `_local_timezone()` skipped the
+  empty value and read `/etc/localtime`; a `today` boundary consequently started at `22:00Z` on the previous date
+  instead of `00:00Z`.
 - `dateutil.tz.gettz("")` also resolves the host local timezone, so merely replacing the truthiness guard with an
   `is not None` check would retain the defect.
 - With `TZ` absent, both Python and Forge use the host local timezone. Invalid non-empty values deliberately retain the
@@ -51,3 +51,15 @@ Authority comes from the platform `tzset(3)` contract, the local-period behavior
   non-empty values.
 - Do not reopen the completed timezone or post-merge correction cards.
 - Keep Wave 7 orders 11--35 parked until this bounded correction merges and closes.
+
+## Implementation outcome
+
+`_local_timezone()` now handles the explicit empty string before dependency or filesystem resolution and returns
+`datetime.UTC`. Unset values still read `/etc/localtime`; valid non-empty forms still resolve through `dateutil`; and
+invalid non-empty forms retain the host-local fallback. Deterministic tests pin the empty-value identity and exact
+period bounds plus the unchanged fallback states.
+
+Verification passes 114 focused tests, 9,214 unit tests with one skip and 122 deselected, 907 regressions, six targeted
+Docker telemetry integrations, full pre-commit, and board-integrity checks. A broader extra invocation also reproduced
+the unrelated cancelled-stream provider-trace failure twice on an untouched lifecycle seam. PR #189 merged as `f0afc0c4`
+with all five GitHub checks passing. No Forge workflow command was used.
