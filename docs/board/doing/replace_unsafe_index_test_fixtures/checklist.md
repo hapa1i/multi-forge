@@ -32,5 +32,5 @@ Current focus: Wave 7 order 14 is active from `74b364d2`; keep orders 15--35 par
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: all hooks passed; `git diff --check` was
   clean; the combined design corpus remained under budget at 59,973 tokens; 347 board files contained 885 valid local
   links with none missing; the Wave 7 lane remained 13 done, one doing, and 21 parked.
-- [ ] Open a draft PR and record its number before merge.
+- [x] Open draft PR #193 for order 14.
 - [ ] After merge, close this member before selecting order 15.
