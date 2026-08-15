@@ -4,10 +4,9 @@ Unified LLM Proxy Server - Anthropic-compatible API for multiple providers.
 This FastAPI server provides an Anthropic Messages API-compatible interface for
 LLM providers via LiteLLM.
 
-The server uses a unified client architecture where provider-specific logic is
-encapsulated in client implementations that inherit from AbstractLLMClient.
-This design ensures consistent behavior across providers while keeping the
-server code clean and maintainable.
+The server routes provider-specific behavior through ``CoreLLMClientAdapter``,
+which exposes the completion, streaming, and token-count operations consumed
+by the request handlers.
 
 Key endpoints:
 - POST /v1/messages - Main chat completion endpoint (streaming/non-streaming)
@@ -58,7 +57,7 @@ from forge.core.telemetry.downstream import mint_downstream_event_id
 from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
-from forge.proxy.base_client import ProxyStreamError, ToolCallError
+from forge.proxy.base_client import ProxyStreamError
 from forge.proxy.client_factory import ModelProvider, TierClientFactory
 from forge.proxy.converters import (
     RequestConversionError,
@@ -1164,14 +1163,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 try:
                     async for chunk in client.create_streaming_completion(openai_request_dict, request_id):
                         yield chunk
-                except ToolCallError as e:
-                    logger.error(f"[{request_id}] ToolCallError: {e}")
-                    yield {
-                        "error": {
-                            "type": e.error_type,
-                            "message": f"Tool call error [{request_id}]",
-                        }
-                    }
                 except ProxyStreamError as e:
                     logger.error(f"[{request_id}] ProxyStreamError ({e.error_type}): {e}")
                     yield {
@@ -1388,72 +1379,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     ),
                 )
 
-            except ToolCallError as e:
-                duration_ms = (time.time() - start_time) * 1000
-                error_msg = str(e)
-
-                _tc_cost = _calc_and_log_cost(
-                    model=actual_model_id,
-                    tier=resolved_tier,
-                    input_tokens=0,
-                    output_tokens=0,
-                    cached_tokens=0,
-                    latency_ms=duration_ms,
-                    failed=True,
-                    request_id=request_id,
-                    forge_run_id=forge_run_id,
-                    forge_root_run_id=forge_root_run_id,
-                    downstream_event_id=downstream_event_id,
-                )
-                proxy_metrics.record_request(
-                    tier=resolved_tier,
-                    model=actual_model_id,
-                    input_tokens=0,
-                    output_tokens=0,
-                    cached_tokens=0,
-                    latency_ms=duration_ms,
-                    streaming=False,
-                    failed=True,
-                    error_type="tool_call_error",
-                    cost_micros=_tc_cost,
-                )
-
-                asyncio.create_task(
-                    log_request_response(
-                        request_id=request_id,
-                        original_model=original_model_name or "",
-                        mapped_model=actual_model_id,
-                        request_body=request_data.model_dump(),
-                        response_body=None,
-                        request_log=_request_log_config(),
-                        status_code=400,
-                        duration_ms=duration_ms,
-                        error=error_msg,
-                        num_messages=num_messages,
-                        num_tools=num_tools,
-                        tool_names=tool_names,
-                        has_system=has_system,
-                        temperature=request_data.temperature,
-                        max_tokens=request_data.max_tokens,
-                        streaming=False,
-                    )
-                )
-
-                log_request_beautifully(
-                    method="POST",
-                    path="/v1/messages",
-                    original_model=original_model_name or "",
-                    mapped_model=actual_model_id,
-                    num_messages=num_messages,
-                    num_tools=num_tools,
-                    status_code=400,
-                )
-
-                logger.error(f"[{request_id}] Tool call error: {e}")
-                raise HTTPException(
-                    status_code=400,
-                    detail={"type": "invalid_request_error", "message": error_msg},
-                )
             except AuthenticationError:
                 # Try refreshing credentials once
                 logger.warning(f"[{request_id}] Auth failed, refreshing credentials")

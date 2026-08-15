@@ -19,6 +19,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from forge.proxy.metrics import proxy_metrics
 
@@ -323,29 +324,30 @@ async def test_non_streaming_records_per_tier(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_failure_records_metrics(monkeypatch):
-    """ToolCallError should increment total_failures and failures_by_type."""
+async def test_reachable_client_failure_records_metrics(monkeypatch):
+    """An ordinary client failure should reach the API-error metrics path."""
     import forge.proxy.server as server
-    from forge.proxy.base_client import ToolCallError
 
     _stub_server(monkeypatch, server)
 
-    # Make get_client return a client that raises ToolCallError
     async def _failing_get_client(*args, **kwargs):
         client = AsyncMock()
-        client.create_completion = AsyncMock(
-            side_effect=ToolCallError("SCHEMA_MISMATCH", "Write", {"error": "bad call"})
-        )
+        client.create_completion = AsyncMock(side_effect=RuntimeError("upstream failed"))
         return client
 
     monkeypatch.setattr(server.client_factory, "get_client", _failing_get_client)
 
-    with pytest.raises(Exception):  # HTTPException wrapping ToolCallError
+    with pytest.raises(HTTPException) as exc_info:
         await server.create_message(_make_request_data(stream=False), _DummyRawRequest())
 
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == {"type": "api_error", "message": "Internal error [req_test]"}
     snap = proxy_metrics.snapshot()
+    assert snap["total_requests"] == 1
     assert snap["total_failures"] == 1
-    assert snap["failures_by_type"].get("tool_call_error") == 1
+    assert snap["failures_by_type"] == {"api_error": 1}
+    assert snap["by_tier"]["sonnet"]["requests"] == 1
+    assert snap["by_model"]["openai/gpt-5.5"]["requests"] == 1
 
 
 @pytest.mark.asyncio
