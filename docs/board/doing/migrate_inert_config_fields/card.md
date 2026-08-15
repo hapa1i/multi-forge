@@ -4,7 +4,8 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O049).
 
-**Lane**: `todo/` -- accepted Wave 7 compatibility work; this is the first-release warning phase, not deletion.
+**Lane**: `doing/` -- active on `refactor/migrate-inert-config-fields` from `c99be7a3`; this is the first-release
+warning phase, not deletion.
 
 **Findings**: O049's `ProviderConfig.enable_preamble`, `ProviderConfig.openai_api_mode`, and
 `SessionConfig.manifest_filename` subset only.
@@ -21,13 +22,14 @@ proxy/session configuration files.
 - Keep `MANIFEST_FILENAME` as the single durable path authority.
 
 `MemoryIntent.generated_file` is owned by
-[`migrate_memory_intent_generated_file`](../migrate_memory_intent_generated_file/card.md), because durable-state
+[`migrate_memory_intent_generated_file`](../../todo/migrate_memory_intent_generated_file/card.md), because durable-state
 migration is independent of user-config deprecation.
 
 ## Evidence and Authority
 
-On `5777192a`, the provider keys are loaded/passed through but never consumed, while `manifest_filename` is always
-constructed with its default and `MANIFEST_FILENAME` owns the actual path. The authority is
+Rechecked on `c99be7a3`: `enable_preamble` and `manifest_filename` remain declaration-only; `openai_api_mode` remains in
+four shipped templates and is passed through template and proxy-instance loaders without a runtime consumer.
+`MANIFEST_FILENAME` still owns every session path. The authority is
 [`docs/design.md` "3.6 Configuration System"](../../../design.md#36-configuration-system),
 [`docs/design.md` "3.2 Contract files"](../../../design.md#32-contract-files-authoritative-paths), and the DG4 warning
 window.

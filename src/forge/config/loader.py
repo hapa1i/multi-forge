@@ -34,6 +34,7 @@ from forge.backend.sources import (
 )
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
+    DEPRECATED_PROXY_INSTANCE_PROVIDER_SETTINGS,
     PROXY_BLOCK_FIELDS,
     PROXY_PROVIDER_DIRECT_FIELDS,
     PROXY_SHARED_NON_BLOCK_FIELDS,
@@ -45,6 +46,8 @@ from forge.config.schema import (
     TierModels,
     TierOverride,
     TierOverrides,
+    warn_deprecated_forge_config_fields,
+    warn_deprecated_proxy_instance_fields,
 )
 from forge.core.paths import get_forge_home
 from forge.core.state import atomic_write_text
@@ -428,6 +431,7 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
 
     try:
         data_map = _require_mapping(data, "root")
+        warn_deprecated_proxy_instance_fields(data_map)
         tiers_data = _require_mapping(data_map.get("tiers", {}), "tiers")
         tiers = TierModels(
             haiku=tiers_data.get("haiku", ""),
@@ -500,6 +504,13 @@ def write_proxy_instance_config(
 
     data = asdict(config)
 
+    # Read old proxy files during the compatibility window, but never author
+    # their inert provider settings into a newly serialized proxy.yaml.
+    provider_settings = data.get("provider_settings")
+    if isinstance(provider_settings, dict):
+        for field_name in DEPRECATED_PROXY_INSTANCE_PROVIDER_SETTINGS:
+            provider_settings.pop(field_name, None)
+
     if omit_legacy_retention:
         for section_name in ("audit", "provider_trace"):
             section = data.get(section_name)
@@ -551,7 +562,6 @@ def _proxy_instance_to_forge_config(
         tiers=proxy_config.tiers,
         tier_overrides=proxy_config.tier_overrides,
         base_url=proxy_config.upstream_base_url,
-        openai_api_mode=proxy_config.provider_settings.get("openai_api_mode", "auto"),
         error_hints=proxy_config.provider_settings.get("error_hints", False),
         **{name: getattr(proxy_config, name) for name in PROXY_PROVIDER_DIRECT_FIELDS},
     )
@@ -671,6 +681,7 @@ def _load_template_config(template: str) -> "ForgeConfig":
     template_data = yaml.safe_load(content)
     if not isinstance(template_data, dict):
         raise ValueError(f"Template '{template}' must be a mapping (dict)")
+    warn_deprecated_forge_config_fields(template_data)
     template_data.pop("internal", None)
 
     proxy_block = template_data.get("proxy")

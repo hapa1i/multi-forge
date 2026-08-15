@@ -519,6 +519,13 @@ defaults when the keys are absent. Tool-ignore entries must be strings, `model_a
 string-to-string tier mappings, `prompt_caching` is `passthrough` or `auto_inject`, and `auto_cache_min_tokens` is an
 integer. Forge rejects malformed values when loading either a template or a proxy instance.
 
+Configuration authored by Forge 0.9.4 or earlier remains readable for one release window. Explicit occurrences of its
+three inert fields warn once per process; omission is silent, and new templates or proxy files omit them. Remove
+`enable_preamble` and `openai_api_mode` from custom template provider blocks, remove `provider_settings.openai_api_mode`
+from existing `proxy.yaml` files, and remove `session.manifest_filename` from old Forge configuration. Backend and
+`wire_shape` already select the proxy transport; session manifests always use `forge.session.json`. Their old values
+never changed runtime behavior.
+
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.
 

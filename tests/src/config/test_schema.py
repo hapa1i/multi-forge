@@ -1,5 +1,6 @@
 """Tests for config schema types (is_openai_model, dict_to_dataclass, ForgeConfig, ProxyInstanceConfig)."""
 
+from dataclasses import fields
 from typing import Any
 
 import pytest
@@ -8,8 +9,10 @@ from forge.config import load_config
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
     OPENAI_MODELS,
+    PROVIDER_CONFIG_NAMES,
     ForgeConfig,
     ProviderConfig,
+    ProxyConfig,
     TierModels,
     is_openai_model,
 )
@@ -235,6 +238,12 @@ class TestDictToDataclass:
 class TestForgeConfigMethods:
     """Tests for ForgeConfig methods."""
 
+    def test_provider_registry_matches_provider_config_fields(self):
+        """Compatibility scans cover every ProviderConfig block."""
+        provider_fields = tuple(field.name for field in fields(ProxyConfig) if field.type is ProviderConfig)
+
+        assert PROVIDER_CONFIG_NAMES == provider_fields
+
     def test_to_dict(self):
         """to_dict returns nested dict."""
         config = load_config()
@@ -245,6 +254,20 @@ class TestForgeConfigMethods:
         assert "proxy" in d
         assert "session" in d
         assert d["session"]["default_tier"] == "sonnet"
+
+    def test_to_dict_omits_deprecated_compatibility_fields(self):
+        """New serialization does not author inert first-release compatibility keys."""
+        config = ForgeConfig()
+        config.session.manifest_filename = "custom.json"
+        config.proxy.litellm.enable_preamble = True
+        config.proxy.litellm.openai_api_mode = "responses"
+
+        data = config.to_dict()
+
+        assert "manifest_filename" not in data["session"]
+        for provider_name in ("gemini", "openai", "litellm", "openrouter"):
+            assert "enable_preamble" not in data["proxy"][provider_name]
+            assert "openai_api_mode" not in data["proxy"][provider_name]
 
     def test_from_dict(self):
         """from_dict creates config from dict."""
