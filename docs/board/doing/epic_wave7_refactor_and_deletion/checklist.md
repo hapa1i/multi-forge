@@ -3,7 +3,8 @@
 Current focus: orders 1--10 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189; keep orders 11--35 in `todo/`.
+shipped in PR #189. Order 11 [`remove_obsolete_proxy_abstractions`](../remove_obsolete_proxy_abstractions/card.md) is
+active from `cc03a4e6`; keep orders 12--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -60,6 +61,12 @@ shipped in PR #189; keep orders 11--35 in `todo/`.
   Wave 7 finding/member counts.
 - [x] Close the empty-`TZ` correction in PR #189 (`f0afc0c4`) with focused, full, telemetry-integration, pre-commit, and
   board verification before selecting order 11.
+- [x] Close PR #189 on pushed `main` at `cc03a4e6`, create `refactor/remove-obsolete-proxy-abstractions`, and activate
+  only order 11.
+- [x] Reverify O047/O048 and the admitted O092 factory subset against current source, resources, entry points,
+  extensions, docs, tests, and concrete implementations.
+- [x] Delete only the unreachable proxy surfaces after moving useful failure-metrics coverage to a reachable path;
+  complete focused/full/integration/board verification while keeping order 12 parked.
 
-Orders 11--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 12--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

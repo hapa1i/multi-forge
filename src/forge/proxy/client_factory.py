@@ -252,9 +252,7 @@ class TierClientFactory:
         """
         return self._detect_provider(model_name)
 
-    async def get_client(
-        self, model_name: str, tier: Optional[str] = None
-    ) -> Any:  # Returns AbstractLLMClient instances
+    async def get_client(self, model_name: str, tier: Optional[str] = None) -> Any:
         """
         Get client for the specified model.
 
@@ -341,9 +339,7 @@ class TierClientFactory:
 
             return client
 
-    async def invalidate_and_retry(
-        self, model_name: str, tier: Optional[str] = None
-    ) -> Any:  # Returns AbstractLLMClient instances
+    async def invalidate_and_retry(self, model_name: str, tier: Optional[str] = None) -> Any:
         """
         Invalidate cached credentials and fetch new ones.
 
@@ -462,39 +458,3 @@ class TierClientFactory:
             raise ValueError(f"Unsupported provider for default hyperparams: {provider}")
 
         return self._resolve_tier_hyperparams(provider_enum, tier, model_name)
-
-    def get_cache_status(self) -> Dict[str, Any]:
-        """Get current cache status for monitoring."""
-        status: Dict[str, Any] = {
-            "ttl_configuration": {
-                "default": self._default_ttl,
-                "litellm": self._litellm_ttl,
-            },
-            "cached_models": {},
-        }
-        current_time = time.monotonic()
-
-        for cache_key, (_, fetch_time, provider) in self._cache.items():
-            model_name, tier = cache_key
-            ttl = self._get_ttl_for_provider(provider)
-            age = current_time - fetch_time
-            remaining_ttl = max(0, ttl - age)
-
-            # Use "model_name:tier" as display key for readability
-            display_key = f"{model_name}:{tier}"
-            status["cached_models"][display_key] = {
-                "model": model_name,
-                "tier": tier,
-                "provider": provider.value,
-                "age_seconds": round(age, 1),
-                "remaining_ttl_seconds": round(remaining_ttl, 1),
-                "ttl_seconds": ttl,
-                "expired": age >= ttl,
-            }
-
-        return status
-
-    def clear_cache(self):
-        """Clear all cached credentials."""
-        logger.info("Clearing all cached credentials")
-        self._cache.clear()

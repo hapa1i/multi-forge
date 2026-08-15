@@ -2,11 +2,11 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--10 shipped independently in PRs #178--#184 and #186--#188. The bounded
-[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
-before order 11; the earlier
+**Lane**: `doing/` -- orders 1--10 shipped independently in PRs #178--#184 and #186--#188; order 11
+[`remove_obsolete_proxy_abstractions`](../remove_obsolete_proxy_abstractions/card.md) is active from `cc03a4e6`, and 24
+members remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
+correction shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
-The other 25 members remain parked.
 
 ## Goal
 
@@ -62,7 +62,7 @@ runs last so it lands on the smallest stable surface.
 | 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
 | 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../done/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
 | 10    | O073             | [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
-| 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
+| 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../remove_obsolete_proxy_abstractions/card.md)                   | unreachable proxy types and factory diagnostics      |
 | 12    | O049 config      | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |
 | 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../todo/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |
 | 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../todo/replace_unsafe_index_test_fixtures/card.md)           | transaction-safe test state construction             |

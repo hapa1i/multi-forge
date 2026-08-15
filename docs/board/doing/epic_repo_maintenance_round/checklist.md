@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--10 and both bounded corrective members are closed through PR #189; keep orders 11--35
-parked.
+Current focus: Wave 7 orders 1--10 and both bounded corrective members are closed through PR #189. Order 11
+[`remove_obsolete_proxy_abstractions`](../remove_obsolete_proxy_abstractions/card.md) is active from `cc03a4e6`; keep
+orders 12--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -218,5 +219,9 @@ parked.
   empty-`TZ` regression.
 - [x] Restore explicit empty-`TZ` UTC semantics with deterministic focused, full, integration, and board verification;
   ship PR #189 (`f0afc0c4`) and keep Wave 7 order 11 parked through the closeout.
+- [x] Close PR #189 on `main` at `cc03a4e6`, branch from that exact commit, and activate only order 11
+  `remove_obsolete_proxy_abstractions`.
+- [x] Remove only the reverified proxy types, handlers, and diagnostics after moving useful metrics coverage to a
+  reachable failure; complete the order-11 verification while keeping orders 12--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

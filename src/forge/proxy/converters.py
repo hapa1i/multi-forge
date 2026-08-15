@@ -962,9 +962,9 @@ async def convert_openai_to_anthropic_sse(
                 continue
 
             # Handle error chunks from stream generator.
-            # stream_generator() catches ToolCallError/ProxyStreamError and yields
-            # error dicts instead of raising — so no exception reaches the except
-            # block below. We must set the failure flag here for metrics.
+            # stream_generator() catches ProxyStreamError and yields an error dict
+            # instead of raising, so no exception reaches the except block below.
+            # We must set the failure flag here for metrics.
             if "error" in chunk:
                 error_data = chunk["error"]
                 _stream_failed = True
