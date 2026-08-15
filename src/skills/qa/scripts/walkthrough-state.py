@@ -5,8 +5,9 @@ Provides deterministic bookkeeping so the agent never does arithmetic —
 it only classifies (pass/fail/skip) while this script handles structure,
 counting, and progress tracking.
 
-This script is owned by the QA skill. The walkthrough skill carries a separate
-physical copy so each skill can evolve its checklist/state behavior independently.
+This script is packaged with the QA skill. The walkthrough skill carries an
+equivalent physical copy so both installed skills remain self-contained.
+Their implementations are kept in lockstep except for the two skill-identity lines above.
 
 Usage (read-only):
     python3 walkthrough-state.py <checklist> index

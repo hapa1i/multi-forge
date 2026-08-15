@@ -1356,8 +1356,8 @@ State tracking with `--from X.Y` resume. Separate skill prevents cross-mode cont
 **Deterministic bookkeeper** (`walkthrough-state.py`): Each checklist-driven skill keeps a local state script that
 parses its checklist markdown into structured JSON. Commands: `index`, `step N.X`, and `summary` for read-only
 inspection; `init`, `record`, `var`, `prereq-check`, `report`, and `validate` for state management. Code blocks tagged
-`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection.
-Covered by `tests/src/skills/test_walkthrough_state.py`.
+`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection. The
+tests keep both self-contained copies identical except for two identity lines.
 
 ---
 
