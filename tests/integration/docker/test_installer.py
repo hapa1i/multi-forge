@@ -7,6 +7,7 @@ against real filesystem paths without risk to host machine.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -48,6 +49,7 @@ _PACKAGED_CLAUDE_HOME = f"{_PACKAGED_HOME}/.claude"
 _PACKAGED_CODEX_HOME = f"{_PACKAGED_HOME}/.codex"
 _PACKAGED_SITE_ROOT = f"{_PACKAGED_LIFECYCLE_ROOT}/site"
 _PACKAGED_RUNTIME_BIN = f"{_PACKAGED_LIFECYCLE_ROOT}/bin"
+_SKILLS_ROOT = Path(__file__).resolve().parents[3] / "src" / "skills"
 
 
 def _get_tracking_path(container: ContainerLike) -> str:
@@ -614,6 +616,60 @@ PY
             "forge_file": f"{_PACKAGED_SITE_ROOT}/forge/__init__.py",
             "extensions": f"{_PACKAGED_SITE_ROOT}/forge/_extensions",
         }
+
+        parity_home = f"{_PACKAGED_LIFECYCLE_ROOT}/parity/home"
+        parity_project = f"{_PACKAGED_LIFECYCLE_ROOT}/parity/project"
+        create_parity_roots = synced_container.exec(f"mkdir -p {parity_home} {parity_project}")
+        assert create_parity_roots.returncode == 0, create_parity_roots.stderr
+
+        runtime_list = synced_container.exec(
+            _packaged_forge_command("runtime list --json", project_root=parity_project, home=parity_home)
+        )
+        assert runtime_list.returncode == 0, runtime_list.stderr
+        claude_runtime = next(item for item in json.loads(runtime_list.stdout) if item["id"] == "claude_code")
+        assert claude_runtime["skill_scopes"] == ["user", "project", "local"]
+
+        enable_parity = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable --scope user --profile full --runtime claude",
+                project_root=parity_project,
+                home=parity_home,
+            )
+        )
+        assert enable_parity.returncode == 0, enable_parity.stderr
+
+        for skill in ("walkthrough", "qa"):
+            installed_script = f"{parity_home}/.claude/skills/{skill}/scripts/walkthrough-state.py"
+            installed_checklist = f"{parity_home}/.claude/skills/{skill}/resources/checklist.md"
+            assert synced_container.read_file(installed_script) == (
+                _SKILLS_ROOT / skill / "scripts" / "walkthrough-state.py"
+            ).read_text(encoding="utf-8")
+            assert synced_container.exec(f"test -x {installed_script}").returncode == 0
+            index = synced_container.exec(f"/usr/bin/python3 {installed_script} {installed_checklist} index")
+            assert index.returncode == 0, index.stderr
+            assert json.loads(index.stdout)["total_assertions"] > 0
+
+        sync_parity = synced_container.exec(
+            _packaged_forge_command("extension sync --scope user", project_root=parity_project, home=parity_home)
+        )
+        assert sync_parity.returncode == 0, sync_parity.stderr
+        status_parity = synced_container.exec(
+            _packaged_forge_command(
+                "extension status --scope user --json", project_root=parity_project, home=parity_home
+            )
+        )
+        assert status_parity.returncode == 0, status_parity.stderr
+        parity_packages = json.loads(status_parity.stdout)["installations"][0]["skill_packages"]
+        assert {package["skill"] for package in parity_packages} >= {"walkthrough", "qa"}
+
+        disable_parity = synced_container.exec(
+            _packaged_forge_command(
+                "extension disable --scope user --yes", project_root=parity_project, home=parity_home
+            )
+        )
+        assert disable_parity.returncode == 0, disable_parity.stderr
+        assert synced_container.exec(f"test ! -e {parity_home}/.claude/skills/walkthrough").returncode == 0
+        assert synced_container.exec(f"test ! -e {parity_home}/.claude/skills/qa").returncode == 0
 
         legacy_home = f"{_PACKAGED_LIFECYCLE_ROOT}/legacy/home"
         legacy_project = f"{_PACKAGED_LIFECYCLE_ROOT}/legacy/project"

@@ -132,8 +132,8 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 # Same-named standalone scripts in separate skill directories collide in mypy's
-# module map during broad scans. Keep this exclusion local to the duplicate
-# script name; it is not a source-of-truth relationship between the skills.
+# module map during broad scans. The walkthrough copy is checked directly, while
+# source parity and the dual-copy behavioral matrix cover the excluded QA copy.
 exclude = [
     'src/skills/qa/scripts/walkthrough-state\.py$',
 ]

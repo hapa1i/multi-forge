@@ -2,7 +2,7 @@
 
 Current focus: orders 1--9 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #187. Keep orders 10--35 in `todo/` until the next member's execution branch is created.
+PR #187. Order 10 is active from `3260a6fa`; keep orders 11--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -50,6 +50,10 @@ PR #187. Keep orders 10--35 in `todo/` until the next member's execution branch 
 - [x] Replace the two mutable fake families with one instance-owned test scaffold, preserve transport-specific defaults,
   and complete focused/full/board verification before selecting order 10.
 - [x] Ship order 9 independently in PR #187 (`be321ad2`) and close its member before activating order 10.
+- [x] Create `refactor/lock-walkthrough-state-parity` from `3260a6fa`, activate only O073, and retain self-contained
+  installed copies plus 25 parked members.
+- [x] Guard every non-identity source line, run the full behavioral matrix against both copies, and complete
+  runtime-skill/package verification before selecting order 11.
 
-Orders 10--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 11--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

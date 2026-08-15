@@ -1,4 +1,4 @@
-"""Unit tests for walkthrough-state.py — the walkthrough state machine.
+"""Unit tests for both parity-locked walkthrough-state.py copies.
 
 Tests cover:
 - Parsing: sections, subsections, annotations, code_blocks, assertions
@@ -8,20 +8,34 @@ Tests cover:
 """
 
 import json
-import sys
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
-# Import the script's functions directly
-SCRIPT_DIR = str(Path(__file__).resolve().parents[3] / "src" / "skills" / "walkthrough" / "scripts")
-sys.path.insert(0, SCRIPT_DIR)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+STATE_SCRIPT_PATHS = {
+    skill: REPO_ROOT / "src" / "skills" / skill / "scripts" / "walkthrough-state.py" for skill in ("walkthrough", "qa")
+}
+pc: ModuleType
 
-# ruff: noqa: E402
-from importlib import import_module
 
-# Import as module (filename has hyphens, so use importlib)
-pc = import_module("walkthrough-state")
+def _load_state_script(skill: str) -> ModuleType:
+    """Load one standalone skill script under a collision-free test module name."""
+    spec = spec_from_file_location(f"forge_{skill}_walkthrough_state", STATE_SCRIPT_PATHS[skill])
+    assert spec is not None and spec.loader is not None
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module", params=tuple(STATE_SCRIPT_PATHS), ids=tuple(STATE_SCRIPT_PATHS), autouse=True)
+def _state_script(request: pytest.FixtureRequest) -> None:
+    """Run every behavioral test against both package-local script copies."""
+    global pc
+    pc = _load_state_script(request.param)
+
 
 # --- Fixtures ---
 

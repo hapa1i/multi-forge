@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--9 and the PR #185 corrective member are closed through PR #187; keep orders 10--35
-parked until the next member's execution branch is created.
+Current focus: Wave 7 orders 1--9 and the PR #185 corrective member are closed through PR #187. Order 10 is active from
+`3260a6fa`; keep orders 11--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -210,5 +210,8 @@ parked until the next member's execution branch is created.
   verification; keep Wave 7 order 10 parked until order 9 ships.
 - [x] Ship O099's fake-family subset independently in PR #187 (`be321ad2`) and close its member before activating Wave 7
   order 10.
+- [x] Branch from the order-9 closeout (`3260a6fa`) and activate only order 10 `lock_walkthrough_state_parity`.
+- [x] Lock the walkthrough/QA state-script bodies, test both installed copies, and complete bundled-skill package and
+  runtime verification; keep Wave 7 order 11 parked until order 10 ships.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

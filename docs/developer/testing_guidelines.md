@@ -593,7 +593,7 @@ src/skills/walkthrough/
 └── scripts/
     ├── setup-test-repo.sh           # Hermetic repo setup
     ├── run-in-repo.sh              # Safety wrapper (path denylist + 6 gates)
-    └── walkthrough-state.py        # Deterministic state machine (walkthrough-owned)
+    └── walkthrough-state.py        # Self-contained parity-locked state machine
 
 src/skills/qa/
 ├── SKILL.md                          # Full QA in Docker container
@@ -604,11 +604,13 @@ src/skills/qa/
 │   └── report-template.md           # Report template
 └── scripts/
     ├── start-container.sh           # Docker lifecycle
-    └── walkthrough-state.py        # Deterministic state machine (QA-owned)
+    └── walkthrough-state.py        # Self-contained parity-locked state machine
 ```
 
-The walkthrough and QA state scripts are separate physical copies. They currently share a lot of implementation shape,
-but each skill owns its copy so checklist/state behavior can change independently.
+The walkthrough and QA state scripts are separate physical copies so each installed skill remains runnable without
+Forge, its sibling skill, or the repository checkout. Their executable bodies are intentionally identical: a
+normalization guard permits only two named skill-identity docstring lines to differ, and the complete state-machine test
+matrix runs against both copies. Any behavioral change must update both files in the same change.
 
 ### Running
 
