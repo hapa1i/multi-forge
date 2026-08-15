@@ -2,7 +2,7 @@
 
 Current focus: orders 1--8 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #186. Keep orders 9--35 in `todo/`; order 9 is next but not active.
+PR #186. Order 9 is active from `549fb0e3`; keep orders 10--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -45,6 +45,10 @@ PR #186. Keep orders 9--35 in `todo/`; order 9 is next but not active.
   ownership plus 27 parked members.
 - [x] Remove only the verified redundant `python-dotenv` dev edge, retain Starlette's live `httpx2` dependency, complete
   package/full/board verification, and ship order 8 in PR #186 (`19dcf9cb`) before selecting order 9.
+- [x] Create `refactor/share-proxy-transport-test-fakes` from `549fb0e3`, activate only O099's fake-family subset, and
+  retain production transport behavior plus 26 parked members.
+- [x] Replace the two mutable fake families with one instance-owned test scaffold, preserve transport-specific defaults,
+  and complete focused/full/board verification before selecting order 10.
 
-Orders 9--35 are intentionally parked. This checklist does not authorize parallel implementation or any other separately
-gated Wave 6 finding.
+Orders 10--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+separately gated Wave 6 finding.

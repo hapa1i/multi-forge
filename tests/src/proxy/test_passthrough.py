@@ -10,71 +10,22 @@ from types import SimpleNamespace
 import pytest
 
 from forge.proxy import passthrough
+from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
 
-class _FakeResponse:
-    def __init__(
-        self,
-        status_code: int = 200,
-        content: bytes = b'{"ok":true}',
-        headers: dict | None = None,
-    ) -> None:
-        self.status_code = status_code
-        self.content = content
-        self.headers = headers or {"content-type": "application/json"}
-
-
-class _FakeStream:
-    def __init__(
-        self,
-        status_code: int = 200,
-        chunks: tuple[bytes, ...] = (b"event: message_start\n\n",),
-        headers: dict | None = None,
-    ) -> None:
-        self.status_code = status_code
-        self._chunks = chunks
-        self.headers = headers or {"content-type": "application/json"}
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    async def aiter_bytes(self):
-        for chunk in self._chunks:
-            yield chunk
-
-    async def aread(self) -> bytes:
-        return b"".join(self._chunks)
-
-
-class _FakeAsyncClient:
-    """Records the outbound request and returns canned responses."""
-
-    captured: dict = {}
-
-    def __init__(self, *args, **kwargs) -> None:
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    async def post(self, url, headers=None, json=None):
-        _FakeAsyncClient.captured = {"url": url, "headers": headers, "json": json}
-        return _FakeResponse()
-
-    def stream(self, method, url, headers=None, json=None):
-        _FakeAsyncClient.captured = {
-            "method": method,
-            "url": url,
-            "headers": headers,
-            "json": json,
-        }
-        return _FakeStream()
+@pytest.fixture
+def anthropic_transport(
+    proxy_transport: ProxyTransportFake,
+    monkeypatch: pytest.MonkeyPatch,
+) -> ProxyTransportFake:
+    """Wire the shared fake with Anthropic-specific payload defaults."""
+    proxy_transport.response = FakeResponse(content=b'{"ok":true}')
+    proxy_transport.stream_response = FakeStream(
+        chunks=(b"event: message_start\n\n",),
+        headers={"content-type": "application/json"},
+    )
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", proxy_transport.client)
+    return proxy_transport
 
 
 _UPSTREAM_CONTROL_HEADERS = {
@@ -112,10 +63,7 @@ def test_build_upstream_headers_defaults_anthropic_version():
 
 
 @pytest.mark.asyncio
-async def test_forward_sends_raw_body_unchanged(monkeypatch):
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
-    _FakeAsyncClient.captured = {}
-
+async def test_forward_sends_raw_body_unchanged(anthropic_transport):
     raw_body = {
         "model": "claude-opus-4-6",
         "max_tokens": 100,
@@ -130,15 +78,14 @@ async def test_forward_sends_raw_body_unchanged(monkeypatch):
         request_id="req_1",
     )
 
-    captured = _FakeAsyncClient.captured
-    assert captured["url"] == "https://api.anthropic.com/v1/messages"
-    assert captured["json"] == raw_body  # forwarded byte-for-byte, unknown field intact
+    captured = anthropic_transport.captured
+    assert captured.url == "https://api.anthropic.com/v1/messages"
+    assert captured.json == raw_body  # forwarded byte-for-byte, unknown field intact
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_forward_count_tokens_path(monkeypatch):
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
+async def test_forward_count_tokens_path(anthropic_transport):
     raw_body = {
         "model": "claude-opus-4-6",
         "messages": [{"role": "user", "content": "hi"}],
@@ -153,12 +100,11 @@ async def test_forward_count_tokens_path(monkeypatch):
         path="/v1/messages/count_tokens",
     )
 
-    assert _FakeAsyncClient.captured["url"] == "https://api.anthropic.com/v1/messages/count_tokens"
+    assert anthropic_transport.captured.url == "https://api.anthropic.com/v1/messages/count_tokens"
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_returns_event_stream(monkeypatch):
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
+async def test_forward_streaming_returns_event_stream(anthropic_transport):
     raw_body = {"model": "m", "max_tokens": 10, "stream": True, "messages": []}
 
     resp = await passthrough.forward(
@@ -175,15 +121,12 @@ async def test_forward_streaming_returns_event_stream(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_upstream_error_preserves_status(monkeypatch):
-    class _StreamingErrorClient(_FakeAsyncClient):
-        def stream(self, method, url, headers=None, json=None):
-            return _FakeStream(
-                status_code=401,
-                chunks=(b'{"type":"error","error":{"type":"authentication_error"}}',),
-            )
-
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _StreamingErrorClient)
+async def test_forward_streaming_upstream_error_preserves_status(anthropic_transport):
+    anthropic_transport.stream_response = FakeStream(
+        status_code=401,
+        chunks=(b'{"type":"error","error":{"type":"authentication_error"}}',),
+        headers={"content-type": "application/json"},
+    )
     captured: dict = {}
 
     def _on_complete(usage, body, failed):
@@ -204,34 +147,15 @@ async def test_forward_streaming_upstream_error_preserves_status(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_failure(monkeypatch):
-    class _ReadErrorStream(_FakeStream):
-        exit_count = 0
-
-        def __init__(self):
-            super().__init__(status_code=529, chunks=(b"provider-secret",))
-
-        async def __aexit__(self, *exc):
-            self.exit_count += 1
-            return False
-
-        async def aread(self) -> bytes:
-            raise passthrough.httpx.ReadError("injected body read failure")
-
-    class _ReadErrorClient(_FakeAsyncClient):
-        def __init__(self):
-            self.stream_cm = _ReadErrorStream()
-            self.exit_count = 0
-
-        async def __aexit__(self, *exc):
-            self.exit_count += 1
-            return False
-
-        def stream(self, method, url, headers=None, json=None):
-            return self.stream_cm
-
-    client = _ReadErrorClient()
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", lambda **_kwargs: client)
+async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_failure(
+    anthropic_transport,
+):
+    anthropic_transport.stream_response = FakeStream(
+        status_code=529,
+        chunks=(b"provider-secret",),
+        headers={"content-type": "application/json"},
+        read_error=passthrough.httpx.ReadError("injected body read failure"),
+    )
     completed: list[tuple[dict, dict | None, bool]] = []
 
     resp = await passthrough.forward(
@@ -245,21 +169,20 @@ async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_
 
     assert resp.status_code == 502
     assert b"provider-secret" not in bytes(resp.body)
-    assert client.stream_cm.exit_count == 1
-    assert client.exit_count == 1
+    assert anthropic_transport.stream_response.exit_count == 1
+    assert anthropic_transport.client_exit_count == 1
     assert completed == [({}, None, True)]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [200, 429])
-async def test_forward_non_streaming_relays_safe_headers_with_forge_overlay(monkeypatch, status_code):
+async def test_forward_non_streaming_relays_safe_headers_with_forge_overlay(anthropic_transport, status_code):
     body = b'\x00{"opaque":"response-bytes"}\xff'
-
-    class _HeaderClient(_FakeAsyncClient):
-        async def post(self, url, headers=None, json=None):
-            return _FakeResponse(status_code=status_code, content=body, headers=_UPSTREAM_CONTROL_HEADERS)
-
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderClient)
+    anthropic_transport.response = FakeResponse(
+        status_code=status_code,
+        content=body,
+        headers=_UPSTREAM_CONTROL_HEADERS,
+    )
 
     resp = await passthrough.forward(
         raw_body={"model": "m", "messages": []},
@@ -282,15 +205,16 @@ async def test_forward_non_streaming_relays_safe_headers_with_forge_overlay(monk
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_success_relays_safe_headers_and_preserves_chunks(monkeypatch):
+async def test_forward_streaming_success_relays_safe_headers_and_preserves_chunks(
+    anthropic_transport,
+):
     chunks = (b"event: ping\n", b"data: {}\n\n")
-    upstream_headers = {**_UPSTREAM_CONTROL_HEADERS, "Cache-Control": "public, max-age=60"}
+    upstream_headers = {
+        **_UPSTREAM_CONTROL_HEADERS,
+        "Cache-Control": "public, max-age=60",
+    }
 
-    class _HeaderStreamClient(_FakeAsyncClient):
-        def stream(self, method, url, headers=None, json=None):
-            return _FakeStream(status_code=200, chunks=chunks, headers=upstream_headers)
-
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderStreamClient)
+    anthropic_transport.stream_response = FakeStream(status_code=200, chunks=chunks, headers=upstream_headers)
 
     resp = await passthrough.forward(
         raw_body={"model": "m", "stream": True, "messages": []},
@@ -313,14 +237,15 @@ async def test_forward_streaming_success_relays_safe_headers_and_preserves_chunk
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_error_relays_safe_headers_with_forge_overlay(monkeypatch):
+async def test_forward_streaming_error_relays_safe_headers_with_forge_overlay(
+    anthropic_transport,
+):
     body = b'{"type":"error","error":{"type":"overloaded_error"}}'
-
-    class _HeaderErrorClient(_FakeAsyncClient):
-        def stream(self, method, url, headers=None, json=None):
-            return _FakeStream(status_code=529, chunks=(body,), headers=_UPSTREAM_CONTROL_HEADERS)
-
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _HeaderErrorClient)
+    anthropic_transport.stream_response = FakeStream(
+        status_code=529,
+        chunks=(body,),
+        headers=_UPSTREAM_CONTROL_HEADERS,
+    )
 
     resp = await passthrough.forward(
         raw_body={"model": "m", "stream": True, "messages": []},
@@ -340,12 +265,8 @@ async def test_forward_streaming_error_relays_safe_headers_with_forge_overlay(mo
 
 
 @pytest.mark.asyncio
-async def test_forward_transport_error_preserves_forge_overlay(monkeypatch):
-    class _TransportErrorClient(_FakeAsyncClient):
-        async def post(self, url, headers=None, json=None):
-            raise passthrough.httpx.ConnectError("injected transport failure")
-
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _TransportErrorClient)
+async def test_forward_transport_error_preserves_forge_overlay(anthropic_transport):
+    anthropic_transport.request_error = passthrough.httpx.ConnectError("injected transport failure")
 
     resp = await passthrough.forward(
         raw_body={"model": "m", "messages": []},
@@ -362,7 +283,7 @@ async def test_forward_transport_error_preserves_forge_overlay(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_handler_forwards_raw_body(monkeypatch, proxy_runtime_ready):
+async def test_passthrough_handler_forwards_raw_body(monkeypatch, proxy_runtime_ready, anthropic_transport):
     """_handle_anthropic_passthrough (the middleware's delegate) reads the RAW body and forwards it."""
     server = proxy_runtime_ready
 
@@ -380,9 +301,6 @@ async def test_passthrough_handler_forwards_raw_body(monkeypatch, proxy_runtime_
         "forge.core.auth.template_secrets.resolve_env_or_credential",
         lambda var: "UPSTREAM-KEY" if var == "ANTHROPIC_API_KEY" else None,
     )
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
-    _FakeAsyncClient.captured = {}
-
     raw_body = {
         "model": "claude-opus-4-6",
         "max_tokens": 10,
@@ -399,8 +317,8 @@ async def test_passthrough_handler_forwards_raw_body(monkeypatch, proxy_runtime_
 
     resp = await server._handle_anthropic_passthrough(_RawReq(), "req_pt")  # the middleware's delegate
 
-    assert _FakeAsyncClient.captured["json"] == raw_body
-    assert _FakeAsyncClient.captured["json"]["extra_field"] == 1  # unknown field survived
+    assert anthropic_transport.captured.json == raw_body
+    assert anthropic_transport.captured.json["extra_field"] == 1  # unknown field survived
     assert resp.status_code == 200
 
 
@@ -472,7 +390,9 @@ def _passthrough_config(
     return SimpleNamespace(proxy=proxy)
 
 
-def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatch, proxy_runtime_ready):
+def test_passthrough_middleware_bypasses_validation_for_unknown_block(
+    monkeypatch, proxy_runtime_ready, anthropic_transport
+):
     """Through the real ASGI app, the middleware forwards the raw body BEFORE FastAPI
     binds MessagesRequest — so an unknown/future content block type that the closed
     block union would 422 is forwarded byte-for-byte instead."""
@@ -484,9 +404,6 @@ def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatc
         "forge.core.auth.template_secrets.resolve_env_or_credential",
         lambda var: "UPSTREAM-KEY",
     )
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
-    _FakeAsyncClient.captured = {}
-
     # A nested block type absent from data_models.ContentBlock — would 422 on the route.
     raw_body = {
         "model": "claude-opus-4-6",
@@ -505,7 +422,7 @@ def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatc
     resp = client.post("/v1/messages", json=raw_body)
 
     assert resp.status_code == 200  # NOT 422 — validation was bypassed
-    assert _FakeAsyncClient.captured["json"]["messages"][0]["content"][0]["type"] == "future_block_99"
+    assert anthropic_transport.captured.json["messages"][0]["content"][0]["type"] == "future_block_99"
     assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"  # M7: resolved-model header
 
 
@@ -563,7 +480,9 @@ def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_passthrough_inspect_mode_writes_audit_metadata(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_passthrough_inspect_mode_writes_audit_metadata(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """A passthrough proxy in inspect mode writes a metadata audit record (no body)."""
     from forge.proxy import audit_logger
 
@@ -593,9 +512,6 @@ async def test_passthrough_inspect_mode_writes_audit_metadata(monkeypatch, tmp_p
 
     monkeypatch.setattr(server.config, "proxy", ProxyCfg())
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
-    _FakeAsyncClient.captured = {}
-
     raw_body = {
         "model": "claude-opus-4-6",
         "max_tokens": 10,
@@ -639,19 +555,6 @@ _SSE_USAGE_CHUNKS = (
 )
 
 
-class _UsageResponseClient(_FakeAsyncClient):
-    """Returns a non-streaming response body carrying usage + secret text."""
-
-    async def post(self, url, headers=None, json=None):
-        _UsageResponseClient.captured = {"url": url, "headers": headers, "json": json}
-        return _FakeResponse(content=_USAGE_RESPONSE)
-
-
-class _SSEUsageClient(_FakeAsyncClient):
-    def stream(self, method, url, headers=None, json=None):
-        return _FakeStream(chunks=_SSE_USAGE_CHUNKS)
-
-
 class _RawReq:
     """Minimal stand-in for a FastAPI Request on the passthrough path."""
 
@@ -674,9 +577,12 @@ def test_usage_accumulator_handles_split_chunks():
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_taps_usage(monkeypatch):
+async def test_forward_streaming_taps_usage(anthropic_transport):
     """Streaming forward taps usage from the SSE and reports it via on_complete."""
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEUsageClient)
+    anthropic_transport.stream_response = FakeStream(
+        chunks=_SSE_USAGE_CHUNKS,
+        headers={"content-type": "application/json"},
+    )
     captured: dict = {}
 
     def _on_complete(usage, body, failed):
@@ -701,13 +607,13 @@ async def test_forward_streaming_taps_usage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_logs_cost_from_response_usage(monkeypatch, proxy_runtime_ready):
+async def test_passthrough_logs_cost_from_response_usage(monkeypatch, proxy_runtime_ready, anthropic_transport):
     """B2: non-streaming usage flows into _calc_and_log_cost (cost is logged, not bypassed)."""
     server = proxy_runtime_ready
 
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     captured_cost: list[dict] = []
     monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: captured_cost.append(kw) or 0)
@@ -767,7 +673,9 @@ async def test_passthrough_enforces_spend_cap_reject(monkeypatch, proxy_runtime_
 
 
 @pytest.mark.asyncio
-async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_passthrough_full_body_captures_redacted_response(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """B3/M5: full-body record includes the redacted response + request hashes, no plaintext."""
     from forge.proxy import audit_logger
 
@@ -781,7 +689,7 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
         _passthrough_config(intercept_mode="inspect", audit_full_body=True).proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     raw_body = {
         "model": "claude-opus-4-6",
@@ -816,7 +724,9 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_passthrough_override_mutates_body_and_records(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """Override augments the system prompt + pins reasoning, forwards the mutated body,
     and writes a redacted mutation record."""
     from forge.proxy import audit_logger
@@ -831,8 +741,7 @@ async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_pa
         _passthrough_config(intercept_mode="override", augment="STAY-FOCUSED", reasoning_effort="high").proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
-    _UsageResponseClient.captured = {}
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     raw_body = {
         "model": "claude-opus-4-6",
@@ -842,7 +751,7 @@ async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_pa
     }
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_ov"), "req_ov")
 
-    sent = _UsageResponseClient.captured["json"]
+    sent = anthropic_transport.captured.json
     assert sent["system"][-1]["text"] == "STAY-FOCUSED"  # augment forwarded
     assert sent["thinking"]["budget_tokens"] == 10000  # reasoning pinned to the 'high' floor
 
@@ -892,7 +801,9 @@ async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_preserves_history_through_server(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_passthrough_override_preserves_history_through_server(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """Through the server path, override leaves historical thinking blocks byte-identical."""
     import copy
 
@@ -908,8 +819,7 @@ async def test_passthrough_override_preserves_history_through_server(monkeypatch
         _passthrough_config(intercept_mode="override", augment="EXTRA").proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
-    _UsageResponseClient.captured = {}
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     history = [
         {
@@ -926,13 +836,15 @@ async def test_passthrough_override_preserves_history_through_server(monkeypatch
     }
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_hist"), "req_hist")
 
-    sent = _UsageResponseClient.captured["json"]
+    sent = anthropic_transport.captured.json
     assert sent["messages"] == history  # signed thinking untouched
     assert sent["system"][-1]["text"] == "EXTRA"  # but the control surface was augmented
 
 
 @pytest.mark.asyncio
-async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_non_override_mode_does_not_apply_override(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """Override directives are inert unless intercept.mode == 'override' (no mutation)."""
     from forge.proxy import audit_logger
 
@@ -947,8 +859,7 @@ async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path, 
         _passthrough_config(intercept_mode="inspect", augment="SHOULD-NOT-APPEAR").proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
-    _UsageResponseClient.captured = {}
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     raw_body = {
         "model": "claude-opus-4-6",
@@ -958,14 +869,16 @@ async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path, 
     }
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_insp2"), "req_insp2")
 
-    sent = _UsageResponseClient.captured["json"]
+    sent = anthropic_transport.captured.json
     assert sent["system"] == [{"type": "text", "text": "base"}]  # body unmutated
     assert "thinking" not in sent
     assert audit_logger.read_audit_logs(record_type="mutation") == []  # no mutation record
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_passthrough_override_uses_model_tier_not_default(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """Reasoning pin keys off the request's model tier (opus), not proxy default_tier (sonnet)."""
     from forge.proxy import audit_logger
 
@@ -982,8 +895,7 @@ async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp
     }
     monkeypatch.setattr(server.config, "proxy", cfg.proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
-    _UsageResponseClient.captured = {}
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     raw_body = {
         "model": "claude-opus-4-6",
@@ -993,7 +905,7 @@ async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp
     }
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_t4"), "req_t4")
 
-    sent = _UsageResponseClient.captured["json"]
+    sent = anthropic_transport.captured.json
     assert sent["thinking"]["budget_tokens"] == 10000  # opus 'high' floor, not sonnet 'minimal'
 
 
@@ -1037,7 +949,9 @@ async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_path, proxy_runtime_ready):
+async def test_override_full_body_record_is_self_consistent(
+    monkeypatch, tmp_path, proxy_runtime_ready, anthropic_transport
+):
     """#6: the full-body record pairs the MUTATED body with a hash recomputed from it."""
     from forge.proxy import audit_logger
 
@@ -1051,8 +965,7 @@ async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_pat
         _passthrough_config(intercept_mode="override", augment="AUGTEXT", audit_full_body=True).proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
-    _UsageResponseClient.captured = {}
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     raw_body = {
         "model": "claude-opus-4-6",
@@ -1062,7 +975,7 @@ async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_pat
     }
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_fbc"), "req_fbc")
 
-    sent = _UsageResponseClient.captured["json"]
+    sent = anthropic_transport.captured.json
     fb = [r for r in audit_logger.read_audit_logs(record_type="request") if r.get("full_body")]
     assert len(fb) == 1
     # The record's hash matches the MUTATED (augmented) system, not the pre-mutation one.
@@ -1098,15 +1011,13 @@ _PT_CTX = {
 }
 
 
-class _SSEContentClient(_FakeAsyncClient):
-    def stream(self, method, url, headers=None, json=None):
-        return _FakeStream(chunks=_SSE_CONTENT_CHUNKS)
-
-
 @pytest.mark.asyncio
-async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch):
+async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch, anthropic_transport):
     """The relay computes the four lifecycle flags and calls the one shared helper."""
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+    anthropic_transport.stream_response = FakeStream(
+        chunks=_SSE_CONTENT_CHUNKS,
+        headers={"content-type": "application/json"},
+    )
     captured: list[dict] = []
     monkeypatch.setattr(passthrough, "record_provider_trace", lambda **kw: captured.append(kw))
 
@@ -1135,10 +1046,13 @@ async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_mirror_is_latent_for_non_capable_source(monkeypatch, tmp_path):
+async def test_passthrough_mirror_is_latent_for_non_capable_source(monkeypatch, tmp_path, anthropic_transport):
     """End-to-end through the REAL helper: a source without provider-trace capability persists nothing."""
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+    anthropic_transport.stream_response = FakeStream(
+        chunks=_SSE_CONTENT_CHUNKS,
+        headers={"content-type": "application/json"},
+    )
 
     resp = await passthrough.forward(
         raw_body={"model": "m", "stream": True, "messages": []},
@@ -1155,15 +1069,6 @@ async def test_passthrough_mirror_is_latent_for_non_capable_source(monkeypatch, 
     assert ptl.read_provider_traces() == []  # gate suppressed the write
 
 
-class _CancelStream(_FakeStream):
-    async def aiter_bytes(self):
-        yield (
-            b'event: content_block_start\ndata: {"type":"content_block_start","index":0,'
-            b'"content_block":{"type":"text","text":""}}\n\n'
-        )
-        raise asyncio.CancelledError()
-
-
 @pytest.mark.asyncio
 async def test_passthrough_mirror_records_disconnect(monkeypatch):
     """A cancelled relay records client_disconnected and re-raises (not swallowed)."""
@@ -1172,10 +1077,17 @@ async def test_passthrough_mirror_records_disconnect(monkeypatch):
 
     client_cm = SimpleNamespace(__aexit__=_noop_aexit)
     stream_cm = SimpleNamespace(__aexit__=_noop_aexit)
+    cancelled_stream = FakeStream(
+        chunks=(
+            b'event: content_block_start\ndata: {"type":"content_block_start","index":0,'
+            b'"content_block":{"type":"text","text":""}}\n\n',
+        ),
+        iteration_error=asyncio.CancelledError(),
+    )
 
     async def _drain():
         agen = passthrough._stream_opened_upstream(
-            client_cm, stream_cm, _CancelStream(), "req_x", provider_trace_ctx=_PT_CTX
+            client_cm, stream_cm, cancelled_stream, "req_x", provider_trace_ctx=_PT_CTX
         )
         async for _chunk in agen:
             pass
@@ -1200,7 +1112,7 @@ def test_passthrough_does_not_import_server():
 
 
 @pytest.mark.asyncio
-async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_runtime_ready):
+async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_runtime_ready, anthropic_transport):
     """A1 characterization: forwarded body identical; cost then metrics on completion.
 
     Pinned before extracting the handler to passthrough_ingress.py so the move is
@@ -1211,7 +1123,7 @@ async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_ru
 
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
 
     order: list[str] = []
     monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: order.append("cost") or 0)
@@ -1228,13 +1140,13 @@ async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_ru
 
     assert resp.status_code == 200
     assert order == ["cost", "metrics"]
-    assert _UsageResponseClient.captured["json"] == raw_body
+    assert anthropic_transport.captured.json == raw_body
     assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"
     assert resp.headers["X-Resolved-Tier"] == "opus"
 
 
 @pytest.mark.asyncio
-async def test_passthrough_streaming_accounting_order(monkeypatch, proxy_runtime_ready):
+async def test_passthrough_streaming_accounting_order(monkeypatch, proxy_runtime_ready, anthropic_transport):
     """A1 characterization (streaming): cost -> metrics -> trace at stream end.
 
     The relay's _on_end runs the accounting closure (cost, then metrics) BEFORE
@@ -1246,7 +1158,10 @@ async def test_passthrough_streaming_accounting_order(monkeypatch, proxy_runtime
 
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
-    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+    anthropic_transport.stream_response = FakeStream(
+        chunks=_SSE_CONTENT_CHUNKS,
+        headers={"content-type": "application/json"},
+    )
 
     order: list[str] = []
     monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: order.append("cost") or 0)
