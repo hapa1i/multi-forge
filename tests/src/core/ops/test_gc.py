@@ -42,6 +42,7 @@ from forge.install.tracking import TrackingStore, compute_checksum
 from forge.session import IndexStore
 from forge.session.models import create_session_state
 from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,23 +57,18 @@ def _forge_home() -> Path:
 def _seed_session(tmp_path: Path, name: str, forge_root: Path | None = None) -> Path:
     """Create a session in the index + on disk. Returns the forge_root."""
     fr = forge_root or tmp_path / "project"
-    session_dir = fr / ".forge" / "sessions" / name
-    session_dir.mkdir(parents=True, exist_ok=True)
     # Write a valid manifest (not a `{}` sentinel): corrupt-state detection reads
     # the manifest strictly, so a seeded session must model a healthy one.
-    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
+    state = create_session_state(name, worktree_path=str(fr))
 
     index = IndexStore()
-    index.add_session(
-        name=name,
-        worktree_path=str(fr),
-        project_root=str(tmp_path),
+    publish_session(
+        index,
+        state,
+        tmp_path,
         forge_root=str(fr),
         checkout_root=str(fr),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
     return fr
 
@@ -619,8 +615,8 @@ class TestCollectCleanReport:
         assert state.worktree is not None
         state.worktree.is_worktree = True
         state.forge_root = str(fr)
-        SessionStore(str(fr), "degraded").write(state)
-        IndexStore().add_from_state(
+        publish_session(
+            IndexStore(),
             state,
             project_root=str(tmp_path),
             forge_root=str(fr),

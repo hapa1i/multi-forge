@@ -19,6 +19,7 @@ from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 from forge.session.identity import make_scoped_key
 from forge.session.index import INDEX_FILENAME, IndexStore
 from forge.session.store import get_manifest_path
+from tests.fixtures.session_state import publish_session_from_fields
 
 
 @pytest.fixture
@@ -158,18 +159,16 @@ class TestActiveSessionStore:
         pin = incompatible_state / "project.toml"
         pin.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
         pin_before = pin.read_bytes()
-        manifest_path = get_manifest_path(incompatible_root, "paired-index")
-        manifest_path.parent.mkdir(parents=True)
-        manifest_path.write_text("{}", encoding="utf-8")
-        manifest_before = manifest_path.read_bytes()
-
         index_store = IndexStore(temp_forge_home / "sessions" / INDEX_FILENAME)
-        index_store.add_session(
+        publish_session_from_fields(
+            index_store,
             "paired-index",
-            str(incompatible_root),
-            str(incompatible_root),
+            incompatible_root,
+            incompatible_root,
             forge_root=str(incompatible_root),
         )
+        manifest_path = get_manifest_path(incompatible_root, "paired-index")
+        manifest_before = manifest_path.read_bytes()
         store.upsert_session(
             "stale-active",
             worktree_path=str(incompatible_root),

@@ -21,6 +21,7 @@ from forge.session.exceptions import ManifestChangedError
 from forge.session.identity import make_scoped_key
 from forge.session.models import CodexConfirmed, SessionState, session_state_to_dict
 from forge.session.store import CLI_LOCK_TIMEOUT_S, get_manifest_path
+from tests.fixtures.session_state import publish_session
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -45,6 +46,30 @@ def project(tmp_path: Path) -> Path:
 _ROOT = "sentinel: use the project root"
 
 
+def _session_state(
+    root: Path,
+    name: str,
+    *,
+    worktree_path: str | None = _ROOT,
+    is_worktree: bool = False,
+    owns_worktree: bool = True,
+    claude_id: str | None = None,
+    thread_id: str | None = None,
+) -> SessionState:
+    state = create_session_state(name, worktree_path=str(root) if worktree_path is _ROOT else worktree_path)
+    if is_worktree:
+        assert state.worktree is not None
+        state.worktree.is_worktree = True
+    if not owns_worktree:
+        assert state.worktree is not None
+        state.worktree.owns_worktree = False
+    if claude_id:
+        state.confirmed.claude_session_id = claude_id
+    if thread_id:
+        state.confirmed.codex = CodexConfirmed(thread_id=thread_id)
+    return state
+
+
 def seed_orphan(
     root: Path,
     name: str,
@@ -60,17 +85,15 @@ def seed_orphan(
     ``worktree_path=None`` seeds a manifest with no worktree block; the default
     records the project root itself (the ordinary healthy shape).
     """
-    state = create_session_state(name, worktree_path=str(root) if worktree_path is _ROOT else worktree_path)
-    if is_worktree:
-        assert state.worktree is not None
-        state.worktree.is_worktree = True
-    if not owns_worktree:
-        assert state.worktree is not None
-        state.worktree.owns_worktree = False
-    if claude_id:
-        state.confirmed.claude_session_id = claude_id
-    if thread_id:
-        state.confirmed.codex = CodexConfirmed(thread_id=thread_id)
+    state = _session_state(
+        root,
+        name,
+        worktree_path=worktree_path,
+        is_worktree=is_worktree,
+        owns_worktree=owns_worktree,
+        claude_id=claude_id,
+        thread_id=thread_id,
+    )
     SessionStore(str(root), name).write(state)
     return state
 
@@ -83,8 +106,8 @@ def seed_live(
     thread_id: str | None = None,
 ) -> SessionState:
     """Write a manifest plus its index row: a healthy session."""
-    state = seed_orphan(root, name, claude_id=claude_id, thread_id=thread_id)
-    IndexStore().add_from_state(state, str(root), forge_root=str(root), checkout_root=str(root))
+    state = _session_state(root, name, claude_id=claude_id, thread_id=thread_id)
+    publish_session(IndexStore(), state, root, forge_root=root, checkout_root=root)
     return state
 
 
@@ -163,8 +186,7 @@ class TestScan:
     def test_collision_when_row_column_lags_live_manifest(self, project: Path) -> None:
         """Review round 3 CRITICAL: a live manifest binding not yet reconciled
         into its row column must still block the orphan (columns lag manifests)."""
-        state = seed_orphan(project, "live-lagging")
-        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        seed_live(project, "live-lagging")
         store = SessionStore(str(project), "live-lagging")
         live = store.read()
         live.confirmed.claude_session_id = "uuid-lag"
@@ -182,8 +204,7 @@ class TestScan:
 
     def test_collision_when_thread_lives_only_on_live_manifest(self, project: Path) -> None:
         """Ordinary Codex sessions record their thread on the manifest alone."""
-        state = seed_orphan(project, "live-codex-lag")
-        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        seed_live(project, "live-codex-lag")
         store = SessionStore(str(project), "live-codex-lag")
         live = store.read()
         live.confirmed.codex = CodexConfirmed(thread_id="thread-lag")
@@ -505,9 +526,9 @@ class TestApply:
         assert make_scoped_key("orphan", str(project)) not in IndexStore().read().sessions
 
     def test_name_claimed_since_scan_refused(self, project: Path) -> None:
-        state = seed_orphan(project, "orphan")
+        seed_orphan(project, "orphan")
         records = self._scan(project).records
-        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        assert repair_orphans(project, records).repaired == ("orphan",)
 
         result = repair_orphans(project, records)
 
@@ -596,14 +617,14 @@ class TestApply:
         project: Path,
         tmp_path: Path,
     ) -> None:
-        state = seed_orphan(
+        seed_orphan(
             project,
             "claimed",
             worktree_path=str(tmp_path / "checkout"),
             is_worktree=True,
         )
         records = self._scan(project).records
-        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        assert repair_orphans(project, records).repaired == ("claimed",)
 
         result = repair_orphans(project, records)
 

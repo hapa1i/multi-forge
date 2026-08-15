@@ -17,6 +17,7 @@ from forge.session.active import ActiveSessionStore
 from forge.session.models import (
     Derivation,
 )
+from tests.fixtures.session_state import publish_session, publish_session_from_fields
 from tests.src.cli.session_command_support import (
     _BrokenActiveSessionStore,
     _proxy_cfg,
@@ -40,8 +41,8 @@ def _seed_missing_worktree_session(project: Path, name: str = "degraded") -> Pat
     assert state.worktree is not None
     state.worktree.is_worktree = True
     state.forge_root = str(project)
-    SessionStore(str(project), name).write(state)
-    IndexStore().add_from_state(
+    publish_session(
+        IndexStore(),
         state,
         project_root=str(project),
         forge_root=str(project),
@@ -166,11 +167,10 @@ class TestSessionList:
         import json
 
         state = create_session_state("model-pinned", worktree_path=str(temp_env), direct_model="claude-opus-4-8")
-        SessionStore(str(temp_env), "model-pinned").write(state)
-        IndexStore().add_session(
-            name="model-pinned",
-            worktree_path=str(temp_env),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            state,
+            temp_env,
             forge_root=str(temp_env),
             checkout_root=str(temp_env),
             relative_path=".",
@@ -217,11 +217,10 @@ class TestSessionList:
             {"copied_path": str(first_rel)},
             {"copied_path": str(second_rel)},
         ]
-        SessionStore(str(temp_env), "model-history").write(state)
-        IndexStore().add_session(
-            name="model-history",
-            worktree_path=str(temp_env),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            state,
+            temp_env,
             forge_root=str(temp_env),
             checkout_root=str(temp_env),
             relative_path=".",
@@ -248,12 +247,11 @@ class TestSessionList:
         import json
 
         wt = temp_env  # cwd == project
-        (wt / ".forge" / "sessions" / "live-one").mkdir(parents=True)
-        (wt / ".forge" / "sessions" / "live-one" / "forge.session.json").write_text("{}")
-        IndexStore().add_session(
-            name="live-one",
-            worktree_path=str(wt),
-            project_root=str(wt),
+        publish_session_from_fields(
+            IndexStore(),
+            "live-one",
+            wt,
+            wt,
             forge_root=str(wt),
             checkout_root=str(wt),
             relative_path=".",
@@ -545,11 +543,10 @@ def _seed_bare_session(project: Path, name: str) -> Path:
     """Write a minimal same-project session and register it in the index."""
     state = create_session_state(name, worktree_path=str(project))
     state.forge_root = str(project)
-    SessionStore(str(project), name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        state,
+        project,
         forge_root=str(project),
         checkout_root=str(project),
         relative_path=".",
@@ -609,11 +606,10 @@ class TestSessionShowPlanInfo:
         state = create_session_state("planner", worktree_path=str(checkout_root))
         state.forge_root = str(nested_forge_root)
         state.confirmed.latest_plan_path = ".claude/plans/nested-plan.md"
-        SessionStore(str(nested_forge_root), "planner").write(state)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(checkout_root),
-            project_root=str(checkout_root),
+        publish_session(
+            IndexStore(),
+            state,
+            checkout_root,
             forge_root=str(nested_forge_root),
             checkout_root=str(checkout_root),
             relative_path="nested",
@@ -728,11 +724,10 @@ class TestSessionShowPlanInfo:
             worktree_path=str(temp_env),
         )
         fork_state.forge_root = str(temp_env)
-        SessionStore(str(temp_env), "executor").write(fork_state)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(temp_env),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            fork_state,
+            temp_env,
             forge_root=str(temp_env),
             checkout_root=str(temp_env),
             relative_path=".",
@@ -799,11 +794,10 @@ class TestSessionShowPlanInfo:
             worktree_path=str(temp_env),
         )
         fork_state.forge_root = str(temp_env)
-        SessionStore(str(temp_env), "executor").write(fork_state)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(temp_env),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            fork_state,
+            temp_env,
             forge_root=str(temp_env),
             checkout_root=str(temp_env),
             relative_path=".",

@@ -6,8 +6,9 @@ from pathlib import Path
 
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import list_sessions
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.active import ActiveSessionStore
+from tests.fixtures.session_state import publish_session, publish_session_from_fields
 
 
 def test_list_sessions_empty(tmp_path: Path, monkeypatch) -> None:
@@ -24,21 +25,9 @@ def test_list_sessions_reads_index(tmp_path: Path, monkeypatch) -> None:
     # Isolate ~/.forge into tmp via HOME.
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    # Seed the index with one session (per-session directory structure)
     wt = tmp_path / "wt"
-    session_dir = wt / ".forge" / "sessions" / "alpha"
-    session_dir.mkdir(parents=True)
-    (session_dir / "forge.session.json").write_text("{}")
-
     index = IndexStore()
-    index.add_session(
-        name="alpha",
-        worktree_path=str(wt),
-        project_root=str(tmp_path),
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
-    )
+    publish_session_from_fields(index, "alpha", wt, tmp_path)
 
     ctx = ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path)
     result = list_sessions(ctx=ctx, include_incognito=True)
@@ -51,11 +40,10 @@ def test_list_sessions_reports_direct_model_pin(tmp_path: Path, monkeypatch) -> 
 
     wt = tmp_path / "wt"
     state = create_session_state("alpha", worktree_path=str(wt), direct_model="claude-opus-4-8")
-    SessionStore(str(wt), "alpha").write(state)
-    IndexStore().add_session(
-        name="alpha",
-        worktree_path=str(wt),
-        project_root=str(tmp_path),
+    publish_session(
+        IndexStore(),
+        state,
+        tmp_path,
         forge_root=str(wt),
         checkout_root=str(wt),
         relative_path=".",
@@ -107,11 +95,10 @@ def test_list_sessions_reports_direct_model_history_from_transcripts(tmp_path: P
         {"copied_path": str(second_rel)},
         {"copied_path": str(second_rel)},
     ]
-    SessionStore(str(wt), "alpha").write(state)
-    IndexStore().add_session(
-        name="alpha",
-        worktree_path=str(wt),
-        project_root=str(tmp_path),
+    publish_session(
+        IndexStore(),
+        state,
+        tmp_path,
         forge_root=str(wt),
         checkout_root=str(wt),
         relative_path=".",
@@ -133,13 +120,11 @@ def test_list_sessions_is_active_reflects_active_store(tmp_path: Path, monkeypat
 
     wt = tmp_path / "wt"
     for name in ("live", "dormant"):
-        session_dir = wt / ".forge" / "sessions" / name
-        session_dir.mkdir(parents=True)
-        (session_dir / "forge.session.json").write_text("{}")
-        IndexStore().add_session(
-            name=name,
-            worktree_path=str(wt),
-            project_root=str(tmp_path),
+        publish_session_from_fields(
+            IndexStore(),
+            name,
+            wt,
+            tmp_path,
             forge_root=str(wt),
             checkout_root=str(wt),
             relative_path=".",
@@ -167,12 +152,11 @@ def _seed_sessions(tmp_path: Path) -> None:
 
     # Session in repo-A, forge root at repo-A root
     wt_a = tmp_path / "repo-a"
-    (wt_a / ".forge" / "sessions" / "sess-a").mkdir(parents=True)
-    (wt_a / ".forge" / "sessions" / "sess-a" / "forge.session.json").write_text("{}")
-    index.add_session(
-        name="sess-a",
-        worktree_path=str(wt_a),
-        project_root=str(wt_a),
+    publish_session_from_fields(
+        index,
+        "sess-a",
+        wt_a,
+        wt_a,
         forge_root=str(wt_a),
         checkout_root=str(wt_a),
         relative_path=".",
@@ -180,12 +164,11 @@ def _seed_sessions(tmp_path: Path) -> None:
 
     # Session in repo-A worktree (same project_root, different forge_root)
     wt_a2 = tmp_path / "repo-a-feat"
-    (wt_a2 / ".forge" / "sessions" / "sess-a-feat").mkdir(parents=True)
-    (wt_a2 / ".forge" / "sessions" / "sess-a-feat" / "forge.session.json").write_text("{}")
-    index.add_session(
-        name="sess-a-feat",
-        worktree_path=str(wt_a2),
-        project_root=str(wt_a),
+    publish_session_from_fields(
+        index,
+        "sess-a-feat",
+        wt_a2,
+        wt_a,
         forge_root=str(wt_a2),
         checkout_root=str(wt_a2),
         relative_path=".",
@@ -193,12 +176,11 @@ def _seed_sessions(tmp_path: Path) -> None:
 
     # Session in repo-B (different project_root)
     wt_b = tmp_path / "repo-b"
-    (wt_b / ".forge" / "sessions" / "sess-b").mkdir(parents=True)
-    (wt_b / ".forge" / "sessions" / "sess-b" / "forge.session.json").write_text("{}")
-    index.add_session(
-        name="sess-b",
-        worktree_path=str(wt_b),
-        project_root=str(wt_b),
+    publish_session_from_fields(
+        index,
+        "sess-b",
+        wt_b,
+        wt_b,
         forge_root=str(wt_b),
         checkout_root=str(wt_b),
         relative_path=".",
@@ -294,7 +276,6 @@ def test_list_sessions_reads_manifest_with_entry_scope(tmp_path: Path, monkeypat
         worktree_path=str(worktree_a),
     )
     manifest_a.forge_root = str(forge_root_a)
-    SessionStore(str(forge_root_a), "shared").write(manifest_a)
 
     manifest_b = create_session_state(
         "shared",
@@ -303,20 +284,19 @@ def test_list_sessions_reads_manifest_with_entry_scope(tmp_path: Path, monkeypat
         worktree_path=str(worktree_b),
     )
     manifest_b.forge_root = str(forge_root_b)
-    SessionStore(str(forge_root_b), "shared").write(manifest_b)
 
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_a),
-        project_root=str(project_root),
+    publish_session(
+        index,
+        manifest_a,
+        project_root,
         forge_root=str(forge_root_a),
         checkout_root=str(worktree_a),
         relative_path="alpha",
     )
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_b),
-        project_root=str(project_root),
+    publish_session(
+        index,
+        manifest_b,
+        project_root,
         forge_root=str(forge_root_b),
         checkout_root=str(worktree_b),
         relative_path="beta",

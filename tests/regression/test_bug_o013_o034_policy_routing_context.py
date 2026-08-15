@@ -19,6 +19,7 @@ import forge.core.ops.policy as policy_ops
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import LaunchConfirmed, StartedWithProxy
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -43,11 +44,10 @@ def policy_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def _seed_session(project: Path, name: str) -> None:
     state = create_session_state(name, worktree_path=str(project))
     state.forge_root = str(project)
-    SessionStore(str(project), name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        state,
+        project,
         forge_root=str(project),
         checkout_root=str(project),
         relative_path=".",

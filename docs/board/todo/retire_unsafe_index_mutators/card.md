@@ -8,7 +8,7 @@
 
 **Finding**: O050's public-mutator deletion phase.
 
-**Depends on**: [`replace_unsafe_index_test_fixtures`](../replace_unsafe_index_test_fixtures/card.md).
+**Depends on**: [`replace_unsafe_index_test_fixtures`](../../doing/replace_unsafe_index_test_fixtures/card.md).
 
 ## Goal
 

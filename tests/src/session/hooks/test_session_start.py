@@ -29,6 +29,7 @@ from forge.session.hooks import (
     resolve_session_name,
 )
 from forge.session.hooks.session_start import _capture_transcript_rollover
+from tests.fixtures.session_state import publish_session, publish_session_from_fields
 
 
 def _hold_lock(lock_path: str, hold_s: float) -> None:
@@ -105,7 +106,13 @@ class TestResolveSessionName:
     def test_resolve_priority_3_uuid_lookup(self, temp_worktree: Path, temp_index: IndexStore) -> None:
         """UUID lookup should be third priority (after env vars)."""
         # Add session to index with a UUID
-        temp_index.add_session("uuid-session", str(temp_worktree), str(temp_worktree), claude_session_id="uuid-123")
+        publish_session_from_fields(
+            temp_index,
+            "uuid-session",
+            temp_worktree,
+            temp_worktree,
+            claude_session_id="uuid-123",
+        )
 
         # Clear env vars
         with patch.dict(os.environ, {}, clear=True):
@@ -516,13 +523,11 @@ class TestHandleSessionStart:
         base_store = SessionStore(str(temp_worktree), "test-session")
         manifest = base_store.read()
         manifest.forge_root = str(nested_forge_root)
-        nested_store.write(manifest)
 
-        temp_index.add_session(
-            "test-session",
-            str(temp_worktree),
-            str(temp_worktree),
-            claude_session_id="original-uuid-123",
+        publish_session(
+            temp_index,
+            manifest,
+            temp_worktree,
             forge_root=str(nested_forge_root),
             checkout_root=str(temp_worktree),
             relative_path="nested-project",
@@ -712,15 +717,9 @@ class TestHookIndexSync:
         )
         manifest.confirmed.claude_session_id = "pre-seeded-uuid"
         store = SessionStore(str(temp_worktree), "sync-test")
-        store.write(manifest)
 
         # Add to index with pre-seeded UUID
-        temp_index.add_session(
-            "sync-test",
-            worktree_path=str(temp_worktree),
-            project_root=str(temp_worktree),
-            claude_session_id="pre-seeded-uuid",
-        )
+        publish_session(temp_index, manifest, temp_worktree)
 
         monkeypatch.setenv(ENV_SESSION, "sync-test")
         monkeypatch.setenv("FORGE_FORGE_ROOT", str(temp_worktree))

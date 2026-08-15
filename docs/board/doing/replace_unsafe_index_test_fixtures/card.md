@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 durable-state fixture work.
+**Lane**: `doing/` -- active on `refactor/replace-unsafe-index-test-fixtures` from `74b364d2`.
 
 **Finding**: O050's caller-migration phase.
 
@@ -12,8 +12,9 @@ Provide transaction-safe test builders and migrate direct public-index mutator c
 
 ## Evidence and Authority
 
-On `5777192a`, approximately 183 calls across 48 test files use `add_session`, `add_from_state`, or `remove_session` to
-construct states that production cannot create safely. Authority:
+Reverified on `74b364d2`: 180 executable invocations across 48 test files use `add_session`, `add_from_state`, or
+`remove_session` to construct states that production cannot create safely (179 Python AST calls plus one embedded
+integration script; the raw textual count of 183 also includes three test docstrings). Authority:
 [`docs/design.md` "3.2 Contract files"](../../../design.md#32-contract-files-authoritative-paths) and
 [`docs/developer/testing_guidelines.md` "Real Over Mock"](../../../developer/testing_guidelines.md#testing-philosophy-real-over-mock).
 
@@ -29,4 +30,4 @@ construct states that production cannot create safely. Authority:
 ## Exclusions
 
 This card does not delete the public methods. That occurs only in
-[`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md) after a zero-caller recheck.
+[`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md) after a zero-caller recheck.

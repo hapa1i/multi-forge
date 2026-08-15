@@ -46,6 +46,7 @@ from forge.session.codex_handoff import (
 from forge.session.exceptions import ManifestCorruptedError, ManifestUnreadableError
 from forge.session.index import IndexStore
 from forge.session.models import CodexConfirmed, create_session_state
+from tests.fixtures.session_state import publish_session
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
 _TID_B = "11111111-2222-3333-4444-555555555555"
@@ -99,17 +100,15 @@ def _write_transcript(path: Path) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _index_session(name: str, forge_root: Path, project_root: Path, parent: str | None = None) -> None:
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(forge_root),
-        project_root=str(project_root),
+def _publish_session(state, forge_root: Path, project_root: Path, parent: str | None = None) -> None:
+    state.parent_session = parent
+    publish_session(
+        IndexStore(),
+        state,
+        project_root,
         forge_root=str(forge_root),
         checkout_root=str(forge_root),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=parent,
     )
 
 
@@ -121,8 +120,7 @@ def _make_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path
     _write_transcript(transcript)
     state = create_session_state(name="planner", worktree_path=str(proj))
     state.confirmed.transcript_path = str(transcript)
-    SessionStore(str(proj), "planner").write(state)
-    _index_session("planner", proj, proj)
+    _publish_session(state, proj, proj)
     monkeypatch.chdir(proj)
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
     ctx = ExecutionContext(cwd=proj, worktree_root=proj, project_root=proj, forge_root=proj)
@@ -133,8 +131,7 @@ def _seed_codex_session(proj: Path, name: str = "impl", thread_id: str | None = 
     state = create_session_state(name=name, worktree_path=str(proj), runtime="codex", parent_session="planner")
     if thread_id is not None:
         state.confirmed.codex = CodexConfirmed(thread_id=thread_id)
-    SessionStore(str(proj), name).write(state)
-    _index_session(name, proj, proj, parent="planner")
+    _publish_session(state, proj, proj, parent="planner")
 
 
 def _make_rollout(

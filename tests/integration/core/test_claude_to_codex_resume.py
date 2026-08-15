@@ -32,8 +32,8 @@ from forge.core.runtime.codex_preflight import CodexPreflight, preflight_codex
 from forge.core.usage.ledger import read_usage_events
 from forge.session.manager import SessionManager
 from forge.session.models import create_session_state
-from forge.session.store import SessionStore
 from forge.session.transfer import _CurationCall
+from tests.fixtures.session_state import publish_session
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -90,15 +90,9 @@ def _register_parent(forge_root: Path, transcript: Path) -> None:
     then the on-disk manifest, so the bridge exercises both.
     """
     mgr = SessionManager()
-    mgr.index_store.add_session(
-        name="planner",
-        worktree_path=str(forge_root),
-        project_root=str(forge_root),
-        forge_root=str(forge_root),
-    )
     state = create_session_state(name="planner", worktree_path=str(forge_root))
     state.confirmed.transcript_path = str(transcript)
-    SessionStore(str(forge_root), "planner").write(state)
+    publish_session(mgr.index_store, state, forge_root, forge_root=forge_root)
 
 
 def test_plan_in_claude_implement_in_codex_under_one_run_tree(tmp_path: Path) -> None:

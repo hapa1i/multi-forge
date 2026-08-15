@@ -20,6 +20,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import PolicyIntent
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -45,11 +46,10 @@ def _seed_session(forge_root: str, name: str, *, policy: PolicyIntent | None = N
     state.forge_root = forge_root
     if policy:
         state.intent.policy = policy
-    SessionStore(forge_root, name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=forge_root,
-        project_root=forge_root,
+    publish_session(
+        IndexStore(),
+        state,
+        forge_root,
         forge_root=forge_root,
         checkout_root=forge_root,
         relative_path=".",

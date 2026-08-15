@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from tests.fixtures.session_state import publish_session_from_fields
 
 
 @pytest.fixture
@@ -24,20 +25,15 @@ def _seed_session_with_reports(
     from forge.session import IndexStore
 
     forge_root = tmp_path / "project"
-    (forge_root / ".forge" / "sessions" / session_name).mkdir(parents=True)
-    (forge_root / ".forge" / "sessions" / session_name / "forge.session.json").write_text("{}")
-
     index = IndexStore()
-    index.add_session(
-        name=session_name,
-        worktree_path=str(forge_root),
-        project_root=str(tmp_path),
+    publish_session_from_fields(
+        index,
+        session_name,
+        forge_root,
+        tmp_path,
         forge_root=str(forge_root),
         checkout_root=str(forge_root),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
 
     # Artifact path retains the ".../handoff/" segment (kept by design; see plan Phase 3).

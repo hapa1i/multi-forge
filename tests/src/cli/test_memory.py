@@ -9,6 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from tests.fixtures.session_state import publish_session
 
 
 def _frontmatter(path: Path) -> dict[str, object]:
@@ -27,7 +28,7 @@ def runner() -> CliRunner:
 @pytest.fixture
 def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, str]:
     """Create a Forge project with a session and test docs."""
-    from forge.session import IndexStore, SessionStore, create_session_state
+    from forge.session import IndexStore, create_session_state
 
     forge_root = tmp_path / "project"
     forge_root.mkdir()
@@ -51,19 +52,15 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
         worktree_path=str(forge_root),
     )
     state.forge_root = str(forge_root)
-    SessionStore(str(forge_root), "s1").write(state)
 
     index = IndexStore()
-    index.add_session(
-        name="s1",
-        worktree_path=str(forge_root),
-        project_root=str(tmp_path),
+    publish_session(
+        index,
+        state,
+        tmp_path,
         forge_root=str(forge_root),
         checkout_root=str(forge_root),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
 
     monkeypatch.setenv("FORGE_SESSION", "s1")
@@ -1879,7 +1876,7 @@ class TestShadowsReview:
         both, but the official doc baseline comes from the resolved session's root."""
         import subprocess
 
-        from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session import IndexStore, create_session_state
         from forge.session.passport import synthesize_passport, write_passport
 
         project_root = tmp_path
@@ -1913,7 +1910,6 @@ class TestShadowsReview:
             worktree_path=str(root_a),
         )
         state_a.forge_root = str(root_a)
-        SessionStore(str(root_a), "sess-a").write(state_a)
 
         # Root B: a sibling with its own shadow and a different official doc.
         # Shadow discovery uses passport scanning, so put a shadow-only passport
@@ -1941,21 +1937,17 @@ class TestShadowsReview:
             worktree_path=str(root_b),
         )
         state_b.forge_root = str(root_b)
-        SessionStore(str(root_b), "sess-b").write(state_b)
 
         # Register both sessions in the global index under the same project_root
         index = IndexStore()
-        for name, root in [("sess-a", root_a), ("sess-b", root_b)]:
-            index.add_session(
-                name=name,
-                worktree_path=str(root),
-                project_root=str(project_root),
+        for state, root in [(state_a, root_a), (state_b, root_b)]:
+            publish_session(
+                index,
+                state,
+                project_root,
                 forge_root=str(root),
                 checkout_root=str(root),
                 relative_path=".",
-                is_incognito=False,
-                is_fork=False,
-                parent_session=None,
             )
 
         monkeypatch.setenv("FORGE_SESSION", "sess-a")

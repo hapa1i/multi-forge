@@ -11,6 +11,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.identity import make_scoped_key
+from tests.fixtures.session_state import publish_session
 
 
 @pytest.fixture
@@ -38,8 +39,7 @@ def seed_live(root: Path, name: str, *, claude_id: str | None = None) -> None:
     state = create_session_state(name, worktree_path=str(root))
     if claude_id:
         state.confirmed.claude_session_id = claude_id
-    SessionStore(str(root), name).write(state)
-    IndexStore().add_from_state(state, str(root), forge_root=str(root))
+    publish_session(IndexStore(), state, root, forge_root=root)
 
 
 class TestSessionRepair:

@@ -43,6 +43,7 @@ from forge.session.exceptions import (
 )
 from forge.session.index import IndexStore
 from forge.session.models import CodexConfirmed, SessionState
+from tests.fixtures.session_state import remove_index_row_only, seed_row_only_session
 
 pytestmark = pytest.mark.regression
 
@@ -78,10 +79,11 @@ def _mark(store: SessionStore, uuid: str) -> None:
 def _seed_residue(index: IndexStore, state: SessionState, project: Path) -> None:
     """Write a row with no manifest -- the residue a killed transaction leaves.
 
-    add_from_state, not create_session_txn: the transaction would write the
-    manifest too, which is exactly the state this models the absence of.
+    The raw row-only fixture is required here because the production transaction
+    would write the manifest too, erasing the crash window under test.
     """
-    index.add_from_state(
+    seed_row_only_session(
+        index,
         state,
         str(project),
         checkout_root=str(project),
@@ -882,7 +884,9 @@ class TestForkStaleTargetReplacement:
         manager.start_session("parent", worktree_path=str(project), direct=True)
         manager.fork_session("parent", "target")
         _mark(SessionStore(str(project), "target"), "o" * 8)
-        index.remove_session("target", forge_root=str(project))
+        # Remove only the row to construct the pre-existing orphan manifest this
+        # force-fork path is required to reclaim.
+        remove_index_row_only(index, "target", project)
 
         manager.fork_session("parent", "target", force=True)
 

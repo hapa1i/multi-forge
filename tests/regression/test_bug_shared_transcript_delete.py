@@ -23,6 +23,7 @@ import pytest
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import Derivation, session_state_to_dict
+from tests.fixtures.session_state import publish_session, seed_row_only_session
 
 pytestmark = pytest.mark.regression
 
@@ -85,8 +86,8 @@ def _write_session(
             parent_transcript=derivation_parent_transcript,
         )
 
-    SessionStore(str(project), name).write(state)
-    manager.index_store.add_from_state(
+    publish_session(
+        manager.index_store,
         state,
         str(project),
         checkout_root=str(checkout_root),
@@ -260,7 +261,10 @@ def test_delete_preserves_uuid_referenced_by_corrupt_sibling_raw_manifest(
     sibling_data = session_state_to_dict(sibling)
     sibling_data["unknown_top_level"] = True
     sibling_store.manifest_path.write_text(json.dumps(sibling_data), encoding="utf-8")
-    manager.index_store.add_from_state(
+    # The raw row helper is intentional: the sibling manifest is corrupt by
+    # construction, so the coherent publisher would reject or overwrite the case.
+    seed_row_only_session(
+        manager.index_store,
         sibling,
         str(project),
         checkout_root=str(project),

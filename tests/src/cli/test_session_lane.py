@@ -17,6 +17,7 @@ from forge.session.models import (
     ConsumerLaneIntent,
     LaneRecord,
 )
+from tests.fixtures.session_state import publish_session
 
 # memory_writer's two valid lanes: the default + the claude-max subscription lane.
 _DEFAULT = LaneRecord("claude_code", "anthropic-direct", "opus")
@@ -55,13 +56,12 @@ def _seed(
     if confirmed is not None:
         manifest.confirmed.consumer_lanes = confirmed
     store = SessionStore(str(project), "worker")
-    store.write(manifest)
     # resolve_session (FORGE_SESSION path) looks the session up in the index, so register it
     # the way `forge session start` would -- a cwd-only manifest is invisible to get_session_store.
-    IndexStore().add_session(
-        name="worker",
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        manifest,
+        project,
         forge_root=str(project),
         checkout_root=str(project),
         relative_path=".",

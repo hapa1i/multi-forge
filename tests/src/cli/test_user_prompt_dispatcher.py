@@ -17,6 +17,7 @@ from click.testing import CliRunner
 from forge.cli.hooks import hooks
 from forge.core.ops import policy as policy_ops
 from forge.session import IndexStore, SessionStore, create_session_state
+from tests.fixtures.session_state import publish_session, seed_row_only_session
 
 
 def _seed_missing_worktree_session(
@@ -31,23 +32,27 @@ def _seed_missing_worktree_session(
     assert state.worktree is not None
     state.worktree.is_worktree = True
     state.forge_root = str(project)
-    SessionStore(str(project), name).write(state)
     index = IndexStore()
     if index_worktree_path is None:
-        index.add_from_state(
+        publish_session(
+            index,
             state,
             project_root=str(project),
             forge_root=str(project),
             checkout_root=str(missing),
         )
     else:
-        index.add_session(
-            name=name,
-            worktree_path=str(index_worktree_path),
-            project_root=str(project),
+        # This case intentionally gives the row a live checkout while the
+        # authoritative manifest records a missing worktree.
+        SessionStore(str(project), name).create_exclusive(state)
+        seed_row_only_session(
+            index,
+            state,
+            project,
             forge_root=str(project),
             checkout_root=str(index_worktree_path),
             relative_path=".",
+            worktree_path=index_worktree_path,
         )
     return missing
 
@@ -228,13 +233,11 @@ class TestUserPromptSubmitDispatcher:
     def test_session_list_includes_model_pin(self, tmp_path: Path, monkeypatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.chdir(tmp_path)
-        SessionStore(str(tmp_path), "model-pinned").write(
-            create_session_state("model-pinned", worktree_path=str(tmp_path), direct_model="claude-opus-4-8")
-        )
-        IndexStore().add_session(
-            name="model-pinned",
-            worktree_path=str(tmp_path),
-            project_root=str(tmp_path),
+        state = create_session_state("model-pinned", worktree_path=str(tmp_path), direct_model="claude-opus-4-8")
+        publish_session(
+            IndexStore(),
+            state,
+            tmp_path,
             forge_root=str(tmp_path),
             checkout_root=str(tmp_path),
             relative_path=".",
@@ -505,11 +508,10 @@ class TestPlanDirectCommands:
                 "snapshot_path": ".forge/artifacts/planner/plans/real.md",
             }
         ]
-        SessionStore(str(tmp_path), "planner").write(parent)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(tmp_path),
-            project_root=str(tmp_path),
+        publish_session(
+            IndexStore(),
+            parent,
+            tmp_path,
             forge_root=str(tmp_path),
             checkout_root=str(tmp_path),
             relative_path=".",
@@ -522,11 +524,10 @@ class TestPlanDirectCommands:
             worktree_path=str(tmp_path),
         )
         child.forge_root = str(tmp_path)
-        SessionStore(str(tmp_path), "executor").write(child)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(tmp_path),
-            project_root=str(tmp_path),
+        publish_session(
+            IndexStore(),
+            child,
+            tmp_path,
             forge_root=str(tmp_path),
             checkout_root=str(tmp_path),
             relative_path=".",

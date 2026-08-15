@@ -24,6 +24,7 @@ from forge.core.ops.session_context import (
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import CodexConfirmed, PolicyIntent, StartedWithProxy
 from forge.session.store import get_manifest_path
+from tests.fixtures.session_state import publish_session
 
 
 class TestModelToFamily:
@@ -251,8 +252,7 @@ class TestGetSessionContext:
             template="litellm-openai",
         )
 
-        SessionStore(str(worktree), "proxy-session").write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
 
         monkeypatch.setenv("FORGE_SESSION", "proxy-session")
 
@@ -272,8 +272,7 @@ class TestGetSessionContext:
             direct_model="claude-opus-4-8",
         )
 
-        SessionStore(str(worktree), "direct-session").write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
 
         monkeypatch.setenv("FORGE_SESSION", "direct-session")
 
@@ -294,8 +293,7 @@ class TestGetSessionContext:
         state.confirmed.claude_session_id = "old-uuid"
 
         store = SessionStore(str(worktree), "test-session")
-        store.write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
 
         def mutate(manifest):
             manifest.confirmed.claude_session_id = "new-uuid"
@@ -338,8 +336,7 @@ class TestGetSessionContext:
             template="litellm-openai",
         )
 
-        SessionStore(str(worktree), "proxied-session").write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
 
         ctx = get_session_context("proxied-session")
 
@@ -364,8 +361,7 @@ class TestGetSessionContext:
             }
         }
 
-        SessionStore(str(worktree), "policy-session").write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
 
         ctx = get_session_context("policy-session")
 
@@ -384,8 +380,7 @@ class TestBindingCollectionFailsClosed:
 
     def _corrupt_manifest(self, worktree: Path, name: str) -> None:
         state = create_session_state(name=name, worktree_path=str(worktree))
-        SessionStore(str(worktree), name).write(state)
-        IndexStore().add_from_state(state, str(worktree))
+        publish_session(IndexStore(), state, worktree)
         get_manifest_path(worktree, name).write_text("{ not json", encoding="utf-8")
 
     def test_unreadable_manifest_stops_a_uuid_lookup(self, tmp_path: Path) -> None:
@@ -424,9 +419,12 @@ class TestCrossProjectManifestVisibility:
         state = create_session_state(name="same", worktree_path=str(root))
         state.confirmed.claude_session_id = uuid
         state.confirmed.codex = CodexConfirmed(thread_id=thread, rollout_path="/x", rollout_source="adopted")
-        SessionStore(str(root), "same").write(state)
         if indexed:
-            IndexStore().add_from_state(state, str(root))
+            publish_session(IndexStore(), state, root)
+        else:
+            # The second project intentionally contributes a manifest-only
+            # binding, which the global collector must not hide.
+            SessionStore(str(root), "same").write(state)
 
     @pytest.fixture
     def two_projects(self, tmp_path: Path) -> Path:

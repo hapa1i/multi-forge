@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock, _patch, patch
 
 from forge.session import IndexStore, SessionStore, create_session_state
+from tests.fixtures.session_state import publish_session
 
 if TYPE_CHECKING:
     from forge.cli.session import ResolvedRouting
@@ -40,7 +41,6 @@ def _seed_scoped_duplicate_sessions(project: Path) -> tuple[Path, Path]:
         worktree_path=str(worktree_a),
     )
     manifest_a.forge_root = str(forge_root_a)
-    SessionStore(str(forge_root_a), "shared").write(manifest_a)
 
     manifest_b = create_session_state(
         "shared",
@@ -49,20 +49,19 @@ def _seed_scoped_duplicate_sessions(project: Path) -> tuple[Path, Path]:
         worktree_path=str(worktree_b),
     )
     manifest_b.forge_root = str(forge_root_b)
-    SessionStore(str(forge_root_b), "shared").write(manifest_b)
 
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_a),
-        project_root=str(project),
+    publish_session(
+        index,
+        manifest_a,
+        project,
         forge_root=str(forge_root_a),
         checkout_root=str(worktree_a),
         relative_path=".",
     )
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_b),
-        project_root=str(project),
+    publish_session(
+        index,
+        manifest_b,
+        project,
         forge_root=str(forge_root_b),
         checkout_root=str(worktree_b),
         relative_path="nested-project",
@@ -137,11 +136,10 @@ def _seed_cleanup_session(project: Path, forge_root: Path, name: str = "old-sess
         worktree_path=str(project),
     )
     state.forge_root = str(forge_root)
-    SessionStore(str(forge_root), name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        state,
+        project,
         forge_root=str(forge_root),
         checkout_root=str(project),
         relative_path=".",

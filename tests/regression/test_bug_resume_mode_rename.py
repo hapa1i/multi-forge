@@ -21,6 +21,7 @@ import pytest
 
 from forge.session import SessionStore, create_session_state
 from forge.session.models import Derivation
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -59,8 +60,7 @@ def test_fresh_resume_from_legacy_handoff_parent_records_transfer(tmp_path: Path
     parent.forge_root = str(forge_root)
     # Parent was written by pre-rename Forge: its derivation carries "handoff".
     parent.confirmed.derivation = Derivation(parent_session="grandparent", resume_mode="handoff")
-    SessionStore(str(forge_root), "parent").write(parent)
-    IndexStore().add_from_state(parent, str(forge_root))
+    publish_session(IndexStore(), parent, forge_root)
 
     child_state, _ = SessionManager().resume_session("parent", child_name="child", forge_root=str(forge_root))
 

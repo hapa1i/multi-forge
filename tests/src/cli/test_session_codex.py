@@ -38,9 +38,10 @@ from forge.core.ops.codex_session import (
     CodexSessionStartResult,
 )
 from forge.core.ops.session import ForgeOpError
-from forge.session import IndexStore, SessionStore
+from forge.session import IndexStore
 from forge.session.active import ActiveSessionEntry
 from forge.session.models import CodexConfirmed, create_session_state
+from tests.fixtures.session_state import publish_session
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
 
@@ -432,20 +433,18 @@ class TestResumeCodexDispatch:
             (project_root / ".git").mkdir(parents=True)
             (project_root / ".forge").mkdir()
 
-        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state = create_session_state(
+            "impl", parent_session="planner", worktree_path=str(codex_project), runtime="codex"
+        )
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
-        SessionStore(str(codex_project), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(codex_project),
-            project_root=str(codex_project),
+        publish_session(
+            IndexStore(),
+            state,
+            codex_project,
             forge_root=str(codex_project),
             checkout_root=str(codex_project),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session="planner",
         )
 
         monkeypatch.chdir(other_project)
@@ -521,20 +520,18 @@ class TestResumeCodexDispatch:
             (project_root / ".git").mkdir(parents=True)
             (project_root / ".forge").mkdir()
 
-        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state = create_session_state(
+            "impl", parent_session="planner", worktree_path=str(codex_project), runtime="codex"
+        )
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
-        SessionStore(str(codex_project), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(codex_project),
-            project_root=str(codex_project),
+        publish_session(
+            IndexStore(),
+            state,
+            codex_project,
             forge_root=str(codex_project),
             checkout_root=str(codex_project),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session="planner",
         )
 
         monkeypatch.chdir(other_project)
@@ -568,11 +565,10 @@ class TestResumeCodexDispatch:
         state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
-        SessionStore(str(codex_project), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(codex_project),
-            project_root=str(codex_project),
+        publish_session(
+            IndexStore(),
+            state,
+            codex_project,
             forge_root=str(codex_project),
             checkout_root=str(codex_project),
             relative_path=".",
@@ -604,11 +600,10 @@ class TestResumeCodexDispatch:
         state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
-        SessionStore(str(codex_project), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(codex_project),
-            project_root=str(codex_project),
+        publish_session(
+            IndexStore(),
+            state,
+            codex_project,
             forge_root=str(codex_project),
             checkout_root=str(codex_project),
             relative_path=".",
@@ -637,17 +632,13 @@ class TestResumeCodexDispatch:
 
         state = create_session_state("impl", worktree_path=str(claude_project))
         state.forge_root = str(claude_project)
-        SessionStore(str(claude_project), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(claude_project),
-            project_root=str(claude_project),
+        publish_session(
+            IndexStore(),
+            state,
+            claude_project,
             forge_root=str(claude_project),
             checkout_root=str(claude_project),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session=None,
         )
 
         monkeypatch.chdir(other_project)
@@ -995,7 +986,7 @@ class TestInteractiveCliRendering:
 
 class TestShowCodexSession:
     def _seed(self, proj: Path, *, context_delivery: str | None = None) -> None:
-        state = create_session_state("impl", worktree_path=str(proj), runtime="codex")
+        state = create_session_state("impl", parent_session="planner", worktree_path=str(proj), runtime="codex")
         state.confirmed.codex = CodexConfirmed(
             thread_id=_TID,
             rollout_path=f"/codex/sessions/2026/06/10/rollout-x-{_TID}.jsonl",
@@ -1006,17 +997,13 @@ class TestShowCodexSession:
             last_run_at="2026-06-10T00:00:00Z",
             context_delivery=context_delivery,
         )
-        SessionStore(str(proj), "impl").write(state)
-        IndexStore().add_session(
-            name="impl",
-            worktree_path=str(proj),
-            project_root=str(proj),
+        publish_session(
+            IndexStore(),
+            state,
+            proj,
             forge_root=str(proj),
             checkout_root=str(proj),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session="planner",
         )
 
     def test_show_json_includes_runtime_and_codex(self, runner: CliRunner, project: Path) -> None:

@@ -16,6 +16,7 @@ from forge.session import IndexStore, SessionManager, SessionStore, create_sessi
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import DirtyWorktreeError, SessionNotFoundError
+from tests.fixtures.session_state import publish_session, remove_index_row_only
 from tests.src.cli.session_command_support import (
     _proxy_cfg,
     _proxy_routing,
@@ -32,11 +33,10 @@ def _seed_delete_session(project_root: Path, forge_root: Path, name: str) -> Non
     forge_root.mkdir(parents=True, exist_ok=True)
     state = create_session_state(name, worktree_path=str(forge_root))
     state.forge_root = str(forge_root)
-    SessionStore(str(forge_root), name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(forge_root),
-        project_root=str(project_root),
+    publish_session(
+        IndexStore(),
+        state,
+        project_root,
         forge_root=str(forge_root),
         checkout_root=str(project_root),
         relative_path=str(forge_root.relative_to(project_root)),
@@ -667,7 +667,7 @@ class TestSessionDelete:
             launcher_pid=os.getpid(),
         )
         # Drop the index entry, leaving the dir on disk + a live active entry.
-        IndexStore().remove_session("orphan-live")
+        remove_index_row_only(IndexStore(), "orphan-live", fr or temp_env)
 
         result = runner.invoke(main, ["session", "delete", "orphan-live"])
 
@@ -690,7 +690,9 @@ class TestSessionDelete:
             launch_mode=LAUNCH_MODE_HOST,
             launcher_pid=os.getpid(),
         )
-        IndexStore().remove_session("orphan-force")
+        # Deliberately leave the manifest behind to exercise force cleanup of an
+        # active orphan rather than the ordinary ownership-aware delete path.
+        remove_index_row_only(IndexStore(), "orphan-force", fr or temp_env)
 
         result = runner.invoke(main, ["session", "delete", "orphan-force", "--yes", "--force"])
 
@@ -993,11 +995,10 @@ class TestSessionDelete:
             worktree_path=str(forge_root_b),
         )
         other_manifest.forge_root = str(forge_root_b)
-        SessionStore(str(forge_root_b), other_name).write(other_manifest)
-        IndexStore().add_session(
-            name=other_name,
-            worktree_path=str(forge_root_b),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            other_manifest,
+            temp_env,
             forge_root=str(forge_root_b),
         )
 

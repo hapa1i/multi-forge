@@ -17,6 +17,7 @@ from forge.session.models import (
     StartedWithProxy,
     SystemPromptIntent,
 )
+from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     _proxy_cfg,
     _proxy_routing,
@@ -301,10 +302,8 @@ class TestResumeNativeMode:
         assert state.confirmed.claude_session_id is None
         from forge.session.index import IndexStore
 
-        store = SessionStore(str(temp_env), "no-uuid")
-        store.write(state)
         idx = IndexStore()
-        idx.add_from_state(state, str(temp_env))
+        publish_session(idx, state, temp_env)
 
         result = runner.invoke(main, ["session", "resume", "no-uuid", "--fresh", "--resume-mode", "native"])
 

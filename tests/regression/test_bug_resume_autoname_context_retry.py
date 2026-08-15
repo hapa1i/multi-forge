@@ -9,6 +9,7 @@ import pytest
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session.exceptions import SessionExistsError
 from forge.session.prev_sessions import child_path, child_path_rel
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -24,17 +25,13 @@ def _seed_winner(manager: SessionManager, project: Path, name: str = "parent-res
     winner = create_session_state(name, worktree_path=str(project))
     winner.forge_root = str(project)
     winner.parent_session = "parent"
-    SessionStore(str(project), name).create_exclusive(winner)
-    manager.index_store.add_session(
-        name=name,
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        manager.index_store,
+        winner,
+        project,
         forge_root=str(project),
         checkout_root=str(project),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session="parent",
     )
 
 
@@ -51,8 +48,8 @@ def test_resume_autoname_retry_updates_context_file(tmp_path: Path) -> None:
     parent.forge_root = str(project)
 
     manager = SessionManager()
-    SessionStore(str(project), "parent").write(parent)
-    manager.index_store.add_from_state(
+    publish_session(
+        manager.index_store,
         parent,
         str(project),
         checkout_root=str(project),
@@ -119,9 +116,13 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     parent.forge_root = str(project)
 
     manager = SessionManager()
-    SessionStore(str(project), "parent").write(parent)
-    manager.index_store.add_from_state(
-        parent, str(project), checkout_root=str(project), forge_root=str(project), relative_path="."
+    publish_session(
+        manager.index_store,
+        parent,
+        str(project),
+        checkout_root=str(project),
+        forge_root=str(project),
+        relative_path=".",
     )
 
     winner_snapshot = child_path(project, "parent", "parent-resumed")
@@ -174,9 +175,13 @@ def test_resume_autoname_collision_preserves_winner_manifest(tmp_path: Path, mon
     parent.forge_root = str(project)
 
     manager = SessionManager()
-    SessionStore(str(project), "parent").write(parent)
-    manager.index_store.add_from_state(
-        parent, str(project), checkout_root=str(project), forge_root=str(project), relative_path="."
+    publish_session(
+        manager.index_store,
+        parent,
+        str(project),
+        checkout_root=str(project),
+        forge_root=str(project),
+        relative_path=".",
     )
 
     winner_store = SessionStore(str(project), "parent-resumed")

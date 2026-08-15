@@ -10,6 +10,7 @@ import pytest
 from forge.core.ops.session_context import collect_bound_uuids
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.exceptions import SessionWorktreeMissingError
+from tests.fixtures.session_state import publish_session
 
 
 def _seed_degraded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[SessionManager, Path, Path]:
@@ -24,9 +25,9 @@ def _seed_degraded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> t
     state.worktree.is_worktree = True
     state.forge_root = str(forge_root)
     state.confirmed.claude_session_id = "uuid-degraded"
-    SessionStore(str(forge_root), state.name).write(state)
     index = IndexStore()
-    index.add_from_state(
+    publish_session(
+        index,
         state,
         project_root=str(forge_root),
         forge_root=str(forge_root),

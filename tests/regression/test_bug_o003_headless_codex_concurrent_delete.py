@@ -19,6 +19,7 @@ from forge.core.ops.context import ExecutionContext
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.session import IndexStore, SessionManager, SessionNotFoundError, SessionStore
 from forge.session.models import CodexConfirmed, create_session_state
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -48,8 +49,8 @@ def test_resume_returns_completed_turn_when_session_is_deleted_during_codex(
     state = create_session_state(name="impl", worktree_path=str(project), runtime="codex")
     state.forge_root = str(project)
     state.confirmed.codex = CodexConfirmed(thread_id="thread-before-delete")
-    SessionStore(str(project), state.name).write(state)
-    IndexStore().add_from_state(
+    publish_session(
+        IndexStore(),
         state,
         project_root=str(project),
         forge_root=str(project),
