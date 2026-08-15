@@ -2,7 +2,8 @@
 
 Current focus: orders 1--10 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #188. Keep orders 11--35 in `todo/`.
+PR #188. The bounded [`correct_empty_tz_period_bounds`](../correct_empty_tz_period_bounds/card.md) correction is active
+from `459887fa`; keep orders 11--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -55,6 +56,10 @@ PR #188. Keep orders 11--35 in `todo/`.
 - [x] Guard every non-identity source line, run the full behavioral matrix against both copies, and complete
   runtime-skill/package verification before selecting order 11.
 - [x] Ship order 10 independently in PR #188 (`b8e4b32c`) and close its member without activating order 11.
+- [x] Branch from the order-10 closeout (`459887fa`) and activate only `correct_empty_tz_period_bounds`; do not change
+  Wave 7 finding/member counts.
+- [ ] Close the empty-`TZ` correction with focused, full, telemetry-integration, pre-commit, and board verification
+  before selecting order 11.
 
 Orders 11--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

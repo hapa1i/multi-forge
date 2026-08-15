@@ -25,11 +25,15 @@ class RelativeTimeStyle(StrEnum):
 def _local_timezone() -> tzinfo:
     """Resolve the host timezone with transition rules when the platform exposes them.
 
-    ``TZ`` accepts the process-local forms supported by POSIX environments: IANA
-    keys, absolute or colon-prefixed TZif paths, and POSIX rule strings. Invalid
-    values fall back to ``/etc/localtime``.
+    ``TZ`` accepts the process-local forms supported by POSIX environments: an
+    empty value selects UTC, while IANA keys, absolute or colon-prefixed TZif
+    paths, and POSIX rule strings retain their transition rules. Invalid values
+    fall back to ``/etc/localtime``.
     """
-    if timezone_name := os.environ.get("TZ"):
+    timezone_name = os.environ.get("TZ")
+    if timezone_name == "":
+        return UTC
+    if timezone_name is not None:
         try:
             if timezone := gettz(timezone_name):
                 return timezone

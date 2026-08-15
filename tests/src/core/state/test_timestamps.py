@@ -213,6 +213,39 @@ class TestLocalPeriodBounds:
 
         assert datetime(2026, 8, 14, tzinfo=timezone).utcoffset() == -timedelta(hours=4)
 
+    @pytest.mark.parametrize("timezone_name", [None, "Invalid/ForgeZone"])
+    def test_unset_or_invalid_tz_uses_localtime(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        timezone_name: str | None,
+    ) -> None:
+        localtime_path = tmp_path / "localtime"
+        localtime_path.write_bytes(b"test zone data")
+        local_timezone = ZoneInfo("Europe/Berlin")
+        gettz_calls: list[str] = []
+
+        class FakeZoneInfo:
+            @staticmethod
+            def from_file(localtime_file: object) -> tzinfo:
+                assert getattr(localtime_file, "read")() == b"test zone data"
+                return local_timezone
+
+        def unresolved_timezone(value: str) -> None:
+            gettz_calls.append(value)
+            return None
+
+        if timezone_name is None:
+            monkeypatch.delenv("TZ", raising=False)
+        else:
+            monkeypatch.setenv("TZ", timezone_name)
+        monkeypatch.setattr(timestamps_module, "gettz", unresolved_timezone)
+        monkeypatch.setattr(timestamps_module, "Path", lambda _path: localtime_path)
+        monkeypatch.setattr(timestamps_module, "ZoneInfo", FakeZoneInfo)
+
+        assert timestamps_module._local_timezone() is local_timezone
+        assert gettz_calls == ([] if timezone_name is None else [timezone_name])
+
     def test_all_sentinel_belongs_to_callers(self) -> None:
         with pytest.raises(ValueError, match="Unknown local period"):
             local_period_bounds("all", now=datetime(2026, 1, 1, tzinfo=UTC))

@@ -3,6 +3,8 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--10 shipped independently in PRs #178--#184 and #186--#188. The bounded
+[`correct_empty_tz_period_bounds`](../correct_empty_tz_period_bounds/card.md) correction is active from `459887fa`
+before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 The other 25 members remain parked.
 
