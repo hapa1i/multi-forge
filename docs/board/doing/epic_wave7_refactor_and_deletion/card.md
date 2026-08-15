@@ -2,9 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--9 shipped independently in PRs #178--#184 and #186--#187. The bounded
+**Lane**: `doing/` -- orders 1--10 shipped independently in PRs #178--#184 and #186--#188. The bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
-Order 10 is active from `3260a6fa`; the other 25 members remain parked.
+The other 25 members remain parked.
 
 ## Goal
 
@@ -59,7 +59,7 @@ runs last so it lands on the smallest stable surface.
 | 7     | O098, O092       | [`remove_verified_internal_residue`](../../done/remove_verified_internal_residue/card.md)               | verified session metadata and cap-state residue      |
 | 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
 | 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../done/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
-| 10    | O073             | [`lock_walkthrough_state_parity`](../lock_walkthrough_state_parity/card.md)                             | self-contained skill copies with drift guards        |
+| 10    | O073             | [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
 | 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
 | 12    | O049 config      | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |
 | 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../todo/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |

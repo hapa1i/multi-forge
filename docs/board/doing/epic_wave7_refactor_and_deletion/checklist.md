@@ -1,8 +1,8 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--9 and the bounded
+Current focus: orders 1--10 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #187. Order 10 is active from `3260a6fa`; keep orders 11--35 in `todo/`.
+PR #188. Keep orders 11--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -54,6 +54,7 @@ PR #187. Order 10 is active from `3260a6fa`; keep orders 11--35 in `todo/`.
   installed copies plus 25 parked members.
 - [x] Guard every non-identity source line, run the full behavioral matrix against both copies, and complete
   runtime-skill/package verification before selecting order 11.
+- [x] Ship order 10 independently in PR #188 (`b8e4b32c`) and close its member without activating order 11.
 
 Orders 11--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

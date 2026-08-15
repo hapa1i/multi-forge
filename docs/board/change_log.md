@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-15
 
+### Lock walkthrough and QA state-script parity
+
+**Goal/outcome**: Keep both installed skills self-contained while preventing their shared state machine from drifting
+silently.
+
+**Key changes**:
+
+- A byte-and-mode parity contract permits only the two skill-identity lines to differ and requires both scripts to stay
+  owner-executable.
+- The complete 93-case behavioral matrix runs against each copy, while clean-wheel lifecycle coverage verifies both
+  packaged scripts through enable, sync, status, and disable.
+
+**Verification**: 188 focused tests, 9,212 unit tests (one skip), 906 regressions, one targeted Docker lifecycle, build,
+clean-wheel smoke, full pre-commit, and board-integrity checks pass. PR #188 merged as `b8e4b32c` with all five GitHub
+checks passing. No Forge workflow command was used.
+
 ### Share proxy transport test fakes
 
 **Goal/outcome**: Replace parallel proxy HTTP fake families with one instance-safe test scaffold without changing

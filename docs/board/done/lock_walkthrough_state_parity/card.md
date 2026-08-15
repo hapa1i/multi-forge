@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/lock-walkthrough-state-parity` from `3260a6fa`.
+**Lane**: `done/` -- shipped in PR #188 (`b8e4b32c`) on 2026-08-15.
 
 **Finding**: O073.
 
@@ -50,4 +50,6 @@ Verification passed with 188 focused parity/behavior tests, seven compiler/profi
 tests (one expected skip), all 906 regression tests, and one targeted clean-wheel Docker lifecycle test. The wheel and
 source distribution build, clean-wheel runtime smoke, runtime-list check, full pre-commit, Markdown, and diff checks
 pass. The board audit resolves all 870 local links across 341 Markdown files, confirms the 9-done/1-doing/25-todo Wave 7
-graph, and finds no stale order-10 `todo/` target. Order 11 remains parked.
+graph, and finds no stale order-10 `todo/` target. PR #188 merged as `b8e4b32c` after all five GitHub checks passed; the
+final closeout audit resolves the same 870 links and confirms the 10-done/0-doing/25-todo graph. Order 11 remains
+parked.

@@ -1,6 +1,6 @@
 # Lock walkthrough and QA state-script parity checklist
 
-Current focus: order 10 is active from `3260a6fa`; orders 11--35 remain parked.
+Current focus: complete -- order 10 shipped in PR #188 (`b8e4b32c`); orders 11--35 remain parked.
 
 ## Activation and evidence
 
@@ -40,4 +40,5 @@ Current focus: order 10 is active from `3260a6fa`; orders 11--35 remain parked.
   install.
 - [x] Run Markdown, 341-file/870-link board-integrity, 9-done/1-doing/25-todo lane, document-size, and diff checks;
   record the outcome without activating order 11.
-- [ ] Open a draft PR; after merge, add the change-log entry and move the card to `done/` before selecting order 11.
+- [x] Open draft PR #188 without activating order 11.
+- [x] After PR #188 merged as `b8e4b32c`, add the change-log entry, move the card to `done/`, and keep order 11 parked.
