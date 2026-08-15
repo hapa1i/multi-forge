@@ -12,6 +12,7 @@ import pytest
 
 import forge.proxy.proxy_orchestrator as _orchestrator_module
 from forge.proxy.proxies import ProxyRegistryStore
+from tests.fixtures.proxy_transport import ProxyTransportFake
 
 # ---------------------------------------------------------------------------
 # Config isolation (autouse)
@@ -50,6 +51,17 @@ def reset_config_singleton():
     for attr in ["proxy", "session"]:
         if attr in proxy_obj.__dict__:
             del proxy_obj.__dict__[attr]
+
+
+# ---------------------------------------------------------------------------
+# Transport fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def proxy_transport() -> ProxyTransportFake:
+    """Provide an instance-owned configurable HTTP transport fake."""
+    return ProxyTransportFake()
 
 
 # ---------------------------------------------------------------------------

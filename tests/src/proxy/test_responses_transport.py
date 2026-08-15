@@ -16,88 +16,19 @@ import pytest
 import forge.proxy.responses_ingress as ri
 import forge.proxy.responses_passthrough as rp
 from forge.core.credential_registry import Credential, EnvVar
+from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
 
-class _FakeResponse:
-    """Stand-in for an httpx non-streaming response (request() return)."""
-
-    def __init__(
-        self,
-        status_code: int = 200,
-        content: bytes = b'{"id":"resp_1","usage":{"input_tokens":11,"output_tokens":7}}',
-        headers: dict | None = None,
-    ) -> None:
-        self.status_code = status_code
-        self.content = content
-        self.headers = headers or {"content-type": "application/json"}
-
-
-class _FakeStream:
-    """Stand-in for an httpx streaming-response context manager."""
-
-    def __init__(
-        self,
-        status_code: int = 200,
-        chunks: tuple[bytes, ...] = (b"event: response.completed\n\n",),
-        headers: dict | None = None,
-    ) -> None:
-        self.status_code = status_code
-        self._chunks = chunks
-        self.headers = headers or {"content-type": "text/event-stream"}
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    async def aiter_bytes(self):
-        for chunk in self._chunks:
-            yield chunk
-
-    async def aread(self) -> bytes:
-        return b"".join(self._chunks)
-
-
-class _FakeAsyncClient:
-    """Records the outbound request and returns canned responses.
-
-    Single shared ``captured`` dict so a test can read what crossed the wire
-    (method, url, headers, json) regardless of streaming vs non-streaming.
-    """
-
-    captured: dict = {}
-    response_factory = staticmethod(_FakeResponse)
-    stream_factory = staticmethod(_FakeStream)
-
-    def __init__(self, *args, **kwargs) -> None:
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    async def request(self, method, url, headers=None, json=None):
-        _FakeAsyncClient.captured = {"method": method, "url": url, "headers": headers, "json": json}
-        return type(self).response_factory()
-
-    def stream(self, method, url, headers=None, json=None):
-        _FakeAsyncClient.captured = {"method": method, "url": url, "headers": headers, "json": json}
-        return type(self).stream_factory()
-
-
-@pytest.fixture(autouse=True)
-def _reset_captured():
-    """Isolate the class-level ``_FakeAsyncClient.captured`` between tests.
-
-    The fake records the last outbound request on a shared class attribute; resetting
-    it before every test removes the cross-test bleed in one place (module-local state,
-    so it lives here rather than in conftest.py).
-    """
-    _FakeAsyncClient.captured = {}
-    yield
+@pytest.fixture
+def responses_transport(
+    proxy_transport: ProxyTransportFake,
+    monkeypatch: pytest.MonkeyPatch,
+) -> ProxyTransportFake:
+    """Wire the shared fake with Responses-specific payload defaults."""
+    proxy_transport.response = FakeResponse(content=b'{"id":"resp_1","usage":{"input_tokens":11,"output_tokens":7}}')
+    proxy_transport.stream_response = FakeStream(chunks=(b"event: response.completed\n\n",))
+    monkeypatch.setattr(rp.httpx, "AsyncClient", proxy_transport.client)
+    return proxy_transport
 
 
 # ── Header builder (g) ──────────────────────────────────────────────────────────────
@@ -222,23 +153,25 @@ def test_extract_usage_from_non_streaming_body():
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_post_relays_and_accounts(monkeypatch):
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-
-    class _CostingResponse(_FakeResponse):
-        def __init__(self):
-            super().__init__(
-                content=b'{"usage":{"input_tokens":11,"output_tokens":7}}',
-                headers={"content-type": "application/json", "x-litellm-response-cost": "0.000123"},
-            )
-
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_CostingResponse))
+async def test_forward_non_streaming_post_relays_and_accounts(responses_transport):
+    responses_transport.response = FakeResponse(
+        content=b'{"usage":{"input_tokens":11,"output_tokens":7}}',
+        headers={
+            "content-type": "application/json",
+            "x-litellm-response-cost": "0.000123",
+        },
+    )
     seen: dict = {}
 
     def _on_complete(usage, cost_micros, failed, error_type):
         seen.update(usage=usage, cost_micros=cost_micros, failed=failed, error_type=error_type)
 
-    body = {"model": "gpt-5.5-codex", "input": "hi", "stream": False, "unknown_future_field": 1}
+    body = {
+        "model": "gpt-5.5-codex",
+        "input": "hi",
+        "stream": False,
+        "unknown_future_field": 1,
+    }
     resp = await rp.forward(
         method="POST",
         url_path="/v1/responses",
@@ -251,10 +184,10 @@ async def test_forward_non_streaming_post_relays_and_accounts(monkeypatch):
         on_complete=_on_complete,
     )
 
-    captured = _FakeAsyncClient.captured
-    assert captured["method"] == "POST"
-    assert captured["url"] == "https://upstream.test/v1/responses"
-    assert captured["json"] == body  # byte-faithful, unknown field intact
+    captured = responses_transport.captured
+    assert captured.method == "POST"
+    assert captured.url == "https://upstream.test/v1/responses"
+    assert captured.json == body  # byte-faithful, unknown field intact
     assert resp.status_code == 200
     # Token telemetry from the body; real dollar cost from the upstream header (USD->micros).
     assert seen == {
@@ -266,9 +199,9 @@ async def test_forward_non_streaming_post_relays_and_accounts(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_without_cost_header_is_unavailable(monkeypatch):
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
+async def test_forward_non_streaming_without_cost_header_is_unavailable(
+    responses_transport,
+):
     seen: dict = {}
 
     await rp.forward(
@@ -291,21 +224,19 @@ async def test_forward_non_streaming_without_cost_header_is_unavailable(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
+async def test_forward_streaming_post_relays_bytes_and_usage(responses_transport):
     sse = (
         b'data: {"type":"response.output_text.delta","delta":"he"}\n\n',
         b'data: {"type":"response.completed","response":{"usage":' b'{"input_tokens":20,"output_tokens":9}}}\n\n',
     )
 
-    class _SSEStream(_FakeStream):
-        def __init__(self):
-            super().__init__(
-                chunks=sse,
-                headers={"content-type": "text/event-stream", "x-litellm-response-cost": "0.0005"},
-            )
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_SSEStream))
+    responses_transport.stream_response = FakeStream(
+        chunks=sse,
+        headers={
+            "content-type": "text/event-stream",
+            "x-litellm-response-cost": "0.0005",
+        },
+    )
     seen: dict = {}
 
     resp = await rp.forward(
@@ -321,7 +252,7 @@ async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
     )
 
     assert resp.media_type == "text/event-stream"
-    assert _FakeAsyncClient.captured["method"] == "POST"
+    assert responses_transport.captured.method == "POST"
     streamed = b"".join([c if isinstance(c, bytes) else c.encode() async for c in resp.body_iterator])
     assert streamed == b"".join(sse)  # byte-faithful relay
     # Stream end fires on_complete with usage from response.completed + cost from header.
@@ -334,34 +265,14 @@ async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_failure(monkeypatch):
-    class _ReadErrorStream(_FakeStream):
-        exit_count = 0
-
-        def __init__(self):
-            super().__init__(status_code=429, chunks=(b"provider-secret",))
-
-        async def __aexit__(self, *exc):
-            self.exit_count += 1
-            return False
-
-        async def aread(self) -> bytes:
-            raise rp.httpx.ReadError("injected body read failure")
-
-    class _ReadErrorClient(_FakeAsyncClient):
-        def __init__(self):
-            self.stream_cm = _ReadErrorStream()
-            self.exit_count = 0
-
-        async def __aexit__(self, *exc):
-            self.exit_count += 1
-            return False
-
-        def stream(self, method, url, headers=None, json=None):
-            return self.stream_cm
-
-    client = _ReadErrorClient()
-    monkeypatch.setattr(rp.httpx, "AsyncClient", lambda **_kwargs: client)
+async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_failure(
+    responses_transport,
+):
+    responses_transport.stream_response = FakeStream(
+        status_code=429,
+        chunks=(b"provider-secret",),
+        read_error=rp.httpx.ReadError("injected body read failure"),
+    )
     completed: list[tuple[dict, int | None, bool, str | None]] = []
 
     resp = await rp.forward(
@@ -378,8 +289,8 @@ async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_
 
     assert resp.status_code == 502
     assert b"provider-secret" not in bytes(resp.body)
-    assert client.stream_cm.exit_count == 1
-    assert client.exit_count == 1
+    assert responses_transport.stream_response.exit_count == 1
+    assert responses_transport.client_exit_count == 1
     assert completed == [({}, None, True, "upstream_error")]
 
 
@@ -388,9 +299,7 @@ async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method", ["GET", "DELETE"])
-async def test_forward_bodyless_sends_no_json(monkeypatch, method):
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
+async def test_forward_bodyless_sends_no_json(responses_transport, method):
 
     await rp.forward(
         method=method,
@@ -403,19 +312,16 @@ async def test_forward_bodyless_sends_no_json(monkeypatch, method):
         request_id="req_bodyless",
     )
 
-    captured = _FakeAsyncClient.captured
-    assert captured["method"] == method
-    assert captured["url"] == "https://upstream.test/v1/responses/resp_abc"
-    assert captured["json"] is None  # bodyless -> no JSON body sent upstream
+    captured = responses_transport.captured
+    assert captured.method == method
+    assert captured.url == "https://upstream.test/v1/responses/resp_abc"
+    assert captured.json is None  # bodyless -> no JSON body sent upstream
 
 
 @pytest.mark.asyncio
-async def test_forward_top_level_non_id_path_preserves_query(monkeypatch):
+async def test_forward_top_level_non_id_path_preserves_query(responses_transport):
     # A top-level non-{id} Responses path (e.g. input_tokens) must forward through
     # the same catch-all with method + query preserved.
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
-
     await rp.forward(
         method="POST",
         url_path="/v1/responses/input_tokens",
@@ -427,25 +333,20 @@ async def test_forward_top_level_non_id_path_preserves_query(monkeypatch):
         request_id="req_toplevel",
     )
 
-    assert _FakeAsyncClient.captured["url"] == "https://upstream.test/v1/responses/input_tokens?include=usage"
-    assert _FakeAsyncClient.captured["method"] == "POST"
+    assert responses_transport.captured.url == "https://upstream.test/v1/responses/input_tokens?include=usage"
+    assert responses_transport.captured.method == "POST"
 
 
 @pytest.mark.asyncio
-async def test_forward_relays_response_headers_with_allowlist(monkeypatch):
-    class _HeaderedResponse(_FakeResponse):
-        def __init__(self):
-            super().__init__(
-                headers={
-                    "content-type": "application/json",
-                    "transfer-encoding": "chunked",  # stripped
-                    "x-request-id": "up-1",  # proxy-owned -> dropped, not duplicated
-                    "openai-version": "2020-10-01",  # safe -> forwarded
-                }
-            )
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_HeaderedResponse))
+async def test_forward_relays_response_headers_with_allowlist(responses_transport):
+    responses_transport.response = FakeResponse(
+        headers={
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",  # stripped
+            "x-request-id": "up-1",  # proxy-owned -> dropped, not duplicated
+            "openai-version": "2020-10-01",  # safe -> forwarded
+        }
+    )
 
     resp = await rp.forward(
         method="GET",
@@ -795,7 +696,9 @@ async def _drain(resp):
 
 
 @pytest.mark.asyncio
-async def test_streaming_response_failed_event_is_recorded_as_failure(monkeypatch):
+async def test_streaming_response_failed_event_is_recorded_as_failure(
+    responses_transport,
+):
     """Regression: a streamed HTTP 200 ending in response.failed must NOT be recorded
     as a success — transport ok, generation failed."""
     sse = (
@@ -804,12 +707,10 @@ async def test_streaming_response_failed_event_is_recorded_as_failure(monkeypatc
         b'"error":{"code":"server_error"}}}\n\n',
     )
 
-    class _FailStream(_FakeStream):
-        def __init__(self):
-            super().__init__(chunks=sse, headers={"content-type": "text/event-stream"})
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_FailStream))
+    responses_transport.stream_response = FakeStream(
+        chunks=sse,
+        headers={"content-type": "text/event-stream"},
+    )
     seen: dict = {}
 
     resp = await rp.forward(
@@ -831,15 +732,13 @@ async def test_streaming_response_failed_event_is_recorded_as_failure(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_streaming_response_incomplete_is_partial_success(monkeypatch):
+async def test_streaming_response_incomplete_is_partial_success(responses_transport):
     sse = (b'data: {"type":"response.incomplete","response":{"usage":{"input_tokens":5,"output_tokens":3}}}\n\n',)
 
-    class _IncStream(_FakeStream):
-        def __init__(self):
-            super().__init__(chunks=sse, headers={"content-type": "text/event-stream"})
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_IncStream))
+    responses_transport.stream_response = FakeStream(
+        chunks=sse,
+        headers={"content-type": "text/event-stream"},
+    )
     seen: dict = {}
 
     resp = await rp.forward(
@@ -862,18 +761,13 @@ async def test_streaming_response_incomplete_is_partial_success(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_non_streaming_status_failed_is_recorded_as_failure(monkeypatch):
+async def test_non_streaming_status_failed_is_recorded_as_failure(responses_transport):
     """Regression: a non-streaming 200 whose body carries status=failed is a failure."""
 
-    class _FailedBody(_FakeResponse):
-        def __init__(self):
-            super().__init__(
-                content=b'{"status":"failed","usage":{"input_tokens":5,"output_tokens":0},"error":{"code":"x"}}',
-                headers={"content-type": "application/json"},
-            )
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FailedBody))
+    responses_transport.response = FakeResponse(
+        content=b'{"status":"failed","usage":{"input_tokens":5,"output_tokens":0},"error":{"code":"x"}}',
+        headers={"content-type": "application/json"},
+    )
     seen: dict = {}
 
     resp = await rp.forward(
@@ -974,12 +868,9 @@ async def test_responses_reject_mode_cap_returns_429_without_forwarding(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_forward_merges_extra_response_headers_non_streaming(monkeypatch):
+async def test_forward_merges_extra_response_headers_non_streaming(responses_transport):
     """Issue 3 unit: forward() overlays extra_response_headers onto the relayed
     non-streaming response without dropping the relayed ones."""
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
-
     resp = await rp.forward(
         method="POST",
         url_path="/v1/responses",
@@ -997,11 +888,8 @@ async def test_forward_merges_extra_response_headers_non_streaming(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_merges_extra_response_headers_streaming(monkeypatch):
+async def test_forward_merges_extra_response_headers_streaming(responses_transport):
     """Issue 3 unit: the streaming StreamingResponse also carries extra_response_headers."""
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_FakeStream))
-
     resp = await rp.forward(
         method="POST",
         url_path="/v1/responses",
@@ -1055,16 +943,14 @@ def test_normalize_usage_degrades_malformed_field_without_raising():
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_malformed_usage_degrades_not_aborts(monkeypatch):
+async def test_forward_non_streaming_malformed_usage_degrades_not_aborts(
+    responses_transport,
+):
     """Issue 4 regression: a 200 body with a non-numeric token field must NOT raise
-    (which would abort the otherwise-successful response); usage degrades to unavailable."""
+    (which would abort the otherwise-successful response); usage degrades to unavailable.
+    """
 
-    class _MalformedUsage(_FakeResponse):
-        def __init__(self):
-            super().__init__(content=b'{"id":"r","usage":{"input_tokens":"bad","output_tokens":7}}')
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_MalformedUsage))
+    responses_transport.response = FakeResponse(content=b'{"id":"r","usage":{"input_tokens":"bad","output_tokens":7}}')
     seen: dict = {}
 
     resp = await rp.forward(
@@ -1085,7 +971,9 @@ async def test_forward_non_streaming_malformed_usage_degrades_not_aborts(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_malformed_usage_does_not_corrupt_stream(monkeypatch):
+async def test_forward_streaming_malformed_usage_does_not_corrupt_stream(
+    responses_transport,
+):
     """Issue 4 regression: a response.completed event with a non-numeric token field must
     not raise into the relay -- bytes still flow byte-faithfully, usage degrades."""
     sse = (
@@ -1093,12 +981,10 @@ async def test_forward_streaming_malformed_usage_does_not_corrupt_stream(monkeyp
         b'data: {"type":"response.completed","response":{"usage":{"input_tokens":"bad","output_tokens":9}}}\n\n',
     )
 
-    class _BadStream(_FakeStream):
-        def __init__(self):
-            super().__init__(chunks=sse, headers={"content-type": "text/event-stream"})
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_BadStream))
+    responses_transport.stream_response = FakeStream(
+        chunks=sse,
+        headers={"content-type": "text/event-stream"},
+    )
     seen: dict = {}
 
     resp = await rp.forward(
@@ -1136,11 +1022,9 @@ _TRACE_CTX = {
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_records_provider_trace(monkeypatch):
+async def test_forward_non_streaming_records_provider_trace(monkeypatch, responses_transport):
     """Issue 5 regression: a non-streaming generation records a provider trace with
     request_mode='non_streaming'. Before the fix, only the streaming path traced."""
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
     traces: list = []
     monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
 
@@ -1159,15 +1043,13 @@ async def test_forward_non_streaming_records_provider_trace(monkeypatch):
 
     assert len(traces) == 1
     assert traces[0]["request_mode"] == "non_streaming"
-    assert traces[0]["final_usage_seen"] is True  # the _FakeResponse body carries usage
+    assert traces[0]["final_usage_seen"] is True  # the default fake response body carries usage
     assert traces[0]["proxy_id"] == "p1"  # ctx fields forwarded verbatim
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_no_trace_without_ctx(monkeypatch):
+async def test_forward_non_streaming_no_trace_without_ctx(monkeypatch, responses_transport):
     """A non-generation relay (no provider_trace_ctx) records no trace and skips body parse."""
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
     traces: list = []
     monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
 
@@ -1186,15 +1068,10 @@ async def test_forward_non_streaming_no_trace_without_ctx(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_forward_non_streaming_trace_final_usage_false_when_body_lacks_usage(monkeypatch):
+async def test_forward_non_streaming_trace_final_usage_false_when_body_lacks_usage(monkeypatch, responses_transport):
     """final_usage_seen is honest: a non-streaming body with no usage records it False."""
 
-    class _NoUsage(_FakeResponse):
-        def __init__(self):
-            super().__init__(content=b'{"id":"r"}')
-
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_NoUsage))
+    responses_transport.response = FakeResponse(content=b'{"id":"r"}')
     traces: list = []
     monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
 
@@ -1216,10 +1093,8 @@ async def test_forward_non_streaming_trace_final_usage_false_when_body_lacks_usa
 
 
 @pytest.mark.asyncio
-async def test_forward_streaming_still_records_streaming_trace_mode(monkeypatch):
+async def test_forward_streaming_still_records_streaming_trace_mode(monkeypatch, responses_transport):
     """The streaming path still records request_mode='streaming' after parameterization."""
-    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
-    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_FakeStream))
     traces: list = []
     monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
 
