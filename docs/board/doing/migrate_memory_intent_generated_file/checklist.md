@@ -40,4 +40,5 @@ Current focus: Wave 7 order 13 is active from `9a334b18`; keep orders 14--35 par
 - [x] Run design-size, board link/lane/size, and diff checks: living design docs remain below 30k tokens, all 885 local
   path links across 346 board documents resolve, the Wave 7 graph is 12 `done` / 1 `doing` / 22 `todo`, and order 14
   remains parked.
-- [ ] Open one draft PR for order 13; after merge, close this member before selecting order 14.
+- [x] Open draft PR #192 for order 13.
+- [ ] After merge, close this member before selecting order 14.
