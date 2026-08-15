@@ -2,9 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--7 shipped independently in PRs #178--#184, and order 8 shipped in PR #186. The bounded
-[`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
-Order 9 is active from `549fb0e3`; the other 26 members remain parked.
+**Lane**: `doing/` -- orders 1--9 shipped independently in PRs #178--#184 and #186--#187. The bounded
+[`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185;
+the other 26 members remain parked.
 
 ## Goal
 
@@ -58,7 +58,7 @@ runs last so it lands on the smallest stable surface.
 | 6     | O064             | [`centralize_cli_metric_formatting`](../../done/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
 | 7     | O098, O092       | [`remove_verified_internal_residue`](../../done/remove_verified_internal_residue/card.md)               | verified session metadata and cap-state residue      |
 | 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
-| 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../share_proxy_transport_test_fakes/card.md)                       | instance-safe proxy transport fixtures               |
+| 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../done/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
 | 10    | O073             | [`lock_walkthrough_state_parity`](../../todo/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
 | 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
 | 12    | O049 config      | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |

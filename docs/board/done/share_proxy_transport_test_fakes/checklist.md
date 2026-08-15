@@ -1,6 +1,7 @@
 # Share instance-safe proxy transport test fakes checklist
 
-Current focus: order 9 is active from `549fb0e3`; orders 10--35 remain parked.
+Current focus: complete -- order 9 shipped in PR #187 (`be321ad2`); order 10 remains parked until its execution branch
+is created.
 
 ## Activation and evidence
 
@@ -27,5 +28,5 @@ Current focus: order 9 is active from `549fb0e3`; orders 10--35 remain parked.
   board-integrity, lane-graph, and diff checks.
 - [x] Record the verified outcome without activating order 10.
 - [x] Open a draft PR without activating order 10.
-- [ ] After merge, add the change-log entry, move this card to `done/`, and leave order 10 parked pending explicit
-  selection.
+- [x] After PR #187 merged as `be321ad2`, add the change-log entry, move this card to `done/`, verify the final
+  9-done/0-doing/26-parked Wave 7 graph, and leave order 10 parked until its execution branch is created.

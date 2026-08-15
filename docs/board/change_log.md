@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-15
 
+### Share proxy transport test fakes
+
+**Goal/outcome**: Replace parallel proxy HTTP fake families with one instance-safe test scaffold without changing
+production transport behavior.
+
+**Key changes**:
+
+- Both passthrough suites now configure transport-specific defaults through a shared per-test response, stream, client,
+  request-capture, failure-injection, and teardown fixture.
+- Direct contracts cover instance isolation and request, iteration, read, context-entry, and teardown failures; the
+  original factory-leak claim was corrected because pytest already restored those monkeypatches.
+
+**Verification**: 128 focused tests, 14 targeted regressions, 9,117 unit tests (one skip), 906 regressions, full
+pre-commit and Markdown hooks, and board-integrity checks pass. PR #187 merged as `be321ad2` with all five GitHub checks
+passing. No Forge workflow command was used.
+
 ### Remove redundant development dependency metadata
 
 **Goal/outcome**: Remove the duplicate dev `python-dotenv` floor without weakening runtime or test dependencies.

@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/share-proxy-transport-test-fakes` from `549fb0e3`.
+**Lane**: `done/` -- shipped in PR #187 (`be321ad2`) on 2026-08-15.
 
 **Finding**: O099's `_FakeResponse` family subset. The transcript-selector subset already shipped with D007/D024.
 
@@ -44,5 +44,6 @@ transport files pass in either execution order, and no production transport, acc
 
 Verification passed with 128 focused tests, 14 targeted regressions, 9,117 unit tests (one expected skip), and all 906
 regression tests. Full pre-commit and Markdown hooks pass. The board audit resolves all 870 local paths across 340
-Markdown files, confirms the 8-done/1-doing/26-todo Wave 7 graph, and finds no stale lane target. Docker integration and
-wheel smoke are not required because only test infrastructure and board records changed.
+Markdown files, confirms the final 9-done/0-doing/26-todo Wave 7 graph, and finds no stale lane target. Docker
+integration and wheel smoke were not required because only test infrastructure and board records changed. PR #187 merged
+as `be321ad2` after all five GitHub checks passed.
