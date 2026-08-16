@@ -1,7 +1,7 @@
 # Resolve proxy authentication invalidation scope
 
 **Status**: Proposed. Recorded on 2026-08-16 from review of Wave 7 order 16,
-[`replace_legacy_tier_inference`](../../doing/replace_legacy_tier_inference/card.md), in draft PR #195.
+[`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md), which shipped in PR #195.
 
 ## Problem
 

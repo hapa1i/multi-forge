@@ -36,10 +36,12 @@ wc -l docs/board/change_log.md
 - `get_client` now requires a resolved tier; the dead `_MODEL` lookup and false auto-detection log are gone.
 - Exact-tier authentication retry is unchanged, while the retained all-tier invalidation path rebuilds the configured
   `proxy.default_tier` instead of guessing from undeclared environment variables.
+- Recorded the provider-scoped authentication-invalidation question as a separate proposed decision instead of widening
+  O051 during review.
 
 **Verification**: 50 focused tests, 794 proxy unit tests, 9,200 full unit tests (one skip, 122 deselected), 913
 regressions, seven targeted Docker proxy-routing tests, full pre-commit, design-size checks, and board-integrity checks
-pass. No Forge workflow command was used.
+pass. PR #195 merged as `aca65c7f` with all five GitHub checks passing. No Forge workflow command was used.
 
 ### Retire unsafe public index mutators
 

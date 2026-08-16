@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--15 and both bounded corrective members are closed through PR #194; order 16 is active
-from `358b39d6`, and orders 17--35 remain parked.
+Current focus: Wave 7 orders 1--16 and both bounded corrective members are closed through PR #195; keep orders 17--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -243,5 +243,6 @@ from `358b39d6`, and orders 17--35 remain parked.
   `replace_legacy_tier_inference` after reverifying the request-tier, cache, and auth-retry paths.
 - [x] Replace O051's nonexistent environment inference with explicit or named-default tier provenance while keeping
   orders 17--35 parked.
+- [x] Ship order 16 independently in PR #195 (`aca65c7f`) and close its member without activating order 17.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

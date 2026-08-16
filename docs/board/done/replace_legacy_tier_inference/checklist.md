@@ -1,6 +1,6 @@
 # Replace legacy environment-based tier inference checklist
 
-Current focus: draft PR #195 is open; await review and merge. Orders 17--35 remain parked.
+Current focus: complete -- order 16 shipped in PR #195 (`aca65c7f`); order 17 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -33,4 +33,6 @@ Current focus: draft PR #195 is open; await review and merge. Orders 17--35 rema
   [`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md), without
   changing order 16's invalidation breadth.
 - [x] Open draft PR #195 for order 16.
-- [ ] After merge, close this member before selecting order 17.
+- [x] Close the member after PR #195 merged as `aca65c7f` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 887 local links across 350 board documents resolve, the Wave 7 graph is 16
+  `done` / 0 `doing` / 19 `todo`, and order 17 remains parked.

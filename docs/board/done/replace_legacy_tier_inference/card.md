@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O051).
 
-**Lane**: `doing/` on `refactor/replace-legacy-tier-inference`, branched from the order-15 closeout at `358b39d6`.
+**Lane**: `done/` -- shipped in PR #195 (`aca65c7f`) on 2026-08-16.
 
 **Finding**: O051.
 
@@ -49,3 +49,7 @@ the failed `(model, tier)` adapter. The underlying credential cache is provider-
 domain may be wider than either one tier or all tiers for one model. The proposed
 [`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md) card owns the
 explicit decision; this card does not broaden invalidation or change retry hyperparameters.
+
+PR #195 merged as `aca65c7f` after 50 focused tests, 794 proxy unit tests, 9,200 full unit tests (one skip, 122
+deselected), 913 regressions, seven targeted Docker proxy-routing tests, full pre-commit, board/design checks, and all
+five GitHub checks passed. No Forge workflow command was used.

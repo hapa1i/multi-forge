@@ -2,10 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--15 shipped independently in PRs #178--#184, #186--#188, and #190--#194; order 16 is
-active from `358b39d6`, and 19 members remain parked. The bounded
-[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
-before order 11; the earlier
+**Lane**: `doing/` -- orders 1--16 shipped independently in PRs #178--#184, #186--#188, and #190--#195; 19 members
+remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
+correction shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal
@@ -67,7 +66,7 @@ runs last so it lands on the smallest stable surface.
 | 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |
 | 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../done/replace_unsafe_index_test_fixtures/card.md)           | transaction-safe test state construction             |
 | 15    | O050 API         | [`retire_unsafe_index_mutators`](../../done/retire_unsafe_index_mutators/card.md)                       | zero-caller unsafe public mutators                   |
-| 16    | O051             | [`replace_legacy_tier_inference`](../replace_legacy_tier_inference/card.md)                             | explicit tier/cache/auth-retry provenance            |
+| 16    | O051             | [`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
 | 17    | O052             | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)             | session-context error classification                 |
 | 18    | O092 session     | [`remove_dead_session_helpers`](../../todo/remove_dead_session_helpers/card.md)                         | verified internal session-only zero-callers          |
 | 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../../todo/deprecate_supervisor_verdict_wrapper/card.md)       | one-release re-export deprecation                    |

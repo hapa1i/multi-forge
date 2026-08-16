@@ -1,10 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--13 and the bounded
-[`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
-PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189, order 11 shipped in PR #190, order 12 shipped in PR #191, order 13 shipped in PR #192, and order 14
-shipped in PR #193, and order 15 shipped in PR #194. Order 16 is active from `358b39d6`; keep orders 17--35 in `todo/`.
+Current focus: orders 1--16 and both bounded corrective members are closed through PR #195; keep orders 17--35 in
+`todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -91,6 +88,7 @@ shipped in PR #193, and order 15 shipped in PR #194. Order 16 is active from `35
   order 16 after reverifying its factory, routing, cache, and retry seams.
 - [x] Remove the nonexistent tier environment shim while preserving explicit request-tier and named-default routing;
   complete focused/full/integration/board verification before selecting order 17.
+- [x] Ship order 16 independently in PR #195 (`aca65c7f`) and close its member before activating order 17.
 
 Orders 17--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
