@@ -13,7 +13,12 @@ from forge.core.state import file_lock_for_target, now_iso
 from forge.session.exceptions import SessionExistsError
 from forge.session.identity import make_scoped_key
 from forge.session.index import CLI_LOCK_TIMEOUT_S, IndexStore
-from forge.session.models import CodexConfirmed, SessionIndexEntry, SessionState, create_session_state
+from forge.session.models import (
+    CodexConfirmed,
+    SessionIndexEntry,
+    SessionState,
+    create_session_state,
+)
 from forge.session.store import SessionStore
 
 
@@ -114,9 +119,7 @@ def seed_row_only_session(
     locking so the fixture is invalid in only the dimension named by the test.
     """
     effective_forge_root = _coherent_forge_root(state, project_root, forge_root)
-    indexed_worktree_path = str(
-        worktree_path or (state.worktree.path if state.worktree else str(project_root))
-    )
+    indexed_worktree_path = str(worktree_path or (state.worktree.path if state.worktree else str(project_root)))
     entry = SessionIndexEntry(
         worktree_path=indexed_worktree_path,
         project_root=str(project_root),
@@ -162,7 +165,5 @@ def _coherent_forge_root(
     if state.forge_root is None:
         state.forge_root = effective
     elif Path(state.forge_root).resolve() != Path(effective).resolve():
-        raise ValueError(
-            f"manifest forge_root {state.forge_root!r} does not match indexed forge_root {effective!r}"
-        )
+        raise ValueError(f"manifest forge_root {state.forge_root!r} does not match indexed forge_root {effective!r}")
     return effective

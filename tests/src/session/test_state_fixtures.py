@@ -63,9 +63,7 @@ _LEGACY_MUTATOR_CONTRACTS = Counter(
 )
 
 
-def test_publish_session_writes_row_before_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_publish_session_writes_row_before_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "project"
     project.mkdir()
     index = IndexStore(tmp_path / "index.json")
@@ -86,9 +84,7 @@ def test_publish_session_writes_row_before_manifest(
     assert SessionStore(str(project), state.name).read() == state
 
 
-def test_publish_session_compensates_when_manifest_write_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_publish_session_compensates_when_manifest_write_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "project"
     project.mkdir()
     index = IndexStore(tmp_path / "index.json")
@@ -115,20 +111,14 @@ def test_publish_session_preserves_binding_uniqueness(tmp_path: Path) -> None:
     second = create_session_state("second", worktree_path=str(project))
     second.confirmed.claude_session_id = "shared-uuid"
 
-    publish_session(
-        index, first, project, forge_root=project, require_uuid_unbound=True
-    )
+    publish_session(index, first, project, forge_root=project, require_uuid_unbound=True)
     with pytest.raises(UuidAlreadyBoundError):
-        publish_session(
-            index, second, project, forge_root=project, require_uuid_unbound=True
-        )
+        publish_session(index, second, project, forge_root=project, require_uuid_unbound=True)
 
     assert not SessionStore(str(project), second.name).exists()
 
 
-def test_delete_published_session_removes_manifest_before_row(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_delete_published_session_removes_manifest_before_row(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "project"
     project.mkdir()
     index = IndexStore(tmp_path / "index.json")
@@ -191,25 +181,15 @@ def test_legacy_index_mutators_are_confined_to_direct_contract_tests() -> None:
 
     for path in (repo / "tests").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        parents = {
-            child: node
-            for node in ast.walk(tree)
-            for child in ast.iter_child_nodes(node)
-        }
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
         for node in ast.walk(tree):
-            if not (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr in names
-            ):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in names):
                 continue
             scopes: list[str] = []
-            current = node
+            current: ast.AST = node
             while current in parents:
                 current = parents[current]
-                if isinstance(
-                    current, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-                ):
+                if isinstance(current, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
                     scopes.append(current.name)
             found[(node.func.attr, ".".join(reversed(scopes)))] += 1
             paths.add(str(path.relative_to(repo)))
