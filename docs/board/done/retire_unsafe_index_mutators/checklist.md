@@ -1,6 +1,6 @@
 # Retire unsafe public index mutators checklist
 
-Current focus: Wave 7 order 15 is active from `0e8e1cbb`; keep orders 16--35 parked.
+Current focus: complete -- order 15 shipped in PR #194 (`ae7519fc`); order 16 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -31,4 +31,6 @@ Current focus: Wave 7 order 15 is active from `0e8e1cbb`; keep orders 16--35 par
   tokens, all 885 local links across 348 board documents resolve, and the Wave 7 graph is 14 `done` / 1 `doing` / 20
   `todo`.
 - [x] Open draft PR #194 for order 15.
-- [ ] After merge, close this member before selecting order 16.
+- [x] Close the member after PR #194 merged as `ae7519fc` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 879 local links across 348 board documents resolve, the Wave 7 graph is 15
+  `done` / 0 `doing` / 20 `todo`, and order 16 remains parked.

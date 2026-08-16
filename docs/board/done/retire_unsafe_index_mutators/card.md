@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O050).
 
-**Lane**: `doing/` -- active on `refactor/retire-unsafe-index-mutators` from `0e8e1cbb`.
+**Lane**: `done/` -- shipped in PR #194 (`ae7519fc`) on 2026-08-16.
 
 **Finding**: O050's public-mutator deletion phase.
 
@@ -38,3 +38,14 @@ transaction contract in
 
 Do not make `create_session_txn`/`delete_session_txn` public-fixture shortcuts, relax collision checks, or change the
 index/manifest lock order.
+
+## Outcome
+
+The three row-only public mutators and their direct contracts are gone. Durable session fixtures and production paths
+now use the create/delete transactions exclusively, while private entry construction, binding checks, compensation,
+ownership, and race semantics remain covered. A repository-wide AST guard rejects attribute references to the retired
+names, and a post-review transaction test pins scoped same-name deletion across two Forge roots.
+
+PR #194 merged as `ae7519fc` after 217 focused tests on the final head, 9,199 unit tests (one skip, 122 deselected), 913
+regressions, 69 targeted Docker session tests, full pre-commit, board/design checks, and all five GitHub checks passed.
+No Forge workflow command was used.

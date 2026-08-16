@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--14 and both bounded corrective members are closed through PR #193. Order 15
-[`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md) is active from `0e8e1cbb`; keep orders 16--35
+Current focus: Wave 7 orders 1--15 and both bounded corrective members are closed through PR #194; keep orders 16--35
 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
@@ -239,5 +238,6 @@ parked.
 - [x] Close PR #193 on `main` at `0e8e1cbb`, branch from that exact commit, and activate only order 15
   `retire_unsafe_index_mutators` after reverifying the residual direct contracts and stale references.
 - [x] Delete only the unsafe public index mutators and their direct contracts while keeping orders 16--35 parked.
+- [x] Ship order 15 independently in PR #194 (`ae7519fc`) and close its member without activating order 16.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

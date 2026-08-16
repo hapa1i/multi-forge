@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-16
 
+### Retire unsafe public index mutators
+
+**Goal/outcome**: Remove row-only public index mutation paths after every supported caller moved to the durable session
+transactions.
+
+**Key changes**:
+
+- Deleted `IndexStore.add_session`, `add_from_state`, and `remove_session` plus their direct-only contracts, leaving
+  durable publication and deletion under the transaction lock and compensation rules.
+- Replaced the temporary direct-call allowlist with a zero-attribute-reference guard, removed stale live references, and
+  added transaction coverage proving a scoped delete preserves the same session name in another Forge root.
+
+**Verification**: 217 focused tests on the final head, 9,199 unit tests (one skip, 122 deselected), 913 regressions, 69
+targeted Docker session tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #194 merged as
+`ae7519fc` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Make durable session test state transactional
 
 **Goal/outcome**: Replace unsafe row-only test setup with shared builders that preserve the production row-plus-manifest

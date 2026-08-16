@@ -4,8 +4,7 @@ Current focus: orders 1--13 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
 shipped in PR #189, order 11 shipped in PR #190, order 12 shipped in PR #191, order 13 shipped in PR #192, and order 14
-shipped in PR #193. Order 15 [`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md) is active from
-`0e8e1cbb`; keep orders 16--35 in `todo/`.
+shipped in PR #193, and order 15 shipped in PR #194; keep orders 16--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -87,6 +86,7 @@ shipped in PR #193. Order 15 [`retire_unsafe_index_mutators`](../retire_unsafe_i
   order 15 after reverifying the residual direct contracts and stale references.
 - [x] Delete the three unsafe public index mutators, their direct-only tests, and live stale references while preserving
   the transaction implementation and all invariant coverage.
+- [x] Ship order 15 independently in PR #194 (`ae7519fc`) and close its member before activating order 16.
 
 Orders 16--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
