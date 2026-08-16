@@ -1,6 +1,6 @@
 # Replace legacy environment-based tier inference checklist
 
-Current focus: implementation and verification complete; draft PR pending. Orders 17--35 remain parked.
+Current focus: draft PR #195 is open; await review and merge. Orders 17--35 remain parked.
 
 ## Activation and evidence
 
@@ -29,4 +29,5 @@ Current focus: implementation and verification complete; draft PR pending. Order
 - [x] Run targeted Docker translated-proxy integration coverage (seven passed).
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 886 local links across 349 board documents resolve, and Wave 7 is 15 `done` / 1 `doing` / 19 `todo`.
-- [ ] Open a draft PR for order 16 and record its final proof before closeout.
+- [x] Open draft PR #195 for order 16.
+- [ ] After merge, close this member before selecting order 17.
