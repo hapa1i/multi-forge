@@ -790,11 +790,11 @@ synonym for “everything left.”
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
   are split into 35 members. Orders 1--17 shipped independently in PRs #178--#184, #186--#188, and #190--#196; order 18
-  [`remove_dead_session_helpers`](doing/remove_dead_session_helpers/card.md) is active in draft PR #197 from `f2fcc688`,
-  and 17 are parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md)
-  post-merge correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's
-  `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified
-  scope; and O092's unadmitted tail is not an executable deletion set.
+  [`remove_dead_session_helpers`](doing/remove_dead_session_helpers/card.md) is active in PR #197 from `f2fcc688`, and
+  17 are parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
+  correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's `httpx2`
+  half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified scope; and
+  O092's unadmitted tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

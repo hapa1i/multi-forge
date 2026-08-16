@@ -1,6 +1,6 @@
 # Remove verified dead session helpers checklist
 
-Current focus: draft PR #197 open. Orders 19--35 remain parked.
+Current focus: PR #197 open. Orders 19--35 remain parked.
 
 ## Activation and evidence
 
@@ -40,5 +40,5 @@ Current focus: draft PR #197 open. Orders 19--35 remain parked.
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 893 local links across 352 board documents resolve, and Wave 7 is 17 `done` / 1 `doing` / 17 `todo`. No
   Forge workflow command was used.
-- [x] Open draft PR #197 for order 18.
+- [x] Open PR #197 for order 18.
 - [ ] After merge, close order 18 before selecting order 19.
