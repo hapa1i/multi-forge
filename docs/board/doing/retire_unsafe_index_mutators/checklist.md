@@ -29,5 +29,5 @@ Current focus: Wave 7 order 15 is active from `0e8e1cbb`; keep orders 16--35 par
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 885 local links across 348 board documents resolve, and the Wave 7 graph is 14 `done` / 1 `doing` / 20
   `todo`.
-- [ ] Open a draft PR and record its number before merge.
+- [x] Open draft PR #194 for order 15.
 - [ ] After merge, close this member before selecting order 16.
