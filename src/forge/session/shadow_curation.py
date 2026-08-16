@@ -77,7 +77,6 @@ def collect_shadow_entries(
     *,
     ctx: ExecutionContext,
     scope: str,
-    session_filter: str | None,
 ) -> tuple[list[ShadowEntry], set[str]]:
     """Collect shadow entries across sessions in *scope*.
 
@@ -91,8 +90,6 @@ def collect_shadow_entries(
     scanned_roots: set[str] = set()
 
     for item in result.sessions:
-        if session_filter and item.name != session_filter:
-            continue
         entry = item.entry
         fr = entry.forge_root or entry.worktree_path
         if not fr:
@@ -101,40 +98,38 @@ def collect_shadow_entries(
 
     # Shadow docs are discovered via passport scan, not session manifests.
     # Scan passported shadow docs under the scope-appropriate roots.
-    # Skip when filtering to a named session: project shadows belong to no session.
-    if session_filter is None:
-        from forge.session.project_memory import (
-            DEFAULT_SCAN_ROOTS,
-            scan_shadow_passports,
-        )
+    from forge.session.project_memory import (
+        DEFAULT_SCAN_ROOTS,
+        scan_shadow_passports,
+    )
 
-        roots_to_scan: set[str] = set()
-        if scope == "project":
-            if ctx.forge_root is not None:
-                roots_to_scan.add(str(ctx.forge_root))
-        else:
-            roots_to_scan |= scanned_roots
-            if ctx.forge_root is not None:
-                roots_to_scan.add(str(ctx.forge_root))
+    roots_to_scan: set[str] = set()
+    if scope == "project":
+        if ctx.forge_root is not None:
+            roots_to_scan.add(str(ctx.forge_root))
+    else:
+        roots_to_scan |= scanned_roots
+        if ctx.forge_root is not None:
+            roots_to_scan.add(str(ctx.forge_root))
 
-        seen_keys = {(e.forge_root, e.shadow_path) for e in entries}
-        for fr in sorted(roots_to_scan):
-            fr_path = Path(fr)
-            for official_rel, shadow_path, strategy in scan_shadow_passports(fr_path, DEFAULT_SCAN_ROOTS):
-                key = (fr, shadow_path)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                scanned_roots.add(fr)
-                entries.append(
-                    ShadowEntry(
-                        official=official_rel,
-                        shadow_path=shadow_path,
-                        strategy=strategy,
-                        session="(project)",
-                        forge_root=fr,
-                    )
+    seen_keys = {(e.forge_root, e.shadow_path) for e in entries}
+    for fr in sorted(roots_to_scan):
+        fr_path = Path(fr)
+        for official_rel, shadow_path, strategy in scan_shadow_passports(fr_path, DEFAULT_SCAN_ROOTS):
+            key = (fr, shadow_path)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            scanned_roots.add(fr)
+            entries.append(
+                ShadowEntry(
+                    official=official_rel,
+                    shadow_path=shadow_path,
+                    strategy=strategy,
+                    session="(project)",
+                    forge_root=fr,
                 )
+            )
 
     return entries, scanned_roots
 

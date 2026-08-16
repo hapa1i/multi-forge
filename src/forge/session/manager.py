@@ -1705,7 +1705,7 @@ class SessionManager:
         require_session_worktree(parent_name, parent_worktree_path, action="launch")
 
         if child_name is None:
-            child_name = self._generate_relaunch_name(parent_name, forge_root=parent_forge_root)
+            child_name = self._generate_relaunch_name(forge_root=parent_forge_root)
 
         # See start_session: row-only residue must reach the transaction, not be
         # rejected here.
@@ -1749,7 +1749,7 @@ class SessionManager:
 
         return parent, child_state
 
-    def _generate_relaunch_name(self, parent_name: str, forge_root: str | None = None) -> str:
+    def _generate_relaunch_name(self, *, forge_root: str | None = None) -> str:
         """Generate a unique name for a relaunched session (project-scoped)."""
         existing = {name for name, _ in self.list_sessions(forge_root_filter=forge_root)}
         return generate_unique_name(existing)

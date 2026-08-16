@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--17 shipped independently in PRs #178--#184, #186--#188, and #190--#196, with 18 members
+**Lane**: `doing/` -- orders 1--17 shipped independently in PRs #178--#184, #186--#188, and #190--#196; order 18
+[`remove_dead_session_helpers`](../remove_dead_session_helpers/card.md) is active from `f2fcc688`, with 17 members
 parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
 shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
@@ -68,7 +69,7 @@ runs last so it lands on the smallest stable surface.
 | 15    | O050 API         | [`retire_unsafe_index_mutators`](../../done/retire_unsafe_index_mutators/card.md)                       | zero-caller unsafe public mutators                   |
 | 16    | O051             | [`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
 | 17    | O052             | [`remove_dead_session_context_retry`](../../done/remove_dead_session_context_retry/card.md)             | session-context error classification                 |
-| 18    | O092 session     | [`remove_dead_session_helpers`](../../todo/remove_dead_session_helpers/card.md)                         | verified internal session-only zero-callers          |
+| 18    | O092 session     | [`remove_dead_session_helpers`](../remove_dead_session_helpers/card.md)                                 | verified internal session-only zero-callers          |
 | 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../../todo/deprecate_supervisor_verdict_wrapper/card.md)       | one-release re-export deprecation                    |
 | 20    | O092 search      | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                     | unchanged-snapshot index avoidance                   |
 | 21    | O092, O096       | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)             | live settings merge/rollback coverage                |

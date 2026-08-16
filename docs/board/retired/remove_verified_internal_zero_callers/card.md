@@ -19,7 +19,7 @@ The admitted subsets now live with their actual compatibility and subsystem owne
 
 - factory cache methods: [`remove_obsolete_proxy_abstractions`](../../done/remove_obsolete_proxy_abstractions/card.md);
 - dead git-root exception: [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md);
-- session helpers: [`remove_dead_session_helpers`](../../todo/remove_dead_session_helpers/card.md);
+- session helpers: [`remove_dead_session_helpers`](../../doing/remove_dead_session_helpers/card.md);
 - verdict wrapper: [`deprecate_supervisor_verdict_wrapper`](../../todo/deprecate_supervisor_verdict_wrapper/card.md);
 - transcript guard: [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md);
 - status-line candidates: [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md); and

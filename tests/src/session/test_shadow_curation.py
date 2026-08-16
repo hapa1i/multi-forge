@@ -401,7 +401,7 @@ class TestCollectShadowEntries:
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, roots = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
+        entries, roots = collect_shadow_entries(ctx=ctx, scope="project")
 
         assert len(entries) == 1
         entry = entries[0]
@@ -412,52 +412,6 @@ class TestCollectShadowEntries:
         assert entry.session == "(project)"
         assert entry.forge_root == str(forge_root)
         assert str(forge_root) in roots
-
-    def test_session_filter_skips_passport_scan(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
-        """session_filter suppresses the passport scan -- project shadows belong to no session."""
-        from forge.core.ops.context import ExecutionContext
-        from forge.session import IndexStore, create_session_state
-        from forge.session.passport import synthesize_passport, write_passport
-        from forge.session.shadow_curation import collect_shadow_entries
-
-        forge_root = tmp_path / "project"
-        forge_root.mkdir()
-        (forge_root / ".forge").mkdir(parents=True)
-        (forge_root / "docs").mkdir()
-        official = forge_root / "docs" / "notes.md"
-        official.write_text("# Notes\n")
-        write_passport(
-            official,
-            synthesize_passport(
-                strategy="generic",
-                update_mode="shadow-only",
-                shadow_path=".forge/memory/shadow_notes.md",
-            ),
-        )
-
-        for name in ("s1", "s2"):
-            state = create_session_state(
-                name,
-                proxy_template="litellm-openai",
-                proxy_base_url="http://localhost:8085",
-                worktree_path=str(forge_root),
-            )
-            state.forge_root = str(forge_root)
-            publish_session(
-                IndexStore(),
-                state,
-                tmp_path,
-                forge_root=str(forge_root),
-                checkout_root=str(forge_root),
-                relative_path=".",
-            )
-
-        monkeypatch.chdir(forge_root)
-        ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter="s2")
-
-        # Passport scan is skipped when session_filter is set
-        assert len(entries) == 0
 
     def _setup_project_shadow(self, tmp_path: Path) -> Path:
         """Create a forge_root with a sessionless shadow-only passport (no manifest)."""
@@ -506,7 +460,7 @@ class TestCollectShadowEntries:
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
+        entries, _ = collect_shadow_entries(ctx=ctx, scope="project")
 
         assert len(entries) == 1
         assert entries[0].official == "docs/notes.md"
@@ -525,7 +479,7 @@ class TestCollectShadowEntries:
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
+        entries, _ = collect_shadow_entries(ctx=ctx, scope="project")
 
         assert len(entries) == 1
         assert entries[0].session == "(project)"
@@ -540,7 +494,7 @@ class TestCollectShadowEntries:
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, roots = collect_shadow_entries(ctx=ctx, scope="workspace", session_filter=None)
+        entries, roots = collect_shadow_entries(ctx=ctx, scope="workspace")
 
         assert any(e.session == "(project)" and e.official == "docs/notes.md" for e in entries)
         assert str(forge_root) in roots
