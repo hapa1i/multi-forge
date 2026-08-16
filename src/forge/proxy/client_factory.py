@@ -204,31 +204,6 @@ class TierClientFactory:
             return self._litellm_ttl
         return self._default_ttl
 
-    def _get_tier_for_model(self, model_name: str, provider: ModelProvider) -> Optional[str]:
-        """Detect which tier (haiku/sonnet/opus) a model belongs to.
-
-        Args:
-            model_name: The model identifier (e.g., "openai/gpt-4o-mini")
-            provider: The provider type
-
-        Returns:
-            Tier name (haiku/sonnet/opus) or None if not found
-        """
-        prefix_map = {
-            ModelProvider.LITELLM: "LITELLM",
-            ModelProvider.OPENROUTER: "OPENROUTER",
-        }
-        prefix = prefix_map.get(provider)
-        if not prefix:
-            return None
-
-        for tier in ["haiku", "sonnet", "opus"]:
-            tier_model = os.getenv(f"{prefix}_{tier.upper()}_MODEL")
-            if tier_model and tier_model.lower() == model_name.lower():
-                return tier
-
-        return None
-
     def _import_client_class(self, provider: ModelProvider):
         """Lazy import client classes to avoid circular dependencies."""
         if provider not in self._client_classes:
@@ -252,7 +227,7 @@ class TierClientFactory:
         """
         return self._detect_provider(model_name)
 
-    async def get_client(self, model_name: str, tier: Optional[str] = None) -> Any:
+    async def get_client(self, model_name: str, *, tier: str) -> Any:
         """
         Get client for the specified model.
 
@@ -260,8 +235,7 @@ class TierClientFactory:
 
         Args:
             model_name: The model identifier
-            tier: The tier name (haiku/sonnet/opus) for tier-specific hyperparameters.
-                  If not provided, attempts to auto-detect from model name.
+            tier: The request-resolved tier name for tier-specific hyperparameters.
 
         Returns:
             Client instance for the appropriate provider
@@ -271,11 +245,6 @@ class TierClientFactory:
         """
         provider = self._detect_provider(model_name)
         ttl = self._get_ttl_for_provider(provider)
-
-        # Auto-detect tier as a fallback for backwards compatibility
-        if tier is None:
-            tier = self._get_tier_for_model(model_name, provider) or "sonnet"
-            logger.debug(f"Auto-detected tier '{tier}' for model {model_name}")
 
         # Cache key includes tier to support same model with different hyperparameters
         cache_key = (model_name, tier)
@@ -339,7 +308,7 @@ class TierClientFactory:
 
             return client
 
-    async def invalidate_and_retry(self, model_name: str, tier: Optional[str] = None) -> Any:
+    async def invalidate_and_retry(self, model_name: str, *, tier: Optional[str]) -> Any:
         """
         Invalidate cached credentials and fetch new ones.
 
@@ -347,7 +316,8 @@ class TierClientFactory:
 
         Args:
             model_name: The model whose credentials should be refreshed
-            tier: The tier name (haiku/sonnet/opus). If None, invalidates all tiers for this model.
+            tier: The request-resolved tier name. If None, invalidates all tiers for this model and rebuilds the
+                  configured default tier.
 
         Returns:
             Fresh credentials or client
@@ -365,7 +335,8 @@ class TierClientFactory:
                 for key in keys_to_remove:
                     del self._cache[key]
 
-        return await self.get_client(model_name, tier=tier)
+        retry_tier = tier if tier is not None else config.proxy.default_tier
+        return await self.get_client(model_name, tier=retry_tier)
 
     def _resolve_tier_hyperparams(
         self,
