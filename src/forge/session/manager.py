@@ -1749,7 +1749,7 @@ class SessionManager:
 
         return parent, child_state
 
-    def _generate_relaunch_name(self, *, forge_root: str | None = None) -> str:
+    def _generate_relaunch_name(self, *, forge_root: str) -> str:
         """Generate a unique name for a relaunched session (project-scoped)."""
         existing = {name for name, _ in self.list_sessions(forge_root_filter=forge_root)}
         return generate_unique_name(existing)

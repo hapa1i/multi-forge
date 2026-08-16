@@ -21,10 +21,6 @@ def test_relaunch_name_generation_scopes_existing_names_by_forge_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-
     other_root = tmp_path / "other"
     target_root = tmp_path / "target"
     _init_project(other_root)

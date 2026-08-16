@@ -35,12 +35,18 @@ govern the deletion.
 
 Do not remove active session selection, change shadow ordering, or base relaunch uniqueness on the parent name.
 
+Review also confirmed a related O092-tail candidate that remains outside this member: `collect_shadow_entries` builds
+`entries` only in the passport scan, so `seen_keys` always starts empty and every emitted entry has
+`session="(project)"`. Upstream key deduplication therefore makes `_review_curate`'s same-shadow session-name merge
+unreachable today. This evidence is recorded for separate follow-up admission; the branch does not change that behavior.
+
 ## Outcome
 
 Shadow discovery no longer carries an unreachable session filter through either the session-layer collector or its
 private CLI wrapper; the live passport scan, scope, root collection, and deduplication path are unchanged. The
-definition-only session-tip no-op and its sole import are gone. Relaunch name generation now accepts only the
-project-scoping `forge_root`, while the parent still supplies lineage and child state exactly as before.
+definition-only session-tip no-op and its sole import are gone. Relaunch name generation now requires the
+project-scoping `forge_root`, rejecting accidental unscoped calls while the parent still supplies lineage and child
+state exactly as before.
 
 The direct-only filtered shadow test was removed. A new control proves relaunch collision inputs contain only names from
 the selected Forge root, and the live launch characterization pins the keyword-only `forge_root` handoff.

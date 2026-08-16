@@ -1,6 +1,6 @@
 # Remove verified dead session helpers checklist
 
-Current focus: implementation and verification complete; draft PR pending. Orders 19--35 remain parked.
+Current focus: draft PR #197 open. Orders 19--35 remain parked.
 
 ## Activation and evidence
 
@@ -12,6 +12,7 @@ Current focus: implementation and verification complete; draft PR pending. Order
   filtered behavior test.
 - [x] Prove `_print_session_tip` has no caller and `_generate_relaunch_name.parent_name` does not affect name generation
   or project-scoped collision handling.
+- [x] Record the related, unreachable curation session-name merge as excluded O092-tail evidence without changing it.
 
 ## Implementation
 
@@ -39,4 +40,5 @@ Current focus: implementation and verification complete; draft PR pending. Order
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 893 local links across 352 board documents resolve, and Wave 7 is 17 `done` / 1 `doing` / 17 `todo`. No
   Forge workflow command was used.
-- [ ] Open a draft PR for order 18 and close it after merge before selecting order 19.
+- [x] Open draft PR #197 for order 18.
+- [ ] After merge, close order 18 before selecting order 19.
