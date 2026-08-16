@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--15 and both bounded corrective members are closed through PR #194; keep orders 16--35
-parked.
+Current focus: Wave 7 orders 1--15 and both bounded corrective members are closed through PR #194; order 16 is active
+from `358b39d6`, and orders 17--35 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -239,5 +239,9 @@ parked.
   `retire_unsafe_index_mutators` after reverifying the residual direct contracts and stale references.
 - [x] Delete only the unsafe public index mutators and their direct contracts while keeping orders 16--35 parked.
 - [x] Ship order 15 independently in PR #194 (`ae7519fc`) and close its member without activating order 16.
+- [x] Close PR #194 on `main` at `358b39d6`, branch from that exact commit, and activate only order 16
+  `replace_legacy_tier_inference` after reverifying the request-tier, cache, and auth-retry paths.
+- [x] Replace O051's nonexistent environment inference with explicit or named-default tier provenance while keeping
+  orders 17--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

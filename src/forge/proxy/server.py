@@ -1042,8 +1042,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
 
         # Get unified client for this model (pass tier for tier-specific hyperparameters)
         try:
-            client = await client_factory.get_client(actual_model_id, tier=request_data.tier)
-            logger.debug(f"[{request_id}] Got client for {actual_model_id} (tier={request_data.tier})")
+            client = await client_factory.get_client(actual_model_id, tier=resolved_tier)
+            logger.debug(f"[{request_id}] Got client for {actual_model_id} (tier={resolved_tier})")
         except AuthenticationError as e:
             logger.error(f"[{request_id}] Authentication failed: {e}")
             raise HTTPException(

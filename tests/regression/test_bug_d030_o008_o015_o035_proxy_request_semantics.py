@@ -92,22 +92,6 @@ def test_d030_proxy_tier_hyperparameters_ignore_undocumented_environment_overrid
     assert hyperparameters.thinking.budget_tokens == 4096
 
 
-def test_d030_keeps_model_environment_fallback_parked_for_o051(monkeypatch: pytest.MonkeyPatch) -> None:
-    import forge.proxy.client_factory as client_factory_module
-
-    monkeypatch.setattr(client_factory_module.TierClientFactory, "_instance", None)
-    monkeypatch.setenv("LITELLM_OPUS_MODEL", "openai/gpt-5.5")
-    factory = client_factory_module.TierClientFactory()
-
-    assert (
-        factory._get_tier_for_model(
-            "openai/gpt-5.5",
-            client_factory_module.ModelProvider.LITELLM,
-        )
-        == "opus"
-    )
-
-
 def test_o008_reasoning_pin_removes_incompatible_sampling_parameters() -> None:
     body = {
         "model": "claude-opus-4-6",

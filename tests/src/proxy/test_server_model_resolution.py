@@ -111,7 +111,7 @@ def _install_server_stubs(monkeypatch: pytest.MonkeyPatch, case: ResolutionCase)
         "cost_calls": [],
     }
 
-    async def _fake_get_client(model: str, *, tier: str | None = None):
+    async def _fake_get_client(model: str, *, tier: str):
         captured["client_calls"].append({"model": model, "tier": tier})
 
         async def _create_completion(openai_request: dict[str, Any], request_id: str) -> dict[str, Any]:
