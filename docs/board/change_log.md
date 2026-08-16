@@ -39,8 +39,8 @@ wc -l docs/board/change_log.md
   call order.
 
 **Verification**: 185 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. No Forge workflow command
-was used.
+session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #196 merged as
+`bc4f3a0c` with all five GitHub checks passing. No Forge workflow command was used.
 
 ### Replace legacy environment-based tier inference
 

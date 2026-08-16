@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O052).
 
-**Lane**: `doing/` -- active on `refactor/remove-dead-session-context-retry` from the order-16 closeout at `2ec0f92d`.
+**Lane**: `done/` -- shipped in PR #196 (`bc4f3a0c`) on 2026-08-16.
 
 **Finding**: O052.
 
@@ -37,5 +37,6 @@ Explicit identifiers now perform exactly the intended scoped and unscoped name l
 manifest fallback. The duplicate unscoped retry and its incorrect manifest-corruption explanation are gone. Direct
 controls pin corruption, unreadable-state, and ambiguity propagation plus both fallback stages.
 
-Verification passed 185 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, and board/design checks. No Forge workflow command was used.
+PR #196 merged as `bc4f3a0c` after 185 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23
+targeted Docker session-lifecycle tests, full pre-commit, board/design checks, and all five GitHub checks passed. No
+Forge workflow command was used.

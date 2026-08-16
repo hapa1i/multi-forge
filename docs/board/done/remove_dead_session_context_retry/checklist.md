@@ -1,6 +1,6 @@
 # Remove the dead session-context retry checklist
 
-Current focus: draft PR #196 is open; await review and merge. Orders 18--35 remain parked.
+Current focus: complete -- order 17 shipped in PR #196 (`bc4f3a0c`); order 18 remains parked pending activation.
 
 ## Activation and evidence
 
@@ -23,4 +23,6 @@ Current focus: draft PR #196 is open; await review and merge. Orders 18--35 rema
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 893 local links across 351 board documents resolve, and Wave 7 is 16 `done` / 1 `doing` / 18 `todo`.
 - [x] Open draft PR #196 for order 17.
-- [ ] After merge, close this member before selecting order 18.
+- [x] Close the member after PR #196 merged as `bc4f3a0c` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 887 local links across 351 board documents resolve, the Wave 7 graph is 17
+  `done` / 0 `doing` / 18 `todo`, and order 18 remains parked.
