@@ -29,5 +29,8 @@ Current focus: draft PR #195 is open; await review and merge. Orders 17--35 rema
 - [x] Run targeted Docker translated-proxy integration coverage (seven passed).
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 886 local links across 349 board documents resolve, and Wave 7 is 15 `done` / 1 `doing` / 19 `todo`.
+- [x] Verify the post-PR auth-invalidation review and record the provider-scoped decision separately in
+  [`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md), without
+  changing order 16's invalidation breadth.
 - [x] Open draft PR #195 for order 16.
 - [ ] After merge, close this member before selecting order 17.

@@ -41,3 +41,11 @@ an environment guess. The nonexistent `_MODEL` lookup and false auto-detection l
 retains its original invalidation breadth and rebuilds `proxy.default_tier`; production authentication retry continues
 to rebuild the exact tier that failed. Model selection, provider detection, retry count, and wire behavior are
 unchanged.
+
+## Deferred follow-up
+
+Post-PR review confirmed that the `tier=None` branch is test-only and that the production auth-failure path evicts only
+the failed `(model, tier)` adapter. The underlying credential cache is provider-scoped, so the intended invalidation
+domain may be wider than either one tier or all tiers for one model. The proposed
+[`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md) card owns the
+explicit decision; this card does not broaden invalidation or change retry hyperparameters.
