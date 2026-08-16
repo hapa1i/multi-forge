@@ -1,7 +1,8 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--16 and both bounded corrective members are closed through PR #195; keep orders 17--35 in
-`todo/`.
+Current focus: orders 1--16 and both bounded corrective members are closed through PR #195. Order 17
+[`remove_dead_session_context_retry`](../remove_dead_session_context_retry/card.md) is active from `2ec0f92d`; keep
+orders 18--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -89,6 +90,10 @@ Current focus: orders 1--16 and both bounded corrective members are closed throu
 - [x] Remove the nonexistent tier environment shim while preserving explicit request-tier and named-default routing;
   complete focused/full/integration/board verification before selecting order 17.
 - [x] Ship order 16 independently in PR #195 (`aca65c7f`) and close its member before activating order 17.
+- [x] Close order 16 on pushed `main` at `2ec0f92d`, create `refactor/remove-dead-session-context-retry`, and activate
+  only order 17 after reverifying its name, UUID, manifest-fallback, and error-classification paths.
+- [x] Remove only the duplicate unscoped name retry while preserving state errors, ambiguity, and fallback ordering.
+- [x] Complete order 17's focused, full, regression, Docker session, pre-commit, design-size, and board-integrity gates.
 
-Orders 17--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 18--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
