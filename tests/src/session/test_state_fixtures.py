@@ -96,6 +96,25 @@ def test_delete_published_session_removes_manifest_before_row(tmp_path: Path, mo
     assert not SessionStore(str(project), state.name).exists()
 
 
+def test_delete_published_session_preserves_same_name_in_other_project(tmp_path: Path) -> None:
+    project_a = tmp_path / "project-a"
+    project_b = tmp_path / "project-b"
+    project_a.mkdir()
+    project_b.mkdir()
+    index = IndexStore(tmp_path / "index.json")
+
+    for project in (project_a, project_b):
+        state = create_session_state("planner", worktree_path=str(project))
+        publish_session(index, state, project, forge_root=project)
+
+    assert delete_published_session(index, "planner", project_a)
+
+    assert not index.session_exists("planner", forge_root=str(project_a))
+    assert index.session_exists("planner", forge_root=str(project_b))
+    assert not SessionStore(str(project_a), "planner").exists()
+    assert SessionStore(str(project_b), "planner").exists()
+
+
 def test_row_only_helpers_make_the_invalid_dimension_explicit(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()

@@ -23,7 +23,8 @@ Current focus: Wave 7 order 15 is active from `0e8e1cbb`; keep orders 16--35 par
 
 ## Verification and closeout
 
-- [x] Run focused index, fixture-contract, session-operation, and named regression tests (216 passed).
+- [x] Run focused index, fixture-contract, session-operation, and named regression tests (217 passed, including the
+  post-review scoped-delete transaction regression).
 - [x] Run `make test-unit` (9,199 passed, 1 skipped, 122 deselected) and `make test-regression` (913 passed).
 - [x] Run targeted Docker session lifecycle and CLI integration coverage (69 passed).
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
