@@ -7,8 +7,9 @@ from pathlib import Path
 import pytest
 
 from forge.core.ops.resolution import ResolvedSession, resolve_session_repo_wide
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.exceptions import AmbiguousSessionError, SessionNotFoundError
+from tests.fixtures.session_state import publish_session
 
 
 def _seed_session(
@@ -25,11 +26,10 @@ def _seed_session(
         worktree_path=str(forge_root),
     )
     manifest.forge_root = str(forge_root)
-    SessionStore(str(forge_root), name).write(manifest)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(forge_root),
-        project_root=str(project_root),
+    publish_session(
+        IndexStore(),
+        manifest,
+        project_root,
         forge_root=str(forge_root),
     )
 

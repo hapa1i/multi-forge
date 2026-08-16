@@ -34,6 +34,7 @@ from forge.session import SessionStore, UuidAlreadyBoundError
 from forge.session import index as index_mod
 from forge.session.claude.paths import get_transcript_path
 from forge.session.index import IndexStore
+from tests.fixtures.session_state import remove_index_row_only
 
 _UUID = "aaaa1111-2222-3333-4444-555566667777"
 
@@ -688,7 +689,7 @@ class TestDiscovery:
         adopt_session(ctx, plan_adoption(ctx, _UUID), name="crashed")
         # Drop the row and keep the manifest: the orphan shape this test is about,
         # seeded directly now that no crash in the current code path produces one.
-        IndexStore().remove_session("crashed", forge_root=str(project))
+        remove_index_row_only(IndexStore(), "crashed", project)
 
         assert SessionStore(str(project), "crashed").exists(), "the orphan manifest this test is about"
         assert IndexStore().read().sessions == {}, "and it is not in the index"

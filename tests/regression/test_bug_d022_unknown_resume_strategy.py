@@ -18,6 +18,7 @@ from forge.session import (
     create_session_state,
 )
 from forge.session.prev_sessions import child_notes_path, child_path, generated_path
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -29,8 +30,8 @@ def test_unknown_transfer_strategy_fails_before_artifacts_or_child_state(tmp_pat
     parent.forge_root = str(project)
 
     manager = SessionManager()
-    SessionStore(str(project), parent.name).write(parent)
-    manager.index_store.add_from_state(
+    publish_session(
+        manager.index_store,
         parent,
         str(project),
         checkout_root=str(project),

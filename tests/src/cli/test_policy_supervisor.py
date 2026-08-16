@@ -22,6 +22,7 @@ from forge.session.models import (
     StartedWithProxy,
     SupervisorConfig,
 )
+from tests.fixtures.session_state import publish_session
 
 
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
@@ -44,7 +45,6 @@ def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
     target_a.forge_root = str(forge_root_a)
     target_a.confirmed.claude_session_id = "uuid-alpha"
     target_a.confirmed.started_with_proxy = StartedWithProxy(base_url="http://localhost:8101", template="template-a")
-    SessionStore(str(forge_root_a), "shared").write(target_a)
 
     target_b = create_session_state(
         "shared",
@@ -55,7 +55,6 @@ def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
     target_b.forge_root = str(forge_root_b)
     target_b.confirmed.claude_session_id = "uuid-beta"
     target_b.confirmed.started_with_proxy = StartedWithProxy(base_url="http://localhost:8102", template="template-b")
-    SessionStore(str(forge_root_b), "shared").write(target_b)
 
     controller = create_session_state(
         "controller",
@@ -64,28 +63,27 @@ def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
         worktree_path=str(project),
     )
     controller.forge_root = str(forge_root_a)
-    SessionStore(str(forge_root_a), "controller").write(controller)
 
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_a),
-        project_root=str(project),
+    publish_session(
+        index,
+        target_a,
+        project,
         forge_root=str(forge_root_a),
         checkout_root=str(worktree_a),
         relative_path=".",
     )
-    index.add_session(
-        name="shared",
-        worktree_path=str(worktree_b),
-        project_root=str(project),
+    publish_session(
+        index,
+        target_b,
+        project,
         forge_root=str(forge_root_b),
         checkout_root=str(worktree_b),
         relative_path="nested-project",
     )
-    index.add_session(
-        name="controller",
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        index,
+        controller,
+        project,
         forge_root=str(forge_root_a),
         checkout_root=str(project),
         relative_path=".",

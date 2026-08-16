@@ -165,20 +165,18 @@ def test_session_list_corrupt_index_routes_to_handler() -> None:
 
 def _seed_corrupt_manifest_session(name: str, tmp_path: Path) -> None:
     """Index a session under tmp_path, then corrupt its manifest on disk."""
-    from forge.session import IndexStore, SessionStore, create_session_state
+    from forge.session import IndexStore, create_session_state
+    from tests.fixtures.session_state import publish_session
 
     fr = tmp_path / "project"
-    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(fr),
-        project_root=str(tmp_path),
+    state = create_session_state(name, worktree_path=str(fr))
+    publish_session(
+        IndexStore(),
+        state,
+        tmp_path,
         forge_root=str(fr),
         checkout_root=str(fr),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
     (fr / ".forge" / "sessions" / name / "forge.session.json").write_text("{ corrupt manifest", encoding="utf-8")
 
@@ -231,20 +229,18 @@ def test_session_show_corrupt_manifest_routes_to_handler(tmp_path: Path) -> None
 
 def _seed_valid_session(name: str, tmp_path: Path) -> Path:
     """Index a session with a VALID manifest on disk. Returns the manifest path."""
-    from forge.session import IndexStore, SessionStore, create_session_state
+    from forge.session import IndexStore, create_session_state
+    from tests.fixtures.session_state import publish_session
 
     fr = tmp_path / "project"
-    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(fr),
-        project_root=str(tmp_path),
+    state = create_session_state(name, worktree_path=str(fr))
+    publish_session(
+        IndexStore(),
+        state,
+        tmp_path,
         forge_root=str(fr),
         checkout_root=str(fr),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
     return fr / ".forge" / "sessions" / name / "forge.session.json"
 

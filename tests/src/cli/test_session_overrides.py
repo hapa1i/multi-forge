@@ -11,6 +11,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import VerificationConfig
+from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     successful_claude_launch,
 )
@@ -21,11 +22,10 @@ def _seed_cross_project_session(*, caller_root: Path, target_root: Path, name: s
     state = create_session_state(name, worktree_path=str(target_root))
     state.forge_root = str(target_root)
     store = SessionStore(str(target_root), name)
-    store.write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(target_root),
-        project_root=str(caller_root),
+    publish_session(
+        IndexStore(),
+        state,
+        caller_root,
         forge_root=str(target_root),
         checkout_root=str(target_root),
         relative_path=".",

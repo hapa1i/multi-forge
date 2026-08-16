@@ -13,6 +13,7 @@ from forge.core.ops import policy as policy_ops
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 
 @fixture
@@ -76,11 +77,10 @@ class TestPolicyEnable:
         state = create_session_state("worker", worktree_path=str(target))
         state.forge_root = str(target)
         store = SessionStore(str(target), "worker")
-        store.write(state)
-        IndexStore().add_session(
-            name="worker",
-            worktree_path=str(target),
-            project_root=str(caller),
+        publish_session(
+            IndexStore(),
+            state,
+            caller,
             forge_root=str(target),
             checkout_root=str(target),
             relative_path=".",

@@ -24,25 +24,22 @@ def transfer_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     Seeds ``generated.md`` + ``children/exec.md`` (byte-identical) via the real
     assembler so frontmatter/strategy round-trip exactly as in production.
     """
-    from forge.session import IndexStore, SessionStore, create_session_state
+    from forge.session import IndexStore, create_session_state
     from forge.session.transfer import ResumeStrategy, assemble_transfer_context
+    from tests.fixtures.session_state import publish_session
 
     forge_root = tmp_path / "project"
     (forge_root / ".forge").mkdir(parents=True)
 
     state = create_session_state("planner", worktree_path=str(forge_root))
     state.forge_root = str(forge_root)
-    SessionStore(str(forge_root), "planner").write(state)
-    IndexStore().add_session(
-        name="planner",
-        worktree_path=str(forge_root),
-        project_root=str(tmp_path),
+    publish_session(
+        IndexStore(),
+        state,
+        tmp_path,
         forge_root=str(forge_root),
         checkout_root=str(forge_root),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=None,
     )
     assemble_transfer_context(
         parent_name="planner",

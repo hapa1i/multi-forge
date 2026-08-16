@@ -23,6 +23,7 @@ from forge.session.shadow_curation import (
     run_shadow_curation,
 )
 from tests.fixtures.codex_result import codex_result
+from tests.fixtures.session_state import publish_session
 
 # ---------------------------------------------------------------------------
 # build_curation_prompt
@@ -359,7 +360,7 @@ class TestCollectShadowEntries:
     def test_returns_shadow_entries_and_scanned_roots(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
         """Shadow entries are discovered via passport scan, not session manifests."""
         from forge.core.ops.context import ExecutionContext
-        from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session import IndexStore, create_session_state
         from forge.session.passport import synthesize_passport, write_passport
         from forge.session.shadow_curation import collect_shadow_entries
 
@@ -388,18 +389,14 @@ class TestCollectShadowEntries:
             worktree_path=str(forge_root),
         )
         state.forge_root = str(forge_root)
-        SessionStore(str(forge_root), "s1").write(state)
 
-        IndexStore().add_session(
-            name="s1",
-            worktree_path=str(forge_root),
-            project_root=str(tmp_path),
+        publish_session(
+            IndexStore(),
+            state,
+            tmp_path,
             forge_root=str(forge_root),
             checkout_root=str(forge_root),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session=None,
         )
 
         monkeypatch.chdir(forge_root)
@@ -419,7 +416,7 @@ class TestCollectShadowEntries:
     def test_session_filter_skips_passport_scan(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
         """session_filter suppresses the passport scan -- project shadows belong to no session."""
         from forge.core.ops.context import ExecutionContext
-        from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session import IndexStore, create_session_state
         from forge.session.passport import synthesize_passport, write_passport
         from forge.session.shadow_curation import collect_shadow_entries
 
@@ -446,17 +443,13 @@ class TestCollectShadowEntries:
                 worktree_path=str(forge_root),
             )
             state.forge_root = str(forge_root)
-            SessionStore(str(forge_root), name).write(state)
-            IndexStore().add_session(
-                name=name,
-                worktree_path=str(forge_root),
-                project_root=str(tmp_path),
+            publish_session(
+                IndexStore(),
+                state,
+                tmp_path,
                 forge_root=str(forge_root),
                 checkout_root=str(forge_root),
                 relative_path=".",
-                is_incognito=False,
-                is_fork=False,
-                parent_session=None,
             )
 
         monkeypatch.chdir(forge_root)
@@ -485,7 +478,7 @@ class TestCollectShadowEntries:
         return forge_root
 
     def _register_session(self, tmp_path: Path, forge_root: Path, name: str = "s1") -> None:
-        from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session import IndexStore, create_session_state
 
         state = create_session_state(
             name,
@@ -494,17 +487,13 @@ class TestCollectShadowEntries:
             worktree_path=str(forge_root),
         )
         state.forge_root = str(forge_root)
-        SessionStore(str(forge_root), name).write(state)
-        IndexStore().add_session(
-            name=name,
-            worktree_path=str(forge_root),
-            project_root=str(tmp_path),
+        publish_session(
+            IndexStore(),
+            state,
+            tmp_path,
             forge_root=str(forge_root),
             checkout_root=str(forge_root),
             relative_path=".",
-            is_incognito=False,
-            is_fork=False,
-            parent_session=None,
         )
 
     def test_discovers_project_origin_shadow_via_scan(self, tmp_path: Path, monkeypatch: MagicMock) -> None:

@@ -32,6 +32,11 @@ from forge.session.models import (
     create_session_state,
 )
 from forge.session.store import get_manifest_path
+from tests.fixtures.session_state import (
+    publish_session,
+    publish_session_from_fields,
+    seed_row_only_session,
+)
 
 
 def _create_manifest_stub(worktree: Path, session_name: str) -> None:
@@ -176,7 +181,7 @@ class TestIndexStoreWrite:
 
 
 class TestIndexStoreAddSession:
-    """Test IndexStore.add_session()."""
+    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
 
     def test_add_session_basic(self, store: IndexStore) -> None:
         """add_session() should add a new session."""
@@ -241,9 +246,7 @@ class TestIndexStoreGetSession:
     def test_get_session_existing(self, store: IndexStore) -> None:
         """get_session() should return existing session."""
         wt = Path(store.index_path).parent.parent / "wt_test_session"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
 
         entry = store.get_session("test-session")
         assert entry.worktree_path == str(wt)
@@ -284,17 +287,20 @@ class TestIndexStoreListSessions:
         pin.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
         pin_before = pin.read_bytes()
 
-        _create_manifest_stub(compatible_root, "visible")
-        store.add_session(
+        publish_session_from_fields(
+            store,
             "visible",
-            str(compatible_root),
-            str(compatible_root),
+            compatible_root,
+            compatible_root,
             forge_root=str(compatible_root),
         )
-        store.add_session(
-            "stale-other-root",
-            str(incompatible_root),
-            str(incompatible_root),
+        stale = create_session_state("stale-other-root", worktree_path=str(incompatible_root))
+        # Deliberately seed crash residue so list_sessions must prune the row
+        # without touching the incompatible project or active registry.
+        seed_row_only_session(
+            store,
+            stale,
+            incompatible_root,
             forge_root=str(incompatible_root),
         )
         active_store = ActiveSessionStore(index_path.parent / ACTIVE_FILENAME)
@@ -319,17 +325,14 @@ class TestIndexStoreListSessions:
         wt1 = Path(store.index_path).parent.parent / "wt1"
         wt2 = Path(store.index_path).parent.parent / "wt2"
         wt3 = Path(store.index_path).parent.parent / "wt3"
-        _create_manifest_stub(wt1, "old-session")
-        _create_manifest_stub(wt2, "new-session")
-        _create_manifest_stub(wt3, "mid-session")
 
-        store.add_session("old-session", str(wt1), "/path")
+        publish_session_from_fields(store, "old-session", wt1, "/path")
         store.update_session("old-session", "2024-12-17T10:00:00+00:00")
 
-        store.add_session("new-session", str(wt2), "/path")
+        publish_session_from_fields(store, "new-session", wt2, "/path")
         store.update_session("new-session", "2024-12-17T12:00:00+00:00")
 
-        store.add_session("mid-session", str(wt3), "/path")
+        publish_session_from_fields(store, "mid-session", wt3, "/path")
         store.update_session("mid-session", "2024-12-17T11:00:00+00:00")
 
         sessions = store.list_sessions()
@@ -345,17 +348,14 @@ class TestIndexStoreListSessions:
         wt1 = Path(store.index_path).parent.parent / "wt_zebra"
         wt2 = Path(store.index_path).parent.parent / "wt_apple"
         wt3 = Path(store.index_path).parent.parent / "wt_banana"
-        _create_manifest_stub(wt1, "zebra")
-        _create_manifest_stub(wt2, "apple")
-        _create_manifest_stub(wt3, "banana")
 
-        store.add_session("zebra", str(wt1), "/path")
+        publish_session_from_fields(store, "zebra", wt1, "/path")
         store.update_session("zebra", timestamp)
 
-        store.add_session("apple", str(wt2), "/path")
+        publish_session_from_fields(store, "apple", wt2, "/path")
         store.update_session("apple", timestamp)
 
-        store.add_session("banana", str(wt3), "/path")
+        publish_session_from_fields(store, "banana", wt3, "/path")
         store.update_session("banana", timestamp)
 
         sessions = store.list_sessions()
@@ -368,11 +368,9 @@ class TestIndexStoreListSessions:
         """list_sessions() can exclude incognito sessions."""
         wt1 = Path(store.index_path).parent.parent / "wt_normal"
         wt2 = Path(store.index_path).parent.parent / "wt_incognito"
-        _create_manifest_stub(wt1, "normal")
-        _create_manifest_stub(wt2, "incognito")
 
-        store.add_session("normal", str(wt1), "/path")
-        store.add_session("incognito", str(wt2), "/path", is_incognito=True)
+        publish_session_from_fields(store, "normal", wt1, "/path")
+        publish_session_from_fields(store, "incognito", wt2, "/path", is_incognito=True)
 
         all_sessions = store.list_sessions(include_incognito=True)
         assert len(all_sessions) == 2
@@ -387,12 +385,12 @@ class TestIndexStoreListSessions:
         worktree = Path(store.index_path).parent.parent / "repo-worktree"
         forge_root.mkdir(parents=True, exist_ok=True)
         worktree.mkdir(parents=True, exist_ok=True)
-        _create_manifest_stub(forge_root, "worktree-session")
 
-        store.add_session(
+        publish_session_from_fields(
+            store,
             "worktree-session",
-            str(worktree),
-            str(forge_root),
+            worktree,
+            forge_root,
             forge_root=str(forge_root),
             checkout_root=str(worktree),
             relative_path=".",
@@ -408,9 +406,7 @@ class TestIndexStoreUpdateSession:
     def test_update_session_timestamp(self, store: IndexStore) -> None:
         """update_session() should update timestamp."""
         wt = Path(store.index_path).parent.parent / "wt_update_session"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
 
         new_timestamp = "2024-12-17T15:00:00"
         entry = store.update_session("test-session", new_timestamp)
@@ -424,9 +420,7 @@ class TestIndexStoreUpdateSession:
     def test_update_session_defaults_to_now(self, store: IndexStore) -> None:
         """update_session() should default to now() if no timestamp."""
         wt = Path(store.index_path).parent.parent / "wt_update_now"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
         before = now_iso()
 
         entry = store.update_session("test-session")
@@ -441,7 +435,7 @@ class TestIndexStoreUpdateSession:
 
 
 class TestIndexStoreRemoveSession:
-    """Test IndexStore.remove_session()."""
+    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
 
     def test_remove_session_existing(self, store: IndexStore) -> None:
         """remove_session() should remove existing session."""
@@ -472,9 +466,7 @@ class TestIndexStoreSessionExists:
     def test_session_exists_true(self, store: IndexStore) -> None:
         """session_exists() should return True for existing session."""
         wt = Path(store.index_path).parent.parent / "wt_exists"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
         assert store.session_exists("test-session") is True
 
     def test_session_exists_false(self, store: IndexStore) -> None:
@@ -487,7 +479,7 @@ class TestIndexStoreSessionExists:
 
 
 class TestIndexStoreAddFromManifest:
-    """Test IndexStore.add_from_state()."""
+    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
 
     # Default proxy values for tests (proxy is required in v1 manifests)
     DEFAULT_PROXY_TEMPLATE = "test-family"
@@ -553,9 +545,7 @@ class TestIndexStoreUuidFields:
     def test_new_entry_has_empty_uuid_fields(self, store: IndexStore) -> None:
         """New index entries should have empty UUID fields."""
         wt = Path(store.index_path).parent.parent / "wt_uuid_empty"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
         entry = store.get_session("test-session")
 
         assert entry.claude_session_id is None
@@ -563,9 +553,7 @@ class TestIndexStoreUuidFields:
     def test_uuid_fields_roundtrip(self, store: IndexStore, index_path: Path) -> None:
         """UUID fields should serialize and deserialize correctly."""
         wt = Path(store.index_path).parent.parent / "wt_uuid_roundtrip"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path", claude_session_id="abc-123")
+        publish_session_from_fields(store, "test-session", wt, "/path", claude_session_id="abc-123")
 
         # Re-read and verify
         reloaded = store.get_session("test-session")
@@ -590,9 +578,7 @@ class TestIndexStoreFindByUuid:
     def test_find_by_current_uuid(self, store: IndexStore) -> None:
         """find_session_by_uuid() should find session by current UUID."""
         wt = Path(store.index_path).parent.parent / "wt_find_current"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path", claude_session_id="uuid-123")
+        publish_session_from_fields(store, "test-session", wt, "/path", claude_session_id="uuid-123")
 
         result = store.find_session_by_uuid("uuid-123")
         assert result is not None
@@ -601,9 +587,7 @@ class TestIndexStoreFindByUuid:
     def test_find_by_uuid_not_found(self, store: IndexStore) -> None:
         """find_session_by_uuid() should return None if UUID not found."""
         wt = Path(store.index_path).parent.parent / "wt_find_none"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
 
         result = store.find_session_by_uuid("nonexistent-uuid")
         assert result is None
@@ -613,13 +597,10 @@ class TestIndexStoreFindByUuid:
         wt1 = Path(store.index_path).parent.parent / "wt_multi_a"
         wt2 = Path(store.index_path).parent.parent / "wt_multi_b"
         wt3 = Path(store.index_path).parent.parent / "wt_multi_c"
-        _create_manifest_stub(wt1, "session-a")
-        _create_manifest_stub(wt2, "session-b")
-        _create_manifest_stub(wt3, "session-c")
 
-        store.add_session("session-a", str(wt1), "/path", claude_session_id="uuid-a")
-        store.add_session("session-b", str(wt2), "/path", claude_session_id="uuid-b")
-        store.add_session("session-c", str(wt3), "/path", claude_session_id="uuid-c")
+        publish_session_from_fields(store, "session-a", wt1, "/path", claude_session_id="uuid-a")
+        publish_session_from_fields(store, "session-b", wt2, "/path", claude_session_id="uuid-b")
+        publish_session_from_fields(store, "session-c", wt3, "/path", claude_session_id="uuid-c")
 
         result_a = store.find_session_by_uuid("uuid-a")
         result_b = store.find_session_by_uuid("uuid-b")
@@ -644,9 +625,7 @@ class TestIndexStoreSyncUuidFromManifest:
     def test_sync_uuid_basic(self, store: IndexStore) -> None:
         """sync_uuid_from_state() should copy UUID field from manifest."""
         wt = Path(store.index_path).parent.parent / "wt_sync_basic"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
+        publish_session_from_fields(store, "test-session", wt, "/path")
 
         manifest = create_session_state(
             "test-session",
@@ -666,9 +645,7 @@ class TestIndexStoreSyncUuidFromManifest:
     def test_sync_uuid_skips_none(self, store: IndexStore) -> None:
         """sync_uuid_from_state() should not overwrite with None."""
         wt = Path(store.index_path).parent.parent / "wt_sync_skip"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path", claude_session_id="existing-uuid")
+        publish_session_from_fields(store, "test-session", wt, "/path", claude_session_id="existing-uuid")
 
         # Sync with manifest that has no confirmed info
         manifest = create_session_state(
@@ -702,24 +679,19 @@ class TestProjectIdentityFields:
     DEFAULT_PROXY_URL = "http://localhost:8080"
 
     def test_add_session_stores_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
-        """add_session() persists forge_root, checkout_root, relative_path."""
+        """Published rows persist forge_root, checkout_root, and relative_path."""
         worktree = tmp_path / "checkout"
         worktree.mkdir()
         forge = worktree / "sub" / "project"
         forge.mkdir(parents=True)
         (forge / ".forge").mkdir()
 
-        # get_session() validates manifest exists under forge_root
-        manifest_dir = forge / ".forge" / "sessions" / "test-identity"
-        manifest_dir.mkdir(parents=True)
-        (manifest_dir / "forge.session.json").write_text(
-            '{"schema_version":1,"name":"test-identity","created_at":"2024-01-01T00:00:00","last_accessed_at":"2024-01-01T00:00:00","intent":{},"overrides":{},"confirmed":{}}'
-        )
-
-        entry = store.add_session(
-            "test-identity",
-            worktree_path=str(worktree),
-            project_root=str(tmp_path),
+        state = create_session_state("test-identity", worktree_path=str(worktree))
+        state.forge_root = str(forge)
+        entry = publish_session(
+            store,
+            state,
+            tmp_path,
             forge_root=str(forge),
             checkout_root=str(worktree),
             relative_path="sub/project",
@@ -734,15 +706,17 @@ class TestProjectIdentityFields:
         assert loaded.checkout_root == str(worktree)
         assert loaded.relative_path == "sub/project"
 
-    def test_add_session_identity_fields_fallback(self, store: IndexStore) -> None:
+    def test_identity_fields_fall_back_to_worktree_path(self, store: IndexStore, tmp_path: Path) -> None:
         """Identity fields fall back to worktree_path when not provided."""
-        entry = store.add_session(
+        worktree = tmp_path / "worktree"
+        entry = publish_session_from_fields(
+            store,
             "legacy-session",
-            worktree_path="/some/path",
-            project_root="/some/repo",
+            worktree,
+            tmp_path,
         )
-        assert entry.forge_root == "/some/path"
-        assert entry.checkout_root == "/some/path"
+        assert entry.forge_root == str(worktree)
+        assert entry.checkout_root == str(worktree)
         assert entry.relative_path == "."
 
     def test_add_from_state_passes_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
@@ -759,7 +733,8 @@ class TestProjectIdentityFields:
         )
         state.forge_root = str(worktree)
 
-        entry = store.add_from_state(
+        entry = publish_session(
+            store,
             state,
             str(tmp_path),
             checkout_root=str(worktree),
@@ -783,7 +758,7 @@ class TestProjectIdentityFields:
         )
         state.forge_root = str(worktree)
 
-        entry = store.add_from_state(state, str(tmp_path))
+        entry = publish_session(store, state, tmp_path)
         assert entry.forge_root == str(worktree)
 
     def test_read_v1_index_with_identity_fields(self, store: IndexStore, index_path: Path) -> None:
@@ -878,11 +853,9 @@ class TestProjectScopedNames:
         """Two projects can have sessions named 'planner'."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
+        publish_session_from_fields(store, "planner", wt_b, wt_b, forge_root=wt_b)
 
         # Both exist when scoped
         assert store.session_exists("planner", forge_root=str(wt_a))
@@ -892,11 +865,9 @@ class TestProjectScopedNames:
         """Scoped get_session returns the correct project's entry."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
+        publish_session_from_fields(store, "planner", wt_b, wt_b, forge_root=wt_b)
 
         entry_a = store.get_session("planner", forge_root=str(wt_a))
         entry_b = store.get_session("planner", forge_root=str(wt_b))
@@ -908,15 +879,14 @@ class TestProjectScopedNames:
         """Session in project A is invisible from project B's scope."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_c = Path(store.index_path).parent.parent / "project-c"
-        _create_manifest_stub(wt_a, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
 
         assert store.session_exists("planner", forge_root=str(wt_a))
         assert not store.session_exists("planner", forge_root=str(wt_c))
 
     def test_remove_session_scoped(self, store: IndexStore) -> None:
-        """Removing a session in project A doesn't affect project B."""
+        """Direct legacy mutator: removing project A must not affect project B."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
         _create_manifest_stub(wt_a, "planner")
@@ -933,9 +903,8 @@ class TestProjectScopedNames:
     def test_list_sessions_returns_display_names(self, store: IndexStore) -> None:
         """list_sessions returns display names, not scoped keys."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
-        _create_manifest_stub(wt_a, "my-session")
 
-        store.add_session("my-session", str(wt_a), str(wt_a), forge_root=str(wt_a))
+        publish_session_from_fields(store, "my-session", wt_a, wt_a, forge_root=wt_a)
 
         sessions = store.list_sessions()
         names = [n for n, _ in sessions]
@@ -948,11 +917,9 @@ class TestProjectScopedNames:
 
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
+        publish_session_from_fields(store, "planner", wt_b, wt_b, forge_root=wt_b)
 
         with pytest.raises(AmbiguousSessionError):
             store.get_session("planner")
@@ -960,9 +927,15 @@ class TestProjectScopedNames:
     def test_find_by_uuid_returns_display_name_and_forge_root(self, store: IndexStore) -> None:
         """find_session_by_uuid returns (display_name, forge_root) tuple."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
-        _create_manifest_stub(wt_a, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a), claude_session_id="uuid-abc")
+        publish_session_from_fields(
+            store,
+            "planner",
+            wt_a,
+            wt_a,
+            forge_root=wt_a,
+            claude_session_id="uuid-abc",
+        )
 
         result = store.find_session_by_uuid("uuid-abc")
         assert result is not None
@@ -980,12 +953,12 @@ class TestProjectScopedNames:
         # Nested project: forge_root is a subdirectory of the checkout
         checkout = base / "repo"
         forge_root_nested = checkout / "packages" / "app"
-        _create_manifest_stub(forge_root_nested, "planner")
 
-        store.add_session(
+        publish_session_from_fields(
+            store,
             "planner",
-            worktree_path=str(checkout),  # checkout root
-            project_root=str(checkout),
+            checkout,
+            checkout,
             forge_root=str(forge_root_nested),  # nested .forge/ location
         )
 
@@ -1000,19 +973,19 @@ class TestProjectScopedNames:
         base = Path(store.index_path).parent.parent
         root_project = base / "root-repo"
         nested_forge = root_project / "packages" / "sub"
-        _create_manifest_stub(root_project, "planner")
-        _create_manifest_stub(nested_forge, "planner")
 
-        store.add_session(
+        publish_session_from_fields(
+            store,
             "planner",
-            worktree_path=str(root_project),
-            project_root=str(root_project),
+            root_project,
+            root_project,
             forge_root=str(root_project),
         )
-        store.add_session(
+        publish_session_from_fields(
+            store,
             "planner",
-            worktree_path=str(root_project),
-            project_root=str(root_project),
+            root_project,
+            root_project,
             forge_root=str(nested_forge),
         )
 
@@ -1029,11 +1002,9 @@ class TestProjectScopedNames:
 
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
+        publish_session_from_fields(store, "planner", wt_b, wt_b, forge_root=wt_b)
 
         with pytest.raises(AmbiguousSessionError):
             store.session_exists("planner")
@@ -1044,17 +1015,15 @@ class TestProjectScopedNames:
 
         wt_a = Path(store.index_path).parent.parent / "project-a"
         wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
 
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
+        publish_session_from_fields(store, "planner", wt_a, wt_a, forge_root=wt_a)
+        publish_session_from_fields(store, "planner", wt_b, wt_b, forge_root=wt_b)
 
         with pytest.raises(AmbiguousSessionError):
             store.update_session("planner")
 
     def test_remove_session_unscoped_ambiguous_raises(self, store: IndexStore) -> None:
-        """remove_session() with forge_root=None raises on duplicates."""
+        """Direct legacy mutator: unscoped duplicate removal raises."""
         from forge.session.exceptions import AmbiguousSessionError
 
         wt_a = Path(store.index_path).parent.parent / "project-a"
@@ -1077,11 +1046,16 @@ class TestCodexThreadColumn:
 
     def test_uniqueness_is_enforced_for_threads_too(self, tmp_path: Path) -> None:
         store = IndexStore()
-        store.add_session("first", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD)
+        publish_session_from_fields(store, "first", tmp_path, tmp_path, codex_thread_id=self._THREAD)
 
         with pytest.raises(UuidAlreadyBoundError) as caught:
-            store.add_session(
-                "second", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD, require_uuid_unbound=True
+            publish_session_from_fields(
+                store,
+                "second",
+                tmp_path,
+                tmp_path,
+                codex_thread_id=self._THREAD,
+                require_uuid_unbound=True,
             )
 
         assert caught.value.owner == "first"
@@ -1089,7 +1063,7 @@ class TestCodexThreadColumn:
     def test_drift_reconciliation_moves_the_guard_to_the_live_id(self, tmp_path: Path) -> None:
         """Codex can re-bind a thread across a resume; a stale column guards nothing."""
         store = IndexStore()
-        store.add_session("drifter", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD)
+        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._THREAD)
 
         store.update_codex_thread("drifter", self._DRIFTED, str(tmp_path))
 
@@ -1098,11 +1072,21 @@ class TestCodexThreadColumn:
 
         # The guard must now refuse the live id, not the abandoned one.
         with pytest.raises(UuidAlreadyBoundError):
-            store.add_session(
-                "adopter", str(tmp_path), str(tmp_path), codex_thread_id=self._DRIFTED, require_uuid_unbound=True
+            publish_session_from_fields(
+                store,
+                "adopter",
+                tmp_path,
+                tmp_path,
+                codex_thread_id=self._DRIFTED,
+                require_uuid_unbound=True,
             )
-        store.add_session(
-            "reuse-old", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD, require_uuid_unbound=True
+        publish_session_from_fields(
+            store,
+            "reuse-old",
+            tmp_path,
+            tmp_path,
+            codex_thread_id=self._THREAD,
+            require_uuid_unbound=True,
         )
 
     def test_reconciling_an_unknown_session_is_a_no_op(self, tmp_path: Path) -> None:

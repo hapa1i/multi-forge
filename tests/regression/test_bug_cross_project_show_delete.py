@@ -23,7 +23,8 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -57,13 +58,7 @@ def _setup_repo_with_two_forge_roots(tmp_path: Path, monkeypatch: pytest.MonkeyP
         worktree_path=str(fr_b),
     )
     manifest.forge_root = str(fr_b)
-    SessionStore(str(fr_b), name).write(manifest)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(fr_b),
-        project_root=str(repo),
-        forge_root=str(fr_b),
-    )
+    publish_session(IndexStore(), manifest, repo, forge_root=fr_b)
 
     monkeypatch.chdir(repo)
     return fr_a, fr_b

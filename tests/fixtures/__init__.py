@@ -32,6 +32,13 @@ from tests.fixtures.repos import (
     git_repo,
     git_repo_with_claude,
 )
+from tests.fixtures.session_state import (
+    delete_published_session,
+    publish_session,
+    publish_session_from_fields,
+    remove_index_row_only,
+    seed_row_only_session,
+)
 
 __all__ = [
     # Repos
@@ -54,4 +61,10 @@ __all__ = [
     "base_git_repo",
     "clean_workspace",
     "pytest_runtest_makereport",
+    # Durable session state
+    "publish_session",
+    "publish_session_from_fields",
+    "delete_published_session",
+    "seed_row_only_session",
+    "remove_index_row_only",
 ]

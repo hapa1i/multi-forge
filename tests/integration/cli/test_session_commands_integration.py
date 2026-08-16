@@ -248,12 +248,13 @@ class TestSessionResume:
             state = create_session_state("degraded", worktree_path="{missing}")
             state.worktree.is_worktree = True
             state.forge_root = "/workspace"
-            SessionStore("/workspace", "degraded").write(state)
-            IndexStore().add_from_state(
+            store = SessionStore("/workspace", "degraded")
+            IndexStore().create_session_txn(
                 state,
                 project_root="/workspace",
                 forge_root="/workspace",
                 checkout_root="{missing}",
+                write_manifest=lambda: store.create_exclusive(state),
             )
             """,
         )

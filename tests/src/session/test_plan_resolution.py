@@ -18,6 +18,7 @@ from forge.session.plan_resolution import (
     resolve_plan_info,
 )
 from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 
 @pytest.fixture
@@ -147,11 +148,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         parent = create_session_state("planner", worktree_path=str(forge_root))
         parent.forge_root = str(forge_root)
         parent.confirmed.latest_plan_path = ".claude/plans/p.md"
-        SessionStore(str(forge_root), "planner").write(parent)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(forge_root),
-            project_root=str(forge_root),
+        publish_session(
+            IndexStore(),
+            parent,
+            forge_root,
             forge_root=str(forge_root),
             checkout_root=str(forge_root),
             relative_path=".",
@@ -193,11 +193,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         planner_a = create_session_state("planner", worktree_path=str(project_a_root))
         planner_a.forge_root = str(fr_a)
         planner_a.confirmed.latest_plan_path = ".claude/plans/plan-A.md"
-        SessionStore(str(fr_a), "planner").write(planner_a)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(project_a_root),
-            project_root=str(project_a_root),
+        publish_session(
+            IndexStore(),
+            planner_a,
+            project_a_root,
             forge_root=str(fr_a),
             checkout_root=str(project_a_root),
             relative_path=".",
@@ -206,11 +205,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         planner_b = create_session_state("planner", worktree_path=str(project_b_root))
         planner_b.forge_root = str(fr_b)
         planner_b.confirmed.latest_plan_path = ".claude/plans/plan-B.md"
-        SessionStore(str(fr_b), "planner").write(planner_b)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(project_b_root),
-            project_root=str(project_b_root),
+        publish_session(
+            IndexStore(),
+            planner_b,
+            project_b_root,
             forge_root=str(fr_b),
             checkout_root=str(project_b_root),
             relative_path=".",
@@ -223,11 +221,10 @@ class TestResolvePlanInfoLegacyForkFallback:
             worktree_path=str(project_a_root),
         )
         executor_in_a.forge_root = str(fr_a)
-        SessionStore(str(fr_a), "executor").write(executor_in_a)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(project_a_root),
-            project_root=str(project_a_root),
+        publish_session(
+            IndexStore(),
+            executor_in_a,
+            project_a_root,
             forge_root=str(fr_a),
             checkout_root=str(project_a_root),
             relative_path=".",
@@ -252,11 +249,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         planner_a = create_session_state("planner", worktree_path=str(repo_root))
         planner_a.forge_root = str(fr_a)
         planner_a.confirmed.latest_plan_path = ".claude/plans/plan-A.md"
-        SessionStore(str(fr_a), "planner").write(planner_a)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(repo_root),
-            project_root=str(repo_root),
+        publish_session(
+            IndexStore(),
+            planner_a,
+            repo_root,
             forge_root=str(fr_a),
             checkout_root=str(repo_root),
             relative_path="proj-a",
@@ -265,11 +261,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         planner_b = create_session_state("planner", worktree_path=str(repo_root))
         planner_b.forge_root = str(fr_b)
         planner_b.confirmed.latest_plan_path = ".claude/plans/plan-B.md"
-        SessionStore(str(fr_b), "planner").write(planner_b)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(repo_root),
-            project_root=str(repo_root),
+        publish_session(
+            IndexStore(),
+            planner_b,
+            repo_root,
             forge_root=str(fr_b),
             checkout_root=str(repo_root),
             relative_path="proj-b",
@@ -282,11 +277,10 @@ class TestResolvePlanInfoLegacyForkFallback:
             worktree_path=str(repo_root),
         )
         executor_in_b.forge_root = str(fr_b)
-        SessionStore(str(fr_b), "executor").write(executor_in_b)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(repo_root),
-            project_root=str(repo_root),
+        publish_session(
+            IndexStore(),
+            executor_in_b,
+            repo_root,
             forge_root=str(fr_b),
             checkout_root=str(repo_root),
             relative_path="proj-b",
@@ -310,11 +304,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         planner.confirmed.artifacts["plans"] = [
             {"kind": "approved", "snapshot_path": ".forge/artifacts/planner/plans/real.md"}
         ]
-        SessionStore(str(parent_fr), "planner").write(planner)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(parent_fr),
-            project_root=str(project_root),
+        publish_session(
+            IndexStore(),
+            planner,
+            project_root,
             forge_root=str(parent_fr),
             checkout_root=str(parent_fr),
             relative_path=".",
@@ -326,11 +319,10 @@ class TestResolvePlanInfoLegacyForkFallback:
         other_planner = create_session_state("planner", worktree_path=str(other_repo))
         other_planner.forge_root = str(other_repo)
         other_planner.confirmed.latest_plan_path = ".claude/plans/wrong.md"
-        SessionStore(str(other_repo), "planner").write(other_planner)
-        IndexStore().add_session(
-            name="planner",
-            worktree_path=str(other_repo),
-            project_root=str(other_repo),
+        publish_session(
+            IndexStore(),
+            other_planner,
+            other_repo,
             forge_root=str(other_repo),
             checkout_root=str(other_repo),
             relative_path=".",
@@ -345,11 +337,10 @@ class TestResolvePlanInfoLegacyForkFallback:
             worktree_path=str(child_fr),
         )
         executor.forge_root = str(child_fr)
-        SessionStore(str(child_fr), "executor").write(executor)
-        IndexStore().add_session(
-            name="executor",
-            worktree_path=str(child_fr),
-            project_root=str(project_root),
+        publish_session(
+            IndexStore(),
+            executor,
+            project_root,
             forge_root=str(child_fr),
             checkout_root=str(child_fr),
             relative_path=".",

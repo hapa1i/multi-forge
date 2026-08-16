@@ -16,6 +16,7 @@ from forge.cli.main import main
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -37,11 +38,10 @@ def test_policy_enable_preserves_supervisor_intent(tmp_path: Path, monkeypatch: 
         team_supervisor=team_supervisor,
     )
     store = SessionStore(str(project), "worker")
-    store.write(state)
-    IndexStore().add_session(
-        name="worker",
-        worktree_path=str(project),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        state,
+        project,
         forge_root=str(project),
         checkout_root=str(project),
         relative_path=".",

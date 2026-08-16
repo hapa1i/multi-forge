@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.identity import make_scoped_key
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -32,10 +33,10 @@ def test_list_retains_session_with_valid_manifest_and_missing_worktree(
     assert state.worktree is not None
     state.worktree.is_worktree = True
     state.forge_root = str(forge_root)
-    SessionStore(str(forge_root), state.name).write(state)
 
     index = IndexStore()
-    index.add_from_state(
+    publish_session(
+        index,
         state,
         project_root=str(forge_root),
         forge_root=str(forge_root),

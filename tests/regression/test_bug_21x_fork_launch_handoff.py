@@ -29,9 +29,10 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.cli.session import _generate_parent_transfer_context
-from forge.session import SessionManager, SessionStore, create_session_state
+from forge.session import SessionManager, create_session_state
 from forge.session.hooks import HookInput, handle_session_start
 from forge.session.transfer import ResumeStrategy, assemble_transfer_context
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -236,9 +237,8 @@ def test_worktree_fork_handoff_regenerates_stale_context(tmp_path: Path) -> None
     )
     parent_state.confirmed.transcript_path = str(transcript)
 
-    SessionStore(str(parent_dir), "stale-parent").write(parent_state)
     manager = SessionManager()
-    manager.index_store.add_from_state(parent_state, str(parent_dir))
+    publish_session(manager.index_store, parent_state, parent_dir)
 
     # Legacy stale flat files at the OLD location. New code ignores these
     # entirely; they remain on disk until GC sweeps them.
@@ -297,8 +297,7 @@ def test_worktree_fork_handoff_writes_to_nested_forge_root(tmp_path: Path) -> No
     parent_state.forge_root = str(parent_dir)
 
     manager = SessionManager()
-    SessionStore(str(parent_dir), "parent").write(parent_state)
-    manager.index_store.add_from_state(parent_state, str(parent_dir))
+    publish_session(manager.index_store, parent_state, parent_dir)
 
     fork_state = create_session_state(
         "child",

@@ -349,6 +349,19 @@ tests = missing fixture.
 **Module-level test doubles**: If a fake class (e.g., `_Proc`) appears in multiple tests in one file, define it once at
 module level with parameterized construction — don't duplicate inline.
 
+### Durable session state
+
+Ordinary tests must create and delete indexed sessions with the builders in `tests.fixtures.session_state`. Use
+`publish_session` when the test already has a `SessionState`, `publish_session_from_fields` for minimal state, and
+`delete_published_session` for complete removal. These builders route through `create_session_txn` and
+`delete_session_txn`, preserving row-first publication, compensation, binding uniqueness, lock order, and
+ownership-aware deletion.
+
+Tests whose subject is an impossible or incomplete state may use `seed_row_only_session` or `remove_index_row_only`.
+Each such call must explain the violated invariant at the call site. Do not use those raw builders as shortcuts for
+ordinary setup, and do not call `IndexStore.add_session`, `add_from_state`, or `remove_session` outside their direct API
+contract tests.
+
 ---
 
 ## LLM Testing Strategy

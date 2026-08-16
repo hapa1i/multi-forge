@@ -16,6 +16,7 @@ from forge.cli.hooks import hooks
 from forge.session import SessionStore, create_session_state
 from forge.session.index import IndexStore
 from forge.session.models import AdoptionConfirmed
+from tests.fixtures.session_state import publish_session
 
 
 def _write_pending_transcript_marker(
@@ -345,7 +346,11 @@ class TestStopHook:
         manifest.confirmed.confirmed_by = "hook:SessionStart:startup"
         store.write(manifest)
 
-        IndexStore().add_from_state(
+        # `_write_manifest` serves manifest-only hook tests. Re-publish this
+        # specialized snapshot through the row-first transaction for this test.
+        assert store.delete()
+        publish_session(
+            IndexStore(),
             manifest,
             str(tmp_path),
             checkout_root=str(tmp_path),

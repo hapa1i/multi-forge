@@ -38,6 +38,7 @@ from forge.session.codex_handoff import (
     write_observation_receipt,
 )
 from forge.session.models import CodexConfirmed, create_session_state
+from tests.fixtures.session_state import publish_session
 
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "codex"
 _SUCCESS_STREAM = (_FIXTURES / "exec_json_success.jsonl").read_text()
@@ -104,17 +105,15 @@ def _write_transcript(path: Path) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _index_session(name: str, forge_root: Path, project_root: Path, parent: str | None = None) -> None:
-    IndexStore().add_session(
-        name=name,
-        worktree_path=str(forge_root),
-        project_root=str(project_root),
+def _publish_session(state, forge_root: Path, project_root: Path, parent: str | None = None) -> None:
+    state.parent_session = parent
+    publish_session(
+        IndexStore(),
+        state,
+        project_root,
         forge_root=str(forge_root),
         checkout_root=str(forge_root),
         relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session=parent,
     )
 
 
@@ -124,8 +123,7 @@ def _seed_parent(proj: Path) -> None:
     _write_transcript(transcript)
     state = create_session_state(name="planner", worktree_path=str(proj))
     state.confirmed.transcript_path = str(transcript)
-    SessionStore(str(proj), "planner").write(state)
-    _index_session("planner", proj, proj)
+    _publish_session(state, proj, proj)
 
 
 def _make_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, ExecutionContext]:
@@ -373,8 +371,7 @@ class TestStartCodexSession:
         from forge.session.models import Derivation
 
         other.confirmed.derivation = Derivation(parent_session="planner", context_file=str(snapshot))
-        SessionStore(str(other_root), "other").write(other)
-        _index_session("other", other_root, other_root)
+        _publish_session(other, other_root, other_root)
 
         with _codex_mocks():
             with pytest.raises(ForgeOpError, match="referenced by another"):
@@ -683,8 +680,7 @@ def _seed_duplicate_project(tmp_path: Path, name: str = "impl") -> Path:
     other_root = tmp_path / "other"
     (other_root / ".forge").mkdir(parents=True)
     other = create_session_state(name=name, worktree_path=str(other_root))
-    SessionStore(str(other_root), name).write(other)
-    _index_session(name, other_root, other_root)
+    _publish_session(other, other_root, other_root)
     return other_root
 
 
@@ -739,8 +735,7 @@ def _seed_codex_session(proj: Path, name: str = "impl", thread_id: str | None = 
     state = create_session_state(name=name, worktree_path=str(proj), runtime="codex", parent_session="planner")
     if thread_id is not None:
         state.confirmed.codex = CodexConfirmed(thread_id=thread_id)
-    SessionStore(str(proj), name).write(state)
-    _index_session(name, proj, proj, parent="planner")
+    _publish_session(state, proj, proj, parent="planner")
 
 
 class TestContinueCodexSession:
@@ -754,8 +749,8 @@ class TestContinueCodexSession:
         state = create_session_state(name="impl", worktree_path=str(missing), runtime="codex")
         state.forge_root = str(proj)
         state.confirmed.codex = CodexConfirmed(thread_id=_SUCCESS_TID)
-        SessionStore(str(proj), "impl").write(state)
-        IndexStore().add_from_state(
+        publish_session(
+            IndexStore(),
             state,
             project_root=str(proj),
             forge_root=str(proj),
@@ -881,8 +876,7 @@ class TestContinueCodexSession:
             auth_source="codex_store",
             billing_mode="subscription_quota",
         )
-        SessionStore(str(proj), "impl").write(state)
-        _index_session("impl", proj, proj, parent="planner")
+        _publish_session(state, proj, proj, parent="planner")
 
         changed = replace(_preflight(), auth_method="api_key", auth_source="env", billing_mode="api")
         with _codex_mocks():

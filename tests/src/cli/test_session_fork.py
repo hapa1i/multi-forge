@@ -17,6 +17,7 @@ from forge.cli.main import main
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
+from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     _proxy_cfg,
     _proxy_routing,
@@ -40,11 +41,10 @@ def _seed_cross_project_session(project: Path, session_name: str = "cross-sess")
         worktree_path=str(other_root),
     )
     manifest.forge_root = str(other_root)
-    SessionStore(str(other_root), session_name).write(manifest)
-    IndexStore().add_session(
-        name=session_name,
-        worktree_path=str(other_root),
-        project_root=str(project),
+    publish_session(
+        IndexStore(),
+        manifest,
+        project,
         forge_root=str(other_root),
     )
     return other_root
@@ -139,11 +139,10 @@ class TestCrossProjectResolution:
             worktree_path=str(temp_env),
         )
         local.forge_root = str(temp_env)
-        SessionStore(str(temp_env), "local-sess").write(local)
-        IndexStore().add_session(
-            name="local-sess",
-            worktree_path=str(temp_env),
-            project_root=str(temp_env),
+        publish_session(
+            IndexStore(),
+            local,
+            temp_env,
             forge_root=str(temp_env),
         )
 

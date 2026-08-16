@@ -9,8 +9,9 @@ from click.testing import CliRunner
 from pytest import fixture
 
 from forge.cli.main import main
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session, publish_session_from_fields
 
 
 def _project_env(tmp_path: Path, monkeypatch):
@@ -39,11 +40,10 @@ def _seed_session(
         state.intent.policy = policy
     if claude_session_id:
         state.confirmed.claude_session_id = claude_session_id
-    SessionStore(forge_root, name).write(state)
-    IndexStore().add_session(
-        name=name,
-        worktree_path=forge_root,
-        project_root=project_root or forge_root,
+    publish_session(
+        IndexStore(),
+        state,
+        project_root or forge_root,
         forge_root=forge_root,
         checkout_root=forge_root,
         relative_path=".",
@@ -331,16 +331,16 @@ class TestSupervisedTip:
         _seed_session(project_root, "planner", project_root=project_root)
 
         broken_dir = Path(project_root) / ".forge" / "sessions" / "broken"
-        broken_dir.mkdir(parents=True)
-        (broken_dir / "forge.session.json").write_text("{invalid json")
-        IndexStore().add_session(
-            name="broken",
-            worktree_path=project_root,
-            project_root=project_root,
+        publish_session_from_fields(
+            IndexStore(),
+            "broken",
+            project_root,
+            project_root,
             forge_root=project_root,
             checkout_root=project_root,
             relative_path=".",
         )
+        (broken_dir / "forge.session.json").write_text("{invalid json")
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
         result = runner.invoke(main, ["policy", "status"])
