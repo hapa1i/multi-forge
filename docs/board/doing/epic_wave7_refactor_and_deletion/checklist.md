@@ -3,9 +3,8 @@
 Current focus: orders 1--13 and the bounded
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member are closed through
 PR #188. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
-shipped in PR #189, order 11 shipped in PR #190, order 12 shipped in PR #191, and order 13 shipped in PR #192. Order 14
-[`replace_unsafe_index_test_fixtures`](../replace_unsafe_index_test_fixtures/card.md) is active from `74b364d2`; keep
-orders 15--35 in `todo/`.
+shipped in PR #189, order 11 shipped in PR #190, order 12 shipped in PR #191, order 13 shipped in PR #192, and order 14
+shipped in PR #193; keep orders 15--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -82,6 +81,7 @@ orders 15--35 in `todo/`.
   only order 14 after reverifying 180 executable calls across 48 test files.
 - [x] Replace ordinary unsafe index setup with invariant-preserving shared builders while retaining explicit invalid and
   race fixtures; complete focused/full/integration/board verification before selecting order 15.
+- [x] Ship order 14 independently in PR #193 (`56dfc27b`) and close its member without activating order 15.
 
 Orders 15--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

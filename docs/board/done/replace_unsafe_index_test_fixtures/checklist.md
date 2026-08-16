@@ -1,6 +1,6 @@
 # Replace unsafe index test fixtures checklist
 
-Current focus: Wave 7 order 14 is active from `74b364d2`; keep orders 15--35 parked.
+Current focus: complete -- order 14 shipped in PR #193 (`56dfc27b`); order 15 remains parked pending explicit selection.
 
 ## Activation and evidence
 
@@ -33,4 +33,6 @@ Current focus: Wave 7 order 14 is active from `74b364d2`; keep orders 15--35 par
   clean; the combined design corpus remained under budget at 59,973 tokens; 347 board files contained 885 valid local
   links with none missing; the Wave 7 lane remained 13 done, one doing, and 21 parked.
 - [x] Open draft PR #193 for order 14.
-- [ ] After merge, close this member before selecting order 15.
+- [x] Close the member after PR #193 merged as `56dfc27b` with all five GitHub checks passing.
+- [x] Complete the post-merge audit: all 879 local path links across 347 board documents resolve, the Wave 7 graph is 14
+  `done` / 0 `doing` / 21 `todo`, and the change log remains within budget at 26,811 tokens.

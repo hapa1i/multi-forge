@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-16
 
+### Make durable session test state transactional
+
+**Goal/outcome**: Replace unsafe row-only test setup with shared builders that preserve the production row-plus-manifest
+transaction contract.
+
+**Key changes**:
+
+- Routed ordinary test publication and deletion through transaction-backed builders, with contract coverage for write
+  order, compensation, binding uniqueness, and ownership-aware deletion.
+- Isolated deliberate crash residue, orphan manifests, and race states behind explicit raw helpers, leaving only 18
+  direct mutator-contract calls for the independent API-deletion member.
+
+**Verification**: 1,775 focused session/core-ops tests, 9,211 unit tests (one skip, 122 deselected), 913 regressions, 69
+targeted Docker session tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #193 merged as
+`56dfc27b` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Migrate legacy memory-intent state
 
 **Goal/outcome**: Remove the behaviorless `MemoryIntent.generated_file` field without making Forge-authored legacy

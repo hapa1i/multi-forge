@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--13 and both bounded corrective members are closed through PR #192. Order 14
-[`replace_unsafe_index_test_fixtures`](../replace_unsafe_index_test_fixtures/card.md) is active from `74b364d2`; keep
-orders 15--35 parked.
+Current focus: Wave 7 orders 1--14 and both bounded corrective members are closed through PR #193; keep orders 15--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -234,6 +233,7 @@ orders 15--35 parked.
   while keeping orders 14--35 parked.
 - [x] Close PR #192 on `main` at `74b364d2`, branch from that exact commit, and activate only order 14
   `replace_unsafe_index_test_fixtures` after reverifying 180 executable calls across 48 test files.
-- [x] Migrate unsafe index test setup through coherent shared builders while keeping orders 15--35 parked.
+- [x] Migrate unsafe index test setup through coherent shared builders in PR #193 (`56dfc27b`) while keeping orders
+  15--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

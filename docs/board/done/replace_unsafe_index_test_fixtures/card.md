@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/replace-unsafe-index-test-fixtures` from `74b364d2`.
+**Lane**: `done/` -- shipped in PR #193 (`56dfc27b`) on 2026-08-16.
 
 **Finding**: O050's caller-migration phase.
 
@@ -31,3 +31,13 @@ integration script; the raw textual count of 183 also includes three test docstr
 
 This card does not delete the public methods. That occurs only in
 [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md) after a zero-caller recheck.
+
+## Outcome
+
+Ordinary tests now publish and delete coherent row-plus-manifest state through shared transaction-backed builders.
+Deliberate crash residue, orphan manifests, and race states use narrowly named raw helpers with call-site rationale;
+only 18 direct mutator-contract calls remain for the independent deletion member.
+
+PR #193 merged as `56dfc27b` after 1,775 focused session/core-ops tests, 9,211 unit tests (one skip, 122 deselected),
+913 regressions, 69 targeted Docker session tests, full pre-commit, board/design checks, and all five GitHub checks
+passed. No Forge workflow command was used.
