@@ -1,6 +1,6 @@
 # Remove the dead session-context retry checklist
 
-Current focus: implementation and verification complete; draft PR pending. Orders 18--35 remain parked.
+Current focus: draft PR #196 is open; await review and merge. Orders 18--35 remain parked.
 
 ## Activation and evidence
 
@@ -22,4 +22,5 @@ Current focus: implementation and verification complete; draft PR pending. Order
   Docker session-lifecycle integration coverage (23 passed).
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 893 local links across 351 board documents resolve, and Wave 7 is 16 `done` / 1 `doing` / 18 `todo`.
-- [ ] Open a draft PR for order 17 and record its final proof before closeout.
+- [x] Open draft PR #196 for order 17.
+- [ ] After merge, close this member before selecting order 18.
