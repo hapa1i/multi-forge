@@ -2,9 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--14 shipped independently in PRs #178--#184, #186--#188, and #190--#193; 21 members
-remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
-correction shipped in PR #189 before order 11; the earlier
+**Lane**: `doing/` -- orders 1--14 shipped independently in PRs #178--#184, #186--#188, and #190--#193; order 15
+[`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md) is active from `0e8e1cbb`, with 20 members
+parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction
+shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal
@@ -65,7 +66,7 @@ runs last so it lands on the smallest stable surface.
 | 12    | O049 config      | [`migrate_inert_config_fields`](../../done/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |
 | 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |
 | 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../done/replace_unsafe_index_test_fixtures/card.md)           | transaction-safe test state construction             |
-| 15    | O050 API         | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                       | zero-caller unsafe public mutators                   |
+| 15    | O050 API         | [`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md)                               | zero-caller unsafe public mutators                   |
 | 16    | O051             | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
 | 17    | O052             | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)             | session-context error classification                 |
 | 18    | O092 session     | [`remove_dead_session_helpers`](../../todo/remove_dead_session_helpers/card.md)                         | verified internal session-only zero-callers          |

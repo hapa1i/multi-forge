@@ -30,7 +30,7 @@ integration script; the raw textual count of 183 also includes three test docstr
 ## Exclusions
 
 This card does not delete the public methods. That occurs only in
-[`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md) after a zero-caller recheck.
+[`retire_unsafe_index_mutators`](../../doing/retire_unsafe_index_mutators/card.md) after a zero-caller recheck.
 
 ## Outcome
 

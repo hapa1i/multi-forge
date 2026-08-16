@@ -1,6 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--14 and both bounded corrective members are closed through PR #193; keep orders 15--35
+Current focus: Wave 7 orders 1--14 and both bounded corrective members are closed through PR #193. Order 15
+[`retire_unsafe_index_mutators`](../retire_unsafe_index_mutators/card.md) is active from `0e8e1cbb`; keep orders 16--35
 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
@@ -235,5 +236,8 @@ parked.
   `replace_unsafe_index_test_fixtures` after reverifying 180 executable calls across 48 test files.
 - [x] Migrate unsafe index test setup through coherent shared builders in PR #193 (`56dfc27b`) while keeping orders
   15--35 parked.
+- [x] Close PR #193 on `main` at `0e8e1cbb`, branch from that exact commit, and activate only order 15
+  `retire_unsafe_index_mutators` after reverifying the residual direct contracts and stale references.
+- [x] Delete only the unsafe public index mutators and their direct contracts while keeping orders 16--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

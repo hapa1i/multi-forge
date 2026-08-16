@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O050).
 
-**Lane**: `todo/` -- accepted Wave 7 durable-state cleanup work.
+**Lane**: `doing/` -- active on `refactor/retire-unsafe-index-mutators` from `0e8e1cbb`.
 
 **Finding**: O050's public-mutator deletion phase.
 
@@ -16,8 +16,10 @@ Delete the unsafe public mutators after every caller has moved to transaction-sa
 
 ## Evidence and Authority
 
-On `5777192a`, `add_session`, `add_from_state`, and `remove_session` have no production callers, but approximately 183
-test calls across 48 files make immediate deletion an oversized and unsafe fixture rewrite. The authority is
+Reverified on `0e8e1cbb`: `add_session`, `add_from_state`, and `remove_session` have no external production callers.
+Only `add_from_state` calls another member internally; 18 executable calls remain in direct API contracts in
+`tests/src/session/test_index.py`, plus one stale non-call test assignment to `add_from_state`. Order 14 moved every
+ordinary fixture to transaction-safe builders. The authority is
 [`docs/design.md` "3.2 Contract files"](../../../design.md#32-contract-files-authoritative-paths) and the row-first
 transaction contract in
 [`docs/design.md` "3.3 Session file schema"](../../../design.md#33-session-file-schema-forgesessionjson).
@@ -27,6 +29,8 @@ transaction contract in
 - Confirm the prerequisite leaves zero callers outside the definitions and lock-local transaction implementation.
 - Delete `IndexStore.add_session`, `add_from_state`, and `remove_session` plus direct-only tests.
 - Retain only private lock-local primitives required by `create_session_txn` and `delete_session_txn`.
+- Convert the fixture drift guard from a direct-contract allowlist to a zero-reference invariant.
+- Remove stale live-code, test, and developer-guide references without rewriting historical completed-work records.
 - Preserve row-first creation, in-lock compensation, binding uniqueness, delete ownership, and race fixtures.
 - Run focused index/session/regression tests and targeted session integration coverage.
 

@@ -574,8 +574,8 @@ def _check_still_adoptable(
         )
 
     # Index rows, their manifests, and orphan manifests under this project (card
-    # step 1). The in-lock check inside add_session is index-only, so any binding
-    # the index has not recorded would otherwise pass every gate and double-bind.
+    # step 1). The in-lock check inside create_session_txn is index-only, so any
+    # binding the index has not recorded would otherwise pass every gate and double-bind.
     try:
         owner = collect_bound_uuids(forge_root).get(session_uuid)
     except BindingLookupError as e:

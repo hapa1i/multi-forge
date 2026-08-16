@@ -193,7 +193,7 @@ class TestCompensation:
     ) -> None:
         """file_lock_for_target is not reentrant, so compensation must stay in-lock.
 
-        A compensation that called `remove_session` would block on the lock it
+        A compensation that reacquired the index lock would block on the lock it
         already holds and surface FileLockTimeoutError instead of the callback's
         own error.
         """

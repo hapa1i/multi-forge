@@ -104,8 +104,8 @@ def test_force_worktree_fork_rolls_back_created_git_state_on_commit_failure(
     repo_root = get_repo_root(repo)
     expected_worktree = resolve_worktree_path(repo_root, "child")
 
-    # Inject at the commit transaction: since session_create_crash_atomicity the
-    # row and manifest are written by create_session_txn, not add_from_state.
+    # Inject at the commit transaction: row and manifest publication is atomic
+    # under create_session_txn's index lock.
     original_txn = index_store.create_session_txn
 
     def fail_commit(state, *args, **kwargs):

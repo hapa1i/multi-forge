@@ -477,7 +477,6 @@ class TestWorktreeOwnership:
         real_mgr = SessionManager()
         real_mgr.index_store = MagicMock()
         real_mgr.index_store.session_exists.return_value = False
-        real_mgr.index_store.add_from_state = MagicMock()
 
         def _get_session(name: str, forge_root: str | None = None) -> SessionIndexEntry:
             if name == "planner" and forge_root is None:

@@ -11,8 +11,8 @@ Session manifests are treated as a strict contract:
 
 Writes always produce schema v1.
 
-Invariant: session names are globally unique across all worktrees (enforced by
-IndexStore.add_session). The directory name IS the session name.
+Invariant: session names are unique within one forge root (enforced by
+IndexStore.create_session_txn). The directory name IS the session name.
 """
 
 from __future__ import annotations

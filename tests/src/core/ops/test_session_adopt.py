@@ -461,9 +461,8 @@ class TestConcurrencyAndRollback:
         real_delete = store.delete
         blocked: list[str] = []
 
-        # Keep the mutation check cheap: before rollback used delete_session_txn,
-        # this nested index acquisition succeeded because remove_session had
-        # already released the lock.
+        # Keep the mutation check cheap: before rollback held one transaction
+        # lock through both removals, this nested index acquisition succeeded.
         monkeypatch.setattr(index_mod, "CLI_LOCK_TIMEOUT_S", 0.05)
 
         def _delete_while_probing_the_index() -> bool:
