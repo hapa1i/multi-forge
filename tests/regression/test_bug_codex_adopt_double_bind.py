@@ -176,8 +176,8 @@ def test_interleaved_adopts_bind_the_thread_once(project: Path, monkeypatch: pyt
 def test_an_orphan_manifest_from_a_killed_adopt_blocks_the_next_one(project: Path) -> None:
     """A binding that never reached the index still owns the thread.
 
-    Reproduces what a SIGKILL between ``create_exclusive`` and ``add_from_state``
-    leaves behind: a manifest carrying the thread id, with no index row. The index
+    Reproduces what a SIGKILL between the legacy manifest and index writes leaves
+    behind: a manifest carrying the thread id, with no index row. The index
     write lock cannot see it, so only the orphan scan can.
     """
     ctx = ExecutionContext.from_cwd(project)

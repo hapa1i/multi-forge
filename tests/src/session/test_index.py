@@ -15,7 +15,6 @@ from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import (
     IndexCorruptedError,
     InvalidSessionNameError,
-    SessionExistsError,
     SessionNotFoundError,
     UuidAlreadyBoundError,
 )
@@ -31,19 +30,11 @@ from forge.session.models import (
     SessionIndex,
     create_session_state,
 )
-from forge.session.store import get_manifest_path
 from tests.fixtures.session_state import (
     publish_session,
     publish_session_from_fields,
     seed_row_only_session,
 )
-
-
-def _create_manifest_stub(worktree: Path, session_name: str) -> None:
-    """Create a minimal manifest file at the per-session path."""
-    manifest_path = get_manifest_path(worktree, session_name)
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text("{}")
 
 
 @pytest.fixture
@@ -178,66 +169,6 @@ class TestIndexStoreWrite:
             data = json.load(f)
         assert data["version"] == INDEX_VERSION
         assert data["sessions"] == {}
-
-
-class TestIndexStoreAddSession:
-    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
-
-    def test_add_session_basic(self, store: IndexStore) -> None:
-        """add_session() should add a new session."""
-        wt = Path(store.index_path).parent.parent / "wt_add_basic"
-        _create_manifest_stub(wt, "test-session")
-
-        entry = store.add_session(
-            name="test-session",
-            worktree_path=str(wt),
-            project_root="/path/to/project",
-        )
-
-        assert entry.worktree_path == str(wt)
-        assert entry.project_root == "/path/to/project"
-        assert entry.is_fork is False
-        assert entry.is_incognito is False
-
-        # Verify persisted (scoped key, not bare name)
-        assert store.session_exists("test-session")
-
-    def test_add_session_with_flags(self, store: IndexStore) -> None:
-        """add_session() should support fork/incognito flags."""
-        wt = Path(store.index_path).parent.parent / "wt_flags"
-        _create_manifest_stub(wt, "fork-session")
-
-        entry = store.add_session(
-            name="fork-session",
-            worktree_path=str(wt),
-            project_root="/path",
-            is_fork=True,
-            is_incognito=True,
-            parent_session="parent",
-        )
-
-        assert entry.is_fork is True
-        assert entry.is_incognito is True
-        assert entry.parent_session == "parent"
-
-    def test_add_session_duplicate(self, store: IndexStore) -> None:
-        """add_session() should raise SessionExistsError for duplicates."""
-        wt = Path(store.index_path).parent.parent / "wt_dup"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
-
-        with pytest.raises(SessionExistsError) as exc_info:
-            store.add_session("test-session", str(wt), "/other")
-        assert "test-session" in str(exc_info.value)
-
-    def test_add_session_invalid_name(self, store: IndexStore) -> None:
-        """add_session() should validate session name."""
-        wt = Path(store.index_path).parent.parent / "wt_invalid_name"
-        _create_manifest_stub(wt, "valid-name")
-
-        with pytest.raises(InvalidSessionNameError):
-            store.add_session("INVALID", str(wt), "/path")
 
 
 class TestIndexStoreGetSession:
@@ -434,32 +365,6 @@ class TestIndexStoreUpdateSession:
             store.update_session("nonexistent")
 
 
-class TestIndexStoreRemoveSession:
-    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
-
-    def test_remove_session_existing(self, store: IndexStore) -> None:
-        """remove_session() should remove existing session."""
-        wt = Path(store.index_path).parent.parent / "wt_remove"
-        _create_manifest_stub(wt, "test-session")
-
-        store.add_session("test-session", str(wt), "/path")
-        assert store.session_exists("test-session") is True
-
-        result = store.remove_session("test-session")
-        assert result is True
-        assert store.session_exists("test-session") is False
-
-    def test_remove_session_not_found(self, store: IndexStore) -> None:
-        """remove_session() should return False for missing session."""
-        result = store.remove_session("nonexistent")
-        assert result is False
-
-    def test_remove_session_invalid_name(self, store: IndexStore) -> None:
-        """remove_session() should validate session name."""
-        with pytest.raises(InvalidSessionNameError):
-            store.remove_session("INVALID")
-
-
 class TestIndexStoreSessionExists:
     """Test IndexStore.session_exists()."""
 
@@ -476,63 +381,6 @@ class TestIndexStoreSessionExists:
     def test_session_exists_invalid_name(self, store: IndexStore) -> None:
         """session_exists() should return False for invalid name."""
         assert store.session_exists("INVALID") is False
-
-
-class TestIndexStoreAddFromManifest:
-    """Direct legacy-mutator contracts retained for Wave 7 order 15 deletion."""
-
-    # Default proxy values for tests (proxy is required in v1 manifests)
-    DEFAULT_PROXY_TEMPLATE = "test-family"
-    DEFAULT_PROXY_URL = "http://localhost:8080"
-
-    def test_add_from_state_basic(self, store: IndexStore) -> None:
-        """add_from_state() should add session from manifest."""
-        manifest = create_session_state(
-            "test-session",
-            proxy_template=self.DEFAULT_PROXY_TEMPLATE,
-            proxy_base_url=self.DEFAULT_PROXY_URL,
-        )
-
-        entry = store.add_from_state(manifest, "/path/to/project")
-
-        assert store.session_exists("test-session") is True
-        assert entry.project_root == "/path/to/project"
-        assert entry.worktree_path == "/path/to/project"  # No worktree
-
-    def test_add_from_state_with_worktree(self, store: IndexStore) -> None:
-        """add_from_state() should use worktree path if present."""
-        wt = Path(store.index_path).parent.parent / "wt_add_from_state"
-        _create_manifest_stub(wt, "test-session")
-
-        manifest = create_session_state(
-            "test-session",
-            proxy_template=self.DEFAULT_PROXY_TEMPLATE,
-            proxy_base_url=self.DEFAULT_PROXY_URL,
-            worktree_path=str(wt),
-            worktree_branch="feature",
-        )
-
-        entry = store.add_from_state(manifest, "/path/to/project")
-
-        assert entry.worktree_path == str(wt)
-        assert entry.project_root == "/path/to/project"
-
-    def test_add_from_state_with_flags(self, store: IndexStore) -> None:
-        """add_from_state() should preserve fork/incognito flags."""
-        manifest = create_session_state(
-            "fork-session",
-            proxy_template=self.DEFAULT_PROXY_TEMPLATE,
-            proxy_base_url=self.DEFAULT_PROXY_URL,
-            parent_session="parent",
-            is_fork=True,
-            is_incognito=True,
-        )
-
-        entry = store.add_from_state(manifest, "/path")
-
-        assert entry.is_fork is True
-        assert entry.is_incognito is True
-        assert entry.parent_session == "parent"
 
 
 class TestIndexStoreUuidFields:
@@ -678,7 +526,7 @@ class TestProjectIdentityFields:
     DEFAULT_PROXY_TEMPLATE = "test-family"
     DEFAULT_PROXY_URL = "http://localhost:8080"
 
-    def test_add_session_stores_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
+    def test_published_entry_stores_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
         """Published rows persist forge_root, checkout_root, and relative_path."""
         worktree = tmp_path / "checkout"
         worktree.mkdir()
@@ -719,8 +567,8 @@ class TestProjectIdentityFields:
         assert entry.checkout_root == str(worktree)
         assert entry.relative_path == "."
 
-    def test_add_from_state_passes_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
-        """add_from_state() passes caller-provided identity fields to the index."""
+    def test_publish_session_passes_identity_fields(self, store: IndexStore, tmp_path: Path) -> None:
+        """Publishing passes caller-provided identity fields to the index."""
         worktree = tmp_path / "wt"
         worktree.mkdir()
         (worktree / ".forge").mkdir()
@@ -745,8 +593,8 @@ class TestProjectIdentityFields:
         assert entry.checkout_root == str(worktree)
         assert entry.relative_path == "."
 
-    def test_add_from_state_falls_back_to_state_forge_root(self, store: IndexStore, tmp_path: Path) -> None:
-        """add_from_state() uses state.forge_root when caller doesn't provide forge_root."""
+    def test_publish_session_falls_back_to_state_forge_root(self, store: IndexStore, tmp_path: Path) -> None:
+        """Publishing uses state.forge_root when the caller omits forge_root."""
         worktree = tmp_path / "wt"
         worktree.mkdir()
 
@@ -885,21 +733,6 @@ class TestProjectScopedNames:
         assert store.session_exists("planner", forge_root=str(wt_a))
         assert not store.session_exists("planner", forge_root=str(wt_c))
 
-    def test_remove_session_scoped(self, store: IndexStore) -> None:
-        """Direct legacy mutator: removing project A must not affect project B."""
-        wt_a = Path(store.index_path).parent.parent / "project-a"
-        wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
-
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
-
-        store.remove_session("planner", forge_root=str(wt_a))
-
-        assert not store.session_exists("planner", forge_root=str(wt_a))
-        assert store.session_exists("planner", forge_root=str(wt_b))
-
     def test_list_sessions_returns_display_names(self, store: IndexStore) -> None:
         """list_sessions returns display names, not scoped keys."""
         wt_a = Path(store.index_path).parent.parent / "project-a"
@@ -1021,21 +854,6 @@ class TestProjectScopedNames:
 
         with pytest.raises(AmbiguousSessionError):
             store.update_session("planner")
-
-    def test_remove_session_unscoped_ambiguous_raises(self, store: IndexStore) -> None:
-        """Direct legacy mutator: unscoped duplicate removal raises."""
-        from forge.session.exceptions import AmbiguousSessionError
-
-        wt_a = Path(store.index_path).parent.parent / "project-a"
-        wt_b = Path(store.index_path).parent.parent / "project-b"
-        _create_manifest_stub(wt_a, "planner")
-        _create_manifest_stub(wt_b, "planner")
-
-        store.add_session("planner", str(wt_a), str(wt_a), forge_root=str(wt_a))
-        store.add_session("planner", str(wt_b), str(wt_b), forge_root=str(wt_b))
-
-        with pytest.raises(AmbiguousSessionError):
-            store.remove_session("planner")
 
 
 class TestCodexThreadColumn:

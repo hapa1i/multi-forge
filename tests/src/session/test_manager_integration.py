@@ -657,8 +657,8 @@ manager.start_session(name='parent-session', worktree_path='/workspace')
 repo_root = get_repo_root(Path('/workspace'))
 expected_worktree = resolve_worktree_path(repo_root, 'fork-session')
 
-# Inject at the commit transaction: since session_create_crash_atomicity the row
-# and manifest are published by create_session_txn, not add_from_state.
+# Inject at the commit transaction: row and manifest publication is atomic under
+# create_session_txn's index lock.
 original_txn = index_store.create_session_txn
 
 def fail_commit(state, *args, **kwargs):

@@ -5,7 +5,7 @@ Root cause: `SessionManager.start_session` checked `session_exists` outside the
 index lock (manager.py:498) but wrote the manifest *before* reserving the index
 name. Two concurrent creates of one name both passed the stale pre-check; the
 loser overwrote the winner's manifest, hit `SessionExistsError` inside
-`add_session`'s lock, and its rollback deleted that manifest -- leaving the
+the legacy row-only index write, and its rollback deleted that manifest -- leaving the
 winner indexed with no state.
 
 Fix: reserve the index name before writing the manifest, matching the ordering

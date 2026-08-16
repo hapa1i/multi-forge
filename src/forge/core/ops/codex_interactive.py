@@ -535,9 +535,9 @@ def _discover_thread_post_exit(
 def _sync_codex_thread_to_index(name: str, thread_id: str | None, forge_root: str | None) -> None:
     """Keep ``SessionIndexEntry.codex_thread_id`` mirroring the manifest.
 
-    The column is what ``add_session`` checks under the index write lock when
-    adoption binds a pre-existing thread, so a stale value guards an id the session
-    no longer uses. Best-effort by contract (see ``IndexStore.update_codex_thread``).
+    The column is what ``create_session_txn`` checks under the index write lock
+    when adoption binds a pre-existing thread, so a stale value guards an id the
+    session no longer uses. Best-effort by contract (see ``IndexStore.update_codex_thread``).
     """
     if thread_id:
         IndexStore().update_codex_thread(name, thread_id, forge_root)

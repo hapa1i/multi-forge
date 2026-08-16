@@ -287,89 +287,6 @@ class IndexStore:
 
             return latest_entry
 
-    def add_session(
-        self,
-        name: str,
-        worktree_path: str,
-        project_root: str,
-        *,
-        is_fork: bool = False,
-        is_incognito: bool = False,
-        parent_session: str | None = None,
-        claude_session_id: str | None = None,
-        codex_thread_id: str | None = None,
-        forge_root: str | None = None,
-        checkout_root: str | None = None,
-        relative_path: str | None = None,
-        require_uuid_unbound: bool = False,
-    ) -> SessionIndexEntry:
-        """Add a new session to the index.
-
-        Session names are project-scoped: the same name can exist in different
-        forge_root projects. The dict key is a deterministic compound key.
-
-        Args:
-            name: Session display name (unique within this forge_root).
-            worktree_path: Absolute path to worktree.
-            project_root: Absolute path to main repository.
-            is_fork: Whether this is a forked session.
-            is_incognito: Whether this is an incognito session.
-            parent_session: Parent session name if this is a fork.
-            forge_root: Forge project root (where .forge/ lives).
-            checkout_root: Git checkout root (--show-toplevel).
-            relative_path: forge_root relative to checkout_root.
-            codex_thread_id: Native Codex thread id, when binding a pre-existing one.
-            require_uuid_unbound: Re-check conversation uniqueness **inside** this
-                method's write lock, for whichever of ``claude_session_id`` /
-                ``codex_thread_id`` is set. Callers that bind a pre-existing
-                conversation (``forge session adopt``) pass True: their
-                precondition check runs under a separate lock acquisition, so
-                without this two concurrent adopts on one conversation would both
-                pass and both bind. The check lives here rather than in a sibling
-                method so it shares this lock instead of duplicating the write.
-
-        Returns:
-            The created SessionIndexEntry.
-
-        Raises:
-            InvalidSessionNameError: If name is invalid.
-            SessionExistsError: If session already exists in this project.
-            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
-        """
-        validate_name(name)
-        effective_forge_root = forge_root or worktree_path
-
-        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
-            index = self.read()
-
-            scoped_key = make_scoped_key(name, effective_forge_root)
-            if scoped_key in index.sessions:
-                raise SessionExistsError(name)
-
-            if require_uuid_unbound:
-                self._require_conversation_unbound(
-                    index,
-                    claude_session_id=claude_session_id,
-                    codex_thread_id=codex_thread_id,
-                )
-
-            entry = self._build_entry(
-                worktree_path=worktree_path,
-                project_root=project_root,
-                is_fork=is_fork,
-                is_incognito=is_incognito,
-                parent_session=parent_session,
-                claude_session_id=claude_session_id,
-                codex_thread_id=codex_thread_id,
-                forge_root=effective_forge_root,
-                checkout_root=checkout_root,
-                relative_path=relative_path,
-            )
-
-            index.sessions[scoped_key] = entry
-            self.write(index)
-            return entry
-
     def create_session_txn(
         self,
         state: SessionState,
@@ -407,7 +324,7 @@ class IndexStore:
             forge_root: Forge project root; falls back to ``state.forge_root``.
             relative_path: forge_root relative to checkout_root.
             require_uuid_unbound: Re-check conversation uniqueness inside this
-                lock. See ``add_session`` for why adoption needs it.
+                publication lock so concurrent adopts cannot both bind it.
             write_manifest: Callable that writes the manifest. Runs after the row
                 is durable; its exception propagates unchanged after compensation.
 
@@ -423,8 +340,7 @@ class IndexStore:
         validate_name(name)
 
         worktree_path = state.worktree.path if state.worktree else project_root
-        # Mirrors add_from_state -> add_session: caller's forge_root, then the
-        # manifest's, then the worktree.
+        # Caller-provided root wins, then the manifest's root, then the worktree.
         effective_forge_root = forge_root or state.forge_root or worktree_path
         codex_thread_id = state.confirmed.codex.thread_id if state.confirmed.codex else None
 
@@ -550,8 +466,8 @@ class IndexStore:
 
         Codex can re-bind a thread across a resume ("drift"). The manifest records
         the live id, and this keeps the index column pointing at the same thing --
-        otherwise ``add_session``'s uniqueness check guards an id the session no
-        longer uses, and adoption could publish a second binding for the live one.
+        otherwise the publication transaction's uniqueness check guards an id the
+        session no longer uses, and adoption could publish a second binding for the live one.
 
         Best-effort, like ``update_uuid``: drift is already a fait accompli by the
         time this runs, so failing here must not break the resume that observed it.
@@ -576,32 +492,6 @@ class IndexStore:
                 self.write(index)
         except Exception as e:
             _log.debug("Codex index sync for '%s' failed (non-critical): %s", name, e)
-
-    def remove_session(self, name: str, forge_root: str | None = None) -> bool:
-        """Remove a session from the index.
-
-        Args:
-            name: Session display name.
-            forge_root: Scope to this project. Strict resolution when None.
-
-        Returns:
-            True if removed, False if not found.
-
-        Raises:
-            InvalidSessionNameError: If name is invalid.
-        """
-        validate_name(name)
-
-        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
-            index = self.read()
-
-            key = resolve_key_strict(index.sessions, name, forge_root)
-            if key is None:
-                return False
-
-            del index.sessions[key]
-            self.write(index)
-            return True
 
     def delete_session_txn(
         self,
@@ -750,52 +640,6 @@ class IndexStore:
                 return False
             return self._manifest_exists_for_row(key, index.sessions[key])
 
-    def add_from_state(
-        self,
-        state: SessionState,
-        project_root: str,
-        *,
-        checkout_root: str | None = None,
-        forge_root: str | None = None,
-        relative_path: str | None = None,
-        require_uuid_unbound: bool = False,
-    ) -> SessionIndexEntry:
-        """Add session to index from a session state.
-
-        Convenience method that extracts relevant fields from state.
-        Identity fields (forge_root, checkout_root, relative_path) are passed
-        explicitly by the caller — they are computed from git and filesystem state
-        that this method cannot derive from SessionState alone.
-
-        Args:
-            state: The session state.
-            project_root: Absolute path to main repository.
-            checkout_root: Git checkout root (--show-toplevel).
-            forge_root: Forge project root (where .forge/ lives).
-            relative_path: forge_root relative to checkout_root.
-
-        Returns:
-            The created SessionIndexEntry.
-        """
-        worktree_path = state.worktree.path if state.worktree else project_root
-        # Use state.forge_root as fallback if caller didn't pass it
-        effective_forge_root = forge_root or state.forge_root
-
-        return self.add_session(
-            name=state.name,
-            worktree_path=worktree_path,
-            project_root=project_root,
-            is_fork=state.is_fork,
-            is_incognito=state.is_incognito,
-            parent_session=state.parent_session,
-            claude_session_id=state.confirmed.claude_session_id,
-            codex_thread_id=state.confirmed.codex.thread_id if state.confirmed.codex else None,
-            forge_root=effective_forge_root,
-            checkout_root=checkout_root,
-            relative_path=relative_path,
-            require_uuid_unbound=require_uuid_unbound,
-        )
-
     def find_session_by_uuid(
         self, session_uuid: str, *, timeout_s: float = CLI_LOCK_TIMEOUT_S
     ) -> tuple[str, str] | None:
@@ -862,8 +706,8 @@ class IndexStore:
         Never raises. The caller is unwinding the manifest callback's exception and
         has promised to re-raise it unchanged, so a failure here must not replace
         it -- the row it could not remove is prunable, and every reader self-heals
-        it. Cannot call ``remove_session``: ``file_lock_for_target`` is not
-        reentrant, so re-entering it would deadlock against this transaction.
+        it. Cannot call another index-locking method: ``file_lock_for_target`` is
+        not reentrant, so re-entering it would deadlock against this transaction.
         """
         index.sessions.pop(scoped_key, None)
         try:

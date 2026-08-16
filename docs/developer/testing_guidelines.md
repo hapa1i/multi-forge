@@ -359,8 +359,8 @@ ownership-aware deletion.
 
 Tests whose subject is an impossible or incomplete state may use `seed_row_only_session` or `remove_index_row_only`.
 Each such call must explain the violated invariant at the call site. Do not use those raw builders as shortcuts for
-ordinary setup, and do not call `IndexStore.add_session`, `add_from_state`, or `remove_session` outside their direct API
-contract tests.
+ordinary setup. The retired `IndexStore.add_session`, `add_from_state`, and `remove_session` APIs must not be
+reintroduced; the unit-tier drift guard rejects attribute references across production and test code.
 
 ---
 
