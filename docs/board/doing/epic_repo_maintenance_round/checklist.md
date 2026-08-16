@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--16 and both bounded corrective members are closed through PR #195; keep orders 17--35
-parked.
+Current focus: Wave 7 orders 1--16 and both bounded corrective members are closed through PR #195. Order 17
+[`remove_dead_session_context_retry`](../remove_dead_session_context_retry/card.md) is active from `2ec0f92d`; keep
+orders 18--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -244,5 +245,8 @@ parked.
 - [x] Replace O051's nonexistent environment inference with explicit or named-default tier provenance while keeping
   orders 17--35 parked.
 - [x] Ship order 16 independently in PR #195 (`aca65c7f`) and close its member without activating order 17.
+- [x] Close PR #195 on `main` at `2ec0f92d`, branch from that exact commit, and activate only order 17
+  `remove_dead_session_context_retry` after reverifying its error and fallback paths.
+- [x] Delete only O052's duplicate index retry while keeping orders 18--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

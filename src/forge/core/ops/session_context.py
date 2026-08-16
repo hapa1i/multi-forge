@@ -164,16 +164,8 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             raise  # Propagate with location list intact
         except (StateCorruptedError, StateUnreadableError):
             raise  # corruption -> top-level reset handler, not "no session found"
-        except ForgeSessionError as e:
-            # Check if it's corruption (in index but manifest bad) vs not found
-            try:
-                manager.get_session_entry(session)
-            except (StateCorruptedError, StateUnreadableError):
-                raise  # corrupt index -> top-level reset handler
-            except ForgeSessionError:
-                pass  # Not in index — fall through to UUID lookup
-            else:
-                raise SessionContextError(str(e)) from e
+        except ForgeSessionError:
+            pass  # Not in index — fall through to UUID lookup
 
         # Try as Claude session UUID (cross-project)
         index = IndexStore()

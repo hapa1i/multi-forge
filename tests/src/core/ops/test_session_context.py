@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, call
 
 import pytest
 
 from forge.config.loader import write_proxy_instance_config
 from forge.config.schema import ProxyInstanceConfig, TierModels
+from forge.core.ops import context as context_module
+from forge.core.ops import session_context as session_context_module
 from forge.core.ops.session_context import (
     BindingLookupError,
     SessionContext,
@@ -21,10 +24,34 @@ from forge.core.ops.session_context import (
     get_session_context,
     resolve_session_identifier,
 )
-from forge.session import IndexStore, SessionStore, create_session_state
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.session import (
+    ForgeSessionError,
+    IndexStore,
+    SessionStore,
+    create_session_state,
+)
+from forge.session.exceptions import AmbiguousSessionError
 from forge.session.models import CodexConfirmed, PolicyIntent, StartedWithProxy
 from forge.session.store import get_manifest_path
 from tests.fixtures.session_state import publish_session
+
+
+@pytest.fixture
+def resolution_seams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Isolate the name, UUID-index, and manifest-scan resolution stages."""
+    manager = MagicMock()
+    index = MagicMock()
+    manifest_scan = MagicMock()
+
+    monkeypatch.setattr(session_context_module, "SessionManager", lambda: manager)
+    monkeypatch.setattr(session_context_module, "IndexStore", lambda: index)
+    monkeypatch.setattr(session_context_module, "scan_manifests_for_uuid", manifest_scan)
+    monkeypatch.setattr(context_module, "find_forge_root", lambda _path: Path("/scoped-project"))
+
+    return manager, index, manifest_scan
 
 
 class TestModelToFamily:
@@ -155,6 +182,69 @@ class TestResolveSessionIdentifier:
     def test_unknown_name_and_uuid_raises(self):
         with pytest.raises(SessionContextError, match="tried as name and UUID"):
             resolve_session_identifier("nonexistent-session-xyz-000")
+
+    def test_not_found_name_reaches_uuid_lookup_without_duplicate_retry(self, resolution_seams) -> None:
+        manager, index, manifest_scan = resolution_seams
+        manager.get_session_entry.side_effect = ForgeSessionError("not found")
+        index.find_session_by_uuid.return_value = ("uuid-owner", "/uuid-root")
+
+        assert resolve_session_identifier("session-or-uuid") == ("uuid-owner", "/uuid-root")
+        assert manager.get_session_entry.call_args_list == [
+            call("session-or-uuid", forge_root="/scoped-project"),
+            call("session-or-uuid"),
+        ]
+        index.find_session_by_uuid.assert_called_once_with("session-or-uuid")
+        manifest_scan.assert_not_called()
+
+    def test_not_found_uuid_reaches_manifest_fallback(self, resolution_seams) -> None:
+        manager, index, manifest_scan = resolution_seams
+        manager.get_session_entry.side_effect = ForgeSessionError("not found")
+        index.find_session_by_uuid.return_value = None
+        manifest_scan.return_value = ("manifest-owner", "/manifest-root")
+
+        assert resolve_session_identifier("session-or-uuid") == ("manifest-owner", "/manifest-root")
+        assert manager.get_session_entry.call_args_list == [
+            call("session-or-uuid", forge_root="/scoped-project"),
+            call("session-or-uuid"),
+        ]
+        index.find_session_by_uuid.assert_called_once_with("session-or-uuid")
+        manifest_scan.assert_called_once_with("session-or-uuid")
+
+    @pytest.mark.parametrize("error_type", [StateCorruptedError, StateUnreadableError])
+    def test_unscoped_index_state_errors_propagate(self, resolution_seams, error_type) -> None:
+        manager, index, manifest_scan = resolution_seams
+        manager.get_session_entry.side_effect = [
+            ForgeSessionError("scoped miss"),
+            error_type("/index.json", "cannot read"),
+        ]
+
+        with pytest.raises(error_type, match="index.json"):
+            resolve_session_identifier("session-or-uuid")
+
+        assert manager.get_session_entry.call_args_list == [
+            call("session-or-uuid", forge_root="/scoped-project"),
+            call("session-or-uuid"),
+        ]
+        index.find_session_by_uuid.assert_not_called()
+        manifest_scan.assert_not_called()
+
+    def test_unscoped_ambiguity_propagates_without_uuid_fallback(self, resolution_seams) -> None:
+        manager, index, manifest_scan = resolution_seams
+        manager.get_session_entry.side_effect = [
+            ForgeSessionError("scoped miss"),
+            AmbiguousSessionError("shared", ["/one", "/two"]),
+        ]
+
+        with pytest.raises(AmbiguousSessionError) as exc_info:
+            resolve_session_identifier("shared")
+
+        assert exc_info.value.forge_roots == ["/one", "/two"]
+        assert manager.get_session_entry.call_args_list == [
+            call("shared", forge_root="/scoped-project"),
+            call("shared"),
+        ]
+        index.find_session_by_uuid.assert_not_called()
+        manifest_scan.assert_not_called()
 
 
 class TestGetSessionContext:

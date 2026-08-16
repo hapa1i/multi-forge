@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-16
 
+### Remove the dead session-context retry
+
+**Goal/outcome**: Remove an index-only retry that could not observe the manifest corruption named by its comment.
+
+**Key changes**:
+
+- Explicit session identifiers now perform one scoped and one unscoped name lookup before UUID-index and stale-manifest
+  fallback, without repeating the unscoped lookup.
+- Added direct controls for corruption, unreadable-state, and ambiguity propagation plus both fallback stages and their
+  call order.
+
+**Verification**: 185 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
+session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. No Forge workflow command
+was used.
+
 ### Replace legacy environment-based tier inference
 
 **Goal/outcome**: Remove the nonexistent proxy tier environment shim and make the factory's tier provenance explicit.
