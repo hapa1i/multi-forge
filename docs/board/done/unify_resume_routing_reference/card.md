@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/unify-resume-routing-reference` from the order-23 closeout (`6e4038db`).
+**Lane**: `done/` -- shipped in PR #203 (`0d041b83`) after all five GitHub checks passed.
 
 **Finding**: O054.
 
@@ -30,3 +30,9 @@ only a template. The focused resume/mode/routing baseline is 73 passing tests. A
 
 Do not reroute direct sessions, change proxy health semantics, or alter transfer-context serialization beyond removing
 the duplicated calculation.
+
+## Closeout
+
+PR #203 merged as `0d041b83` with all five GitHub checks passing. Transfer, native, and rewind fresh-resume paths now
+share `_resume_context_ref`, retaining direct-mode null routing and proxy-ID precedence with template fallback. Order 25
+remains parked for separate activation from this closeout.

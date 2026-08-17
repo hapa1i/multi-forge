@@ -1,7 +1,6 @@
 # Unify resume routing-reference resolution checklist
 
-Current focus: order 24 is active on `refactor/unify-resume-routing-reference` from `6e4038db`; keep orders 25--35
-parked.
+Current focus: complete -- order 24 shipped in PR #203 (`0d041b83`); orders 25--35 remain parked.
 
 ## Activation and evidence
 
@@ -29,4 +28,4 @@ parked.
 - [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and `design_appendix.md` (29,990) stay
   below 30,000 tokens; and audit 358 board documents, 882 local links, zero missing links, and Wave 7's 23 done / one
   doing / 11 todo lanes without a Forge workflow.
-- [x] Commit and push order 24 for review without activating order 25.
+- [x] Open PR #203, merge it as `0d041b83` after all five checks pass, and close order 24 without activating order 25.

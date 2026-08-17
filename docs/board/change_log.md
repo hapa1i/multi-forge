@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-17
 
+### Unify resume routing-reference resolution
+
+**Goal/outcome**: Replace three drifted fresh-resume routing calculations with the existing shared reference rule while
+preserving context-budget and launch behavior.
+
+**Key changes**:
+
+- Routed transfer, native, and rewind fresh-resume context-limit lookup through `_resume_context_ref`.
+- Preserved explicit and inherited proxy-ID precedence, template fallback for legacy or injected routing, and
+  direct-mode null routing.
+- Added precedence regressions plus a structural guard against restoring local routing-field reads in the three modes.
+
+**Verification**: 79 focused tests, 9,220 unit tests (one skip, 122 deselected), 921 regressions, 16 targeted Docker
+resume tests (53 deselected), full pre-commit, 29,974/29,990 design-document counts, and the 358-document/882-link board
+audit pass. PR #203 merged as `0d041b83` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Share Codex thread index synchronization
 
 **Goal/outcome**: Replace the duplicated Codex post-turn index writer with one UI-free operation while preserving the
