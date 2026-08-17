@@ -11,6 +11,7 @@
 ## Goal
 
 Keep the explicit `--local` CLI while making both mutually exclusive mode flags write one authoritative destination.
+Align the omitted `--model` default with the repository's canonical `claude-opus-5` default.
 
 ## Evidence and Authority
 
@@ -22,13 +23,17 @@ Executable characterization confirms omitted mode, `--local`, and a network-free
 invocation all exit zero with the same count, while the conflicting pair exits two. Before this member, no direct test
 pinned those four invocations.
 
+The model catalog now makes `claude-opus-5` the canonical Opus default. Both the old and new Claude IDs use the same
+local `cl100k_base` fallback, so the existing design gates remain unchanged at 29,986 and 29,987 tokens.
+
 ## Acceptance Criteria
 
 - `--local`, omitted mode, and `--provider-api` select one named mode value with unchanged output/exit behavior.
 - `--local --provider-api` remains an argparse error and help continues to describe both choices.
+- Omitted `--model` uses `claude-opus-5` without changing the offline encoder or existing document counts.
 - Add direct script tests for all four invocations and run the repository token-count smoke checks.
 
 ## Exclusions
 
-Do not remove `--local`, change token models/provider access, alter output schemas, or require network access for local
-mode.
+Do not remove `--local`, change provider routing/access, alter output schemas, or require network access for local mode.
+Beyond the requested omitted-model refresh to `claude-opus-5`, do not change token-model behavior.

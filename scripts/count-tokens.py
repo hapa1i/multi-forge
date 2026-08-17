@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 
-DEFAULT_MODEL = "claude-opus-4-6"
+DEFAULT_MODEL = "claude-opus-5"
 _MODE_LOCAL = "local"
 _MODE_PROVIDER_API = "provider_api"
 

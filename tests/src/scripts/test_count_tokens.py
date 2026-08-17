@@ -12,6 +12,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPT = _REPO_ROOT / "scripts" / "count-tokens.py"
+_DEFAULT_MODEL = "claude-opus-5"
 _MODEL = "gpt-4o"
 
 
@@ -53,6 +54,16 @@ def get_encoding(name: str) -> _Encoding:
         )
 
     return run
+
+
+def test_default_model_is_current_opus(
+    run_count_tokens: Callable[..., subprocess.CompletedProcess[str]],
+) -> None:
+    result = run_count_tokens()
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert result.stdout == ("3 tokens | 14 chars | 2 lines\n" f"  method: tiktoken local ({_DEFAULT_MODEL})\n")
 
 
 def test_omitted_mode_uses_local_counting(
@@ -110,3 +121,4 @@ def test_help_retains_both_mode_choices(
     assert "no provider API" in result.stdout
     assert "--provider-api" in result.stdout
     assert "Try provider count_tokens APIs before falling back to" in result.stdout
+    assert f"default: {_DEFAULT_MODEL}" in result.stdout
