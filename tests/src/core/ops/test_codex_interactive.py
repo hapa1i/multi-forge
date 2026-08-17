@@ -270,7 +270,10 @@ class TestBareInteractiveStart:
         assert state.confirmed.codex.thread_id is None
 
     def test_deleted_during_tui_does_not_recreate_session_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        forbid_codex_thread_index_sync: Callable[[str], None],
     ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
@@ -278,6 +281,7 @@ class TestBareInteractiveStart:
             _make_rollout(_codex_home(tmp_path), _TID, cwd=kw["cwd"])
             assert SessionStore(str(proj), "solo").delete() is True
 
+        forbid_codex_thread_index_sync("codex_interactive")
         with _interactive_mocks():
             result = start_interactive_codex_session(
                 ctx=ctx, name="solo", invoke=_FakeInvoke(side_effect=_delete_during_tui)
@@ -624,7 +628,10 @@ class TestReattachCodexSession:
         assert state.confirmed.codex.last_run_at is not None
 
     def test_deleted_during_reattach_does_not_recreate_session_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        forbid_codex_thread_index_sync: Callable[[str], None],
     ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         _seed_codex_session(proj)
@@ -632,6 +639,7 @@ class TestReattachCodexSession:
         def _delete_during_tui(**kw: Any) -> None:
             assert SessionStore(str(proj), "impl").delete() is True
 
+        forbid_codex_thread_index_sync("codex_interactive")
         with _interactive_mocks():
             result = reattach_codex_session(ctx=ctx, name="impl", invoke=_FakeInvoke(side_effect=_delete_during_tui))
 

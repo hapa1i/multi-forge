@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -910,3 +911,32 @@ class TestCodexThreadColumn:
     def test_reconciling_an_unknown_session_is_a_no_op(self, tmp_path: Path) -> None:
         """Best-effort by contract: drift already happened, so this must not raise."""
         IndexStore().update_codex_thread("never-added", self._DRIFTED, str(tmp_path))
+
+    def test_drift_collision_is_logged_and_the_live_id_remains_guarded(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        store = IndexStore()
+        publish_session_from_fields(store, "first", tmp_path, tmp_path, codex_thread_id=self._THREAD)
+        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._DRIFTED)
+        first_key = make_scoped_key("first", str(tmp_path))
+        drifter_key = make_scoped_key("drifter", str(tmp_path))
+        first_before = store.read().sessions[first_key]
+
+        with caplog.at_level(logging.WARNING, logger="forge.session.index"):
+            store.update_codex_thread("drifter", self._THREAD, str(tmp_path))
+
+        sessions = store.read().sessions
+        assert sessions[first_key] == first_before
+        assert sessions[drifter_key].codex_thread_id == self._THREAD
+        assert any("which session 'first' already holds" in message for message in caplog.messages)
+        with pytest.raises(UuidAlreadyBoundError):
+            publish_session_from_fields(
+                store,
+                "adopter",
+                tmp_path,
+                tmp_path,
+                codex_thread_id=self._THREAD,
+                require_uuid_unbound=True,
+            )

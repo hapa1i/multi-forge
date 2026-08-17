@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 command-core refactor work.
+**Lane**: `doing/` -- active on `refactor/share-codex-thread-index-sync` from the order-22 closeout (`a3dadb18`).
 
 **Finding**: O053.
 
@@ -12,8 +12,11 @@ Use one UI-free writer for the byte-identical Codex interactive/session thread-b
 
 ## Evidence and Authority
 
-On `5777192a`, `_sync_codex_thread_to_index` is duplicated byte-for-byte in the two Codex ops modules and writes the
-same adoption-sensitive durable index column. Authority:
+Reverified on `a3dadb18`: `_sync_codex_thread_to_index` remains duplicated byte-for-byte in the two Codex ops modules,
+with four callers immediately after successful manifest reconciliation. Both copies write the same adoption-sensitive
+durable index column. `IndexStore.update_codex_thread` already owns scoped resolution, missing-row no-op, collision
+warning, durable update, and best-effort failure handling. The focused pre-change Codex op/adoption/index baseline is
+201 passing tests. Authority:
 [`docs/design.md` "3.12 Command-core ops"](../../../design.md#312-command-core-ops-shared-implementation) and
 [`docs/design_appendix.md` "I. Codex Runtime Reference"](../../../design_appendix.md#i-codex-runtime-reference).
 

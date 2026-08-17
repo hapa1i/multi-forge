@@ -153,6 +153,7 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert state.confirmed.derivation is not None
     assert state.confirmed.derivation.parent_session == "planner"
     assert state.confirmed.derivation.context_file == ".forge/prev_sessions/planner/children/impl.md"
+    assert SessionManager().get_session_entry("impl", forge_root=str(tmp_path)).codex_thread_id == result.thread_id
 
     # The snapshot is keyed by the real session name -- no synthetic per-run children.
     children = tmp_path / ".forge" / "prev_sessions" / "planner" / "children"
@@ -191,6 +192,7 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert state.confirmed.codex.last_run_at is not None
     assert refreshed.confirmed.codex.last_run_at is not None
     assert refreshed.confirmed.codex.last_run_at >= state.confirmed.codex.last_run_at
+    assert SessionManager().get_session_entry("impl", forge_root=str(tmp_path)).codex_thread_id == resume.thread_id
 
     # The resume turn opens its own run tree, attributed to the same session.
     resume_events = read_usage_events(root_run_id=resume.root_run_id)

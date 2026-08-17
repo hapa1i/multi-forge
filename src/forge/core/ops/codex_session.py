@@ -33,6 +33,7 @@ from forge.core.invoker import (
 )
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.ops.codex_bridge import _temporary_run_env, bridge_session_to_codex
+from forge.core.ops.codex_thread_index import sync_codex_thread_to_index
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import referenced_transfer_context_paths
 from forge.core.ops.session import ForgeOpError
@@ -60,7 +61,6 @@ from forge.session.exceptions import (
     SessionFileNotFoundError,
     SessionWorktreeMissingError,
 )
-from forge.session.index import IndexStore
 from forge.session.launchability import require_session_worktree
 from forge.session.models import (
     CodexConfirmed,
@@ -402,7 +402,7 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_by = "cli:codex-start"
 
     if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     if effective_thread_id is None:
         warnings.append(
@@ -541,7 +541,7 @@ def continue_codex_session(
         m.confirmed.codex = codex
 
     if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     return CodexSessionResumeResult(
         session=name,
@@ -653,14 +653,3 @@ def _rollback_created_session(
             leftover.unlink(missing_ok=True)
         except OSError:
             logger.debug("Codex start rollback: snapshot cleanup failed (non-critical)", exc_info=True)
-
-
-def _sync_codex_thread_to_index(name: str, thread_id: str | None, forge_root: str | None) -> None:
-    """Keep ``SessionIndexEntry.codex_thread_id`` mirroring the manifest.
-
-    The column is what ``create_session_txn`` checks under the index write lock
-    when adoption binds a pre-existing thread, so a stale value guards an id the
-    session no longer uses. Best-effort by contract (see ``IndexStore.update_codex_thread``).
-    """
-    if thread_id:
-        IndexStore().update_codex_thread(name, thread_id, forge_root)
