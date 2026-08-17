@@ -214,10 +214,12 @@ def _process_pending_work_best_effort() -> None:
         def _index_handler(marker: Marker) -> None:
             """Index a transcript for search.
 
-            Extracts content, decomposes into three stores (metadata, BM25 index,
-            content), then marks as indexed. All store operations are idempotent
-            upserts, so work queue retries produce correct state.
+            Skips snapshots whose persisted mtime/size fingerprint still matches.
+            Otherwise extracts content, decomposes into three stores (metadata,
+            BM25 index, content), then marks as indexed. All store operations are
+            idempotent upserts, so work queue retries produce correct state.
             """
+            from forge.core.state import StateError
             from forge.search.bm25_store import BM25IndexStore
             from forge.search.content_store import ContentStore
             from forge.search.extractor import decompose_document, extract_document
@@ -241,6 +243,17 @@ def _process_pending_work_best_effort() -> None:
             if not transcript_abs.is_file():
                 raise FileNotFoundError(f"Transcript not found: {transcript_abs}")
 
+            index_store = IndexStateStore(forge_root=forge_root)
+            try:
+                unchanged = not index_store.read().needs_reindex(transcript_abs)
+            except StateError as e:
+                # Index state is optimization bookkeeping, not the searchable source.
+                # Do the idempotent writes; the strict final mark retains the marker.
+                logger.debug("Index-state guard unavailable for %s; indexing without it: %s", transcript_abs, e)
+                unchanged = False
+            if unchanged:
+                return
+
             doc = extract_document(
                 transcript_path=transcript_abs,
                 session_name=payload["session_name"],
@@ -260,7 +273,6 @@ def _process_pending_work_best_effort() -> None:
             content_store = ContentStore(forge_root=forge_root)
             content_store.add(doc.transcript_path, content)
 
-            index_store = IndexStateStore(forge_root=forge_root)
             index_store.mark_indexed(transcript_abs)
 
         def _memory_writer_handler(marker: Marker) -> None:

@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--19 and both bounded corrective members are closed through PR #198. Keep orders 20--35 in
+Current focus: order 20 is active on `refactor/wire-transcript-reindex-guard` from `93957659`; keep orders 21--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -107,6 +107,13 @@ Current focus: orders 1--19 and both bounded corrective members are closed throu
 - [x] Complete order 19's focused, semantic-policy, full-unit, regression, pre-commit, design-size, and board-integrity
   gates without a Forge workflow.
 - [x] Ship order 19 independently in PR #198 (`7fd701b5`) and close its member without activating order 20.
+- [x] Close order 19 on pushed `main` at `93957659`, create `refactor/wire-transcript-reindex-guard`, and activate only
+  order 20 after correcting its metadata-fingerprint contract.
+- [x] Wire O092's existing `mtime`/size guard at the startup-queue index boundary, fail open to full indexing when its
+  bookkeeping cannot be read, and make explicit full rebuild replace that state consistently with the search stores.
+- [x] Complete order 20's focused, full, regression, Docker Stop/artifact, pre-commit, design-size, and board-integrity
+  gates without a Forge workflow.
+- [ ] Ship order 20 independently and close its member before activating order 21.
 
-Orders 20--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 21--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

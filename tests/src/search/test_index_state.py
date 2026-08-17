@@ -303,6 +303,16 @@ class TestIndexStateStoreWrite:
         assert loaded.updated_at == original.updated_at
         assert loaded.indexed_files == {}
 
+    def test_replace_all_overwrites_corrupt_state(self, store: IndexStateStore, transcript_file: Path) -> None:
+        store.state_path.parent.mkdir(parents=True)
+        store.state_path.write_text("not valid json", encoding="utf-8")
+        replacement = IndexState()
+        replacement.mark_indexed(transcript_file)
+
+        store.replace_all(replacement)
+
+        assert store.read().indexed_files == replacement.indexed_files
+
 
 # ---------------------------------------------------------------------------
 # IndexStateStore.update

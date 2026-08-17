@@ -236,6 +236,11 @@ class IndexStateStore:
         data = asdict(state)
         atomic_write_json(self._state_path, data)
 
+    def replace_all(self, state: IndexState, *, timeout_s: float = CLI_LOCK_TIMEOUT_S) -> None:
+        """Replace all index state under lock (for rebuild-index)."""
+        with file_lock_for_target(target_path=self._state_path, timeout_s=timeout_s):
+            self.write(state)
+
     def update(self, *, timeout_s: float, mutate: Callable[[IndexState], None]) -> IndexState:
         """Locked read-modify-write cycle.
 

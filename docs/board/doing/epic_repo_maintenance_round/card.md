@@ -6,7 +6,7 @@ closeout audit rejected stale claims D033/O020 and handed 34 still-live correctn
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
 added bounded O012 and retention-status hardening without changing that finding count. Wave 7 now contains 32 verified
 findings across 35 implementation members. Orders 1--19 shipped independently in PRs #178--#184, #186--#188, and
-#190--#198, with 16 members parked. The bounded
+#190--#198; order 20 is active with 15 members parked. The bounded
 [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped five

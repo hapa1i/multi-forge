@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--19 and both bounded corrective members are closed through PR #198. Keep orders 20--35
-parked.
+Current focus: Wave 7 order 20 is active from the order-19 closeout (`93957659`). Keep orders 21--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -257,5 +256,9 @@ parked.
 - [x] Retain O092's supervisor verdict wrapper for its warning release, emit one caller-attributed deprecation, migrate
   internal consumers, and complete the order-19 verification while keeping orders 20--35 parked.
 - [x] Ship order 19 independently in PR #198 (`7fd701b5`) and close its member without activating order 20.
+- [x] Close PR #198 on `main` at `93957659`, branch from that exact commit, and activate only order 20
+  `wire_transcript_reindex_guard` after correcting its metadata-fingerprint contract.
+- [x] Wire O092's metadata guard and complete order-20 verification while keeping orders 21--35 parked.
+- [ ] Ship order 20 independently and close its member without activating order 21.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

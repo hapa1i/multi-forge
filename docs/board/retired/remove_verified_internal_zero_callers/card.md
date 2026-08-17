@@ -21,7 +21,7 @@ The admitted subsets now live with their actual compatibility and subsystem owne
 - dead git-root exception: [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md);
 - session helpers: [`remove_dead_session_helpers`](../../done/remove_dead_session_helpers/card.md);
 - verdict wrapper: [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md);
-- transcript guard: [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md);
+- transcript guard: [`wire_transcript_reindex_guard`](../../doing/wire_transcript_reindex_guard/card.md);
 - status-line candidates: [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md); and
 - mode selector: [`simplify_count_tokens_mode_selector`](../../todo/simplify_count_tokens_mode_selector/card.md).
 
