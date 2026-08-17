@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -100,7 +101,18 @@ def parse_supervisor_verdict_with_status(response: str) -> tuple[SupervisorVerdi
 
 
 def parse_supervisor_verdict(response: str) -> SupervisorVerdict:
-    """Extract a JSON verdict from a supervisor response (fallback warn on failure)."""
+    """Extract a JSON verdict from a supervisor response (fallback warn on failure).
+
+    .. deprecated::
+        Use ``forge.policy.semantic.verdict.parse_supervisor_verdict_with_status``
+        so parse failures remain distinguishable from genuine low-confidence verdicts.
+    """
+    warnings.warn(
+        "parse_supervisor_verdict() is deprecated; use "
+        "forge.policy.semantic.verdict.parse_supervisor_verdict_with_status() instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return parse_supervisor_verdict_with_status(response)[0]
 
 

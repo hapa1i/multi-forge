@@ -1,7 +1,8 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--18 and both bounded corrective members are closed through PR #197. Keep orders 19--35 in
-`todo/` until a separate activation commit.
+Current focus: orders 1--18 and both bounded corrective members are closed through PR #197. Order 19
+[`deprecate_supervisor_verdict_wrapper`](../deprecate_supervisor_verdict_wrapper/card.md) is active from `2745e5ed`;
+keep orders 20--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -100,6 +101,12 @@ Current focus: orders 1--18 and both bounded corrective members are closed throu
   project-scoped generated-name collision handling.
 - [x] Complete order 18's focused, full, regression, Docker session, pre-commit, design-size, and board-integrity gates.
 - [x] Ship order 18 independently in PR #197 (`86a83a1d`) and close its member before activating order 19.
+- [x] Close order 18 on pushed `main` at `2745e5ed`, create `refactor/deprecate-supervisor-verdict-wrapper`, and
+  activate only order 19 after correcting and reverifying its compatibility contract.
+- [x] Retain O092's supervisor verdict wrapper for its warning release, emit one caller-attributed deprecation, and move
+  internal consumers to the status-bearing parser while keeping orders 20--35 parked.
+- [x] Complete order 19's focused, semantic-policy, full-unit, regression, pre-commit, design-size, and board-integrity
+  gates without a Forge workflow.
 
-Orders 19--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 20--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

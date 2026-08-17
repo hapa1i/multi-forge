@@ -25,6 +25,28 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-17
+
+### Deprecate the supervisor verdict compatibility wrapper
+
+**Goal/outcome**: Mark the deliberately exported legacy verdict parser for later removal without changing its return or
+fallback behavior in the first warning release.
+
+**Key changes**:
+
+- Kept `parse_supervisor_verdict` importable and behaviorally identical while issuing a caller-attributed
+  `FutureWarning` that is visible under Python's default filters and names the fully qualified status-bearing
+  replacement.
+- Moved internal parser and regression coverage to `parse_supervisor_verdict_with_status`; retained one focused
+  compatibility contract for the package export, valid and fallback parity, warning count, message, attribution, and a
+  warning-free replacement path.
+- Corrected the execution card's return-type and release-window wording after reverifying production, test, export,
+  resource, extension, documentation, string-target, and history references.
+
+**Verification**: 198 focused tests, 272 semantic-policy tests, 9,207 unit tests (one skip, 122 deselected), 913
+regressions, a fresh-process consumer-module warning smoke, full pre-commit, design-size checks, and board-integrity
+checks pass. No Forge workflow command was used.
+
 ## 2026-08-16
 
 ### Remove verified dead session helpers

@@ -1,7 +1,8 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--18 and both bounded corrective members are closed through PR #197. Keep orders 19--35
-parked until a separate activation commit.
+Current focus: Wave 7 orders 1--18 and both bounded corrective members are closed through PR #197. Order 19
+[`deprecate_supervisor_verdict_wrapper`](../deprecate_supervisor_verdict_wrapper/card.md) is active from `2745e5ed`;
+keep orders 20--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -252,5 +253,9 @@ parked until a separate activation commit.
   `remove_dead_session_helpers` after reverifying its three bounded internal surfaces.
 - [x] Remove only O092's three verified internal session residues while keeping orders 19--35 parked.
 - [x] Ship order 18 independently in PR #197 (`86a83a1d`) and close its member without activating order 19.
+- [x] Close PR #197 on `main` at `2745e5ed`, branch from that exact commit, and activate only order 19
+  `deprecate_supervisor_verdict_wrapper` after correcting its return-type acceptance wording.
+- [x] Retain O092's supervisor verdict wrapper for its warning release, emit one caller-attributed deprecation, migrate
+  internal consumers, and complete the order-19 verification while keeping orders 20--35 parked.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
