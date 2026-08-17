@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--21 and both bounded corrective members are closed through PR #200. Keep orders 22--35
-parked.
+Current focus: Wave 7 order 22 is active on `refactor/simplify-count-tokens-mode-selector` from the order-21 closeout
+(`78678e18`). Keep orders 23--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -267,5 +267,11 @@ parked.
 - [x] Complete order 21's focused, full, regression, Docker installer, clean-wheel, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 21 independently in PR #200 (`63ae0f74`) and close its member without activating order 22.
+- [x] Close order 21 on pushed `main` at `78678e18`, branch from that exact commit, and activate only order 22
+  `simplify_count_tokens_mode_selector` after reverifying its public selector contract.
+- [x] Wire both token-count flags to one named mode while keeping orders 23--35 parked.
+- [x] Complete order 22's focused, full, regression, token-smoke, pre-commit, design-size, and board-integrity gates
+  without a Forge workflow.
+- [ ] Ship order 22 independently and close its member without activating order 23.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

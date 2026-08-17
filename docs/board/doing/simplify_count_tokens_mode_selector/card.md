@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `todo/` -- accepted Wave 7 script cleanup work.
+**Lane**: `doing/` -- active on `refactor/simplify-count-tokens-mode-selector` from the order-21 closeout (`78678e18`).
 
 **Finding**: O092's `scripts/count-tokens.py --local` subset.
 
@@ -14,8 +14,13 @@ Keep the explicit `--local` CLI while making both mutually exclusive mode flags 
 
 ## Evidence and Authority
 
-On `5777192a`, local counting is the default and `--provider-api` is the only remote path; argparse enforces mutual
-exclusion, but `args.local` itself is unread. The public help surface makes flag deletion incompatible under DG4.
+Reverified on `78678e18`: local counting remains the default and `--provider-api` remains the only provider-attempt
+path; argparse enforces mutual exclusion, but `args.local` is still unread. The help surface still documents both flags,
+so deleting `--local` would violate DG4.
+
+Executable characterization confirms omitted mode, `--local`, and a network-free OpenAI-shaped `--provider-api`
+invocation all exit zero with the same count, while the conflicting pair exits two. Before this member, no direct test
+pinned those four invocations.
 
 ## Acceptance Criteria
 

@@ -31,6 +31,8 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 
 DEFAULT_MODEL = "claude-opus-4-6"
+_MODE_LOCAL = "local"
+_MODE_PROVIDER_API = "provider_api"
 
 
 def _detect_provider(model: str) -> str:
@@ -157,14 +159,19 @@ def main() -> None:
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
         "--local",
-        action="store_true",
+        dest="mode",
+        action="store_const",
+        const=_MODE_LOCAL,
         help="Use local tiktoken counting (default; no provider API calls)",
     )
     mode_group.add_argument(
         "--provider-api",
-        action="store_true",
+        dest="mode",
+        action="store_const",
+        const=_MODE_PROVIDER_API,
         help="Try provider count_tokens APIs before falling back to tiktoken",
     )
+    parser.set_defaults(mode=_MODE_LOCAL)
     parser.add_argument(
         "--quiet",
         "-q",
@@ -182,7 +189,11 @@ def main() -> None:
             print("0 tokens (empty input)")
         return
 
-    token_count, method = count_tokens(text, args.model, provider_api=args.provider_api)
+    token_count, method = count_tokens(
+        text,
+        args.model,
+        provider_api=args.mode == _MODE_PROVIDER_API,
+    )
 
     if args.quiet:
         print(token_count)
