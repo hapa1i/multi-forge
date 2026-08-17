@@ -374,6 +374,42 @@ class TestStopHookArtifacts:
         # Marker may exist - depends on implementation
         assert result.returncode == 0
 
+    def test_repeated_unchanged_stop_drain_keeps_search_index_byte_stable(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        """A repeated Stop may enqueue again, but unchanged snapshot metadata avoids rewrites."""
+        transcript_path = self._setup_session_with_transcript(mock_claude_workspace)
+        payload = {
+            "hook_event_name": "Stop",
+            "transcript_path": transcript_path,
+            "session_id": "uuid-123",
+        }
+
+        first = self._invoke_stop_hook(mock_claude_workspace, payload)
+        assert first["queued_index"] is True
+        first_drain = mock_claude_workspace.exec("forge model backend list --json")
+        assert first_drain.returncode == 0, first_drain.stderr
+
+        index_paths = tuple(
+            f"/workspace/.forge/search-index/{name}"
+            for name in (
+                "documents.json",
+                "bm25_index.json",
+                "content.json",
+                "state.json",
+            )
+        )
+        assert all(mock_claude_workspace.file_exists(path) for path in index_paths)
+        before = {path: mock_claude_workspace.read_file(path) for path in index_paths}
+
+        second = self._invoke_stop_hook(mock_claude_workspace, payload)
+        assert second["queued_index"] is True
+        second_drain = mock_claude_workspace.exec("forge model backend list --json")
+        assert second_drain.returncode == 0, second_drain.stderr
+
+        assert {path: mock_claude_workspace.read_file(path) for path in index_paths} == before
+
     def test_marker_contains_session_info(self, mock_claude_workspace: ContainerLike) -> None:
         """Pending-work marker should contain session info."""
         self._setup_session_with_transcript(

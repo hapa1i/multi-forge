@@ -92,6 +92,8 @@ def test_rebuild_index_sees_latest_turn_after_repeated_stop(
 
     first = runner.invoke(hooks, ["stop"], input=json.dumps(payload))
     assert first.exit_code == 0, first.output
+    first_index = runner.invoke(main, ["model", "backend", "list", "--json"])
+    assert first_index.exit_code == 0, first_index.output
 
     _append_text_entry(
         transcript,
@@ -114,6 +116,12 @@ def test_rebuild_index_sees_latest_turn_after_repeated_stop(
     artifact_text = artifact.read_text(encoding="utf-8")
     assert "emoji" in artifact_text
     assert "greeting.py" in artifact_text
+
+    incremental = runner.invoke(main, ["search", "query", "emoji", "--json"])
+    assert incremental.exit_code == 0, incremental.output
+    incremental_data = json.loads(incremental.output)
+    assert incremental_data["total_results"] == 1
+    assert incremental_data["results"][0]["session_name"] == session_name
 
     rebuilt = runner.invoke(main, ["search", "rebuild-index"])
     assert rebuilt.exit_code == 0, rebuilt.output

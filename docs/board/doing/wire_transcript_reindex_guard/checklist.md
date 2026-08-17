@@ -1,0 +1,43 @@
+# Wire the transcript reindex guard checklist
+
+Current focus: order 20 is active from `93957659`; keep orders 21--35 parked.
+
+## Activation and evidence
+
+- [x] Close order 19 on pushed `main` at `93957659` after PR #198 merged as `7fd701b5` with all five checks passing.
+- [x] Create `refactor/wire-transcript-reindex-guard` from that exact closeout and move only order 20 to `doing/`.
+- [x] Recheck `needs_reindex`, the startup-queue index handler, Stop artifact copying/enqueueing, full rebuild, cleanup,
+  state-store errors, tests, documentation, and history on the execution base.
+- [x] Correct the card's byte-identity claim: the version-1 state fingerprint is `mtime` plus size, not content.
+- [x] Record the 58-test search-state/startup-queue baseline before implementation.
+
+## Implementation
+
+- [x] Read index state after project/path/file validation and skip extraction plus all three upserts only when metadata
+  matches.
+- [x] Preserve the full metadata, BM25, and content upsert order for new, changed, or invalidated transcripts.
+- [x] Keep `mark_indexed` last so failed store writes and state-read failures retain the marker for retry.
+- [x] Leave Stop copying/enqueueing, full rebuild semantics, index-state schema, and same-size/same-`mtime` limitations
+  unchanged.
+
+## Acceptance controls
+
+| Surface            | Fixture                                               | Assertion                                                                         |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| First index        | marker with a new transcript                          | extraction and all three stores run; state is marked last                         |
+| Metadata match     | second marker for the unchanged snapshot              | marker succeeds without extraction or store writes                                |
+| Changed snapshot   | indexed transcript with changed `mtime` or size       | full upsert path runs and state refreshes                                         |
+| Invalidated state  | stores exist but the transcript state entry is absent | full upsert path runs again                                                       |
+| State read failure | corrupt/newer/unreadable `state.json`                 | no search store is mutated and marker records a retry                             |
+| Repeated Stop      | same session UUID captured twice                      | latest changed artifact remains searchable; unchanged drain avoids duplicate work |
+
+## Verification and closeout
+
+- [x] Run focused search-state, startup-queue, hook, and named regression tests (64 passed).
+- [x] Run `make test-unit` (9,212 passed, one skipped, 122 deselected), `make test-regression` (913 passed), and
+  `make pre-commit`.
+- [x] Run the targeted Docker Stop/artifact integration path required for hook/session producer coverage (one passed, 12
+  deselected).
+- [x] Run diff, design-size, board-link, and Wave 7 lane-count checks without a Forge workflow (354 board documents, 880
+  local links, zero missing; 19 done, one doing, 15 todo; normative docs unchanged).
+- [x] Commit and push order 20 for review without activating order 21.

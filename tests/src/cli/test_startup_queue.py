@@ -269,6 +269,17 @@ def _create_index_marker_with_transcript(tmp_path: Path, session_id: str = "test
     return marker
 
 
+def _enqueue_existing_index_marker(tmp_path: Path, *, session_id: str) -> Path:
+    marker = enqueue_index_marker(
+        session_id=session_id,
+        worktree_path=tmp_path,
+        session_name="test-session",
+        transcript_snapshot_rel=f".forge/artifacts/test-session/transcripts/{session_id}.jsonl",
+    )
+    assert marker is not None
+    return marker
+
+
 class TestIndexMarkerProcessing:
     """Tests for index marker processing during CLI startup."""
 
@@ -318,6 +329,170 @@ class TestIndexMarkerProcessing:
         store = SearchDocumentStore(forge_root=tmp_path)
         docs = store.read()
         assert any(d.session_id == "doc-test" for d in docs)
+
+    def test_metadata_unchanged_snapshot_skips_extraction_and_store_writes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        session_id = "guard-unchanged"
+        _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+        first = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+        assert first.exit_code == 0, first.output
+
+        index_dir = tmp_path / ".forge" / "search-index"
+        store_paths = tuple(
+            index_dir / name
+            for name in (
+                "documents.json",
+                "bm25_index.json",
+                "content.json",
+                "state.json",
+            )
+        )
+        before = {path: path.read_bytes() for path in store_paths}
+        marker = _enqueue_existing_index_marker(tmp_path, session_id=session_id)
+
+        def unexpected_work(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("metadata-unchanged snapshots must not be extracted or rewritten")
+
+        import forge.search.extractor as extractor
+        from forge.search.bm25_store import BM25IndexStore
+        from forge.search.content_store import ContentStore
+        from forge.search.store import SearchDocumentStore
+
+        monkeypatch.setattr(extractor, "extract_document", unexpected_work)
+        monkeypatch.setattr(SearchDocumentStore, "add", unexpected_work)
+        monkeypatch.setattr(BM25IndexStore, "upsert_document", unexpected_work)
+        monkeypatch.setattr(ContentStore, "add", unexpected_work)
+
+        second = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert second.exit_code == 0, second.output
+        assert not marker.exists()
+        assert {path: path.read_bytes() for path in store_paths} == before
+
+    def test_changed_snapshot_runs_full_upsert_and_refreshes_state(self, tmp_path: Path) -> None:
+        session_id = "guard-changed"
+        _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+        first = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+        assert first.exit_code == 0, first.output
+
+        transcript = tmp_path / f".forge/artifacts/test-session/transcripts/{session_id}.jsonl"
+        transcript.write_text(
+            '{"requestId":"r2","timestamp":"2026-01-01T00:01:00Z",'
+            '"message":{"role":"user","content":[{"type":"text","text":"updated transcript"}]}}\n',
+            encoding="utf-8",
+        )
+        marker = _enqueue_existing_index_marker(tmp_path, session_id=session_id)
+
+        second = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert second.exit_code == 0, second.output
+        assert not marker.exists()
+
+        from forge.search.bm25_store import BM25IndexStore
+        from forge.search.content_store import ContentStore
+        from forge.search.index_state import IndexStateStore
+        from forge.search.store import SearchDocumentStore
+
+        key = str(transcript)
+        assert "updated transcript" in ContentStore(forge_root=tmp_path).read_all()[key]
+        assert SearchDocumentStore(forge_root=tmp_path).read()[0].session_id == session_id
+        bm25_index = BM25IndexStore(forge_root=tmp_path).read()
+        assert bm25_index is not None
+        assert bm25_index.doc_keys == [key]
+        state_entry = IndexStateStore(forge_root=tmp_path).read().indexed_files[key]
+        assert state_entry.size == transcript.stat().st_size
+        assert state_entry.mtime == transcript.stat().st_mtime
+
+    def test_missing_state_entry_reindexes_metadata_unchanged_snapshot(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        session_id = "guard-invalidated"
+        _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+        first = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+        assert first.exit_code == 0, first.output
+
+        transcript = tmp_path / f".forge/artifacts/test-session/transcripts/{session_id}.jsonl"
+        from forge.search.index_state import IndexStateStore
+
+        state_store = IndexStateStore(forge_root=tmp_path)
+        state = state_store.read()
+        del state.indexed_files[str(transcript)]
+        state_store.write(state)
+
+        import forge.search.extractor as extractor
+
+        real_extract = extractor.extract_document
+        extracted: list[Path] = []
+
+        def track_extract(
+            transcript_path: Path,
+            session_name: str,
+            session_id: str,
+            worktree_path: str,
+        ) -> extractor.SearchDocument:
+            extracted.append(transcript_path)
+            return real_extract(
+                transcript_path=transcript_path,
+                session_name=session_name,
+                session_id=session_id,
+                worktree_path=worktree_path,
+            )
+
+        monkeypatch.setattr(extractor, "extract_document", track_extract)
+        marker = _enqueue_existing_index_marker(tmp_path, session_id=session_id)
+
+        second = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert second.exit_code == 0, second.output
+        assert not marker.exists()
+        assert extracted == [transcript]
+        assert str(transcript) in state_store.read().indexed_files
+
+    def test_corrupt_index_state_retries_before_search_store_writes(self, tmp_path: Path) -> None:
+        marker = _create_index_marker_with_transcript(tmp_path, session_id="guard-corrupt-state")
+        index_dir = tmp_path / ".forge" / "search-index"
+        index_dir.mkdir(parents=True)
+        state_path = index_dir / "state.json"
+        state_path.write_text("not valid json", encoding="utf-8")
+
+        result = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        marker_data = json.loads(marker.read_text(encoding="utf-8"))
+        assert marker_data["attempt_count"] == 1
+        assert "state.json" in marker_data["last_error"]
+        assert state_path.read_text(encoding="utf-8") == "not valid json"
+        assert not (index_dir / "documents.json").exists()
+        assert not (index_dir / "bm25_index.json").exists()
+        assert not (index_dir / "content.json").exists()
+
+    def test_failed_content_write_retries_without_marking_transcript_indexed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        session_id = "guard-write-failure"
+        marker = _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+
+        from forge.search.content_store import ContentStore
+
+        def fail_content_write(*_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("simulated content-store failure")
+
+        monkeypatch.setattr(ContentStore, "add", fail_content_write)
+
+        result = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        marker_data = json.loads(marker.read_text(encoding="utf-8"))
+        assert marker_data["attempt_count"] == 1
+        assert marker_data["last_error"] == "handler error: simulated content-store failure"
+        assert not (tmp_path / ".forge" / "search-index" / "state.json").exists()
 
     def test_incompatible_project_retries_without_search_writes(self, tmp_path: Path) -> None:
         marker = _create_index_marker_with_transcript(tmp_path, session_id="compat-refused")
