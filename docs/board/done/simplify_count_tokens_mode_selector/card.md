@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `doing/` -- active on `refactor/simplify-count-tokens-mode-selector` from the order-21 closeout (`78678e18`).
+**Lane**: `done/` -- shipped in PR #201 (`b350b4d5`) after all five GitHub checks passed.
 
 **Finding**: O092's `scripts/count-tokens.py --local` subset.
 
@@ -37,3 +37,10 @@ local `cl100k_base` fallback, so the existing design gates remain unchanged at 2
 
 Do not remove `--local`, change provider routing/access, alter output schemas, or require network access for local mode.
 Beyond the requested omitted-model refresh to `claude-opus-5`, do not change token-model behavior.
+
+## Closeout
+
+PR #201 merged as `b350b4d5` with all five GitHub checks passing. Both public mode selectors now write one authoritative
+destination, local counting remains the explicit offline default, and omitted `--model` now follows the canonical
+`claude-opus-5` default without changing existing document counts. Order 23 remains parked for separate activation from
+this closeout.

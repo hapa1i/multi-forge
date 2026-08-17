@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-17
 
+### Align count-tokens mode and model defaults
+
+**Goal/outcome**: Remove the unread token-count mode field without deleting its public selector, and align the omitted
+model with the repository's canonical Opus default.
+
+**Key changes**:
+
+- Made `--local` and `--provider-api` write one authoritative mode while preserving local default behavior, help, mutual
+  exclusion, output, and provider fallback semantics.
+- Changed the omitted model from `claude-opus-4-6` to `claude-opus-5`; both use the same offline `cl100k_base` fallback,
+  while opt-in provider counting now targets the canonical Opus model by default.
+- Added hermetic subprocess contracts for the model default, omitted and explicit local modes, provider mode,
+  conflicting flags, and help output.
+
+**Verification**: Six focused tests, 9,216 unit tests (one skip, 122 deselected), 915 regressions, real default/local/
+provider token-count smokes, full pre-commit, unchanged 29,986/29,987 design-document counts, and the
+356-document/882-link board audit pass. PR #201 merged as `b350b4d5` with all five GitHub checks passing. No Forge
+workflow command was used.
+
 ### Retire test-only settings helpers
 
 **Goal/outcome**: Remove three internal settings helpers that had no supported caller without weakening the live backup,

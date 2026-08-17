@@ -1,7 +1,6 @@
 # Simplify the count-tokens mode selector checklist
 
-Current focus: order 22 is active on `refactor/simplify-count-tokens-mode-selector` from `78678e18`; keep orders 23--35
-parked.
+Current focus: complete -- order 22 shipped in PR #201 (`b350b4d5`); orders 23--35 remain parked.
 
 ## Activation and evidence
 
@@ -32,4 +31,4 @@ parked.
 - [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,986) and `design_appendix.md` (29,987) stay
   below 30,000 tokens; and audit 356 board documents, 882 local links, zero missing links, and Wave 7's 21 done / one
   doing / 13 todo lanes without a Forge workflow.
-- [x] Commit and push order 22 for review without activating order 23.
+- [x] Open PR #201, merge it as `b350b4d5` after all five checks pass, and close order 22 without activating order 23.

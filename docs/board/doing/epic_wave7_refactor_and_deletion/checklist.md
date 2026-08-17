@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 22 is active on `refactor/simplify-count-tokens-mode-selector` from `78678e18`; keep orders 23--35
-in `todo/`.
+Current focus: orders 1--22 and both bounded corrective members are closed through PR #201. Keep orders 23--35 in
+`todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -126,7 +126,7 @@ in `todo/`.
 - [x] Make both token-count flags write one authoritative mode and pin every invocation shape directly.
 - [x] Complete order 22's focused, full, regression, token-smoke, pre-commit, design-size, and board-integrity gates
   without a Forge workflow.
-- [ ] Ship order 22 independently and close its member before activating order 23.
+- [x] Ship order 22 independently in PR #201 (`b350b4d5`) and close its member before activating order 23.
 
 Orders 23--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
