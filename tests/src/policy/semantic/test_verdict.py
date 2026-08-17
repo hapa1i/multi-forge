@@ -1,6 +1,8 @@
 """Tests for policy/semantic/verdict.py."""
 
 import json
+import warnings
+from pathlib import Path
 
 import pytest
 
@@ -14,8 +16,12 @@ from forge.policy.semantic.verdict import (
 )
 
 
+def _parse_verdict(response: str) -> SupervisorVerdict:
+    return parse_supervisor_verdict_with_status(response)[0]
+
+
 class TestParseSupervisorVerdict:
-    """Tests for parse_supervisor_verdict function."""
+    """Tests for supervisor verdict parsing."""
 
     def test_parse_aligned_verdict(self) -> None:
         """Parse aligned verdict from JSON code fence."""
@@ -24,7 +30,7 @@ class TestParseSupervisorVerdict:
 {"verdict": "aligned", "confidence": 0.95, "violations": []}
 ```
 """
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
         assert verdict.verdict == "aligned"
         assert verdict.confidence == 0.95
         assert verdict.violations == []
@@ -46,7 +52,7 @@ class TestParseSupervisorVerdict:
 }
 ```
 """
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
         assert verdict.verdict == "divergent"
         assert verdict.confidence == 0.85
         assert len(verdict.violations) == 1
@@ -55,7 +61,7 @@ class TestParseSupervisorVerdict:
     def test_parse_no_json_fence(self) -> None:
         """Fails open with warning (divergent+0.0) when no JSON fence found."""
         response = "This action looks fine to me."
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
         assert verdict.verdict == "divergent"
         assert verdict.confidence == 0.0
         assert len(verdict.violations) == 1
@@ -65,14 +71,14 @@ class TestParseSupervisorVerdict:
         response = """```json
 {"verdict": "aligned", confidence: broken}
 ```"""
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
         assert verdict.verdict == "divergent"
         assert verdict.confidence == 0.0
         assert len(verdict.violations) == 1
 
     def test_parse_empty_response(self) -> None:
         """Fails open with warning (divergent+0.0) on empty response."""
-        verdict = parse_supervisor_verdict("")
+        verdict = _parse_verdict("")
         assert verdict.verdict == "divergent"
         assert verdict.confidence == 0.0
         assert len(verdict.violations) == 1
@@ -82,13 +88,13 @@ class TestParseSupervisorVerdict:
         response = """```json
 {"verdict": "aligned", "confidence": 1.5}
 ```"""
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
         assert verdict.confidence == 1.0
 
         response2 = """```json
 {"verdict": "aligned", "confidence": -0.5}
 ```"""
-        verdict2 = parse_supervisor_verdict(response2)
+        verdict2 = _parse_verdict(response2)
         assert verdict2.confidence == 0.0
 
     @pytest.mark.parametrize("raw_confidence", ["null", "true", '"high"', "NaN", "Infinity", "-Infinity"])
@@ -138,9 +144,33 @@ class TestParseSupervisorVerdict:
             }
         )
 
-        verdict = parse_supervisor_verdict(response)
+        verdict = _parse_verdict(response)
 
         assert verdict.violations == [{"evidence": "Changed the plan", "citations": ["Plan section 2"]}]
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '{"verdict":"aligned","confidence":0.95,"violations":[]}',
+        "This is not a supervisor verdict.",
+    ],
+    ids=["parsed", "fallback"],
+)
+def test_legacy_wrapper_warns_at_caller_and_preserves_verdict(response: str) -> None:
+    from forge.policy.semantic import parse_supervisor_verdict as exported_parser
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        expected, _parsed = parse_supervisor_verdict_with_status(response)
+
+    assert exported_parser is parse_supervisor_verdict
+    with pytest.warns(FutureWarning, match="parse_supervisor_verdict_with_status") as caught:
+        actual = parse_supervisor_verdict(response)
+
+    assert len(caught) == 1
+    assert Path(caught[0].filename).resolve() == Path(__file__).resolve()
+    assert actual == expected
 
 
 class TestVerdictToDecision:

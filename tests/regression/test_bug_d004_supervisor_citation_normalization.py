@@ -12,7 +12,10 @@ from typing import Any
 
 import pytest
 
-from forge.policy.semantic.verdict import parse_supervisor_verdict, verdict_to_decision
+from forge.policy.semantic.verdict import (
+    parse_supervisor_verdict_with_status,
+    verdict_to_decision,
+)
 
 pytestmark = pytest.mark.regression
 
@@ -25,7 +28,7 @@ def _decision(citations: Any):
             "violations": [{"evidence": "Changed the plan", "citations": citations}],
         }
     )
-    return verdict_to_decision(parse_supervisor_verdict(response))
+    return verdict_to_decision(parse_supervisor_verdict_with_status(response)[0])
 
 
 @pytest.mark.parametrize(

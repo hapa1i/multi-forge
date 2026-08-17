@@ -17,7 +17,11 @@ import pytest
 from forge.core.reactive.session_runner import SessionResult
 from forge.policy.engine import PolicyEngine
 from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
-from forge.policy.semantic.verdict import parse_supervisor_verdict, verdict_to_decision
+from forge.policy.semantic.verdict import (
+    SupervisorVerdict,
+    parse_supervisor_verdict_with_status,
+    verdict_to_decision,
+)
 from forge.policy.types import ActionContext
 from forge.session.models import SupervisorConfig
 
@@ -28,6 +32,10 @@ _SUPERVISOR_UUID = "12345678-1234-1234-1234-123456789abc"
 
 def _response(violations: Any) -> str:
     return json.dumps({"verdict": "divergent", "confidence": 0.95, "violations": violations})
+
+
+def _parse_verdict(response: str) -> SupervisorVerdict:
+    return parse_supervisor_verdict_with_status(response)[0]
 
 
 def _context() -> ActionContext:
@@ -60,16 +68,14 @@ def test_non_mapping_violation_cannot_become_policy_error_denial(
 
 @pytest.mark.parametrize("violations", [None, "bad", {"evidence": "bad"}, 7])
 def test_non_list_violation_container_normalizes_to_no_specific_violations(violations: Any) -> None:
-    decision = verdict_to_decision(parse_supervisor_verdict(_response(violations)))
+    decision = verdict_to_decision(_parse_verdict(_response(violations)))
 
     assert decision.decision == "warn"
     assert decision.violations == []
 
 
 def test_non_mapping_entries_are_ignored_without_hiding_valid_violations() -> None:
-    verdict = parse_supervisor_verdict(
-        _response(["bad", {"evidence": "Changed the plan", "citations": ["Plan section 2"]}])
-    )
+    verdict = _parse_verdict(_response(["bad", {"evidence": "Changed the plan", "citations": ["Plan section 2"]}]))
 
     decision = verdict_to_decision(verdict)
 

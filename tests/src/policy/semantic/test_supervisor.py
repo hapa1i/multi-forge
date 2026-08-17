@@ -1590,18 +1590,20 @@ class TestFailOpenWithWarning:
 
     def test_empty_response_produces_warn(self) -> None:
         """Empty supervisor response should map to warn decision."""
-        from forge.policy.semantic.verdict import parse_supervisor_verdict
+        from forge.policy.semantic.verdict import parse_supervisor_verdict_with_status
 
-        verdict = parse_supervisor_verdict("")
+        verdict, parsed = parse_supervisor_verdict_with_status("")
+        assert parsed is False
         decision = verdict_to_decision(verdict)
         assert decision.decision == "warn"
         assert len(decision.warnings) > 0
 
     def test_unparseable_response_produces_warn(self) -> None:
         """Unparseable supervisor response should map to warn decision."""
-        from forge.policy.semantic.verdict import parse_supervisor_verdict
+        from forge.policy.semantic.verdict import parse_supervisor_verdict_with_status
 
-        verdict = parse_supervisor_verdict("This is not JSON at all.")
+        verdict, parsed = parse_supervisor_verdict_with_status("This is not JSON at all.")
+        assert parsed is False
         decision = verdict_to_decision(verdict)
         assert decision.decision == "warn"
         assert len(decision.warnings) > 0
