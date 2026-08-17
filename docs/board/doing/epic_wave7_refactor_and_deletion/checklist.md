@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--24 and both bounded corrective members are closed through PR #203. Keep orders 25--35 in
+Current focus: order 25 is active on `refactor/reuse-claude-usage-measurement` from `5eb39d15`; keep orders 26--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -139,6 +139,12 @@ Current focus: orders 1--24 and both bounded corrective members are closed throu
 - [x] Complete order 24's focused, full, regression, targeted session integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 24 independently in PR #203 (`0d041b83`) and close its member before activating order 25.
+- [x] Close order 24 on pushed `main` at `5eb39d15`, create `refactor/reuse-claude-usage-measurement`, and activate only
+  order 25.
+- [x] Route the workflow verb aggregate through the shared Claude measurement resolver.
+- [x] Complete order 25's focused, full, regression, targeted telemetry/cost integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 25 independently and close its member before activating order 26.
 
-Orders 25--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 26--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

@@ -76,26 +76,30 @@ def resolve_claude_p_measurement(
         return UsageMeasurement(None, None, "unavailable", "unattributed")
 
     if proxied:
-        cost_evident = cost is not None and cost.cost_measured
+        # ``track_verb_cost`` can only report cost after capturing a snapshot delta.
+        # Treat malformed/synthetic holders as unmeasured instead of publishing cost
+        # without the tokens and provenance that make the snapshot meaningful.
+        if cost is None or not cost.measured:
+            return UsageMeasurement(None, None, "unavailable", "unattributed", write_downstream=False)
+
+        cost_evident = cost.cost_measured
         cost_micro_usd: int | None
         reporter: Reporter | None
         confidence: Confidence
-        if cost_evident and cost is not None:
+        if cost_evident:
             cost_micro_usd, reporter, confidence = cost.total_cost_micros, "forge_proxy", "reported"
         else:
             cost_micro_usd, reporter, confidence = None, None, "unavailable"
-        if cost is not None and cost.measured:
-            return UsageMeasurement(
-                cost_micro_usd,
-                reporter,
-                confidence,
-                "verb_snapshot_estimated",
-                cost.input_tokens,
-                cost.output_tokens,
-                cost.cached_tokens,
-                write_downstream=False,
-            )
-        return UsageMeasurement(cost_micro_usd, reporter, confidence, "unattributed", write_downstream=False)
+        return UsageMeasurement(
+            cost_micro_usd,
+            reporter,
+            confidence,
+            "verb_snapshot_estimated",
+            cost.input_tokens,
+            cost.output_tokens,
+            cost.cached_tokens,
+            write_downstream=False,
+        )
 
     prov = direct_cost_provenance(self_cost, envelope_parsed, input_tokens, output_tokens, cached_tokens)
     return UsageMeasurement(
