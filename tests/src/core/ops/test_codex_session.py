@@ -254,6 +254,7 @@ class TestStartCodexSession:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
+        forbid_codex_thread_index_sync: Callable[[str], None],
     ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
@@ -265,13 +266,8 @@ class TestStartCodexSession:
                 forge_root=str(proj),
             )
 
-        with (
-            patch(
-                "forge.core.ops.codex_session._sync_codex_thread_to_index",
-                side_effect=AssertionError("deleted identity must not reach index reconciliation"),
-            ),
-            _codex_mocks(on_codex_spawn=_delete_during_codex),
-        ):
+        forbid_codex_thread_index_sync("codex_session")
+        with _codex_mocks(on_codex_spawn=_delete_during_codex):
             result = start_codex_session(
                 ctx=ctx,
                 name="impl",
@@ -795,6 +791,7 @@ class TestContinueCodexSession:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
+        forbid_codex_thread_index_sync: Callable[[str], None],
     ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         _seed_codex_session(proj)
@@ -807,13 +804,8 @@ class TestContinueCodexSession:
                 forge_root=str(proj),
             )
 
-        with (
-            patch(
-                "forge.core.ops.codex_session._sync_codex_thread_to_index",
-                side_effect=AssertionError("deleted identity must not reach index reconciliation"),
-            ),
-            _codex_mocks(on_codex_spawn=_delete_during_codex),
-        ):
+        forbid_codex_thread_index_sync("codex_session")
+        with _codex_mocks(on_codex_spawn=_delete_during_codex):
             result = continue_codex_session(ctx=ctx, name="impl", task="Keep going")
 
         assert isinstance(result, CodexSessionResumeResult)

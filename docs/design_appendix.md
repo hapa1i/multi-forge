@@ -1814,13 +1814,13 @@ All CLI-owned (§3.5):
   `thread_id` the stream missed.
 - `discovered_post_exit`: interactive time+cwd discovery — the rollout **filename** is the thread source (filename
   timestamps are local time, so discovery filters by mtime).
-- `adopted`: `forge session adopt <thread-id>` bound a rollout that predates the session. Unlike the three above, the
-  rollout was not produced by a Forge-launched turn, so `last_run_at` and `context_delivery` stay `None` until the first
-  managed turn. The lookup scans **all** thread-id matches and filters by the rollout head's `cwd`, refusing a no-match,
-  a cwd mismatch, or more than one match — it must not inherit `find_rollout_path`'s newest-mtime tie-break, because
-  adoption binds to whatever it picks.
+- `adopted`: `forge session adopt <thread-id>` bound a rollout that predates the session, so `last_run_at` and
+  `context_delivery` stay `None` until the first managed turn. Lookup scans **all** thread-id matches and filters by the
+  rollout head's `cwd`, refusing zero, mismatched, or multiple matches. It must not use `find_rollout_path`'s
+  newest-mtime tie-break because adoption binds its choice.
 
-`confirmed.launch` and `claude_session_id` stay unset (§3.5).
+`confirmed.launch` and `claude_session_id` stay unset (§3.5). Shared `core/ops/codex_thread_index.py` mirrors post-turn
+`thread_id` into the adoption-guarded index after manifest persistence.
 
 ### I.2 Codex `RuntimeSpec` declarations
 

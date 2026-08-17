@@ -315,10 +315,10 @@ session.
 afterwards. Two properties follow. The id reaches the index row, so `require_uuid_unbound` can re-check uniqueness
 **inside the index write lock**, the only lock shared across session names; the pre-check alone runs under a separate
 acquisition and cannot stop two differently-named adopts of one conversation from both passing it. And no window exists
-in which a published session lacks its binding. The Codex arm needs an index column of its own for this
-(`codex_thread_id`), which mirrors `confirmed.codex.thread_id`: the ordinary Codex paths learn their thread only after
-the run, so they reconcile the column rather than set it at creation — including when Codex re-binds a thread across a
-resume ("drift"), where a stale column would guard an id the session no longer uses.
+in which a published session lacks its binding. Codex therefore has its own index column (`codex_thread_id`) mirroring
+`confirmed.codex.thread_id`. Ordinary paths learn the thread after a run, so shared `core/ops/codex_thread_index.py`
+reconciles the column after manifest persistence, including drift; a stale value would guard a thread the session no
+longer uses.
 
 **Adoption also holds a conversation-scoped lock across its final scan and commit** (`conversation_lock`, under
 `FORGE_HOME/locks/`). The index write lock is not sufficient on its own: the binding scans read manifest directories

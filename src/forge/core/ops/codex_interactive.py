@@ -57,6 +57,7 @@ from forge.core.ops.codex_session import (
     require_codex_thread_id,
     resolve_codex_session,
 )
+from forge.core.ops.codex_thread_index import sync_codex_thread_to_index
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
@@ -76,7 +77,6 @@ from forge.session.codex_handoff import (
 from forge.session.codex_invoke import invoke_codex_interactive
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import SessionWorktreeMissingError
-from forge.session.index import IndexStore
 from forge.session.launchability import require_session_worktree
 from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
 from forge.session.prev_sessions import child_notes_path, child_path
@@ -352,7 +352,7 @@ def start_interactive_codex_session(
         m.confirmed.confirmed_by = "cli:codex-interactive-start"
 
     if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        _sync_codex_thread_to_index(name, thread_id, str(child_forge_root))
+        sync_codex_thread_to_index(name, thread_id, str(child_forge_root))
 
     if thread_id is None:
         warnings.append(
@@ -476,7 +476,7 @@ def reattach_codex_session(
         m.confirmed.codex = codex
 
     if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        _sync_codex_thread_to_index(name, effective_thread, session_forge_root)
+        sync_codex_thread_to_index(name, effective_thread, session_forge_root)
 
     return CodexInteractiveResult(
         session=name,
@@ -530,14 +530,3 @@ def _discover_thread_post_exit(
             f"refusing to guess which one is this session's thread."
         )
     return None, None, None
-
-
-def _sync_codex_thread_to_index(name: str, thread_id: str | None, forge_root: str | None) -> None:
-    """Keep ``SessionIndexEntry.codex_thread_id`` mirroring the manifest.
-
-    The column is what ``create_session_txn`` checks under the index write lock
-    when adoption binds a pre-existing thread, so a stale value guards an id the
-    session no longer uses. Best-effort by contract (see ``IndexStore.update_codex_thread``).
-    """
-    if thread_id:
-        IndexStore().update_codex_thread(name, thread_id, forge_root)
