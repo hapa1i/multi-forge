@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-17
 
+### Retire test-only settings helpers
+
+**Goal/outcome**: Remove three internal settings helpers that had no supported caller without weakening the live backup,
+rollback, or conflict contracts.
+
+**Key changes**:
+
+- Removed `restore_settings_backup` and `check_scalar_conflict` with their five direct-only tests; the installer
+  continues to use backup snapshots, rollback-state capture/restore, and `set_scalar` conflict handling.
+- Removed the zero-caller `_extract_command_paths` helper while preserving the active canonical hook deduplication path.
+- Reverified that none of the removed symbols was exported, documented as supported, registered as an entry point, or
+  referenced by packaged extension assets.
+
+**Verification**: 106 focused tests, 9,210 unit tests (one skip, 122 deselected), 915 regressions, 23 targeted Docker
+installer tests, the clean-wheel runtime smoke, full pre-commit, design-size checks, and the 355-document/880-link board
+audit pass. PR #200 merged as `63ae0f74` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Wire the transcript reindex guard
 
 **Goal/outcome**: Avoid re-extracting and rewriting unchanged transcript snapshots without allowing optimization

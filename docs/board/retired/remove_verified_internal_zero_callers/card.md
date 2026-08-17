@@ -35,8 +35,10 @@ The cap-state branch, converter candidates, and unnamed O5 tail remain excluded 
 - Remove `_generate_relaunch_name.parent_name` while preserving project-scoped collision behavior.
 - Retain and wire the explicit `count-tokens.py --local` selector by making both mode flags write one destination.
 
-`_extract_command_paths` is owned by the settings-helper card. Status-line cache candidates, defensive cap parsing,
-converter residue, and unnamed O5 claims remain excluded pending individual verification.
+`_extract_command_paths` shipped with
+[`retire_test_only_settings_helpers`](../../done/retire_test_only_settings_helpers/card.md). Status-line cache
+candidates, defensive cap parsing, converter residue, and unnamed O5 claims remain excluded pending individual
+verification.
 
 ## Historical Acceptance Criteria
 

@@ -1,7 +1,6 @@
 # Retire test-only settings helpers checklist
 
-Current focus: order 21 is active on `refactor/retire-test-only-settings-helpers` from `5664258b`; keep orders 22--35
-parked.
+Current focus: complete -- order 21 shipped in PR #200 (`63ae0f74`); orders 22--35 remain parked.
 
 ## Activation and evidence
 
@@ -32,4 +31,4 @@ parked.
 - [x] Run full pre-commit, diff, design-size, board-link, and Wave 7 lane-count checks without a Forge workflow: both
   living design documents remain below 30k tokens, all 880 local links across 355 board documents resolve, and Wave 7 is
   20 `done` / one `doing` / 14 `todo`.
-- [x] Commit and push order 21 for review without activating order 22.
+- [x] Open PR #200, merge it as `63ae0f74` after all five checks pass, and close order 21 without activating order 22.

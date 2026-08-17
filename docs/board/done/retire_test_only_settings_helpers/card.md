@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O092/O096).
 
-**Lane**: `doing/` -- active on `refactor/retire-test-only-settings-helpers` from the order-20 closeout (`5664258b`).
+**Lane**: `done/` -- shipped in PR #200 (`63ae0f74`) after all five GitHub checks passed.
 
 **Findings**: O096 plus O092's `_extract_command_paths` subset.
 
@@ -35,3 +35,9 @@ passing tests.
 
 Do not remove live rollback-state helpers, change backup permissions, relax scalar conflicts, or alter baseline and
 ownership-sidecar restoration.
+
+## Closeout
+
+PR #200 merged as `63ae0f74` with all five GitHub checks passing. The three internal residues and only their direct-only
+tests were removed; live backup, rollback, scalar-conflict, forced-merge, baseline, and ownership-sidecar behavior
+remains covered. Order 22 remains parked for separate activation from this closeout.

@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 21 is active on `refactor/retire-test-only-settings-helpers` from the order-20 closeout
-(`5664258b`). Keep orders 22--35 parked.
+Current focus: Wave 7 orders 1--21 and both bounded corrective members are closed through PR #200. Keep orders 22--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -266,6 +266,6 @@ Current focus: Wave 7 order 21 is active on `refactor/retire-test-only-settings-
 - [x] Remove only the three verified settings-helper residues while keeping orders 22--35 parked.
 - [x] Complete order 21's focused, full, regression, Docker installer, clean-wheel, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 21 independently and close its member without activating order 22.
+- [x] Ship order 21 independently in PR #200 (`63ae0f74`) and close its member without activating order 22.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
