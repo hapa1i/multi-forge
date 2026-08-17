@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-17
 
+### Share Codex thread index synchronization
+
+**Goal/outcome**: Replace the duplicated Codex post-turn index writer with one UI-free operation while preserving the
+manifest-first and adoption-safety contracts.
+
+**Key changes**:
+
+- Routed interactive and headless start/resume paths through one writer after successful manifest persistence, retaining
+  the no-thread skip and `IndexStore.update_codex_thread` as the scoped, durable, best-effort authority.
+- Preserved collision logging and live-thread adoption guards, with keyed state assertions that do not depend on index
+  iteration order.
+- Added a shared deleted-identity failure fixture, a guard against restoring the legacy private copies, and real Codex
+  start/resume integration assertions for the durable index column.
+
+**Verification**: 205 focused tests, 504 command-core tests, 9,220 unit tests (one skip, 122 deselected), 915
+regressions, one targeted real Codex start/resume integration, full pre-commit, 29,972/29,990 design-document counts,
+and the 357-document/882-link board audit pass. PR #202 merged as `d1abccc7` with all five GitHub checks passing. No
+Forge workflow command was used.
+
 ### Align count-tokens mode and model defaults
 
 **Goal/outcome**: Remove the unread token-count mode field without deleting its public selector, and align the omitted

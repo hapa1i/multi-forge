@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 23 is active on `refactor/share-codex-thread-index-sync` from the order-22 closeout
-(`a3dadb18`). Keep orders 24--35 parked.
+Current focus: Wave 7 orders 1--23 and both bounded corrective members are closed through PR #202. Keep orders 24--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -278,6 +278,6 @@ Current focus: Wave 7 order 23 is active on `refactor/share-codex-thread-index-s
 - [x] Extract one adoption-safe Codex thread-to-index writer while keeping orders 24--35 parked.
 - [x] Complete order 23's focused, full, regression, targeted Codex integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 23 independently and close its member without activating order 24.
+- [x] Ship order 23 independently in PR #202 (`d1abccc7`) and close its member without activating order 24.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

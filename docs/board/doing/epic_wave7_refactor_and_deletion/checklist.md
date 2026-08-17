@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 23 is active on `refactor/share-codex-thread-index-sync` from `a3dadb18`; keep orders 24--35 in
+Current focus: orders 1--23 and both bounded corrective members are closed through PR #202. Keep orders 24--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -132,7 +132,7 @@ Current focus: order 23 is active on `refactor/share-codex-thread-index-sync` fr
 - [x] Share the adoption-sensitive Codex thread-to-index writer across both command-core ops modules.
 - [x] Complete order 23's focused, full, regression, targeted Codex integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 23 independently and close its member before activating order 24.
+- [x] Ship order 23 independently in PR #202 (`d1abccc7`) and close its member before activating order 24.
 
 Orders 24--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

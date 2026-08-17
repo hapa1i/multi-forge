@@ -1,7 +1,6 @@
 # Share Codex thread-to-index synchronization checklist
 
-Current focus: order 23 is active on `refactor/share-codex-thread-index-sync` from `a3dadb18`; keep orders 24--35
-parked.
+Current focus: complete -- order 23 shipped in PR #202 (`d1abccc7`); orders 24--35 remain parked.
 
 ## Activation and evidence
 
@@ -27,4 +26,4 @@ parked.
 - [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,972) and `design_appendix.md` (29,990) stay
   below 30,000 tokens; and audit 357 board documents, 882 local links, zero missing links, and Wave 7's 22 done / one
   doing / 12 todo lanes without a Forge workflow.
-- [x] Commit and push order 23 for review without activating order 24.
+- [x] Open PR #202, merge it as `d1abccc7` after all five checks pass, and close order 23 without activating order 24.

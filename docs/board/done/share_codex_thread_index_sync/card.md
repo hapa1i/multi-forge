@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/share-codex-thread-index-sync` from the order-22 closeout (`a3dadb18`).
+**Lane**: `done/` -- shipped in PR #202 (`d1abccc7`) after all five GitHub checks passed.
 
 **Finding**: O053.
 
@@ -29,3 +29,9 @@ warning, durable update, and best-effort failure handling. The focused pre-chang
 ## Exclusions
 
 Do not unify the surrounding launch flows, change thread discovery, or loosen ambiguous/native adoption checks.
+
+## Closeout
+
+PR #202 merged as `d1abccc7` with all five GitHub checks passing. Interactive and headless start/resume now share one
+post-manifest index writer, while `IndexStore.update_codex_thread` retains scoped resolution, durable update, collision,
+and best-effort ownership. Order 24 remains parked for separate activation from this closeout.
