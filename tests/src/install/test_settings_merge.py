@@ -13,7 +13,6 @@ from forge.install.models import InstalledSettingsEntry, InstallModule, InstallS
 from forge.install.ownership import attributed
 from forge.install.settings_merge import (
     backup_settings,
-    check_scalar_conflict,
     find_backup_files,
     get_settings_path,
     hooks_already_present,
@@ -23,7 +22,6 @@ from forge.install.settings_merge import (
     permissions_already_present,
     read_settings,
     read_tracked_settings_baseline,
-    restore_settings_backup,
     scalar_already_set,
     set_scalar,
     smart_unmerge,
@@ -220,27 +218,6 @@ class TestReadTrackedSettingsBaseline:
             read_tracked_settings_baseline(baseline)
 
 
-class TestRestoreSettingsBackup:
-    """Tests for restore_settings_backup function."""
-
-    def test_restore_returns_false_when_no_backup(self, tmp_path: Path) -> None:
-        result = restore_settings_backup(tmp_path / "settings.json")
-        assert result is False
-
-    def test_restore_restores_backup(self, tmp_path: Path) -> None:
-        settings_file = tmp_path / "settings.json"
-        # New format: .settings.json.forge.backup.{timestamp}
-        backup_file = tmp_path / ".settings.json.forge.backup.20250101-120000"
-
-        backup_file.write_text('{"backup": "content"}')
-        settings_file.write_text('{"current": "content"}')
-
-        result = restore_settings_backup(settings_file)
-
-        assert result is True
-        assert settings_file.read_text() == '{"backup": "content"}'
-
-
 class TestMergeHooks:
     """Tests for merge_hooks function."""
 
@@ -322,22 +299,6 @@ class TestMergePermissions:
 
         assert "allow" in settings["permissions"]
         assert "Read" in settings["permissions"]["allow"]
-
-
-class TestCheckScalarConflict:
-    """Tests for check_scalar_conflict function."""
-
-    def test_no_conflict_when_missing(self) -> None:
-        settings: dict[str, Any] = {}
-        assert not check_scalar_conflict(settings, "statusLine", "/path")
-
-    def test_no_conflict_when_same(self) -> None:
-        settings = {"statusLine": "/same/path"}
-        assert not check_scalar_conflict(settings, "statusLine", "/same/path")
-
-    def test_conflict_when_different(self) -> None:
-        settings = {"statusLine": "/current/path"}
-        assert check_scalar_conflict(settings, "statusLine", "/new/path")
 
 
 class TestSetScalar:

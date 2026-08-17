@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--20 and both bounded corrective members are closed through PR #199. Keep orders 21--35 in
+Current focus: order 21 is active on `refactor/retire-test-only-settings-helpers` from `5664258b`; keep orders 22--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -114,6 +114,13 @@ Current focus: orders 1--20 and both bounded corrective members are closed throu
 - [x] Complete order 20's focused, full, regression, Docker Stop/artifact, pre-commit, design-size, and board-integrity
   gates without a Forge workflow.
 - [x] Ship order 20 independently in PR #199 (`7b3ac2df`) and close its member before activating order 21.
+- [x] Close order 20 on pushed `main` at `5664258b`, create `refactor/retire-test-only-settings-helpers`, and activate
+  only order 21 after reverifying its three internal settings surfaces.
+- [x] Delete only the test-only/zero-caller settings helpers while preserving reachable backup, rollback, and conflict
+  coverage.
+- [x] Complete order 21's focused, full, regression, Docker installer, clean-wheel, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 21 independently and close its member before activating order 22.
 
-Orders 21--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 22--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
