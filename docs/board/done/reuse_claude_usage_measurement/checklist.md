@@ -1,7 +1,6 @@
 # Reuse Claude usage measurement resolution checklist
 
-Current focus: order 25 is active on `refactor/reuse-claude-usage-measurement` from `5eb39d15`; keep orders 26--35
-parked.
+Current focus: complete -- order 25 shipped in PR #204 (`356ea665`); orders 26--35 remain parked.
 
 ## Activation and evidence
 
@@ -30,4 +29,4 @@ parked.
 - [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and `design_appendix.md` (29,990) stay
   below 30,000 tokens; and audit 359 board documents, 882 local links, zero missing links, and Wave 7's 24 done / one
   doing / 10 todo lanes without a Forge workflow.
-- [x] Commit and push order 25 for review without activating order 26.
+- [x] Open PR #204, merge it as `356ea665` after all five checks pass, and close order 25 without activating order 26.

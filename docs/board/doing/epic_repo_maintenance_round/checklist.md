@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 25 is active on `refactor/reuse-claude-usage-measurement` from the order-24 closeout
-(`5eb39d15`). Keep orders 26--35 parked.
+Current focus: Wave 7 orders 1--25 and both bounded corrective members are closed through PR #204. Keep orders 26--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -292,6 +292,6 @@ Current focus: Wave 7 order 25 is active on `refactor/reuse-claude-usage-measure
   parked.
 - [x] Complete order 25's focused, full, regression, targeted telemetry/cost integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 25 independently and close its member without activating order 26.
+- [x] Ship order 25 independently in PR #204 (`356ea665`) and close its member without activating order 26.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

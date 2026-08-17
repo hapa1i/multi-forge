@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/reuse-claude-usage-measurement` from the order-24 closeout (`5eb39d15`).
+**Lane**: `done/` -- shipped in PR #204 (`356ea665`) after all five GitHub checks passed.
 
 **Finding**: O055.
 
@@ -29,3 +29,9 @@ usage-attribution schema in
 ## Exclusions
 
 Do not change billing classification, fabricate missing cost, or merge Codex and Claude measurement rules.
+
+## Closeout
+
+PR #204 merged as `356ea665` with all five GitHub checks passing. Workflow verb aggregates now use
+`resolve_claude_p_measurement`; the shared resolver also treats an inconsistent synthetic cost flag as unmeasured while
+leaving the production tracker invariant unchanged. Order 26 remains parked for separate activation from this closeout.

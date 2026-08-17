@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-18
+
+### Reuse Claude usage-measurement resolution
+
+**Goal/outcome**: Remove the workflow aggregate's duplicate proxied-Claude precedence while preserving its event shape
+and best-effort behavior.
+
+**Key changes**:
+
+- Routed `emit_verb_usage` through `resolve_claude_p_measurement` for cost, tokens, reporter, confidence, and source.
+- Kept unmeasured snapshots authoritative when handed an impossible synthetic cost-evidence flag; production
+  `track_verb_cost` still derives both flags from the same delta list.
+- Added full aggregate-shape coverage and made the real proxy-panel integration publish and inspect the verb event.
+
+**Verification**: 118 focused tests (891 deselected), 9,222 unit tests (one skip, 122 deselected), 921 regressions, one
+targeted Docker proxy-panel test (four deselected), full pre-commit, 29,974/29,990 design-document counts, and the
+359-document/882-link board audit pass. PR #204 merged as `356ea665` with all five GitHub checks passing. No Forge
+workflow command was used.
+
 ## 2026-08-17
 
 ### Unify resume routing-reference resolution
