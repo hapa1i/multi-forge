@@ -62,9 +62,7 @@ def test_omitted_mode_uses_local_counting(
 
     assert result.returncode == 0
     assert result.stderr == ""
-    assert result.stdout == (
-        "3 tokens | 14 chars | 2 lines\n" "  method: tiktoken local (gpt-4o)\n"
-    )
+    assert result.stdout == ("3 tokens | 14 chars | 2 lines\n" "  method: tiktoken local (gpt-4o)\n")
 
 
 def test_explicit_local_matches_omitted_mode(
@@ -85,9 +83,7 @@ def test_provider_mode_selects_provider_path_without_network(
 
     assert result.returncode == 0
     assert result.stderr == ""
-    assert result.stdout == (
-        "3 tokens | 14 chars | 2 lines\n" "  method: tiktoken (gpt-4o)\n"
-    )
+    assert result.stdout == ("3 tokens | 14 chars | 2 lines\n" "  method: tiktoken (gpt-4o)\n")
 
 
 def test_conflicting_modes_remain_an_argparse_error(
