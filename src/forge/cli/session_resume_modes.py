@@ -29,24 +29,17 @@ def _resume_fresh_rewind(
     memory_flag: bool | None = None,
 ) -> None:
     """Create a child session that resumes from a truncated parent transcript copy."""
-    from forge.cli.session import _get_effective_proxy_for_session
     from forge.cli.session_lifecycle import (
         _execute_resume_launch_plan,
         _get_resume_launch_preferences,
         _resolve_manifest_prompt_file,
+        _resume_context_ref,
         _resume_launch_preferences_for_op,
         _resume_routing_for_op,
         _rollback_created_session,
     )
 
-    if routing:
-        effective_proxy_ref = routing.proxy_id
-    elif direct:
-        effective_proxy_ref = None
-    else:
-        effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(parent_state)
-        effective_proxy_ref = effective_proxy_id or effective_template
-
+    effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
     context_limit = _resolve_context_limit(effective_proxy_ref)
 
     try:
@@ -150,22 +143,15 @@ def _resume_fresh_native(
     memory_flag: bool | None = None,
 ) -> None:
     """Create a child session with native conversation resume."""
-    from forge.cli.session import _get_effective_proxy_for_session
     from forge.cli.session_lifecycle import (
         _execute_resume_launch_plan,
         _get_resume_launch_preferences,
+        _resume_context_ref,
         _resume_launch_preferences_for_op,
         _resume_routing_for_op,
     )
 
-    if routing:
-        effective_proxy_ref = routing.proxy_id
-    elif direct:
-        effective_proxy_ref = None
-    else:
-        effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(parent_state)
-        effective_proxy_ref = effective_proxy_id or effective_template
-
+    effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
     context_limit = _resolve_context_limit(effective_proxy_ref)
 
     try:

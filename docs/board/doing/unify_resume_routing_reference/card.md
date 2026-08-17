@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 session refactor work.
+**Lane**: `doing/` -- active on `refactor/unify-resume-routing-reference` from the order-23 closeout (`6e4038db`).
 
 **Finding**: O054.
 
@@ -12,8 +12,11 @@ Make every resume mode derive its inherited routing reference through the existi
 
 ## Evidence and Authority
 
-On `5777192a`, two resume-mode copies prefer only `proxy_id`, while `_resume_context_ref` correctly falls back through
-`proxy_id or template`. Authority:
+Reverified on `6e4038db`: `_resume_fresh`, `_resume_fresh_native`, and `_resume_fresh_rewind` each duplicate the same
+override/direct/inheritance calculation. All three choose only `routing.proxy_id` for an explicit override, while the
+existing `_resume_context_ref` correctly falls back through `routing.proxy_id or routing.template`. The production CLI
+resolver populates both fields, but `ResolvedRouting` permits template-only values and inherited legacy manifests carry
+only a template. The focused resume/mode/routing baseline is 73 passing tests. Authority:
 [`docs/design.md` "3.9 Session Resume"](../../../design.md#39-session-resume-context-management) and
 [`docs/design.md` "3.6.12 Subprocess routing resolution"](../../../design.md#3612-subprocess-routing-resolution-normative).
 

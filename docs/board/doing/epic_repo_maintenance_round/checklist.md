@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--23 and both bounded corrective members are closed through PR #202. Keep orders 24--35
-parked.
+Current focus: Wave 7 order 24 is active on `refactor/unify-resume-routing-reference` from the order-23 closeout
+(`6e4038db`). Keep orders 25--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -279,5 +279,12 @@ parked.
 - [x] Complete order 23's focused, full, regression, targeted Codex integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 23 independently in PR #202 (`d1abccc7`) and close its member without activating order 24.
+- [x] Close order 23 on pushed `main` at `6e4038db`, branch from that exact commit, and activate only order 24
+  `unify_resume_routing_reference`.
+- [x] Route transfer, native, and rewind resume context-limit lookup through one routing-reference helper while keeping
+  orders 25--35 parked.
+- [x] Complete order 24's focused, full, regression, targeted session integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 24 independently and close its member without activating order 25.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

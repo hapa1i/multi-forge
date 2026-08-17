@@ -1039,9 +1039,10 @@ the temporary JSONL, falls back to plain native resume/native-relocate, and repo
 curation emits the `ai-curated` privacy warning. Failed child rollback reports its session and failure, then prints a
 transcript-preserving delete command that preserves shared worktrees.
 
-**Context budget enforcement:** Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails
-fast** before spawning Claude when the parent transcript exceeds the proxy context window, naming
-`structured`/`ai-curated` as the fix. Bounded strategies (truncation/AI selection) need no pre-flight check.
+**Context budget enforcement:** Every resume mode chooses the same reference: explicit proxy ID then template; direct
+mode none; otherwise inherited proxy ID then template. For `full`, Forge **fails fast** before spawn when the parent
+transcript exceeds that proxy's window, naming `structured`/`ai-curated` as fixes. Other strategies need no budget
+preflight.
 
 **Depth control:** `--depth N|all` traverses lineage beyond the immediate parent (default `1`), pulling context from
 earlier sessions in the ancestry chain.

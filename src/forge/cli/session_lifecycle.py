@@ -1822,15 +1822,7 @@ def _resume_fresh(
     When ``review`` is True, opens the per-child transfer file in $EDITOR
     before launching (user can curate the context).
     """
-    # Routing for context limit: --proxy/--no-proxy override > parent's effective routing.
-    if routing:
-        effective_proxy_ref = routing.proxy_id
-    elif direct:
-        effective_proxy_ref = None
-    else:
-        effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(parent_state)
-        effective_proxy_ref = effective_proxy_id or effective_template
-
+    effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
     context_limit = _resolve_context_limit(effective_proxy_ref)
     token_multiplier = _resume_token_estimate_multiplier(
         parent_state=parent_state,
