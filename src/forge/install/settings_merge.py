@@ -187,22 +187,6 @@ def read_tracked_settings_baseline(path: Path | None) -> dict[str, Any]:
     return baseline
 
 
-def restore_settings_backup(path: Path) -> bool:
-    """Restore settings from most recent backup.
-
-    Args:
-        path: Path to settings file.
-
-    Returns:
-        True if restored, False if no backup exists.
-    """
-    backups = find_backup_files(path)
-    if not backups:
-        return False
-    shutil.copy2(backups[0], path)  # Most recent
-    return True
-
-
 def save_added_settings(settings_path: Path, added: dict[str, Any]) -> Path:
     """Save the added settings structure.
 
@@ -518,25 +502,6 @@ def scalar_already_set(
 # --- Merge operations ---
 
 
-def _extract_command_paths(entry: dict[str, Any]) -> set[str]:
-    """Extract command paths from a hook entry for deduplication.
-
-    System boundary: reads Claude Code settings.json which may contain
-    either format depending on when the user last ran forge extension sync.
-    - Current: {"hooks": [{"type": "command", "command": "..."}]}
-    - Pre-sync: {"type": "command", "command": "..."} at entry level
-    """
-    commands = set()
-    # Pre-sync format: command at entry level
-    if cmd := entry.get("command"):
-        commands.add(cmd)
-    # Current format: nested hooks array
-    for hook in entry.get("hooks", []):
-        if cmd := hook.get("command"):
-            commands.add(cmd)
-    return commands
-
-
 def _canonical_json(entry: dict[str, Any]) -> str:
     """Serialize a hook entry to a canonical JSON string for equality comparison."""
     import json
@@ -661,27 +626,6 @@ def merge_env(
         )
 
     return added
-
-
-def check_scalar_conflict(
-    settings: dict[str, Any],
-    key: str,
-    forge_value: Any,
-) -> bool:
-    """Check if scalar key has conflicting value.
-
-    Args:
-        settings: Current settings dict.
-        key: Settings key to check.
-        forge_value: Value Forge wants to set.
-
-    Returns:
-        True if conflict exists, False otherwise.
-    """
-    current = settings.get(key)
-    if current is None:
-        return False
-    return current != forge_value
 
 
 def set_scalar(
