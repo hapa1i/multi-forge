@@ -41,8 +41,8 @@ wc -l docs/board/change_log.md
   project-scoped collision inputs.
 
 **Verification**: 552 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. No Forge workflow command
-was used.
+session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #197 merged as
+`86a83a1d` with all five GitHub checks passing. No Forge workflow command was used.
 
 ### Remove the dead session-context retry
 

@@ -4,7 +4,7 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `doing/` -- active on `refactor/remove-dead-session-helpers` from the order-17 closeout at `f2fcc688`.
+**Lane**: `done/` -- shipped in PR #197 (`86a83a1d`) on 2026-08-17.
 
 **Finding**: O092's `collect_shadow_entries.session_filter`, `_print_session_tip`, and
 `_generate_relaunch_name.parent_name` subsets.
@@ -52,4 +52,5 @@ The direct-only filtered shadow test was removed. A new control proves relaunch 
 the selected Forge root, and the live launch characterization pins the keyword-only `forge_root` handoff.
 
 Verification passed 552 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, and board/design checks. No Forge workflow command was used.
+session-lifecycle tests, full pre-commit, and board/design checks. PR #197 merged as `86a83a1d` with all five GitHub
+checks passing. No Forge workflow command was used.

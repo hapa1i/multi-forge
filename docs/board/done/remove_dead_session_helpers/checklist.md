@@ -1,6 +1,6 @@
 # Remove verified dead session helpers checklist
 
-Current focus: PR #197 open. Orders 19--35 remain parked.
+Current focus: complete -- order 18 shipped in PR #197 (`86a83a1d`); order 19 remains parked pending activation.
 
 ## Activation and evidence
 
@@ -41,4 +41,5 @@ Current focus: PR #197 open. Orders 19--35 remain parked.
   tokens, all 893 local links across 352 board documents resolve, and Wave 7 is 17 `done` / 1 `doing` / 17 `todo`. No
   Forge workflow command was used.
 - [x] Open PR #197 for order 18.
-- [ ] After merge, close order 18 before selecting order 19.
+- [x] Close the member after PR #197 merged as `86a83a1d` with all five GitHub checks passing.
+- [x] Complete the post-merge audit and leave order 19 parked for a separate activation commit.

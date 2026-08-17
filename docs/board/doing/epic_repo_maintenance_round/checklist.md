@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--17 and both bounded corrective members are closed through PR #196. Order 18
-[`remove_dead_session_helpers`](../remove_dead_session_helpers/card.md) is active from `f2fcc688`; keep orders 19--35
-parked.
+Current focus: Wave 7 orders 1--18 and both bounded corrective members are closed through PR #197. Keep orders 19--35
+parked until a separate activation commit.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -252,5 +251,6 @@ parked.
 - [x] Close PR #196 on `main` at `f2fcc688`, branch from that exact commit, and activate only order 18
   `remove_dead_session_helpers` after reverifying its three bounded internal surfaces.
 - [x] Remove only O092's three verified internal session residues while keeping orders 19--35 parked.
+- [x] Ship order 18 independently in PR #197 (`86a83a1d`) and close its member without activating order 19.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
