@@ -1,8 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--18 and both bounded corrective members are closed through PR #197. Order 19
-[`deprecate_supervisor_verdict_wrapper`](../deprecate_supervisor_verdict_wrapper/card.md) is active from `2745e5ed`;
-keep orders 20--35 parked.
+Current focus: Wave 7 orders 1--19 and both bounded corrective members are closed through PR #198. Keep orders 20--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -257,5 +256,6 @@ keep orders 20--35 parked.
   `deprecate_supervisor_verdict_wrapper` after correcting its return-type acceptance wording.
 - [x] Retain O092's supervisor verdict wrapper for its warning release, emit one caller-attributed deprecation, migrate
   internal consumers, and complete the order-19 verification while keeping orders 20--35 parked.
+- [x] Ship order 19 independently in PR #198 (`7fd701b5`) and close its member without activating order 20.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

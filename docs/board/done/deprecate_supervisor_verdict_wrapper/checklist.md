@@ -1,6 +1,6 @@
 # Deprecate the supervisor verdict compatibility wrapper checklist
 
-Current focus: order 19 implementation on `refactor/deprecate-supervisor-verdict-wrapper`; orders 20--35 remain parked.
+Current focus: complete -- order 19 shipped in PR #198 (`7fd701b5`); orders 20--35 remain parked.
 
 ## Activation and evidence
 
@@ -40,4 +40,4 @@ Current focus: order 19 implementation on `refactor/deprecate-supervisor-verdict
 - [x] Run `make test-unit` (9,207 passed, one skipped, 122 deselected), `make test-regression` (913 passed), and
   `make pre-commit`.
 - [x] Run diff, design-size, board-link, and Wave 7 lane-count checks without a Forge workflow.
-- [ ] Open a PR for order 19 and close it after merge before selecting order 20.
+- [x] Open PR #198, merge it as `7fd701b5` after all five checks pass, and close order 19 without activating order 20.

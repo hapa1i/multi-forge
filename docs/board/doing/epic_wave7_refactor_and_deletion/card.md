@@ -2,11 +2,9 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--18 shipped independently in PRs #178--#184, #186--#188, and #190--#197; order 19
-[`deprecate_supervisor_verdict_wrapper`](../deprecate_supervisor_verdict_wrapper/card.md) is active from `2745e5ed`,
-with 16 members parked. The bounded
-[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
-before order 11; the earlier
+**Lane**: `doing/` -- orders 1--19 shipped independently in PRs #178--#184, #186--#188, and #190--#198; 16 members
+remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
+correction shipped in PR #189 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal
@@ -71,7 +69,7 @@ runs last so it lands on the smallest stable surface.
 | 16    | O051             | [`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
 | 17    | O052             | [`remove_dead_session_context_retry`](../../done/remove_dead_session_context_retry/card.md)             | session-context error classification                 |
 | 18    | O092 session     | [`remove_dead_session_helpers`](../../done/remove_dead_session_helpers/card.md)                         | verified internal session-only zero-callers          |
-| 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../deprecate_supervisor_verdict_wrapper/card.md)               | one-release re-export deprecation                    |
+| 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md)       | one-release re-export deprecation                    |
 | 20    | O092 search      | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                     | unchanged-snapshot index avoidance                   |
 | 21    | O092, O096       | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)             | live settings merge/rollback coverage                |
 | 22    | O092 script      | [`simplify_count_tokens_mode_selector`](../../todo/simplify_count_tokens_mode_selector/card.md)         | explicit local/provider selector                     |

@@ -4,8 +4,8 @@
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4).
 
-**Lane**: `doing/` -- active on `refactor/deprecate-supervisor-verdict-wrapper` from the order-18 closeout at
-`2745e5ed`; final deletion remains release-gated.
+**Lane**: `done/` -- shipped in PR #198 (`7fd701b5`) after all five GitHub checks passed; final deletion remains
+release-gated.
 
 **Finding**: O092's `parse_supervisor_verdict` subset.
 
@@ -46,3 +46,8 @@ warning-count, message, and attribution coverage.
 Verification passed with 198 focused verdict/supervisor/regression tests, 272 semantic-policy tests, 9,207 unit tests
 (one skip, 122 deselected), 913 regressions, a fresh-process consumer-module warning smoke, full pre-commit, design-size
 checks, and board-integrity checks. No Forge workflow command was used.
+
+## Closeout
+
+PR #198 merged as `7fd701b5` with all five GitHub checks passing. Order 20 remains parked for a separate activation from
+this closeout; the compatibility wrapper cannot be removed until the release gate above is independently satisfied.

@@ -1,6 +1,6 @@
 # Remove verified dead session helpers checklist
 
-Current focus: complete -- order 18 shipped in PR #197 (`86a83a1d`); order 19 remains parked pending activation.
+Current focus: complete -- order 18 shipped in PR #197 (`86a83a1d`); order 19 later shipped in PR #198 (`7fd701b5`).
 
 ## Activation and evidence
 

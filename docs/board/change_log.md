@@ -45,7 +45,7 @@ fallback behavior in the first warning release.
 
 **Verification**: 198 focused tests, 272 semantic-policy tests, 9,207 unit tests (one skip, 122 deselected), 913
 regressions, a fresh-process consumer-module warning smoke, full pre-commit, design-size checks, and board-integrity
-checks pass. No Forge workflow command was used.
+checks pass. PR #198 merged as `7fd701b5` with all five GitHub checks passing. No Forge workflow command was used.
 
 ## 2026-08-16
 
