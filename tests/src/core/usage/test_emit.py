@@ -10,6 +10,7 @@ identity, with provider-reported tokens. Both no-op without a run identity.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 from forge.backend.sources import get_model_source
 from forge.core.reactive.cost_tracking import VerbCostResult
@@ -23,7 +24,10 @@ from forge.core.usage.emit import (
     emit_worker_usage,
 )
 from forge.core.usage.ledger import read_usage_events
-from forge.core.usage.measurement import direct_cost_provenance
+from forge.core.usage.measurement import (
+    direct_cost_provenance,
+    resolve_claude_p_measurement,
+)
 
 
 def _ok_result(**overrides: Any) -> SessionResult:
@@ -273,14 +277,73 @@ class TestEmitVerbAndWorkerVocabulary:
 
     def test_verb_aggregate_measured(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_v")
-        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
-        emit_verb_usage(
-            command="panel",
-            cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True, cost_measured=True),
+        monkeypatch.setenv("FORGE_PARENT_RUN_ID", "run_parent")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        cost = VerbCostResult(
+            verb="panel",
+            total_cost_micros=900,
+            input_tokens=5,
+            output_tokens=3,
+            cached_tokens=2,
+            duration_ms=12.25,
+            measured=True,
+            cost_measured=True,
         )
+        with patch(
+            "forge.core.usage.emit.resolve_claude_p_measurement",
+            wraps=resolve_claude_p_measurement,
+        ) as resolver:
+            emit_verb_usage(
+                command="panel",
+                cost=cost,
+                status="error",
+                workflow="review",
+                session="planner",
+            )
+
+        resolver.assert_called_once_with(caller="verb", proxied=True, cost=cost)
         e = read_usage_events()[0]
-        # Aggregate spans heterogeneous worker routes -> no single route; reported cost.
-        assert (e.route, e.reporter, e.confidence) == (None, "forge_proxy", "reported")
+        assert {
+            "run_id": e.run_id,
+            "parent_run_id": e.parent_run_id,
+            "root_run_id": e.root_run_id,
+            "runtime": e.runtime,
+            "command": e.command,
+            "status": e.status,
+            "workflow": e.workflow,
+            "session": e.session,
+            "route": e.route,
+            "reporter": e.reporter,
+            "confidence": e.confidence,
+            "measurement_source": e.measurement_source,
+            "attribution_granularity": e.attribution_granularity,
+            "input_tokens": e.input_tokens,
+            "output_tokens": e.output_tokens,
+            "cached_tokens": e.cached_tokens,
+            "cost_micro_usd": e.cost_micro_usd,
+            "latency_ms": e.latency_ms,
+            "source_refs": e.source_refs,
+        } == {
+            "run_id": "run_v",
+            "parent_run_id": "run_parent",
+            "root_run_id": "run_root",
+            "runtime": "claude_code",
+            "command": "panel",
+            "status": "error",
+            "workflow": "review",
+            "session": "planner",
+            "route": None,
+            "reporter": "forge_proxy",
+            "confidence": "reported",
+            "measurement_source": "verb_snapshot_estimated",
+            "attribution_granularity": "verb",
+            "input_tokens": 5,
+            "output_tokens": 3,
+            "cached_tokens": 2,
+            "cost_micro_usd": 900,
+            "latency_ms": 12.2,
+            "source_refs": None,
+        }
 
     def test_verb_aggregate_measured_tokens_unreported_cost(self, monkeypatch) -> None:
         """A fan-out that moved tokens but reported no cost logs null $, not a fake $0."""
@@ -292,6 +355,8 @@ class TestEmitVerbAndWorkerVocabulary:
                 verb="panel",
                 total_cost_micros=0,
                 input_tokens=5,
+                output_tokens=3,
+                cached_tokens=2,
                 measured=True,
                 cost_measured=False,
             ),
@@ -299,6 +364,8 @@ class TestEmitVerbAndWorkerVocabulary:
         e = read_usage_events()[0]
         assert e.cost_micro_usd is None
         assert (e.reporter, e.confidence) == (None, "unavailable")
+        assert e.measurement_source == "verb_snapshot_estimated"
+        assert (e.input_tokens, e.output_tokens, e.cached_tokens) == (5, 3, 2)
 
     def test_verb_aggregate_unmeasured(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_v")
@@ -306,6 +373,44 @@ class TestEmitVerbAndWorkerVocabulary:
         emit_verb_usage(command="panel", cost=VerbCostResult(verb="panel"))
         e = read_usage_events()[0]
         assert (e.route, e.reporter, e.confidence) == (None, None, "unavailable")
+        assert e.measurement_source == "unattributed"
+        assert (e.cost_micro_usd, e.input_tokens, e.output_tokens, e.cached_tokens) == (
+            None,
+            None,
+            None,
+            None,
+        )
+        assert e.source_refs is None
+
+    def test_unmeasured_snapshot_ignores_inconsistent_cost_evidence(self) -> None:
+        measurement = resolve_claude_p_measurement(
+            caller="verb",
+            proxied=True,
+            cost=VerbCostResult(
+                verb="panel",
+                total_cost_micros=900,
+                measured=False,
+                cost_measured=True,
+            ),
+        )
+
+        assert (
+            measurement.cost_micro_usd,
+            measurement.reporter,
+            measurement.confidence,
+            measurement.measurement_source,
+        ) == (None, None, "unavailable", "unattributed")
+        assert (measurement.input_tokens, measurement.output_tokens, measurement.cached_tokens) == (None, None, None)
+
+    def test_verb_aggregate_without_run_identity_is_skipped(self, monkeypatch) -> None:
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+
+        emit_verb_usage(
+            command="panel",
+            cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True, cost_measured=True),
+        )
+
+        assert read_usage_events() == []
 
     def test_worker_leaf(self) -> None:
         emit_worker_usage(run_id="run_leaf", command="panel", status="success")

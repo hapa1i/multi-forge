@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 usage refactor work.
+**Lane**: `doing/` -- active on `refactor/reuse-claude-usage-measurement` from the order-24 closeout (`5eb39d15`).
 
 **Finding**: O055.
 
@@ -12,9 +12,12 @@ Make verb-usage emission use the shared Claude measurement resolver instead of r
 
 ## Evidence and Authority
 
-On `5777192a`, `emit_verb_usage` repeats the proxy measurement branch already owned by `resolve_claude_p_measurement`.
-Authority: [`docs/design.md` "3.14 Cost tracking and spend caps"](../../../design.md#314-cost-tracking-and-spend-caps)
-and the usage-attribution schema in
+Reverified on `5eb39d15`: `emit_verb_usage` still repeats the proxied `caller="verb"` cost, token, reporter, confidence,
+and measurement-source branch already owned by `resolve_claude_p_measurement`. Its four production callers are the
+panel, analyze, debate, and consensus aggregates; the session-result and worker emitters already use the shared
+resolver. The focused usage/ledger regression baseline is 116 passing tests. Authority:
+[`docs/design.md` "3.14 Cost tracking and spend caps"](../../../design.md#314-cost-tracking-and-spend-caps) and the
+usage-attribution schema in
 [`docs/design_appendix.md` "A.13"](../../../design_appendix.md#a13-usage-attribution-ledger-schema-314).
 
 ## Acceptance Criteria

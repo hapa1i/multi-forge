@@ -18,6 +18,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.core.usage.ledger import read_usage_events
 from forge.review.models import AVAILABLE_MODELS, ModelSpec
 from tests.integration.proxy.conftest import RegisteredProxyServer
 
@@ -322,6 +323,9 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", proxy.proxy_id)
     monkeypatch.setenv("FORGE_E2E_CLAUDE_CAPTURE", str(capture_path))
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
+    # Ambient identity is required for the workflow aggregate to publish a usage event.
+    monkeypatch.setenv("FORGE_RUN_ID", "run_panel_e2e")
+    monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel_e2e")
     # Register the canary in AVAILABLE_MODELS — the registry resolve_model_specs()
     # validates an explicit --models against. DEFAULT_MODELS is only the no-args
     # fallback quorum, never consulted when --models is passed, so patching it left
@@ -361,6 +365,22 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     payload = json.loads(result.output)
     assert payload["successful"] == 1
     assert payload["failed"] == 0
+
+    verb_events = [
+        event
+        for event in read_usage_events()
+        if event.run_id == "run_panel_e2e" and event.command == "panel" and event.attribution_granularity == "verb"
+    ]
+    assert len(verb_events) == 1
+    verb_event = verb_events[0]
+    assert verb_event.status == "success"
+    assert verb_event.route is None
+    assert (verb_event.reporter, verb_event.confidence) == ("forge_proxy", "reported")
+    assert verb_event.measurement_source == "verb_snapshot_estimated"
+    assert verb_event.cost_micro_usd is not None and verb_event.cost_micro_usd > 0
+    assert verb_event.input_tokens is not None and verb_event.input_tokens > 0
+    assert verb_event.output_tokens is not None and verb_event.output_tokens > 0
+    assert verb_event.source_refs is None
 
     capture_records = [json.loads(line) for line in capture_path.read_text().splitlines()]
     assert capture_records

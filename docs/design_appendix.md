@@ -803,7 +803,7 @@ run:
   honestly absent). Neither → `unavailable`.
 
 Tokens follow the cost source (no mixed provenance: a `verb_snapshot_estimated` event never carries the exact in-band
-tokens). This is the first emission of `reporter=claude_code` and `measurement_source=runtime_native`.
+tokens). `resolve_claude_p_measurement` solely owns this precedence; emitters supply identity and persist its result.
 
 **Per-worker fan-out events (Phase 4d/5).** The review fan-out (`run_multi_review` →
 `ClaudeHeadlessInvoker.run_parallel`) emits one event per worker (`attribution_granularity=worker`): the run-tree leaf
