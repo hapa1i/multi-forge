@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-17
 
+### Wire the transcript reindex guard
+
+**Goal/outcome**: Avoid re-extracting and rewriting unchanged transcript snapshots without allowing optimization
+bookkeeping to gate searchability.
+
+**Key changes**:
+
+- Wired the existing modification-time/size fingerprint into deferred indexing after project, containment, and
+  transcript validation; unchanged snapshots now skip extraction and all three search-store writes.
+- Preserved full idempotent indexing for new, changed, invalidated, and unreadable-state snapshots, with the strict
+  state mark last so failed bookkeeping remains retryable without hiding searchable content.
+- Made explicit full rebuild replace fresh index state once under lock, repairing corrupt/newer bookkeeping and removing
+  the per-transcript read-modify-write loop.
+
+**Verification**: 107 focused tests, 9,215 unit tests (one skip, 122 deselected), 915 regressions, one targeted Docker
+Stop/artifact integration, full pre-commit, design-size checks, and the 354-document/880-link board audit pass. PR #199
+merged as `7b3ac2df` with all five GitHub checks passing. No Forge workflow command was used.
+
 ### Deprecate the supervisor verdict compatibility wrapper
 
 **Goal/outcome**: Mark the deliberately exported legacy verdict parser for later removal without changing its return or

@@ -1,6 +1,6 @@
 # Wire the transcript reindex guard checklist
 
-Current focus: order 20 is active from `93957659`; keep orders 21--35 parked.
+Current focus: complete -- order 20 shipped in PR #199 (`7b3ac2df`); orders 21--35 remain parked.
 
 ## Activation and evidence
 
@@ -44,4 +44,4 @@ Current focus: order 20 is active from `93957659`; keep orders 21--35 parked.
   deselected).
 - [x] Run diff, design-size, board-link, and Wave 7 lane-count checks without a Forge workflow (354 board documents, 880
   local links, zero missing; 19 done, one doing, 15 todo; normative docs unchanged).
-- [x] Commit and push order 20 for review without activating order 21.
+- [x] Open PR #199, merge it as `7b3ac2df` after all five checks pass, and close order 20 without activating order 21.

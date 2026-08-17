@@ -5,7 +5,7 @@
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O092
 subset).
 
-**Lane**: `doing/` -- active on `refactor/wire-transcript-reindex-guard` from the order-19 closeout (`93957659`).
+**Lane**: `done/` -- shipped in PR #199 (`7b3ac2df`) after all five GitHub checks passed.
 
 **Finding**: O092's `IndexState.needs_reindex` subset.
 
@@ -47,3 +47,9 @@ The index-state schema and full-rebuild all-artifacts replacement contract remai
 bookkeeping consistently with the other three stores. Run search/index and startup-queue unit tests, regressions, and
 the targeted Stop/artifact integration path because repeated Stop is the producer path even though the hook itself does
 not change.
+
+## Closeout
+
+PR #199 merged as `7b3ac2df` with all five GitHub checks passing. The review follow-up restored fail-open search writes
+when optimization state is unavailable and made explicit rebuild repair that state; order 21 remains parked for a
+separate activation from this closeout.
