@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--23 and both bounded corrective members are closed through PR #202. Keep orders 24--35 in
+Current focus: order 24 is active on `refactor/unify-resume-routing-reference` from `6e4038db`; keep orders 25--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -133,6 +133,12 @@ Current focus: orders 1--23 and both bounded corrective members are closed throu
 - [x] Complete order 23's focused, full, regression, targeted Codex integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 23 independently in PR #202 (`d1abccc7`) and close its member before activating order 24.
+- [x] Close order 23 on pushed `main` at `6e4038db`, create `refactor/unify-resume-routing-reference`, and activate only
+  order 24.
+- [x] Route all three fresh resume modes through the shared proxy-ID/template reference helper.
+- [x] Complete order 24's focused, full, regression, targeted session integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 24 independently and close its member before activating order 25.
 
-Orders 24--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 25--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
