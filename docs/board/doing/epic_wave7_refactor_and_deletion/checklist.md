@@ -1,6 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--17 and both bounded corrective members are closed through PR #196; keep orders 18--35 in
+Current focus: orders 1--17 and both bounded corrective members are closed through PR #196. Order 18
+[`remove_dead_session_helpers`](../remove_dead_session_helpers/card.md) is active from `f2fcc688`; keep orders 19--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -94,6 +95,11 @@ Current focus: orders 1--17 and both bounded corrective members are closed throu
 - [x] Remove only the duplicate unscoped name retry while preserving state errors, ambiguity, and fallback ordering.
 - [x] Complete order 17's focused, full, regression, Docker session, pre-commit, design-size, and board-integrity gates.
 - [x] Ship order 17 independently in PR #196 (`bc4f3a0c`) and close its member before activating order 18.
+- [x] Close order 17 on pushed `main` at `f2fcc688`, create `refactor/remove-dead-session-helpers`, and activate only
+  order 18 after reverifying its collector parameter, no-op helper, and relaunch-name argument.
+- [x] Remove only the three verified session residues while preserving live shadow discovery, relaunch lineage, and
+  project-scoped generated-name collision handling.
+- [x] Complete order 18's focused, full, regression, Docker session, pre-commit, design-size, and board-integrity gates.
 
-Orders 18--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 19--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

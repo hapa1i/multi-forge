@@ -597,15 +597,12 @@ def shadows_group() -> None:
     """Inspect accumulated shadow proposals."""
 
 
-def _collect_shadow_entries(
-    scope: str,
-    session_filter: str | None,
-) -> tuple[list[ShadowEntry], set[str]]:
+def _collect_shadow_entries(scope: str) -> tuple[list[ShadowEntry], set[str]]:
     """Thin wrapper around session-layer ``collect_shadow_entries``."""
     from forge.session.shadow_curation import collect_shadow_entries
 
     ctx = ExecutionContext.from_cwd()
-    return collect_shadow_entries(ctx=ctx, scope=scope, session_filter=session_filter)
+    return collect_shadow_entries(ctx=ctx, scope=scope)
 
 
 @shadows_group.command("list")
@@ -620,7 +617,7 @@ def _collect_shadow_entries(
 def shadows_list_cmd(scope: str, as_json: bool) -> None:
     """List shadow proposals discovered from passports."""
     try:
-        entries, scanned_roots = _collect_shadow_entries(scope, None)
+        entries, scanned_roots = _collect_shadow_entries(scope)
     except ForgeOpError as e:
         print_error(f"{e}", console=err_console)
         sys.exit(1)
@@ -690,7 +687,7 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
 def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     """Show shadow proposal content for an official doc."""
     try:
-        entries, scanned_roots = _collect_shadow_entries(scope, None)
+        entries, scanned_roots = _collect_shadow_entries(scope)
     except ForgeOpError as e:
         print_error(f"{e}", console=err_console)
         sys.exit(1)
@@ -952,7 +949,7 @@ def _review_curate(
     # --session cross-project doesn't mix CWD shadows with another root's official doc.
     session_ctx = ExecutionContext.from_cwd(cwd=forge_root)
     try:
-        entries, _roots = collect_shadow_entries(ctx=session_ctx, scope=scope, session_filter=None)
+        entries, _roots = collect_shadow_entries(ctx=session_ctx, scope=scope)
     except ForgeOpError as e:
         raise click.ClickException(str(e))
 

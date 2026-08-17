@@ -53,7 +53,7 @@ def test_shadows_review_bare_json_keeps_stdout_jq_safe(
     ``shadows_show`` without ``as_json`` and then ``print_tip``ped to stdout, leaking
     non-JSON under ``--json``. Now it forwards ``as_json`` and gates the tip.
     """
-    monkeypatch.setattr("forge.cli.memory._collect_shadow_entries", lambda scope, sf: ([], []))
+    monkeypatch.setattr("forge.cli.memory._collect_shadow_entries", lambda scope: ([], []))
     result = CliRunner().invoke(main, ["memory", "shadows", "review", "--for", "docs/x.md", "--json"])
     assert result.exit_code == 0, result.output
     assert "Tip:" not in result.stdout

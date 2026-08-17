@@ -53,7 +53,8 @@ epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
 implementation. A post-order-6 audit promoted O098 and the verified cap-state branch subset of O092 as one bounded
 member, so Wave 7 now contains 32 findings across 35 members. Orders 1--17 shipped independently in PRs #178--#184,
-#186--#188, and #190--#196, and 18 members remain parked. A bounded post-merge correction for explicitly empty `TZ`
+#186--#188, and #190--#196; [`remove_dead_session_helpers`](doing/remove_dead_session_helpers/card.md) is active as
+order 18 from `f2fcc688`, and 17 members remain parked. A bounded post-merge correction for explicitly empty `TZ`
 semantics shipped in PR #189 without changing either count. D056 and other correctness, security, performance,
 test-policy, output, and documentation rows still require their separately defined Wave 6 gates.
 
@@ -743,16 +744,16 @@ the user admitted that bounded subset as one new member, bringing the current gr
 
 The admission corrects the original report rather than treating it as a command:
 
-| Finding scope | Admission result                                                                                                                                                                                                             |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| O062          | Rejected. The current result types have different lifecycle/consumer contracts; a common base would add coupling.                                                                                                            |
-| O063          | Rejected. Only the tiny write/update shape matches; registry read, error, version, and stale-process semantics differ.                                                                                                       |
-| O067          | Verified and admitted. Incremental SSE framing is still identical; transport-owned merge behavior stays separate.                                                                                                            |
-| O093          | Rejected as deletion/simplification. Explicit-backend mapping is consumed and test-pinned; its completed investigation card is retired, not shipped.                                                                         |
-| O095          | Narrowed and admitted only for worker parsing and optional JSON metadata. Repeated Click option declarations remain local.                                                                                                   |
-| O092          | Split by symbol/compatibility owner. The redundant cap-state non-dict branch is now verified and admitted; converter candidates and the unnamed tail remain excluded, and warning windows still block same-release deletion. |
-| O098          | Verified and admitted with the adjacent zero-caller session summary helper after import, patch-target, entry-point, documentation, resource, and history checks found no compatibility consumer.                             |
-| O068--O070    | Split at existing preflight/execution, install path/transaction, and status source/render seams; no card authorizes a monolithic rewrite.                                                                                    |
+| Finding scope | Admission result                                                                                                                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O062          | Rejected. The current result types have different lifecycle/consumer contracts; a common base would add coupling.                                                                                                                         |
+| O063          | Rejected. Only the tiny write/update shape matches; registry read, error, version, and stale-process semantics differ.                                                                                                                    |
+| O067          | Verified and admitted. Incremental SSE framing is still identical; transport-owned merge behavior stays separate.                                                                                                                         |
+| O093          | Rejected as deletion/simplification. Explicit-backend mapping is consumed and test-pinned; its completed investigation card is retired, not shipped.                                                                                      |
+| O095          | Narrowed and admitted only for worker parsing and optional JSON metadata. Repeated Click option declarations remain local.                                                                                                                |
+| O092          | Split by symbol/compatibility owner. The cap-state branch is admitted; the curation session-name merge is recorded but not admitted; converter and unnamed candidates remain excluded; warning windows still block same-release deletion. |
+| O098          | Verified and admitted with the adjacent zero-caller session summary helper after import, patch-target, entry-point, documentation, resource, and history checks found no compatibility consumer.                                          |
+| O068--O070    | Split at existing preflight/execution, install path/transaction, and status source/render seams; no card authorizes a monolithic rewrite.                                                                                                 |
 
 Fresh-process import timing confirmed O043's heavyweight edge (about 317 ms cumulative for `forge.core.lanes` versus 20
 ms for `forge.core.runtime_vocab`). Focused characterization passed 58 tests: 23 cover fresh-config and explicit-backend
@@ -788,11 +789,12 @@ synonym for “everything left.”
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
-  are split into 35 members. Orders 1--17 shipped independently in PRs #178--#184, #186--#188, and #190--#196, and 18
-  are parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
+  are split into 35 members. Orders 1--17 shipped independently in PRs #178--#184, #186--#188, and #190--#196; order 18
+  [`remove_dead_session_helpers`](doing/remove_dead_session_helpers/card.md) is active in PR #197 from `f2fcc688`, and
+  17 are parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
   correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's `httpx2`
   half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified scope; and
-  O092's unverified tail is not an executable deletion set.
+  O092's unadmitted tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-16
 
+### Remove verified dead session helpers
+
+**Goal/outcome**: Remove three internal-only O092 session residues without changing live discovery or relaunch behavior.
+
+**Key changes**:
+
+- Removed the unused shadow session filter and its private CLI pass-through; live callers continue through the same
+  passport-based project/workspace discovery and deduplication path.
+- Deleted the uncalled session-tip no-op and removed the unused relaunch parent argument while retaining parent lineage
+  and `forge_root`-scoped name generation.
+- Replaced the direct-only filtered-shadow test with controls for live shadow collection, exact relaunch call shape, and
+  project-scoped collision inputs.
+
+**Verification**: 552 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
+session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. No Forge workflow command
+was used.
+
 ### Remove the dead session-context retry
 
 **Goal/outcome**: Remove an index-only retry that could not observe the manifest corruption named by its comment.

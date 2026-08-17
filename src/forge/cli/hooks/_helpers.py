@@ -10,7 +10,6 @@ from typing import Any
 import click
 
 from forge.session.hooks import HookResult
-from forge.session.models import SessionState
 
 
 def _find_latest_plan_from_transcript(transcript_path: str, cwd: Path) -> Path | None:
@@ -117,15 +116,6 @@ def _read_stdin_json() -> tuple[dict[str, Any] | None, str | None]:
         return None, "invalid_json"
 
     return parsed, None
-
-
-def _print_session_tip(manifest: SessionState) -> None:
-    """No-op: SessionEnd hook output is suppressed by Claude Code.
-
-    See anthropics/claude-code#9090. The reconnect tip is printed from
-    the parent launcher process instead (_print_post_exit_tip in session.py).
-    Kept as a stub so the session-end hook doesn't break if called.
-    """
 
 
 def _append_artifact_entry(

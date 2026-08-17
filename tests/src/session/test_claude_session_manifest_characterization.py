@@ -401,12 +401,15 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
 
     with (
         patch("forge.cli.session_lifecycle._get_active_session_entry", return_value=active_entry),
-        patch("forge.session.manager.SessionManager._generate_relaunch_name", return_value="char-active-child"),
+        patch(
+            "forge.session.manager.SessionManager._generate_relaunch_name", return_value="char-active-child"
+        ) as generate_relaunch_name,
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
     ):
         result = runner.invoke(main, ["session", "resume", "char-active", "--force"])
 
     assert result.exit_code == 0, result.output
+    generate_relaunch_name.assert_called_once_with(forge_root=str(temp_env))
     state = SessionStore(str(temp_env), "char-active-child").read()
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
