@@ -23,7 +23,7 @@ The admitted subsets now live with their actual compatibility and subsystem owne
 - verdict wrapper: [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md);
 - transcript guard: [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md);
 - status-line candidates: [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md); and
-- mode selector: [`simplify_count_tokens_mode_selector`](../../todo/simplify_count_tokens_mode_selector/card.md).
+- mode selector: [`simplify_count_tokens_mode_selector`](../../doing/simplify_count_tokens_mode_selector/card.md).
 
 The cap-state branch, converter candidates, and unnamed O5 tail remain excluded rather than inherited by a replacement.
 
@@ -33,7 +33,8 @@ The cap-state branch, converter candidates, and unnamed O5 tail remain excluded 
 - Remove `TierClientFactory.get_cache_status`/`clear_cache`, `ProjectRootNotFoundError`, the unused
   `collect_shadow_entries.session_filter` behavior, `_print_session_tip`, and unused `render_categories` parameters.
 - Remove `_generate_relaunch_name.parent_name` while preserving project-scoped collision behavior.
-- Retain and wire the explicit `count-tokens.py --local` selector by making both mode flags write one destination.
+- Retain and wire the explicit `count-tokens.py --local` selector through
+  [`simplify_count_tokens_mode_selector`](../../doing/simplify_count_tokens_mode_selector/card.md).
 
 `_extract_command_paths` shipped with
 [`retire_test_only_settings_helpers`](../../done/retire_test_only_settings_helpers/card.md). Status-line cache
