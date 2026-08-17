@@ -28,8 +28,11 @@ is deliberately restored. The focused 58-test search-state/startup-queue baselin
   the transcript's current `mtime` and size.
 - A new transcript, a missing state entry, or changed `mtime`/size still performs the full idempotent upsert sequence;
   the index-state entry is written only after all three stores succeed.
-- Missing transcripts and corrupt, newer, or unreadable index state retain the marker for the existing retry/poison path
-  without partial writes caused by this guard.
+- Missing transcripts retain the marker before indexing. Corrupt, newer, or unreadable index state disables only the
+  skip optimization: all three idempotent stores are still written, while the strict final state update retains the
+  marker for the existing retry/poison path instead of allowing bookkeeping to gate searchability.
+- `search rebuild-index` replaces index state from the successful extraction set in one locked write, so the explicit
+  full-rebuild recovery path repairs corrupt/newer bookkeeping without per-document read-modify-writes.
 - Tests pin unchanged-snapshot avoidance, changed and invalidated reindexing, state-write ordering, and repeated Stop
   behavior; the measured seam is extraction/store invocation count rather than elapsed time.
 
@@ -40,6 +43,7 @@ incremental, or claim same-size/same-`mtime` content detection. Those are separa
 
 ## Compatibility and Test Tier
 
-Index-state schema, full-rebuild behavior, and atomic recovery remain unchanged. Run search/index and startup-queue unit
-tests, regressions, and the targeted Stop/artifact integration path because repeated Stop is the producer path even
-though the hook itself does not change.
+The index-state schema and full-rebuild all-artifacts replacement contract remain unchanged; rebuild now replaces its
+bookkeeping consistently with the other three stores. Run search/index and startup-queue unit tests, regressions, and
+the targeted Stop/artifact integration path because repeated Stop is the producer path even though the hook itself does
+not change.

@@ -219,6 +219,7 @@ def _process_pending_work_best_effort() -> None:
             BM25 index, content), then marks as indexed. All store operations are
             idempotent upserts, so work queue retries produce correct state.
             """
+            from forge.core.state import StateError
             from forge.search.bm25_store import BM25IndexStore
             from forge.search.content_store import ContentStore
             from forge.search.extractor import decompose_document, extract_document
@@ -243,7 +244,14 @@ def _process_pending_work_best_effort() -> None:
                 raise FileNotFoundError(f"Transcript not found: {transcript_abs}")
 
             index_store = IndexStateStore(forge_root=forge_root)
-            if not index_store.read().needs_reindex(transcript_abs):
+            try:
+                unchanged = not index_store.read().needs_reindex(transcript_abs)
+            except StateError as e:
+                # Index state is optimization bookkeeping, not the searchable source.
+                # Do the idempotent writes; the strict final mark retains the marker.
+                logger.debug("Index-state guard unavailable for %s; indexing without it: %s", transcript_abs, e)
+                unchanged = False
+            if unchanged:
                 return
 
             doc = extract_document(

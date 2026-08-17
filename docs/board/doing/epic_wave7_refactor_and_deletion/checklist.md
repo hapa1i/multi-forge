@@ -109,8 +109,8 @@ Current focus: order 20 is active on `refactor/wire-transcript-reindex-guard` fr
 - [x] Ship order 19 independently in PR #198 (`7fd701b5`) and close its member without activating order 20.
 - [x] Close order 19 on pushed `main` at `93957659`, create `refactor/wire-transcript-reindex-guard`, and activate only
   order 20 after correcting its metadata-fingerprint contract.
-- [x] Wire O092's existing `mtime`/size guard at the startup-queue index boundary while preserving validation, store
-  ordering, retry behavior, full rebuilds, and the index-state schema.
+- [x] Wire O092's existing `mtime`/size guard at the startup-queue index boundary, fail open to full indexing when its
+  bookkeeping cannot be read, and make explicit full rebuild replace that state consistently with the search stores.
 - [x] Complete order 20's focused, full, regression, Docker Stop/artifact, pre-commit, design-size, and board-integrity
   gates without a Forge workflow.
 - [ ] Ship order 20 independently and close its member before activating order 21.

@@ -13,12 +13,15 @@ Current focus: order 20 is active from `93957659`; keep orders 21--35 parked.
 
 ## Implementation
 
-- [x] Read index state after project/path/file validation and skip extraction plus all three upserts only when metadata
-  matches.
+- [x] Read index state after project/path/file validation and skip extraction plus all three upserts only when readable
+  metadata matches.
 - [x] Preserve the full metadata, BM25, and content upsert order for new, changed, or invalidated transcripts.
-- [x] Keep `mark_indexed` last so failed store writes and state-read failures retain the marker for retry.
-- [x] Leave Stop copying/enqueueing, full rebuild semantics, index-state schema, and same-size/same-`mtime` limitations
-  unchanged.
+- [x] Treat state-read failure as an unavailable optimization rather than a searchability gate; keep `mark_indexed` last
+  and strict so the completed store writes remain searchable while the marker records a retry.
+- [x] Make full rebuild replace fresh index state once under lock, repairing corrupt/newer bookkeeping and removing the
+  per-transcript read-modify-write loop without making the rebuild incremental.
+- [x] Leave Stop copying/enqueueing, the full-replacement contract, index-state schema, and same-size/same-`mtime`
+  limitations unchanged.
 
 ## Acceptance controls
 
@@ -28,13 +31,14 @@ Current focus: order 20 is active from `93957659`; keep orders 21--35 parked.
 | Metadata match     | second marker for the unchanged snapshot              | marker succeeds without extraction or store writes                                |
 | Changed snapshot   | indexed transcript with changed `mtime` or size       | full upsert path runs and state refreshes                                         |
 | Invalidated state  | stores exist but the transcript state entry is absent | full upsert path runs again                                                       |
-| State read failure | corrupt/newer/unreadable `state.json`                 | no search store is mutated and marker records a retry                             |
+| State read failure | corrupt/newer/unreadable `state.json`                 | all three stores update; strict final mark leaves state unchanged and retries     |
+| Full rebuild       | corrupt/newer `state.json` with valid artifacts       | stores and fresh state replace successfully in one locked state write             |
 | Repeated Stop      | same session UUID captured twice                      | latest changed artifact remains searchable; unchanged drain avoids duplicate work |
 
 ## Verification and closeout
 
-- [x] Run focused search-state, startup-queue, hook, and named regression tests (64 passed).
-- [x] Run `make test-unit` (9,212 passed, one skipped, 122 deselected), `make test-regression` (913 passed), and
+- [x] Run focused search-state, startup-queue, search CLI, and named regression tests after review fixes (107 passed).
+- [x] Run `make test-unit` (9,215 passed, one skipped, 122 deselected), `make test-regression` (915 passed), and
   `make pre-commit`.
 - [x] Run the targeted Docker Stop/artifact integration path required for hook/session producer coverage (one passed, 12
   deselected).

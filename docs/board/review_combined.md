@@ -442,7 +442,8 @@ Documented drift cross-references the ranked inventory where one exists:
   [`align_stop_verification_contract`](done/align_stop_verification_contract/card.md).
 - **O092 subset — `IndexState.needs_reindex`:** before order-20 activation it had zero callers, so the index
   re-extracted and rewrote on every Stop even when the existing state fingerprint (`mtime` plus size) was unchanged. The
-  bounded member wires that guard without treating it as byte identity.
+  bounded member wires that guard without treating it as byte identity; unreadable bookkeeping bypasses the optimization
+  rather than gating search writes, and explicit full rebuild replaces the state in one locked write.
 - **D029 — `tool_prefixes_to_ignore`:** reachable only in a `ProxyConfig` shape that no proxy file can produce.
 
 `U001` still needs severity, acceptance criteria, and a board-card decision. U002 and U003 are now admitted into the

@@ -351,7 +351,7 @@ def rebuild_index_cmd() -> None:
 
     from forge.search.engine import BM25
     from forge.search.extractor import decompose_document, extract_document
-    from forge.search.index_state import IndexStateStore
+    from forge.search.index_state import IndexState, IndexStateStore
 
     project_root = _resolve_forge_root()
     from forge.cli.guards import enforce_target_project_compatibility
@@ -426,15 +426,15 @@ def rebuild_index_cmd() -> None:
     bm25_store.replace_all(bm25_data)
     content_store.replace_all(content_map)
 
-    # Mark all as indexed
+    # Rebuild state from the same successful extraction set. A single locked
+    # replacement repairs corrupt/newer bookkeeping without N read-modify-writes.
+    rebuilt_state = IndexState()
     for doc in new_docs:
         try:
-            index_store.mark_indexed(Path(doc.transcript_path))
+            rebuilt_state.mark_indexed(Path(doc.transcript_path))
         except (FileNotFoundError, ValueError):
             pass
-
-    # Prune stale entries from index state (stores were fully replaced)
-    index_store.prune_missing()
+    index_store.replace_all(rebuilt_state)
 
     console.print(f"[green]Indexed {len(new_docs)} transcripts.[/green]")
     if errors:

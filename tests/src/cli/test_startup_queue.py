@@ -453,23 +453,78 @@ class TestIndexMarkerProcessing:
         assert extracted == [transcript]
         assert str(transcript) in state_store.read().indexed_files
 
-    def test_corrupt_index_state_retries_before_search_store_writes(self, tmp_path: Path) -> None:
-        marker = _create_index_marker_with_transcript(tmp_path, session_id="guard-corrupt-state")
+    @pytest.mark.parametrize(
+        ("state_contents", "error_fragment"),
+        [
+            pytest.param("not valid json", "invalid JSON", id="corrupt"),
+            pytest.param('{"schema_version": 999, "indexed_files": {}}', "incompatible version", id="newer"),
+        ],
+    )
+    def test_unusable_index_state_does_not_gate_search_store_writes(
+        self,
+        tmp_path: Path,
+        state_contents: str,
+        error_fragment: str,
+    ) -> None:
+        session_id = "guard-unusable-state"
+        marker = _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+        transcript = tmp_path / f".forge/artifacts/test-session/transcripts/{session_id}.jsonl"
         index_dir = tmp_path / ".forge" / "search-index"
         index_dir.mkdir(parents=True)
         state_path = index_dir / "state.json"
-        state_path.write_text("not valid json", encoding="utf-8")
+        state_path.write_text(state_contents, encoding="utf-8")
 
         result = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
 
         assert result.exit_code == 0, result.output
         marker_data = json.loads(marker.read_text(encoding="utf-8"))
         assert marker_data["attempt_count"] == 1
-        assert "state.json" in marker_data["last_error"]
-        assert state_path.read_text(encoding="utf-8") == "not valid json"
-        assert not (index_dir / "documents.json").exists()
-        assert not (index_dir / "bm25_index.json").exists()
-        assert not (index_dir / "content.json").exists()
+        assert error_fragment in marker_data["last_error"]
+        assert state_path.read_text(encoding="utf-8") == state_contents
+
+        from forge.search.content_store import ContentStore
+
+        assert (index_dir / "documents.json").is_file()
+        assert (index_dir / "bm25_index.json").is_file()
+        assert str(transcript) in ContentStore(forge_root=tmp_path).read_all()
+
+    def test_unreadable_index_state_does_not_gate_search_store_writes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        session_id = "guard-unreadable-state"
+        marker = _create_index_marker_with_transcript(tmp_path, session_id=session_id)
+        transcript = tmp_path / f".forge/artifacts/test-session/transcripts/{session_id}.jsonl"
+        index_dir = tmp_path / ".forge" / "search-index"
+        state_path = index_dir / "state.json"
+        state_path.parent.mkdir(parents=True)
+        state_path.write_text('{"schema_version": 1, "indexed_files": {}}', encoding="utf-8")
+
+        from forge.search.exceptions import IndexStateUnreadableError
+        from forge.search.index_state import IndexStateStore
+
+        real_read = IndexStateStore.read
+
+        def unreadable_state(store: IndexStateStore) -> object:
+            if store.state_path == state_path:
+                raise IndexStateUnreadableError(str(state_path), "permission denied")
+            return real_read(store)
+
+        monkeypatch.setattr(IndexStateStore, "read", unreadable_state)
+
+        result = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        marker_data = json.loads(marker.read_text(encoding="utf-8"))
+        assert marker_data["attempt_count"] == 1
+        assert "permission denied" in marker_data["last_error"]
+
+        from forge.search.content_store import ContentStore
+
+        assert (index_dir / "documents.json").is_file()
+        assert (index_dir / "bm25_index.json").is_file()
+        assert str(transcript) in ContentStore(forge_root=tmp_path).read_all()
 
     def test_failed_content_write_retries_without_marking_transcript_indexed(
         self,
