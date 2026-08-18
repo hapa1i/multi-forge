@@ -109,8 +109,7 @@ def test_d023_fork_preflights_confirmed_transcript_fallback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _project_root, _real_manager, store = _seed_fallback_transcript(tmp_path, monkeypatch)
-    parent = store.read()
+    _project_root, real_manager, _store = _seed_fallback_transcript(tmp_path, monkeypatch)
 
     with (
         patch("forge.cli.session_fork.SessionManager") as manager_cls,
@@ -118,7 +117,7 @@ def test_d023_fork_preflights_confirmed_transcript_fallback(
         successful_claude_launch() as invoke_claude,
     ):
         manager = manager_cls.return_value
-        manager.get_session.return_value = parent
+        manager.index_store = real_manager.index_store
         result = CliRunner().invoke(
             main,
             ["session", "fork", "parent", "--name", "child", "--strategy", "full"],

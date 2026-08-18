@@ -76,6 +76,40 @@ logger = logging.getLogger(__name__)
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
+def fork_target_matches_replacement(
+    *,
+    existing_state: SessionState | None,
+    parent_name: str,
+    target_forge_root: str | Path,
+    expected_worktree_path: str | Path,
+    expected_branch: str,
+    expected_is_worktree: bool,
+    expected_owns_worktree: bool,
+) -> bool:
+    """Return whether durable target identity permits narrow stale replacement.
+
+    Runtime liveness is intentionally excluded: read-only planning uses the
+    non-repairing active-store seam, while mutation rechecks through the
+    self-healing seam immediately before replacement.
+    """
+    if existing_state is None or not existing_state.is_fork or existing_state.parent_session != parent_name:
+        return False
+    if (
+        existing_state.forge_root is not None
+        and Path(existing_state.forge_root).resolve() != Path(target_forge_root).resolve()
+    ):
+        return False
+
+    worktree = existing_state.worktree
+    if worktree is None or Path(worktree.path).resolve() != Path(expected_worktree_path).resolve():
+        return False
+    if worktree.branch != expected_branch or worktree.is_worktree != expected_is_worktree:
+        return False
+    if expected_is_worktree and getattr(worktree, "owns_worktree", True) != expected_owns_worktree:
+        return False
+    return True
+
+
 def _append_unique_string(values: list[str], value: Any) -> None:
     if isinstance(value, str) and value and value not in values:
         values.append(value)
@@ -1122,30 +1156,17 @@ class SessionManager:
 
         Replacement is intentionally narrow: the existing session must already
         be a fork from this parent, point at the same target checkout/branch,
-        and be inactive. Keep this mutation-time verdict aligned with
-        ``core.ops.session_fork_preflight._can_force_replace`` until order 32
-        consumes the plan behind one execution boundary.
+        and be inactive.
         """
-        if existing_state is None:
-            return False
-        if not existing_state.is_fork or existing_state.parent_session != parent_name:
-            return False
-        if (
-            existing_state.forge_root is not None
-            and Path(existing_state.forge_root).resolve() != Path(target_forge_root).resolve()
+        if not fork_target_matches_replacement(
+            existing_state=existing_state,
+            parent_name=parent_name,
+            target_forge_root=target_forge_root,
+            expected_worktree_path=expected_worktree_path,
+            expected_branch=expected_branch,
+            expected_is_worktree=expected_is_worktree,
+            expected_owns_worktree=expected_owns_worktree,
         ):
-            return False
-
-        existing_worktree = existing_state.worktree
-        if existing_worktree is None:
-            return False
-        if Path(existing_worktree.path).resolve() != Path(expected_worktree_path).resolve():
-            return False
-        if existing_worktree.branch != expected_branch:
-            return False
-        if existing_worktree.is_worktree != expected_is_worktree:
-            return False
-        if expected_is_worktree and getattr(existing_worktree, "owns_worktree", True) != expected_owns_worktree:
             return False
 
         try:
@@ -1503,7 +1524,7 @@ class SessionManager:
         # forks default to transfer; same-directory forks default to native UNLESS the caller asks
         # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
         # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
-        # if the CLI's best-effort _persist_fork_transfer_derivation refinement later fails.
+        # if command core's best-effort _persist_fork_transfer_derivation refinement later fails.
         if resume_mode == "native-relocate" and (create_worktree or is_into):
             fork_resume_mode = "native-relocate"
         elif create_worktree or is_into or resume_mode == "transfer":

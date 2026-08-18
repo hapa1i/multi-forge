@@ -1,17 +1,17 @@
-"""CLI-owned derivation enrichment for derived sessions."""
+"""Derivation enrichment for derived sessions."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from forge.cli.session_lifecycle import _persist_fork_transfer_derivation
 from forge.cli.session_rewind import _persist_rewind_derivation
+from forge.core.ops.session_fork_execution import _persist_fork_transfer_derivation
 from forge.session.models import Derivation, create_session_state
 from forge.session.store import SessionStore
 
 
 def test_persist_fork_transfer_derivation_records_strategy_and_context(tmp_path: Path) -> None:
-    """Worktree fork transfer metadata is persisted after the CLI creates context."""
+    """Worktree fork transfer metadata is persisted after command core creates context."""
     worktree = tmp_path / "child-worktree"
     worktree.mkdir()
     context = worktree / ".forge" / "handoff" / "child.md"

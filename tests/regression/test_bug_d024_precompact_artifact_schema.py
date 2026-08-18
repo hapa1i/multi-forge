@@ -25,6 +25,7 @@ from forge.session.exceptions import (
 )
 from forge.session.models import CompactionConfirmed
 from forge.session.transfer import ResumeStrategy, assemble_transfer_context
+from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 pytestmark = pytest.mark.regression
 
@@ -229,7 +230,7 @@ def test_legacy_snapshot_tail_does_not_bypass_cli_fork_full_budget_preflight(
         patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
     ):
         manager = manager_cls.return_value
-        manager.get_session.return_value = parent
+        _configure_mock_fork_manager(manager, parent, project)
         result = CliRunner().invoke(
             main,
             ["session", "fork", "parent", "--name", "child", "--strategy", "full"],

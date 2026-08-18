@@ -72,6 +72,13 @@ class ProxyStartError(ValueError):
     """Raised when a proxy cannot be started."""
 
 
+@dataclass(frozen=True)
+class ProxyEnsurePlan:
+    """Read-only proxy resolution consumed immediately before realization."""
+
+    exact_entry: ProxyEntry | None
+
+
 class ProxyUnreachableError(Exception):
     """Raised when a proxy's ``GET /`` cannot be read (down, non-200, or non-JSON body)."""
 
@@ -781,6 +788,30 @@ def _should_persist_failed_reuse_status(entry: ProxyEntry) -> bool:
     return _is_orphaned_starting(entry)
 
 
+def plan_ensure_proxy(name: str) -> ProxyEnsurePlan:
+    """Resolve one proxy reference without health checks or process startup."""
+    registry = ProxyRegistryStore().read()
+    exact_proxy_id = name in registry.proxies
+    try:
+        resolved: ProxyEntry | None = resolve_proxy(registry, name)
+    except AmbiguousProxyError:
+        raise
+    except ProxyNotFoundError:
+        if not template_exists(name):
+            raise
+        _load_template_for_proxy(name)
+        return ProxyEnsurePlan(exact_entry=None)
+
+    if exact_proxy_id:
+        return ProxyEnsurePlan(exact_entry=resolved)
+
+    # A template-name match is realized through start_proxy even when a
+    # registry entry currently exists, so validate the template Forge will use.
+    _validate_template_exists(name)
+    _load_template_for_proxy(name)
+    return ProxyEnsurePlan(exact_entry=None)
+
+
 def ensure_proxy(name: str, *, host: str = "localhost") -> tuple[ProxyEntry, bool]:
     """Resolve a proxy by id/template, auto-starting from a matching template when needed.
 
@@ -806,21 +837,11 @@ def ensure_proxy(name: str, *, host: str = "localhost") -> tuple[ProxyEntry, boo
         ProxyStartError: A template matched but the proxy failed to start.
         ProxyRegistryCorruptedError: The registry exists but cannot be parsed.
     """
-    registry = ProxyRegistryStore().read()
-    exact_proxy_id = name in registry.proxies
-    try:
-        resolved: ProxyEntry | None = resolve_proxy(registry, name)
-    except AmbiguousProxyError:
-        raise
-    except ProxyNotFoundError:
-        if not template_exists(name):
-            raise
-        resolved = None
-
     # Exact proxy IDs preserve the existing presence-only contract, even when the
     # proxy_id happens to share a name with a template.
-    if resolved is not None and exact_proxy_id:
-        return resolved, False
+    plan = plan_ensure_proxy(name)
+    if plan.exact_entry is not None:
+        return plan.exact_entry, False
 
     logger.info("Ensuring live proxy for template '%s'", name)
     result = start_proxy(template=name, host=host)

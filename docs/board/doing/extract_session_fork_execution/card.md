@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 structural/deletion work.
+**Lane**: `doing/` -- active on `refactor/extract-session-fork-execution` from `1897b547`.
 
 **Findings**: O068's mutation/launch subset and O096's unreachable second `elif proxy_name` branch.
 
@@ -15,9 +15,9 @@ input, prompts, presentation, and process handoff.
 
 ## Evidence and Authority
 
-On `5777192a`, the callback still owns child creation, native relocation, rollback, transfer/rewind artifacts, extension
-preparation, `ForkLaunchPlan` assembly, and launch rendering. The second proxy-name routing branch is unreachable
-because preflight routing is already populated. Authority:
+Reverified on `1897b547`, the callback still owns child creation, native relocation, rollback, transfer/rewind
+artifacts, extension preparation, `ForkLaunchPlan` assembly, and launch rendering. The second proxy-name routing branch
+is unreachable because preflight routing is already populated. Authority:
 [`docs/design.md` "3.12 Command-core ops"](../../../design.md#312-command-core-ops-shared-implementation) and the
 session transaction/launch contracts in
 [`docs/design.md` "3.2"](../../../design.md#32-contract-files-authoritative-paths).
@@ -43,3 +43,7 @@ reserved for this execution boundary.
 
 Do not change branch naming, session identity, transfer/rewind strategy, extension ownership, or post-launch best-effort
 confirmation semantics.
+
+Start still renders extension inheritance through the CLI-owned `_auto_install_extensions`, while fork returns typed
+extension events from command core. Their shared detection/install mechanics remain explicit follow-up debt; order 33
+decomposes the installer transaction itself and does not currently own this caller seam.

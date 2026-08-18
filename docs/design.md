@@ -360,13 +360,13 @@ conversation, and hooks reconcile the identity when Claude rolls it over. Codex-
 For Claude, `confirmed.claude_session_id` has field-specific CLI/hook ownership depending on the launch path.
 `forge session start` **pre-seeds** it: the CLI generates a UUID, writes it to the manifest at creation, and imposes it
 on Claude via `--session-id`; the SessionStart hook then **validates** that UUID. The same pre-seed applies to
-**transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): the CLI mints a
-**new** UUID and imposes it via `--session-id`. The exception is a **native** fork (`--resume-mode native`, which passes
-`--fork-session`): there the CLI does **not** pre-seed — Claude mints the child UUID and SessionStart **discovers and
-records** it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`,
-which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
-records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
-— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session).
+**transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): Forge mints a **new**
+UUID and imposes it via `--session-id`. The exception is a **native** fork (`--resume-mode native`, which passes
+`--fork-session`): Forge does **not** pre-seed — Claude mints the child UUID and SessionStart **discovers and records**
+it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`, which
+**binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it records
+what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged — one
+manifest per conversation, and reattach behaves exactly as it does for a Forge-born session).
 
 The same command adopts a native **Codex** thread: the runtime is decided by which store holds a matching conversation,
 never by the shape of the id (both runtimes use UUIDs, and their differing versions are an undocumented third-party
@@ -580,8 +580,8 @@ To avoid writer conflicts:
     applied unvalidated on a later `resume --proxy`.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
-    children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
-    imposes it via `--session-id`) and the SessionStart hook validates it. **Native** fork launches
+    children (`session fork`, `resume --fresh`): the command core **pre-seeds** it (generates a UUID, writes it at
+    creation, imposes it via `--session-id`) and the SessionStart hook validates it. **Native** fork launches
     (`--resume-mode native`, `--fork-session`) do **not** pre-seed — Claude mints the child UUID and the hook records
     it; Stop/StopFailure reconcile when native fork launches materialize a child UUID after startup.
 - Hooks write:
@@ -1088,7 +1088,7 @@ Same-directory forks default to `resume_mode: native`, `strategy: null`, `depth:
 Passing `--resume-mode transfer` -- or any transfer flag (`--strategy`/`--inline-plan`), which auto-switches a
 same-directory fork to transfer with an info line -- instead yields a same-directory *transfer* fork:
 `resume_mode: transfer`, a fresh child Claude session (no parent `--resume --fork-session`), and a generated
-`context_file`. Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and
+`context_file`. Worktree and `--into` forks start with `resume_mode: transfer`; the execution op enriches `strategy` and
 `context_file` when it generates a transfer context file. `--resume-mode native-relocate` stays worktree/`--into`-only.
 `fork --strategy rewind --drop-last N` is also worktree/`--into`-only: it records `resume_mode: native-relocate`,
 `strategy: rewind`, `context_file`, `dropped_turns`, and `rewind_relocated_session_id` for the fresh truncated copy.
@@ -1278,10 +1278,10 @@ management should be done deliberately from terminal.
 ### 3.12 Command-core ops (shared implementation)
 
 Shared terminal (`forge ...`) and direct (`%...` via `forge hook user-prompt-submit`) operations live in
-`src/forge/core/ops/`, without Click, output, or hook JSON. They return typed data/failures. Session fork resolves one
-read-only parent/target/strategy/routing plan before Click starts runtimes and the manager revalidates/mutates. Claude
-lifecycle paths share a manifest context: recorded `forge_root` owns `SessionStore`; worktree is the guarded launch
-path.
+`src/forge/core/ops/`, without Click, output, or hook JSON, and return typed results. Fork resolves one read-only plan;
+`session.launch` owns pure preference/prompt resolution; command core owns creation, artifacts, rollback, and launch
+planning; Click realizes routes, renders, and hands off; the manager rechecks races. Claude lifecycle paths share a
+manifest context: recorded `forge_root` owns `SessionStore`; worktree is the guarded launch path.
 
 `core/ops/policy.py` owns the registry-derived activation vocabulary, validation, and typed values shared by terminal
 `forge policy enable|disable` and direct `%policy enable|disable`. The terminal surface still writes policy intent while

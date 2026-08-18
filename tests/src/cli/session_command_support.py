@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, _patch, patch
 
 from forge.session import IndexStore, SessionStore, create_session_state
@@ -17,6 +18,57 @@ if TYPE_CHECKING:
 def successful_claude_launch() -> _patch[Mock]:
     """Patch Claude invocation for tests that only need a successful launch."""
     return patch("forge.core.ops.claude_session.invoke_claude", return_value=0)
+
+
+def _publish_fork_parent(parent: Any, project_root: Path) -> IndexStore:
+    """Publish a fork parent through the concrete stores used by preflight."""
+    if (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            check=False,
+        ).returncode
+        != 0
+    ):
+        subprocess.run(["git", "init"], cwd=project_root, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=project_root, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=project_root, check=True)
+        readme = project_root / "README.md"
+        readme.write_text("# test\n", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=project_root, check=True)
+        subprocess.run(
+            ["git", "-c", "commit.gpgsign=false", "commit", "-m", "test"],
+            cwd=project_root,
+            capture_output=True,
+            check=True,
+        )
+
+    index_store = IndexStore()
+    worktree_root = Path(parent.worktree.path) if parent.worktree is not None else project_root
+    forge_root = Path(parent.forge_root) if parent.forge_root else worktree_root
+    forge_root.mkdir(parents=True, exist_ok=True)
+    (forge_root / ".forge").mkdir(exist_ok=True)
+    parent.forge_root = str(forge_root)
+    try:
+        relative_path = str(forge_root.relative_to(project_root)) or "."
+    except ValueError:
+        relative_path = "."
+    publish_session(
+        index_store,
+        parent,
+        project_root,
+        checkout_root=project_root,
+        forge_root=forge_root,
+        relative_path=relative_path,
+    )
+    return index_store
+
+
+def _configure_mock_fork_manager(mock_manager: Any, parent: Any, project_root: Path) -> None:
+    """Back a narrow mutation mock with the concrete stores used by preflight."""
+    mock_manager.index_store = _publish_fork_parent(parent, project_root)
+    mock_manager.get_session.return_value = parent
 
 
 def _iso_days_ago(days: int) -> str:

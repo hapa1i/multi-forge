@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--31 shipped; orders 32--35 remain parked.
+Current focus: Wave 7 order 32 `extract_session_fork_execution` is active from `1897b547`; orders 33--35 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -330,5 +330,9 @@ Current focus: Wave 7 orders 1--31 shipped; orders 32--35 remain parked.
 - [x] Extract and verify order 31's typed read-only preflight while keeping order 32 parked; publication remains on the
   active member.
 - [x] Ship order 31 independently in PR #210 (`85c050e2`) and close it without activating order 32.
+- [x] Close order 31 on pushed `main` at `1897b547`, branch from that exact commit, and activate only order 32
+  `extract_session_fork_execution` after the preflight merge.
+- [x] Extract and verify order 32's typed execution/compensation boundary while keeping order 33 parked; publication
+  remains on the active member.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

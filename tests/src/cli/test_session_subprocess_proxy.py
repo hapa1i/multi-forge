@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.session import create_session_state
+from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 
 @pytest.fixture
@@ -49,7 +50,7 @@ def test_fork_threads_subprocess_proxy_env(temp_project: Path) -> None:
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_project)
         mock_manager.fork_session.return_value = (parent, fork_state)
 
         result = CliRunner().invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])

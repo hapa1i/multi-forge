@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import SessionStore, create_session_state
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
+from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 
 @pytest.fixture
@@ -145,7 +146,7 @@ def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner,
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_env)
         mock_manager.fork_session.return_value = (parent, fork_state)
         result = runner.invoke(
             main,
@@ -210,7 +211,7 @@ def test_worktree_rewind_proxy_addendum_injected_once(runner: CliRunner, temp_en
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_env)
         mock_manager.fork_session.return_value = (parent, fork_state)
         result = runner.invoke(
             main,
@@ -259,7 +260,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
         patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_env)
         mock_manager.fork_session.return_value = (parent, fork_state)
         mock_manager.delete_session.side_effect = OSError("cleanup denied")
         result = runner.invoke(
@@ -289,6 +290,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
     mock_manager.delete_session.assert_called_once_with(
         "fork-child",
         delete_worktree=True,
+        delete_branch=True,
         delete_transcripts=False,
         force=True,
         forge_root=fork_state.forge_root,
@@ -322,7 +324,7 @@ def test_rewind_fork_rejects_sidecar_parent(runner: CliRunner, temp_env: Path) -
         patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_env)
         result = runner.invoke(
             main,
             [
@@ -356,7 +358,7 @@ def test_rewind_fork_rejects_sidecar_child_at_launch_seam(runner: CliRunner, tem
         patch("forge.cli.session_fork._prepare_rewind_launch_artifacts") as mock_prepare,
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, temp_env)
         mock_manager.fork_session.return_value = (parent, fork_state)
         result = runner.invoke(
             main,
@@ -376,6 +378,14 @@ def test_rewind_fork_rejects_sidecar_child_at_launch_seam(runner: CliRunner, tem
 
     assert result.exit_code == 1
     assert "--strategy rewind is not supported with sidecar mode" in result.output
+    mock_manager.delete_session.assert_called_once_with(
+        "fork-child",
+        delete_worktree=True,
+        delete_branch=True,
+        delete_transcripts=False,
+        force=True,
+        forge_root=fork_state.forge_root,
+    )
     mock_prepare.assert_not_called()
     mock_invoke.assert_not_called()
 

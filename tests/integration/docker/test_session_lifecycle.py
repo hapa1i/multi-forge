@@ -513,6 +513,50 @@ print('fork_nw_ok')
         """)
         assert "fork_nw_ok" in check.stdout, f"No-worktree fork check failed: {check.stderr}"
 
+    def test_fork_rejects_codex_parent_before_child_creation(self, forge_workspace: ContainerLike) -> None:
+        """The Claude-only fork command must reject a durable Codex parent without residue."""
+        forge_workspace.exec("forge extension enable --scope user --profile minimal")
+        start = forge_workspace.exec("cd /workspace && forge session start codex-parent --no-launch")
+        assert start.returncode == 0, f"Parent setup failed: {start.stderr}"
+
+        mutate = forge_workspace.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+
+path = Path('/workspace/.forge/sessions/codex-parent/forge.session.json')
+manifest = json.loads(path.read_text())
+manifest['intent']['launch']['runtime'] = 'codex'
+path.write_text(json.dumps(manifest))
+"
+        """)
+        assert mutate.returncode == 0, f"Codex parent setup failed: {mutate.stderr}"
+
+        result = forge_workspace.exec(
+            "cd /workspace && forge session fork codex-parent --name codex-child --worktree --no-launch 2>&1"
+        )
+        assert result.returncode != 0, "Forking a Codex parent should fail"
+        assert "Codex session" in result.stdout, result.stdout
+
+        check = forge_workspace.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+import subprocess
+
+index = json.loads((Path.home() / '.forge' / 'sessions' / 'index.json').read_text())
+assert all(key.split('|', 1)[0] != 'codex-child' for key in index.get('sessions', {})), index
+branch = subprocess.run(
+    ['git', 'show-ref', '--verify', '--quiet', 'refs/heads/codex-child'],
+    cwd='/workspace',
+    capture_output=True,
+)
+assert branch.returncode != 0, 'Codex rejection left a child branch'
+print('codex_fork_rejected_cleanly')
+"
+        """)
+        assert "codex_fork_rejected_cleanly" in check.stdout, f"Codex rejection check failed: {check.stderr}"
+
     def test_force_same_dir_fork_rejects_unrelated_existing_session(self, forge_workspace: ContainerLike) -> None:
         """Force same-dir fork should fail when the target name already belongs to a different session."""
         forge_workspace.exec("forge extension enable --scope user --profile minimal")

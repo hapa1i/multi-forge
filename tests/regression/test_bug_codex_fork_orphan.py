@@ -21,10 +21,12 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.session import create_session_state
 from forge.session.exceptions import CannotForkCodexParentError
 from forge.session.manager import SessionManager
 from forge.session.models import LaunchIntent
 from forge.session.store import SessionStore
+from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 pytestmark = pytest.mark.regression
 
@@ -40,17 +42,19 @@ def _enable_forge(path: Path) -> None:
     (path / ".forge").mkdir(exist_ok=True)
 
 
-def test_fork_rejects_codex_parent_before_creating_state(monkeypatch) -> None:
-    codex_state = MagicMock()
-    codex_state.intent.launch.runtime = "codex"
-    manager = MagicMock()
-    manager.get_session.return_value = codex_state
+def test_fork_rejects_codex_parent_before_creating_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _enable_forge(repo)
+    monkeypatch.chdir(repo)
 
-    # Patch the seams the guard reaches before fork_session(): the manager, the forge-root
-    # resolver, and the cwd guard (so the command runs outside a real repo).
+    codex_state = create_session_state("planner", worktree_path=str(repo))
+    codex_state.intent.launch = LaunchIntent(runtime="codex")
+    manager = MagicMock()
+    _configure_mock_fork_manager(manager, codex_state, repo)
+
+    # Keep only the mutation boundary mocked; preflight reads concrete durable state.
     monkeypatch.setattr("forge.cli.session_fork.SessionManager", lambda: manager)
-    monkeypatch.setattr("forge.cli.session_fork._cwd_forge_root", lambda: "/fake/forge/root")
-    monkeypatch.setattr("forge.cli.guards.require_repo_root", lambda: None)
 
     result = CliRunner().invoke(main, ["session", "fork", "planner"])
 

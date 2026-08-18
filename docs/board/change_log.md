@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Extract session-fork execution
+
+**Goal/outcome**: Execute a validated fork plan behind one command-core mutation and compensation boundary.
+
+**Key changes**:
+
+- Added a typed execution op for child creation, routing/supervisor persistence, native/transfer/rewind artifacts,
+  extension preparation, rollback, and launch-plan assembly; Click now realizes runtimes, renders events, and hands off.
+- Made hard pre-launch failures remove owned manifest, index, worktree, branch, and transcript state, with an explicit
+  recovery command when cleanup fails; a new test exposed and closed the previously surviving child-branch residue.
+- Removed the unreachable proxy re-resolution, deleted mock-manager planner fallbacks, and shared stale-replacement and
+  supervisor-proxy planning decisions between read-only preflight and mutation-time rechecks.
+- Review hardening closes ready-fallback and partial-factory rewind transcript leaks, removes the dead model-pin module,
+  preserves styled warnings, and shares pure launch-preference and prompt-file resolution.
+
+**Verification**: 206 review-focused; 9,299 unit (one skip, 122 deselected); 925 regression; seven targeted Docker
+fork/rewind checks; full pre-commit, diff, 29,993/29,966 design, and 368-document/894-link board checks pass. No Forge
+workflow command was used.
+
 ### Extract session-fork preflight
 
 **Goal/outcome**: Refuse deterministic fork failures before child or runtime mutation.
@@ -2082,54 +2101,33 @@ deferred items.
 
 ## 2026-06-18 -- 2026-06-20 (compacted)
 
-Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_downstream_ledgers`, `unified_backend`,
-`backend_remote_reconciliation`, `openrouter_user_direct_callers`).
+Telemetry backend-attribution and remote-reconciliation arc; detailed history remains in the matching done cards.
 
-- **upstream_downstream_ledgers** (06-18): re-cut telemetry into `~/.forge/telemetry/{downstream,upstream}/` JSONL
-  planes (downstream = model-attempt evidence; upstream = operation outcomes, default volume `non_success`). Cap-safe
-  migration: caps persist `telemetry/caps/<proxy_id>.json` and bootstrap from `max(cap_state, downstream, legacy)` so
-  the path move never zeroes monthly caps; `proxy costs reset` wipes all new planes + caches; provider-trace reads
-  project downstream fields. Closeout: two-pane `forge activity` (Operation outcomes / Model calls), shared measurement
-  resolution, engine writes via `record_upstream_operation`. Verified: 264 + 32 + 434/237/517 + 36 integration;
-  `make pre-commit`.
-- **unified_backend** (06-18, closeout 06-19): built-in `ModelSource` catalog (local/remote LiteLLM, OpenRouter,
-  Anthropic passthrough, direct); templates moved to `proxy.source` deriving endpoint/auth/lifecycle from the catalog;
-  downstream `backend_id` attribution while `source_id`/`source_kind` stay writer-origin; OpenRouter-specific gates
-  replaced by source capabilities. `backend list/show` mark a shared local LiteLLM instance (display-only, never feeds
-  `backend_id`). Follow-up: custom templates preflight credentials from declared `proxy.source`. Verified: 526 + 11
-  integration; 175; 156 focused; `make pre-commit`. Shipped via PR #39 (`ab690ac9`).
-- **backend_remote_reconciliation** (PR 1 06-19, PR 2 06-20): generalized provider-trace/user-grouping off OpenRouter
-  (`openrouter_user_grouping` -> `provider_user_grouping`; capability-gated by `backend_id`; a source-less proxy writes
-  no trace). PR 2 shipped `forge backend reconcile <source-id>` (single-id MVP): `backend/remote/` adapter protocol +
-  registry, `OpenRouterRemoteAdapter` (metadata-only `GET /generation`, never content), buckets
-  joined/remote/missing-remote/not-queryable; remote/network failures are renderable data, never raised (hardened by a
-  32-agent review, 21 findings: NaN/overflow bodies -> `unavailable`). Verified: 185 + 52 + 2322; live
-  `test_provider_trace_e2e.py`; `make pre-commit`.
-- **openrouter_user_direct_callers** (06-20): extended OpenRouter `user`-field grouping to direct `core.llm` callers
-  under ONE global toggle `provider_trace.inject_provider_user` (`~/.forge/config.yaml`, default off) instead of
-  per-proxy; `forge config set/edit` gained nested-section support. Breaking (research preview): per-proxy `proxy.yaml`
-  `inject_provider_user`/`inject_openrouter_user` removed (stale key ignored with a one-time relocation warning).
-  Verified: 432 tests; mypy/pyright; sidecar Docker integration; `make pre-commit`.
+- Split telemetry into downstream model-attempt and upstream operation-outcome JSONL planes. Monthly caps bootstrap from
+  the maximum of cap state, downstream data, and legacy data; reset clears every plane and cache. Activity gained its
+  two-pane view and shared measurement resolution.
+- Added the `ModelSource` catalog and made `proxy.source` own endpoint, auth, and lifecycle capabilities. Downstream
+  `backend_id` remains distinct from writer-origin fields; the shared local LiteLLM row is display-only. Custom-template
+  credential preflight remained deferred.
+- Generalized provider grouping beyond OpenRouter and shipped single-source remote reconciliation with metadata-only
+  OpenRouter queries. Remote failures and invalid numeric bodies render as unavailable data. Direct-call grouping uses
+  one global opt-in; the research-preview per-proxy keys were removed with a relocation warning.
+- Verification covered focused suites, live provider-trace and sidecar Docker paths, static checks, and pre-commit;
+  `unified_backend` shipped in PR #39.
 
 ## 2026-05-22 -- 2026-06-16 (compacted)
 
 Runtime, Codex frontend, transfer, proxy observability, and status-line foundations; detailed history remains in the
-matching `done/` cards and PRs.
+matching done cards and PRs.
 
-- **Runtime/handoff:** added origin-rooted `RunIdentity`, usage ledger, shared invoker/fan-out, frozen registry,
-  runtime-tagged actions, and opt-in native relocation. Split Stop memory from transfer, made passports authoritative,
-  and shipped schema-backed transfer, audit-proxy, and status-line contracts. Path rewriting, sidecar relocation,
-  default native relocation, and slow-upstream replay remained deferred.
-- **Runtime/CLI closeout:** headless `codex exec` hooks remained unavailable, so Forge retained initial-message delivery
-  and transfer attribution. Costs became reported-or-unavailable; activity/scope naming and linked-worktree roots were
-  normalized; stale shims left cleanly.
-- **Codex frontend:** shipped start/resume, hook adapters, SessionStart transfer, TUI, enrollment, and
-  capability/version guards. Trust stayed scoped and enrollment-gated. App-server transport, fail-open upstream work,
-  and PermissionRequest/`trusted_hash` research remained deferred; supervisor controls and same-dir transfer shipped.
-- **Provider/launch:** live probes established OpenRouter generation/cancellation semantics; leak-gated headers and
-  `ProviderTraceMeta` preserved early/fallback metadata. Launchers gained cascade/effort controls without a schema bump.
-- **Proxy/operator observability:** fixed logging/trace config, added redacted request logs and JSONL retention, and
-  closed plaintext leaks. Provider traces gained lifecycle and `list/show/explain`; direct callers and parse/auth
-  fail-opens remained deferred. Status-line supervisor health uses the usage ledger without new state.
-- **Verification:** roughly 6.1k--6.4k unit tests plus focused integration and real provider/Codex policy, transfer,
-  generation, cancellation, and launch paths; regression, type checks, review follow-ups, and pre-commit passed.
+- Added origin-rooted run identity, usage accounting, shared invocation, frozen runtime actions, schema-backed transfer,
+  authoritative passports, and opt-in native relocation. Headless Codex hooks remained unavailable, so initial-message
+  delivery and transfer attribution stayed canonical.
+- Shipped Codex start/resume, hook adapters, TUI, enrollment, version/capability guards, supervisor controls, and
+  same-directory transfer. Trust remained scoped and enrollment-gated; app-server transport, fail-open upstream work,
+  PermissionRequest research, path rewriting, sidecar relocation, and default native relocation remained deferred.
+- Added leak-gated provider metadata, cascade/effort launch controls, redacted retained request logs, provider-trace
+  lifecycle and read commands, and usage-backed status-line health. Costs became reported-or-unavailable; direct
+  provider callers and parse/auth fail-opens remained deferred.
+- Verification covered roughly 6.1k--6.4k unit tests, regressions, static checks, pre-commit, and focused real
+  provider/Codex policy, transfer, generation, cancellation, and launch paths.

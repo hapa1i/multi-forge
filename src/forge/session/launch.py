@@ -23,6 +23,27 @@ from forge.session import (
 logger = logging.getLogger(__name__)
 
 
+def get_launch_preferences(state: SessionState) -> tuple[bool, tuple[str, ...], str | None]:
+    """Return persisted host/sidecar launch preferences for a session."""
+    launch = state.intent.launch
+    if launch is None:
+        return state.confirmed.is_sandboxed, (), None
+
+    use_sidecar = launch.mode == LAUNCH_MODE_SIDECAR
+    if not use_sidecar or launch.sidecar is None:
+        return use_sidecar, (), None
+
+    return use_sidecar, tuple(launch.sidecar.mounts), launch.sidecar.image
+
+
+def resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:
+    """Resolve a session's configured system-prompt file when it exists."""
+    if manifest.intent.system_prompt is None or manifest.intent.system_prompt.file is None:
+        return None
+    prompt_path = Path(manifest.intent.system_prompt.file).expanduser()
+    return prompt_path.resolve() if prompt_path.exists() else None
+
+
 def _build_session_env(
     *,
     session_name: str,

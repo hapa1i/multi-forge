@@ -27,6 +27,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import create_session_state
 from forge.session.exceptions import SessionExistsError
+from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 pytestmark = pytest.mark.regression
 
@@ -67,7 +68,7 @@ def test_fork_onto_existing_name_emits_recovery_tip(runner: CliRunner, session_p
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
     ):
         mock_manager = mock_manager_cls.return_value
-        mock_manager.get_session.return_value = parent
+        _configure_mock_fork_manager(mock_manager, parent, session_project)
         mock_manager.fork_session.side_effect = SessionExistsError("taken")
 
         result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "taken"])

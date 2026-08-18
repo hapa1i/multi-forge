@@ -3,8 +3,8 @@
 The Click adapter owns rendering, exits, proxy startup, and execution. This
 module resolves deterministic preconditions into an immutable plan before any
 child manifest, index row, Git ref, worktree, transfer artifact, or runtime is
-created. The mutation layer repeats race-sensitive checks until order 32 moves
-execution behind the plan as one transaction boundary.
+created. The execution op consumes this plan while the manager repeats only
+race-sensitive ownership and liveness checks at mutation time.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -29,6 +29,7 @@ from forge.install.project_compat import (
 from forge.policy.semantic.supervisor import (
     supervisor_option_error,
     validate_checker_model,
+    validate_supervisor_proxy_reference,
 )
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
@@ -60,6 +61,7 @@ from forge.session.exceptions import (
 )
 from forge.session.git import get_main_repo_root
 from forge.session.identity import session_name_from_key
+from forge.session.manager import fork_target_matches_replacement
 from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
     _validate_template_model_pin,
@@ -353,7 +355,11 @@ def plan_session_fork(
         into=into,
         create_worktree=create_worktree,
     )
-    _validate_supervisor_proxy_reference(request.supervisor_proxy)
+    if request.supervisor_proxy is not None:
+        try:
+            validate_supervisor_proxy_reference(request.supervisor_proxy)
+        except ValueError as e:
+            raise ForkPreflightError(str(e)) from e
 
     return ForkPreflightPlan(
         request=request,
@@ -521,46 +527,9 @@ def _load_parent_read_only(
 ) -> tuple[SessionState, SessionIndexEntry]:
     """Load the authoritative parent without index self-healing writes."""
     entry = manager.index_store.peek_session(request.parent_name, forge_root=request.forge_root)
-    if isinstance(entry, SessionIndexEntry):
-        return SessionStore(entry.root, request.parent_name).read(), entry
-    if isinstance(manager, SessionManager):
+    if not isinstance(entry, SessionIndexEntry):
         raise SessionNotFoundError(request.parent_name)
-
-    # Test doubles and older embedders may not expose the read-only store seam.
-    # The production IndexStore always takes the branch above.
-    parent = manager.get_session(request.parent_name, forge_root=request.forge_root)
-    fallback = manager.index_store.get_session(request.parent_name, forge_root=request.forge_root)
-    if isinstance(fallback, SessionIndexEntry):
-        return parent, fallback
-    synthetic = _synthetic_parent_entry(parent, request.cwd)
-    relative_path = getattr(fallback, "relative_path", None)
-    if isinstance(relative_path, str) and relative_path:
-        synthetic = replace(synthetic, relative_path=relative_path)
-    return parent, synthetic
-
-
-def _synthetic_parent_entry(parent: SessionState, cwd: Path) -> SessionIndexEntry:
-    worktree = Path(parent.worktree.path) if parent.worktree is not None else cwd
-    forge_root = Path(parent.forge_root) if parent.forge_root else worktree
-    try:
-        relative = str(forge_root.relative_to(worktree)) or "."
-    except ValueError:
-        relative = "."
-    try:
-        project_root = get_main_repo_root(worktree)
-    except (ForgeSessionError, OSError):
-        project_root = worktree
-    return SessionIndexEntry(
-        worktree_path=str(worktree),
-        project_root=str(project_root),
-        last_accessed_at=parent.last_accessed_at,
-        is_fork=parent.is_fork,
-        is_incognito=parent.is_incognito,
-        parent_session=parent.parent_session,
-        forge_root=str(forge_root),
-        checkout_root=str(worktree),
-        relative_path=relative,
-    )
+    return SessionStore(entry.root, request.parent_name).read(), entry
 
 
 def _parent_worktree(parent: SessionState, entry: SessionIndexEntry, cwd: Path) -> Path:
@@ -853,48 +822,6 @@ def _validate_model_pin(
         raise ForkPreflightError(error)
 
 
-def _validate_supervisor_proxy_reference(supervisor_proxy: str | None) -> None:
-    """Reject deterministic supervisor routing failures before any proxy starts.
-
-    Error text mirrors ``ensure_supervisor_proxy``; order 32 removes this split
-    when supervisor realization moves behind the command-core plan.
-    """
-    if supervisor_proxy is None:
-        return
-
-    from forge.config.loader import load_config, template_exists
-    from forge.proxy.proxies import (
-        AmbiguousProxyError,
-        ProxyNotFoundError,
-        ProxyRegistryStore,
-        resolve_proxy,
-    )
-
-    try:
-        resolve_proxy(ProxyRegistryStore().read(), supervisor_proxy)
-        return
-    except AmbiguousProxyError as e:
-        raise ForkPreflightError(str(e)) from e
-    except ProxyNotFoundError as e:
-        try:
-            exists = template_exists(supervisor_proxy)
-        except ValueError as template_error:
-            raise ForkPreflightError(str(template_error)) from template_error
-        if not exists:
-            raise ForkPreflightError(
-                f"Supervisor proxy '{supervisor_proxy}' is not running and no template named "
-                f"'{supervisor_proxy}' exists. Run 'forge proxy template list' to see templates."
-            ) from e
-
-    try:
-        load_config(template=supervisor_proxy)
-    except ValueError as e:
-        raise ForkPreflightError(
-            f"Supervisor proxy '{supervisor_proxy}': failed to start from template: "
-            f"Invalid template '{supervisor_proxy}': {e}"
-        ) from e
-
-
 def _validate_budget(
     request: ForkPreflightRequest,
     *,
@@ -973,21 +900,6 @@ def _preflight_target(
     into: _IntoTarget | None,
     create_worktree: bool,
 ) -> ForkTargetPlan:
-    if not isinstance(manager, SessionManager):
-        # Legacy CLI seam tests replace the manager wholesale and assert only
-        # adapter wiring. Real command execution and command-core tests always
-        # use the concrete manager and take the full target path below.
-        return _target_identity(
-            parent=parent,
-            parent_entry=parent_entry,
-            parent_worktree=parent_worktree,
-            parent_relative=parent_relative,
-            fork_name=fork_name,
-            into=into,
-            create_worktree=create_worktree,
-            branch=request.branch,
-        )
-
     if into is not None:
         checkout = into.checkout_root
         target_root = checkout / parent_relative
@@ -1091,19 +1003,15 @@ def _can_force_replace(
     expected_is_worktree: bool,
     expected_owns_worktree: bool,
 ) -> bool:
-    if existing_state is None or not existing_state.is_fork or existing_state.parent_session != parent_name:
-        return False
-    if (
-        existing_state.forge_root is not None
-        and Path(existing_state.forge_root).resolve() != target_forge_root.resolve()
+    if not fork_target_matches_replacement(
+        existing_state=existing_state,
+        parent_name=parent_name,
+        target_forge_root=target_forge_root,
+        expected_worktree_path=expected_worktree_path,
+        expected_branch=expected_branch,
+        expected_is_worktree=expected_is_worktree,
+        expected_owns_worktree=expected_owns_worktree,
     ):
-        return False
-    worktree = existing_state.worktree
-    if worktree is None or Path(worktree.path).resolve() != expected_worktree_path.resolve():
-        return False
-    if worktree.branch != expected_branch or worktree.is_worktree != expected_is_worktree:
-        return False
-    if expected_is_worktree and getattr(worktree, "owns_worktree", True) != expected_owns_worktree:
         return False
     try:
         return ActiveSessionStore().peek_session(fork_name, forge_root=str(target_forge_root)) is None
