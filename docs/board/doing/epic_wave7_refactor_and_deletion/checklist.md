@@ -1,7 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--26 and both bounded corrective members are closed through PR #205. Keep orders 27--35 in
-`todo/`.
+Current focus: orders 1--26 and both bounded corrective members are closed through PR #205. Order 27 is active; keep
+orders 28--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -151,6 +151,12 @@ Current focus: orders 1--26 and both bounded corrective members are closed throu
 - [x] Complete order 26's focused, full, regression, targeted telemetry integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 26 independently in PR #205 (`5c36f25f`) and close its member before activating order 27.
+- [x] Close order 26 on pushed `main` at `8787f7e7`, create `refactor/share-review-worker-preparation`, and activate
+  only order 27 after reverifying its shared preparation and CLI parser seams.
+- [x] Share the review worker preparation/parser scaffold while keeping orders 28--35 parked.
+- [x] Complete order 27's focused, full, regression, targeted workflow-worker integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 27 independently and close its member before activating order 28.
 
-Orders 27--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 28--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

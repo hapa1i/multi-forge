@@ -13,7 +13,6 @@ Both rounds delegate to ``run_multi_review()`` for parallel fan-out.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from forge.core.invoker import Attribution
 from forge.core.reactive.structured_output import extract_json_from_response
@@ -21,6 +20,11 @@ from forge.core.reactive.structured_output import extract_json_from_response
 from .engine import run_multi_review
 from .models import ConsensusOutput, ModelSpec, RoleSpec
 from .routing import WorkerRoutingPlan
+from .worker_preparation import (
+    ReviewWorkerInput,
+    load_review_resource,
+    prepare_review_workers,
+)
 
 ROLE_MARKER = "{role_prompt}"
 
@@ -54,10 +58,7 @@ def validate_resource(resource_path: str) -> str:
 
     Raises ValueError if the marker is missing.
     """
-    content = Path(resource_path).read_text()
-    if ROLE_MARKER not in content:
-        raise ValueError(f"Resource {resource_path} must contain '{ROLE_MARKER}' marker " "for role injection.")
-    return content
+    return load_review_resource(resource_path, marker=ROLE_MARKER, assignment_kind="role")
 
 
 def _build_reconciliation_brief(
@@ -158,33 +159,15 @@ def run_consensus(
     template = validate_resource(resource_path)
 
     # --- Build Round 1 specs ---
-    specs_r1: list[ModelSpec] = []
-    seen: dict[str, int] = {}
-    for role_spec in roles:
-        filled = template.replace(
-            ROLE_MARKER,
-            role_spec.role_prompt + CONSENSUS_GUARDRAIL,
-        )
-        label = role_spec.effective_label
-        base_id = f"{role_spec.model.name}-{label}"
-        count = seen.get(base_id, 0)
-        seen[base_id] = count + 1
-        worker_id = base_id if count == 0 else f"{base_id}-{count}"
-        specs_r1.append(
-            ModelSpec(
-                name=role_spec.model.name,
-                model_id=role_spec.model.model_id,
-                family=role_spec.model.family,
-                provider_refs=role_spec.model.provider_refs,
-                description=f"{label} role via {role_spec.model.name}",
-                preferred_proxy=role_spec.model.preferred_proxy,
-                prompt=filled,
-                worker_id=worker_id,
-                runtime=role_spec.model.runtime,
-            )
-        )
-
-    role_map = {spec.effective_worker_id: r.effective_label for spec, r in zip(specs_r1, roles)}
+    prepared = prepare_review_workers(
+        template,
+        [ReviewWorkerInput(model=role.model, label=role.effective_label, prompt=role.role_prompt) for role in roles],
+        marker=ROLE_MARKER,
+        guardrail=CONSENSUS_GUARDRAIL,
+        assignment_kind="role",
+    )
+    specs_r1 = prepared.specs
+    role_map = prepared.label_map
 
     plan_r1 = routing_plan if routing_plan is not None else resolve_invocation_routing(specs_r1, via=via)
 

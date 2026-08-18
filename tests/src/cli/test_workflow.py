@@ -1479,6 +1479,30 @@ class TestRunDebateCode:
         assert "Code Under Evaluation" not in prompt_arg
 
 
+class TestReviewJsonMetadata:
+    def test_shared_json_metadata_order(self):
+        from forge.cli.workflow import _add_review_json_metadata
+
+        data = {"result": "base"}
+        _add_review_json_metadata(
+            data,
+            resolved_models={"reviewer": {"runtime": "codex"}},
+            passed=False,
+            check_mode_str="verdict",
+            reason="no verdict",
+            routing_warnings=["fallback route"],
+        )
+
+        assert list(data) == [
+            "result",
+            "resolved_models",
+            "passed",
+            "check_mode",
+            "reason",
+            "routing_warnings",
+        ]
+
+
 class TestParseWorkerSpecs:
     def test_stock_stance(self):
         from forge.cli.workflow import _parse_worker_specs

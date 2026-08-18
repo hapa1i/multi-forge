@@ -34,6 +34,7 @@ from forge.review.models import (
     StanceSpec,
     resolve_model_specs,
 )
+from forge.review.worker_preparation import parse_review_worker_assignments
 
 # Verdict strings treated as "pass" by --check gating.
 # ACCEPT/ACCEPT_WITH_CONDITIONS from debate resources;
@@ -1274,49 +1275,43 @@ def _parse_worker_specs(worker_args: tuple[str, ...] | list[str], *, code_mode: 
     from forge.review.models import AVAILABLE_MODELS
 
     prompts = _DEFAULT_CODE_STANCE_PROMPTS if code_mode else _DEFAULT_PROPOSAL_STANCE_PROMPTS
-    stances: list[StanceSpec] = []
-    for arg in worker_args:
-        if ":" not in arg:
-            raise ValueError(f"Invalid --worker '{arg}'. Expected model:stance or model:custom prompt.")
+    assignments = parse_review_worker_assignments(
+        worker_args,
+        assignment_kind="stance",
+        named_prompts=prompts,
+        available_models=AVAILABLE_MODELS,
+    )
+    return [
+        StanceSpec(
+            stance=assignment.assignment,
+            stance_prompt=assignment.prompt,
+            model=assignment.model,
+            display_label=assignment.display_label,
+        )
+        for assignment in assignments
+    ]
 
-        model_name, rest = arg.split(":", 1)
-        model_name = model_name.strip()
 
-        if model_name not in AVAILABLE_MODELS:
-            available = list(AVAILABLE_MODELS.keys())
-            raise ValueError(f"Unknown model '{model_name}'. Available: {available}")
-
-        spec = AVAILABLE_MODELS[model_name]
-        rest = rest.strip()
-
-        # Strip optional surrounding quotes (may survive in some shell contexts)
-        if len(rest) >= 2 and rest[0] in ('"', "'") and rest[-1] == rest[0]:
-            rest = rest[1:-1]
-
-        if not rest:
-            raise ValueError(f"Empty stance/prompt for model '{model_name}'.")
-
-        if rest in prompts:
-            stances.append(
-                StanceSpec(
-                    stance=rest,
-                    stance_prompt=prompts[rest],
-                    model=spec,
-                )
-            )
-        else:
-            # Anything not a known stance is a custom prompt
-            label = rest[:30] + ("..." if len(rest) > 30 else "")
-            stances.append(
-                StanceSpec(
-                    stance="custom",
-                    stance_prompt=rest,
-                    model=spec,
-                    display_label=label,
-                )
-            )
-
-    return stances
+def _add_review_json_metadata(
+    data: dict[str, Any],
+    *,
+    passed: bool | None = None,
+    check_mode_str: str | None = None,
+    reason: str | None = None,
+    resolved_models: dict[str, dict[str, Any]] | None = None,
+    routing_warnings: list[str] | None = None,
+) -> None:
+    """Append shared optional review metadata in the stable wire order."""
+    if resolved_models:
+        data["resolved_models"] = resolved_models
+    if passed is not None:
+        data["passed"] = passed
+    if check_mode_str is not None:
+        data["check_mode"] = check_mode_str
+    if reason is not None:
+        data["reason"] = reason
+    if routing_warnings:
+        data["routing_warnings"] = routing_warnings
 
 
 def _build_adversarial_json(
@@ -1345,16 +1340,14 @@ def _build_adversarial_json(
         "successful": output.successful,
         "failed": output.failed,
     }
-    if resolved_models:
-        data["resolved_models"] = resolved_models
-    if passed is not None:
-        data["passed"] = passed
-    if check_mode_str is not None:
-        data["check_mode"] = check_mode_str
-    if reason is not None:
-        data["reason"] = reason
-    if routing_warnings:
-        data["routing_warnings"] = routing_warnings
+    _add_review_json_metadata(
+        data,
+        passed=passed,
+        check_mode_str=check_mode_str,
+        reason=reason,
+        resolved_models=resolved_models,
+        routing_warnings=routing_warnings,
+    )
     return data
 
 
@@ -1433,42 +1426,21 @@ def _parse_consensus_worker_specs(
     """
     from forge.review.models import AVAILABLE_MODELS
 
-    role_specs: list[RoleSpec] = []
-    for arg in worker_args:
-        if ":" not in arg:
-            raise ValueError(f"Invalid --worker '{arg}'. Expected model:role or model:custom prompt.")
-
-        model_name, rest = arg.split(":", 1)
-        model_name = model_name.strip()
-
-        if model_name not in AVAILABLE_MODELS:
-            available = list(AVAILABLE_MODELS.keys())
-            raise ValueError(f"Unknown model '{model_name}'. Available: {available}")
-
-        spec = AVAILABLE_MODELS[model_name]
-        rest = rest.strip()
-
-        # Strip optional surrounding quotes (may survive in some shell contexts)
-        if len(rest) >= 2 and rest[0] in ('"', "'") and rest[-1] == rest[0]:
-            rest = rest[1:-1]
-
-        if not rest:
-            raise ValueError(f"Empty role/prompt for model '{model_name}'.")
-
-        if rest in NAMED_ROLES:
-            role_specs.append(RoleSpec(role=rest, role_prompt=NAMED_ROLES[rest], model=spec))
-        else:
-            label = rest[:30] + ("..." if len(rest) > 30 else "")
-            role_specs.append(
-                RoleSpec(
-                    role="custom",
-                    role_prompt=rest,
-                    model=spec,
-                    display_label=label,
-                )
-            )
-
-    return role_specs
+    assignments = parse_review_worker_assignments(
+        worker_args,
+        assignment_kind="role",
+        named_prompts=NAMED_ROLES,
+        available_models=AVAILABLE_MODELS,
+    )
+    return [
+        RoleSpec(
+            role=assignment.assignment,
+            role_prompt=assignment.prompt,
+            model=assignment.model,
+            display_label=assignment.display_label,
+        )
+        for assignment in assignments
+    ]
 
 
 def _build_consensus_json(
@@ -1509,16 +1481,14 @@ def _build_consensus_json(
         "successful": output.successful,
         "failed": output.failed,
     }
-    if resolved_models:
-        data["resolved_models"] = resolved_models
-    if passed is not None:
-        data["passed"] = passed
-    if check_mode_str is not None:
-        data["check_mode"] = check_mode_str
-    if reason is not None:
-        data["reason"] = reason
-    if routing_warnings:
-        data["routing_warnings"] = routing_warnings
+    _add_review_json_metadata(
+        data,
+        passed=passed,
+        check_mode_str=check_mode_str,
+        reason=reason,
+        resolved_models=resolved_models,
+        routing_warnings=routing_warnings,
+    )
     return data
 
 

@@ -790,13 +790,15 @@ Forge proxy. See [design_appendix.md §G](design_appendix.md#g-subprocess-routin
 | Team supervisor     | Dispatch direct | No configured route is a valid direct resumed-session posture    |
 | Memory writer       | Fail open       | Async/best-effort; benefits future sessions, not the current one |
 
-**Per-invocation routing plan:** Workflow commands resolve routing for all workers **once** at invocation start as a
-frozen `WorkerRoutingPlan`. If any Codex worker is selected, the plan also freezes one fresh cached Codex preflight for
-readiness, auth, and billing attribution; no workflow verb runs an inline doctor. This prevents registry or readiness
-drift during parallel fan-out and keeps two-round consensus on one snapshot. User-facing workflow JSON surfaces each
-decision in `resolved_models`, including runtime, requested model, actual model ref, provider, proxy, template, routing
-source, and model-selection state. Runtime-native Codex entries report `resolved_model=null` and
-`model_selection="runtime_default"` because Forge does not pin or observe the exact Codex model.
+**Review worker preparation:** `review.worker_preparation` owns role/stance marker validation and fill, stable worker
+IDs/labels, and `model:assignment` parsing. Commands retain domain types, routing/fan-out, and JSON schemas.
+
+**Per-invocation routing plan:** Workflow commands resolve one frozen `WorkerRoutingPlan` for all workers at invocation
+start. With Codex, it also freezes one cached readiness/auth/billing preflight; no workflow verb runs an inline doctor.
+This prevents fan-out drift and keeps two-round consensus on one snapshot. Workflow JSON exposes decisions in
+`resolved_models`: runtime, requested/actual model, provider, proxy, template, source, and selection state. Codex
+entries report `resolved_model=null` and `model_selection="runtime_default"` because Forge neither pins nor observes the
+exact model.
 
 > **Routing reference details** — data type schemas (`ModelRoute`, `RoutingResult`, `WorkerRoutingPlan`), function
 > signatures, route derivation ranking, and sidecar constraints are in
