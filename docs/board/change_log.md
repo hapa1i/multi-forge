@@ -29,15 +29,15 @@ wc -l docs/board/change_log.md
 
 ### Unify Claude session state-context derivation
 
-**Goal/outcome**: Centralize Claude session checkout and durable state ownership.
+**Goal/outcome**: Centralize Claude session state ownership.
 
 **Key changes**:
 
-- Routed start, launch, resume, fork, and post-create mutations through one typed context: recorded `forge_root` owns
-  `SessionStore`; worktree/current directory are legacy fallbacks; launch, schema, repair, and adoption behavior stays.
+- One typed context routes start/launch/resume/fork and post-create mutations: recorded `forge_root` owns
+  `SessionStore`; worktree/CWD are legacy fallbacks; other behavior stays.
 
-**Verification**: 223 focused; 9,249 unit (one skip, 122 deselected); 923 regression; 69 Docker; pre-commit, diff,
-29,989/29,990 design, and 364-document/896-link board checks pass. No Forge workflow command was used.
+**Verification**: 223 focused; 9,249 unit (one skip, 122 deselected); 923 regression; 69 Docker; pre-commit/diff;
+29,989/29,990 design; 364-doc/894-link board. PR #207 merged as `32c6917b` after five checks; no Forge workflow ran.
 
 ### Stabilize search-index snapshot fingerprints
 

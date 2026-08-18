@@ -1,7 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 28, [`unify_claude_session_state_context`](../unify_claude_session_state_context/card.md), is
-active from corrected `main` at `52c36e2a`; keep orders 29--35 in `todo/`.
+Current focus: orders 1--28 and all bounded corrective members are closed after PR #207. Keep orders 29--35 in `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -165,7 +164,7 @@ active from corrected `main` at `52c36e2a`; keep orders 29--35 in `todo/`.
 - [x] Route Claude session state context through one typed resolver while keeping orders 29--35 parked.
 - [x] Complete order 28's focused, full, regression, targeted session integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 28 independently and close its member before activating order 29.
+- [x] Ship order 28 independently in PR #207 (`32c6917b`) and close its member without activating order 29.
 
 Orders 29--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

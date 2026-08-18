@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/unify-claude-session-state-context` from corrected `main` at `52c36e2a`.
+**Lane**: `done/` -- shipped in PR #207 (`32c6917b`) after all five GitHub checks passed.
 
 **Finding**: O058.
 
@@ -32,3 +32,9 @@ manifest's Forge root remains the state anchor; worktree is a launch path, not a
 Do not infer Forge root from the current shell when durable state supplies it, recreate missing worktrees, or change
 session repair/adoption authority. Preserve the legacy launch-hook environment rule: a manifest without a recorded
 `forge_root` omits `FORGE_FORGE_ROOT` even though Forge-side state uses its legacy fallback.
+
+## Closeout
+
+PR #207 merged as `32c6917b` with all five GitHub checks passing. Claude start, launch, resume, fork, and the CLI fork's
+launch-preparation seams now share one typed manifest context while state ownership, launchability, and the legacy hook
+environment remain distinct. Orders 29--35 remain parked for separate activation.

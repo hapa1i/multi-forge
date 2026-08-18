@@ -1,7 +1,6 @@
 # Unify Claude session state-context derivation checklist
 
-Current focus: active on `refactor/unify-claude-session-state-context` from corrected `main` at `52c36e2a`; only Wave 7
-order 28 is active.
+Current focus: complete -- order 28 shipped in PR #207 (`32c6917b`); orders 29--35 remain parked.
 
 ## Reverification and contract
 
@@ -39,5 +38,5 @@ order 28 is active.
 - [x] Run `make test-unit` (9,249 passed, one skipped, 122 deselected) and `make test-regression` (923 passed).
 - [x] Run targeted Docker session start/resume/fork integration coverage (69 passed).
 - [x] Run full `make pre-commit`, diff checks, design token counts (29,989 and 29,990), and the board audit (364
-  documents, 896 local links, zero missing; 14 proposed / 10 todo / three doing / 162 done / four retired).
-- [ ] Open a draft PR; after merge, close order 28 before activating order 29.
+  documents, 894 local links, zero missing; 14 proposed / 10 todo / two doing / 163 done / four retired).
+- [x] Merge PR #207 as `32c6917b` after all five checks pass and close order 28 without activating order 29.
