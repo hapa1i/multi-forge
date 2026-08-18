@@ -10,7 +10,11 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.workqueue import enqueue_index_marker
-from forge.search.content_store import ContentStore
+from forge.search.content_store import (
+    HANDLER_LOCK_TIMEOUT_S,
+    STORE_LOCK_TIMEOUT_S,
+    ContentStore,
+)
 from forge.search.index_state import IndexStateStore
 
 pytestmark = pytest.mark.regression
@@ -57,9 +61,15 @@ def test_incremental_index_retains_marker_when_transcript_changes_during_store_w
     real_add = ContentStore.add
     mutated = False
 
-    def add_then_mutate(self: ContentStore, doc_key: str, content: str, **kwargs: object) -> None:
+    def add_then_mutate(
+        self: ContentStore,
+        doc_key: str,
+        content: str,
+        *,
+        timeout_s: float = HANDLER_LOCK_TIMEOUT_S,
+    ) -> None:
         nonlocal mutated
-        real_add(self, doc_key, content, **kwargs)
+        real_add(self, doc_key, content, timeout_s=timeout_s)
         if not mutated:
             transcript.write_text(_transcript("snapshot C is newer and longer", request_id="r-c"), encoding="utf-8")
             mutated = True
@@ -102,9 +112,14 @@ def test_rebuild_state_describes_extracted_bytes_when_transcript_changes_during_
     real_replace_all = ContentStore.replace_all
     mutated = False
 
-    def replace_then_mutate(self: ContentStore, content_map: dict[str, str], **kwargs: object) -> None:
+    def replace_then_mutate(
+        self: ContentStore,
+        content_map: dict[str, str],
+        *,
+        timeout_s: float = STORE_LOCK_TIMEOUT_S,
+    ) -> None:
         nonlocal mutated
-        real_replace_all(self, content_map, **kwargs)
+        real_replace_all(self, content_map, timeout_s=timeout_s)
         if not mutated:
             transcript.write_text(_transcript("snapshot C is newer and longer", request_id="r-c"), encoding="utf-8")
             mutated = True

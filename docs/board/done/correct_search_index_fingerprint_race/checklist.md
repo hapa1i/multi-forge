@@ -20,7 +20,7 @@ order 28.
 | ----------------- | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------ |
 | Incremental race  | artifact becomes C while snapshot B is written   | state describes B; marker remains; retry indexes C                  | `tests/regression/test_bug_search_index_fingerprint_race.py` |
 | Bulk rebuild race | artifact becomes C during full store replacement | state describes B; rerun warning is visible; next rebuild indexes C | `tests/regression/test_bug_search_index_fingerprint_race.py` |
-| State API         | explicit fingerprint from an earlier snapshot   | exact values persist; a different path is rejected                  | `tests/src/search/test_index_state.py`                       |
+| State API         | explicit fingerprint from an earlier snapshot    | exact values persist; a different path is rejected                  | `tests/src/search/test_index_state.py`                       |
 | Producer path     | repeated unchanged Stop drain in Docker          | deferred artifact indexing remains operational and idempotent       | `tests/integration/cli/test_artifact_hooks_integration.py`   |
 
 ## Verification and closeout

@@ -2,10 +2,10 @@
 
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `done/` -- corrected directly on `main` after PR #206 closed and before Wave 7 order 28 activated.
+**Lane**: `done/` -- corrected directly on `main` as `2bd556e9` after PR #206 closed and before Wave 7 order 28.
 
-**Related shipped member**:
-[`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md) (O092 metadata guard).
+**Related shipped member**: [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md) (O092
+metadata guard).
 
 This is a post-merge correctness edge in shipped order 20, not a reopened or renumbered review-ledger finding. The Wave
 7 finding and member counts remain unchanged.
@@ -35,10 +35,10 @@ Authority comes from the exact-state ordering contract in
 
 - Incremental indexing captures the transcript's version-1 `mtime`/size fingerprint before extraction and rejects a
   different fingerprint immediately after extraction.
-- After all three stores succeed, index state records that captured fingerprint rather than re-statting the live path.
-  A later mutation detected after the state write retains the marker for a clean retry.
-- Rebuild records each successfully extracted snapshot's captured fingerprint in its single state replacement and
-  warns the operator to rerun when an artifact changes while the stores are being replaced.
+- After all three stores succeed, index state records that captured fingerprint rather than re-statting the live path. A
+  later mutation detected after the state write retains the marker for a clean retry.
+- Rebuild records each successfully extracted snapshot's captured fingerprint in its single state replacement and warns
+  the operator to rerun when an artifact changes while the stores are being replaced.
 - Regression tests mutate the artifact during incremental and bulk store writes, prove that state describes the stored
   bytes, and prove that the next retry/rerun indexes the newer snapshot.
 - The state schema and its `mtime`/size comparison remain unchanged.
