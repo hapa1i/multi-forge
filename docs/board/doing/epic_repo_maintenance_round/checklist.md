@@ -324,6 +324,6 @@ Current focus: Wave 7 order 30 `share_passthrough_sse_framing` is active from `1
 - [x] Share only incremental SSE data-line framing while keeping orders 31--35 parked.
 - [x] Complete order 30's focused, full, regression, targeted streaming integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 30 independently and close it without activating order 31.
+- [x] Ship order 30 independently in PR #209 (`a1efd5d7`) and close it without activating order 31.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

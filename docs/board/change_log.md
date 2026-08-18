@@ -42,7 +42,7 @@ wc -l docs/board/change_log.md
 
 **Verification**: 130 focused plus 88 conversion/accounting tests; 9,263 unit (one skip, 122 deselected); 923
 regression; six targeted Docker checks; full pre-commit, diff, 29,961/29,966 design, and 366-document/894-link board
-checks pass. No Forge workflow command was used.
+checks pass. PR #209 merged as `a1efd5d7`; no Forge workflow command was used.
 
 ### Share transfer and rewind rendering primitives
 

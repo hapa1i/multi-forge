@@ -1,6 +1,6 @@
 # Share passthrough SSE framing checklist
 
-Current focus: active -- order 30 only; orders 31--35 remain parked.
+Current focus: closed -- order 30 shipped in PR #209; orders 31--35 remain parked.
 
 ## Activation and evidence
 
@@ -36,4 +36,4 @@ Current focus: active -- order 30 only; orders 31--35 remain parked.
 - [x] Run the conversion/accounting regression slice and targeted streaming proxy integrations.
 - [x] Run `make test-unit`, `make test-regression`, full `make pre-commit`, diff/design-size checks, and the board audit
   without a Forge workflow.
-- [ ] Open the order-30 PR and close this member after merge without activating order 31.
+- [x] Merge PR #209 as `a1efd5d7` and close this member without activating order 31.

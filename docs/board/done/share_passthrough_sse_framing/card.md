@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/share-passthrough-sse-framing` from `1d02b0cb`; orders 31--35 remain parked.
+**Lane**: `done/` -- shipped in PR #209 as `a1efd5d7` after focused, full, regression, targeted proxy integration, and
+pre-commit verification.
 
 **Finding**: O067, promoted from unverified during Wave 7 admission.
 

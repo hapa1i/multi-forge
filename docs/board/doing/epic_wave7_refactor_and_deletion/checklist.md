@@ -176,7 +176,7 @@ Current focus: order 30 `share_passthrough_sse_framing` is active from `1d02b0cb
 - [x] Share only incremental SSE data-line framing while keeping orders 31--35 parked.
 - [x] Complete order 30's focused, full, regression, targeted streaming integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 30 independently and close its member without activating order 31.
+- [x] Ship order 30 independently in PR #209 (`a1efd5d7`) and close its member without activating order 31.
 
 Orders 31--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.
