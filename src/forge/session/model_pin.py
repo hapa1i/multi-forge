@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from forge.config.schema import ProxyInstanceConfig
+from forge.config.schema import ProxyInstanceConfig, TierModels
 from forge.core.models.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
@@ -11,18 +11,24 @@ from forge.core.models.direct_model import (
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
 
 
-def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
-    """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
+def _routing_supports_model_pin(
+    *,
+    wire_shape: str,
+    tiers: TierModels,
+    model_alternatives: dict[str, dict[str, str]],
+    pin: DirectModelPin,
+) -> bool:
+    """Whether routing config can honor a Claude pin via its default or alternatives."""
     # Passthrough forwards the client model unchanged, so any resolvable Claude pin
     # reaches the API as-is; the alternatives/tier-default check does not apply here.
     # (resolve_direct_model_pin already rejected non-Claude/unknown models upstream.)
-    if proxy_cfg.wire_shape == ANTHROPIC_PASSTHROUGH:
+    if wire_shape == ANTHROPIC_PASSTHROUGH:
         return True
-    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
+    alt_models = model_alternatives.get(pin.tier, {})
     if pin.canonical_model in alt_models:
         return True
 
-    tier_model = proxy_cfg.tiers.get(pin.tier)
+    tier_model = tiers.get(pin.tier)
     if not tier_model:
         return False
 
@@ -33,6 +39,43 @@ def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPi
     except ModelCatalogError:
         return False
     return default_model == pin.canonical_model
+
+
+def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
+    """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
+    return _routing_supports_model_pin(
+        wire_shape=proxy_cfg.wire_shape,
+        tiers=proxy_cfg.tiers,
+        model_alternatives=proxy_cfg.model_alternatives,
+        pin=pin,
+    )
+
+
+def _validate_template_model_pin(template: str, pin: DirectModelPin) -> str | None:
+    """Return a user-facing error when a prospective template cannot honor a pin."""
+    from forge.config.loader import load_config
+    from forge.core.state.exceptions import StateCorruptedError
+
+    try:
+        proxy_cfg = load_config(template=template).proxy
+        provider_cfg = proxy_cfg.get_provider()
+    except (StateCorruptedError, FileNotFoundError, TypeError, ValueError) as e:
+        return f"Could not load proxy template '{template}': {e}"
+
+    if _routing_supports_model_pin(
+        wire_shape=proxy_cfg.wire_shape,
+        tiers=provider_cfg.tiers,
+        model_alternatives=provider_cfg.model_alternatives,
+        pin=pin,
+    ):
+        return None
+
+    alt_models = provider_cfg.model_alternatives.get(pin.tier, {})
+    available = ", ".join(sorted(alt_models.keys())) if alt_models else "(none configured)"
+    return (
+        f"Proxy template '{template}' does not configure model alternative or tier default "
+        f"for '{pin.canonical_model}' in tier '{pin.tier}'. Available alternatives: {available}"
+    )
 
 
 def _apply_direct_model_env_if_supported(

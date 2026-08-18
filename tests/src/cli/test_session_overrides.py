@@ -601,15 +601,13 @@ class TestCwdGuardWiring:
         mock_mrr.assert_called_once()
         mock_rr.assert_not_called()
 
-    def test_fork_calls_require_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
+    def test_fork_routes_same_directory_intent_to_preflight(self, runner: CliRunner, temp_env: Path) -> None:
         with successful_claude_launch():
             runner.invoke(main, ["session", "start", "fork-parent", "--no-proxy", "--no-launch"])
 
-        with (
-            patch("forge.cli.guards.require_repo_root", return_value=temp_env) as mock_rr,
-            patch("forge.cli.guards.require_main_repo_root") as mock_mrr,
-            successful_claude_launch(),
-        ):
+        from forge.core.ops.session_fork_preflight import plan_session_fork
+
+        with patch("forge.cli.session_fork.plan_session_fork", wraps=plan_session_fork) as planner:
             runner.invoke(
                 main,
                 [
@@ -621,21 +619,20 @@ class TestCwdGuardWiring:
                     "--no-proxy",
                 ],
             )
-        mock_rr.assert_called_once()
-        mock_mrr.assert_not_called()
+        request = planner.call_args.args[0]
+        assert request.create_worktree is False
+        assert request.into_path is None
 
-    def test_fork_worktree_calls_require_main_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
+    def test_fork_routes_worktree_intent_to_preflight(self, runner: CliRunner, temp_env: Path) -> None:
         with successful_claude_launch():
             runner.invoke(
                 main,
                 ["session", "start", "fork-wt-parent", "--no-proxy", "--no-launch"],
             )
 
-        with (
-            patch("forge.cli.guards.require_repo_root") as mock_rr,
-            patch("forge.cli.guards.require_main_repo_root", return_value=temp_env) as mock_mrr,
-        ):
-            # Don't need full worktree setup — guard is called before fork_session
+        from forge.core.ops.session_fork_preflight import plan_session_fork
+
+        with patch("forge.cli.session_fork.plan_session_fork", wraps=plan_session_fork) as planner:
             runner.invoke(
                 main,
                 [
@@ -648,8 +645,9 @@ class TestCwdGuardWiring:
                     "--no-proxy",
                 ],
             )
-        mock_mrr.assert_called_once()
-        mock_rr.assert_not_called()
+        request = planner.call_args.args[0]
+        assert request.create_worktree is True
+        assert request.into_path is None
 
     def test_fork_into_skips_guards(self, runner: CliRunner, temp_env: Path) -> None:
         with successful_claude_launch():

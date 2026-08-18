@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 30 `share_passthrough_sse_framing` is active from `1d02b0cb`; orders 31--35 remain parked.
+Current focus: Wave 7 order 31 `extract_session_fork_preflight` is active from `54188e61`; orders 32--35 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -325,5 +325,9 @@ Current focus: Wave 7 order 30 `share_passthrough_sse_framing` is active from `1
 - [x] Complete order 30's focused, full, regression, targeted streaming integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 30 independently in PR #209 (`a1efd5d7`) and close it without activating order 31.
+- [x] Close order 30 on pushed `main` at `54188e61`, branch from that exact commit, and activate only order 31
+  `extract_session_fork_preflight` after reverifying the callback, manager, routing, and mutation boundaries.
+- [x] Extract and verify order 31's typed read-only preflight while keeping order 32 parked; publication remains on the
+  active member.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

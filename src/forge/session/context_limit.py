@@ -31,6 +31,25 @@ def _context_window_for_proxy_model(model: str) -> int:
     return get_context_window_tokens(lookup_model)
 
 
+def _largest_configured_context_limit(models: list[tuple[str, str]]) -> int:
+    """Return the largest catalog-known tier context, or the runtime default."""
+    tier_limits: list[tuple[int, str, str]] = []
+    for tier, model in models:
+        if not model:
+            continue
+        try:
+            tier_limits.append((_context_window_for_proxy_model(model), tier, model))
+        except Exception as e:
+            logger.debug(f"Skipping unknown model {model!r} for tier {tier}: {e}")
+
+    if not tier_limits:
+        return _default_context_limit()
+
+    context_limit, tier, model = max(tier_limits, key=lambda item: item[0])
+    logger.debug(f"Computed context limit {context_limit} for model {model} (tier {tier})")
+    return context_limit
+
+
 def _get_context_limit_for_proxy(proxy_id: str) -> int:
     """Compute context limit from the largest configured proxy tier model.
 
@@ -45,26 +64,26 @@ def _get_context_limit_for_proxy(proxy_id: str) -> int:
             logger.debug(f"No proxy config found for {proxy_id}, using default context limit")
             return _default_context_limit()
 
-        tier_limits: list[tuple[int, str, str]] = []
-        for tier in ("haiku", "sonnet", "opus"):
-            model = proxy_config.tiers.get(tier)
-            if not model:
-                continue
-            try:
-                tier_limits.append((_context_window_for_proxy_model(model), tier, model))
-            except Exception as e:
-                logger.debug(f"Skipping unknown model {model!r} for tier {tier} in proxy {proxy_id}: {e}")
-
-        if not tier_limits:
-            logger.debug(f"No catalog-known tier models found for {proxy_id}, using default context limit")
-            return _default_context_limit()
-
-        context_limit, tier, model = max(tier_limits, key=lambda item: item[0])
-        logger.debug(f"Computed context limit {context_limit} for model {model} (tier {tier}) in proxy {proxy_id}")
-        return context_limit
+        return _largest_configured_context_limit(
+            [(tier, proxy_config.tiers.get(tier)) for tier in ("haiku", "sonnet", "opus")]
+        )
 
     except Exception as e:
         logger.debug(f"Failed to compute context limit: {e}, using default")
+        return _default_context_limit()
+
+
+def _get_context_limit_for_template(template: str) -> int:
+    """Compute a prospective context limit without creating a proxy instance."""
+    try:
+        from forge.config.loader import load_config
+
+        provider = load_config(template=template).proxy.get_provider()
+        return _largest_configured_context_limit(
+            [(tier, provider.tiers.get(tier)) for tier in ("haiku", "sonnet", "opus")]
+        )
+    except Exception as e:
+        logger.debug(f"Failed to compute context limit for template {template!r}: {e}")
         return _default_context_limit()
 
 

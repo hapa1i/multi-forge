@@ -13,10 +13,12 @@ import pytest
 
 from forge.session.exceptions import (
     BranchExistsError,
+    BranchInUseError,
     InvalidBranchNameError,
 )
 from forge.session.worktree.create import (
     get_worktree_for_branch,
+    preflight_create_worktree,
     sanitize_branch_name,
     validate_branch_name,
 )
@@ -105,6 +107,22 @@ class TestBranchExistsErrorMessage:
         assert "checked out" in str(e)
         assert "/repo-executor" in str(e)
         assert "git worktree remove" not in str(e)
+
+
+def test_force_replacement_preflight_rejects_branch_checked_out_elsewhere() -> None:
+    """A deterministic branch-in-use refusal must precede runtime startup."""
+    with (
+        patch("forge.session.worktree.create.get_repo_root", return_value=Path("/repo")),
+        patch("forge.session.worktree.create.branch_exists", return_value=True),
+        patch("forge.session.worktree.create.get_worktree_for_branch", return_value="/repo-other"),
+    ):
+        with pytest.raises(BranchInUseError, match="/repo-other"):
+            preflight_create_worktree(
+                "child",
+                cwd=Path("/repo"),
+                force=True,
+                replace_owned_stale_state=True,
+            )
 
 
 def _mock_worktree_lookup(porcelain_output: bytes, branch: str) -> str | None:

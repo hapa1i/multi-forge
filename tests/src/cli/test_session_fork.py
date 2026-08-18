@@ -1922,6 +1922,40 @@ class TestSessionFork:
 class TestSessionForkIntoPreflight:
     """Tests for --into cross-repo preflight validation."""
 
+    def test_rejected_preflight_does_not_start_proxy_or_supervisor(self, runner: CliRunner, temp_env: Path) -> None:
+        parent = create_session_state("planner", worktree_path=str(temp_env), worktree_branch="main")
+        parent.confirmed.claude_session_id = "parent-uuid"
+        publish_session(IndexStore(), parent, temp_env, forge_root=str(temp_env))
+
+        with (
+            patch("forge.cli.session_fork._resolve_routing_from_cli") as resolve_routing,
+            patch("forge.policy.semantic.supervisor.ensure_supervisor_proxy") as ensure_supervisor,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "planner",
+                    "--name",
+                    "reviewer",
+                    "--worktree",
+                    "--no-launch",
+                    "--resume-mode",
+                    "native-relocate",
+                    "--proxy",
+                    "test-proxy",
+                    "--supervise",
+                    "--supervisor-proxy",
+                    "supervisor-proxy",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert "native-relocate cannot be combined with --no-launch" in result.output
+        resolve_routing.assert_not_called()
+        ensure_supervisor.assert_not_called()
+
     def test_into_nested_incompatible_target_refuses_before_proxy_or_fork(
         self, runner: CliRunner, temp_env: Path
     ) -> None:

@@ -28,9 +28,11 @@ from .config_copy import (
 )
 from ..git import find_git_binary, get_main_repo_root, get_repo_root
 from .create import (
+    WorktreePreflight,
     WorktreeResult,
     branch_exists,
     create_worktree,
+    preflight_create_worktree,
     read_file_at_revision,
     resolve_commit,
     resolve_worktree_path,
@@ -41,6 +43,7 @@ from .create import (
 __all__ = [
     # create.py
     "WorktreeResult",
+    "WorktreePreflight",
     "find_git_binary",
     "get_repo_root",
     "get_main_repo_root",
@@ -51,6 +54,7 @@ __all__ = [
     "sanitize_branch_name",
     "resolve_worktree_path",
     "create_worktree",
+    "preflight_create_worktree",
     # config_copy.py
     "ConfigCopyResult",
     "DEFAULT_CONFIG_ALLOWLIST",
