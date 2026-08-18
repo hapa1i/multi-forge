@@ -56,8 +56,8 @@ from forge.core.ops.claude_session import (
     ForkLaunchPlan,
     SupervisorWiring,
     _apply_supervisor_wiring,
-    _resolve_claude_session_state_context,
     fork_claude_session,
+    resolve_claude_session_state_context,
 )
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
@@ -774,7 +774,7 @@ def fork(
 
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
     fork_operation_cwd = Path.cwd()
-    fork_state_context = _resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
+    fork_state_context = resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
     _persist_routing_override(
         forge_root=fork_state_context.forge_root,
         session_name=fork_manifest.name,
@@ -804,7 +804,7 @@ def fork(
             template=_preflight_routing.template if _preflight_routing else None,
             direct=direct,
         )
-        fork_state_context = _resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
+        fork_state_context = resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
 
     if _preflight_routing:
         effective_template = _preflight_routing.template
@@ -937,10 +937,7 @@ def fork(
         # Pre-seed claude_project_root so cleanup targets the child's encoded dir even before the
         # hook reconciles. No --session-id: --fork-session assigns the child UUID (hook records it).
         try:
-            from forge.session import SessionStore as _ForkStore
-
-            _nr_store_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path(_fork_cwd)
-            _nr_store = _ForkStore(str(_nr_store_root), fork_manifest.name)
+            _nr_store = fork_state_context.store
 
             def _preseed_cpr(m: SessionState) -> None:
                 m.confirmed.claude_project_root = _fork_cwd
@@ -988,7 +985,7 @@ def fork(
             print_error_with_tip(error, tip)
             sys.exit(1)
 
-        _rewind_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
+        _rewind_worktree = fork_state_context.worktree_path
         _rewind_prompt_files: list[Path] = []
         if _rewind_artifacts.context_path is not None:
             _rewind_prompt_files.append(_rewind_artifacts.context_path)
@@ -1009,9 +1006,9 @@ def fork(
         # checkout; a same-directory fork writes under forge_root (same CWD as the parent). Gate on
         # is_worktree (a same-dir fork carries a non-None Worktree with is_worktree=False).
         if is_worktree_fork:
-            worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
+            prompt_base_dir = fork_state_context.worktree_path
         else:
-            worktree_path = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path.cwd()
+            prompt_base_dir = fork_state_context.forge_root
         if is_worktree_fork and resume_mode is None:
             print_tip(
                 "Worktree fork uses transfer context by default.",
@@ -1033,14 +1030,14 @@ def fork(
         if configured_prompt is not None:
             prompt_files.append(configured_prompt)
         launch_prompt_file = _combine_prompt_files(
-            worktree_path=worktree_path,
+            worktree_path=prompt_base_dir,
             session_name=fork_manifest.name,
             prompt_files=prompt_files,
         )
         if launch_prompt_file:
             prompt_path = Path(launch_prompt_file)
             try:
-                console.print(f"  Context:  {prompt_path.relative_to(worktree_path)}")
+                console.print(f"  Context:  {prompt_path.relative_to(prompt_base_dir)}")
             except ValueError:
                 console.print(f"  Context:  {display_path(prompt_path)}")
         for warning in prompt_warnings:
@@ -1054,14 +1051,11 @@ def fork(
             )
         except Exception:
             logger.warning("Failed to persist fork derivation transfer details", exc_info=True)
+        fork_state_context = resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
 
         _fork_uuid = str(_uuid.uuid4())
         try:
-            from forge.session import SessionStore as _ForkStore
-
-            _fork_wt = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
-            _fork_store_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else _fork_wt
-            _fork_store = _ForkStore(str(_fork_store_root), fork_manifest.name)
+            _fork_store = fork_state_context.store
             from forge.session.claude.paths import (
                 resolve_claude_project_root as _resolve_fork_root_preseed,
             )

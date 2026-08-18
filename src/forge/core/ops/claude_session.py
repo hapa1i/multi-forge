@@ -386,7 +386,7 @@ def resolve_and_validate_system_prompt(
     return None
 
 
-def _resolve_claude_session_state_context(
+def resolve_claude_session_state_context(
     manifest: SessionState,
     *,
     cwd: Path,
@@ -438,7 +438,7 @@ def launch_claude_session(
             "and cannot be launched with Claude. Use the matching runtime command."
         )
 
-    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
+    state_context = resolve_claude_session_state_context(manifest, cwd=Path.cwd())
     try:
         worktree_path = require_session_worktree(
             manifest.name,
@@ -467,6 +467,8 @@ def launch_claude_session(
         proxy_id=proxy_id,
         fork_name=fork_name,
         parent_session=parent_session,
+        # Preserve the legacy hook-env contract: a manifest with no recorded
+        # root omits FORGE_FORGE_ROOT even though Forge-side state falls back.
         forge_root=manifest.forge_root,
         subprocess_proxy=manifest.intent.subprocess_proxy,
         sidecar=use_sidecar,
@@ -608,14 +610,15 @@ def start_claude_session(
     )
 
     operation_cwd = Path.cwd()
-    state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
-    # Post-create mutations (rows 2-4): reassign manifest as each store write lands.
+    state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
+    # Each intermediate write re-reads the manifest, so refresh defensively before
+    # another mutation consumes the context. Supervisor is the final consumer.
     if memory_flag is True:
         manifest = _apply_memory_activation(state_context)
-        state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
+        state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     if subprocess_proxy:
         manifest = _apply_subprocess_proxy(state_context, subprocess_proxy)
-        state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
+        state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     if supervisor is not None:
         manifest = _apply_supervisor_wiring(
             state_context,
@@ -733,7 +736,7 @@ def resume_claude_session(
     """Run the shared Claude resume mutation/launch tail without rendering."""
     operation_started_at = datetime.now(timezone.utc)
     manifest = plan.manifest
-    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
+    state_context = resolve_claude_session_state_context(manifest, cwd=Path.cwd())
     worktree_path = state_context.worktree_path
     forge_root = state_context.forge_root
     store = state_context.store
@@ -843,7 +846,7 @@ def fork_claude_session(
     """Run a prepared Claude fork launch without rendering."""
     operation_started_at = datetime.now(timezone.utc)
     manifest = plan.manifest
-    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
+    state_context = resolve_claude_session_state_context(manifest, cwd=Path.cwd())
     worktree_path = state_context.worktree_path
     store = state_context.store
     preferences = plan.launch_preferences

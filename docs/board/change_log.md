@@ -36,7 +36,7 @@ wc -l docs/board/change_log.md
 - Routed start, launch, resume, fork, and post-create mutations through one typed context: recorded `forge_root` owns
   `SessionStore`; worktree/current directory are legacy fallbacks; launch, schema, repair, and adoption behavior stays.
 
-**Verification**: 222 focused; 9,248 unit (one skip, 122 deselected); 923 regression; 69 Docker; pre-commit, diff,
+**Verification**: 223 focused; 9,249 unit (one skip, 122 deselected); 923 regression; 69 Docker; pre-commit, diff,
 29,989/29,990 design, and 364-document/896-link board checks pass. No Forge workflow command was used.
 
 ### Stabilize search-index snapshot fingerprints

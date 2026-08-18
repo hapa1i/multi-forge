@@ -30,4 +30,5 @@ manifest's Forge root remains the state anchor; worktree is a launch path, not a
 ## Exclusions
 
 Do not infer Forge root from the current shell when durable state supplies it, recreate missing worktrees, or change
-session repair/adoption authority.
+session repair/adoption authority. Preserve the legacy launch-hook environment rule: a manifest without a recorded
+`forge_root` omits `FORGE_FORGE_ROOT` even though Forge-side state uses its legacy fallback.

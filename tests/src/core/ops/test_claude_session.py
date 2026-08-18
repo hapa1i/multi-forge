@@ -1,10 +1,12 @@
 """Focused tests for shared Claude session operation boundaries."""
 
+import ast
 import inspect
 from pathlib import Path
 
 import pytest
 
+import forge.cli.session_fork as session_fork_cli
 from forge.core.ops import claude_session as claude_session_ops
 from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
@@ -12,7 +14,7 @@ from forge.session import SessionState, SessionStore, create_session_state
 
 
 def _resolve(state: SessionState, *, cwd: Path) -> claude_session_ops.ClaudeSessionStateContext:
-    return claude_session_ops._resolve_claude_session_state_context(state, cwd=cwd)
+    return claude_session_ops.resolve_claude_session_state_context(state, cwd=cwd)
 
 
 def test_state_context_uses_durable_root_and_recorded_worktree(tmp_path: Path) -> None:
@@ -121,14 +123,42 @@ def test_post_create_mutations_use_resolved_store_outside_cwd(
     assert not SessionStore(str(shell), state.name).exists()
 
 
-def test_all_affected_claude_ops_share_the_state_context_resolver() -> None:
+def test_post_create_mutations_fall_back_to_worktree_not_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worktree = tmp_path / "legacy-checkout"
+    shell = tmp_path / "unrelated-shell"
+    worktree.mkdir()
+    shell.mkdir()
+    monkeypatch.chdir(shell)
+
+    state = create_session_state("legacy", worktree_path=str(worktree))
+    store = SessionStore(str(worktree), state.name)
+    store.write(state)
+    context = _resolve(state, cwd=shell)
+
+    state = claude_session_ops._apply_memory_activation(context)
+    context = _resolve(state, cwd=shell)
+    claude_session_ops._apply_subprocess_proxy(context, "subprocess-proxy")
+
+    persisted = store.read()
+    assert persisted.intent.memory is not None
+    assert persisted.intent.memory.auto_update is not None
+    assert persisted.intent.memory.auto_update.enabled is True
+    assert persisted.intent.subprocess_proxy == "subprocess-proxy"
+    assert not SessionStore(str(shell), state.name).exists()
+
+
+def test_state_context_structural_drift_reminders() -> None:
+    # These source checks are cheap reminders; the behavioral cases above own correctness.
     for operation in (
         claude_session_ops.start_claude_session,
         claude_session_ops.launch_claude_session,
         claude_session_ops.resume_claude_session,
         claude_session_ops.fork_claude_session,
     ):
-        assert "_resolve_claude_session_state_context" in inspect.getsource(operation)
+        assert "resolve_claude_session_state_context" in inspect.getsource(operation)
 
     for mutation in (
         claude_session_ops._apply_memory_activation,
@@ -139,6 +169,30 @@ def test_all_affected_claude_ops_share_the_state_context_resolver() -> None:
         assert "context.store" in source
         assert "Path.cwd" not in source
         assert "SessionStore(" not in source
+
+    cli_tree = ast.parse(inspect.getsource(session_fork_cli))
+    cli_fork = next(node for node in cli_tree.body if isinstance(node, ast.FunctionDef) and node.name == "fork")
+    calls = {
+        node.func.id for node in ast.walk(cli_fork) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    local_store_imports = [
+        alias
+        for node in ast.walk(cli_fork)
+        if isinstance(node, ast.ImportFrom) and node.module == "forge.session"
+        for alias in node.names
+        if alias.name == "SessionStore"
+    ]
+    context_store_reads = [
+        node
+        for node in ast.walk(cli_fork)
+        if isinstance(node, ast.Attribute)
+        and node.attr == "store"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "fork_state_context"
+    ]
+    assert "resolve_claude_session_state_context" in calls
+    assert not local_store_imports
+    assert len(context_store_reads) == 2
 
 
 def test_launch_refuses_missing_recorded_worktree_before_callbacks(
