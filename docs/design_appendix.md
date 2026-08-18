@@ -1747,10 +1747,11 @@ overlay (a system boundary), so missing/malformed frontmatter warns and still re
 
 `ai-curated` emits eight sections. Code owns the skeleton; the model returns structured JSON parsed with
 `extract_json_from_response`. Decisions cite a transcript turn (`[turn N]`) or file; `_validate_decision_citations`
-drops fabricated citations with a warning. `forge.session.context_rendering` owns trimmed text, section framing, and
-plain/cited bullet mechanics; transfer and rewind supply their section/empty/citation labels and retain their envelopes,
-budgets, emitted-turn sets, and citation validation. Sections 1–7 live in the AI snapshot; section 8 is the notes
-overlay:
+drops fabricated citations with a warning so `schema: full` does not overstate evidence quality.
+`forge.session.context_rendering` owns trimmed text, section framing, and plain/cited bullet mechanics; transfer and
+rewind supply their section/empty/citation labels and retain their envelopes, budgets, emitted-turn sets, and citation
+validation. Sections 1–7 live in the AI snapshot; section 8 is the notes overlay (so the snapshot has 7 headers and the
+composed launch view has 8):
 
 1. `## Lineage`
 2. `## Goal / Current Task`

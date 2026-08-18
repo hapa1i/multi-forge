@@ -22,13 +22,14 @@ why copied rendering logic needs an owned seam. Authority:
 
 ## Acceptance Criteria
 
-- Public/shared rendering primitives have neutral inputs and explicit empty-label/section options.
+- Shared module-level rendering primitives have neutral inputs and explicit empty-label/section options.
 - Golden fixtures preserve transfer Markdown and rewind prompt bytes; existing tests retain the current truncation,
   emitted-turn, and citation boundaries.
-- Remove cross-module private imports where the shared helper replaces them.
+- Remove the duplicated local rendering helpers without adding a new transfer-to-rewind private import.
 - Run transfer/rewind unit, regression, and targeted rewind integration suites.
 
 ## Exclusions
 
 Do not unify full-transfer and rewind strategies or change budget/emitted-turn selection. O018's separately gated
-rendered-but-truncated citation defect remains outside this behavior-preserving refactor.
+rendered-but-truncated citation defect remains outside this behavior-preserving refactor. Existing non-rendering private
+imports from `transfer` also remain outside this member; reconsidering their ownership is a follow-up candidate.

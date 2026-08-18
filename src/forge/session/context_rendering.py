@@ -25,7 +25,10 @@ def render_cited_text_bullets(
     empty_label: str,
     citation_label: str,
 ) -> list[str]:
-    """Render text/citation items as bullets with caller-owned labels."""
+    """Render text/citation items as bullets with caller-owned labels.
+
+    Callers must validate citation provenance before rendering; this function trusts its input.
+    """
     lines: list[str] = []
     if isinstance(items, list):
         for item in items:

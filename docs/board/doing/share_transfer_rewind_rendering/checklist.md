@@ -15,8 +15,8 @@ Current focus: active -- order 29 only; orders 30--35 remain parked.
 
 ## Implementation
 
-- [x] Add neutral public session rendering primitives with explicit section-title, empty-state, and citation-label
-  inputs.
+- [x] Add neutral shared module-level session rendering primitives with explicit section-title, empty-state, and
+  citation-label inputs.
 - [x] Route transfer and rewind rendering through the shared primitives and remove the duplicate local helpers.
 - [x] Add byte-level transfer-document, rewind-document, and rewind-prompt fixtures plus direct shared-helper coverage.
 - [x] Record shared rendering ownership in the normative transfer-context design section.
