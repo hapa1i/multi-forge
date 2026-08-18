@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/centralize-telemetry-jsonl-reads` from the order-25 closeout (`83394417`).
+**Lane**: `done/` -- shipped in PR #205 (`5c36f25f`) after all five GitHub checks passed.
 
 **Finding**: O056.
 
@@ -36,3 +36,10 @@ and
 Do not create one shared telemetry record schema, change JSONL bytes, collapse plane retention, or downgrade newer-state
 failures. Keep `CostTracker.bootstrap_from_logs` separate: cap bootstrap skips irrelevant month shards before opening
 them and deduplicates `downstream_event_id` records.
+
+## Closeout
+
+PR #205 merged as `5c36f25f` with all five GitHub checks passing. Usage, downstream, and upstream now share sorted shard
+reads, tolerant object decoding, source-path context, and lazy period matching while retaining their distinct
+schema/filter order. `CostTracker.bootstrap_from_logs` remains separate for filename-first month pruning and attempt-ID
+deduplication. Order 27 remains parked for separate activation from this closeout.

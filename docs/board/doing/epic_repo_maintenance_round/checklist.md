@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 26 is active on `refactor/centralize-telemetry-jsonl-reads` from the order-25 closeout
-(`83394417`). Keep orders 27--35 parked.
+Current focus: Wave 7 orders 1--26 and both bounded corrective members are closed through PR #205. Keep orders 27--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -295,9 +295,9 @@ Current focus: Wave 7 order 26 is active on `refactor/centralize-telemetry-jsonl
 - [x] Ship order 25 independently in PR #204 (`356ea665`) and close its member without activating order 26.
 - [x] Close order 25 on pushed `main` at `83394417`, branch from that exact commit, and activate only order 26
   `centralize_telemetry_jsonl_reads`.
-- [ ] Share the telemetry JSONL read scaffold while keeping orders 27--35 parked.
-- [ ] Complete order 26's focused, full, regression, targeted telemetry integration, pre-commit, design-size, and
+- [x] Share the telemetry JSONL read scaffold while keeping orders 27--35 parked.
+- [x] Complete order 26's focused, full, regression, targeted telemetry integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 26 independently and close its member without activating order 27.
+- [x] Ship order 26 independently in PR #205 (`5c36f25f`) and close its member without activating order 27.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

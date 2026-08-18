@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Centralize tolerant telemetry JSONL reads
+
+**Goal/outcome**: Share telemetry shard/object/timestamp mechanics without collapsing each plane's schema and failure
+policy.
+
+**Key changes**:
+
+- Added one sorted, tolerant JSONL object iterator with source-path context and lazy half-open period matching.
+- Routed usage, downstream, and upstream reads through it while preserving schema/filter order, warnings, counters,
+  merging, sorting, and retention.
+- Kept cap bootstrap separate because it prunes shards by filename before opening and deduplicates `downstream_event_id`
+  records.
+
+**Verification**: 73 focused tests, 168 expanded telemetry/usage tests, 9,230 unit tests (one skip, 122 deselected), 921
+regressions, five targeted Docker cost-visibility tests, full pre-commit, 29,978/29,990 design-document counts, and the
+360-document/882-link board audit pass. PR #205 merged as `5c36f25f` with all five GitHub checks passing. No Forge
+workflow command was used.
+
 ### Reuse Claude usage-measurement resolution
 
 **Goal/outcome**: Remove the workflow aggregate's duplicate proxied-Claude precedence while preserving its event shape

@@ -1,7 +1,6 @@
 # Centralize tolerant telemetry JSONL reads checklist
 
-Current focus: order 26 is active on `refactor/centralize-telemetry-jsonl-reads` from the order-25 closeout
-(`83394417`); keep orders 27--35 parked.
+Current focus: complete -- order 26 shipped in PR #205 (`5c36f25f`); orders 27--35 remain parked.
 
 ## Activation and evidence
 
@@ -38,4 +37,4 @@ Current focus: order 26 is active on `refactor/centralize-telemetry-jsonl-reads`
   (five passed) suites.
 - [x] Run full pre-commit, `git diff --check`, design-size checks (29,978 and 29,990 tokens), and the board audit (360
   documents, 882 local links, zero missing; 25 done / one doing / nine todo) without a Forge workflow.
-- [x] Commit and push order 26 for review without activating order 27.
+- [x] Open PR #205, merge it as `5c36f25f` after all five checks pass, and close order 26 without activating order 27.
