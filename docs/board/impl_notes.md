@@ -15,7 +15,7 @@ the notes that are worth carrying forward.
 
 ```bash
 wc -l docs/board/impl_notes.md
-./scripts/count-tokens.py --model <agent-model> docs/board/impl_notes.md
+./scripts/count-tokens.py docs/board/impl_notes.md
 ```
 
 ## What Belongs Here

@@ -10,13 +10,16 @@ conversation context — they evaluate the resource in isolation.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from forge.core.invoker import Attribution
 
 from .engine import run_multi_review
-from .models import AdversarialOutput, ModelSpec, StanceSpec
+from .models import AdversarialOutput, StanceSpec
 from .routing import WorkerRoutingPlan
+from .worker_preparation import (
+    ReviewWorkerInput,
+    load_review_resource,
+    prepare_review_workers,
+)
 
 STANCE_MARKER = "{stance_prompt}"
 
@@ -33,10 +36,7 @@ def validate_resource(resource_path: str) -> str:
 
     Raises ValueError if the marker is missing.
     """
-    content = Path(resource_path).read_text()
-    if STANCE_MARKER not in content:
-        raise ValueError(f"Resource {resource_path} must contain '{STANCE_MARKER}' marker " "for stance injection.")
-    return content
+    return load_review_resource(resource_path, marker=STANCE_MARKER, assignment_kind="stance")
 
 
 def run_adversarial(
@@ -67,31 +67,17 @@ def run_adversarial(
 
     template = validate_resource(resource_path)
 
-    specs: list[ModelSpec] = []
-    seen: dict[str, int] = {}
-    for stance in stances:
-        filled = template.replace(
-            STANCE_MARKER,
-            stance.stance_prompt + ETHICAL_GUARDRAIL,
-        )
-        label = stance.effective_label
-        base_id = f"{stance.model.name}-{label}"
-        count = seen.get(base_id, 0)
-        seen[base_id] = count + 1
-        worker_id = base_id if count == 0 else f"{base_id}-{count}"
-        specs.append(
-            ModelSpec(
-                name=stance.model.name,
-                model_id=stance.model.model_id,
-                family=stance.model.family,
-                provider_refs=stance.model.provider_refs,
-                description=f"{label} stance via {stance.model.name}",
-                preferred_proxy=stance.model.preferred_proxy,
-                prompt=filled,
-                worker_id=worker_id,
-                runtime=stance.model.runtime,
-            )
-        )
+    prepared = prepare_review_workers(
+        template,
+        [
+            ReviewWorkerInput(model=stance.model, label=stance.effective_label, prompt=stance.stance_prompt)
+            for stance in stances
+        ],
+        marker=STANCE_MARKER,
+        guardrail=ETHICAL_GUARDRAIL,
+        assignment_kind="stance",
+    )
+    specs = prepared.specs
 
     if routing_plan is None:
         routing_plan = resolve_invocation_routing(specs, via=via)
@@ -108,11 +94,9 @@ def run_adversarial(
         reasoning_effort=reasoning_effort,
     )
 
-    stance_map = {spec.effective_worker_id: s.effective_label for spec, s in zip(specs, stances)}
-
     return AdversarialOutput(
         resource_path=resource_path,
         stances=[s.stance for s in stances],
         results=output.results,
-        stance_map=stance_map,
+        stance_map=prepared.label_map,
     )

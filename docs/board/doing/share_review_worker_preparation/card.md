@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 review refactor work.
+**Lane**: `doing/` -- active on `refactor/share-review-worker-preparation`, branched from pushed `main` at `8787f7e7`.
 
 **Findings**: O057 and the verified worker-spec/parser plus optional JSON-metadata-tail subset of O095.
 
@@ -13,10 +13,10 @@ parsing without hiding command-specific semantics.
 
 ## Evidence and Authority
 
-On `5777192a`, consensus and adversarial runners repeat resource validation, marker replacement, worker-ID
+Reverified on `8787f7e7`: consensus and adversarial runners repeat resource validation, marker replacement, worker-ID
 deduplication, and label maps. Their CLI parsers also repeat model lookup, colon/quote/empty validation, custom-label
-truncation, and optional JSON metadata tails. This admission verified the source statically without invoking a Forge
-workflow. Authority:
+truncation, and optional JSON metadata tails. The focused review/CLI baseline passes 214 tests. This activation verified
+the source and tests without invoking a Forge workflow. Authority:
 [`docs/design.md` "5.2 Policy, skills, workflows, and memory"](../../../design.md#52-policy-skills-workflows-and-memory)
 and
 [`docs/developer/cli_style_guidelines.md` "Command Shape"](../../../developer/cli_style_guidelines.md#command-shape).
@@ -34,3 +34,7 @@ and
 
 Keep Click option declarations visible on each command. Do not change default workers, context mode, routing, fan-out,
 or combine consensus and adversarial result types.
+
+## Closeout
+
+Open. Orders 28--35 remain parked until this member ships and closes independently.
