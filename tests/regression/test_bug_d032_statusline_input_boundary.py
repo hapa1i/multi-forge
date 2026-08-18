@@ -34,9 +34,9 @@ def test_non_object_json_is_a_bounded_status_error(payload: str) -> None:
 @pytest.mark.parametrize("workspace", [None, "bad", 42, []])
 def test_wrong_typed_workspace_falls_back_to_missing_workspace(workspace: object) -> None:
     with (
-        patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
-        patch("forge.cli.status_line.discover_session", return_value=(None, False)),
-        patch("forge.cli.status_line.get_git_branch", return_value=None),
+        patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
+        patch("forge.cli.statusline.sources.discover_session", return_value=(None, False)),
+        patch("forge.cli.statusline.sources.get_git_branch", return_value=None),
     ):
         result = CliRunner().invoke(
             status_line,
@@ -63,9 +63,9 @@ def test_malformed_proxy_url_falls_back_without_a_traceback() -> None:
 
 def test_valid_empty_object_still_renders() -> None:
     with (
-        patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
-        patch("forge.cli.status_line.discover_session", return_value=(None, False)),
-        patch("forge.cli.status_line.get_git_branch", return_value=None),
+        patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
+        patch("forge.cli.statusline.sources.discover_session", return_value=(None, False)),
+        patch("forge.cli.statusline.sources.get_git_branch", return_value=None),
     ):
         result = CliRunner().invoke(status_line, input="{}", env={"FORGE_STATUS_TRUNCATE": "0"})
 

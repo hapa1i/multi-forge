@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+from types import ModuleType
 from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import TranscriptStats, status_line
+from forge.cli.status_line import status_line
+from forge.cli.statusline import context as status_context
+from forge.cli.statusline import registry as status_registry
+from forge.cli.statusline import sources as status_sources
+from forge.cli.statusline import types as status_types
+from forge.cli.statusline.types import TranscriptStats
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 _INPUT = {
@@ -21,6 +29,70 @@ _INPUT = {
         "current_usage": {"input_tokens": 12_000},
     },
 }
+
+_SOURCE_FUNCTIONS = {
+    "compute_cache_hit_rate",
+    "detect_proxy",
+    "discover_session",
+    "get_git_branch",
+    "get_line_change_values",
+    "get_transcript_stats",
+    "scan_transcript",
+}
+
+
+def _tree(module: ModuleType) -> ast.Module:
+    return ast.parse(inspect.getsource(module))
+
+
+def _top_level_definitions(module: ModuleType) -> set[str]:
+    return {
+        node.name
+        for node in _tree(module).body
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
+def _dotted_attributes(module: ModuleType) -> set[str]:
+    def dotted(node: ast.AST) -> str | None:
+        parts: list[str] = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if not isinstance(node, ast.Name):
+            return None
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+
+    return {name for node in ast.walk(_tree(module)) if isinstance(node, ast.Attribute) if (name := dotted(node))}
+
+
+def _imported_modules(module: ModuleType) -> set[str]:
+    imports: set[str] = set()
+    for node in ast.walk(_tree(module)):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module)
+    return imports
+
+
+def test_source_facts_have_one_lower_owner_and_all_consumers_use_it() -> None:
+    assert set(status_sources.__all__) == _SOURCE_FUNCTIONS
+    assert _SOURCE_FUNCTIONS <= _top_level_definitions(status_sources)
+    assert _SOURCE_FUNCTIONS.isdisjoint(_top_level_definitions(sl))
+    assert set(status_types.__all__) == {"ProxyRuntimeTruth", "TranscriptStats"}
+    assert {"ProxyRuntimeTruth", "TranscriptStats"} <= _top_level_definitions(status_types)
+    assert "forge.cli.status_line" not in _imported_modules(status_sources)
+    assert "forge.cli.status_line" not in _imported_modules(status_types)
+
+    assert {
+        "status_sources.detect_proxy",
+        "status_sources.discover_session",
+        "status_sources.get_line_change_values",
+    } <= _dotted_attributes(sl)
+    assert {"sources.get_git_branch", "sources.get_transcript_stats"} <= _dotted_attributes(status_context)
+    assert "sources.compute_cache_hit_rate" in _dotted_attributes(status_registry)
 
 
 @pytest.mark.parametrize(
@@ -43,10 +115,10 @@ def test_status_line_acquires_only_declared_sources_once(
     session_probe = Mock(return_value=(None, False))
 
     with (
-        patch.object(sl, "detect_proxy", proxy_probe),
-        patch.object(sl, "discover_session", session_probe),
-        patch.object(sl, "get_git_branch", return_value="main"),
-        patch.object(sl, "_cached_scan_transcript", return_value=TranscriptStats()),
+        patch.object(status_sources, "detect_proxy", proxy_probe),
+        patch.object(status_sources, "discover_session", session_probe),
+        patch.object(status_sources, "get_git_branch", return_value="main"),
+        patch.object(status_sources, "get_transcript_stats", return_value=TranscriptStats()),
         patch.object(sl, "_get_terminal_width", return_value=200),
         patch("forge.runtime_config.get_runtime_config", return_value=config),
     ):
@@ -69,9 +141,9 @@ def test_repeated_zero_source_renders_keep_probe_counters_at_zero() -> None:
     runner = CliRunner()
 
     with (
-        patch.object(sl, "detect_proxy", proxy_probe),
-        patch.object(sl, "discover_session", session_probe),
-        patch.object(sl, "get_git_branch", return_value="main"),
+        patch.object(status_sources, "detect_proxy", proxy_probe),
+        patch.object(status_sources, "discover_session", session_probe),
+        patch.object(status_sources, "get_git_branch", return_value="main"),
         patch.object(sl, "_get_terminal_width", return_value=200),
         patch("forge.runtime_config.get_runtime_config", return_value=config),
     ):

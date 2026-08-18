@@ -27,6 +27,18 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
+### Extract status-line source facts
+
+**Goal/outcome**: Put status-line sources below the command without behavior drift.
+
+**Key changes**:
+
+- Moved neutral types and fail-open proxy/transcript/session/Git acquisition to `statusline`; consumers use it directly.
+- Deferred rendering and caches to order 35.
+
+**Verification**: 348 focused; 9,304 unit (1 skip, 122 deselected); 925 regression; 17 Docker; pre-commit/diff; design
+29,993/29,956; board 370 docs/894 links. No Forge workflow ran.
+
 ### Decompose the extension install transaction
 
 **Goal/outcome**: Make the extension install transaction reviewable by phase without changing mutation or rollback

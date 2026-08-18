@@ -28,6 +28,7 @@ from enum import StrEnum
 from typing import Callable, Optional
 
 from forge.cli import status_line as sl
+from forge.cli.statusline import sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER
 
@@ -194,7 +195,7 @@ def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
             ctx.transcript_path,
             ctx.session_id,
             ctx.config.statusline.cache_hit_ttl,
-            sl.compute_cache_hit_rate,
+            sources.compute_cache_hit_rate,
         )
     if rate is None:
         return None

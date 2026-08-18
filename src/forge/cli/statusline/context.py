@@ -6,9 +6,8 @@ Expensive derivations (transcript scan, git branch, context parsing) are
 actually accesses them — e.g. ``segments: [path, model]`` does no transcript
 scan and no git subprocess.
 
-Helpers come from ``forge.cli.status_line`` via module-attribute lookup at call
-time (so tests can patch them, and so the import direction stays acyclic — see
-the module docstring in ``registry.py``).
+Source facts come from the lower ``statusline.sources`` layer. Formatting
+helpers still use ``forge.cli.status_line`` until order 35 moves the render tail.
 """
 
 from __future__ import annotations
@@ -18,13 +17,14 @@ from functools import cached_property
 from typing import Any
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import ProxyRuntimeTruth, TranscriptStats
+from forge.cli.statusline import sources
 from forge.cli.statusline.palette import (
     Glyphs,
     Palette,
     resolve_glyphs,
     resolve_palette,
 )
+from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
 from forge.core.ops.usage_summary import SupervisorHealth
 from forge.runtime_config import RuntimeConfig
 
@@ -154,11 +154,11 @@ class RenderContext:
 
     @cached_property
     def transcript_stats(self) -> TranscriptStats:
-        return sl._cached_scan_transcript(self.transcript_path)
+        return sources.get_transcript_stats(self.transcript_path)
 
     @cached_property
     def git_branch(self) -> str | None:
-        return sl.get_git_branch(self.workspace_dir)
+        return sources.get_git_branch(self.workspace_dir)
 
     @cached_property
     def context_info(self) -> dict[str, Any] | None:

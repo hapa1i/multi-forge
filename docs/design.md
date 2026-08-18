@@ -18,15 +18,15 @@ common libraries (Auth, Models, State) under a unified interface (`forge` CLI).
 
 These components run independently but share code (libraries/config).
 
-| Component           | Responsibility                     | Location                    |
-| :------------------ | :--------------------------------- | :-------------------------- |
-| **Forge Proxy**     | Model routing, Auth, Tool fixing   | `src/forge/proxy/`          |
-| **Forge Session**   | Session isolation, Worktrees       | `src/forge/session/`        |
-| **Forge Skills**    | Agent workflows (Review, Planning) | `src/skills/` + `forge` CLI |
-| **Forge Status**    | Visual feedback & Dashboard        | `src/forge/status/`         |
-| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/policy/`         |
-| **Commands/Agents** | Claude Code extensions             | `src/{commands,agents}/`    |
-| **Hooks**           | Lifecycle events (Claude Code)     | `src/forge/cli/hooks/`      |
+| Component           | Responsibility                     | Location                                       |
+| :------------------ | :--------------------------------- | :--------------------------------------------- |
+| **Forge Proxy**     | Model routing, Auth, Tool fixing   | `src/forge/proxy/`                             |
+| **Forge Session**   | Session isolation, Worktrees       | `src/forge/session/`                           |
+| **Forge Skills**    | Agent workflows (Review, Planning) | `src/skills/` + `forge` CLI                    |
+| **Forge Status**    | Visual feedback & Dashboard        | `src/forge/cli/status_line.py` + `statusline/` |
+| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/policy/`                            |
+| **Commands/Agents** | Claude Code extensions             | `src/{commands,agents}/`                       |
+| **Hooks**           | Lifecycle events (Claude Code)     | `src/forge/cli/hooks/`                         |
 
 > See [diagrams.md §1: Core Architecture Overview](diagrams.md#1-core-architecture-overview) for a visual overview.
 

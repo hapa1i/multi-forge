@@ -308,7 +308,7 @@ wc -l docs/board/impl_notes.md
 
 - The four primitives -- `normalize_transcript_role`, `resolve_entry_role`, `extract_entry_blocks`,
   `group_entries_into_turns` -- are public in `core/transcript.py` and are the only home for transcript role/turn
-  parsing. `session/transfer.py` (curation) and `session/rewind.py` consume them; `cli/status_line.py` uses
+  parsing. `session/transfer.py` (curation) and `session/rewind.py` consume them; `cli/statusline/sources.py` uses
   `resolve_entry_role` for its role counts. New consumers must reuse these, not reimplement locally.
 - **Recurring-bug cause:** a divergent local copy in `status_line` had dropped the `human`/`ai` role-alias
   normalization, so those entries were miscounted (raw/`None` instead of `user`/`assistant`). Bypassing the shared
@@ -739,15 +739,17 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   and falls back to `DEFAULT_ORDER` when empty OR when a non-empty config resolves to nothing (never blanks the bar).
 - **Proxy/session acquisition is plan-lazy**: every `registry.Segment` declares its `StatusSource` requirements. Resolve
   configured/default order into one immutable `RenderPlan` before calling `detect_proxy()` or `discover_session()`, then
-  render from that same plan so acquisition and producers cannot drift. A zero-source layout skips both probes; each
-  requested source runs at most once. New segments must extend the exhaustive declaration test, while their own git,
-  transcript/cache, or hook-diagnostic work remains governed by lazy `RenderContext` access.
+  render from that same plan so acquisition and producers cannot drift. `statusline/types.py` owns neutral facts and
+  `statusline/sources.py` owns proxy, transcript, session, and Git acquisition; the command module must not redeclare
+  them. A zero-source layout skips both probes; each requested source runs at most once. New segments must extend the
+  exhaustive declaration test, while their own Git, transcript/cache, or hook-diagnostic work remains governed by lazy
+  `RenderContext` access.
 - **`DEFAULT_ORDER` is the golden contract**: empty `statusline.segments` reproduces the pre-config bar byte-for-byte
   (`test_statusline_registry.py` golden snapshots). It EXCLUDES `rate_limits` + every opt-in segment.
 - **Lazy `RenderContext`**: derivations are `cached_property`, so a segment not in the active set does zero I/O (no
-  transcript scan, git subprocess, or proxy-field access). Producers reach `format_*` via `sl.<name>` module-attribute
-  lookup — keeps the import direction acyclic (registry/context import `status_line`; `status_line()` imports them
-  lazily) and lets tests patch helpers.
+  transcript scan, Git subprocess, or proxy-field access). Source facts come from the lower `sources` module; producers
+  still reach `format_*` through `sl.<name>` until the render-tail extraction, keeping that remaining import cycle
+  avoided through lazy entrypoint imports.
 - **Palette = output-level ANSI remap**: each role emits a unique code; `apply_palette` is a single-pass regex mapping
   default→themed. `default` palette == empty remap == byte-identical no-op (golden-safe). Glyphs thread ONLY into the
   `get_context_display` progress bar (block chars can't be safely output-remapped). Do not thread a `palette` arg

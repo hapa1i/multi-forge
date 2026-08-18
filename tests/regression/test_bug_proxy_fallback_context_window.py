@@ -12,12 +12,13 @@ tier mappings or context windows from the proxy config file.
 Fix: Enrich the registry fallback by loading proxy.yaml and computing
 context windows from the model catalog (best-effort, same data as GET /).
 
-Affected file: src/forge/cli/status_line.py
+Source owner: src/forge/cli/statusline/sources.py
 """
 
 import pytest
 
-from forge.cli.status_line import ProxyRuntimeTruth, get_effective_context_window
+from forge.cli.status_line import get_effective_context_window
+from forge.cli.statusline.types import ProxyRuntimeTruth
 
 pytestmark = pytest.mark.regression
 

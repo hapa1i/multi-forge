@@ -7,7 +7,7 @@
 **Findings**: O070 plus O092's status-line cache and `render_categories` parameter subsets.
 
 **Depends on**: [`centralize_cli_metric_formatting`](../../done/centralize_cli_metric_formatting/card.md) and
-[`extract_statusline_sources`](../extract_statusline_sources/card.md).
+[`extract_statusline_sources`](../../doing/extract_statusline_sources/card.md).
 
 ## Goal
 

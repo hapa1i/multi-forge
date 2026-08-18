@@ -476,16 +476,14 @@ a non-empty config resolves to nothing. The flat `show_rate_limits` key was remo
 an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor`, `policy`, `audit`, `drift`,
 `spend_cap`, `launch`, `forge_cost`. Full key/segment reference: `docs/end-user/config.md`.
 
-**Segment-lazy source acquisition.** Each registry entry declares whether it consumes proxy and/or session facts. The
-renderer resolves the configured order first, unions those declarations, and acquires each requested source at most once
-for the shared render context. `path`, `branch`, `lines`, `tokens`, `think`, and `hooks` require neither proxy nor
-session discovery; `model`, `rate_limits`, `cache_hit`, `audit`, `drift`, and `spend_cap` require proxy discovery;
-`breadcrumb`, `loop`, `sidecar`, `supervisor`, `policy`, `launch`, and `forge_cost` require session discovery; `cost`
-requires both because proxy spend is scoped by the managed-session launch baseline. Thus `[path, branch]` performs no
-proxy HTTP/registry or session index/manifest read. This classification covers only those two shared sources:
-`branch`/`lines`, `tokens`/`think`/direct `cache_hit`, and `hooks` still own their declared git, transcript/cache, and
-hook-diagnostic work. The empty/default layout requires both sources and remains byte-compatible, including their
-existing fail-open behavior.
+**Segment-lazy source acquisition.** `statusline/types.py` owns neutral proxy/transcript facts; `statusline/sources.py`
+owns fail-open proxy, transcript, session, and Git acquisition; `status_line.py` coordinates stdin, planning, and
+output. Registry entries declare proxy/session requirements, whose union is acquired once per render. `path`, `branch`,
+`lines`, `tokens`, `think`, and `hooks` require neither shared source; `model`, `rate_limits`, `cache_hit`, `audit`,
+`drift`, and `spend_cap` require proxy; `breadcrumb`, `loop`, `sidecar`, `supervisor`, `policy`, `launch`, and
+`forge_cost` require session; `cost` requires both. Thus `[path, branch]` does no proxy HTTP/registry or session
+index/manifest read. Lazy `RenderContext` properties still own segment-specific Git, transcript/cache, and hook
+diagnostics. The empty/default layout requests both shared sources and stays byte-compatible and fail-open.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
 real `$`; `cost_mode=subscription` shows quota burn instead of dollar spend — both the 5h and weekly windows,

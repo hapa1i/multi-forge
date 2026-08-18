@@ -24,8 +24,6 @@ from forge.cli.status_line import (
     METRICS_COLOR,
     RED,
     YELLOW,
-    ProxyRuntimeTruth,
-    TranscriptStats,
     explicit_tier_from_model,
     format_audit,
     format_drift,
@@ -36,9 +34,11 @@ from forge.cli.status_line import (
     format_supervisor,
     status_line,
 )
+from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import render_segments
+from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
 from forge.core.ops.usage_summary import SupervisorHealth
 from forge.core.tiers import detect_tier_word
 from forge.core.usage.ledger import UsageEvent, log_usage_event
@@ -640,10 +640,10 @@ class TestEndToEndRender:
         runner = CliRunner()
         with contextlib.ExitStack() as es:
             es.enter_context(patch.object(sl, "_get_terminal_width", return_value=200))
-            es.enter_context(patch.object(sl, "detect_proxy", return_value=(False, None, False)))
-            es.enter_context(patch.object(sl, "discover_session", return_value=(session or (None, False))))
-            es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
-            es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=TranscriptStats()))
+            es.enter_context(patch.object(status_sources, "detect_proxy", return_value=(False, None, False)))
+            es.enter_context(patch.object(status_sources, "discover_session", return_value=(session or (None, False))))
+            es.enter_context(patch.object(status_sources, "get_git_branch", return_value=None))
+            es.enter_context(patch.object(status_sources, "get_transcript_stats", return_value=TranscriptStats()))
             es.enter_context(patch("forge.runtime_config.get_runtime_config", return_value=cfg))
             res = runner.invoke(
                 status_line,

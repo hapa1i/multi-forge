@@ -15,15 +15,16 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 import unicodedata
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
 import click
 
+from forge.cli.statusline import sources as status_sources
+from forge.cli.statusline import types as status_types
 from forge.core.metric_formatting import (
     TokenDisplayPolicy,
     UsdDisplayPolicy,
@@ -32,7 +33,6 @@ from forge.core.metric_formatting import (
     format_usd_micros,
 )
 from forge.core.tiers import detect_tier_word
-from forge.core.transcript import resolve_entry_role
 
 # Set up minimal logging for status line (stderr to avoid polluting stdout)
 logger = logging.getLogger(__name__)
@@ -128,12 +128,6 @@ def _get_terminal_width() -> int:
     return shutil.get_terminal_size(fallback=(DEFAULT_TERM_WIDTH, 24)).columns
 
 
-def _status_timeout() -> float:
-    from forge.runtime_config import get_runtime_config
-
-    return get_runtime_config().status_timeout
-
-
 def compact_model_name(model: str) -> str:
     """Strip provider prefix and shorten model names for display.
 
@@ -145,158 +139,7 @@ def compact_model_name(model: str) -> str:
     return get_compact_name(model)
 
 
-class ProxyRuntimeTruth:
-    """Structured proxy runtime truth from GET / endpoint."""
-
-    def __init__(self, raw: dict[str, Any]):
-        self.raw = raw
-        self.is_proxy = raw.get("is_proxy", False)
-
-        # Proxy identity (B2.1)
-        proxy = raw.get("proxy", {})
-        self.proxy_id = proxy.get("proxy_id")
-        self.template = proxy.get("template") or raw.get("template", "unknown")
-        self.port = proxy.get("port")
-        self.base_url = proxy.get("base_url")
-
-        # Runtime truth
-        runtime = raw.get("runtime", {})
-        self.active_tier = runtime.get("active_tier")
-        self.active_context_window = runtime.get("active_context_window")
-        self.context_windows = runtime.get("context_windows", {})
-        self.tier_mappings = runtime.get("tier_mappings", {})
-
-        # Older proxy response shape (system boundary: proxy HTTP response)
-        self.tiers = raw.get("tiers", {})
-
-    def get_context_window_for_tier(self, tier: str) -> int | None:
-        """Get context window for a tier, preferring runtime truth."""
-        # Prefer runtime.context_windows (authoritative)
-        if tier in self.context_windows:
-            return self.context_windows[tier]
-        # Fallback: older proxy response shape (system boundary)
-        tier_info = self.tiers.get(tier, {})
-        return tier_info.get("context_window")
-
-    @property
-    def proxy_cost_usd(self) -> float:
-        """Total estimated proxy cost in USD from metrics snapshot."""
-        metrics = self.raw.get("metrics", {})
-        costs = metrics.get("costs", {})
-        return costs.get("total_usd", 0.0)
-
-
-def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
-    """Detect if using a proxy and fetch its runtime truth.
-
-    Returns:
-        Tuple of (is_proxy, runtime_truth_or_none, is_authoritative).
-        - is_authoritative=True means live proxy GET / succeeded
-        - is_authoritative=False means we fell back to registry lookup
-    """
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
-    if not base_url:
-        return False, None, False
-
-    # Parse as URL — works for any host, not just localhost (CR-016)
-    from urllib.parse import urlparse
-
-    # Normalize scheme-less URLs (e.g., "localhost:8085" → "http://localhost:8085")
-    normalized = base_url if "://" in base_url else f"http://{base_url}"
-    try:
-        parsed = urlparse(normalized)
-        if not parsed.hostname:
-            return False, None, False
-    except ValueError as e:
-        logger.debug("Invalid ANTHROPIC_BASE_URL %r: %s", base_url, e)
-        return False, None, False
-
-    # Try live proxy query first (authoritative)
-    # Use scheme://netloc/ to strip any path (proxy serves identity at /)
-    try:
-        import urllib.request
-
-        query_url = f"{parsed.scheme}://{parsed.netloc}/"
-        with urllib.request.urlopen(query_url, timeout=_status_timeout()) as response:
-            proxy_info = json.loads(response.read())
-
-        if proxy_info.get("is_proxy") is True:
-            return True, ProxyRuntimeTruth(proxy_info), True  # authoritative
-    except Exception:
-        pass
-
-    # Fallback: reverse lookup from proxy registry (non-authoritative)
-    try:
-        from forge.proxy.proxies import ProxyRegistryStore
-
-        store = ProxyRegistryStore()
-        registry = store.read()
-
-        # Match by port when available, or by full netloc
-        target_port = parsed.port
-        for proxy_id, entry in registry.proxies.items():
-            entry_normalized = entry.base_url if "://" in (entry.base_url or "") else f"http://{entry.base_url or ''}"
-            entry_parsed = urlparse(entry_normalized)
-            match = (target_port is not None and entry_parsed.port == target_port) or (
-                target_port is None and parsed.netloc == entry_parsed.netloc
-            )
-            if match:
-                runtime_dict: dict[str, Any] = {}
-                try:
-                    from forge.config.loader import load_proxy_instance_config
-                    from forge.core.models import get_context_window_tokens
-
-                    proxy_config = load_proxy_instance_config(proxy_id)
-                    if proxy_config is not None:
-                        tier_models = {
-                            t: m
-                            for t, m in [
-                                ("haiku", proxy_config.tiers.haiku),
-                                ("sonnet", proxy_config.tiers.sonnet),
-                                ("opus", proxy_config.tiers.opus),
-                            ]
-                            if m
-                        }
-                        context_windows: dict[str, int] = {}
-                        for tier, model in tier_models.items():
-                            try:
-                                context_windows[tier] = get_context_window_tokens(model)
-                            except Exception:
-                                pass
-                        active_tier = proxy_config.default_tier or "sonnet"
-                        active_cw = context_windows.get(active_tier) or context_windows.get("sonnet")
-                        runtime_dict = {
-                            "tier_mappings": tier_models,
-                            "context_windows": context_windows,
-                            "active_tier": active_tier,
-                            "active_context_window": active_cw,
-                        }
-                except Exception:
-                    pass
-
-                fallback_info = {
-                    "is_proxy": True,
-                    "proxy": {
-                        "proxy_id": proxy_id,
-                        "template": entry.template,
-                        "port": entry.port,
-                        "base_url": entry.base_url,
-                    },
-                    "runtime": runtime_dict,
-                    "tiers": {},
-                }
-                return (
-                    True,
-                    ProxyRuntimeTruth(fallback_info),
-                    False,
-                )  # non-authoritative
-    except Exception:
-        pass
-
-    return False, None, False
-
-
-def _tier_color(tier: str, runtime: ProxyRuntimeTruth | None) -> str:
+def _tier_color(tier: str, runtime: status_types.ProxyRuntimeTruth | None) -> str:
     """Pick color for a tier, using deep variant for extended context (>200K)."""
     extended = False
     if runtime:
@@ -311,7 +154,7 @@ def _tier_color(tier: str, runtime: ProxyRuntimeTruth | None) -> str:
     return TIER_HAIKU
 
 
-def get_tier_display(runtime: ProxyRuntimeTruth | None) -> str | None:
+def get_tier_display(runtime: status_types.ProxyRuntimeTruth | None) -> str | None:
     """Get tier display string showing all mappings.
 
     Format: "O:model S:model H:model" with per-tier coloring.
@@ -376,192 +219,6 @@ def explicit_tier_from_model(model_id: str) -> str | None:
     return detect_tier_word(model_id or "")
 
 
-class TranscriptStats(NamedTuple):
-    """Results from single-pass transcript scan."""
-
-    has_thinking: bool = False
-    user_count: int = 0
-    tool_count: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cached_tokens: int = 0
-
-
-_EMPTY_STATS = TranscriptStats()
-
-# Cache transcript stats by (path, mtime_ns, size) to skip re-scanning unchanged files (CR-017).
-_transcript_cache: dict[str, tuple[int, int, TranscriptStats]] = {}
-
-
-def _cached_scan_transcript(transcript_path: str) -> TranscriptStats:
-    """Scan transcript with file-identity caching.
-
-    Returns cached stats if the file's mtime_ns and size haven't changed.
-    """
-    if not transcript_path:
-        return _EMPTY_STATS
-
-    try:
-        st = Path(transcript_path).stat()
-        key = (st.st_mtime_ns, st.st_size)
-    except OSError:
-        return _EMPTY_STATS
-
-    cached = _transcript_cache.get(transcript_path)
-    if cached is not None and (cached[0], cached[1]) == key:
-        return cached[2]
-
-    stats = scan_transcript(transcript_path)
-    _transcript_cache[transcript_path] = (key[0], key[1], stats)
-    return stats
-
-
-def scan_transcript(transcript_path: str) -> TranscriptStats:
-    """Single-pass transcript scan for thinking, counts, and token metrics.
-
-    Supports both transcript formats:
-    - Old: top-level "type" field ("user" | "assistant")
-    - New: "message.role" field (requestId-based, newer Claude Code)
-
-    Extracts in one pass: thinking indicator, user turn count, tool call count,
-    and cumulative token usage (input/output/cached) from message.usage fields.
-    """
-    if not transcript_path:
-        return _EMPTY_STATS
-
-    path = Path(transcript_path)
-    if not path.is_file():
-        return _EMPTY_STATS
-
-    user_count = 0
-    tool_count = 0
-    input_tokens = 0
-    output_tokens = 0
-    cached_tokens = 0
-    last_assistant_content: list[Any] | None = None
-
-    try:
-        with path.open(encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    role = resolve_entry_role(entry)
-
-                    if role == "user":
-                        # In new format, tool_result messages also have role=user;
-                        # only count actual human turns (no tool_result content)
-                        content = entry.get("message", {}).get("content", [])
-                        is_tool_result = isinstance(content, list) and any(
-                            isinstance(b, dict) and b.get("type") == "tool_result" for b in content
-                        )
-                        if not is_tool_result:
-                            user_count += 1
-                    elif role == "assistant":
-                        content = entry.get("message", {}).get("content", [])
-                        last_assistant_content = content
-                        for block in content:
-                            if isinstance(block, dict) and block.get("type") == "tool_use":
-                                tool_count += 1
-
-                    # Accumulate token usage from any entry with message.usage
-                    usage = entry.get("message", {}).get("usage")
-                    if usage:
-                        input_tokens += usage.get("input_tokens", 0)
-                        output_tokens += usage.get("output_tokens", 0)
-                        cached_tokens += usage.get("cache_read_input_tokens", 0)
-                        cached_tokens += usage.get("cache_creation_input_tokens", 0)
-                except json.JSONDecodeError:
-                    continue
-    except Exception:
-        return _EMPTY_STATS
-
-    has_thinking = False
-    if last_assistant_content:
-        for block in last_assistant_content:
-            if isinstance(block, dict) and block.get("type") == "thinking":
-                has_thinking = True
-                break
-
-    return TranscriptStats(
-        has_thinking=has_thinking,
-        user_count=user_count,
-        tool_count=tool_count,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cached_tokens=cached_tokens,
-    )
-
-
-def _safe_int(value: Any) -> int:
-    """Coerce a transcript usage field to int; 0 on missing/non-numeric."""
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
-def compute_cache_hit_rate(transcript_path: str) -> float | None:
-    """Cache hit rate from the transcript, matching the proxy's definition.
-
-    Proxy formula (``metrics.py`` / ``passthrough.py``):
-    ``sum(cache_read_input_tokens) / sum(input_tokens) * 100`` — cache *reads*
-    over *fresh* input only (cache creation is billed as normal input, not a
-    hit). Entries are deduped by ``requestId`` (fallback ``message.id``), keeping
-    the snapshot with the largest ``input_tokens`` per request, because streaming
-    appends multiple growing usage records per request (Claude Code #5904 —
-    summing them blind inflates 2-4x).
-
-    Returns the rounded percentage, ``0.0`` when there is input but no cache
-    read, or ``None`` when the transcript is missing/empty (fail-open: no data).
-    """
-    if not transcript_path:
-        return None
-    path = Path(transcript_path)
-    if not path.is_file():
-        return None
-
-    by_request: dict[str, tuple[int, int]] = {}  # key -> (input_tokens, cache_read)
-    try:
-        with path.open(encoding="utf-8") as f:
-            for idx, line in enumerate(f):
-                line = line.strip()
-                if not line:
-                    continue
-                # The transcript is an external Claude Code artifact (system
-                # boundary): skip any row whose shape/types are unexpected rather
-                # than crash an opt-in status-line segment.
-                try:
-                    entry = json.loads(line)
-                    message = entry.get("message")
-                    if not isinstance(message, dict):
-                        continue
-                    usage = message.get("usage")
-                    if not isinstance(usage, dict):
-                        continue
-                    request_id = entry.get("requestId") or message.get("id")
-                    key = str(request_id) if request_id is not None else f"_line_{idx}"
-                    inp = _safe_int(usage.get("input_tokens"))
-                    cache_read = _safe_int(usage.get("cache_read_input_tokens"))
-                except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
-                    continue
-                prev = by_request.get(key)
-                if prev is None or inp >= prev[0]:
-                    by_request[key] = (inp, cache_read)
-    except OSError:
-        return None
-
-    if not by_request:
-        return None
-    total_input = sum(v[0] for v in by_request.values())
-    total_cache_read = sum(v[1] for v in by_request.values())
-    if total_input <= 0:
-        return 0.0
-    return round(total_cache_read / total_input * 100, 1)
-
-
 def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
     """Parse context usage from Claude Code's JSON input.
 
@@ -617,7 +274,7 @@ def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
 
 def get_effective_context_window(
     data: dict[str, Any],
-    runtime: ProxyRuntimeTruth | None,
+    runtime: status_types.ProxyRuntimeTruth | None,
     context_info: dict[str, Any] | None,
 ) -> int | None:
     """Resolve the best-known context window size for display."""
@@ -756,38 +413,6 @@ def get_session_metrics(
         metrics.append(duration)
 
     return " ".join(metrics) if metrics else None
-
-
-def get_git_branch(current_dir: str) -> str | None:
-    """Get git branch name for directory."""
-    if not current_dir:
-        return None
-
-    try:
-        # Try symbolic-ref first (for normal branches)
-        timeout = _status_timeout()
-        result = subprocess.run(
-            ["git", "-C", current_dir, "symbolic-ref", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-
-        # Fall back to rev-parse for detached HEAD
-        result = subprocess.run(
-            ["git", "-C", current_dir, "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except Exception:
-        pass
-
-    return None
 
 
 def get_compact_path(current_dir: str) -> str:
@@ -1380,80 +1005,9 @@ def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens:
     return " ".join(parts) if parts else None
 
 
-def _parse_numstat(output: str) -> tuple[int, int]:
-    """Parse `git diff --numstat` output into (added, removed) totals."""
-    added = 0
-    removed = 0
-
-    for line in output.splitlines():
-        parts = line.split("\t", 2)
-        if len(parts) < 3:
-            continue
-        add_str, remove_str = parts[0], parts[1]
-        if add_str.isdigit():
-            added += int(add_str)
-        if remove_str.isdigit():
-            removed += int(remove_str)
-
-    return added, removed
-
-
-# Cache git numstat results with a short TTL to avoid two subprocess calls per refresh
-_numstat_cache: dict[str, tuple[float, tuple[int, int]]] = {}
-_NUMSTAT_TTL_SECS = 5.0
-
-
-def _git_numstat(current_dir: str) -> tuple[int, int]:
-    """Run git diff --numstat (staged + unstaged) with TTL cache."""
-    now = time.monotonic()
-    cached = _numstat_cache.get(current_dir)
-    if cached is not None and (now - cached[0]) < _NUMSTAT_TTL_SECS:
-        return cached[1]
-
-    try:
-        timeout = _status_timeout()
-        unstaged = subprocess.run(
-            ["git", "-C", current_dir, "diff", "--numstat"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        staged = subprocess.run(
-            ["git", "-C", current_dir, "diff", "--cached", "--numstat"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if unstaged.returncode != 0 or staged.returncode != 0:
-            result = (0, 0)
-        else:
-            unstaged_added, unstaged_removed = _parse_numstat(unstaged.stdout)
-            staged_added, staged_removed = _parse_numstat(staged.stdout)
-            result = (unstaged_added + staged_added, unstaged_removed + staged_removed)
-    except Exception:
-        result = (0, 0)
-
-    _numstat_cache[current_dir] = (now, result)
-    return result
-
-
-def get_line_change_values(cost_data: dict[str, Any], current_dir: str = "") -> tuple[int, int]:
-    """Prefer Claude totals, then fall back to cached git diff counts."""
-    if cost_data:
-        lines_added = int(cost_data.get("total_lines_added", 0) or 0)
-        lines_removed = int(cost_data.get("total_lines_removed", 0) or 0)
-        if lines_added > 0 or lines_removed > 0:
-            return lines_added, lines_removed
-
-    if not current_dir:
-        return 0, 0
-
-    return _git_numstat(current_dir)
-
-
 def format_line_changes(cost_data: dict[str, Any], current_dir: str = "") -> str | None:
     """Format direct line counts as +added/-removed with conventional colors."""
-    lines_added, lines_removed = get_line_change_values(cost_data, current_dir)
+    lines_added, lines_removed = status_sources.get_line_change_values(cost_data, current_dir)
     if lines_added == 0 and lines_removed == 0:
         return None
 
@@ -1466,7 +1020,7 @@ def format_line_changes(cost_data: dict[str, Any], current_dir: str = "") -> str
     return f"{DARK_GRAY}/{RESET}".join(parts) if len(parts) == 2 else parts[0]
 
 
-def get_token_breakdown_values(data: dict[str, Any], stats: TranscriptStats) -> tuple[int, int, int]:
+def get_token_breakdown_values(data: dict[str, Any], stats: status_types.TranscriptStats) -> tuple[int, int, int]:
     """Prefer token totals from Claude Code input, with transcript fallback."""
     context_window_data = data.get("context_window")
     if not isinstance(context_window_data, dict):
@@ -1611,42 +1165,6 @@ def render_categories(
     return "".join(parts)
 
 
-def discover_session() -> tuple[dict[str, Any] | None, bool]:
-    """Discover session state via FORGE_SESSION env var only.
-
-    No CWD fallback: if FORGE_SESSION is not set, returns (None, False).
-    This prevents false positives when running native ``claude`` in a
-    directory that happens to have Forge sessions.
-
-    Returns:
-        Tuple of (manifest_dict, is_authoritative).
-        - is_authoritative=True means FORGE_SESSION env var + index lookup succeeded
-        - (None, False) means no Forge session context
-    """
-    session_name = os.environ.get("FORGE_SESSION")
-    if not session_name:
-        return None, False
-
-    forge_root = os.environ.get("FORGE_FORGE_ROOT")
-
-    try:
-        # Lazy import to avoid slowing down status line startup
-        from forge.session.index import IndexStore
-        from forge.session.store import get_manifest_path
-
-        index = IndexStore()
-        entry = index.get_session(session_name, forge_root=forge_root)
-        if entry:
-            manifest_path = get_manifest_path(entry.forge_root or entry.worktree_path, session_name)
-            if manifest_path.is_file():
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                return manifest, True  # authoritative
-    except Exception as e:
-        logger.debug(f"Index lookup failed for FORGE_SESSION={session_name}: {e}")
-
-    return None, False
-
-
 @click.command(name="status-line", hidden=True)
 def status_line() -> None:
     """Generate status line for Claude Code.
@@ -1706,7 +1224,7 @@ def status_line() -> None:
     logger.debug("status-line: required sources=%s", sorted(source.value for source in plan.sources))
 
     if StatusSource.PROXY in plan.sources:
-        is_proxy, runtime, is_proxy_authoritative = detect_proxy()
+        is_proxy, runtime, is_proxy_authoritative = status_sources.detect_proxy()
     else:
         is_proxy, runtime, is_proxy_authoritative = False, None, False
 
@@ -1721,7 +1239,7 @@ def status_line() -> None:
         logger.debug("proxy: runtime=None")
 
     if StatusSource.SESSION in plan.sources:
-        session_manifest, is_session_authoritative = discover_session()
+        session_manifest, is_session_authoritative = status_sources.discover_session()
     else:
         session_manifest, is_session_authoritative = None, False
     session_name = session_manifest.get("name") if session_manifest else None
