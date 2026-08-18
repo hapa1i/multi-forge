@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/extract-session-fork-execution` from `1897b547`.
+**Lane**: `done/` -- shipped in PR #211 as `e4a62d1b` after focused, full, regression, targeted fork/rewind Docker,
+pre-commit, and CI verification.
 
 **Findings**: O068's mutation/launch subset and O096's unreachable second `elif proxy_name` branch.
 

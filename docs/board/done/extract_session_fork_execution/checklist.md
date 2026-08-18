@@ -1,7 +1,6 @@
 # Extract session-fork execution checklist
 
-Current focus: implementation and verification are complete on `refactor/extract-session-fork-execution`; publish order
-32 independently while orders 33--35 remain parked.
+Current focus: closed -- order 32 shipped in PR #211; orders 33--35 remain parked.
 
 - [x] Close order 31 on pushed `main` at `1897b547`, create `refactor/extract-session-fork-execution`, and activate only
   order 32.
@@ -24,7 +23,7 @@ Current focus: implementation and verification are complete on `refactor/extract
 - [x] Record the remaining start/fork extension-preparation duplication without expanding order 32 into installer
   ownership.
 - [x] Re-run 206 focused, 9,299 unit, 925 regression, and seven targeted Docker fork/rewind checks after review fixes.
-- [ ] Publish order 32 independently without activating order 33.
+- [x] Merge PR #211 as `e4a62d1b` and close this member without activating order 33.
 
 ## Acceptance coverage
 
@@ -38,12 +37,14 @@ Current focus: implementation and verification are complete on `refactor/extract
 ## Verification record
 
 - Baseline: 207 focused fork/resume/session tests passed on `1897b547`.
-- Final: 236 expanded fork tests plus three strict-planner migration cases passed; `make test-unit` passed 9,299 with
-  one skip and 122 deselected; `make test-regression` passed 923.
+- Final: 236 expanded fork tests plus three strict-planner migration cases passed; review hardening reran 206 focused
+  tests; `make test-unit` passed 9,299 with one skip and 122 deselected; `make test-regression` passed 925.
 - Docker: five worktree/same-directory/branch/`--into` cases, one Codex-parent refusal, one real native-relocate
   contract, and one real rewind contract passed. The first lifecycle invocation used two stale class selectors and
   collected no tests; the corrected selectors passed.
 - Quality: the first `make pre-commit` applied formatters and exposed two read-only protocol annotations; the clean
-  rerun passed. Final Opus 5 counts are 29,987 for `design.md` and 29,966 for `design_appendix.md`; the board audit
-  found 368 documents, 894 local links, and no missing target.
+  rerun passed. CI's Python 3.11 isort then expanded two import groups that the local Python 3.13 hook left compact; the
+  portable form and all replacement checks passed. Final Opus 5 counts are 29,993 for `design.md` and 29,966 for
+  `design_appendix.md`; the board audit found 368 documents, 894 local links, and no missing target. Wave 7 is 32 done
+  and three todo.
 - No Forge workflow command was used.

@@ -11,8 +11,8 @@
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O096).
 
 **Lane**: `retired/`. The deletion is folded into
-[`extract_session_fork_execution`](../../doing/extract_session_fork_execution/card.md), where the branch precondition
-and resulting routing plan can be characterized at the same seam. This card did not ship independently.
+[`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md), where the branch precondition and
+resulting routing plan can be characterized at the same seam. This card did not ship independently.
 
 ## Historical Goal
 

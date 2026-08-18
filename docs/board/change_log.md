@@ -43,8 +43,8 @@ wc -l docs/board/change_log.md
   preserves styled warnings, and shares pure launch-preference and prompt-file resolution.
 
 **Verification**: 206 review-focused; 9,299 unit (one skip, 122 deselected); 925 regression; seven targeted Docker
-fork/rewind checks; full pre-commit, diff, 29,993/29,966 design, and 368-document/894-link board checks pass. No Forge
-workflow command was used.
+fork/rewind checks; full pre-commit, diff, 29,993/29,966 design, and 368-document/894-link board checks pass. PR #211
+merged as `e4a62d1b`; no Forge workflow command was used.
 
 ### Extract session-fork preflight
 
