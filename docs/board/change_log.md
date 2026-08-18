@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Share passthrough SSE framing
+
+**Goal/outcome**: Remove duplicated incremental SSE framing without collapsing provider-specific usage semantics.
+
+**Key changes**:
+
+- Added one tolerant data/JSON framer for split chunks, no-op lines, `[DONE]`, invalid UTF-8, and malformed JSON, with
+  payload-free debug diagnostics.
+- Routed the Anthropic and Responses usage taps through it while retaining each transport's event merge, lifecycle,
+  normalization, forwarding, teardown, and completion behavior.
+- Added direct framing and delegation contracts; both complete transport suites and raw-stream/accounting Docker paths
+  pin the seam.
+
+**Verification**: 130 focused plus 88 conversion/accounting tests; 9,263 unit (one skip, 122 deselected); 923
+regression; six targeted Docker checks; full pre-commit, diff, 29,961/29,966 design, and 366-document/894-link board
+checks pass. No Forge workflow command was used.
+
 ### Share transfer and rewind rendering primitives
 
 **Goal/outcome**: Remove copied session-context rendering without collapsing transfer and rewind semantics.
@@ -1853,45 +1870,20 @@ existing Claude workflow parity integration (`13 passed`); clean wheel installs 
 `all`, including status/sync/disable lifecycle; `uv build`; `make pre-commit`; QA parser v1.0.32 / 596 assertions;
 walkthrough parser v1.0.5 / 108 assertions. The card remains in `doing/` for review and merge.
 
-### Unmanaged skill packages closeout
+### Unmanaged skill packages
 
-**Goal**: Close the shipped unmanaged-skill-package detection and cleanup card after PR #109 passed review remediation
-and merged to `main`.
-
-**Key changes**:
-
-- Moved the card and preserved checklist from `doing/` to `done/`, updated the lane header, and recorded the ratified
-  fail-closed unsafe-root behavior (never traversed; surfaced as a human root-level diagnostic, never a fabricated JSON
-  package row).
-- Promoted the reviewed discovery-surface, deletion-proof, no-scan-boundary, and scope-ownership invariants to durable
-  implementation notes.
-
-**Verification**: PR #109 merged as `cbb58e16`; merged-`main` re-run of the focused suites (`289 passed`) and
-`make test-unit` (`8230 passed, 1 skipped, 117 deselected`); inbound-link and stale-lane grep clean;
-`make pre-commit-md`; `git diff --check`.
-
-### Phase 8: Unmanaged skill packages (implementation complete; review hold)
-
-**Goal**: Detect runtime skill packages no longer represented by coherent tracking, distinguish safe Forge cleanup from
-report-only user content, and provide scope-correct recovery without adopting or overwriting either class.
+**Goal/outcome**: Detect untracked runtime skill packages and clean only packages with current Forge ownership proof.
 
 **Key changes**:
 
-- Added one-snapshot unmanaged-package discovery with append-only historical names, strict provenance-marker and tree
-  validation, collision reporting, and immutable status records. The emitted marker intentionally causes a one-time
-  research-preview compiled-cache digest change.
-- Added per-package enable/sync recovery, status JSON schema v2, and guarded `unmanaged_skill_packages` cleanup across
-  project, workspace, and all scopes. The status `--json` top-level object is the second research-preview clean break.
-- Anchored cleanup to real runtime-root descriptors, revalidated ownership and filesystem proof immediately before
-  removal, covered cache-reset and drift boundaries, and synchronized operator, design, QA, and walkthrough docs.
-- Review remediation restored a displaced runtime-selection assertion, added human diagnostics for unsafe selected roots
-  without inventing JSON package rows, and replaced full source parsing on status/clean with names-only discovery plus a
-  historical fallback.
+- Added one-snapshot discovery, per-package recovery, status schema v2, and scope-correct guarded cleanup. Provenance,
+  tree, and ownership checks are repeated before deletion; unsafe roots stay untraversed and report-only without
+  fabricated JSON rows.
+- Kept append-only historical names and names-only status/clean discovery. The provenance marker's one-time cache digest
+  change and status JSON top-level object were research-preview clean breaks.
 
-**Verification**: focused acceptance (`289 passed`); related compiler/cache/tracking/validation (`170 passed`);
-`make test-unit` (`8230 passed, 1 skipped, 117 deselected`); `make test-regression` (`522 passed`); wheel-installed
-Docker lifecycle (`1 passed, 19 deselected`); `uv build`; `make pre-commit`; QA parser v1.0.31 / 592 assertions;
-walkthrough parser v1.0.5 / 108 assertions; `git diff --check`. The card remains in `doing/` for human review.
+**Verification**: PR #109 merged as `cbb58e16`; 289 acceptance, 170 related, 8,230 unit (one skip), 522 regression, and
+one wheel-installed Docker lifecycle test passed, with build, pre-commit, QA/walkthrough, link, lane, and diff checks.
 
 ## 2026-07-10 -- 2026-07-17 (compacted)
 

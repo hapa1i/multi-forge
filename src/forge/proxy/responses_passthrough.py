@@ -27,6 +27,7 @@ from fastapi.responses import Response, StreamingResponse
 from forge.core.telemetry.downstream import RequestMode
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.response_headers import merge_response_headers, relay_response_headers
+from forge.proxy.sse_framing import SseJsonDataFramer
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
@@ -160,7 +161,7 @@ class _ResponsesUsageAccumulator:
 
     def __init__(self) -> None:
         self.usage: dict[str, int] = {}
-        self._buf = ""
+        self._framer = SseJsonDataFramer(self._merge)
         self.first_chunk_seen = False
         self.final_usage_seen = False
         self.reported_cost_micros: int | None = None
@@ -169,23 +170,7 @@ class _ResponsesUsageAccumulator:
         self.terminal_status: str | None = None
 
     def feed(self, chunk: bytes) -> None:
-        try:
-            self._buf += chunk.decode("utf-8", errors="ignore")
-        except Exception:  # pragma: no cover - decode is already lenient
-            return
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
-            line = line.strip()
-            if not line.startswith("data:"):
-                continue
-            data = line[len("data:") :].strip()
-            if not data or data == "[DONE]":
-                continue
-            try:
-                event = json.loads(data)
-            except (ValueError, TypeError):
-                continue
-            self._merge(event)
+        self._framer.feed(chunk)
 
     def _merge(self, event: Any) -> None:
         if not isinstance(event, dict):

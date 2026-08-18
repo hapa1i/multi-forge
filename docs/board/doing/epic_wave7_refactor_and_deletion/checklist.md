@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: no member is active -- orders 1--29 shipped; orders 30--35 remain parked.
+Current focus: order 30 `share_passthrough_sse_framing` is active from `1d02b0cb`; orders 31--35 remain parked.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -171,6 +171,12 @@ Current focus: no member is active -- orders 1--29 shipped; orders 30--35 remain
 - [x] Complete order 29's focused, full, regression, targeted rewind integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 29 independently in PR #208 (`ea5b9103`) and close its member without activating order 30.
+- [x] Close order 29 on pushed `main` at `1d02b0cb`, create `refactor/share-passthrough-sse-framing`, and activate only
+  order 30 after reverifying its common framing and protocol-specific merge seams.
+- [x] Share only incremental SSE data-line framing while keeping orders 31--35 parked.
+- [x] Complete order 30's focused, full, regression, targeted streaming integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 30 independently and close its member without activating order 31.
 
-Orders 30--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 31--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

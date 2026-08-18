@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 proxy refactor work.
+**Lane**: `doing/` -- active on `refactor/share-passthrough-sse-framing` from `1d02b0cb`; orders 31--35 remain parked.
 
 **Finding**: O067, promoted from unverified during Wave 7 admission.
 
@@ -13,9 +13,9 @@ different event merge rules.
 
 ## Evidence and Authority
 
-On `5777192a`, both `feed` methods retain the same byte-buffer, newline, `data:`, `[DONE]`, and JSON-tolerance loop;
-their `_merge` methods intentionally parse different protocols. Split-chunk and garbage fixtures passed in the 23-test
-admission slice. Authority: provider wire compatibility under
+Reverified on `1d02b0cb`: both `feed` methods retain the same byte-buffer, newline, `data:`, `[DONE]`, and
+JSON-tolerance loop; their `_merge` methods intentionally parse different protocols. Both complete passthrough unit
+files pass (126 tests), including the split-chunk and garbage fixtures. Authority: provider wire compatibility under
 [`docs/developer/coding_standards.md` "System boundaries"](../../../developer/coding_standards.md#system-boundaries-external-data).
 
 ## Acceptance Criteria
