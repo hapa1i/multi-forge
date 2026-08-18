@@ -1,7 +1,6 @@
 # Extract status-line source facts checklist
 
-Current focus: order 34 is active on `refactor/extract-statusline-sources` from pushed `main` at `43130c3d`; order 35
-remains parked.
+Current focus: closed -- order 34 shipped in PR #213; order 35 remains parked.
 
 - [x] Close order 33 on pushed `main`, create the order-34 branch from that exact commit, and activate only this member.
 - [x] Reverify the 1,789-line command module, three upward package imports, 23 importing files, and 32 concentrated
@@ -15,7 +14,7 @@ remains parked.
 - [x] Run focused status-line units/regressions and targeted status-line integration coverage.
 - [x] Run `make test-unit`, `make test-regression`, `make pre-commit`, design token checks, board integrity, and
   `git diff --check`.
-- [ ] Publish order 34 independently without activating order 35.
+- [x] Merge PR #213 as `e761d0d1` and close this member without activating order 35.
 
 ## Boundary map
 

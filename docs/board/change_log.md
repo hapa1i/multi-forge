@@ -29,7 +29,7 @@ wc -l docs/board/change_log.md
 
 ### Extract status-line source facts
 
-**Goal/outcome**: Put status-line sources below the command without behavior drift.
+**Goal/outcome**: Put status-line sources below the command.
 
 **Key changes**:
 
@@ -37,7 +37,7 @@ wc -l docs/board/change_log.md
 - Deferred rendering and caches to order 35.
 
 **Verification**: 348 focused; 9,304 unit (1 skip, 122 deselected); 925 regression; 17 Docker; pre-commit/diff; design
-29,993/29,956; board 370 docs/894 links. No Forge workflow ran.
+29,993/29,956; board 370 docs/894 links. PR #213 merged as `e761d0d1`; no Forge workflow ran.
 
 ### Decompose the extension install transaction
 

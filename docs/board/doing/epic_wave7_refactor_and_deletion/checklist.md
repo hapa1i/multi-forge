@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 34 `extract_statusline_sources` is active from `43130c3d`; order 35 remains parked.
+Current focus: order 34 shipped in PR #213; order 35 remains parked.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -197,6 +197,9 @@ Current focus: order 34 `extract_statusline_sources` is active from `43130c3d`; 
   order 34 after reverifying its source, import, test, and patch boundaries.
 - [x] Extract and verify order 34's neutral status-line facts and source layer while keeping render/layout work and
   process-cache removal parked for order 35.
+- [x] Complete order 34's focused, full, regression, targeted status-line Docker, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [x] Ship order 34 independently in PR #213 (`e761d0d1`) and close its member without activating order 35.
 
-Order 35 remains intentionally parked while order 34 is active. This checklist does not authorize parallel
-implementation or any other separately gated Wave 6 finding.
+Order 35 remains intentionally parked after order 34 closeout. This checklist does not authorize parallel implementation
+or any other separately gated Wave 6 finding.

@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- implementation and verification complete on `refactor/extract-statusline-sources` from `43130c3d`;
-publication remains pending.
+**Lane**: `done/` -- shipped in PR #213 as `e761d0d1` after focused, full, regression, targeted status-line Docker,
+pre-commit, and CI verification.
 
 **Finding**: O070's source/data subset.
 
