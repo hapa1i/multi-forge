@@ -1,0 +1,24 @@
+# Rewind Code Delta: parent
+
+_Curated by model-b._
+
+## Lineage
+
+parent <- root
+
+## Conversation Gap
+
+The child conversation is rewound after turn 2; dropped turns 3..4 are not live history. Files on disk already include the code changes below.
+
+## Files Changed
+
+- Update renderer. _(cite: turn 3)_
+- Preserve fallback.
+
+## Net Effect
+
+Shared mechanics, distinct envelope.
+
+## Unfinished / Watchpoints
+
+- Review rollout.

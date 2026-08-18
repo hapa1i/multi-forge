@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Share transfer and rewind rendering primitives
+
+**Goal/outcome**: Remove copied session-context rendering without collapsing transfer and rewind semantics.
+
+**Key changes**:
+
+- Added neutral trimmed-text, section-framing, and plain/cited bullet primitives with caller-owned labels.
+- Routed both document renderers through them while retaining each strategy's envelope, budget, emitted-turn set, and
+  citation validation; byte-level transfer, rewind, and rewind-prompt goldens pin the boundary.
+- Left O018's separately gated truncated-turn citation defect outside this behavior-preserving member.
+
+**Verification**: 198 focused; 9,259 unit (one skip, 122 deselected); 923 regression; one real rewind Docker test;
+pre-commit, diff, 29,989/29,937 design, and 365-document/894-link board checks pass. No Forge workflow command was used.
+
 ### Unify Claude session state-context derivation
 
 **Goal/outcome**: Centralize Claude session state ownership.
@@ -2089,33 +2103,23 @@ Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_down
 
 ## 2026-05-22 -- 2026-06-16 (compacted)
 
-Runtime, Codex frontend, session transfer, proxy observability, and status-line foundation. Detailed history remains in
-the corresponding `done/` cards and PRs.
+Runtime, Codex frontend, transfer, proxy observability, and status-line foundations; detailed history remains in the
+matching `done/` cards and PRs.
 
-- **05-22--06-03 -- runtime and handoff foundations:** added origin-rooted `RunIdentity`, the schema-v1 usage ledger,
-  shared invoker/fan-out, frozen runtime registry, runtime-tagged actions, and host-only opt-in native relocation. Split
-  Stop-time memory writing from resume/fork transfer, made passports authoritative for document ownership, and shipped
-  schema-backed transfer artifacts. Added the redact-before-persist audit proxy and configurable status line. Path
-  rewriting, sidecar relocation, a native-relocation default flip, and slow-upstream replay remained deferred.
-- **06-04--06-09 -- runtime and CLI closeout:** confirmed `codex exec` hooks were unavailable headlessly, retaining the
-  initial-message bridge and transfer-curation attribution. Cost accounting became reported-or-unavailable;
-  `forge usage` became `forge activity`, `--scope repo` became `--scope workspace`, and stale shims were removed. Linked
-  worktrees gained git-common-dir project roots, strict JSONL object guards, and retry/cleanup/delta regressions.
-- **06-10--06-14 -- first-class Codex frontend:** shipped Codex start/resume, hook adapter/responder surfaces,
-  SessionStart transfer delivery, interactive TUI, enrollment, and capability/version guards. Enrollment evidence kept
-  trust scoped and policy enrollment-gated. App-server transport, an upstream fail-open draft, and
-  PermissionRequest/`trusted_hash` research remained deferred. Supervisor cascade/effort controls, shadow sampling, and
-  same-directory curated transfer forks shipped alongside it.
-- **06-15 -- provider tracing and launch controls:** live probes established OpenRouter generation-id and cancellation
-  semantics before Forge added leak-gated session/command headers and a separate `ProviderTraceMeta`. Review fixes made
-  cancelled streams emit metadata early and preserved metadata through fallback/non-stream paths. Session launchers
-  gained tier-1 cascade controls and per-caller Claude effort without a schema bump; explicit same-directory transfer
-  options no longer disappear into native resume.
-- **06-16 -- proxy and operator observability:** fixed dropped logging/provider-trace config, made successful and opt-in
-  stream logging DEBUG-only, added strict redacted request logging and shared JSONL retention, and closed two plaintext
-  leak paths. Provider traces gained owner-only lifecycle records, `list/show/explain`, cancellation state, and proxied
-  OpenRouter `user` grouping; direct callers remained deferred. Status-line health derives supervisor failure streaks
-  from the usage ledger without new durable state; parse/auth fail-opens remained deferred.
-- **Verification:** successive unit suites ranged from roughly 6.1k to 6.4k tests, with focused integration and
-  real-provider/Codex paths covering policy, transfer, generation, cancellation, and launch behavior. Regression, mypy,
-  pyright, adversarial-review follow-ups, and final `make pre-commit` checks passed at each closeout.
+- **Runtime/handoff:** added origin-rooted `RunIdentity`, usage ledger, shared invoker/fan-out, frozen registry,
+  runtime-tagged actions, and opt-in native relocation. Split Stop memory from transfer, made passports authoritative,
+  and shipped schema-backed transfer, audit-proxy, and status-line contracts. Path rewriting, sidecar relocation,
+  default native relocation, and slow-upstream replay remained deferred.
+- **Runtime/CLI closeout:** headless `codex exec` hooks remained unavailable, so Forge retained initial-message delivery
+  and transfer attribution. Costs became reported-or-unavailable; activity/scope naming and linked-worktree roots were
+  normalized; stale shims left cleanly.
+- **Codex frontend:** shipped start/resume, hook adapters, SessionStart transfer, TUI, enrollment, and
+  capability/version guards. Trust stayed scoped and enrollment-gated. App-server transport, fail-open upstream work,
+  and PermissionRequest/`trusted_hash` research remained deferred; supervisor controls and same-dir transfer shipped.
+- **Provider/launch:** live probes established OpenRouter generation/cancellation semantics; leak-gated headers and
+  `ProviderTraceMeta` preserved early/fallback metadata. Launchers gained cascade/effort controls without a schema bump.
+- **Proxy/operator observability:** fixed logging/trace config, added redacted request logs and JSONL retention, and
+  closed plaintext leaks. Provider traces gained lifecycle and `list/show/explain`; direct callers and parse/auth
+  fail-opens remained deferred. Status-line supervisor health uses the usage ledger without new state.
+- **Verification:** roughly 6.1k--6.4k unit tests plus focused integration and real provider/Codex policy, transfer,
+  generation, cancellation, and launch paths; regression, type checks, review follow-ups, and pre-commit passed.

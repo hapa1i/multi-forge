@@ -6,7 +6,7 @@ closeout audit rejected stale claims D033/O020 and handed 34 still-live correctn
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
 added bounded O012 and retention-status hardening without changing that finding count. Wave 7 now contains 32 verified
 findings across 35 implementation members. Orders 1--28 shipped independently in PRs #178--#184, #186--#188, and
-#190--#207, with seven members parked. The bounded
+#190--#207; order 29 is active and six members remain parked. The bounded
 [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) correction closed
 order 20's post-merge snapshot race directly on `main` after PR #206 and before order 28. The bounded
 [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
@@ -132,7 +132,7 @@ order.
 | 5M   | O007                | [`fail_non_streaming_response_conversion`](../../done/fail_non_streaming_response_conversion/card.md)               |
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
 | 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
-| 7    | 31 structural rows  | [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md)                                   |
+| 7    | 32 structural rows  | [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md)                                   |
 
 ## Execution Waves
 

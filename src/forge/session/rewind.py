@@ -14,6 +14,12 @@ from forge.core.transcript import (
     group_entries_into_turns,
     truncate,
 )
+from forge.session.context_rendering import (
+    coerce_render_text,
+    render_cited_text_bullets,
+    render_markdown_section,
+    render_text_bullets,
+)
 from forge.session.transfer import (
     MAX_TRANSCRIPT_CHARS,
     _call_llm_for_curation_prompt,
@@ -474,30 +480,33 @@ def _build_rewind_code_delta_output(
         "",
         f"_Curated by {model_used}._",
         "",
-        "## Lineage",
-        "",
-        " <- ".join(lineage) if lineage else parent_name,
-        "",
-        "## Conversation Gap",
-        "",
-        (
-            f"The child conversation is rewound after turn {source.kept_turns}; dropped turns "
-            f"{source.kept_turns + 1}..{source.total_turns} are not live history. "
-            "Files on disk already include the code changes below."
+        *render_markdown_section("Lineage", [" <- ".join(lineage) if lineage else parent_name]),
+        *render_markdown_section(
+            "Conversation Gap",
+            [
+                (
+                    f"The child conversation is rewound after turn {source.kept_turns}; dropped turns "
+                    f"{source.kept_turns + 1}..{source.total_turns} are not live history. "
+                    "Files on disk already include the code changes below."
+                )
+            ],
         ),
-        "",
-        "## Files Changed",
-        "",
-        *_render_change_items(curated.get("changes")),
-        "",
-        "## Net Effect",
-        "",
-        _coerce_text(curated.get("net_effect")) or "_Not captured._",
-        "",
-        "## Unfinished / Watchpoints",
-        "",
-        *_render_str_list(curated.get("unfinished")),
-        "",
+        *render_markdown_section(
+            "Files Changed",
+            render_cited_text_bullets(
+                curated.get("changes"),
+                empty_label="_No code changes captured._",
+                citation_label="cite",
+            ),
+        ),
+        *render_markdown_section(
+            "Net Effect",
+            [coerce_render_text(curated.get("net_effect")) or "_Not captured._"],
+        ),
+        *render_markdown_section(
+            "Unfinished / Watchpoints",
+            render_text_bullets(curated.get("unfinished"), empty_label="_None captured._"),
+        ),
     ]
     return "\n".join(lines)
 
@@ -540,30 +549,6 @@ def _build_rewind_deterministic_output(
         curated=curated,
         model_used="deterministic tool-call summary",
     )
-
-
-def _render_change_items(changes: Any) -> list[str]:
-    lines: list[str] = []
-    if isinstance(changes, list):
-        for item in changes:
-            if isinstance(item, dict):
-                text = _coerce_text(item.get("text"))
-                citation = _coerce_text(item.get("citation"))
-            else:
-                text, citation = _coerce_text(item), ""
-            if not text:
-                continue
-            lines.append(f"- {text} _(cite: {citation})_" if citation else f"- {text}")
-    return lines or ["_No code changes captured._"]
-
-
-def _render_str_list(items: Any) -> list[str]:
-    lines = [f"- {_coerce_text(item)}" for item in items if _coerce_text(item)] if isinstance(items, list) else []
-    return lines or ["_None captured._"]
-
-
-def _coerce_text(value: Any) -> str:
-    return value.strip() if isinstance(value, str) and value.strip() else ""
 
 
 def _parse_raw_transcript_entries(raw_lines: list[str]) -> list[_RawTranscriptEntry]:

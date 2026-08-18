@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 session refactor work.
+**Lane**: `doing/` -- implementation and verification complete on `refactor/share-transfer-rewind-rendering` from
+`7c925880`; pending independent review.
 
 **Finding**: O059.
 
@@ -13,20 +14,21 @@ budget, and citation semantics distinct.
 
 ## Evidence and Authority
 
-On `5777192a`, rewind imports four private transfer helpers but still copies `_coerce_text`, `_render_str_list`, and
-decision/change rendering. Earlier Wave 6 work changed rewind citation behavior, demonstrating why copied rendering
-logic needs an owned seam. Authority:
+Reverified on `7c925880`: rewind imports four private transfer helpers but still copies `_coerce_text`,
+`_render_str_list`, and decision/change rendering. Earlier Wave 6 work changed rewind citation behavior, demonstrating
+why copied rendering logic needs an owned seam. Authority:
 [`docs/design_appendix.md` "H. Transfer Context Schema"](../../../design_appendix.md#h-transfer-context-schema) and
 [`docs/design.md` "3.9 Session Resume"](../../../design.md#39-session-resume-context-management).
 
 ## Acceptance Criteria
 
 - Public/shared rendering primitives have neutral inputs and explicit empty-label/section options.
-- Golden fixtures preserve transfer markdown, rewind prompt bytes, truncation, emitted-turn tracking, and citations.
+- Golden fixtures preserve transfer Markdown and rewind prompt bytes; existing tests retain the current truncation,
+  emitted-turn, and citation boundaries.
 - Remove cross-module private imports where the shared helper replaces them.
 - Run transfer/rewind unit, regression, and targeted rewind integration suites.
 
 ## Exclusions
 
-Do not unify full-transfer and rewind strategies, change budget selection, or let rendered-but-truncated turns count as
-emitted.
+Do not unify full-transfer and rewind strategies or change budget/emitted-turn selection. O018's separately gated
+rendered-but-truncated citation defect remains outside this behavior-preserving refactor.

@@ -17,6 +17,7 @@ from forge.session.transfer import (
     AI_CURATION_PROVIDER,
     MAX_TRANSCRIPT_CHARS,
     ResumeStrategy,
+    _build_ai_curated_output,
     _build_frontmatter,
     _call_llm_for_curation_prompt,
     _citation_is_grounded,
@@ -823,6 +824,31 @@ class TestDecisionCitationValidation:
         sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
         assert sanitized[0]["text"] == "No cite here"
         assert warnings == []
+
+
+def test_ai_curated_output_matches_golden_fixture() -> None:
+    content = _build_ai_curated_output(
+        parent_name="parent",
+        lineage=["parent", "root"],
+        curated={
+            "goal": "  Ship the renderer.  ",
+            "decisions": [
+                {"text": "  Keep transfer envelope.  ", "citation": "  turn 2  "},
+                "  Preserve bare decisions.  ",
+                {"text": "  ", "citation": "turn 3"},
+            ],
+            "current_state": "  Ready.  ",
+            "files": ["  src/forge/session/transfer.py:895  ", "docs/design_appendix.md", "", 3],
+            "open_questions": [],
+        },
+        model_used="model-a",
+        artifacts_path=".forge/artifacts/parent/transcripts/a.jsonl",
+        proxy_template="proxy-a",
+        latest_plan_path=".claude/plans/renderer.md",
+    )
+
+    golden = Path(__file__).parents[2] / "fixtures" / "transfer_ai_curated.md.golden"
+    assert content == golden.read_text(encoding="utf-8")
 
 
 class TestTargetRuntimeRelabel:
