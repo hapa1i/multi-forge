@@ -413,6 +413,7 @@ class TestRunPanel:
         data = json.loads(result.output)
         assert "--proxy ignored" in data["routing_warnings"][0]
         assert data["resolved_models"]["codex"]["proxy"] is None
+        assert list(data)[-2:] == ["resolved_models", "routing_warnings"]
 
     @patch("forge.review.engine.run_multi_review")
     def test_target_loads_docreview_framework(self, mock_run):
@@ -1480,7 +1481,7 @@ class TestRunDebateCode:
 
 
 class TestReviewJsonMetadata:
-    def test_shared_json_metadata_order(self):
+    def test_worker_json_metadata_order(self):
         from forge.cli.workflow import _add_review_json_metadata
 
         data = {"result": "base"}
@@ -1499,6 +1500,25 @@ class TestReviewJsonMetadata:
             "passed",
             "check_mode",
             "reason",
+            "routing_warnings",
+        ]
+
+    def test_check_json_keeps_required_fields_before_optional_metadata(self):
+        from forge.cli.workflow import _build_check_json
+
+        data = _build_check_json(
+            _mock_output(),
+            passed=False,
+            reason="no verdict",
+            resolved_models={"reviewer": {"runtime": "codex"}},
+            routing_warnings=["fallback route"],
+        )
+
+        assert list(data)[-5:] == [
+            "passed",
+            "check_mode",
+            "reason",
+            "resolved_models",
             "routing_warnings",
         ]
 

@@ -793,10 +793,11 @@ def _build_check_json(
     data["passed"] = passed
     data["check_mode"] = "verdict"
     data["reason"] = reason
-    if resolved_models:
-        data["resolved_models"] = resolved_models
-    if routing_warnings:
-        data["routing_warnings"] = routing_warnings
+    _add_review_json_metadata(
+        data,
+        resolved_models=resolved_models,
+        routing_warnings=routing_warnings,
+    )
     return data
 
 
@@ -827,10 +828,11 @@ def _handle_review_output(
 
     if as_json:
         data = build_json_dict(output)
-        if resolved_models:
-            data["resolved_models"] = resolved_models
-        if routing_warnings:
-            data["routing_warnings"] = routing_warnings
+        _add_review_json_metadata(
+            data,
+            resolved_models=resolved_models,
+            routing_warnings=routing_warnings,
+        )
         click.echo(json.dumps(data, indent=2))
     else:
         click.echo(_format_resolved_models(resolved_models or {}) + format_synthesis_prompt(output))
@@ -1301,7 +1303,7 @@ def _add_review_json_metadata(
     resolved_models: dict[str, dict[str, Any]] | None = None,
     routing_warnings: list[str] | None = None,
 ) -> None:
-    """Append shared optional review metadata in the stable wire order."""
+    """Append selected review metadata after the caller's existing wire prefix."""
     if resolved_models:
         data["resolved_models"] = resolved_models
     if passed is not None:

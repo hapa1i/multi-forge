@@ -32,7 +32,8 @@ Current focus: order 27 is active on `refactor/share-review-worker-preparation`;
 
 ## Verification and closeout
 
-- [x] Run focused review/CLI unit tests and expanded review tests (223 focused and 443 expanded tests pass).
+- [x] Run focused review/CLI unit tests and expanded review tests (223 initial focused, 158 review-fix focused, and 444
+  expanded tests pass).
 - [x] Run the full unit (9,239 passed, one skipped), regression (921 passed), and targeted Docker workflow-worker (four
   passed) suites.
 - [x] Run full pre-commit, `git diff --check`, design-size checks (29,988 and 29,990 tokens), and the board audit (361

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
+from typing import Literal
 
 from .models import ModelSpec
 

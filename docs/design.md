@@ -794,7 +794,7 @@ Forge proxy. See [design_appendix.md §G](design_appendix.md#g-subprocess-routin
 IDs/labels, and `model:assignment` parsing. Commands retain domain types, routing/fan-out, and JSON schemas.
 
 **Per-invocation routing plan:** Workflow commands resolve one frozen `WorkerRoutingPlan` for all workers at invocation
-start. With Codex, it also freezes one cached readiness/auth/billing preflight; no workflow verb runs an inline doctor.
+start. With Codex, it freezes one fresh cached readiness/auth/billing preflight; no workflow verb runs an inline doctor.
 This prevents fan-out drift and keeps two-round consensus on one snapshot. Workflow JSON exposes decisions in
 `resolved_models`: runtime, requested/actual model, provider, proxy, template, source, and selection state. Codex
 entries report `resolved_model=null` and `model_selection="runtime_default"` because Forge neither pins nor observes the
