@@ -406,6 +406,49 @@ def test_claude_removal_is_symmetric_and_clears_settings_ownership(
     assert {owner.runtime for owner in surviving.module_owners} == {CODEX_RUNTIME}
 
 
+def test_user_runtime_removal_uses_environment_target(
+    tmp_path: Path,
+    isolate_claude_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = _settings_entry(
+        "statusLine",
+        InstallModule.STATUSLINE,
+        {"type": "command", "command": "forge status-line"},
+        merge_type="scalar",
+    )
+    installation = Installation(
+        scope=InstallScope.USER.value,
+        mode="copy",
+        profile="standard",
+        module_owners=[attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME)],
+        settings_entries=[entry],
+        installed_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+    settings_path = isolate_claude_home / "settings.json"
+    write_settings(settings_path, {"statusLine": entry.value})
+    save_added_settings(settings_path, entries_to_added_structure([entry]))
+    tracking = TrackingStore(tmp_path / "forge-home" / "installed.json")
+    tracking.set_installation(InstallScope.USER.value, installation)
+
+    validations: list[tuple[Path, Path, str]] = []
+    real_validate = runtime_removal_module.validate_path_within_boundary
+
+    def capture_validation(path: Path, boundary: Path, operation: str = "delete") -> None:
+        validations.append((path, boundary, operation))
+        real_validate(path, boundary, operation)
+
+    monkeypatch.setattr(runtime_removal_module, "validate_path_within_boundary", capture_validation)
+
+    plan = Installer(scope=InstallScope.USER, tracking_store=tracking).uninstall_runtimes((CLAUDE_CODE_RUNTIME,))
+
+    assert plan.full_coverage
+    assert (settings_path, isolate_claude_home, "update settings") in validations
+    assert all(boundary == isolate_claude_home for _path, boundary, _operation in validations)
+    assert tracking.get_installation(InstallScope.USER.value) is None
+
+
 def test_claude_removal_reads_recorded_baseline_instead_of_newest_history(tmp_path: Path) -> None:
     installation, tracking, settings_path, _added_path, baseline_path = _materialize_dual_installation(tmp_path)
     newer_backup = settings_path.parent / ".settings.json.forge.backup.20270101-000000"

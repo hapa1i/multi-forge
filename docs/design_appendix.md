@@ -1106,11 +1106,12 @@ surfaces. Attributed file, settings, package, and owner rows drop together. Remo
 dropping owners prevents sync resurrection. Partial removal retains visible unattributed rows; full coverage deletes the
 row. `profile` stays historical.
 
-File, baseline, sidecar, Codex-scope, and marker checks preflight; filesystem work precedes atomic tracking. Enable/sync
-snapshot per-attempt ownership without rotating the baseline, plus exact Codex config bytes/mode. Codex apply/read-back
-or final tracking failure restores snapshots and new files; if the config changes again, rollback preserves it and names
-the incomplete path. A runtime-removal failure commits a coherent completed subset. A failed reconciliation leaves the
-old safe over-claim; landed settings restore first, and errors name tracking plus incomplete rollback paths.
+Enable/sync preflights file/baseline/sidecar/Codex-scope/marker checks, then runs setup/cache, dispatcher/file,
+settings/ownership, stale reconciliation, and Codex phases; assembly precedes atomic tracking. Each attempt snapshots
+ownership without rotating the baseline, plus exact Codex config bytes/mode. Codex apply/read-back or final tracking
+failure restores snapshots and new files; if the config changes again, rollback preserves it and names the incomplete
+path. A runtime-removal failure commits a coherent completed subset. A failed reconciliation leaves the old safe
+over-claim; landed settings restore first, and errors name tracking plus incomplete rollback paths.
 
 `disable --all` aggregates rows and exits 1 on failure. Setup uninstall deletes `$FORGE_HOME` only after success,
 preserving tracking when teardown cannot run. Legacy `cleanup-project` validates one canonical row and newest sidecar,

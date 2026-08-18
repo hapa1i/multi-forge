@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
+from forge.install import installer as installer_module
+from forge.install import path_policy as path_policy_module
+from forge.install import runtime_removal as runtime_removal_module
 from forge.install.exceptions import (
     NestedClaudeDirectoryError,
     PathBoundaryViolationError,
@@ -38,8 +41,15 @@ class TestCanonicalPackagePath:
 
 
 class TestGetTargetRoot:
-    def test_user_scope_respects_claude_home(self, tmp_path: Path) -> None:
-        assert get_target_root(InstallScope.USER) == tmp_path / "claude_home"
+    def test_user_scope_respects_claude_home(self, isolate_claude_home: Path) -> None:
+        assert get_target_root(InstallScope.USER) == isolate_claude_home
+
+    def test_imported_bindings_share_environment_target(self, isolate_claude_home: Path) -> None:
+        assert {
+            installer_module.get_target_root(InstallScope.USER),
+            path_policy_module.get_target_root(InstallScope.USER),
+            runtime_removal_module.get_target_root(InstallScope.USER),
+        } == {isolate_claude_home}
 
     @pytest.mark.parametrize("scope", [InstallScope.PROJECT, InstallScope.LOCAL])
     def test_project_scopes(self, scope: InstallScope, tmp_path: Path) -> None:
@@ -183,6 +193,22 @@ def test_tracked_file_boundary_rejects_duplicate_package_claims(tmp_path: Path) 
             scope=InstallScope.PROJECT,
             project_root=tmp_path,
         )
+
+
+def test_legacy_tracked_file_boundary_uses_environment_target(isolate_claude_home: Path) -> None:
+    installation = Installation(scope="user", mode="copy", profile="standard")
+    target = isolate_claude_home / "commands" / "legacy.md"
+
+    assert (
+        tracked_file_boundary(
+            installation,
+            target,
+            "delete file",
+            scope=InstallScope.USER,
+            project_root=None,
+        )
+        == isolate_claude_home
+    )
 
 
 def test_codex_scope_validator_preserves_project_root_error(tmp_path: Path) -> None:

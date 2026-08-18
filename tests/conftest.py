@@ -104,7 +104,7 @@ def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def isolate_claude_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def isolate_claude_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Force tests to use an isolated CLAUDE_HOME.
 
     This prevents user-local state under ~/.claude from being touched by tests.
@@ -118,6 +118,7 @@ def isolate_claude_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     isolated_home = tmp_path / "claude_home"
     isolated_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("CLAUDE_HOME", str(isolated_home))
+    return isolated_home
 
 
 @pytest.fixture(autouse=True)

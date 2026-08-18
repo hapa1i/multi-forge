@@ -1504,14 +1504,13 @@ launcher is globally reachable — install kind (`global` / `editable` / `venv` 
 PATH reachability, dispatcher state, and the current process's dev-override state. This tool install is the prerequisite
 to installing the extensions described below.
 
-Forge extensions live in this repo and are installed via `forge extension enable`. Forge keeps the user/project/local
-scope model and modular profiles (`minimal` / `standard` / `full`). Six modules (commands, agents, skills, hooks,
-status-line, permissions) are combined into profiles and declare durable runtime owners. Commands, agents, status line,
-and permissions are Claude-owned; skills and hooks are owned by both Claude and Codex. `module_planning.py` owns pure
-profile/scope/runtime policy; `installer.py` owns discovery and writes. The skills module compiles one logical skill
-into each selected runtime package: Claude user and project/local packages go to `$CLAUDE_HOME/skills` and
-`<root>/.claude/skills`; Codex user and project packages go to `$HOME/.agents/skills` and `<root>/.agents/skills`. Codex
-has no local skill scope and skills never use `$CODEX_HOME`.
+`forge extension enable` installs repository extensions at user/project/local scope with `minimal`, `standard`, or
+`full` profiles. Six modules (commands, agents, skills, hooks, status-line, permissions) have durable runtime owners.
+Commands, agents, status line, and permissions are Claude-owned; skills and hooks are owned by both Claude and Codex.
+`module_planning.py` owns module policy; `installer.py` owns discovery/apply order: setup/cache, dispatcher/files,
+settings/ownership, stale reconciliation, Codex, assembly, tracking. Skills compile per runtime: Claude targets are
+`$CLAUDE_HOME/skills` (user) and `<root>/.claude/skills` (project/local); Codex targets are `$HOME/.agents/skills`
+(user) and `<root>/.agents/skills` (project). Codex has no local skill scope and skills never use `$CODEX_HOME`.
 
 Portable skills use `forge-skill.yaml` plus `content.md`; typed Claude/Codex adapters bind runtime capabilities and emit
 a complete validated package. A legacy `SKILL.md` package remains a Claude-only compatibility source. The current

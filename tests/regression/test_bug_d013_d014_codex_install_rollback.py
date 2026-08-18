@@ -30,10 +30,13 @@ pytestmark = pytest.mark.regression
 
 
 @pytest.fixture
-def installer_setup(tmp_path: Path) -> Generator[tuple[Installer, TrackingStore, Path, Path], None, None]:
+def installer_setup(
+    tmp_path: Path,
+    isolate_claude_home: Path,
+) -> Generator[tuple[Installer, TrackingStore, Path, Path], None, None]:
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
-    claude_home = tmp_path / "claude_home"
+    claude_home = isolate_claude_home
 
     source = tmp_path / "src"
     source.mkdir()
@@ -48,9 +51,9 @@ def installer_setup(tmp_path: Path) -> Generator[tuple[Installer, TrackingStore,
 
 
 def _run(installer: Installer, claude_home: Path, source: Path, **kwargs: Any) -> Any:
+    assert claude_home == Path(os.environ["CLAUDE_HOME"])
     with (
         patch("forge.install.installer.get_forge_source_root", return_value=source.parent),
-        patch("forge.install.installer.get_target_root", return_value=claude_home),
         patch(
             "forge.install.installer.installed_runtimes",
             return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],
