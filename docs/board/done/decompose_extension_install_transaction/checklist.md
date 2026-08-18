@@ -1,7 +1,6 @@
 # Decompose the extension install transaction checklist
 
-Current focus: order 33 is active on `refactor/decompose-extension-install-transaction` from pushed `main` at
-`b72fab14`; orders 34--35 remain parked.
+Current focus: closed -- order 33 shipped in PR #212; orders 34--35 remain parked.
 
 - [x] Close order 32 on pushed `main`, create the order-33 branch from that exact commit, and activate only this member.
 - [x] Reverify `Installer.init` as a 425-line transaction and find 20 installer `get_target_root` patches across seven
@@ -17,7 +16,7 @@ Current focus: order 33 is active on `refactor/decompose-extension-install-trans
 - [x] Run focused installer/path-policy/runtime-removal tests and all regression tests.
 - [x] Run targeted Docker installer/runtime-skill lifecycle tests, build, and clean-wheel enable/disable verification.
 - [x] Run `make test-unit`, `make pre-commit`, design token checks, board integrity, and `git diff --check`.
-- [ ] Publish order 33 independently without activating order 34.
+- [x] Merge PR #212 as `f1afb30c` and close this member without activating order 34.
 
 ## Phase-order and fault matrix
 

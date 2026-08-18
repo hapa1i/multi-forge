@@ -43,7 +43,7 @@ semantics.
 
 **Verification**: 829 installer tests (one skip); 9,303 unit (one skip, 122 deselected); 925 regression; 23 targeted
 Docker installer/runtime-skill lifecycle checks; build, clean-wheel smoke, full pre-commit, diff, 29,985/29,984 design,
-and 369-document/894-link board checks pass. No Forge workflow command was used.
+and 369-document/894-link board checks pass. PR #212 merged as `f1afb30c`; no Forge workflow command was used.
 
 ## 2026-08-18
 

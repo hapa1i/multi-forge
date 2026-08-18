@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/decompose-extension-install-transaction` from `b72fab14`.
+**Lane**: `done/` -- shipped in PR #212 as `f1afb30c` after focused, full, regression, targeted installer/runtime-skill
+Docker, build, clean-wheel, pre-commit, and CI verification.
 
 **Finding**: O069's `Installer.init` subset.
 
