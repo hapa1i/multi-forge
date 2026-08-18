@@ -27,21 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
-### Stabilize search-index snapshot fingerprints
+### Unify Claude session state-context derivation
 
-**Goal/outcome**: Prevent concurrent transcript refreshes from making index state describe bytes absent from the search
-stores.
+**Goal/outcome**: Centralize Claude session checkout and durable state ownership.
 
 **Key changes**:
 
-- Carried one captured `mtime`/size fingerprint from extraction through incremental and bulk state persistence.
-- Retained incremental markers on detectable drift and made rebuild warn for an explicit rerun while keeping state
-  aligned with the stored snapshot.
-- Added deterministic mutation-during-write regressions for both paths without changing the state schema or Stop queue.
+- Routed start, launch, resume, fork, and post-create mutations through one typed context: recorded `forge_root` owns
+  `SessionStore`; worktree/current directory are legacy fallbacks; launch, schema, repair, and adoption behavior stays.
 
-**Verification**: 109 focused tests, 9,242 unit tests (one skip, 122 deselected), 923 regressions, one targeted Docker
-Stop/artifact test (12 deselected), full pre-commit, diff checks, and the 363-document/894-link board audit pass. No
-Forge workflow command was used.
+**Verification**: 223 focused; 9,249 unit (one skip, 122 deselected); 923 regression; 69 Docker; pre-commit, diff,
+29,989/29,990 design, and 364-document/896-link board checks pass. No Forge workflow command was used.
+
+### Stabilize search-index snapshot fingerprints
+
+**Goal/outcome**: Keep stored search bytes and their persisted transcript fingerprint aligned.
+
+**Key changes**:
+
+- Persisted the extracted fingerprint after incremental/bulk writes; drift retains markers or warns, with deterministic
+  regressions and no schema/queue change.
+
+**Verification**: 109 focused; 9,242 unit (one skip, 122 deselected); 923 regression; one Docker Stop/artifact test (12
+deselected); pre-commit, diff, and 363-document/894-link board checks pass. No Forge workflow command was used.
 
 ### Share review worker preparation
 
