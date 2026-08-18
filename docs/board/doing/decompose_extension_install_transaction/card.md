@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 structural refactor work.
+**Lane**: `doing/` -- active on `refactor/decompose-extension-install-transaction` from `b72fab14`.
 
 **Finding**: O069's `Installer.init` subset.
 
@@ -15,7 +15,7 @@ and tracking commit boundary established by Wave 4.
 
 ## Evidence and Authority
 
-On `5777192a`, `init()` remains about 418 lines spanning compiled-skill materialization, dispatcher/files, Claude
+Reverified on `b72fab14`, `init()` remains 425 lines spanning compiled-skill materialization, dispatcher/files, Claude
 settings/ownership, stale-file cleanup, Codex registration, and final tracking. These phases have different failure and
 rollback semantics; “split the method” is unsafe unless the existing fault matrix remains explicit. Authority:
 [`docs/design_appendix.md` "C. Install Model Reference"](../../../design_appendix.md#c-install-model-reference) and
@@ -25,7 +25,8 @@ Order-5 review also found 21 patches of the installer module's `get_target_root`
 component integration helper caused 11 failures once planning reached lower path policy and was repaired on order 5 by
 configuring its isolated `CLAUDE_HOME` source instead. Twenty installer-binding patches remain across seven files;
 nineteen patch only that binding, while the QA2 stale-symlink regression already needs a second patch at the lower
-path-policy binding. Runtime removal holds a third binding. The repeated setup therefore meets the shared-fixture
+path-policy binding. Runtime removal holds a third binding. The execution-base recheck still finds 20 installer-binding
+patches across seven files, including that one dual patch. The repeated setup therefore meets the shared-fixture
 threshold in the
 [`testing_guidelines.md` monkeypatch policy](../../../developer/testing_guidelines.md#monkeypatch-policy).
 

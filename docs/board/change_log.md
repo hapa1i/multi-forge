@@ -25,6 +25,26 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-19
+
+### Decompose the extension install transaction
+
+**Goal/outcome**: Make the extension install transaction reviewable by phase without changing mutation or rollback
+semantics.
+
+**Key changes**:
+
+- Split the apply path into typed setup, cache, file, settings, stale-reconciliation, Codex, assembly, and tracking
+  phases; conflict return remains before mutation and tracking remains the final write.
+- Replaced namespace-specific target-root patches with one environment-backed fixture and proved installer, legacy
+  path-policy fallback, and runtime removal resolve the same root.
+- Recorded the phase/fault matrix and install ownership order while preserving stale deletion, settings/Codex rollback,
+  runtime preservation, and disable behavior.
+
+**Verification**: 829 installer tests (one skip); 9,303 unit (one skip, 122 deselected); 925 regression; 23 targeted
+Docker installer/runtime-skill lifecycle checks; build, clean-wheel smoke, full pre-commit, diff, 29,985/29,984 design,
+and 369-document/894-link board checks pass. No Forge workflow command was used.
+
 ## 2026-08-18
 
 ### Extract session-fork execution

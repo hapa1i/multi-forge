@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -224,13 +225,16 @@ class TestInstallerInit:
     """Tests for Installer.init method."""
 
     @pytest.fixture
-    def setup_installer(self, tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
+    def setup_installer(
+        self,
+        tmp_path: Path,
+        isolate_claude_home: Path,
+    ) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
         """Set up installer with all temp directories."""
         forge_home = tmp_path / ".forge"
         forge_home.mkdir()
 
-        claude_home = tmp_path / ".claude"
-        claude_home.mkdir()
+        claude_home = isolate_claude_home
 
         # Create source directory with files
         src = tmp_path / "src"
@@ -249,15 +253,11 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=tmp_path,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer = Installer(
-                    scope=InstallScope.USER,
-                    tracking_store=tracking,
-                )
-                yield installer, forge_home, claude_home, src
+            installer = Installer(
+                scope=InstallScope.USER,
+                tracking_store=tracking,
+            )
+            yield installer, forge_home, claude_home, src
 
     def test_init_creates_tracking_file(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
         installer, forge_home, claude_home, src = setup_installer
@@ -266,11 +266,7 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(profile=InstallProfile.MINIMAL)
+            installer.init(profile=InstallProfile.MINIMAL)
 
         assert (forge_home / "installed.json").exists()
 
@@ -281,13 +277,61 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(profile=InstallProfile.MINIMAL)
+            installer.init(profile=InstallProfile.MINIMAL)
 
         assert (claude_home / "commands" / "test.md").exists()
+
+    def test_init_runs_apply_phases_in_transaction_order(
+        self,
+        setup_installer: tuple[Installer, Path, Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        installer, _forge_home, _claude_home, src = setup_installer
+        calls: list[str] = []
+
+        def record_method(name: str, original: Any) -> Any:
+            def wrapped(*args: Any, **kwargs: Any) -> Any:
+                calls.append(name)
+                return original(*args, **kwargs)
+
+            return wrapped
+
+        phase_methods = (
+            ("prepare", "_prepare_install_apply"),
+            ("cache", "_materialize_install_skill_cache"),
+            ("dispatcher", "_apply_install_dispatcher"),
+            ("files", "_apply_install_files"),
+            ("settings", "_apply_install_settings"),
+            ("stale", "_reconcile_install_stale_files"),
+            ("codex", "_apply_install_codex"),
+            ("assembly", "_assemble_installation"),
+        )
+        for phase, method_name in phase_methods:
+            monkeypatch.setattr(
+                installer,
+                method_name,
+                record_method(phase, getattr(installer, method_name)),
+            )
+        monkeypatch.setattr(
+            installer._tracking,
+            "set_installation",
+            record_method("tracking", installer._tracking.set_installation),
+        )
+
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
+            installer.init(profile=InstallProfile.MINIMAL)
+
+        assert calls == [
+            "prepare",
+            "cache",
+            "dispatcher",
+            "files",
+            "settings",
+            "stale",
+            "codex",
+            "assembly",
+            "tracking",
+        ]
 
     def test_init_rejects_file_ownership_outside_resolved_plan_before_writes(
         self,
@@ -329,12 +373,8 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(profile=InstallProfile.MINIMAL)
-                plan2 = installer.init(profile=InstallProfile.MINIMAL)
+            installer.init(profile=InstallProfile.MINIMAL)
+            plan2 = installer.init(profile=InstallProfile.MINIMAL)
 
         # Second run should have "skip" actions for unchanged files
         skip_count = sum(1 for f in plan2.files if f.action == "skip")
@@ -372,11 +412,7 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(profile=InstallProfile.STANDARD)
+            installer.init(profile=InstallProfile.STANDARD)
 
         settings = json.loads((claude_home / "settings.json").read_text())
         allow = settings["permissions"]["allow"]
@@ -406,15 +442,11 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                plan = installer.init(
-                    profile=InstallProfile.MINIMAL,
-                    with_modules={InstallModule.HOOKS},
-                    without_modules={InstallModule.COMMANDS},
-                )
+            plan = installer.init(
+                profile=InstallProfile.MINIMAL,
+                with_modules={InstallModule.HOOKS},
+                without_modules={InstallModule.COMMANDS},
+            )
 
         settings = json.loads((claude_home / "settings.json").read_text())
         assert settings["hooks"] == get_builtin_preset()["hooks"]
@@ -449,11 +481,7 @@ class TestInstallerInit:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(profile=InstallProfile.STANDARD)
+            installer.init(profile=InstallProfile.STANDARD)
 
         settings = json.loads((claude_home / "settings.json").read_text())
         assert settings["hooks"] == get_builtin_preset()["hooks"]
@@ -523,13 +551,13 @@ class TestInstallerScopeModulePolicy:
         render.assert_called_once()
 
     def test_user_standard_filters_statusline_but_keeps_runtime_hooks(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        isolate_claude_home: Path,
     ) -> None:
         import json
 
-        claude_home = tmp_path / "claude-home"
-        claude_home.mkdir()
-        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        claude_home = isolate_claude_home
         source_root = self._source_root(tmp_path / "forge-src")
         tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
         installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
@@ -539,7 +567,6 @@ class TestInstallerScopeModulePolicy:
                 "forge.install.installer.get_forge_source_root",
                 return_value=source_root,
             ),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
             patch("forge.install.installer._codex_available", return_value=False),
         ):
             plan = installer.init(profile=InstallProfile.STANDARD)
@@ -981,13 +1008,16 @@ class TestInstallerSymlinkMode:
     """Tests for symlink installation mode."""
 
     @pytest.fixture
-    def setup_symlink_installer(self, tmp_path: Path) -> tuple[Installer, Path, Path, Path]:
+    def setup_symlink_installer(
+        self,
+        tmp_path: Path,
+        isolate_claude_home: Path,
+    ) -> tuple[Installer, Path, Path, Path]:
         """Set up installer for symlink mode testing."""
         forge_home = tmp_path / ".forge"
         forge_home.mkdir()
 
-        claude_home = tmp_path / ".claude"
-        claude_home.mkdir()
+        claude_home = isolate_claude_home
 
         src = tmp_path / "src"
         src.mkdir()
@@ -1012,14 +1042,10 @@ class TestInstallerSymlinkMode:
             "forge.install.installer.get_forge_source_root",
             return_value=src.parent,
         ):
-            with patch(
-                "forge.install.installer.get_target_root",
-                return_value=claude_home,
-            ):
-                installer.init(
-                    profile=InstallProfile.MINIMAL,
-                    mode=InstallMode.SYMLINK,
-                )
+            installer.init(
+                profile=InstallProfile.MINIMAL,
+                mode=InstallMode.SYMLINK,
+            )
 
         target = claude_home / "commands" / "test.md"
         assert target.is_symlink()
@@ -1280,13 +1306,15 @@ class TestInstallerCodexHooks:
     """Tests for Codex-owned hooks wiring (plan/init/uninstall/update)."""
 
     @pytest.fixture
-    def setup_installer(self, tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
+    def setup_installer(
+        self,
+        tmp_path: Path,
+        isolate_claude_home: Path,
+    ) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
         """Installer with temp dirs; codex config lands in the isolated CODEX_HOME."""
         forge_home = tmp_path / ".forge"
         forge_home.mkdir()
-        # Must match the autouse isolate_claude_home target: uninstall's
-        # path-boundary check validates settings paths against this root.
-        claude_home = tmp_path / "claude_home"
+        claude_home = isolate_claude_home
 
         src = tmp_path / "src"
         src.mkdir()
@@ -1309,9 +1337,9 @@ class TestInstallerCodexHooks:
         available: bool = True,
         **kwargs: Any,
     ) -> Any:
+        assert claude_home == Path(os.environ["CLAUDE_HOME"])
         with (
             patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
             patch(
                 "forge.install.installer.installed_runtimes",
                 return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],
@@ -1322,8 +1350,6 @@ class TestInstallerCodexHooks:
 
     @staticmethod
     def _codex_config(monkeypatch_free_env: None = None) -> Path:
-        import os
-
         return Path(os.environ["CODEX_HOME"]) / "config.toml"
 
     def test_plan_standard_includes_codex_install(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:

@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--32 shipped independently in PRs #178--#184, #186--#188, and #190--#211; three members
-remain parked. The bounded
+**Lane**: `doing/` -- orders 1--32 shipped independently in PRs #178--#184, #186--#188, and #190--#211; order 33 is
+active from `b72fab14` and two members remain parked. The bounded
 [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) correction closed
 order 20's post-merge snapshot race directly on `main` after PR #206 and before order 28. The bounded
 [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
@@ -52,43 +52,43 @@ Only one member should be active at a time unless the parent explicitly records 
 members establish or clean low-level boundaries; compatibility transitions precede deletion; structural decomposition
 runs last so it lands on the smallest stable surface.
 
-| Order | Findings         | Member                                                                                                  | Review boundary                                      |
-| ----- | ---------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 1     | O043             | [`decouple_lane_runtime_vocabulary`](../../done/decouple_lane_runtime_vocabulary/card.md)               | import-only runtime vocabulary                       |
-| 2     | O044             | [`share_policy_activation_rules`](../../done/share_policy_activation_rules/card.md)                     | shared validation, distinct state owners             |
-| 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../../done/centralize_time_parsing_and_periods/card.md)         | timestamp/period primitives with explicit styles     |
-| 4     | O066, O092       | [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md)                               | optional vs strict git-root contracts                |
-| 5     | O065, O069       | [`centralize_install_path_authority`](../../done/centralize_install_path_authority/card.md)             | lower-layer path and ownership policy                |
-| 6     | O064             | [`centralize_cli_metric_formatting`](../../done/centralize_cli_metric_formatting/card.md)               | named token/currency presentation policies           |
-| 7     | O098, O092       | [`remove_verified_internal_residue`](../../done/remove_verified_internal_residue/card.md)               | verified session metadata and cap-state residue      |
-| 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                             | package metadata and clean-wheel proof               |
-| 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../done/share_proxy_transport_test_fakes/card.md)               | instance-safe proxy transport fixtures               |
-| 10    | O073             | [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)                     | self-contained skill copies with drift guards        |
-| 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../done/remove_obsolete_proxy_abstractions/card.md)           | unreachable proxy types and factory diagnostics      |
-| 12    | O049 config      | [`migrate_inert_config_fields`](../../done/migrate_inert_config_fields/card.md)                         | first-release config deprecation only                |
-| 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md)       | tolerant durable-manifest migration                  |
-| 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../done/replace_unsafe_index_test_fixtures/card.md)           | transaction-safe test state construction             |
-| 15    | O050 API         | [`retire_unsafe_index_mutators`](../../done/retire_unsafe_index_mutators/card.md)                       | zero-caller unsafe public mutators                   |
-| 16    | O051             | [`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md)                     | explicit tier/cache/auth-retry provenance            |
-| 17    | O052             | [`remove_dead_session_context_retry`](../../done/remove_dead_session_context_retry/card.md)             | session-context error classification                 |
-| 18    | O092 session     | [`remove_dead_session_helpers`](../../done/remove_dead_session_helpers/card.md)                         | verified internal session-only zero-callers          |
-| 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md)       | one-release re-export deprecation                    |
-| 20    | O092 search      | [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md)                     | metadata-unchanged snapshot avoidance                |
-| 21    | O092, O096       | [`retire_test_only_settings_helpers`](../../done/retire_test_only_settings_helpers/card.md)             | live settings merge/rollback coverage                |
-| 22    | O092 script      | [`simplify_count_tokens_mode_selector`](../../done/simplify_count_tokens_mode_selector/card.md)         | explicit local/provider selector                     |
-| 23    | O053             | [`share_codex_thread_index_sync`](../../done/share_codex_thread_index_sync/card.md)                     | one adoption-safe durable index writer               |
-| 24    | O054             | [`unify_resume_routing_reference`](../../done/unify_resume_routing_reference/card.md)                   | proxy-ID/template resume reference                   |
-| 25    | O055             | [`reuse_claude_usage_measurement`](../../done/reuse_claude_usage_measurement/card.md)                   | one proxied usage precedence rule                    |
-| 26    | O056             | [`centralize_telemetry_jsonl_reads`](../../done/centralize_telemetry_jsonl_reads/card.md)               | tolerant per-plane JSONL read scaffold               |
-| 27    | O057, O095       | [`share_review_worker_preparation`](../../done/share_review_worker_preparation/card.md)                 | review resource/worker input preparation             |
-| 28    | O058             | [`unify_claude_session_state_context`](../../done/unify_claude_session_state_context/card.md)           | manifest-to-store/worktree derivation                |
-| 29    | O059             | [`share_transfer_rewind_rendering`](../../done/share_transfer_rewind_rendering/card.md)                 | shared rendering primitives, distinct envelopes      |
-| 30    | O067             | [`share_passthrough_sse_framing`](../../done/share_passthrough_sse_framing/card.md)                     | common SSE framing, transport-specific merge         |
-| 31    | O068             | [`extract_session_fork_preflight`](../../done/extract_session_fork_preflight/card.md)                   | UI-free pre-mutation validation                      |
-| 32    | O068, O096       | [`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md)                   | mutation/rollback plan and thin Click adapter        |
-| 33    | O069             | [`decompose_extension_install_transaction`](../../todo/decompose_extension_install_transaction/card.md) | ordered install fault and rollback phases            |
-| 34    | O070             | [`extract_statusline_sources`](../../todo/extract_statusline_sources/card.md)                           | source facts and import direction                    |
-| 35    | O070, O092       | [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md)                       | pure render/layout tail and process-local cache exit |
+| Order | Findings         | Member                                                                                            | Review boundary                                      |
+| ----- | ---------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 1     | O043             | [`decouple_lane_runtime_vocabulary`](../../done/decouple_lane_runtime_vocabulary/card.md)         | import-only runtime vocabulary                       |
+| 2     | O044             | [`share_policy_activation_rules`](../../done/share_policy_activation_rules/card.md)               | shared validation, distinct state owners             |
+| 3     | O060, O061, O094 | [`centralize_time_parsing_and_periods`](../../done/centralize_time_parsing_and_periods/card.md)   | timestamp/period primitives with explicit styles     |
+| 4     | O066, O092       | [`unify_git_root_discovery`](../../done/unify_git_root_discovery/card.md)                         | optional vs strict git-root contracts                |
+| 5     | O065, O069       | [`centralize_install_path_authority`](../../done/centralize_install_path_authority/card.md)       | lower-layer path and ownership policy                |
+| 6     | O064             | [`centralize_cli_metric_formatting`](../../done/centralize_cli_metric_formatting/card.md)         | named token/currency presentation policies           |
+| 7     | O098, O092       | [`remove_verified_internal_residue`](../../done/remove_verified_internal_residue/card.md)         | verified session metadata and cap-state residue      |
+| 8     | O071             | [`remove_stale_dependencies`](../../done/remove_stale_dependencies/card.md)                       | package metadata and clean-wheel proof               |
+| 9     | O099 subset      | [`share_proxy_transport_test_fakes`](../../done/share_proxy_transport_test_fakes/card.md)         | instance-safe proxy transport fixtures               |
+| 10    | O073             | [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)               | self-contained skill copies with drift guards        |
+| 11    | O047, O048, O092 | [`remove_obsolete_proxy_abstractions`](../../done/remove_obsolete_proxy_abstractions/card.md)     | unreachable proxy types and factory diagnostics      |
+| 12    | O049 config      | [`migrate_inert_config_fields`](../../done/migrate_inert_config_fields/card.md)                   | first-release config deprecation only                |
+| 13    | O049 manifest    | [`migrate_memory_intent_generated_file`](../../done/migrate_memory_intent_generated_file/card.md) | tolerant durable-manifest migration                  |
+| 14    | O050 fixtures    | [`replace_unsafe_index_test_fixtures`](../../done/replace_unsafe_index_test_fixtures/card.md)     | transaction-safe test state construction             |
+| 15    | O050 API         | [`retire_unsafe_index_mutators`](../../done/retire_unsafe_index_mutators/card.md)                 | zero-caller unsafe public mutators                   |
+| 16    | O051             | [`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md)               | explicit tier/cache/auth-retry provenance            |
+| 17    | O052             | [`remove_dead_session_context_retry`](../../done/remove_dead_session_context_retry/card.md)       | session-context error classification                 |
+| 18    | O092 session     | [`remove_dead_session_helpers`](../../done/remove_dead_session_helpers/card.md)                   | verified internal session-only zero-callers          |
+| 19    | O092 policy      | [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md) | one-release re-export deprecation                    |
+| 20    | O092 search      | [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md)               | metadata-unchanged snapshot avoidance                |
+| 21    | O092, O096       | [`retire_test_only_settings_helpers`](../../done/retire_test_only_settings_helpers/card.md)       | live settings merge/rollback coverage                |
+| 22    | O092 script      | [`simplify_count_tokens_mode_selector`](../../done/simplify_count_tokens_mode_selector/card.md)   | explicit local/provider selector                     |
+| 23    | O053             | [`share_codex_thread_index_sync`](../../done/share_codex_thread_index_sync/card.md)               | one adoption-safe durable index writer               |
+| 24    | O054             | [`unify_resume_routing_reference`](../../done/unify_resume_routing_reference/card.md)             | proxy-ID/template resume reference                   |
+| 25    | O055             | [`reuse_claude_usage_measurement`](../../done/reuse_claude_usage_measurement/card.md)             | one proxied usage precedence rule                    |
+| 26    | O056             | [`centralize_telemetry_jsonl_reads`](../../done/centralize_telemetry_jsonl_reads/card.md)         | tolerant per-plane JSONL read scaffold               |
+| 27    | O057, O095       | [`share_review_worker_preparation`](../../done/share_review_worker_preparation/card.md)           | review resource/worker input preparation             |
+| 28    | O058             | [`unify_claude_session_state_context`](../../done/unify_claude_session_state_context/card.md)     | manifest-to-store/worktree derivation                |
+| 29    | O059             | [`share_transfer_rewind_rendering`](../../done/share_transfer_rewind_rendering/card.md)           | shared rendering primitives, distinct envelopes      |
+| 30    | O067             | [`share_passthrough_sse_framing`](../../done/share_passthrough_sse_framing/card.md)               | common SSE framing, transport-specific merge         |
+| 31    | O068             | [`extract_session_fork_preflight`](../../done/extract_session_fork_preflight/card.md)             | UI-free pre-mutation validation                      |
+| 32    | O068, O096       | [`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md)             | mutation/rollback plan and thin Click adapter        |
+| 33    | O069             | [`decompose_extension_install_transaction`](../decompose_extension_install_transaction/card.md)   | ordered install fault and rollback phases            |
+| 34    | O070             | [`extract_statusline_sources`](../../todo/extract_statusline_sources/card.md)                     | source facts and import direction                    |
+| 35    | O070, O092       | [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md)                 | pure render/layout tail and process-local cache exit |
 
 ## Dependencies and Activation Rules
 

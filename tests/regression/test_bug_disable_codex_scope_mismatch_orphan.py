@@ -27,13 +27,15 @@ pytestmark = pytest.mark.regression
 
 
 @pytest.fixture
-def setup_installer(tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
+def setup_installer(
+    tmp_path: Path,
+    isolate_claude_home: Path,
+) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
     """Minimal installer over temp dirs (mirrors TestInstallerCodexHooks)."""
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
     tracking_path = forge_home / "installed.json"
-    # Must match the autouse isolate_claude_home target (settings boundary check).
-    claude_home = tmp_path / "claude_home"
+    claude_home = isolate_claude_home
 
     src = tmp_path / "src"
     src.mkdir()
@@ -49,9 +51,9 @@ def setup_installer(tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Pa
 
 
 def _run(installer: Installer, src: Path, claude_home: Path, method: str = "init", **kwargs: Any) -> Any:
+    assert claude_home == Path(os.environ["CLAUDE_HOME"])
     with (
         patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-        patch("forge.install.installer.get_target_root", return_value=claude_home),
         patch(
             "forge.install.installer.installed_runtimes",
             return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],

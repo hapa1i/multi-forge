@@ -1,6 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--32 shipped; orders 33--35 remain parked.
+Current focus: order 33 `decompose_extension_install_transaction` is active from `b72fab14`; orders 34--35 remain
+parked.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -188,6 +189,8 @@ Current focus: orders 1--32 shipped; orders 33--35 remain parked.
 - [x] Complete order 32's focused, full, regression, Docker fork/native-relocate/rewind/Codex, pre-commit, design-size,
   and board-integrity gates without a Forge workflow; publication remains on the active member.
 - [x] Ship order 32 independently in PR #211 (`e4a62d1b`) and close its member without activating order 33.
+- [x] Close order 32 on pushed `main` at `b72fab14`, create `refactor/decompose-extension-install-transaction`, and
+  activate only order 33 after reverifying its 425-line apply path and 20 repeated installer target-root patches.
 
-Orders 33--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
-separately gated Wave 6 finding.
+Orders 34--35 remain intentionally parked while order 33 is active. This checklist does not authorize parallel
+implementation or any other separately gated Wave 6 finding.

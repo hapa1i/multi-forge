@@ -16,6 +16,7 @@ transferred to the user and dropping tracking is correct).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import patch
@@ -32,12 +33,11 @@ pytestmark = pytest.mark.regression
 
 
 @pytest.fixture
-def setup_installer(tmp_path: Path) -> Generator[tuple[Installer, Path], None, None]:
+def setup_installer(tmp_path: Path, isolate_claude_home: Path) -> Generator[tuple[Installer, Path], None, None]:
     """Minimal installer over temp dirs (mirrors TestInstallerCodexHooks)."""
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
-    # Must match the autouse isolate_claude_home target (settings boundary check).
-    claude_home = tmp_path / "claude_home"
+    claude_home = isolate_claude_home
 
     src = tmp_path / "src"
     src.mkdir()
@@ -54,9 +54,9 @@ def setup_installer(tmp_path: Path) -> Generator[tuple[Installer, Path], None, N
 
 def _run(installer: Installer, claude_home: Path, method: str = "init", available: bool = True, **kwargs: Any) -> Any:
     src_parent = claude_home.parent / "src"
+    assert claude_home == Path(os.environ["CLAUDE_HOME"])
     with (
         patch("forge.install.installer.get_forge_source_root", return_value=src_parent.parent),
-        patch("forge.install.installer.get_target_root", return_value=claude_home),
         patch(
             "forge.install.installer.installed_runtimes",
             return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],
@@ -67,8 +67,6 @@ def _run(installer: Installer, claude_home: Path, method: str = "init", availabl
 
 
 def _codex_config() -> Path:
-    import os
-
     return Path(os.environ["CODEX_HOME"]) / "config.toml"
 
 

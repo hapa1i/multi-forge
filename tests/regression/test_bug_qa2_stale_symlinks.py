@@ -31,13 +31,12 @@ pytestmark = pytest.mark.regression
 
 
 @pytest.fixture
-def symlink_env(tmp_path: Path) -> dict[str, Path]:
+def symlink_env(tmp_path: Path, isolate_claude_home: Path) -> dict[str, Path]:
     """Minimal installer environment for symlink testing."""
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
 
-    claude_home = tmp_path / ".claude"
-    claude_home.mkdir()
+    claude_home = isolate_claude_home
 
     src = tmp_path / "src"
     commands = src / "commands"
@@ -60,11 +59,7 @@ def _make_installer(env: dict[str, Path]) -> Installer:
 
 
 def _run_init(env: dict[str, Path], installer: Installer, mode: InstallMode = InstallMode.SYMLINK) -> None:
-    with (
-        patch("forge.install.installer.get_forge_source_root", return_value=env["repo_root"]),
-        patch("forge.install.installer.get_target_root", return_value=env["claude_home"]),
-        patch("forge.install.path_policy.get_target_root", return_value=env["claude_home"]),
-    ):
+    with patch("forge.install.installer.get_forge_source_root", return_value=env["repo_root"]):
         installer.init(
             profile=InstallProfile.MINIMAL,
             mode=mode,

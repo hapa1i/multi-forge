@@ -26,13 +26,12 @@ pytestmark = pytest.mark.regression
 
 
 @pytest.fixture
-def hook_env(tmp_path: Path) -> dict[str, Path]:
+def hook_env(tmp_path: Path, isolate_claude_home: Path) -> dict[str, Path]:
     """Minimal installer environment for hook settings tests."""
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
 
-    claude_home = tmp_path / ".claude"
-    claude_home.mkdir()
+    claude_home = isolate_claude_home
 
     # _is_repo_checkout() requires both src/forge/ AND an extension dir
     (tmp_path / "src" / "forge").mkdir(parents=True)
@@ -56,7 +55,6 @@ def test_init_uses_builtin_hooks_when_preset_is_stale(
 ) -> None:
     """Old preset files should not suppress newly added builtin hooks."""
     monkeypatch.setenv("FORGE_HOME", str(hook_env["forge_home"]))
-    monkeypatch.setenv("CLAUDE_HOME", str(hook_env["claude_home"]))
 
     ensure_preset()
     get_preset_path().write_text(
@@ -165,10 +163,7 @@ def test_init_uses_builtin_hooks_when_preset_is_stale(
     )
 
     installer = _make_installer(hook_env)
-    with (
-        patch("forge.install.installer.get_forge_source_root", return_value=hook_env["repo_root"]),
-        patch("forge.install.installer.get_target_root", return_value=hook_env["claude_home"]),
-    ):
+    with patch("forge.install.installer.get_forge_source_root", return_value=hook_env["repo_root"]):
         installer.init(
             profile=InstallProfile.STANDARD,
             _modules_override={InstallModule.HOOKS, InstallModule.PERMISSIONS},

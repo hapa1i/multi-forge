@@ -55,6 +55,7 @@ from .models import (
     Installation,
     InstalledFile,
     InstalledManifest,
+    InstalledSettingsEntry,
     InstalledSkillPackage,
     InstallMode,
     InstallModule,
@@ -164,6 +165,54 @@ class _CodexExecutionError(Exception):
         self.message = message
         self.cause = cause
         self.rollback_state = rollback_state
+
+
+@dataclass(frozen=True)
+class _InstallApplyInputs:
+    """Stable inputs shared by each ordered install-apply phase."""
+
+    plan: InstallPlan
+    profile: InstallProfile
+    mode: InstallMode
+    force: bool
+    skill_runtimes: tuple[str, ...] | None
+    modules: set[InstallModule]
+    selected_runtimes: set[str]
+    claude_modules: set[InstallModule]
+
+
+@dataclass
+class _InstallFileApplyResult:
+    """Files written or refreshed before settings mutation begins."""
+
+    installed_files: list[InstalledFile]
+    newly_created_files: list[InstalledFile]
+
+
+@dataclass
+class _InstallSettingsApplyResult:
+    """Claude settings ownership and its rollback boundary."""
+
+    entries: list[InstalledSettingsEntry]
+    backup_path: Path | None
+    rollback_state: _SettingsRollbackState | None
+
+
+@dataclass
+class _InstallStaleReconciliationResult:
+    """Final tracked files after stale ownership reconciliation."""
+
+    files: list[InstalledFile]
+    updated_at: str
+
+
+@dataclass
+class _InstallCodexApplyResult:
+    """Authoritative Codex tracking and its rollback boundary."""
+
+    config_path: str | None
+    commands: list[str]
+    rollback_state: CodexConfigRollbackState | None
 
 
 def get_forge_source_root() -> Path:
@@ -1594,24 +1643,68 @@ class Installer:
             if CLAUDE_CODE_RUNTIME in selected_runtimes
             else set()
         )
+        inputs = _InstallApplyInputs(
+            plan=plan,
+            profile=profile,
+            mode=mode,
+            force=force,
+            skill_runtimes=skill_runtimes,
+            modules=modules,
+            selected_runtimes=selected_runtimes,
+            claude_modules=claude_modules,
+        )
+        existing = self._prepare_install_apply(inputs)
+        self._materialize_install_skill_cache()
+        self._apply_install_dispatcher(inputs)
+        file_result = self._apply_install_files(inputs, existing)
+        settings_result = self._apply_install_settings(inputs, existing, file_result)
+        stale_result = self._reconcile_install_stale_files(inputs, existing, file_result, settings_result)
+        codex_result = self._apply_install_codex(inputs, existing, file_result, settings_result)
+        installation = self._assemble_installation(
+            inputs,
+            existing,
+            settings_result,
+            stale_result,
+            codex_result,
+        )
+        try:
+            self._tracking.set_installation(self._scope.value, installation, self._project_path_str)
+        except (OSError, StateError) as e:
+            self._raise_post_file_failure(
+                "Failed to commit extension tracking",
+                e,
+                file_result.newly_created_files,
+                plan,
+                settings_rollback_state=settings_result.rollback_state,
+                codex_rollback_state=codex_result.rollback_state,
+            )
+
+        return plan
+
+    def _prepare_install_apply(self, inputs: _InstallApplyInputs) -> Installation | None:
+        """Materialize the scope anchor and run read-only apply preflights."""
 
         # Planning treats creation of a missing Claude anchor as a Claude
         # surface mutation. Materialize it only after the conflict preflight;
         # project CLI flows may already have created it after the version gate.
-        if plan.requires_claude_version:
+        if inputs.plan.requires_claude_version:
             get_target_root(self._scope, self._project_root).mkdir(parents=True, exist_ok=True)
 
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
-        if self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
+        if self._scope == InstallScope.USER and InstallModule.HOOKS in inputs.claude_modules:
             # Read both user settings targets before rendering the dispatcher or
             # changing tracking. The later cleanup can then fail only on a new
             # race or an environmental write error, not known malformed input.
             from .hook_migration import plan_user_legacy_hook_files
 
             plan_user_legacy_hook_files(tuple(existing.settings_entries) if existing is not None else ())
+        return existing
 
-        # Materialize only after all conflicts have cleared.  Dry-run calls
-        # plan() directly and therefore cannot create or repair cache entries.
+    def _materialize_install_skill_cache(self) -> None:
+        """Materialize compiled skills after every planning conflict has cleared."""
+
+        # Dry-run calls plan() directly and therefore cannot create or repair
+        # cache entries.
         for compiled in self._compiled_skill_packages.values():
             try:
                 materialize_compiled_skill(compiled)
@@ -1622,22 +1715,33 @@ class Installer:
                     f"and tracking was not updated: {e}"
                 ) from e
 
+    @staticmethod
+    def _apply_install_dispatcher(inputs: _InstallApplyInputs) -> None:
+        """Preserve the historical dispatcher lifecycle before file writes."""
+
         # Historical extension installs rendered the dispatcher even when
         # scope policy filtered hook modules. Preserve that lifecycle contract,
         # while a skills-only Codex install stays free of unrelated writes.
-        if modules - {InstallModule.SKILLS}:
+        if inputs.modules - {InstallModule.SKILLS}:
             _ensure_hook_dispatcher()
+
+    def _apply_install_files(
+        self,
+        inputs: _InstallApplyInputs,
+        existing: Installation | None,
+    ) -> _InstallFileApplyResult:
+        """Apply planned extension files and retain the rollback-owned subset."""
 
         installed_files: list[InstalledFile] = []
         newly_created_files: list[InstalledFile] = []
         existing_files_by_target = {record.target_path: record for record in existing.files} if existing else {}
         skill_package_dirs_by_file = {
             file_path: Path(package.target_dir)
-            for package in plan.skill_packages
+            for package in inputs.plan.skill_packages
             if package.target_dir is not None
             for file_path in package.file_paths
         }
-        for file_plan in plan.files:
+        for file_plan in inputs.plan.files:
             target = Path(file_plan.target_path)
             package_dir = skill_package_dirs_by_file.get(file_plan.target_path)
             if package_dir is not None:
@@ -1649,7 +1753,7 @@ class Installer:
                         f"Refusing unsafe skill package write '{file_plan.target_path}'; tracking was not updated",
                         e,
                         newly_created_files,
-                        plan,
+                        inputs.plan,
                     )
             if file_plan.action in ("install", "update"):
                 target_existed = target.exists() or target.is_symlink()
@@ -1660,7 +1764,7 @@ class Installer:
                         f"Failed to write extension file '{file_plan.target_path}'; tracking was not updated",
                         e,
                         newly_created_files,
-                        plan,
+                        inputs.plan,
                         unrecorded_targets=() if target_existed else (target,),
                     )
                 installed_files.append(installed_file)
@@ -1674,45 +1778,61 @@ class Installer:
                         f"Failed to refresh extension file ownership '{file_plan.target_path}'",
                         e,
                         newly_created_files,
-                        plan,
+                        inputs.plan,
                     )
                 previous = existing_files_by_target.get(installed_file.target_path)
                 if previous is not None:
                     installed_file.installed_at = previous.installed_at
                 installed_files.append(installed_file)
+        return _InstallFileApplyResult(
+            installed_files=installed_files,
+            newly_created_files=newly_created_files,
+        )
+
+    def _apply_install_settings(
+        self,
+        inputs: _InstallApplyInputs,
+        existing: Installation | None,
+        file_result: _InstallFileApplyResult,
+    ) -> _InstallSettingsApplyResult:
+        """Apply Claude settings and persist the matching ownership sidecar."""
 
         backup_path: Path | None = None
-        settings_rollback_state: _SettingsRollbackState | None = None
-        if claude_modules & _CLAUDE_SETTINGS_MODULES:
+        rollback_state: _SettingsRollbackState | None = None
+        if inputs.claude_modules & _CLAUDE_SETTINGS_MODULES:
             settings_path = get_settings_path(self._scope, self._project_root)
             try:
-                settings_rollback_state = capture_settings_rollback_state(settings_path)
+                rollback_state = capture_settings_rollback_state(settings_path)
                 backup_path = backup_settings(settings_path)
                 settings = read_settings(settings_path)
             except OSError as e:
                 self._raise_post_file_failure(
                     "Failed to prepare Claude settings",
                     e,
-                    newly_created_files,
-                    plan,
-                    settings_rollback_state=settings_rollback_state,
+                    file_result.newly_created_files,
+                    inputs.plan,
+                    settings_rollback_state=rollback_state,
                 )
             removed_entry_ids: set[tuple[str, str]] = set()
-            if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
+            if (
+                existing is not None
+                and self._scope == InstallScope.USER
+                and InstallModule.HOOKS in inputs.claude_modules
+            ):
                 old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
                 if old_hook_entries:
                     unmerge(settings, old_hook_entries)
                     removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
-            if self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
+            if self._scope == InstallScope.USER and InstallModule.HOOKS in inputs.claude_modules:
                 # T6 migration: stage safe same-file legacy cleanup with the
                 # dispatcher merge so settings.json changes in one atomic write.
                 from .hook_migration import remove_known_legacy_hook_entries
 
                 settings, removed_legacy_count = remove_known_legacy_hook_entries(settings)
                 if removed_legacy_count:
-                    plan.legacy_hook_cleanup_paths.append(str(settings_path))
+                    inputs.plan.legacy_hook_cleanup_paths.append(str(settings_path))
             forge_settings = self._load_forge_settings()
-            include_permissions = InstallModule.PERMISSIONS in claude_modules
+            include_permissions = InstallModule.PERMISSIONS in inputs.claude_modules
             entries = merge(
                 settings,
                 forge_settings,
@@ -1721,9 +1841,9 @@ class Installer:
                     InstallModule.STATUSLINE.value: attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
                     InstallModule.PERMISSIONS.value: attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME),
                 },
-                force=force,
-                include_statusline=InstallModule.STATUSLINE in claude_modules,
-                include_hooks=InstallModule.HOOKS in claude_modules,
+                force=inputs.force,
+                include_statusline=InstallModule.STATUSLINE in inputs.claude_modules,
+                include_hooks=InstallModule.HOOKS in inputs.claude_modules,
                 include_permissions=include_permissions,
                 include_env=include_permissions,
             )
@@ -1733,9 +1853,9 @@ class Installer:
                 self._raise_post_file_failure(
                     f"Failed to write Claude settings '{settings_path}'",
                     e,
-                    newly_created_files,
-                    plan,
-                    settings_rollback_state=settings_rollback_state,
+                    file_result.newly_created_files,
+                    inputs.plan,
+                    settings_rollback_state=rollback_state,
                 )
 
             entry_ids = {(entry.key_path, entry.stable_id) for entry in entries}
@@ -1759,40 +1879,55 @@ class Installer:
                 self._raise_post_file_failure(
                     f"Failed to save Claude settings ownership '{settings_path}'",
                     e,
-                    newly_created_files,
-                    plan,
-                    settings_rollback_state=settings_rollback_state,
+                    file_result.newly_created_files,
+                    inputs.plan,
+                    settings_rollback_state=rollback_state,
                 )
         else:
             final_entries = list(existing.settings_entries) if existing else []
             if final_entries:
                 settings_path = get_settings_path(self._scope, self._project_root)
                 try:
-                    settings_rollback_state = capture_settings_rollback_state(settings_path)
+                    rollback_state = capture_settings_rollback_state(settings_path)
                     save_added_settings(settings_path, entries_to_added_structure(final_entries))
                 except OSError as e:
                     self._raise_post_file_failure(
                         f"Failed to preserve Claude settings ownership '{settings_path}'",
                         e,
-                        newly_created_files,
-                        plan,
-                        settings_rollback_state=settings_rollback_state,
+                        file_result.newly_created_files,
+                        inputs.plan,
+                        settings_rollback_state=rollback_state,
                     )
+        return _InstallSettingsApplyResult(
+            entries=final_entries,
+            backup_path=backup_path,
+            rollback_state=rollback_state,
+        )
 
-        # Merge newly installed files with existing tracked files (for idempotent re-runs)
-        now = now_iso()
+    def _reconcile_install_stale_files(
+        self,
+        inputs: _InstallApplyInputs,
+        existing: Installation | None,
+        file_result: _InstallFileApplyResult,
+        settings_result: _InstallSettingsApplyResult,
+    ) -> _InstallStaleReconciliationResult:
+        """Remove verified stale targets and assemble the final file ownership."""
+
+        # Preserve the historical timestamp boundary before stale cleanup and
+        # Codex mutation.
+        updated_at = now_iso()
 
         # All targets the current source scan knows about, plus packages intentionally
         # preserved when an explicit runtime filter narrows an existing installation.
-        planned_targets = {f.target_path for f in plan.files}
+        planned_targets = {file_plan.target_path for file_plan in inputs.plan.files}
         planned_targets.update(
             target
-            for package in plan.skill_packages
+            for package in inputs.plan.skill_packages
             if package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value
             for target in package.file_paths
         )
-        if existing is not None and skill_runtimes is not None:
-            preserved_runtimes = set(plan.preserved_runtime_ids)
+        if existing is not None and inputs.skill_runtimes is not None:
+            preserved_runtimes = set(inputs.plan.preserved_runtime_ids)
             planned_targets.update(
                 record.target_path
                 for record in existing.files
@@ -1833,9 +1968,9 @@ class Installer:
                         self._raise_post_file_failure(
                             f"Failed to remove stale tracked extension file '{target}'",
                             e,
-                            newly_created_files,
-                            plan,
-                            settings_rollback_state=settings_rollback_state,
+                            file_result.newly_created_files,
+                            inputs.plan,
+                            settings_rollback_state=settings_result.rollback_state,
                         )
                     # Collect parent dirs for empty-directory cleanup
                     parent = target.parent
@@ -1852,37 +1987,62 @@ class Installer:
 
         # Build final files list: start with newly installed, add existing tracked files
         # that were skipped (not re-installed this run) AND still in the plan
-        installed_paths = {f.target_path for f in installed_files}
-        final_files = list(installed_files)
+        installed_paths = {file_record.target_path for file_record in file_result.installed_files}
+        final_files = list(file_result.installed_files)
         if existing:
             for existing_file in existing.files:
                 if existing_file.target_path not in installed_paths:
                     if existing_file.target_path in planned_targets:
                         # Keep existing tracked file that was skipped (source still exists)
                         final_files.append(existing_file)
+        return _InstallStaleReconciliationResult(files=final_files, updated_at=updated_at)
+
+    def _apply_install_codex(
+        self,
+        inputs: _InstallApplyInputs,
+        existing: Installation | None,
+        file_result: _InstallFileApplyResult,
+        settings_result: _InstallSettingsApplyResult,
+    ) -> _InstallCodexApplyResult:
+        """Apply Codex registration and resolve authoritative tracking state."""
 
         try:
-            codex_result, codex_rollback_state = self._execute_codex(plan.codex)
+            tracking_result, rollback_state = self._execute_codex(inputs.plan.codex)
         except _CodexExecutionError as e:
             self._raise_post_file_failure(
                 e.message,
                 e.cause,
-                newly_created_files,
-                plan,
-                settings_rollback_state=settings_rollback_state,
+                file_result.newly_created_files,
+                inputs.plan,
+                settings_rollback_state=settings_result.rollback_state,
                 codex_rollback_state=e.rollback_state,
             )
-        if codex_result is not None:
-            codex_path, codex_commands = codex_result
+        if tracking_result is not None:
+            config_path, commands = tracking_result
         elif existing is not None:
             # No authoritative outcome (module not selected, codex binary
             # unavailable, or planned/apply-time conflict): preserve prior
             # tracking -- the previously written managed block may still be
             # on disk and disable must keep knowing to remove it.
-            codex_path = existing.codex_config_path
-            codex_commands = list(existing.codex_commands)
+            config_path = existing.codex_config_path
+            commands = list(existing.codex_commands)
         else:
-            codex_path, codex_commands = None, []
+            config_path, commands = None, []
+        return _InstallCodexApplyResult(
+            config_path=config_path,
+            commands=commands,
+            rollback_state=rollback_state,
+        )
+
+    def _assemble_installation(
+        self,
+        inputs: _InstallApplyInputs,
+        existing: Installation | None,
+        settings_result: _InstallSettingsApplyResult,
+        stale_result: _InstallStaleReconciliationResult,
+        codex_result: _InstallCodexApplyResult,
+    ) -> Installation:
+        """Assemble the final tracking row without changing external state."""
 
         final_skill_packages = [
             InstalledSkillPackage(
@@ -1891,41 +2051,43 @@ class Installer:
                 target_dir=package.target_dir,
                 file_paths=list(package.file_paths),
             )
-            for package in plan.skill_packages
+            for package in inputs.plan.skill_packages
             if package.target_dir is not None
             and (package.cache_dir is not None or package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value)
             and package.action in {"install", "update", "skip"}
         ]
-        if existing is not None and plan.preserved_runtime_ids:
+        if existing is not None and inputs.plan.preserved_runtime_ids:
             final_package_keys = {(package.runtime, package.skill) for package in final_skill_packages}
             final_skill_packages.extend(
                 package
                 for package in existing.skill_packages
-                if package.runtime in plan.preserved_runtime_ids
+                if package.runtime in inputs.plan.preserved_runtime_ids
                 and (package.runtime, package.skill) not in final_package_keys
             )
 
         module_owners: set[ModuleOwner] = {
             attributed(module, runtime)
-            for module in modules
+            for module in inputs.modules
             for runtime in MODULE_RUNTIME_OWNERS[module]
-            if runtime in selected_runtimes and not (module == InstallModule.HOOKS and runtime == CODEX_RUNTIME)
+            if runtime in inputs.selected_runtimes and not (module == InstallModule.HOOKS and runtime == CODEX_RUNTIME)
         }
-        if existing is not None and plan.preserved_runtime_ids:
+        if existing is not None and inputs.plan.preserved_runtime_ids:
             module_owners.update(
-                owner for owner in existing.module_owners if owner.runtime in plan.preserved_runtime_ids
+                owner for owner in existing.module_owners if owner.runtime in inputs.plan.preserved_runtime_ids
             )
         module_owners.update(
-            file_record.attribution for file_record in final_files if isinstance(file_record.attribution, ModuleOwner)
+            file_record.attribution
+            for file_record in stale_result.files
+            if isinstance(file_record.attribution, ModuleOwner)
         )
         module_owners.update(
             settings_record.attribution
-            for settings_record in final_entries
+            for settings_record in settings_result.entries
             if isinstance(settings_record.attribution, ModuleOwner)
         )
         module_owners.update(attributed(InstallModule.SKILLS, package.runtime) for package in final_skill_packages)
         codex_owner = attributed(InstallModule.HOOKS, CODEX_RUNTIME)
-        if codex_path is not None:
+        if codex_result.config_path is not None:
             module_owners.add(codex_owner)
         else:
             module_owners.discard(codex_owner)
@@ -1936,37 +2098,24 @@ class Installer:
             or bool(existing.settings_entries)
             or any(has_module_owner(existing, module, CLAUDE_CODE_RUNTIME) for module in _CLAUDE_SETTINGS_MODULES)
         )
-        installation = Installation(
+        return Installation(
             scope=self._scope.value,
-            mode=mode.value,
-            profile=profile.value,
+            mode=inputs.mode.value,
+            profile=inputs.profile.value,
             module_owners=sorted(module_owners),
-            files=final_files,
+            files=stale_result.files,
             skill_packages=final_skill_packages,
-            settings_entries=final_entries,
+            settings_entries=settings_result.entries,
             settings_backup_path=(
                 existing.settings_backup_path
                 if settings_baseline_established and existing is not None
-                else str(backup_path) if backup_path else None
+                else str(settings_result.backup_path) if settings_result.backup_path else None
             ),
-            codex_config_path=codex_path,
-            codex_commands=codex_commands,
-            installed_at=existing.installed_at if existing else now,
-            updated_at=now,
+            codex_config_path=codex_result.config_path,
+            codex_commands=codex_result.commands,
+            installed_at=existing.installed_at if existing else stale_result.updated_at,
+            updated_at=stale_result.updated_at,
         )
-        try:
-            self._tracking.set_installation(self._scope.value, installation, self._project_path_str)
-        except (OSError, StateError) as e:
-            self._raise_post_file_failure(
-                "Failed to commit extension tracking",
-                e,
-                newly_created_files,
-                plan,
-                settings_rollback_state=settings_rollback_state,
-                codex_rollback_state=codex_rollback_state,
-            )
-
-        return plan
 
     def _raise_post_file_failure(
         self,

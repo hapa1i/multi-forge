@@ -30,7 +30,7 @@ from forge.install.tracking import TrackingStore
 
 
 @pytest.fixture
-def skill_installer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Installer, Path, Path, Path]:
+def skill_installer(tmp_path: Path, isolate_claude_home: Path) -> tuple[Installer, Path, Path, Path]:
     """Set up installer with skills in the source tree.
 
     Creates:
@@ -42,9 +42,7 @@ def skill_installer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[In
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
 
-    claude_home = tmp_path / ".claude"
-    claude_home.mkdir()
-    monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+    claude_home = isolate_claude_home
 
     src = tmp_path / "src"
     (src / "forge").mkdir(parents=True)  # _is_repo_checkout requires src/forge
@@ -82,10 +80,7 @@ class TestSkillProfileFiltering:
         """Standard profile should not include qa/ skill files."""
         installer, _, claude_home, src = skill_installer
 
-        with (
-            patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
-        ):
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
             plan = installer.plan(profile=InstallProfile.STANDARD)
 
         qa_files = [f for f in plan.files if "/skills/qa/" in f.target_path]
@@ -95,10 +90,7 @@ class TestSkillProfileFiltering:
         """Full profile should include qa/ skill files."""
         installer, _, claude_home, src = skill_installer
 
-        with (
-            patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
-        ):
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
             plan = installer.plan(profile=InstallProfile.FULL)
 
         qa_files = [f for f in plan.files if "/skills/qa/" in f.target_path]
@@ -136,10 +128,7 @@ class TestSkillProfileFiltering:
         manifest = InstalledManifest(version=TRACKING_VERSION, installations={"user": existing})
         TrackingStore(tracking_path=forge_home / "installed.json").write(manifest)
 
-        with (
-            patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
-        ):
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
             # Plan with standard profile — ALL qa files should appear
             # because the skill is already installed (skill-level check)
             plan = installer.plan(profile=InstallProfile.STANDARD)
@@ -188,10 +177,7 @@ class TestSkillProfileFiltering:
             InstalledManifest(version=TRACKING_VERSION, installations={"user": existing})
         )
 
-        with (
-            patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
-        ):
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
             plan = installer.plan(profile=InstallProfile.STANDARD)
 
         qa_files = [f for f in plan.files if "/skills/qa/" in f.target_path]
@@ -205,10 +191,7 @@ class TestSkillProfileFiltering:
         """Skills not in SKILL_PROFILE_REQUIREMENTS install with any profile that has SKILLS."""
         installer, _, claude_home, src = skill_installer
 
-        with (
-            patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
-            patch("forge.install.installer.get_target_root", return_value=claude_home),
-        ):
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
             plan = installer.plan(profile=InstallProfile.STANDARD)
 
         wt_files = [f for f in plan.files if "/skills/walkthrough/" in f.target_path]
