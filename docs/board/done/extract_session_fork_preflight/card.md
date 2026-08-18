@@ -39,4 +39,4 @@ phase. The inherited `full`-budget reference deliberately closes the fork-side d
 parent's started proxy ID now precedes its intent template. Moving deterministic checks before runtime resolution may
 also change which independent error wins when one request has multiple invalid inputs; each individual failure retains
 its established rendering and exit. The execution phase belongs to
-[`extract_session_fork_execution`](../../todo/extract_session_fork_execution/card.md).
+[`extract_session_fork_execution`](../../doing/extract_session_fork_execution/card.md).

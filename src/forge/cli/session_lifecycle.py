@@ -28,7 +28,6 @@ from forge.cli.session import (  # noqa: E402
     _generate_parent_transfer_context,
     _get_active_session_entry,
     _get_effective_proxy_for_session,
-    _get_launch_preferences,
     _hint_cross_project_session,
     _print_routing_summary,
     _resolve_routing_from_cli,
@@ -72,7 +71,6 @@ from forge.session import (
     SessionIndexEntry,
     SessionManager,
     SessionState,
-    SessionStore,
 )
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.exceptions import (
@@ -83,6 +81,8 @@ from forge.session.launch import (
     _combine_prompt_files,
     _resolve_extension_detection_root,
     _resolve_launch_mode,
+    get_launch_preferences,
+    resolve_manifest_prompt_file,
 )
 from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
@@ -268,43 +268,6 @@ def _warn_if_version_outdated() -> None:
         f"minimum {result.minimum}. Some features may not work correctly."
     )
     print_tip("Run 'claude update' to upgrade.", blank_before=False, console=console)
-
-
-def _resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:
-    """Resolve a session's configured system prompt file, if any."""
-    if manifest.intent.system_prompt is None or manifest.intent.system_prompt.file is None:
-        return None
-    prompt_path = Path(manifest.intent.system_prompt.file).expanduser()
-    return prompt_path.resolve() if prompt_path.exists() else None
-
-
-def _persist_fork_transfer_derivation(
-    *,
-    manifest: SessionState,
-    strategy: str,
-    context_path: Path | None,
-) -> SessionState:
-    """Persist transfer-specific derivation details for a worktree fork."""
-    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
-
-    context_file: str | None = None
-    if context_path is not None:
-        try:
-            context_file = str(context_path.relative_to(forge_root))
-        except ValueError:
-            context_file = str(context_path)
-
-    def _mutate(m: SessionState) -> None:
-        if m.confirmed.derivation is None:
-            from forge.session.models import Derivation
-
-            m.confirmed.derivation = Derivation(parent_session=m.parent_session or "")
-        m.confirmed.derivation.resume_mode = "transfer"
-        m.confirmed.derivation.strategy = strategy
-        m.confirmed.derivation.context_file = context_file
-
-    return SessionStore(str(forge_root), manifest.name).update(timeout_s=5.0, mutate=_mutate)
 
 
 def _is_legacy_flat_transfer_path(path: Path) -> bool:
@@ -650,7 +613,7 @@ def _get_resume_launch_preferences(
 ) -> tuple[bool, tuple[str, ...], str | None]:
     if direct:
         return False, (), None
-    return _get_launch_preferences(state)
+    return get_launch_preferences(state)
 
 
 def _resume_launch_preferences_for_op(
@@ -1581,7 +1544,7 @@ def _launch_in_place(
     use_sidecar, mounts, image = _get_resume_launch_preferences(manifest, direct=direct)
     prompt_files: list[Path] = []
 
-    configured_prompt = _resolve_manifest_prompt_file(manifest)
+    configured_prompt = resolve_manifest_prompt_file(manifest)
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
 
@@ -1879,7 +1842,7 @@ def _resume_fresh(
     # Launch Claude as a NEW session (not resuming parent's conversation)
     child_worktree = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
     prompt_files: list[Path] = []
-    configured_prompt = _resolve_manifest_prompt_file(child_manifest)
+    configured_prompt = resolve_manifest_prompt_file(child_manifest)
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
     if transfer_result.context_file is not None:

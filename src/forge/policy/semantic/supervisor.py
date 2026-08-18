@@ -1126,6 +1126,29 @@ def should_supervisor_use_direct(source_state: SessionState) -> bool:
     return not source_state.confirmed.started_with_proxy
 
 
+def validate_supervisor_proxy_reference(supervisor_proxy: str) -> None:
+    """Validate a supervisor route without starting a proxy.
+
+    Planning and realization share this decision so deterministic name and
+    template failures cannot drift while the mutation-time resolver still
+    rechecks races before it starts anything.
+    """
+    from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
+    from forge.proxy.proxy_orchestrator import ProxyStartError, plan_ensure_proxy
+
+    try:
+        plan_ensure_proxy(supervisor_proxy)
+    except AmbiguousProxyError as e:
+        raise ValueError(str(e)) from e
+    except ProxyNotFoundError as e:
+        raise ValueError(
+            f"Supervisor proxy '{supervisor_proxy}' is not running and no template named "
+            f"'{supervisor_proxy}' exists. Run 'forge proxy template list' to see templates."
+        ) from e
+    except ProxyStartError as e:
+        raise ValueError(f"Supervisor proxy '{supervisor_proxy}': failed to start from template: {e}") from e
+
+
 def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
     """Ensure the supervisor proxy is running, auto-starting from a template if needed.
 
@@ -1142,8 +1165,6 @@ def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
     a template, when a matched template fails to start, or when the name is ambiguous
     across multiple active proxies.
     """
-    # The order-31 read-only fork planner mirrors these error messages before
-    # runtime realization. Keep them aligned until order 32 consumes that plan.
     # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports.
     from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
     from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy

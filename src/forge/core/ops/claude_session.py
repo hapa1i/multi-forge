@@ -620,7 +620,7 @@ def start_claude_session(
         manifest = _apply_subprocess_proxy(state_context, subprocess_proxy)
         state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     if supervisor is not None:
-        manifest = _apply_supervisor_wiring(
+        manifest = apply_supervisor_wiring(
             state_context,
             supervisor,
             proxy_id=proxy_id,
@@ -1154,7 +1154,7 @@ def _apply_subprocess_proxy(context: ClaudeSessionStateContext, subprocess_proxy
     return context.store.read()
 
 
-def _apply_supervisor_wiring(
+def apply_supervisor_wiring(
     context: ClaudeSessionStateContext,
     wiring: SupervisorWiring,
     *,

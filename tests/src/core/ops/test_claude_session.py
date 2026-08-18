@@ -8,6 +8,7 @@ import pytest
 
 import forge.cli.session_fork as session_fork_cli
 from forge.core.ops import claude_session as claude_session_ops
+from forge.core.ops import session_fork_execution as fork_execution_ops
 from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
 from forge.session import SessionState, SessionStore, create_session_state
@@ -92,7 +93,7 @@ def test_post_create_mutations_use_resolved_store_outside_cwd(
 
     supervisor = create_session_state("planner", worktree_path=str(supervisor_root))
     supervisor.forge_root = str(supervisor_root)
-    state = claude_session_ops._apply_supervisor_wiring(
+    state = claude_session_ops.apply_supervisor_wiring(
         context,
         SupervisorWiring(
             target="planner",
@@ -163,7 +164,7 @@ def test_state_context_structural_drift_reminders() -> None:
     for mutation in (
         claude_session_ops._apply_memory_activation,
         claude_session_ops._apply_subprocess_proxy,
-        claude_session_ops._apply_supervisor_wiring,
+        claude_session_ops.apply_supervisor_wiring,
     ):
         source = inspect.getsource(mutation)
         assert "context.store" in source
@@ -190,9 +191,14 @@ def test_state_context_structural_drift_reminders() -> None:
         and isinstance(node.value, ast.Name)
         and node.value.id == "fork_state_context"
     ]
-    assert "resolve_claude_session_state_context" in calls
+    assert "execute_session_fork" in calls
     assert not local_store_imports
-    assert len(context_store_reads) == 2
+
+    execution_source = inspect.getsource(fork_execution_ops._prepare_created_fork)
+    assert "resolve_claude_session_state_context" in execution_source
+    assert "Path.cwd" not in execution_source
+    assert "SessionStore(" not in execution_source
+    assert not context_store_reads
 
 
 def test_launch_refuses_missing_recorded_worktree_before_callbacks(

@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -19,8 +18,10 @@ from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
+    _configure_mock_fork_manager,
     _proxy_cfg,
     _proxy_routing,
+    _publish_fork_parent,
     _read_session_manifest,
     _seed_scoped_duplicate_sessions,
     _write_session_manifest,
@@ -294,7 +295,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -416,7 +417,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -471,7 +472,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -549,7 +550,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -589,7 +590,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -604,7 +605,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
         with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -632,7 +633,7 @@ class TestSessionFork:
             successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -656,7 +657,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -681,7 +682,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env, with_transcript=False)
         with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -721,7 +722,7 @@ class TestSessionFork:
             successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, samedir_fork)
             result = runner.invoke(
                 main,
@@ -782,7 +783,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -820,7 +821,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -854,7 +855,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(main, ["session", "fork", "fork-parent", "-n", "fork-child"])
 
@@ -900,7 +901,7 @@ class TestSessionFork:
             ) as mock_launch,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -952,7 +953,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             result = runner.invoke(
                 main,
                 [
@@ -987,7 +988,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -1039,7 +1040,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -1068,7 +1069,7 @@ class TestSessionFork:
             successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -1101,7 +1102,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             result = runner.invoke(
                 main,
@@ -1135,7 +1136,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
             mock_manager.delete_session.side_effect = OSError("cleanup denied")
             result = runner.invoke(
@@ -1213,7 +1214,7 @@ class TestSessionFork:
             patch("forge.sidecar.run_sidecar_session", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1283,7 +1284,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1342,15 +1343,22 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork._cwd_forge_root", return_value=str(parent_nested_root)),
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
+            patch(
+                "forge.core.ops.session_fork_execution._detect_parent_extensions",
+                return_value=("standard", "copy"),
+            ),
+            patch("forge.install.installer.Installer") as installer_cls,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
         ):
+            installer_cls.return_value.init.return_value.has_conflicts = False
+            installer_cls.return_value.init.return_value.modules = ["commands", "hooks"]
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1368,11 +1376,7 @@ class TestSessionFork:
 
         assert result.exit_code == 0
         mock_invoke.assert_not_called()
-        mock_auto.assert_called_once_with(
-            install_root=child_nested_root,
-            parent_project_root=parent_nested_root,
-            force_extensions=None,
-        )
+        assert installer_cls.call_args.kwargs["project_root"] == child_nested_root
 
     def test_fork_worktree_full_strategy_budget_uses_parent_forge_root(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -1405,7 +1409,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.resolve_project_root.return_value = str(temp_env)
 
             result = runner.invoke(
@@ -1461,7 +1465,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1529,7 +1533,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork)
 
             result = runner.invoke(
@@ -1574,7 +1578,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude", return_value=1),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -1606,7 +1610,7 @@ class TestSessionFork:
             successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1656,7 +1660,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1703,7 +1707,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1760,7 +1764,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1820,14 +1824,14 @@ class TestSessionFork:
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
+            patch("forge.core.ops.session_fork_execution._prepare_worktree_extensions", return_value=None),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1891,14 +1895,14 @@ class TestSessionFork:
             ),
             patch("forge.cli.session_lifecycle._warn_if_hooks_missing"),
             patch("forge.cli.session_lifecycle._warn_if_version_outdated"),
-            patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
+            patch("forge.core.ops.session_fork_execution._prepare_worktree_extensions", return_value=None),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1961,6 +1965,10 @@ class TestSessionForkIntoPreflight:
         self, runner: CliRunner, temp_env: Path
     ) -> None:
         parent = create_session_state("planner", worktree_path=str(temp_env), worktree_branch="main")
+        parent_root = temp_env / "packages" / "app"
+        (parent_root / ".forge").mkdir(parents=True)
+        parent.forge_root = str(parent_root)
+        _publish_fork_parent(parent, temp_env)
         into_dir = temp_env / "existing-wt"
         target_root = into_dir / "packages" / "app"
         (target_root / ".forge").mkdir(parents=True)
@@ -1984,14 +1992,11 @@ class TestSessionForkIntoPreflight:
             return result
 
         with (
-            patch("forge.cli.session_fork.SessionManager") as manager_cls,
+            patch.object(SessionManager, "fork_session") as fork_session,
+            patch("forge.cli.session_fork._cwd_forge_root", return_value=str(parent_root)),
             patch("subprocess.run", side_effect=fake_git_run),
             patch("forge.cli.session_fork._resolve_routing_from_cli") as resolve_routing,
         ):
-            manager = manager_cls.return_value
-            manager.get_session.return_value = parent
-            manager.index_store.get_session.return_value = SimpleNamespace(relative_path="packages/app")
-
             result = runner.invoke(
                 main,
                 ["session", "fork", "planner", "--into", str(into_dir), "--proxy", "test-proxy"],
@@ -2002,7 +2007,7 @@ class TestSessionForkIntoPreflight:
         assert "running Forge" in result.output
         assert str(target_root / ".forge" / "project.toml") in result.output
         resolve_routing.assert_not_called()
-        manager.fork_session.assert_not_called()
+        fork_session.assert_not_called()
 
     def test_into_cross_repo_rejected_before_fork(self, runner: CliRunner, temp_env: Path) -> None:
         """--into targeting a different repo should fail before fork_session() is called."""
@@ -2021,7 +2026,7 @@ class TestSessionForkIntoPreflight:
             patch("subprocess.run") as mock_run,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
 
             def fake_git_run(cmd, **kwargs):
                 """Return different git-common-dir for target vs parent."""
@@ -2073,6 +2078,7 @@ class TestSessionForkIntoPreflight:
 
         into_dir = temp_env / "existing-wt"
         into_dir.mkdir()
+        (into_dir / ".forge").mkdir()
 
         common_git = str(temp_env / ".git")
 
@@ -2082,7 +2088,7 @@ class TestSessionForkIntoPreflight:
             patch("subprocess.run") as mock_run,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             def fake_git_run(cmd, **kwargs):
@@ -2131,6 +2137,7 @@ class TestSessionForkIntoPreflight:
         into_dir.mkdir()
         child_nested_root = into_dir / "packages" / "app"
         child_nested_root.mkdir(parents=True)
+        (child_nested_root / ".forge").mkdir()
 
         fork_state = create_session_state(
             "reviewer",
@@ -2149,17 +2156,19 @@ class TestSessionForkIntoPreflight:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork._cwd_forge_root", return_value=str(parent_nested_root)),
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
-            patch("forge.install.tracking.TrackingStore") as mock_tracking_cls,
+            patch("forge.core.ops.session_fork_execution.TrackingStore") as mock_tracking_cls,
+            patch("forge.core.ops.session_fork_execution.ProjectRegistryStore") as mock_registry_cls,
+            patch("forge.install.installer.Installer") as installer_cls,
             patch("subprocess.run") as mock_run,
         ):
             mock_manager = mock_manager_cls.return_value
-            mock_manager.get_session.return_value = parent
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             tracking_store = mock_tracking_cls.return_value
@@ -2200,5 +2209,6 @@ class TestSessionForkIntoPreflight:
 
         assert result.exit_code == 0
         tracking_store.get_installation.assert_any_call("local", str(child_nested_root))
-        mock_auto.assert_not_called()
+        mock_registry_cls.return_value.enroll.assert_called_once_with(child_nested_root, "worktree")
+        installer_cls.assert_not_called()
         mock_invoke.assert_not_called()

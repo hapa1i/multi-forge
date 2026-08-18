@@ -60,29 +60,49 @@ def _anthropic_routing() -> session_cli.ResolvedRouting:
     )
 
 
-def test_persist_direct_model_override_warns_on_lock_failure(
-    temp_env: Path, capsys: pytest.CaptureFixture[str]
+def test_fork_model_override_lock_failure_returns_styled_warning(
+    temp_env: Path,
 ) -> None:
     """A failed --model manifest write should be visible instead of silently lost."""
-    from forge.cli import session_model_pin
+    from forge.cli.session_fork import _render_fork_execution_event
+    from forge.core.ops.session_fork_execution import (
+        ForkExecutionEvent,
+        ForkModelOverridePersistenceWarning,
+        _apply_direct_model_override,
+    )
     from forge.core.state import FileLockTimeoutError
 
     state = create_session_state("persist-warning", worktree_path=str(temp_env))
     SessionStore(str(temp_env), "persist-warning").write(state)
+    events: list[ForkExecutionEvent] = []
 
     with patch(
-        "forge.cli.session_model_pin.SessionStore.update",
+        "forge.core.ops.session_fork_execution.SessionStore.update",
         side_effect=FileLockTimeoutError(lock_path=temp_env / "forge.session.json.lock", timeout_s=5.0),
     ):
-        session_model_pin._persist_direct_model_override(
-            forge_root=temp_env,
-            session_name="persist-warning",
+        _apply_direct_model_override(
+            manifest=state,
             direct_model="claude-opus-4-6",
+            forge_root=temp_env,
+            use_sidecar=False,
+            events=events,
         )
 
-    output = capsys.readouterr().out
-    assert "Could not persist --model override" in output
-    assert "future resumes may use the previous stored model" in output
+    assert len(events) == 1
+    event = events[0]
+    assert isinstance(event, ForkModelOverridePersistenceWarning)
+    assert "future resumes may use the previous stored model" in event.continuation
+    with (
+        patch("forge.cli.session_fork.console.print") as mock_print,
+        patch("forge.cli.session_fork.print_tip") as mock_tip,
+    ):
+        _render_fork_execution_event(event)
+
+    mock_print.assert_called_once_with(
+        f"[yellow]Warning:[/yellow] Could not persist --model override for session "
+        f"[green]persist-warning[/green]: {event.error}"
+    )
+    mock_tip.assert_called_once_with(event.continuation, blank_before=False, console=session_cli.console)
 
 
 def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> None:

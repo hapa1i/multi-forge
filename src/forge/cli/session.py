@@ -34,7 +34,6 @@ from forge.core.paths import display_path
 from forge.core.state import RelativeTimeStyle
 from forge.core.state import format_relative_time as format_relative_timestamp
 from forge.session import (
-    LAUNCH_MODE_SIDECAR,
     ActiveSessionEntry,
     ForgeSessionError,
     SessionIndexEntry,
@@ -310,21 +309,6 @@ def _print_active_delete_warning(session_name: str, active_entry: ActiveSessionE
     if active_entry.container_name:
         console.print(f"  Container: {active_entry.container_name}")
     console.print()
-
-
-def _get_launch_preferences(
-    state: SessionState,
-) -> tuple[bool, tuple[str, ...], str | None]:
-    """Return relaunch mode plus persisted sidecar options for a session."""
-    launch = state.intent.launch
-    if launch is None:
-        return state.confirmed.is_sandboxed, (), None
-
-    use_sidecar = launch.mode == LAUNCH_MODE_SIDECAR
-    if not use_sidecar or launch.sidecar is None:
-        return use_sidecar, (), None
-
-    return use_sidecar, tuple(launch.sidecar.mounts), launch.sidecar.image
 
 
 def _resolve_session_artifact_root(*, manager: SessionManager, state: SessionState) -> Path:

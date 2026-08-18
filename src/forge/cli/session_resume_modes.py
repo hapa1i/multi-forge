@@ -11,7 +11,7 @@ from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
-from forge.session.launch import _combine_prompt_files
+from forge.session.launch import _combine_prompt_files, resolve_manifest_prompt_file
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -32,7 +32,6 @@ def _resume_fresh_rewind(
     from forge.cli.session_lifecycle import (
         _execute_resume_launch_plan,
         _get_resume_launch_preferences,
-        _resolve_manifest_prompt_file,
         _resume_context_ref,
         _resume_launch_preferences_for_op,
         _resume_routing_for_op,
@@ -94,7 +93,7 @@ def _resume_fresh_rewind(
 
     prompt_files: list[Path] = []
     child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    configured_prompt = _resolve_manifest_prompt_file(child_manifest)
+    configured_prompt = resolve_manifest_prompt_file(child_manifest)
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
     if rewind_artifacts.context_path is not None:

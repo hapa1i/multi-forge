@@ -129,6 +129,40 @@ def _prepare_rewind_launch_artifacts(
             ),
         )
 
+    try:
+        return _finish_rewind_launch_artifacts(
+            manifest=manifest,
+            parent_name=parent_name,
+            parent_uuid=parent_uuid,
+            parent_project_root=parent_project_root,
+            child_project_root=child_project_root,
+            source_path=source_path,
+            dest_path=dest_path,
+            rewind_uuid=rewind_uuid,
+            drop_last=drop_last,
+            prefix_result=prefix_result,
+        )
+    except Exception:
+        # The fresh UUID is owned by this attempt. The execution op cannot see a
+        # partial factory result, so compensate here before propagating the error.
+        _remove_rewind_transcript(dest_path)
+        raise
+
+
+def _finish_rewind_launch_artifacts(
+    *,
+    manifest: SessionState,
+    parent_name: str,
+    parent_uuid: str,
+    parent_project_root: str,
+    child_project_root: str,
+    source_path: Path,
+    dest_path: Path,
+    rewind_uuid: str,
+    drop_last: int,
+    prefix_result: RewindPrefixResult,
+) -> RewindLaunchArtifacts:
+    """Build and persist rewind context after the fresh transcript exists."""
     warnings: list[str] = []
     if prefix_result.kept_turns < prefix_result.requested_keep_turns:
         extra_dropped = prefix_result.requested_keep_turns - prefix_result.kept_turns
