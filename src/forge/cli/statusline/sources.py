@@ -240,11 +240,15 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
 def compute_cache_hit_rate(transcript_path: str) -> float | None:
     """Return the proxy-compatible cache-read rate for a transcript.
 
-    Formula: ``sum(cache_read_input_tokens) / sum(input_tokens) * 100``.
-    Entries are deduped by ``requestId`` (fallback ``message.id``), keeping the
-    snapshot with the largest input count because streaming appends growing
-    usage records. Returns ``0.0`` for input without cache reads and ``None``
-    for missing or unreadable data.
+    Proxy formula (``metrics.py`` / ``passthrough.py``):
+    ``sum(cache_read_input_tokens) / sum(input_tokens) * 100`` -- cache reads
+    over fresh input only (cache creation is billed as normal input, not a
+    hit). Entries are deduped by ``requestId`` (fallback ``message.id``), keeping
+    the snapshot with the largest input count because streaming appends growing
+    usage records; see Claude Code #5904:
+    https://github.com/anthropics/claude-code/issues/5904. Summing those records
+    blindly inflates usage 2--4x. Returns ``0.0`` for input without cache reads
+    and ``None`` for missing or unreadable data.
     """
     if not transcript_path:
         return None
