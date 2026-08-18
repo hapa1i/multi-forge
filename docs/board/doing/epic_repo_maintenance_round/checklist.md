@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: no Wave 7 member is active -- orders 1--29 shipped; orders 30--35 remain parked.
+Current focus: Wave 7 order 30 `share_passthrough_sse_framing` is active from `1d02b0cb`; orders 31--35 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -319,5 +319,11 @@ Current focus: no Wave 7 member is active -- orders 1--29 shipped; orders 30--35
 - [x] Complete order 29's focused, full, regression, targeted rewind integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 29 independently in PR #208 (`ea5b9103`) and close it without activating order 30.
+- [x] Close order 29 on pushed `main` at `1d02b0cb`, branch from that exact commit, and activate only order 30
+  `share_passthrough_sse_framing` after reverifying its common framing and protocol-specific merge seams.
+- [x] Share only incremental SSE data-line framing while keeping orders 31--35 parked.
+- [x] Complete order 30's focused, full, regression, targeted streaming integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 30 independently and close it without activating order 31.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

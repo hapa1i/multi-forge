@@ -26,6 +26,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.response_headers import merge_response_headers, relay_response_headers
+from forge.proxy.sse_framing import SseJsonDataFramer
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
@@ -102,7 +103,7 @@ class _UsageAccumulator:
 
     def __init__(self) -> None:
         self.usage: dict[str, int] = {}
-        self._buf = ""
+        self._framer = SseJsonDataFramer(self._merge)
         # Lifecycle side-signals for the Phase 3 provider-trace mirror.
         self.saw_content = False  # first user-visible content_block_start/delta seen
         self.saw_final_usage = False  # final message_delta carried output_tokens
@@ -120,23 +121,7 @@ class _UsageAccumulator:
         return self.saw_final_usage
 
     def feed(self, chunk: bytes) -> None:
-        try:
-            self._buf += chunk.decode("utf-8", errors="ignore")
-        except Exception:  # pragma: no cover - decode is already lenient
-            return
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
-            line = line.strip()
-            if not line.startswith("data:"):
-                continue
-            data = line[len("data:") :].strip()
-            if not data or data == "[DONE]":
-                continue
-            try:
-                event = json.loads(data)
-            except (ValueError, TypeError):
-                continue
-            self._merge(event)
+        self._framer.feed(chunk)
 
     def _merge(self, event: Any) -> None:
         if not isinstance(event, dict):
