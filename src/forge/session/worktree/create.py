@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ..exceptions import (
     BranchExistsError,
+    BranchInUseError,
     BranchNotMergedError,
     GitWorktreeError,
     InvalidBranchNameError,
@@ -28,6 +29,16 @@ class WorktreeResult:
     worktree_path: str
     branch: str
     created_branch: bool  # True if a new branch was created
+
+
+@dataclass(frozen=True)
+class WorktreePreflight:
+    """Read-only result of validating a worktree creation target."""
+
+    repo_root: Path
+    worktree_path: Path
+    branch: str
+    existing_branch: bool
 
 
 def branch_exists(branch: str, cwd: Path | None = None) -> bool:
@@ -207,6 +218,56 @@ def resolve_worktree_path(repo_root: Path, session_name: str) -> Path:
     return (repo_root.parent / worktree_dir).resolve()
 
 
+def preflight_create_worktree(
+    session_name: str,
+    branch: str | None = None,
+    cwd: Path | None = None,
+    *,
+    force: bool = False,
+    replace_owned_stale_state: bool = False,
+) -> WorktreePreflight:
+    """Validate a worktree target without changing Git or the filesystem.
+
+    ``create_worktree`` repeats this immediately before mutation so the plan is
+    advisory across process races; callers can still run every deterministic
+    refusal before starting another runtime or reserving session state.
+    """
+    repo_root = get_repo_root(cwd)
+
+    if branch is not None:
+        validate_branch_name(branch)
+        target_branch = branch
+    else:
+        target_branch = sanitize_branch_name(session_name)
+
+    worktree_path = resolve_worktree_path(repo_root, session_name)
+    existing_branch = branch_exists(target_branch, repo_root)
+    if force and replace_owned_stale_state and existing_branch:
+        if branch is not None:
+            wt = get_worktree_for_branch(target_branch, repo_root)
+            raise BranchExistsError(target_branch, worktree=wt)
+        wt = get_worktree_for_branch(target_branch, repo_root)
+        if wt is not None and Path(wt).resolve() != worktree_path:
+            raise BranchInUseError(target_branch, wt)
+        if not _branch_is_merged_into_head(target_branch, repo_root):
+            raise BranchNotMergedError(target_branch)
+
+    if worktree_path.exists():
+        if not (force and replace_owned_stale_state and (worktree_path / ".git").is_file()):
+            raise WorktreePathExistsError(str(worktree_path))
+
+    if existing_branch and (not force or not replace_owned_stale_state):
+        wt = get_worktree_for_branch(target_branch, repo_root)
+        raise BranchExistsError(target_branch, worktree=wt)
+
+    return WorktreePreflight(
+        repo_root=repo_root,
+        worktree_path=worktree_path,
+        branch=target_branch,
+        existing_branch=existing_branch,
+    )
+
+
 def create_worktree(
     session_name: str,
     branch: str | None = None,
@@ -245,26 +306,16 @@ def create_worktree(
         BranchNotMergedError: If branch has unmerged work (force only).
     """
     git = find_git_binary()
-    repo_root = get_repo_root(cwd)
-
-    if branch is not None:
-        validate_branch_name(branch)
-        target_branch = branch
-    else:
-        # Derive from session name (already valid)
-        target_branch = sanitize_branch_name(session_name)
-
-    worktree_path = resolve_worktree_path(repo_root, session_name)
-
-    # Validate every known branch refusal before force-removing an owned stale
-    # checkout. The later delete keeps the same checks as a race-safe defense.
-    existing_branch = branch_exists(target_branch, repo_root)
-    if force and replace_owned_stale_state and existing_branch:
-        if branch is not None:
-            wt = get_worktree_for_branch(target_branch, repo_root)
-            raise BranchExistsError(target_branch, worktree=wt)
-        if not _branch_is_merged_into_head(target_branch, repo_root):
-            raise BranchNotMergedError(target_branch)
+    plan = preflight_create_worktree(
+        session_name,
+        branch,
+        cwd,
+        force=force,
+        replace_owned_stale_state=replace_owned_stale_state,
+    )
+    repo_root = plan.repo_root
+    target_branch = plan.branch
+    worktree_path = plan.worktree_path
 
     # --force only replaces worktree state when the caller has proved the
     # derived target belongs to the same stale Forge child being recovered.
@@ -281,6 +332,8 @@ def create_worktree(
         if worktree_path.exists():
             raise WorktreePathExistsError(str(worktree_path))
     elif worktree_path.exists():
+        # ``preflight_create_worktree`` rejected this path; retain the branch as
+        # a race-safe defense if it appeared after that read-only check.
         raise WorktreePathExistsError(str(worktree_path))
 
     if branch_exists(target_branch, repo_root):

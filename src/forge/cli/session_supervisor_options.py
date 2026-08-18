@@ -13,6 +13,9 @@ from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     supervisor_lane_runtimes,
 )
+from forge.policy.semantic.supervisor import (
+    supervisor_option_error as supervisor_option_error,
+)
 
 
 def supervisor_options(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -76,27 +79,3 @@ def supervisor_options(f: Callable[..., Any]) -> Callable[..., Any]:
     for option in reversed(options):
         f = option(f)
     return f
-
-
-def supervisor_option_error(
-    *,
-    supervise_target: object | None,
-    supervisor_proxy: str | None,
-    supervisor_direct: bool,
-    cascade_flag: bool,
-    checker_model: str | None,
-    checker_provider: str | None,
-    checker_effort: str | None,
-    supervisor_effort: str | None,
-    supervisor_runtime: str | None,
-) -> str | None:
-    """Return the shared supervisor option dependency error, if any."""
-    if supervisor_proxy and supervisor_direct:
-        return "--supervisor-proxy and --no-supervisor-proxy are mutually exclusive"
-    if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        return "--supervisor-proxy/--no-supervisor-proxy require --supervise"
-    if (
-        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
-    ) and not supervise_target:
-        return "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise"
-    return None

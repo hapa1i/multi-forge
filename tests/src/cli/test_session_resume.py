@@ -953,22 +953,26 @@ class TestSupervisorProxyFlags:
         assert "bad-proxy-test" not in sessions
 
     def test_fork_bad_supervisor_proxy_leaves_no_fork(self, runner: CliRunner, temp_env: Path) -> None:
-        """Bad --supervisor-proxy should fail before creating fork state."""
+        """Bad --supervisor-proxy should fail before target routing or fork state."""
         with successful_claude_launch():
             runner.invoke(main, ["session", "start", "fork-badproxy-parent", "--no-proxy"])
-        result = runner.invoke(
-            main,
-            [
-                "session",
-                "fork",
-                "fork-badproxy-parent",
-                "--supervise",
-                "--supervisor-proxy",
-                "nonexistent-proxy",
-            ],
-        )
+        with patch("forge.cli.session_fork._resolve_routing_from_cli") as resolve_routing:
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-badproxy-parent",
+                    "--supervise",
+                    "--supervisor-proxy",
+                    "nonexistent-proxy",
+                    "--proxy",
+                    "target-proxy",
+                ],
+            )
         assert result.exit_code == 1
         assert "no template named" in result.output
+        resolve_routing.assert_not_called()
         manager = SessionManager()
         sessions = {n for n, _ in manager.list_sessions()}
         assert "fork-badproxy-parent" in sessions  # parent still exists

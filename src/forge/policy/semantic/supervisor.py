@@ -961,6 +961,30 @@ def validate_checker_model(checker_model: str | None) -> None:
         raise ValueError(f"--checker-model must be a prefixed model id (got '{checker_model}')")
 
 
+def supervisor_option_error(
+    *,
+    supervise_target: object | None,
+    supervisor_proxy: str | None,
+    supervisor_direct: bool,
+    cascade_flag: bool,
+    checker_model: str | None,
+    checker_provider: str | None,
+    checker_effort: str | None,
+    supervisor_effort: str | None,
+    supervisor_runtime: str | None,
+) -> str | None:
+    """Return the UI-free supervisor option dependency error, if any."""
+    if supervisor_proxy and supervisor_direct:
+        return "--supervisor-proxy and --no-supervisor-proxy are mutually exclusive"
+    if (supervisor_proxy or supervisor_direct) and not supervise_target:
+        return "--supervisor-proxy/--no-supervisor-proxy require --supervise"
+    if (
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
+    ) and not supervise_target:
+        return "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise"
+    return None
+
+
 def apply_checker_options(
     sup: SupervisorConfig,
     *,
@@ -1118,7 +1142,9 @@ def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
     a template, when a matched template fails to start, or when the name is ambiguous
     across multiple active proxies.
     """
-    # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports
+    # The order-31 read-only fork planner mirrors these error messages before
+    # runtime realization. Keep them aligned until order 32 consumes that plan.
+    # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports.
     from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
     from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 

@@ -1277,10 +1277,11 @@ management should be done deliberately from terminal.
 
 ### 3.12 Command-core ops (shared implementation)
 
-Shared terminal (`forge ...`) and direct (`%...` via `forge hook user-prompt-submit`) operations live once in
-`src/forge/core/ops/`. Ops contain no Click, printing, or hook JSON; they return structured data and raise typed
-failures. Claude start/launch/resume/fork share a typed manifest context: recorded `forge_root` owns `SessionStore`,
-while the worktree remains a guarded launch path.
+Shared terminal (`forge ...`) and direct (`%...` via `forge hook user-prompt-submit`) operations live in
+`src/forge/core/ops/`, without Click, output, or hook JSON. They return typed data/failures. Session fork resolves one
+read-only parent/target/strategy/routing plan before Click starts runtimes and the manager revalidates/mutates. Claude
+lifecycle paths share a manifest context: recorded `forge_root` owns `SessionStore`; worktree is the guarded launch
+path.
 
 `core/ops/policy.py` owns the registry-derived activation vocabulary, validation, and typed values shared by terminal
 `forge policy enable|disable` and direct `%policy enable|disable`. The terminal surface still writes policy intent while

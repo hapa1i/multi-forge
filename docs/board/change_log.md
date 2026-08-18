@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Extract session-fork preflight
+
+**Goal/outcome**: Refuse deterministic fork failures before child or runtime mutation.
+
+**Key changes**:
+
+- Added a typed, UI-free parent/target/strategy/routing plan; Click renders it and the manager retains race-safe
+  revalidation and execution.
+- Added durable/Git snapshot fixtures and proxy-start guards across option, parent, budget, routing, and collision
+  failures.
+- Applied the design §3.9 inherited-budget reference (started proxy ID before intent template), preserved notices on
+  later refusal, and deferred unreadable runtime-registry repair to the manager's mutation-time guard.
+
+**Verification**: 306 focused; 9,293 unit (one skip, 122 deselected); 923 regression; seven targeted Docker fork tests;
+full pre-commit, diff, 29,979/29,966 design, and 367-document/894-link board checks pass. No Forge workflow ran.
+
 ### Share passthrough SSE framing
 
 **Goal/outcome**: Remove duplicated incremental SSE framing without collapsing provider-specific usage semantics.

@@ -86,24 +86,28 @@ class ActiveSessionStore:
             return ActiveSessionIndex()
 
         try:
-            with open(self._index_path, encoding="utf-8") as f:
-                data = json.load(f)
-            if (
-                not isinstance(data, dict)
-                or data.get("version") != ACTIVE_INDEX_VERSION
-                or not self._has_current_key_shape(data)
-            ):
-                raise ValueError("incompatible active-session registry")
-            return dacite.from_dict(
-                data_class=ActiveSessionIndex,
-                data=data,
-                config=dacite.Config(strict=True),
-            )
+            return self._read_validated()
         except (OSError, ValueError, DaciteError):
             logger.info("Discarding unreadable active-session registry; recreating empty")
             empty = ActiveSessionIndex()
             self.write(empty)
             return empty
+
+    def _read_validated(self) -> ActiveSessionIndex:
+        """Read and validate without applying the runtime registry's repair policy."""
+        with open(self._index_path, encoding="utf-8") as f:
+            data = json.load(f)
+        if (
+            not isinstance(data, dict)
+            or data.get("version") != ACTIVE_INDEX_VERSION
+            or not self._has_current_key_shape(data)
+        ):
+            raise ValueError("incompatible active-session registry")
+        return dacite.from_dict(
+            data_class=ActiveSessionIndex,
+            data=data,
+            config=dacite.Config(strict=True),
+        )
 
     def _has_current_key_shape(self, data: dict[str, object]) -> bool:
         """Return True when the registry uses scoped session keys."""
@@ -235,6 +239,19 @@ class ActiveSessionStore:
             del latest.sessions[key]
             self.write(latest)
             return None
+
+    def peek_session(self, session_name: str, forge_root: str | None = None) -> ActiveSessionEntry | None:
+        """Return a live entry without repairing or pruning the runtime registry."""
+        from forge.session.identity import resolve_key_strict
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self._read_validated() if self.exists() else ActiveSessionIndex()
+            key = resolve_key_strict(index.sessions, session_name, forge_root)
+
+        if key is None:
+            return None
+        entry = index.sessions.get(key)
+        return entry if entry is not None and self._entry_is_live(entry) else None
 
     def list_sessions(self) -> list[tuple[str, ActiveSessionEntry]]:
         """List all live sessions, pruning stale entries on read.

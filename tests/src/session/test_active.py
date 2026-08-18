@@ -126,6 +126,17 @@ class TestActiveSessionStore:
         assert result.version == ACTIVE_INDEX_VERSION
         assert json.loads(store.index_path.read_text()) == {"version": 1, "sessions": {}}
 
+    def test_peek_session_does_not_repair_unreadable_registry(self, store: ActiveSessionStore) -> None:
+        """Read-only preflight probes must not rewrite malformed runtime state."""
+        store.index_path.parent.mkdir(parents=True, exist_ok=True)
+        original = b'{"version": 1, "sessions": {"x"'
+        store.index_path.write_bytes(original)
+
+        with pytest.raises(ValueError):
+            store.peek_session("x", forge_root="/tmp/project")
+
+        assert store.index_path.read_bytes() == original
+
     def test_get_session_prunes_stale_host_entry(
         self, store: ActiveSessionStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:

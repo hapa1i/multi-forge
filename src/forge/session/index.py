@@ -287,6 +287,25 @@ class IndexStore:
 
             return latest_entry
 
+    def peek_session(self, name: str, forge_root: str | None = None) -> SessionIndexEntry | None:
+        """Return an authoritative session entry without pruning stale rows.
+
+        Unlike :meth:`get_session`, this read-only probe returns ``None`` when
+        the resolved row has no manifest. Pre-mutation planners use it so a
+        rejected command cannot repair or otherwise rewrite the global index.
+        """
+        validate_name(name)
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None:
+                return None
+            entry = index.sessions[key]
+
+        store_root = Path(entry.forge_root or entry.worktree_path)
+        manifest_path = get_manifest_path(store_root, name)
+        return entry if store_root.exists() and manifest_path.is_file() else None
+
     def create_session_txn(
         self,
         state: SessionState,
