@@ -1,0 +1,30 @@
+Analyze this rewound Claude Code session tail and return a JSON object.
+
+The child conversation will resume from before these dropped turns, but the files on disk already include any code
+changes made by them. Your job is to explain that disk/conversation gap.
+
+Return a JSON object with these keys:
+- "changes": array of objects {"text": "<file path - net code change and why it matters>", "citation": "<turn N and/or file path>"}.
+  Cite only a listed turn number (for example "turn 4") or file path. Omit ungrounded claims.
+- "net_effect": short paragraph summarizing the net effect of the dropped code-editing turns.
+- "unfinished": array of strings for dangling or risky follow-ups the resumed agent should know.
+
+Focus on net changes, not replaying every edit. If a file has multiple tool calls, treat the latest call as the best
+signal for the final state. Do not tell the child to reapply changes blindly; the files already contain them.
+Return ONLY the JSON object, with no surrounding prose or code fence.
+
+<rewind_tail>
+## Rewind Boundary
+
+Kept turns: 1..1. Dropped turns: 2..2.
+The resumed child will not have these dropped turns in conversation history.
+The files on disk already include code changes made by these dropped turns.
+
+## Code-edit Tool Calls (net by file)
+
+- src/tail.py: Write sets file content to `tail` (latest turn 2; 1 tool call(s) across turn 2; tools: Write)
+
+## Dropped Transcript
+
+[turn 2]   Tools: Write(path=src/tail.py)
+</rewind_tail>

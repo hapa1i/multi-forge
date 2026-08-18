@@ -1,0 +1,40 @@
+# Session Context: parent
+
+_Parent proxy: proxy-a. Curated by model-a._
+
+## Lineage
+
+parent ← root
+
+## Goal / Current Task
+
+Ship the renderer.
+
+## Decisions
+
+- Keep transfer envelope. _(cite: turn 2)_
+- Preserve bare decisions.
+
+## Current State
+
+Ready.
+
+## Relevant Files
+
+- src/forge/session/transfer.py:895
+- docs/design_appendix.md
+
+## Open Questions
+
+_None captured._
+
+## Runtime Hints
+
+Target runtime: claude.
+
+---
+
+## Artifacts
+
+- **Plan**: `.claude/plans/renderer.md`
+- **Transcript**: `.forge/artifacts/parent/transcripts/a.jsonl`

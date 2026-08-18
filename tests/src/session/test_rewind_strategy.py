@@ -12,6 +12,8 @@ import pytest
 from forge.session.rewind import (
     REWIND_CODE_DELTA_COMMAND,
     REWIND_CODE_DELTA_SCHEMA,
+    RewindCodeDeltaSource,
+    _build_rewind_code_delta_output,
     build_rewind_code_delta_source,
     extract_rewind_file_deltas,
     generate_rewind_code_delta_context,
@@ -394,6 +396,8 @@ def test_rewind_code_delta_prompt_and_rendering_are_grounded(tmp_path: Path) -> 
         )
 
     prompt = mock_adapter.complete.call_args.args[0][1].content
+    golden_prompt = Path(__file__).parents[2] / "fixtures" / "rewind_code_delta_prompt.txt.golden"
+    assert f"{prompt}\n" == golden_prompt.read_text(encoding="utf-8")
     assert "src/tail.py" in prompt
     assert "src/head.py" not in prompt
     assert "files on disk already include" in prompt
@@ -402,6 +406,56 @@ def test_rewind_code_delta_prompt_and_rendering_are_grounded(tmp_path: Path) -> 
     assert "turn 2" in content
     assert "turn 99" not in content
     assert any("ungrounded citation" in warning for warning in warnings)
+
+
+def test_rewind_code_delta_output_matches_golden_fixture() -> None:
+    source = RewindCodeDeltaSource(
+        text="unused by the renderer",
+        emitted_turns={3, 4},
+        file_deltas=[],
+        total_turns=4,
+        kept_turns=2,
+        was_truncated=False,
+    )
+    content = _build_rewind_code_delta_output(
+        parent_name="parent",
+        lineage=["parent", "root"],
+        source=source,
+        curated={
+            "changes": [
+                {"text": "  Update renderer.  ", "citation": "  turn 3  "},
+                "  Preserve fallback.  ",
+                {"text": "  ", "citation": "turn 4"},
+            ],
+            "net_effect": "  Shared mechanics, distinct envelope.  ",
+            "unfinished": ["  Review rollout.  ", "", 3],
+        },
+        model_used="model-b",
+    )
+
+    golden = Path(__file__).parents[2] / "fixtures" / "rewind_code_delta.md.golden"
+    assert content == golden.read_text(encoding="utf-8")
+
+
+def test_rewind_empty_change_label_remains_strategy_specific() -> None:
+    source = RewindCodeDeltaSource(
+        text="",
+        emitted_turns=set(),
+        file_deltas=[],
+        total_turns=2,
+        kept_turns=1,
+        was_truncated=False,
+    )
+
+    content = _build_rewind_code_delta_output(
+        parent_name="parent",
+        lineage=[],
+        source=source,
+        curated={"changes": [], "net_effect": None, "unfinished": []},
+        model_used="deterministic",
+    )
+
+    assert "\n_No code changes captured._\n" in content
 
 
 def test_rewind_code_delta_parse_failure_emits_error_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

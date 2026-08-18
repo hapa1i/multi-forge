@@ -1745,11 +1745,13 @@ overlay (a system boundary), so missing/malformed frontmatter warns and still re
 
 ### H.2 Sections
 
-`ai-curated` emits the full 8-section contract; code owns the skeleton and the model fills section bodies (it returns
-structured JSON, parsed with `extract_json_from_response`). Decisions cite a transcript turn (`[turn N]`) or file;
-citations are validated against the turn range the model saw and fabricated ones are dropped with a warning
-(`_validate_decision_citations`), so `schema: full` does not overstate evidence quality. Sections 1–7 live in the AI
-snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers and the composed launch view has 8):
+`ai-curated` emits eight sections. Code owns the skeleton; the model returns structured JSON parsed with
+`extract_json_from_response`. Decisions cite a transcript turn (`[turn N]`) or file; `_validate_decision_citations`
+drops fabricated citations with a warning so `schema: full` does not overstate evidence quality.
+`forge.session.context_rendering` owns trimmed text, section framing, and plain/cited bullet mechanics; transfer and
+rewind supply their section/empty/citation labels and retain their envelopes, budgets, emitted-turn sets, and citation
+validation. Sections 1–7 live in the AI snapshot; section 8 is the notes overlay (so the snapshot has 7 headers and the
+composed launch view has 8):
 
 1. `## Lineage`
 2. `## Goal / Current Task`
@@ -1780,12 +1782,10 @@ never overwritten. GC pairs a notes file's liveness to its snapshot — it is ne
 
 ### H.4 Relationship to `ctx` (prior art)
 
-The transfer schema (§H.1–M.3) is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is **prior art
-and inspiration only** — its concepts (workstreams, exact transcript binding, branching, indexed retrieval, local
-storage, curation) informed this substrate. Forge will **not** take `ctx` as a dependency: curated transfer is
-load-bearing for Forge's session, policy, and usage story, so its contract lives in-tree. The schema is self-contained
-and **no `ctx` interop is planned**. An optional import/export bridge could be built on the existing schema later
-without changing it, but that is explicitly not committed work.
+The transfer schema is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is prior art only: its
+workstreams, exact transcript binding, branching, indexed retrieval, local storage, and curation informed this
+substrate. Forge will not depend on it; this load-bearing session/policy/usage contract lives in-tree. No `ctx` interop
+is planned. A future optional import/export bridge could use the existing schema unchanged, but is not committed work.
 
 ---
 

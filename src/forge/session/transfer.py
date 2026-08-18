@@ -44,6 +44,12 @@ from forge.session.artifacts import (
     resolve_artifact_path,
 )
 from forge.session.claude.paths import get_transcript_path, resolve_claude_project_root
+from forge.session.context_rendering import (
+    coerce_render_text,
+    render_cited_text_bullets,
+    render_markdown_section,
+    render_text_bullets,
+)
 from forge.session.models import SessionState
 from forge.session.prev_sessions import (
     child_path_rel,
@@ -781,11 +787,6 @@ def _emit_curation_usage(
         )
 
 
-def _coerce_text(value: Any) -> str:
-    """Return a trimmed string, or '' for non-string/empty values."""
-    return value.strip() if isinstance(value, str) and value.strip() else ""
-
-
 # Citation grounding (see _validate_decision_citations). A citation is grounded
 # only if it points at an in-range ``turn N`` the model actually saw, or reads
 # as a ``file[:line]`` reference. Vague prose ("earlier", "the plan") is not.
@@ -827,35 +828,13 @@ def _validate_decision_citations(decisions: Any, emitted_turns: set[int]) -> tup
         if not isinstance(item, dict):
             sanitized.append(item)
             continue
-        citation = _coerce_text(item.get("citation"))
+        citation = coerce_render_text(item.get("citation"))
         if citation and not _citation_is_grounded(citation, emitted_turns):
-            text = _coerce_text(item.get("text"))
+            text = coerce_render_text(item.get("text"))
             warnings.append(f"Dropped ungrounded citation '{citation}' on decision: {text[:60]}")
             item = {**item, "citation": ""}
         sanitized.append(item)
     return sanitized, warnings
-
-
-def _render_decisions(decisions: Any) -> list[str]:
-    """Render the Decisions section as cited bullets (citations pre-validated)."""
-    lines: list[str] = []
-    if isinstance(decisions, list):
-        for item in decisions:
-            if isinstance(item, dict):
-                text = _coerce_text(item.get("text"))
-                citation = _coerce_text(item.get("citation"))
-            else:
-                text, citation = _coerce_text(item), ""
-            if not text:
-                continue
-            lines.append(f"- {text} _(cite: {citation})_" if citation else f"- {text}")
-    return lines or ["_None captured._"]
-
-
-def _render_str_list(items: Any) -> list[str]:
-    """Render a list of strings as markdown bullets, with an empty-state line."""
-    lines = [f"- {_coerce_text(i)}" for i in items if _coerce_text(i)] if isinstance(items, list) else []
-    return lines or ["_None captured._"]
 
 
 # Extra Runtime Hints guidance appended for a Codex target. Claude omits this so its
@@ -916,34 +895,32 @@ def _build_ai_curated_output(
         "",
         f"_Parent proxy: {proxy_template or 'none'}. Curated by {model_used}._",
         "",
-        "## Lineage",
-        "",
-        " ← ".join(lineage) if lineage else parent_name,
-        "",
-        "## Goal / Current Task",
-        "",
-        _coerce_text(curated.get("goal")) or "_Not captured._",
-        "",
-        "## Decisions",
-        "",
-        *_render_decisions(curated.get("decisions")),
-        "",
-        "## Current State",
-        "",
-        _coerce_text(curated.get("current_state")) or "_Not captured._",
-        "",
-        "## Relevant Files",
-        "",
-        *_render_str_list(curated.get("files")),
-        "",
-        "## Open Questions",
-        "",
-        *_render_str_list(curated.get("open_questions")),
-        "",
-        "## Runtime Hints",
-        "",
-        *_runtime_hints_lines(target_runtime),
-        "",
+        *render_markdown_section("Lineage", [" ← ".join(lineage) if lineage else parent_name]),
+        *render_markdown_section(
+            "Goal / Current Task",
+            [coerce_render_text(curated.get("goal")) or "_Not captured._"],
+        ),
+        *render_markdown_section(
+            "Decisions",
+            render_cited_text_bullets(
+                curated.get("decisions"),
+                empty_label="_None captured._",
+                citation_label="cite",
+            ),
+        ),
+        *render_markdown_section(
+            "Current State",
+            [coerce_render_text(curated.get("current_state")) or "_Not captured._"],
+        ),
+        *render_markdown_section(
+            "Relevant Files",
+            render_text_bullets(curated.get("files"), empty_label="_None captured._"),
+        ),
+        *render_markdown_section(
+            "Open Questions",
+            render_text_bullets(curated.get("open_questions"), empty_label="_None captured._"),
+        ),
+        *render_markdown_section("Runtime Hints", _runtime_hints_lines(target_runtime)),
     ]
 
     lines.extend(_format_plan_and_artifacts(latest_plan_path, artifacts_path, plan_content))
