@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `todo/` -- accepted Wave 7 telemetry refactor work.
+**Lane**: `doing/` -- active on `refactor/centralize-telemetry-jsonl-reads` from the order-25 closeout (`83394417`).
 
 **Finding**: O056.
 
@@ -15,8 +15,10 @@ each plane's schema and failure policy.
 
 ## Evidence and Authority
 
-On `5777192a`, all three readers repeat JSONL iteration, timestamp conversion, invalid-line handling, and a newer-schema
-latch; only append I/O is shared in `core/telemetry/jsonl_io.py`. Authority:
+Reverified on `83394417`: all three readers still repeat sorted shard iteration, object-line decoding, timestamp
+matching, and read-error handling; only append I/O is shared in `core/telemetry/jsonl_io.py`. Usage and upstream apply
+schema fences before value/period filters, while downstream deliberately scopes kind/period before its schema counters.
+The focused read/write/schema baseline is 65 passing tests. Authority:
 [`docs/design_appendix.md` "A.13 Usage-attribution ledger schema"](../../../design_appendix.md#a13-usage-attribution-ledger-schema-314)
 and
 [`docs/developer/coding_standards.md` "System boundaries"](../../../developer/coding_standards.md#system-boundaries-external-data).
@@ -32,4 +34,5 @@ and
 ## Exclusions
 
 Do not create one shared telemetry record schema, change JSONL bytes, collapse plane retention, or downgrade newer-state
-failures.
+failures. Keep `CostTracker.bootstrap_from_logs` separate: cap bootstrap skips irrelevant month shards before opening
+them and deduplicates `downstream_event_id` records.
