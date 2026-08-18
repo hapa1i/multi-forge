@@ -14,7 +14,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import TranscriptStats, get_context_display, status_line
+from forge.cli.status_line import get_context_display, status_line
+from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline.palette import (
     ASCII_GLYPHS,
     DEFAULT_PALETTE,
@@ -24,6 +25,7 @@ from forge.cli.statusline.palette import (
     resolve_glyphs,
     resolve_palette,
 )
+from forge.cli.statusline.types import TranscriptStats
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 FIXTURE = {
@@ -43,10 +45,10 @@ def _render_with_statusline(**statusline_kwargs):
     runner = CliRunner()
     with contextlib.ExitStack() as es:
         es.enter_context(patch.object(sl, "_get_terminal_width", return_value=200))
-        es.enter_context(patch.object(sl, "detect_proxy", return_value=(False, None, False)))
-        es.enter_context(patch.object(sl, "discover_session", return_value=(None, False)))
-        es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
-        es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=TranscriptStats()))
+        es.enter_context(patch.object(status_sources, "detect_proxy", return_value=(False, None, False)))
+        es.enter_context(patch.object(status_sources, "discover_session", return_value=(None, False)))
+        es.enter_context(patch.object(status_sources, "get_git_branch", return_value=None))
+        es.enter_context(patch.object(status_sources, "get_transcript_stats", return_value=TranscriptStats()))
         es.enter_context(patch("forge.runtime_config.get_runtime_config", return_value=cfg))
         res = runner.invoke(status_line, input=json.dumps(FIXTURE), env={"FORGE_STATUS_TRUNCATE": "0"})
     assert res.exit_code == 0, res.output

@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from forge.cli import status_line as sl
 from forge.cli.status_line import status_line
+from forge.cli.statusline import sources as status_sources
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 pytestmark = pytest.mark.regression
@@ -29,9 +30,9 @@ def test_bug_d018_path_branch_layout_skips_proxy_and_session_sources() -> None:
         return None, False
 
     with (
-        patch.object(sl, "detect_proxy", side_effect=_detect_proxy),
-        patch.object(sl, "discover_session", side_effect=_discover_session),
-        patch.object(sl, "get_git_branch", return_value="main"),
+        patch.object(status_sources, "detect_proxy", side_effect=_detect_proxy),
+        patch.object(status_sources, "discover_session", side_effect=_discover_session),
+        patch.object(status_sources, "get_git_branch", return_value="main"),
         patch.object(sl, "_get_terminal_width", return_value=200),
         patch("forge.runtime_config.get_runtime_config", return_value=config),
     ):

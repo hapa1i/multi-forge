@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 33 shipped in PR #212; orders 34--35 remain parked.
+Current focus: Wave 7 order 34 `extract_statusline_sources` is active from `43130c3d`; order 35 remains parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -339,5 +339,8 @@ Current focus: Wave 7 order 33 shipped in PR #212; orders 34--35 remain parked.
   `decompose_extension_install_transaction` after reverifying the phase and test-root seams.
 - [x] Decompose and verify order 33's installer apply transaction while keeping orders 34--35 parked.
 - [x] Ship order 33 independently in PR #212 (`f1afb30c`) and close it without activating order 34.
+- [x] Close order 33 on pushed `main` at `43130c3d`, branch from that exact commit, and activate only order 34
+  `extract_statusline_sources` after reverifying the source/import boundary.
+- [x] Extract and verify Wave 7 order 34's status-line source/import boundary without activating order 35.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -22,16 +22,11 @@ from forge.cli.status_line import (
     CTX_WARN,
     DEFAULT_TERM_WIDTH,
     TRAILING_MARGIN,
-    ProxyRuntimeTruth,
-    TranscriptStats,
     _extract_windows,
     _format_reset_countdown,
     _heat_color,
     _visible_width,
     _wrap_output,
-    compute_cache_hit_rate,
-    detect_proxy,
-    discover_session,
     format_billing_cost,
     format_breadcrumb,
     format_cache_hit,
@@ -43,15 +38,21 @@ from forge.cli.status_line import (
     format_token_breakdown,
     format_verification,
     get_context_display,
-    get_line_change_values,
     get_session_metrics,
     get_tier_display,
     get_token_breakdown_values,
     parse_context_from_json,
     render_categories,
-    scan_transcript,
     truncate_ansi,
 )
+from forge.cli.statusline.sources import (
+    compute_cache_hit_rate,
+    detect_proxy,
+    discover_session,
+    get_line_change_values,
+    scan_transcript,
+)
+from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
 
 
 class TestDetectProxy:
@@ -1284,28 +1285,28 @@ class TestGetLineChangeValues:
         assert get_line_change_values({"total_lines_added": 7, "total_lines_removed": 2}, "/tmp/demo") == (7, 2)
 
     def test_falls_back_to_git_numstat(self):
-        from forge.cli.status_line import _numstat_cache
+        from forge.cli.statusline.sources import _numstat_cache
 
         _numstat_cache.clear()
         unstaged = MagicMock(returncode=0, stdout="3\t1\tfoo.py\n-\t-\timage.png\n")
         staged = MagicMock(returncode=0, stdout="2\t4\tbar.py\n")
 
-        with patch("forge.cli.status_line.subprocess.run", side_effect=[unstaged, staged]):
+        with patch("forge.cli.statusline.sources.subprocess.run", side_effect=[unstaged, staged]):
             assert get_line_change_values({}, "/tmp/numstat-test") == (5, 5)
 
     def test_git_timeout_returns_zero(self):
-        from forge.cli.status_line import _numstat_cache
+        from forge.cli.statusline.sources import _numstat_cache
 
         _numstat_cache.clear()
-        with patch("forge.cli.status_line.subprocess.run", side_effect=TimeoutError):
+        with patch("forge.cli.statusline.sources.subprocess.run", side_effect=TimeoutError):
             assert get_line_change_values({}, "/tmp/timeout-test") == (0, 0)
 
     def test_git_failure_returns_zero(self):
-        from forge.cli.status_line import _numstat_cache
+        from forge.cli.statusline.sources import _numstat_cache
 
         _numstat_cache.clear()
         failed = MagicMock(returncode=128, stdout="")
-        with patch("forge.cli.status_line.subprocess.run", return_value=failed):
+        with patch("forge.cli.statusline.sources.subprocess.run", return_value=failed):
             assert get_line_change_values({}, "/tmp/failure-test") == (0, 0)
 
 
@@ -1534,7 +1535,7 @@ class TestOutputHardening:
         runner = CliRunner()
         # Use wide terminal so truncation doesn't interfere
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=200),
         ):
             result = runner.invoke(status_line, input=minimal_json)
@@ -1575,7 +1576,7 @@ class TestOutputHardening:
         )
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=200),
         ):
             result = runner.invoke(status_line, input=input_json)
@@ -1607,9 +1608,9 @@ class TestOutputHardening:
         )
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
-            patch("forge.cli.status_line.discover_session", return_value=(None, False)),
-            patch("forge.cli.status_line.get_git_branch", return_value=None),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.discover_session", return_value=(None, False)),
+            patch("forge.cli.statusline.sources.get_git_branch", return_value=None),
             patch("forge.cli.status_line._get_terminal_width", return_value=200),
         ):
             result = runner.invoke(status_line, input=input_json)
@@ -1653,9 +1654,9 @@ class TestOutputHardening:
         )
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(True, runtime, True)),
-            patch("forge.cli.status_line.discover_session", return_value=(None, False)),
-            patch("forge.cli.status_line.get_git_branch", return_value=None),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(True, runtime, True)),
+            patch("forge.cli.statusline.sources.discover_session", return_value=(None, False)),
+            patch("forge.cli.statusline.sources.get_git_branch", return_value=None),
             patch("forge.cli.status_line._get_terminal_width", return_value=200),
         ):
             result = runner.invoke(status_line, input=input_json)
@@ -1714,13 +1715,13 @@ class TestOutputHardening:
         )
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(True, runtime, True)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(True, runtime, True)),
             patch("forge.cli.status_line._get_terminal_width", return_value=240),
             patch(
-                "forge.cli.status_line.discover_session",
+                "forge.cli.statusline.sources.discover_session",
                 return_value=({"name": "spotted-kingfisher", "parent_session": None}, True),
             ),
-            patch("forge.cli.status_line.get_git_branch", return_value="feat/session-1to1"),
+            patch("forge.cli.statusline.sources.get_git_branch", return_value="feat/session-1to1"),
         ):
             result = runner.invoke(status_line, input=input_json)
 
@@ -1747,7 +1748,7 @@ class TestOutputHardening:
         runner = CliRunner()
         narrow_width = 40
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=narrow_width),
         ):
             result = runner.invoke(status_line, input=minimal_json)
@@ -1770,7 +1771,7 @@ class TestOutputHardening:
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=10),
         ):
             result = runner.invoke(status_line, input=minimal_json)
@@ -1792,7 +1793,7 @@ class TestOutputHardening:
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=DEFAULT_TERM_WIDTH),
         ):
             result = runner.invoke(status_line, input=minimal_json)
@@ -1903,7 +1904,7 @@ class TestWrapOutput:
         runner = CliRunner()
         narrow_width = 40
         with (
-            patch("forge.cli.status_line.detect_proxy", return_value=(False, None, False)),
+            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
             patch("forge.cli.status_line._get_terminal_width", return_value=narrow_width),
         ):
             result = runner.invoke(status_line, input=minimal_json)

@@ -1,7 +1,7 @@
 """Shared JSONL transcript parsing primitives.
 
 Low-level parsing of Claude Code transcript files. Used by:
-- forge.cli.status_line (cheap transcript statistics for the prompt status line)
+- forge.cli.statusline.sources (cheap transcript statistics for the prompt status line)
 - forge.search.extractor (content extraction for search indexing)
 - forge.session.rewind (turn-boundary detection for rewind resumes)
 - forge.session.transfer (context assembly for session resume)

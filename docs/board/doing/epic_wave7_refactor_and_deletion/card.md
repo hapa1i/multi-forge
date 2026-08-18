@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--33 shipped independently in PRs #178--#184, #186--#188, and #190--#212; orders 34--35
-remain parked. The bounded
+**Lane**: `doing/` -- orders 1--33 shipped independently in PRs #178--#184, #186--#188, and #190--#212; order 34 is
+active from `43130c3d` and order 35 remains parked. The bounded
 [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) correction closed
 order 20's post-merge snapshot race directly on `main` after PR #206 and before order 28. The bounded
 [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
@@ -87,7 +87,7 @@ runs last so it lands on the smallest stable surface.
 | 31    | O068             | [`extract_session_fork_preflight`](../../done/extract_session_fork_preflight/card.md)                   | UI-free pre-mutation validation                      |
 | 32    | O068, O096       | [`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md)                   | mutation/rollback plan and thin Click adapter        |
 | 33    | O069             | [`decompose_extension_install_transaction`](../../done/decompose_extension_install_transaction/card.md) | ordered install fault and rollback phases            |
-| 34    | O070             | [`extract_statusline_sources`](../../todo/extract_statusline_sources/card.md)                           | source facts and import direction                    |
+| 34    | O070             | [`extract_statusline_sources`](../extract_statusline_sources/card.md)                                   | source facts and import direction                    |
 | 35    | O070, O092       | [`extract_statusline_rendering`](../../todo/extract_statusline_rendering/card.md)                       | pure render/layout tail and process-local cache exit |
 
 ## Dependencies and Activation Rules

@@ -7,8 +7,9 @@ non-dict ``message`` raised ``AttributeError``. The transcript is an external
 Claude Code artifact (system boundary) and cache_hit is an opt-in segment, so
 bad rows must be skipped/coerced, not crash.
 
-Root cause / fix: ``src/forge/cli/status_line.py`` — guard ``message``/``usage``
-shapes, coerce token fields with ``_safe_int``, and skip rows that still raise.
+Root cause / fix: ``src/forge/cli/statusline/sources.py`` guards
+``message``/``usage`` shapes, coerces token fields, and skips rows that still
+raise.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import json
 
 import pytest
 
-from forge.cli.status_line import compute_cache_hit_rate
+from forge.cli.statusline.sources import compute_cache_hit_rate
 
 pytestmark = pytest.mark.regression
 

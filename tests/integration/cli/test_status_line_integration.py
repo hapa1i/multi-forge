@@ -94,7 +94,7 @@ class TestStatusLineSourcePlan:
         mock_claude_workspace.write_file(
             f"{instrument_dir}/sitecustomize.py",
             """from pathlib import Path
-from forge.cli import status_line as sl
+from forge.cli.statusline import sources
 
 def _detect_proxy():
     with Path('/tmp/d018-proxy-probes').open('a', encoding='utf-8') as handle:
@@ -106,8 +106,8 @@ def _discover_session():
         handle.write('1')
     return None, False
 
-sl.detect_proxy = _detect_proxy
-sl.discover_session = _discover_session
+sources.detect_proxy = _detect_proxy
+sources.discover_session = _discover_session
 """,
         )
         mock_claude_workspace.mkdir("$HOME/.forge", parents=True)

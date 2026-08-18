@@ -21,9 +21,11 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import ProxyRuntimeTruth, status_line
+from forge.cli.status_line import status_line
+from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.registry import render_segments
+from forge.cli.statusline.types import ProxyRuntimeTruth
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 pytestmark = pytest.mark.regression
@@ -73,9 +75,9 @@ def test_full_status_line_exits_zero_on_malformed_metrics():
     }
     with (
         patch.object(sl, "_get_terminal_width", return_value=200),
-        patch.object(sl, "detect_proxy", return_value=(True, runtime, True)),
-        patch.object(sl, "discover_session", return_value=(None, False)),
-        patch.object(sl, "get_git_branch", return_value=None),
+        patch.object(status_sources, "detect_proxy", return_value=(True, runtime, True)),
+        patch.object(status_sources, "discover_session", return_value=(None, False)),
+        patch.object(status_sources, "get_git_branch", return_value=None),
         patch("forge.runtime_config.get_runtime_config", return_value=cfg),
     ):
         result = CliRunner().invoke(status_line, input=json.dumps(fixture), env={"FORGE_STATUS_TRUNCATE": "0"})

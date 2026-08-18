@@ -18,7 +18,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import ProxyRuntimeTruth, TranscriptStats, status_line
+from forge.cli.status_line import status_line
+from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import (
@@ -28,6 +29,7 @@ from forge.cli.statusline.registry import (
     resolve_order,
     resolve_plan,
 )
+from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
 from forge.runtime_config import RuntimeConfig
 
 
@@ -42,10 +44,12 @@ def _render(fixture, *, proxy=None, session=None, stats=None, api_key=True):
     runner = CliRunner()
     with contextlib.ExitStack() as es:
         es.enter_context(patch.object(sl, "_get_terminal_width", return_value=200))
-        es.enter_context(patch.object(sl, "detect_proxy", return_value=(proxy or (False, None, False))))
-        es.enter_context(patch.object(sl, "discover_session", return_value=(session or (None, False))))
-        es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
-        es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=(stats or TranscriptStats())))
+        es.enter_context(patch.object(status_sources, "detect_proxy", return_value=(proxy or (False, None, False))))
+        es.enter_context(patch.object(status_sources, "discover_session", return_value=(session or (None, False))))
+        es.enter_context(patch.object(status_sources, "get_git_branch", return_value=None))
+        es.enter_context(
+            patch.object(status_sources, "get_transcript_stats", return_value=(stats or TranscriptStats()))
+        )
         res = runner.invoke(
             status_line,
             input=json.dumps(fixture),
@@ -389,8 +393,8 @@ class TestLazyContext:
     def test_minimal_segments_skip_transcript_and_git(self):
         ctx = _ctx(FIXTURE_MINIMAL)
         with (
-            patch.object(sl, "_cached_scan_transcript") as scan,
-            patch.object(sl, "get_git_branch") as git,
+            patch.object(status_sources, "get_transcript_stats") as scan,
+            patch.object(status_sources, "get_git_branch") as git,
         ):
             where, stream = render_segments(ctx, ["path", "model"])
         scan.assert_not_called()
@@ -402,14 +406,14 @@ class TestLazyContext:
         # Control: tokens + think both read transcript_stats, but the
         # cached_property collapses that to a single scan.
         ctx = _ctx(FIXTURE_MINIMAL)
-        with patch.object(sl, "_cached_scan_transcript", return_value=TranscriptStats()) as scan:
+        with patch.object(status_sources, "get_transcript_stats", return_value=TranscriptStats()) as scan:
             render_segments(ctx, list(DEFAULT_ORDER))
         scan.assert_called_once()
 
     def test_branch_segment_triggers_git(self):
         # Control: the branch segment (not in [path, model]) does call git.
         ctx = _ctx(FIXTURE_MINIMAL)
-        with patch.object(sl, "get_git_branch", return_value="main") as git:
+        with patch.object(status_sources, "get_git_branch", return_value="main") as git:
             render_segments(ctx, ["path", "branch"])
         git.assert_called_once()
 
