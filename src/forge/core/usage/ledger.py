@@ -30,8 +30,8 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object, try_parse_iso, utc_timestamp_z
-from forge.core.telemetry.jsonl_io import append_jsonl_record
+from forge.core.state import utc_timestamp_z
+from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
 from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
@@ -195,62 +195,47 @@ def read_usage_events(
     applied to the raw record before the typed build, so a non-matching shard line costs
     no deserialization.
     """
-    events_dir = _events_dir()
-    if not events_dir.is_dir():
-        return []
-
     global _warned_newer_schema
     events: list[UsageEvent] = []
     # Strict on shape AND value type: an unknown field is corruption, and so is an invalid
     # Literal (e.g. a bogus measurement_source) or a wrong nested type (source_refs=5). dacite
     # already accepts an int for a `float | None` field, so a 0ms latency still loads cleanly.
     config = dacite.Config(strict=True)
-    for path in sorted(events_dir.glob("*.jsonl")):
+    for item in iter_jsonl_records(
+        _events_dir(),
+        period_start,
+        period_end,
+        logger=logger,
+        read_error_message="Failed to read usage log %s: %s",
+    ):
+        record = item.record
+        ver = record.get("schema_version")
+        if isinstance(ver, int) and ver > USAGE_SCHEMA_VERSION:
+            if not _warned_newer_schema:
+                logger.warning(
+                    "Skipping usage events written by a newer Forge (schema_version=%s); upgrade Forge",
+                    ver,
+                )
+                _warned_newer_schema = True
+            continue
+
+        if run_id and record.get("run_id") != run_id:
+            continue
+        if root_run_id and record.get("root_run_id") != root_run_id:
+            continue
+        if runtime and record.get("runtime") != runtime:
+            continue
+        if command and record.get("command") != command:
+            continue
+        if session and record.get("session") != session:
+            continue
+        if not item.matches_period():
+            continue
+
         try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-
-                    ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > USAGE_SCHEMA_VERSION:
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping usage events written by a newer Forge (schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-
-                    if run_id and record.get("run_id") != run_id:
-                        continue
-                    if root_run_id and record.get("root_run_id") != root_run_id:
-                        continue
-                    if runtime and record.get("runtime") != runtime:
-                        continue
-                    if command and record.get("command") != command:
-                        continue
-                    if session and record.get("session") != session:
-                        continue
-
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        ts = try_parse_iso(ts_str, assume_naive_utc=True)
-                        if ts is None:
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-
-                    try:
-                        events.append(dacite.from_dict(UsageEvent, record, config=config))
-                    except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
-                        logger.warning("Skipping malformed usage event in %s: %s", path.name, e)
-                        continue
-        except OSError as e:
-            logger.warning("Failed to read usage log %s: %s", path, e)
+            events.append(dacite.from_dict(UsageEvent, record, config=config))
+        except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
+            logger.warning("Skipping malformed usage event in %s: %s", item.path.name, e)
 
     events.sort(key=lambda e: e.ts)
     return events

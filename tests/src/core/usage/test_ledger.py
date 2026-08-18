@@ -13,6 +13,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import forge.core.usage.ledger as usage_ledger
 from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import (
     USAGE_SCHEMA_VERSION,
@@ -117,6 +118,26 @@ class TestStrictAndVersion:
         commands = {e.command for e in out}
         assert commands == {"keep"}
         assert sum("newer Forge" in r.message for r in caplog.records) == 1
+
+    def test_newer_version_warning_precedes_value_and_period_filters(self, monkeypatch, caplog) -> None:
+        monkeypatch.setattr(usage_ledger, "_warned_newer_schema", False)
+        _append_raw(
+            {
+                "schema_version": 999,
+                "event_id": "evt_future",
+                "ts": "2999-01-01T00:00:00Z",
+                "run_id": "run_f",
+                "root_run_id": "run_f",
+                "runtime": "future",
+                "command": "drop",
+                "status": "success",
+            }
+        )
+
+        with caplog.at_level(logging.WARNING):
+            assert read_usage_events(command="keep", period_end=datetime(2026, 1, 1, tzinfo=timezone.utc)) == []
+
+        assert sum("newer Forge" in record.message for record in caplog.records) == 1
 
     def test_unknown_field_is_corruption(self, caplog) -> None:
         log_usage_event(_event(command="good"))

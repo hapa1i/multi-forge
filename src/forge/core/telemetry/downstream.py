@@ -19,9 +19,9 @@ from typing import Any, Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object, try_parse_iso, utc_timestamp_z
+from forge.core.state import utc_timestamp_z
 from forge.core.state.retention import PruneJsonlShardsResult
-from forge.core.telemetry.jsonl_io import append_jsonl_record
+from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
 
 # Reporter/Confidence live in the neutral telemetry leaf so the usage ledger can share the
 # one definition without a cycle; re-exported here (records below carry both fields, and
@@ -174,24 +174,6 @@ def _merge_attempt_records(records: list[DownstreamRecord]) -> list[DownstreamRe
     return sorted([*attempts, *passthrough], key=lambda r: r.ts)
 
 
-def _record_in_period(
-    record: dict[str, Any],
-    period_start: datetime | None,
-    period_end: datetime | None,
-) -> bool:
-    if not period_start and not period_end:
-        return True
-    ts_str = record.get("ts", "")
-    ts = try_parse_iso(ts_str, assume_naive_utc=True)
-    if ts is None:
-        return False
-    if period_start and ts < period_start:
-        return False
-    if period_end and ts >= period_end:
-        return False
-    return True
-
-
 def read_downstream_records(
     period_start: datetime | None = None,
     period_end: datetime | None = None,
@@ -235,67 +217,62 @@ def read_downstream_records_with_stats(
     provider_session_id: str | None = None,
 ) -> DownstreamReadResult:
     """Read downstream records plus schema-fence skip counts."""
-    log_dir = _downstream_dir()
-    if not log_dir.is_dir():
-        return DownstreamReadResult(records=[])
-
     global _warned_newer_schema, _warned_older_schema
     config = dacite.Config(strict=True)
     records: list[DownstreamRecord] = []
     skipped_legacy_schema = 0
     skipped_newer_schema = 0
-    for path in sorted(log_dir.glob("*.jsonl")):
+    for item in iter_jsonl_records(
+        _downstream_dir(),
+        period_start,
+        period_end,
+        logger=logger,
+        read_error_message="Failed to read downstream telemetry %s: %s",
+    ):
+        record = item.record
+        if kind and record.get("kind") != kind:
+            continue
+        if not item.matches_period():
+            continue
+        ver = record.get("schema_version")
+        if not isinstance(ver, int) or ver < DOWNSTREAM_SCHEMA_VERSION:
+            skipped_legacy_schema += 1
+            if not _warned_older_schema:
+                logger.warning(
+                    "Skipping downstream telemetry from older Forge backend-identity schema "
+                    "(schema_version=%s); new backend-attributed views start at schema_version=%s",
+                    ver if ver is not None else "missing",
+                    DOWNSTREAM_SCHEMA_VERSION,
+                )
+                _warned_older_schema = True
+            continue
+        if ver > DOWNSTREAM_SCHEMA_VERSION:
+            skipped_newer_schema += 1
+            if not _warned_newer_schema:
+                logger.warning(
+                    "Skipping downstream telemetry from newer Forge (schema_version=%s); upgrade Forge",
+                    ver,
+                )
+                _warned_newer_schema = True
+            continue
+        if request_id and record.get("request_id") != request_id:
+            continue
+        if proxy_id and record.get("proxy_id") != proxy_id:
+            continue
+        if forge_run_id and record.get("forge_run_id") != forge_run_id:
+            continue
+        if forge_root_run_id and record.get("forge_root_run_id") != forge_root_run_id:
+            continue
+        if provider_session_id and record.get("provider_session_id") != provider_session_id:
+            continue
         try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-                    if kind and record.get("kind") != kind:
-                        continue
-                    if not _record_in_period(record, period_start, period_end):
-                        continue
-                    ver = record.get("schema_version")
-                    if not isinstance(ver, int) or ver < DOWNSTREAM_SCHEMA_VERSION:
-                        skipped_legacy_schema += 1
-                        if not _warned_older_schema:
-                            logger.warning(
-                                "Skipping downstream telemetry from older Forge backend-identity schema "
-                                "(schema_version=%s); new backend-attributed views start at schema_version=%s",
-                                ver if ver is not None else "missing",
-                                DOWNSTREAM_SCHEMA_VERSION,
-                            )
-                            _warned_older_schema = True
-                        continue
-                    if ver > DOWNSTREAM_SCHEMA_VERSION:
-                        skipped_newer_schema += 1
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping downstream telemetry from newer Forge (schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-                    if request_id and record.get("request_id") != request_id:
-                        continue
-                    if proxy_id and record.get("proxy_id") != proxy_id:
-                        continue
-                    if forge_run_id and record.get("forge_run_id") != forge_run_id:
-                        continue
-                    if forge_root_run_id and record.get("forge_root_run_id") != forge_root_run_id:
-                        continue
-                    if provider_session_id and record.get("provider_session_id") != provider_session_id:
-                        continue
-                    try:
-                        records.append(dacite.from_dict(DownstreamRecord, record, config=config))
-                    except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
-                        logger.warning(
-                            "Skipping malformed downstream telemetry in %s: %s",
-                            path.name,
-                            e,
-                        )
-        except OSError as e:
-            logger.warning("Failed to read downstream telemetry %s: %s", path, e)
+            records.append(dacite.from_dict(DownstreamRecord, record, config=config))
+        except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
+            logger.warning(
+                "Skipping malformed downstream telemetry in %s: %s",
+                item.path.name,
+                e,
+            )
 
     records.sort(key=lambda r: r.ts)
     merged = _merge_attempt_records(records)

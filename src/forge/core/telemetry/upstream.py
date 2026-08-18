@@ -14,8 +14,8 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object, try_parse_iso, utc_timestamp_z
-from forge.core.telemetry.jsonl_io import append_jsonl_record
+from forge.core.state import utc_timestamp_z
+from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
 
 logger = logging.getLogger(__name__)
 
@@ -162,50 +162,38 @@ def read_upstream_outcomes(
     policy_id: str | None = None,
 ) -> list[UpstreamOutcome]:
     """Read upstream outcomes, sorted by timestamp."""
-    log_dir = _upstream_dir()
-    if not log_dir.is_dir():
-        return []
-
     global _warned_newer_schema
     config = dacite.Config(strict=True)
     outcomes: list[UpstreamOutcome] = []
-    for path in sorted(log_dir.glob("*.jsonl")):
+    for item in iter_jsonl_records(
+        _upstream_dir(),
+        period_start,
+        period_end,
+        logger=logger,
+        read_error_message="Failed to read upstream telemetry %s: %s",
+    ):
+        record = item.record
+        ver = record.get("schema_version")
+        if isinstance(ver, int) and ver > UPSTREAM_SCHEMA_VERSION:
+            if not _warned_newer_schema:
+                logger.warning(
+                    "Skipping upstream telemetry from newer Forge (schema_version=%s); upgrade Forge",
+                    ver,
+                )
+                _warned_newer_schema = True
+            continue
+        if session and record.get("session") != session:
+            continue
+        if command and record.get("command") != command:
+            continue
+        if policy_id and record.get("policy_id") != policy_id:
+            continue
+        if not item.matches_period():
+            continue
         try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-                    ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > UPSTREAM_SCHEMA_VERSION:
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping upstream telemetry from newer Forge (schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-                    if session and record.get("session") != session:
-                        continue
-                    if command and record.get("command") != command:
-                        continue
-                    if policy_id and record.get("policy_id") != policy_id:
-                        continue
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        ts = try_parse_iso(ts_str, assume_naive_utc=True)
-                        if ts is None:
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-                    try:
-                        outcomes.append(dacite.from_dict(UpstreamOutcome, record, config=config))
-                    except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
-                        logger.warning("Skipping malformed upstream telemetry in %s: %s", path.name, e)
-        except OSError as e:
-            logger.warning("Failed to read upstream telemetry %s: %s", path, e)
+            outcomes.append(dacite.from_dict(UpstreamOutcome, record, config=config))
+        except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
+            logger.warning("Skipping malformed upstream telemetry in %s: %s", item.path.name, e)
 
     outcomes.sort(key=lambda r: r.ts)
     return outcomes

@@ -7,7 +7,9 @@ import logging
 import stat
 import threading
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,7 +18,7 @@ from forge.core.telemetry.downstream import (
     DownstreamRecord,
     write_downstream_record,
 )
-from forge.core.telemetry.jsonl_io import append_jsonl_record
+from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
 from forge.core.telemetry.upstream import (
     UPSTREAM_SCHEMA_VERSION,
     UpstreamOutcome,
@@ -47,6 +49,95 @@ def test_append_jsonl_record_compact_json_and_secure_modes(tmp_path: Path) -> No
     assert stat.S_IMODE(log_path.stat().st_mode) == 0o600
     assert stat.S_IMODE(log_path.parent.stat().st_mode) == 0o700
     assert stat.S_IMODE(log_path.parent.parent.stat().st_mode) == 0o700
+
+
+def test_iter_jsonl_records_preserves_shard_and_line_order(tmp_path: Path) -> None:
+    log_dir = tmp_path / "telemetry"
+    log_dir.mkdir()
+    (log_dir / "b.jsonl").write_text('{"id":"b1"}\n[]\n{"id":"b2"}\n')
+    (log_dir / "a.jsonl").write_text('\n{"id":"a1"}\n{bad json\n')
+
+    items = list(
+        iter_jsonl_records(
+            log_dir,
+            logger=logging.getLogger(__name__),
+            read_error_message="read failed for %s: %s",
+        )
+    )
+
+    assert [item.record["id"] for item in items] == ["a1", "b1", "b2"]
+    assert [item.path.name for item in items] == ["a.jsonl", "b.jsonl", "b.jsonl"]
+
+
+def test_jsonl_record_period_matching_is_lazy_and_half_open(tmp_path: Path) -> None:
+    log_dir = tmp_path / "telemetry"
+    log_dir.mkdir()
+    (log_dir / "events.jsonl").write_text(
+        "\n".join(
+            json.dumps({"id": record_id, "ts": ts})
+            for record_id, ts in (
+                ("before", "2025-12-31T23:59:59Z"),
+                ("offset-start", "2025-12-31T19:00:00-05:00"),
+                ("naive-middle", "2026-01-01T12:00:00"),
+                ("end", "2026-01-02T00:00:00Z"),
+                ("malformed", "not-a-timestamp"),
+            )
+        )
+        + "\n"
+    )
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    bounded = list(
+        iter_jsonl_records(
+            log_dir,
+            period_start=start,
+            period_end=end,
+            logger=logging.getLogger(__name__),
+            read_error_message="read failed for %s: %s",
+        )
+    )
+    unbounded = list(
+        iter_jsonl_records(
+            log_dir,
+            logger=logging.getLogger(__name__),
+            read_error_message="read failed for %s: %s",
+        )
+    )
+
+    assert [item.record["id"] for item in bounded if item.matches_period()] == ["offset-start", "naive-middle"]
+    assert all(item.matches_period() for item in unbounded)
+
+
+def test_iter_jsonl_records_logs_one_shard_read_failure_and_continues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    log_dir = tmp_path / "telemetry"
+    log_dir.mkdir()
+    (log_dir / "bad.jsonl").write_text('{"id":"bad"}\n')
+    (log_dir / "good.jsonl").write_text('{"id":"good"}\n')
+    real_open = Path.open
+
+    def open_or_fail(path: Path, *args: Any, **kwargs: Any) -> Any:
+        if path.name == "bad.jsonl":
+            raise OSError("denied")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_or_fail)
+
+    with caplog.at_level(logging.WARNING):
+        items = list(
+            iter_jsonl_records(
+                log_dir,
+                logger=logging.getLogger(__name__),
+                read_error_message="read failed for %s: %s",
+            )
+        )
+
+    assert [item.record["id"] for item in items] == ["good"]
+    assert caplog.messages == [f"read failed for {log_dir / 'bad.jsonl'}: denied"]
 
 
 def test_plane_writers_preserve_compact_record_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

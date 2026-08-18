@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: orders 1--25 and both bounded corrective members are closed through PR #204. Keep orders 26--35 in
+Current focus: order 26 is active on `refactor/centralize-telemetry-jsonl-reads` from `83394417`; keep orders 27--35 in
 `todo/`.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
@@ -145,6 +145,12 @@ Current focus: orders 1--25 and both bounded corrective members are closed throu
 - [x] Complete order 25's focused, full, regression, targeted telemetry/cost integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 25 independently in PR #204 (`356ea665`) and close its member before activating order 26.
+- [x] Close order 25 on pushed `main` at `83394417`, create `refactor/centralize-telemetry-jsonl-reads`, and activate
+  only order 26.
+- [ ] Share sorted shard, object-line, timestamp, and read-error mechanics across the three telemetry readers.
+- [ ] Complete order 26's focused, full, regression, targeted telemetry integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 26 independently and close its member before activating order 27.
 
-Orders 26--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
+Orders 27--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

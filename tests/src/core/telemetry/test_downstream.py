@@ -185,6 +185,54 @@ def test_older_identity_schema_is_skipped(_isolated_downstream: Path, caplog: py
     assert sum("older Forge backend-identity schema" in message for message in caplog.messages) == 1
 
 
+def test_schema_counts_remain_scoped_by_kind_and_period(
+    _isolated_downstream: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _isolated_downstream.mkdir(parents=True)
+    path = _isolated_downstream / "2026-06_1.jsonl"
+    records = [
+        {
+            "schema_version": 99,
+            "kind": "audit",
+            "downstream_event_id": "wrong-kind",
+            "ts": "2026-06-15T00:00:00Z",
+        },
+        {
+            "schema_version": 99,
+            "kind": "attempt",
+            "downstream_event_id": "before",
+            "ts": "2026-05-31T23:59:59Z",
+        },
+        {
+            "schema_version": 99,
+            "kind": "attempt",
+            "downstream_event_id": "newer",
+            "ts": "2026-06-15T00:00:00Z",
+        },
+        {
+            "schema_version": 1,
+            "kind": "attempt",
+            "downstream_event_id": "older",
+            "ts": "2026-06-15T00:00:00Z",
+        },
+    ]
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+
+    with caplog.at_level("WARNING"):
+        result = read_downstream_records_with_stats(
+            datetime(2026, 6, 1, tzinfo=timezone.utc),
+            datetime(2026, 7, 1, tzinfo=timezone.utc),
+            kind="attempt",
+        )
+
+    assert result.records == []
+    assert result.stats.skipped_newer_schema == 1
+    assert result.stats.skipped_legacy_schema == 1
+    assert sum("newer Forge" in message for message in caplog.messages) == 1
+    assert sum("older Forge backend-identity schema" in message for message in caplog.messages) == 1
+
+
 def test_strict_reader_skips_unknown_fields_and_non_object_lines(
     _isolated_downstream: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

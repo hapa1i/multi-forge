@@ -2,9 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--25 shipped independently in PRs #178--#184, #186--#188, and #190--#204; 10 members
-remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
-correction shipped in PR #189 before order 11; the earlier
+**Lane**: `doing/` -- orders 1--25 shipped independently in PRs #178--#184, #186--#188, and #190--#204; order 26 is
+active and nine members remain parked. The bounded
+[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
+before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal
@@ -76,7 +77,7 @@ runs last so it lands on the smallest stable surface.
 | 23    | O053             | [`share_codex_thread_index_sync`](../../done/share_codex_thread_index_sync/card.md)                     | one adoption-safe durable index writer               |
 | 24    | O054             | [`unify_resume_routing_reference`](../../done/unify_resume_routing_reference/card.md)                   | proxy-ID/template resume reference                   |
 | 25    | O055             | [`reuse_claude_usage_measurement`](../../done/reuse_claude_usage_measurement/card.md)                   | one proxied usage precedence rule                    |
-| 26    | O056             | [`centralize_telemetry_jsonl_reads`](../../todo/centralize_telemetry_jsonl_reads/card.md)               | tolerant per-plane JSONL read scaffold               |
+| 26    | O056             | [`centralize_telemetry_jsonl_reads`](../../doing/centralize_telemetry_jsonl_reads/card.md)              | tolerant per-plane JSONL read scaffold               |
 | 27    | O057, O095       | [`share_review_worker_preparation`](../../todo/share_review_worker_preparation/card.md)                 | review resource/worker input preparation             |
 | 28    | O058             | [`unify_claude_session_state_context`](../../todo/unify_claude_session_state_context/card.md)           | manifest-to-store/worktree derivation                |
 | 29    | O059             | [`share_transfer_rewind_rendering`](../../todo/share_transfer_rewind_rendering/card.md)                 | shared rendering primitives, distinct envelopes      |
