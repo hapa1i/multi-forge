@@ -93,9 +93,7 @@ def parse_review_worker_assignments(
     assignments: list[ParsedReviewWorkerAssignment] = []
     for arg in worker_args:
         if ":" not in arg:
-            raise ValueError(
-                f"Invalid --worker '{arg}'. Expected model:{assignment_kind} or model:custom prompt."
-            )
+            raise ValueError(f"Invalid --worker '{arg}'. Expected model:{assignment_kind} or model:custom prompt.")
 
         model_name, value = arg.split(":", 1)
         model_name = model_name.strip()
