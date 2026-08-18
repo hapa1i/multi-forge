@@ -1122,7 +1122,9 @@ class SessionManager:
 
         Replacement is intentionally narrow: the existing session must already
         be a fork from this parent, point at the same target checkout/branch,
-        and be inactive.
+        and be inactive. Keep this mutation-time verdict aligned with
+        ``core.ops.session_fork_preflight._can_force_replace`` until order 32
+        consumes the plan behind one execution boundary.
         """
         if existing_state is None:
             return False

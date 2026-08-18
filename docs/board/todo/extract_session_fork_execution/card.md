@@ -22,12 +22,19 @@ because preflight routing is already populated. Authority:
 session transaction/launch contracts in
 [`docs/design.md` "3.2"](../../../design.md#32-contract-files-authoritative-paths).
 
+Order 31 intentionally retained two temporary seams for this member to remove: mock-manager CLI tests take a weaker
+non-concrete planner path, and force-replacement/supervisor error predicates are duplicated between planning and
+mutation. The frozen request also carries execution-only `extensions`/`memory_flag` fields, while typed error codes are
+reserved for this execution boundary.
+
 ## Acceptance Criteria
 
 - One op consumes the typed preflight and owns create/relocate/artifact/rollback/launch-plan transitions with explicit
   compensation for every pre-launch failure point.
 - Reuse existing `ForkLaunchPlan`/launch ops; remove the unreachable re-resolution branch after proxy, inherited, and
   direct routing characterization.
+- Migrate mock-manager fork tests to concrete stores, remove the weaker planner fallbacks, and consolidate duplicated
+  force-replacement and supervisor error decisions behind the execution boundary.
 - The Click callback becomes a bounded adapter without changing human/JSON output, confirmation, task delivery, or
   runtime launch argv.
 - Run full fork/resume/session regressions and targeted worktree/native-relocate/rewind/Codex integration coverage.

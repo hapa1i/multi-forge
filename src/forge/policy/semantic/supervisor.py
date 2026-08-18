@@ -1142,7 +1142,9 @@ def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
     a template, when a matched template fails to start, or when the name is ambiguous
     across multiple active proxies.
     """
-    # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports
+    # The order-31 read-only fork planner mirrors these error messages before
+    # runtime realization. Keep them aligned until order 32 consumes that plan.
+    # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports.
     from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
     from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 

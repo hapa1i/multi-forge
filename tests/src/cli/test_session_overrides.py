@@ -649,21 +649,25 @@ class TestCwdGuardWiring:
         assert request.create_worktree is True
         assert request.into_path is None
 
-    def test_fork_into_skips_guards(self, runner: CliRunner, temp_env: Path) -> None:
+    def test_fork_into_routes_target_and_skips_cwd_guard(self, runner: CliRunner, temp_env: Path) -> None:
         with successful_claude_launch():
             runner.invoke(
                 main,
                 ["session", "start", "fork-into-parent", "--no-proxy", "--no-launch"],
             )
 
+        from forge.core.ops.session_fork_preflight import plan_session_fork
+
         with (
-            patch("forge.cli.guards.require_repo_root") as mock_rr,
-            patch("forge.cli.guards.require_main_repo_root") as mock_mrr,
+            patch("forge.cli.session_fork.plan_session_fork", wraps=plan_session_fork) as planner,
+            patch("forge.core.ops.session_fork_preflight._validate_command_cwd") as cwd_guard,
         ):
-            # --into has its own validation; CWD guards should not be called
             runner.invoke(main, ["session", "fork", "fork-into-parent", "--into", str(temp_env)])
-        mock_rr.assert_not_called()
-        mock_mrr.assert_not_called()
+
+        request = planner.call_args.args[0]
+        assert request.into_path == str(temp_env)
+        assert request.create_worktree is False
+        cwd_guard.assert_not_called()
 
     def test_incognito_calls_require_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
         with (

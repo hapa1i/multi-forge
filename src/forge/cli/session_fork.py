@@ -336,12 +336,22 @@ def fork(
         drop_last_explicit=drop_last_explicit,
         inline_plan_explicit=inline_plan_explicit,
     )
+    preflight_notices: list[ForkPreflightNotice] = []
     try:
-        preflight = plan_session_fork(
-            request,
-            manager=manager,
-            context_limit_resolver=_resolve_context_limit,
-        )
+        try:
+            preflight = plan_session_fork(
+                request,
+                manager=manager,
+                context_limit_resolver=_resolve_context_limit,
+                notices_sink=preflight_notices,
+            )
+        except Exception:
+            # Planning may collect an explanatory status/tip before a later
+            # refusal. Preserve the established output order on those failure
+            # paths even though successful notices travel on the typed plan.
+            for notice in preflight_notices:
+                _render_fork_preflight_notice(notice)
+            raise
     except ForkPreflightError as e:
         _render_fork_preflight_error(e)
         sys.exit(1)

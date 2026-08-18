@@ -25,12 +25,17 @@ proxies before the mutation call, while target/session checks are split between 
 
 - A typed op resolves target git state, occupancy/collisions, parent launchability, strategy/depth/budget, native
   relocation prerequisites, routing, model, and supervisor inputs without writing files, rows, worktrees, or branches.
-- Click owns prompts/rendering/exits and maps typed op failures to the exact current stderr and exit behavior.
+- Click owns prompts/rendering/exits and maps each typed op failure to the current stderr and exit behavior, retaining
+  any preceding explanatory notice.
 - Fail-first/characterization fixtures prove every rejected precondition leaves the index, manifests, git worktrees,
   branches, transfer artifacts, and runtime processes unchanged.
 - Run fork/session/routing/regression units and targeted fork/rewind integration coverage.
 
 ## Exclusions
 
-Do not change fork semantics, add rollback to preflight, launch a runtime, or absorb the post-create execution phase.
-That phase belongs to [`extract_session_fork_execution`](../../todo/extract_session_fork_execution/card.md).
+Do not otherwise change fork semantics, add rollback to preflight, launch a runtime, or absorb the post-create execution
+phase. The inherited `full`-budget reference deliberately closes the fork-side drift from the normative §3.9 rule: the
+parent's started proxy ID now precedes its intent template. Moving deterministic checks before runtime resolution may
+also change which independent error wins when one request has multiple invalid inputs; each individual failure retains
+its established rendering and exit. The execution phase belongs to
+[`extract_session_fork_execution`](../../todo/extract_session_fork_execution/card.md).

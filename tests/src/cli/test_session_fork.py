@@ -967,6 +967,7 @@ class TestSessionFork:
             )
 
         assert result.exit_code == 1
+        assert "switched to transfer mode" in result.output
         assert "exceeds context limit" in result.output
         mock_manager.fork_session.assert_not_called()
         mock_invoke.assert_not_called()

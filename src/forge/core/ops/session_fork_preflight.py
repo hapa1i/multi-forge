@@ -16,6 +16,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
+from dacite import DaciteError
+
 from forge.core.models.direct_model import DirectModelPin, resolve_direct_model_pin
 from forge.core.naming import generate_unique_name
 from forge.core.paths import display_path
@@ -203,10 +205,15 @@ def plan_session_fork(
     *,
     manager: SessionManager | None = None,
     context_limit_resolver: Callable[[str | None], int] = _resolve_context_limit,
+    notices_sink: list[ForkPreflightNotice] | None = None,
 ) -> ForkPreflightPlan:
-    """Resolve and validate a fork request without durable or runtime writes."""
+    """Resolve a fork without durable/runtime writes.
+
+    ``notices_sink`` receives notices as they are resolved so an adapter can
+    retain earlier context when a later precondition fails.
+    """
     manager = manager or SessionManager()
-    notices: list[ForkPreflightNotice] = []
+    notices = notices_sink if notices_sink is not None else []
 
     if request.direct and request.proxy_name:
         raise ForkPreflightError("--no-proxy and --proxy are mutually exclusive")
@@ -847,7 +854,11 @@ def _validate_model_pin(
 
 
 def _validate_supervisor_proxy_reference(supervisor_proxy: str | None) -> None:
-    """Reject deterministic supervisor routing failures before any proxy starts."""
+    """Reject deterministic supervisor routing failures before any proxy starts.
+
+    Error text mirrors ``ensure_supervisor_proxy``; order 32 removes this split
+    when supervisor realization moves behind the command-core plan.
+    """
     if supervisor_proxy is None:
         return
 
@@ -1044,7 +1055,8 @@ def _preflight_target(
         checkout = worktree_plan.worktree_path
         target_root = checkout / parent_relative
         target_branch = worktree_plan.branch
-        assert replacement_start_point is not None
+        if replacement_start_point is None:
+            raise RuntimeError("worktree preflight is missing its resolved start point")
         prospective_pin = read_file_at_revision(
             Path(parent_relative) / ".forge" / "project.toml",
             revision=replacement_start_point,
@@ -1095,6 +1107,13 @@ def _can_force_replace(
         return False
     try:
         return ActiveSessionStore().peek_session(fork_name, forge_root=str(target_forge_root)) is None
+    except (OSError, ValueError, DaciteError) as e:
+        # The manager's mutation-time check retains the runtime registry's
+        # established self-healing read. Defer repairable unreadable state to
+        # that check so this read-only pass neither rewrites active.json nor
+        # turns its corruption into a permanent force-replacement refusal.
+        logger.debug("Deferring unreadable active state for fork target %r: %s", fork_name, e)
+        return True
     except Exception as e:
         logger.debug("Unable to verify active state for fork target %r: %s", fork_name, e)
         return False

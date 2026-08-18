@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -11,11 +12,13 @@ import pytest
 
 from forge.core.ops.session_fork_preflight import (
     ForkPreflightError,
+    ForkPreflightNotice,
     ForkPreflightRequest,
     _validate_command_cwd,
     plan_session_fork,
 )
-from forge.session import SessionManager, SessionStore
+from forge.session import SessionManager, SessionState, SessionStore
+from forge.session.active import ActiveSessionStore
 from forge.session.claude.paths import get_transcript_path
 from forge.session.exceptions import (
     BranchExistsError,
@@ -26,6 +29,7 @@ from forge.session.exceptions import (
     TranscriptArtifactStateError,
 )
 from forge.session.identity import make_scoped_key
+from forge.session.models import ProxyIntent, StartedWithProxy
 
 
 def _init_repo(path: Path) -> None:
@@ -302,15 +306,80 @@ def test_budget_rejection_leaves_state_unchanged(
         mutate=lambda state: setattr(state.confirmed, "transcript_path", str(transcript)),
     )
     before = _snapshot(repo, manager)
+    notices: list[ForkPreflightNotice] = []
 
     with pytest.raises(ForkPreflightError, match="exceeds context limit"):
         plan_session_fork(
-            _request(repo, strategy="full", resume_mode="transfer", no_launch=True),
+            _request(repo, strategy="full", strategy_explicit=True, no_launch=True),
             manager=manager,
             context_limit_resolver=lambda _ref: 1,
+            notices_sink=notices,
         )
 
+    assert [notice.message for notice in notices] == [
+        "Same-directory fork switched to transfer mode (--strategy/--inline-plan implies a transfer fork)."
+    ]
     assert _snapshot(repo, manager) == before
+
+
+def test_inherited_budget_prefers_started_proxy_id_over_intent_template(
+    fork_preflight_repo: tuple[Path, SessionManager],
+) -> None:
+    repo, manager = fork_preflight_repo
+    transcript = repo / "parent.jsonl"
+    transcript.write_text("small transcript", encoding="utf-8")
+
+    def _seed_routing(state: SessionState) -> None:
+        state.intent.proxy = ProxyIntent(
+            template="intent-template",
+            base_url="http://localhost:8000",
+        )
+        state.confirmed.started_with_proxy = StartedWithProxy(
+            template="started-template",
+            base_url="http://localhost:9000",
+            proxy_id="started-proxy-id",
+        )
+        state.confirmed.transcript_path = str(transcript)
+
+    SessionStore(str(repo), "parent").update(timeout_s=5.0, mutate=_seed_routing)
+    resolved_refs: list[str | None] = []
+
+    def _record_context_reference(ref: str | None) -> int:
+        resolved_refs.append(ref)
+        return 200_000
+
+    plan = plan_session_fork(
+        _request(repo, strategy="full", resume_mode="transfer", no_launch=True),
+        manager=manager,
+        context_limit_resolver=_record_context_reference,
+    )
+
+    assert resolved_refs == ["started-proxy-id"]
+    assert plan.routing.proxy_id == "started-proxy-id"
+    assert plan.transcript_token_estimate is not None
+
+
+def test_unreadable_active_registry_defers_force_replacement_to_manager(
+    fork_preflight_repo: tuple[Path, SessionManager],
+) -> None:
+    repo, manager = fork_preflight_repo
+    manager.fork_session(parent_name="parent", fork_name="child")
+    active_store = ActiveSessionStore()
+    active_store.index_path.parent.mkdir(parents=True, exist_ok=True)
+    malformed = b'{"version": 1, "sessions": {"child"'
+    active_store.index_path.write_bytes(malformed)
+    before = _snapshot(repo, manager)
+
+    plan = plan_session_fork(_request(repo, no_launch=True, force=True), manager=manager)
+
+    assert plan.target.replace_stale_state is True
+    assert active_store.index_path.read_bytes() == malformed
+    assert _snapshot(repo, manager) == before
+
+    _, child = manager.fork_session(parent_name="parent", fork_name="child", force=True)
+
+    assert child.parent_session == "parent"
+    assert json.loads(active_store.index_path.read_text(encoding="utf-8")) == {"version": 1, "sessions": {}}
 
 
 def test_stale_parent_row_is_not_pruned_by_rejected_preflight(
