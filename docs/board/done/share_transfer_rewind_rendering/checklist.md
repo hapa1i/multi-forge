@@ -1,6 +1,6 @@
 # Share transfer and rewind rendering primitives checklist
 
-Current focus: active -- order 29 only; orders 30--35 remain parked.
+Current focus: closed -- order 29 shipped in PR #208; orders 30--35 remain parked.
 
 ## Activation and evidence
 
@@ -37,7 +37,7 @@ Current focus: active -- order 29 only; orders 30--35 remain parked.
 - [x] Run focused transfer/rewind unit and relevant regression tests (198 passed).
 - [x] Run `make test-unit` (9,259 passed, one skipped, 122 deselected) and `make test-regression` (923 passed).
 - [x] Run the real-Claude targeted Docker rewind integration suite (one passed).
-- [x] Run full `make pre-commit`, diff checks, design-size checks (29,989 / 29,937; change log 29,922), and the board
-  audit (365 documents, 894 local links, zero missing; 14 proposed / nine todo / three doing / 163 done / four retired)
-  without a Forge workflow.
-- [ ] Open the order-29 PR and close this member after merge without activating order 30.
+- [x] Run full `make pre-commit`, diff checks, final design-size checks (29,989 / 29,966; change log 29,942), and the
+  board audit (365 documents, 894 local links, zero missing; 14 proposed / nine todo / two doing / 164 done / four
+  retired) without a Forge workflow.
+- [x] Merge PR #208 as `ea5b9103` and close this member without activating order 30.

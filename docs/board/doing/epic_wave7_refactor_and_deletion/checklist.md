@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 29 `share_transfer_rewind_rendering` is active from `7c925880`; orders 30--35 remain parked.
+Current focus: no member is active -- orders 1--29 shipped; orders 30--35 remain parked.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -170,7 +170,7 @@ Current focus: order 29 `share_transfer_rewind_rendering` is active from `7c9258
 - [x] Share only transfer/rewind text, list, and cited-item rendering while keeping orders 30--35 parked.
 - [x] Complete order 29's focused, full, regression, targeted rewind integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 29 independently and close its member without activating order 30.
+- [x] Ship order 29 independently in PR #208 (`ea5b9103`) and close its member without activating order 30.
 
 Orders 30--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

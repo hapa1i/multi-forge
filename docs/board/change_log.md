@@ -38,8 +38,9 @@ wc -l docs/board/change_log.md
   citation validation; byte-level transfer, rewind, and rewind-prompt goldens pin the boundary.
 - Left O018's separately gated truncated-turn citation defect outside this behavior-preserving member.
 
-**Verification**: 198 focused; 9,259 unit (one skip, 122 deselected); 923 regression; one real rewind Docker test;
-pre-commit, diff, 29,989/29,937 design, and 365-document/894-link board checks pass. No Forge workflow command was used.
+**Verification**: 198 focused plus 135 review-fix focused; 9,259 unit (one skip, 122 deselected); 923 regression; one
+real rewind Docker test; pre-commit, diff, 29,989/29,966 design, and 365-document/894-link board checks pass. PR #208
+merged as `ea5b9103`; no Forge workflow command was used.
 
 ### Unify Claude session state-context derivation
 

@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 29 `share_transfer_rewind_rendering` is active from `7c925880`; orders 30--35 remain parked.
+Current focus: no Wave 7 member is active -- orders 1--29 shipped; orders 30--35 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -318,6 +318,6 @@ Current focus: Wave 7 order 29 `share_transfer_rewind_rendering` is active from 
 - [x] Share only transfer/rewind text, list, and cited-item rendering while keeping orders 30--35 parked.
 - [x] Complete order 29's focused, full, regression, targeted rewind integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 29 independently and close it without activating order 30.
+- [x] Ship order 29 independently in PR #208 (`ea5b9103`) and close it without activating order 30.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- implementation and verification complete on `refactor/share-transfer-rewind-rendering` from
-`7c925880`; pending independent review.
+**Lane**: `done/` -- shipped in PR #208 as `ea5b9103` after focused, full, regression, targeted rewind integration, and
+pre-commit verification.
 
 **Finding**: O059.
 
