@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/share-review-worker-preparation`, branched from pushed `main` at `8787f7e7`.
+**Lane**: `done/` -- shipped in PR #206 (`242ded2d`) after all five GitHub checks passed.
 
 **Findings**: O057 and the verified worker-spec/parser plus optional JSON-metadata-tail subset of O095.
 
@@ -37,4 +37,6 @@ or combine consensus and adversarial result types.
 
 ## Closeout
 
-Open. Orders 28--35 remain parked until this member ships and closes independently.
+PR #206 merged as `242ded2d` with all five GitHub checks passing. Consensus and adversarial reviews now share resource,
+worker, assignment-parser, and optional JSON-metadata mechanics while retaining distinct domain types, routing, fan-out,
+prompts, wire orders, and result schemas. Order 28 remains parked for separate activation from this closeout.

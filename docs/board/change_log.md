@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Share review worker preparation
+
+**Goal/outcome**: Remove review worker-preparation drift without hiding consensus and adversarial domain semantics.
+
+**Key changes**:
+
+- Added typed pure helpers for resource marker validation/fill, stable worker IDs and labels, and common
+  `model:assignment` parsing.
+- Routed consensus and adversarial preparation plus all four optional JSON-metadata sites through shared mechanics while
+  retaining distinct routing, fan-out, prompts, wire orders, and result schemas.
+- Recorded the ownership boundary in the design while preserving the fresh cached Codex-preflight requirement.
+
+**Verification**: 223 initial and 158 review-fix focused tests, 444 expanded review tests, 9,239 unit tests (one skip),
+921 regressions, four targeted Docker workflow-worker tests, full pre-commit, 29,988/29,990 design-document counts, and
+the 361-document/882-link board audit pass. PR #206 merged as `242ded2d` with all five GitHub checks passing. No Forge
+workflow command was used.
+
 ### Centralize tolerant telemetry JSONL reads
 
 **Goal/outcome**: Share telemetry shard/object/timestamp mechanics without collapsing each plane's schema and failure

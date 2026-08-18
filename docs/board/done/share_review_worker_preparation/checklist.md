@@ -1,6 +1,6 @@
 # Share review worker preparation helpers checklist
 
-Current focus: order 27 is active on `refactor/share-review-worker-preparation`; orders 28--35 remain parked.
+Current focus: complete -- order 27 shipped in PR #206 (`242ded2d`); orders 28--35 remain parked.
 
 ## Activation and evidence
 
@@ -38,4 +38,4 @@ Current focus: order 27 is active on `refactor/share-review-worker-preparation`;
   passed) suites.
 - [x] Run full pre-commit, `git diff --check`, design-size checks (29,988 and 29,990 tokens), and the board audit (361
   documents, 882 local links, zero missing; 26 done / one doing / eight todo) without a Forge workflow.
-- [ ] Open the order-27 PR, merge it after all checks pass, and close this member before activating order 28.
+- [x] Open PR #206, merge it as `242ded2d` after all five checks pass, and close order 27 before activating order 28.

@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--26 and both bounded corrective members are closed through PR #205. Order 27 is active;
-keep orders 28--35 parked.
+Current focus: Wave 7 orders 1--27 and both bounded corrective members are closed through PR #206. Keep orders 28--35
+parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -304,6 +304,6 @@ keep orders 28--35 parked.
 - [x] Share the review worker preparation/parser scaffold while keeping orders 28--35 parked.
 - [x] Complete order 27's focused, full, regression, targeted workflow-worker integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 27 independently and close its member without activating order 28.
+- [x] Ship order 27 independently in PR #206 (`242ded2d`) and close its member without activating order 28.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
