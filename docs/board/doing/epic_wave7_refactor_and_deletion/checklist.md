@@ -1,6 +1,6 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 31 `extract_session_fork_preflight` is active from `54188e61`; orders 32--35 remain parked.
+Current focus: orders 1--31 shipped; orders 32--35 remain parked.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -182,7 +182,7 @@ Current focus: order 31 `extract_session_fork_preflight` is active from `54188e6
 - [x] Extract a typed, UI-free, read-only fork preflight while keeping order 32's mutation/rollback phase parked.
 - [x] Complete order 31's focused, full, regression, targeted fork integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
-- [ ] Ship order 31 independently and close its member without activating order 32.
+- [x] Ship order 31 independently in PR #210 (`85c050e2`) and close its member without activating order 32.
 
 Orders 32--35 are intentionally parked. This checklist does not authorize parallel implementation or any other
 separately gated Wave 6 finding.

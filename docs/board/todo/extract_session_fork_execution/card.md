@@ -6,7 +6,7 @@
 
 **Findings**: O068's mutation/launch subset and O096's unreachable second `elif proxy_name` branch.
 
-**Depends on**: [`extract_session_fork_preflight`](../../doing/extract_session_fork_preflight/card.md).
+**Depends on**: [`extract_session_fork_preflight`](../../done/extract_session_fork_preflight/card.md).
 
 ## Goal
 

@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/extract-session-fork-preflight` from `54188e61`.
+**Lane**: `done/` -- shipped in PR #210 as `85c050e2` after focused, full, regression, targeted fork integration, and
+pre-commit verification.
 
 **Finding**: O068's pre-mutation subset.
 

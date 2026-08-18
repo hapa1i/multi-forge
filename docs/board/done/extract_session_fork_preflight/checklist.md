@@ -1,7 +1,6 @@
 # Extract session-fork preflight checklist
 
-Current focus: implementation and verification complete; publish the independent order-31 PR without activating order
-32\.
+Current focus: closed -- order 31 shipped in PR #210; orders 32--35 remain parked.
 
 - [x] Create `refactor/extract-session-fork-preflight` from pushed `main` at `54188e61`.
 - [x] Reverify O068 against the callback, manager, routing, supervisor, worktree, and target-occupancy seams.
@@ -20,6 +19,7 @@ Current focus: implementation and verification complete; publish the independent
 - [x] Run targeted Docker fork lifecycle and project-identity integration.
 - [x] Run `make test-unit`, `make test-regression`, `make pre-commit`, design token checks, and board integrity.
 - [x] Record verification and closeout evidence before PR publication.
+- [x] Merge PR #210 as `85c050e2` and close this member without activating order 32.
 
 ## Acceptance coverage
 
@@ -42,5 +42,5 @@ Current focus: implementation and verification complete; publish the independent
 - Review probes reproduced the dropped-notice and unreadable-active-registry failures before their focused fixes; the
   effective-route and `--into` probes confirmed the documented alignment and vacuous old test respectively.
 - Documentation: Claude Opus 5 counts are 29,979 for `design.md` and 29,966 for `design_appendix.md`; all 894 local
-  links across 367 board documents resolve; Wave 7 remains 30 done, one doing, and four todo.
+  links across 367 board documents resolve; Wave 7 is 31 done and four todo.
 - No Forge workflow command was used.
