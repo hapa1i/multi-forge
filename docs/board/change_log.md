@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-18
 
+### Stabilize search-index snapshot fingerprints
+
+**Goal/outcome**: Prevent concurrent transcript refreshes from making index state describe bytes absent from the search
+stores.
+
+**Key changes**:
+
+- Carried one captured `mtime`/size fingerprint from extraction through incremental and bulk state persistence.
+- Retained incremental markers on detectable drift and made rebuild warn for an explicit rerun while keeping state
+  aligned with the stored snapshot.
+- Added deterministic mutation-during-write regressions for both paths without changing the state schema or Stop queue.
+
+**Verification**: 109 focused tests, 9,242 unit tests (one skip, 122 deselected), 923 regressions, one targeted Docker
+Stop/artifact test (12 deselected), full pre-commit, diff checks, and the 363-document/894-link board audit pass. No
+Forge workflow command was used.
+
 ### Share review worker preparation
 
 **Goal/outcome**: Remove review worker-preparation drift without hiding consensus and adversarial domain semantics.

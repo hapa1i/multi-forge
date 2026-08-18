@@ -351,7 +351,13 @@ def rebuild_index_cmd() -> None:
 
     from forge.search.engine import BM25
     from forge.search.extractor import decompose_document, extract_document
-    from forge.search.index_state import IndexState, IndexStateStore
+    from forge.search.index_state import (
+        IndexFingerprint,
+        IndexState,
+        IndexStateStore,
+        capture_index_fingerprint,
+        matches_index_fingerprint,
+    )
 
     project_root = _resolve_forge_root()
     from forge.cli.guards import enforce_target_project_compatibility
@@ -372,6 +378,7 @@ def rebuild_index_cmd() -> None:
 
     # Extract all docs
     new_docs = []
+    extracted_fingerprints: dict[str, IndexFingerprint] = {}
     errors = 0
 
     for session_dir in sorted(artifacts_dir.iterdir()):
@@ -385,13 +392,17 @@ def rebuild_index_cmd() -> None:
         for jsonl_file in sorted(transcripts_dir.glob("*.jsonl")):
             session_id = jsonl_file.stem
             try:
+                fingerprint = capture_index_fingerprint(jsonl_file)
                 doc = extract_document(
                     transcript_path=jsonl_file,
                     session_name=session_name,
                     session_id=session_id,
                     worktree_path=project_root_str,
                 )
+                if not matches_index_fingerprint(jsonl_file, fingerprint):
+                    raise RuntimeError("transcript changed while rebuilding")
                 new_docs.append(doc)
+                extracted_fingerprints[doc.transcript_path] = fingerprint
             except Exception as e:
                 console.print(f"[yellow]Warning:[/yellow] Failed to extract {jsonl_file.name}: {e}")
                 errors += 1
@@ -430,11 +441,18 @@ def rebuild_index_cmd() -> None:
     # replacement repairs corrupt/newer bookkeeping without N read-modify-writes.
     rebuilt_state = IndexState()
     for doc in new_docs:
-        try:
-            rebuilt_state.mark_indexed(Path(doc.transcript_path))
-        except (FileNotFoundError, ValueError):
-            pass
+        rebuilt_state.mark_indexed(
+            Path(doc.transcript_path),
+            fingerprint=extracted_fingerprints[doc.transcript_path],
+        )
     index_store.replace_all(rebuilt_state)
+
+    # State describes the extracted bytes even if a later artifact write races
+    # the bulk stores. Surface the drift so a rerun can index the latest version.
+    for doc in new_docs:
+        path = Path(doc.transcript_path)
+        if not matches_index_fingerprint(path, extracted_fingerprints[doc.transcript_path]):
+            console.print(f"[yellow]Warning:[/yellow] {path.name} changed while rebuilding; rerun rebuild-index.")
 
     console.print(f"[green]Indexed {len(new_docs)} transcripts.[/green]")
     if errors:

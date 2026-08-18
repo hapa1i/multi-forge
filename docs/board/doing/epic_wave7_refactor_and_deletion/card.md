@@ -3,8 +3,11 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; eight members
-remain parked. The bounded [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md)
-correction shipped in PR #189 before order 11; the earlier
+remain parked. The bounded
+[`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) correction closed
+order 20's post-merge snapshot race directly on `main` after PR #206 and before order 28. The bounded
+[`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
+before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped in PR #185.
 
 ## Goal

@@ -223,7 +223,11 @@ def _process_pending_work_best_effort() -> None:
             from forge.search.bm25_store import BM25IndexStore
             from forge.search.content_store import ContentStore
             from forge.search.extractor import decompose_document, extract_document
-            from forge.search.index_state import IndexStateStore
+            from forge.search.index_state import (
+                IndexStateStore,
+                capture_index_fingerprint,
+                matches_index_fingerprint,
+            )
             from forge.search.store import SearchDocumentStore
             from forge.session.artifacts import resolve_forge_root
 
@@ -254,12 +258,15 @@ def _process_pending_work_best_effort() -> None:
             if unchanged:
                 return
 
+            extracted_fingerprint = capture_index_fingerprint(transcript_abs)
             doc = extract_document(
                 transcript_path=transcript_abs,
                 session_name=payload["session_name"],
                 session_id=payload["session_id"],
                 worktree_path=str(worktree_path),
             )
+            if not matches_index_fingerprint(transcript_abs, extracted_fingerprint):
+                raise RuntimeError(f"transcript changed while indexing: {transcript_abs}")
 
             meta, term_freq, doc_len, content = decompose_document(doc)
 
@@ -273,7 +280,11 @@ def _process_pending_work_best_effort() -> None:
             content_store = ContentStore(forge_root=forge_root)
             content_store.add(doc.transcript_path, content)
 
-            index_store.mark_indexed(transcript_abs)
+            # Persist the fingerprint of the extracted bytes, never a later live-path
+            # version. A post-write mutation retains this marker for a clean retry.
+            index_store.mark_indexed(transcript_abs, fingerprint=extracted_fingerprint)
+            if not matches_index_fingerprint(transcript_abs, extracted_fingerprint):
+                raise RuntimeError(f"transcript changed while indexing: {transcript_abs}")
 
         def _memory_writer_handler(marker: Marker) -> None:
             """Spawn a detached background process to run the memory writer.

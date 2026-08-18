@@ -768,6 +768,12 @@ branch moved through a later bounded exception; O084, converter/Gemini residue, 
 tail remain outside. These exclusions make the Wave 7 child epic an executable refactor/deletion sequence rather than a
 synonym for “everything left.”
 
+Post-merge review on 2026-08-18 verified one correctness edge in order 20: incremental and bulk indexing could record a
+newer live transcript fingerprint than the snapshot written to the search stores. This is not a new structural finding
+or member-count change; the bounded
+[`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) correction shipped
+directly on `main` after PR #206 and before order 28.
+
 ### Suggested coordination boundaries
 
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
@@ -792,9 +798,11 @@ synonym for “everything left.”
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
   are split into 35 members. Orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; eight are
   parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
-  correction shipped in PR #189 without changing those counts. O062/O063/O093 are rejected as written; O071's `httpx2`
-  half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified scope; and
-  O092's unadmitted tail is not an executable deletion set.
+  correction shipped in PR #189, and
+  [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order 20's later
+  snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written; O071's
+  `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified
+  scope; and O092's unadmitted tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

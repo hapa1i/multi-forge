@@ -20,6 +20,7 @@ from forge.search.index_state import (
     IndexedFileEntry,
     IndexState,
     IndexStateStore,
+    capture_index_fingerprint,
 )
 
 # ---------------------------------------------------------------------------
@@ -167,6 +168,27 @@ class TestIndexStateMarkIndexed:
         entry = state.indexed_files[str(transcript_file)]
         assert entry.indexed_at  # Non-empty
         assert "T" in entry.indexed_at  # ISO8601 format
+
+    def test_explicit_fingerprint_records_the_extracted_file_version(self, transcript_file: Path) -> None:
+        fingerprint = capture_index_fingerprint(transcript_file)
+        transcript_file.write_text('{"role":"user","content":"newer and longer"}\n')
+
+        state = IndexState()
+        state.mark_indexed(transcript_file, fingerprint=fingerprint)
+
+        entry = state.indexed_files[str(transcript_file)]
+        assert (entry.mtime, entry.size) == (fingerprint.mtime, fingerprint.size)
+        assert state.needs_reindex(transcript_file) is True
+
+    def test_explicit_fingerprint_rejects_a_different_path(
+        self,
+        transcript_file: Path,
+        second_transcript: Path,
+    ) -> None:
+        fingerprint = capture_index_fingerprint(second_transcript)
+
+        with pytest.raises(ValueError, match="fingerprint path .* does not match"):
+            IndexState().mark_indexed(transcript_file, fingerprint=fingerprint)
 
     def test_relative_path_raises_valueerror(self) -> None:
         state = IndexState()

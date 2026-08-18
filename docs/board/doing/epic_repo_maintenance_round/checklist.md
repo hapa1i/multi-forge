@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--27 and both bounded corrective members are closed through PR #206. Keep orders 28--35
+Current focus: Wave 7 orders 1--27 and all three bounded corrective members are closed after PR #206. Keep orders 28--35
 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
@@ -305,5 +305,8 @@ parked.
 - [x] Complete order 27's focused, full, regression, targeted workflow-worker integration, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
 - [x] Ship order 27 independently in PR #206 (`242ded2d`) and close its member without activating order 28.
+- [x] Challenge and reproduce order 20's post-merge fingerprint race, close
+  [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) directly on
+  `main`, and preserve the Wave 7 finding/member counts before activating order 28.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

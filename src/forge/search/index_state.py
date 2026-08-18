@@ -62,6 +62,15 @@ def _require_absolute(path: Path) -> None:
 # --- Data layer ---
 
 
+@dataclass(frozen=True)
+class IndexFingerprint:
+    """Path-bound mtime/size fingerprint for one extracted transcript snapshot."""
+
+    path: str
+    mtime: float
+    size: int
+
+
 @dataclass
 class IndexedFileEntry:
     """Tracking metadata for a single indexed transcript file."""
@@ -69,6 +78,24 @@ class IndexedFileEntry:
     mtime: float
     size: int
     indexed_at: str
+
+
+def capture_index_fingerprint(path: Path) -> IndexFingerprint:
+    """Capture the version-1 search fingerprint for one absolute path."""
+    _require_absolute(path)
+    stat = os.stat(path)
+    return IndexFingerprint(path=str(path), mtime=stat.st_mtime, size=stat.st_size)
+
+
+def matches_index_fingerprint(path: Path, fingerprint: IndexFingerprint) -> bool:
+    """Return whether an absolute path still has the captured fingerprint."""
+    _require_absolute(path)
+    if str(path) != fingerprint.path:
+        raise ValueError(f"fingerprint path {fingerprint.path!r} does not match {path}")
+    try:
+        return capture_index_fingerprint(path) == fingerprint
+    except OSError:
+        return False
 
 
 @dataclass
@@ -98,7 +125,7 @@ class IndexState:
         _require_absolute(path)
 
         try:
-            stat = os.stat(path)
+            fingerprint = capture_index_fingerprint(path)
         except OSError:
             return False
 
@@ -107,30 +134,34 @@ class IndexState:
         if entry is None:
             return True
 
-        return entry.mtime != stat.st_mtime or entry.size != stat.st_size
+        return entry.mtime != fingerprint.mtime or entry.size != fingerprint.size
 
-    def mark_indexed(self, path: Path) -> None:
-        """Record that a file has been indexed with its current mtime/size.
+    def mark_indexed(self, path: Path, *, fingerprint: IndexFingerprint | None = None) -> None:
+        """Record the fingerprint of the file version written to the search stores.
 
-        Creates or updates the entry for the given path using the file's
-        current stat() values and the current timestamp.
+        By default this captures the current mtime/size for compatibility. Callers
+        that extracted the file earlier can pass that exact fingerprint so a later
+        live-path mutation cannot make state describe bytes the stores never saw.
 
         Raises:
             ValueError: If path is not absolute.
-            FileNotFoundError: If path does not exist on disk.
+            FileNotFoundError: If no fingerprint is supplied and path does not exist.
         """
         _require_absolute(path)
 
-        try:
-            stat = os.stat(path)
-        except FileNotFoundError:
-            raise
-        except OSError as e:
-            raise FileNotFoundError(str(path)) from e
+        if fingerprint is None:
+            try:
+                fingerprint = capture_index_fingerprint(path)
+            except FileNotFoundError:
+                raise
+            except OSError as e:
+                raise FileNotFoundError(str(path)) from e
+        elif fingerprint.path != str(path):
+            raise ValueError(f"fingerprint path {fingerprint.path!r} does not match {path}")
 
         self.indexed_files[str(path)] = IndexedFileEntry(
-            mtime=stat.st_mtime,
-            size=stat.st_size,
+            mtime=fingerprint.mtime,
+            size=fingerprint.size,
             indexed_at=now_iso(),
         )
 
@@ -263,18 +294,25 @@ class IndexStateStore:
 
     # -- Convenience wrappers --
 
-    def mark_indexed(self, path: Path, *, timeout_s: float = HANDLER_LOCK_TIMEOUT_S) -> None:
+    def mark_indexed(
+        self,
+        path: Path,
+        *,
+        fingerprint: IndexFingerprint | None = None,
+        timeout_s: float = HANDLER_LOCK_TIMEOUT_S,
+    ) -> None:
         """Mark a file as indexed (locked read-modify-write).
 
-        Convenience wrapper around update() that calls state.mark_indexed(path).
+        Convenience wrapper around update() that records either the supplied
+        extraction fingerprint or the path's current fingerprint.
 
         Raises:
             ValueError: If path is not absolute.
-            FileNotFoundError: If path does not exist on disk.
+            FileNotFoundError: If no fingerprint is supplied and path does not exist.
         """
 
         def _mutate(state: IndexState) -> None:
-            state.mark_indexed(path)
+            state.mark_indexed(path, fingerprint=fingerprint)
 
         self.update(timeout_s=timeout_s, mutate=_mutate)
 

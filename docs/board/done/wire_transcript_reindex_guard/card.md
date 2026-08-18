@@ -7,6 +7,10 @@ subset).
 
 **Lane**: `done/` -- shipped in PR #199 (`7b3ac2df`) after all five GitHub checks passed.
 
+**Post-merge correction**:
+[`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) makes state retain
+the fingerprint of the bytes actually extracted when a later Stop refresh races indexing.
+
 **Finding**: O092's `IndexState.needs_reindex` subset.
 
 ## Goal
@@ -28,6 +32,8 @@ is deliberately restored. The focused 58-test search-state/startup-queue baselin
   the transcript's current `mtime` and size.
 - A new transcript, a missing state entry, or changed `mtime`/size still performs the full idempotent upsert sequence;
   the index-state entry is written only after all three stores succeed.
+- The exact pre-extraction fingerprint follows the extracted snapshot into index state; detectable artifact drift during
+  incremental writes retains the marker, while rebuild records the stored snapshot and emits rerun guidance.
 - Missing transcripts retain the marker before indexing. Corrupt, newer, or unreadable index state disables only the
   skip optimization: all three idempotent stores are still written, while the strict final state update retains the
   marker for the existing retry/poison path instead of allowing bookkeeping to gate searchability.
@@ -52,4 +58,6 @@ not change.
 
 PR #199 merged as `7b3ac2df` with all five GitHub checks passing. The review follow-up restored fail-open search writes
 when optimization state is unavailable and made explicit rebuild repair that state; order 21 remains parked for a
-separate activation from this closeout.
+separate activation from this closeout. A later automated review found the live-path fingerprint race, which the bounded
+[`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) member closed
+directly on `main` before Wave 7 order 28.
