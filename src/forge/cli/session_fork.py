@@ -56,6 +56,7 @@ from forge.core.ops.claude_session import (
     ForkLaunchPlan,
     SupervisorWiring,
     _apply_supervisor_wiring,
+    _resolve_claude_session_state_context,
     fork_claude_session,
 )
 from forge.core.ops.context import _cwd_forge_root
@@ -772,9 +773,10 @@ def fork(
             console.print(f"[dim]{w}[/dim]")
 
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
-    fork_worktree_path = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
+    fork_operation_cwd = Path.cwd()
+    fork_state_context = _resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
     _persist_routing_override(
-        forge_root=(Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path),
+        forge_root=fork_state_context.forge_root,
         session_name=fork_manifest.name,
         routing=_preflight_routing,
         direct=direct,
@@ -796,12 +798,13 @@ def fork(
             supervisor_runtime=supervisor_runtime,
         )
         fork_manifest = _apply_supervisor_wiring(
-            fork_manifest,
+            fork_state_context,
             wiring,
             proxy_id=_preflight_routing.proxy_id if _preflight_routing else None,
             template=_preflight_routing.template if _preflight_routing else None,
             direct=direct,
         )
+        fork_state_context = _resolve_claude_session_state_context(fork_manifest, cwd=fork_operation_cwd)
 
     if _preflight_routing:
         effective_template = _preflight_routing.template
@@ -836,7 +839,7 @@ def fork(
     _apply_and_persist_direct_model_override(
         state=fork_manifest,
         direct_model=normalized_direct_model,
-        forge_root=(Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path),
+        forge_root=fork_state_context.forge_root,
         use_sidecar=use_sidecar,
         surface="fork",
     )

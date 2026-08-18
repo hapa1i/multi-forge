@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; eight members
-remain parked. The bounded
+**Lane**: `doing/` -- orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; order 28 is
+active and seven members remain parked. The bounded
 [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) correction closed
 order 20's post-merge snapshot race directly on `main` after PR #206 and before order 28. The bounded
 [`correct_empty_tz_period_bounds`](../../done/correct_empty_tz_period_bounds/card.md) correction shipped in PR #189
@@ -81,7 +81,7 @@ runs last so it lands on the smallest stable surface.
 | 25    | O055             | [`reuse_claude_usage_measurement`](../../done/reuse_claude_usage_measurement/card.md)                   | one proxied usage precedence rule                    |
 | 26    | O056             | [`centralize_telemetry_jsonl_reads`](../../done/centralize_telemetry_jsonl_reads/card.md)               | tolerant per-plane JSONL read scaffold               |
 | 27    | O057, O095       | [`share_review_worker_preparation`](../../done/share_review_worker_preparation/card.md)                 | review resource/worker input preparation             |
-| 28    | O058             | [`unify_claude_session_state_context`](../../todo/unify_claude_session_state_context/card.md)           | manifest-to-store/worktree derivation                |
+| 28    | O058             | [`unify_claude_session_state_context`](../../doing/unify_claude_session_state_context/card.md)          | manifest-to-store/worktree derivation                |
 | 29    | O059             | [`share_transfer_rewind_rendering`](../../todo/share_transfer_rewind_rendering/card.md)                 | shared rendering primitives, distinct envelopes      |
 | 30    | O067             | [`share_passthrough_sse_framing`](../../todo/share_passthrough_sse_framing/card.md)                     | common SSE framing, transport-specific merge         |
 | 31    | O068             | [`extract_session_fork_preflight`](../../todo/extract_session_fork_preflight/card.md)                   | UI-free pre-mutation validation                      |

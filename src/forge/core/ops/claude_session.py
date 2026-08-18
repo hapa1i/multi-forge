@@ -109,6 +109,15 @@ class ClaudeSessionLaunchResult:
     store_exists: bool
 
 
+@dataclass(frozen=True)
+class ClaudeSessionStateContext:
+    """Manifest-derived checkout and durable state ownership for one Claude op."""
+
+    worktree_path: Path
+    forge_root: Path
+    store: SessionStore
+
+
 class ClaudeStartError(ForgeOpError):
     """Session-creation failure carrying a structured recovery tip for the CLI to render.
 
@@ -377,6 +386,28 @@ def resolve_and_validate_system_prompt(
     return None
 
 
+def _resolve_claude_session_state_context(
+    manifest: SessionState,
+    *,
+    cwd: Path,
+) -> ClaudeSessionStateContext:
+    """Derive checkout and state ownership without testing launchability.
+
+    The recorded Forge root always owns the manifest store. A recorded worktree
+    is only the launch path; it becomes the legacy state fallback when the root
+    field is absent. ``cwd`` applies only when no worktree was recorded either.
+    Missing recorded paths remain intact for ``require_session_worktree`` to
+    classify at the launch boundary.
+    """
+    worktree_path = Path(manifest.worktree.path) if manifest.worktree is not None else cwd
+    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
+    return ClaudeSessionStateContext(
+        worktree_path=worktree_path,
+        forge_root=forge_root,
+        store=SessionStore(str(forge_root), manifest.name),
+    )
+
+
 def launch_claude_session(
     *,
     manifest: SessionState,
@@ -407,6 +438,7 @@ def launch_claude_session(
             "and cannot be launched with Claude. Use the matching runtime command."
         )
 
+    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
     try:
         worktree_path = require_session_worktree(
             manifest.name,
@@ -415,7 +447,7 @@ def launch_claude_session(
         )
     except SessionWorktreeMissingError as e:
         raise ForgeOpError(str(e)) from e
-    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
+    forge_root = state_context.forge_root
 
     from forge.session.claude.paths import resolve_claude_project_root
 
@@ -457,7 +489,7 @@ def launch_claude_session(
             prompt_files=prompt_files,
         )
 
-    store = SessionStore(str(forge_root), manifest.name)
+    store = state_context.store
 
     if not manifest.confirmed.claude_project_root:
         _lr = str(launch_root)
@@ -575,13 +607,23 @@ def start_claude_session(
         pre_seeded_uuid=pre_seeded_uuid,
     )
 
+    operation_cwd = Path.cwd()
+    state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     # Post-create mutations (rows 2-4): reassign manifest as each store write lands.
     if memory_flag is True:
-        manifest = _apply_memory_activation(manifest)
+        manifest = _apply_memory_activation(state_context)
+        state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     if subprocess_proxy:
-        manifest = _apply_subprocess_proxy(manifest, subprocess_proxy)
+        manifest = _apply_subprocess_proxy(state_context, subprocess_proxy)
+        state_context = _resolve_claude_session_state_context(manifest, cwd=operation_cwd)
     if supervisor is not None:
-        manifest = _apply_supervisor_wiring(manifest, supervisor, proxy_id=proxy_id, template=template, direct=direct)
+        manifest = _apply_supervisor_wiring(
+            state_context,
+            supervisor,
+            proxy_id=proxy_id,
+            template=template,
+            direct=direct,
+        )
 
     effective_template = manifest.intent.proxy.template if manifest.intent.proxy else None
     effective_url = manifest.intent.proxy.base_url if manifest.intent.proxy else None
@@ -691,9 +733,10 @@ def resume_claude_session(
     """Run the shared Claude resume mutation/launch tail without rendering."""
     operation_started_at = datetime.now(timezone.utc)
     manifest = plan.manifest
-    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
-    store = SessionStore(str(forge_root), manifest.name)
+    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
+    worktree_path = state_context.worktree_path
+    forge_root = state_context.forge_root
+    store = state_context.store
 
     try:
         persist_resume_routing_override(
@@ -800,9 +843,9 @@ def fork_claude_session(
     """Run a prepared Claude fork launch without rendering."""
     operation_started_at = datetime.now(timezone.utc)
     manifest = plan.manifest
-    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
-    store = SessionStore(str(forge_root), manifest.name)
+    state_context = _resolve_claude_session_state_context(manifest, cwd=Path.cwd())
+    worktree_path = state_context.worktree_path
+    store = state_context.store
     preferences = plan.launch_preferences
 
     try:
@@ -1084,12 +1127,9 @@ def _create_claude_session(
         raise ForgeOpError(str(e)) from e
 
 
-def _apply_memory_activation(manifest: SessionState) -> SessionState:
+def _apply_memory_activation(context: ClaudeSessionStateContext) -> SessionState:
     """Row 2: enable ``intent.memory.auto_update`` and return the re-read manifest."""
     from forge.session.models import MemoryIntent, MemoryWriterConfig
-    from forge.session.store import SessionStore as _MemStore
-
-    forge_root = manifest.forge_root or str(Path.cwd())
 
     def _set_memory(m: SessionState) -> None:
         if m.intent.memory is None:
@@ -1099,24 +1139,20 @@ def _apply_memory_activation(manifest: SessionState) -> SessionState:
         else:
             m.intent.memory.auto_update.enabled = True
 
-    return _MemStore(forge_root, manifest.name).update(timeout_s=5.0, mutate=_set_memory)
+    return context.store.update(timeout_s=5.0, mutate=_set_memory)
 
 
-def _apply_subprocess_proxy(manifest: SessionState, subprocess_proxy: str) -> SessionState:
+def _apply_subprocess_proxy(context: ClaudeSessionStateContext, subprocess_proxy: str) -> SessionState:
     """Row 3: persist ``intent.subprocess_proxy`` and return the re-read manifest."""
-    manifest.intent.subprocess_proxy = subprocess_proxy
-    forge_root = manifest.forge_root or str(Path.cwd())
-    from forge.session.store import SessionStore as _SPStore
-
-    _SPStore(forge_root, manifest.name).update(
+    context.store.update(
         timeout_s=5.0,
         mutate=lambda m: setattr(m.intent, "subprocess_proxy", subprocess_proxy),
     )
-    return _SPStore(forge_root, manifest.name).read()
+    return context.store.read()
 
 
 def _apply_supervisor_wiring(
-    manifest: SessionState,
+    context: ClaudeSessionStateContext,
     wiring: SupervisorWiring,
     *,
     proxy_id: str | None,
@@ -1133,10 +1169,9 @@ def _apply_supervisor_wiring(
     from forge.session.consumer_lanes import lane_record_for_runtime
     from forge.session.models import SupervisorConfig
 
-    forge_root = manifest.forge_root or (manifest.worktree.path if manifest.worktree else str(Path.cwd()))
     sup_config = SupervisorConfig(
         resume_id=wiring.target,
-        forge_root=wiring.source_state.forge_root or forge_root,
+        forge_root=wiring.source_state.forge_root or str(context.forge_root),
     )
     apply_supervisor_routing(
         sup_config,
@@ -1162,9 +1197,8 @@ def _apply_supervisor_wiring(
     lane = (
         lane_record_for_runtime(SUPERVISOR_CONSUMER, wiring.supervisor_runtime) if wiring.supervisor_runtime else None
     )
-    store = SessionStore(forge_root, manifest.name)
-    store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
-    return store.read()
+    context.store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
+    return context.store.read()
 
 
 def _run_incognito_cleanup(

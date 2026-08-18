@@ -1,12 +1,144 @@
 """Focused tests for shared Claude session operation boundaries."""
 
+import inspect
 from pathlib import Path
 
 import pytest
 
-from forge.core.ops.claude_session import launch_claude_session
+from forge.core.ops import claude_session as claude_session_ops
+from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
-from forge.session import create_session_state
+from forge.session import SessionState, SessionStore, create_session_state
+
+
+def _resolve(state: SessionState, *, cwd: Path) -> claude_session_ops.ClaudeSessionStateContext:
+    return claude_session_ops._resolve_claude_session_state_context(state, cwd=cwd)
+
+
+def test_state_context_uses_durable_root_and_recorded_worktree(tmp_path: Path) -> None:
+    forge_root = tmp_path / "nested-project"
+    worktree = tmp_path / "relocated-checkout"
+    shell = tmp_path / "unrelated-shell"
+    state = create_session_state("worker", worktree_path=str(worktree))
+    state.forge_root = str(forge_root)
+
+    context = _resolve(state, cwd=shell)
+
+    assert context.worktree_path == worktree
+    assert context.forge_root == forge_root
+    assert context.store.forge_root == forge_root.resolve()
+    assert context.store.session_name == "worker"
+
+
+def test_state_context_uses_recorded_worktree_for_legacy_missing_root(tmp_path: Path) -> None:
+    worktree = tmp_path / "legacy-checkout"
+    state = create_session_state("legacy", worktree_path=str(worktree))
+
+    context = _resolve(state, cwd=tmp_path / "unrelated-shell")
+
+    assert context.worktree_path == worktree
+    assert context.forge_root == worktree
+    assert context.store.forge_root == worktree.resolve()
+
+
+def test_state_context_uses_explicit_cwd_only_when_no_durable_path_exists(tmp_path: Path) -> None:
+    shell = tmp_path / "legacy-shell"
+    state = create_session_state("legacy")
+
+    context = _resolve(state, cwd=shell)
+
+    assert context.worktree_path == shell
+    assert context.forge_root == shell
+    assert context.store.forge_root == shell.resolve()
+
+
+def test_state_context_does_not_treat_a_missing_worktree_as_state_loss(tmp_path: Path) -> None:
+    forge_root = tmp_path / "project"
+    missing = tmp_path / "missing-checkout"
+    state = create_session_state("degraded", worktree_path=str(missing))
+    state.forge_root = str(forge_root)
+
+    context = _resolve(state, cwd=tmp_path / "unrelated-shell")
+
+    assert context.worktree_path == missing
+    assert context.forge_root == forge_root
+    assert context.store.forge_root == forge_root.resolve()
+
+
+def test_post_create_mutations_use_resolved_store_outside_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forge_root = tmp_path / "project"
+    worktree = tmp_path / "checkout"
+    shell = tmp_path / "unrelated-shell"
+    supervisor_root = tmp_path / "supervisor-project"
+    for path in (forge_root, worktree, shell, supervisor_root):
+        path.mkdir()
+    monkeypatch.chdir(shell)
+
+    state = create_session_state("worker", worktree_path=str(worktree))
+    state.forge_root = str(forge_root)
+    store = SessionStore(str(forge_root), state.name)
+    store.write(state)
+    context = _resolve(state, cwd=shell)
+
+    state = claude_session_ops._apply_memory_activation(context)
+    context = _resolve(state, cwd=shell)
+    state = claude_session_ops._apply_subprocess_proxy(context, "subprocess-proxy")
+    context = _resolve(state, cwd=shell)
+
+    supervisor = create_session_state("planner", worktree_path=str(supervisor_root))
+    supervisor.forge_root = str(supervisor_root)
+    state = claude_session_ops._apply_supervisor_wiring(
+        context,
+        SupervisorWiring(
+            target="planner",
+            source_state=supervisor,
+            supervisor_proxy=None,
+            supervisor_direct=True,
+            cascade=False,
+            checker_model=None,
+            checker_provider=None,
+            checker_effort=None,
+            supervisor_effort=None,
+            supervisor_runtime=None,
+        ),
+        proxy_id=None,
+        template=None,
+        direct=True,
+    )
+
+    persisted = store.read()
+    assert persisted == state
+    assert persisted.intent.memory is not None
+    assert persisted.intent.memory.auto_update is not None
+    assert persisted.intent.memory.auto_update.enabled is True
+    assert persisted.intent.subprocess_proxy == "subprocess-proxy"
+    assert persisted.intent.policy is not None
+    assert persisted.intent.policy.supervisor is not None
+    assert persisted.intent.policy.supervisor.forge_root == str(supervisor_root)
+    assert not SessionStore(str(shell), state.name).exists()
+
+
+def test_all_affected_claude_ops_share_the_state_context_resolver() -> None:
+    for operation in (
+        claude_session_ops.start_claude_session,
+        claude_session_ops.launch_claude_session,
+        claude_session_ops.resume_claude_session,
+        claude_session_ops.fork_claude_session,
+    ):
+        assert "_resolve_claude_session_state_context" in inspect.getsource(operation)
+
+    for mutation in (
+        claude_session_ops._apply_memory_activation,
+        claude_session_ops._apply_subprocess_proxy,
+        claude_session_ops._apply_supervisor_wiring,
+    ):
+        source = inspect.getsource(mutation)
+        assert "context.store" in source
+        assert "Path.cwd" not in source
+        assert "SessionStore(" not in source
 
 
 def test_launch_refuses_missing_recorded_worktree_before_callbacks(

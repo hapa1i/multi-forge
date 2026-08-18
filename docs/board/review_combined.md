@@ -796,13 +796,13 @@ directly on `main` after PR #206 and before order 28.
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
-  are split into 35 members. Orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; eight are
-  parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
-  correction shipped in PR #189, and
-  [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order 20's later
-  snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written; O071's
-  `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified
-  scope; and O092's unadmitted tail is not an executable deletion set.
+  are split into 35 members. Orders 1--27 shipped independently in PRs #178--#184, #186--#188, and #190--#206; order 28
+  is active and seven are parked. A bounded
+  [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge correction shipped in PR
+  #189, and [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order
+  20's later snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written;
+  O071's `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their
+  verified scope; and O092's unadmitted tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

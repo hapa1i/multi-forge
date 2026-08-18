@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 orders 1--27 and all three bounded corrective members are closed after PR #206. Keep orders 28--35
-parked.
+Current focus: Wave 7 order 28, [`unify_claude_session_state_context`](../unify_claude_session_state_context/card.md),
+is active from corrected `main` at `52c36e2a`. Keep orders 29--35 parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -308,5 +308,11 @@ parked.
 - [x] Challenge and reproduce order 20's post-merge fingerprint race, close
   [`correct_search_index_fingerprint_race`](../../done/correct_search_index_fingerprint_race/card.md) directly on
   `main`, and preserve the Wave 7 finding/member counts before activating order 28.
+- [x] Activate `refactor/unify-claude-session-state-context` from corrected `main` at `52c36e2a` and reverify O058's
+  launch/resume/fork plus post-create mutation seams.
+- [x] Unify Claude manifest-to-store/worktree derivation while keeping orders 29--35 parked.
+- [x] Complete order 28's focused, full, regression, targeted session integration, pre-commit, design-size, and
+  board-integrity gates without a Forge workflow.
+- [ ] Ship order 28 independently and close it without activating order 29.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

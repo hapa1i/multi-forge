@@ -1278,15 +1278,10 @@ management should be done deliberately from terminal.
 
 ### 3.12 Command-core ops (shared implementation)
 
-Forge implements "Shared" operations once in a UI-agnostic command-core layer and exposes them via both:
-
-- terminal CLI (`forge ...`), and
-- direct commands (`%...` via `forge hook user-prompt-submit`).
-
-**Location:** `src/forge/core/ops/`
-
-**Contract:** ops contain pure logic (no Click, no printing, no hook JSON). They return structured data and raise typed
-exceptions on failure.
+Shared terminal (`forge ...`) and direct (`%...` via `forge hook user-prompt-submit`) operations live once in
+`src/forge/core/ops/`. Ops contain no Click, printing, or hook JSON; they return structured data and raise typed
+failures. Claude start/launch/resume/fork share a typed manifest context: recorded `forge_root` owns `SessionStore`,
+while the worktree remains a guarded launch path.
 
 `core/ops/policy.py` owns the registry-derived activation vocabulary, validation, and typed values shared by terminal
 `forge policy enable|disable` and direct `%policy enable|disable`. The terminal surface still writes policy intent while
