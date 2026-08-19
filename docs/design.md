@@ -1037,8 +1037,8 @@ non-null `strategy` and `context_file`. `rewind` writes truncated Claude JSONL u
 `tests/integration/docker/test_rewind_native_contract.py` confirm that `<R>` may retain the parent's embedded
 `sessionId`, resume across CWD, and stay unmutated; no envelope rewrite is needed. Unusable code-delta curation removes
 the temporary JSONL, falls back to plain native resume/native-relocate, and reports the fallback; dropped-window
-curation emits the `ai-curated` privacy warning. Failed child rollback reports its session and failure, then prints a
-transcript-preserving delete command that preserves shared worktrees.
+curation emits the `ai-curated` privacy warning. Fork rollback removes newly owned transfer snapshots, preserves
+existing snapshots and shared worktrees, and reports cleanup failures.
 
 **Context budget enforcement:** Every resume mode chooses the same reference: explicit proxy ID then template; direct
 mode none; otherwise inherited proxy ID then template. For `full`, Forge **fails fast** before spawn when the parent

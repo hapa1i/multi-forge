@@ -37,6 +37,7 @@ from forge.session.launch import (
     get_launch_preferences,
     resolve_manifest_prompt_file,
 )
+from forge.session.prev_sessions import child_path
 
 from .claude_session import (
     ClaudeLaunchPreferences,
@@ -211,6 +212,7 @@ class _ForkCompensation:
     """Owned artifacts that rollback may safely remove."""
 
     delete_transcripts: bool = False
+    created_transfer_snapshot: Path | None = None
 
 
 def execute_session_fork(
@@ -276,7 +278,7 @@ def execute_session_fork(
             manifest=manifest,
             error=error,
             events=events,
-            delete_transcripts=compensation.delete_transcripts,
+            compensation=compensation,
         ) from error
     except Exception as error:
         wrapped = ForkExecutionError(
@@ -288,7 +290,7 @@ def execute_session_fork(
             manifest=manifest,
             error=wrapped,
             events=events,
-            delete_transcripts=compensation.delete_transcripts,
+            compensation=compensation,
         ) from error
 
 
@@ -451,13 +453,27 @@ def _prepare_created_fork(
                     continuation="Use --resume-mode native-relocate for byte-faithful Claude resume.",
                 )
             )
-        context_path, warnings = transfer_context_factory(
-            manager=manager,
-            manifest=manifest,
-            parent_state=parent,
-            strategy=request.strategy,
-            inline_plan=request.inline_plan,
+        expected_snapshot = (
+            child_path(state_context.forge_root, manifest.parent_session, manifest.name)
+            if manifest.parent_session is not None
+            else None
         )
+        snapshot_existed = expected_snapshot is not None and expected_snapshot.exists()
+        try:
+            context_path, warnings = transfer_context_factory(
+                manager=manager,
+                manifest=manifest,
+                parent_state=parent,
+                strategy=request.strategy,
+                inline_plan=request.inline_plan,
+            )
+        finally:
+            # The child name is already reserved by fork_session, so an absent-to-file
+            # transition at this exact path belongs to this preparation attempt. Record it
+            # even when the factory writes and then raises; pre-existing snapshots remain
+            # outside compensation because ensure_child deliberately preserves them.
+            if expected_snapshot is not None and not snapshot_existed and expected_snapshot.is_file():
+                compensation.created_transfer_snapshot = expected_snapshot
         prompt_files = []
         if context_path is not None:
             prompt_files.append(context_path)
@@ -784,27 +800,46 @@ def _rollback_created_fork(
     manifest: SessionState,
     error: ForkExecutionError,
     events: list[ForkExecutionEvent],
-    delete_transcripts: bool,
+    compensation: _ForkCompensation,
 ) -> ForkExecutionError:
     try:
         manager.delete_session(
             manifest.name,
             delete_worktree=True,
             delete_branch=True,
-            delete_transcripts=delete_transcripts,
+            delete_transcripts=compensation.delete_transcripts,
             force=True,
             forge_root=manifest.forge_root,
         )
     except Exception as cleanup_error:
         logger.debug("fork preparation rollback delete failed", exc_info=True)
         failure = str(cleanup_error) or type(cleanup_error).__name__
-        keep_transcripts = "" if delete_transcripts else " --keep-transcripts"
+        keep_transcripts = "" if compensation.delete_transcripts else " --keep-transcripts"
         command = f"forge session delete {manifest.name} --yes --force{keep_transcripts}"
         tip = error.tip or "Retry after resolving the preparation error."
+        snapshot_recovery = ""
+        if compensation.created_transfer_snapshot is not None:
+            snapshot_recovery = (
+                f" After deleting the session, remove '{compensation.created_transfer_snapshot}' before retrying."
+            )
         return ForkExecutionError(
             f"{error} Cleanup also failed for created session '{manifest.name}': {failure}.",
             code=error.code,
-            tip=f"Run '{command}' after resolving the cleanup error. {tip}",
+            tip=f"Run '{command}' after resolving the cleanup error.{snapshot_recovery} {tip}",
             events=tuple(events),
         )
+
+    if compensation.created_transfer_snapshot is not None:
+        try:
+            compensation.created_transfer_snapshot.unlink(missing_ok=True)
+        except OSError as cleanup_error:
+            failure = str(cleanup_error) or type(cleanup_error).__name__
+            tip = error.tip or "Retry after resolving the preparation error."
+            return ForkExecutionError(
+                f"{error} Session cleanup succeeded, but created transfer snapshot "
+                f"'{compensation.created_transfer_snapshot}' could not be removed: {failure}.",
+                code=error.code,
+                tip=f"Remove '{compensation.created_transfer_snapshot}' before retrying. {tip}",
+                events=tuple(events),
+            )
     return ForkExecutionError(str(error), code=error.code, tip=error.tip, events=tuple(events))

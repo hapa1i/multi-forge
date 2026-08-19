@@ -12,9 +12,12 @@ closed order 20's post-merge snapshot race directly on `main` after PR #206 and 
 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped five
 verified post-merge corrections in PR #185. The user admitted O098 and the verified cap-state subset of O092 as one
-bounded, non-overlapping sequencing exception. The residual gate on merged `main` at `bad273ef` then accepted 23
-still-live correctness, security, performance, test-policy, output, and documentation rows as 19 parked members under
-[`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md); no implementation is active.
+bounded, non-overlapping sequencing exception. A bounded
+[`correct_fork_transfer_snapshot_rollback`](../correct_fork_transfer_snapshot_rollback/card.md) correction is active
+before Wave 8 to close order 32's post-merge transfer-artifact rollback edge. The residual gate on merged `main` at
+`bad273ef` then accepted 23 still-live correctness, security, performance, test-policy, output, and documentation rows
+as 19 parked members under [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md); all
+Wave 8 members remain parked.
 
 ## Goal
 
