@@ -1349,10 +1349,9 @@ cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its rep
 emitters set it only when the mapping is unambiguous. Schema-v2 readers fence older records with a warning and expose
 skip counts rather than reattribute them.
 
-At startup, `CostTracker` bootstraps from downstream attempts and reconciles the durable cap checkpoint using the larger
-monthly total. Live counters remain authoritative; telemetry-write failure warns without denying model traffic, and
-coalesced checkpoints avoid per-request fsync. Current-calendar-month shards survive retention so restart cannot erase
-active-month cap evidence.
+`CostTracker` takes the larger attempt/checkpoint total. Completion updates counters before an unbounded FIFO worker
+persists cost/trace and coalesced snapshots. Shutdown drains jobs and retries failed checkpoints; hangs can delay it.
+Passthrough response-body audit and overload/drop stay separate. Current-month shards preserve restart evidence.
 
 The directory's lifecycle owner is global `telemetry.downstream` in `~/.forge/config.yaml` (`14` days/`512` MB by
 default; `0` disables either bound). After cap bootstrap, each process resolves once and prunes once. Explicit global

@@ -24,16 +24,16 @@ from forge.core.telemetry import downstream as downstream_telemetry
 from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION
 from forge.proxy.cost_logger import (
     COST_SCHEMA_VERSION,
-    log_request_cost,
     read_cost_logs,
 )
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 pytestmark = pytest.mark.regression
 
 
-def test_log_request_cost_stamps_schema_version() -> None:
+def test_request_cost_record_stamps_schema_version() -> None:
     """Every written cost record carries schema_version=COST_SCHEMA_VERSION (FORGE_HOME isolated)."""
-    log_request_cost(
+    write_request_cost_record(
         proxy_id="p1",
         model="gpt-5.5",
         tier="sonnet",

@@ -53,10 +53,15 @@ from forge.core.run_id import (
     is_valid_provider_session_id,
     is_valid_run_id,
 )
-from forge.core.telemetry.downstream import mint_downstream_event_id
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    write_downstream_record,
+)
 from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
+from forge.proxy.accounting_persistence import ProxyAccountingPersistence
 from forge.proxy.base_client import ProxyStreamError
 from forge.proxy.client_factory import ModelProvider, TierClientFactory
 from forge.proxy.converters import (
@@ -65,7 +70,7 @@ from forge.proxy.converters import (
     convert_openai_to_anthropic,
     convert_openai_to_anthropic_sse,
 )
-from forge.proxy.cost_logger import log_request_cost
+from forge.proxy.cost_logger import build_request_cost_record
 from forge.proxy.cost_tracker import CostTracker
 from forge.proxy.data_models import (
     MessagesRequest,
@@ -117,6 +122,7 @@ PREFERRED_PROVIDER = None
 PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 
 cost_tracker: CostTracker | None = None
+_accounting_persistence: ProxyAccountingPersistence | None = None
 
 
 _warned_unknown_backend_instances: set[str] = set()
@@ -198,6 +204,9 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
             daily_cap_usd=cost_cfg.caps.per_day,
             monthly_cap_usd=cost_cfg.caps.per_month,
             on_cap_hit=cost_cfg.on_cap_hit,
+            cap_state_persister=(
+                _accounting_persistence.submit_cap_state if _accounting_persistence is not None else None
+            ),
         )
         cost_tracker.bootstrap_from_logs(
             get_forge_home() / "telemetry" / "downstream",
@@ -510,23 +519,25 @@ def _calc_and_log_cost(
         else:
             cost_micros, reporter, confidence = None, None, "unavailable"
 
-        log_request_cost(
-            proxy_id=PROXY_ID or "unknown",
-            backend_id=_backend_instance_id(),
-            model=model,
-            tier=tier,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cached_tokens=cached_tokens,
-            cost_micros=cost_micros,
-            latency_ms=latency_ms,
-            failed=failed,
-            request_id=request_id,
-            reporter=reporter,
-            confidence=confidence,
-            forge_run_id=forge_run_id,
-            forge_root_run_id=forge_root_run_id,
-            downstream_event_id=downstream_event_id,
+        _persist_proxy_downstream_record(
+            build_request_cost_record(
+                proxy_id=PROXY_ID or "unknown",
+                backend_id=_backend_instance_id(),
+                model=model,
+                tier=tier,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cached_tokens=cached_tokens,
+                cost_micros=cost_micros,
+                latency_ms=latency_ms,
+                failed=failed,
+                request_id=request_id,
+                reporter=reporter,
+                confidence=confidence,
+                forge_run_id=forge_run_id,
+                forge_root_run_id=forge_root_run_id,
+                downstream_event_id=downstream_event_id,
+            )
         )
 
         # Spend caps account for reported costs only; an unavailable cost advances nothing.
@@ -537,6 +548,14 @@ def _calc_and_log_cost(
     except Exception as e:
         logger.warning("Cost calculation failed for model=%s (non-fatal): %s", model, e)
         return None
+
+
+def _persist_proxy_downstream_record(record: DownstreamRecord) -> None:
+    """Persist proxy completion evidence through the active ordered worker."""
+    if _accounting_persistence is None:
+        write_downstream_record(record)
+    else:
+        _accounting_persistence.submit_downstream_record(record)
 
 
 def _request_cost_header(cost_micros: int | None) -> dict[str, str]:
@@ -671,13 +690,31 @@ def _resolve_model_with_alternatives(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
+    global _accounting_persistence
+    persistence = ProxyAccountingPersistence()
+    _accounting_persistence = persistence
+    if cost_tracker is not None:
+        cost_tracker.set_cap_state_persister(persistence.submit_cap_state)
     logger.info("Server started...")
     try:
         yield
     finally:
-        if cost_tracker is not None:
-            cost_tracker.flush_cap_state()
-        logger.info("Server is shutting down... Cleaning up resources")
+        tracker = cost_tracker
+        try:
+            if tracker is not None:
+                tracker.flush_cap_state()
+            await persistence.close()
+            if tracker is not None:
+                tracker.set_cap_state_persister(None)
+                # The drained worker exposes its result only after close. Retry a failed
+                # checkpoint (or persist a newer coalesced snapshot) without blocking the loop.
+                await asyncio.to_thread(tracker.flush_cap_state)
+        finally:
+            if tracker is not None:
+                tracker.set_cap_state_persister(None)
+            if _accounting_persistence is persistence:
+                _accounting_persistence = None
+            logger.info("Server is shutting down... Cleaning up resources")
 
 
 app = FastAPI(title="Unified LLM Proxy", lifespan=lifespan)
@@ -1070,6 +1107,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             "forge_root_run_id": forge_root_run_id,
             "provider_session_id": forge_session,
             "provider_command": forge_command,
+            "record_sink": _persist_proxy_downstream_record,
         }
 
         def _fail_non_streaming_conversion(openai_response: dict[str, Any], duration_ms: float) -> NoReturn:

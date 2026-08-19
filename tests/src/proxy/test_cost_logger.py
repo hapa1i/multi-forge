@@ -10,10 +10,10 @@ import pytest
 
 from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION
 from forge.proxy.cost_logger import (
-    log_request_cost,
     read_cost_logs,
     read_cost_logs_with_stats,
 )
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 
 @pytest.fixture
@@ -24,9 +24,9 @@ def cost_log_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return telemetry_dir
 
 
-class TestLogRequestCost:
+class TestRequestCostRecordWriting:
     def test_creates_dir_and_writes_record(self, cost_log_dir: Path):
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="openrouter",
             backend_id="openrouter",
             model="anthropic/claude-sonnet-4.6",
@@ -72,7 +72,7 @@ class TestLogRequestCost:
 
     def test_unavailable_cost_is_none_not_zero(self, cost_log_dir: Path):
         """No reported cost → cost_micros is None (not 0); tokens still recorded."""
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="anthropic-passthrough",
             model="claude-opus-4-6",
             tier="opus",
@@ -99,7 +99,7 @@ class TestLogRequestCost:
 
     def test_default_provenance_is_unknown(self, cost_log_dir: Path):
         """A caller that doesn't stamp provenance gets confidence='unknown'."""
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="p",
             model="m",
             tier="sonnet",
@@ -118,7 +118,7 @@ class TestLogRequestCost:
 
     def test_appends_multiple_records(self, cost_log_dir: Path):
         for i in range(3):
-            log_request_cost(
+            write_request_cost_record(
                 proxy_id="test",
                 model="test-model",
                 tier="sonnet",
@@ -138,7 +138,7 @@ class TestLogRequestCost:
         assert len(lines) == 3
 
     def test_failed_request_logged(self, cost_log_dir: Path):
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="test",
             model="test-model",
             tier="opus",
@@ -157,13 +157,13 @@ class TestLogRequestCost:
 
 
 class TestRoundtrip:
-    """Write with log_request_cost, read back with period filtering."""
+    """Write a canonical record, then read it back with period filtering."""
 
     def test_write_then_read_with_period(self, cost_log_dir: Path):
         """Records written by the logger are findable by period-filtered reads."""
         now = datetime.now(timezone.utc)
 
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="test",
             model="claude-sonnet-4-6",
             tier="sonnet",
@@ -185,7 +185,7 @@ class TestRoundtrip:
 
     def test_timestamp_format_is_valid_utc(self, cost_log_dir: Path):
         """Written timestamps parse correctly and don't have double suffixes."""
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="test",
             model="m",
             tier="t",
@@ -354,7 +354,7 @@ class TestForgeRunCorrelation:
     """Slice 4g: cost records carry the Forge run-tree ids; the root-join sums them."""
 
     def _log(self, dir_: Path, *, root: str | None, run: str | None, cost: int | None) -> None:
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="p1",
             model="gpt-5.5",
             tier="sonnet",
@@ -380,7 +380,7 @@ class TestForgeRunCorrelation:
         assert rec["schema_version"] == 1
 
     def test_fields_default_none_when_absent(self, cost_log_dir: Path):
-        log_request_cost(
+        write_request_cost_record(
             proxy_id="p1",
             model="m",
             tier="sonnet",

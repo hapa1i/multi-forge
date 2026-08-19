@@ -580,12 +580,11 @@ explicit OpenRouter `user` field is separate. There is no local price catalog. S
 merges duplicate evidence without collapsing retries; backend filtering occurs after merge. By-verb cost joins
 downstream to transitional `usage/events` by run id.
 
-The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The downstream telemetry shards
-remain the bootstrap source for cap enforcement after restart.
+Proxy completion updates memory before an unbounded FIFO worker persists detached cost/lifecycle records and cap
+snapshots. Lifespan drains accepted jobs and retries failed checkpoints; filesystem hangs can delay it. `GET /` remains
+live. Passthrough response-body audit and overload/drop policy are separate; downstream shards bootstrap restarts.
 
-Cap enforcement is process-local. Each proxy process bootstraps from shared JSONL logs at startup, but in-flight spend
-is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
-proxy ID.
+Caps are process-local; use one process per proxy ID.
 
 After cap bootstrap, global retention bounds downstream shards but preserves the current UTC month; upstream and usage
 accumulate until cleanup. `forge telemetry costs reset` (previewable with `--dry-run`) wipes all telemetry, cap/audit

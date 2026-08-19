@@ -19,7 +19,7 @@ from forge.core.ops.usage_summary import (
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.core.usage.vocabulary import Route
 from forge.proxy import cost_logger
-from forge.proxy.cost_logger import log_request_cost
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 pytestmark = pytest.mark.regression
 
@@ -40,7 +40,7 @@ def _event(*, run: str, route: Route, command: str) -> UsageEvent:
 
 
 def _cost_record(*, run: str, micros: int | None) -> None:
-    log_request_cost(
+    write_request_cost_record(
         proxy_id="p1",
         model="gpt-5.5",
         tier="sonnet",

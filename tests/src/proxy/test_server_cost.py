@@ -1,13 +1,13 @@
-"""Tests for server.py reported-cost provenance and logging (Phase 2 Step 2).
+"""Tests for server.py reported-cost provenance and logging.
 
 _calc_and_log_cost derives provenance from the resolved provider: OpenRouter's
 body cost is 'reported', a LiteLLM gateway's header cost is 'gateway_calculated'.
-With no reported cost it still falls back to the catalog ('inferred') in Step 2;
-Step 3 removes that fallback.
+Without a reported cost, the durable record retains usage with unavailable dollars.
 """
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from types import SimpleNamespace
 from typing import Any
 
@@ -18,9 +18,10 @@ from forge.proxy import server
 
 @pytest.fixture
 def captured_log(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
-    """Capture log_request_cost kwargs instead of writing JSONL."""
+    """Capture the detached cost record instead of writing JSONL."""
     calls: list[dict[str, Any]] = []
-    monkeypatch.setattr(server, "log_request_cost", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(server, "_accounting_persistence", None)
+    monkeypatch.setattr(server, "write_downstream_record", lambda record: calls.append(asdict(record)))
     return calls
 
 

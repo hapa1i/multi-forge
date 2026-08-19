@@ -20,6 +20,7 @@ through ``write_downstream_record`` and reset with the downstream plane.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -104,17 +105,20 @@ def write_provider_trace(
     latency_ms: float | None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
+    record_sink: Callable[[DownstreamRecord], None] | None = None,
 ) -> None:
-    """Build and persist a metadata-only provider-trace record (no gate).
+    """Build and hand off a metadata-only provider-trace record (no gate).
 
     Re-applies the Phase 2 header allowlist to ``provider_meta["headers"]`` so a future
     caller that bypasses that boundary still cannot persist auth/cookie headers — the
     allowlist stays the single source of truth, applied again at the persistence edge.
+    ``record_sink`` defaults to direct persistence; the proxy supplies its ordered worker.
     """
     from forge.core.llm.clients.openai_compat import provider_trace_headers
 
     pm = provider_meta or {}
-    write_downstream_record(
+    persist = record_sink or write_downstream_record
+    persist(
         DownstreamRecord(
             kind="attempt",
             downstream_event_id=downstream_event_id
@@ -167,6 +171,7 @@ def record_provider_trace(
     latency_ms: float | None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
+    record_sink: Callable[[DownstreamRecord], None] | None = None,
 ) -> None:
     """Gate by backend-instance capability, derive local_usage_status, and persist.
 
@@ -205,6 +210,7 @@ def record_provider_trace(
             latency_ms=latency_ms,
             downstream_event_id=downstream_event_id,
             backend_id=backend_id,
+            record_sink=record_sink,
         )
     except Exception as e:  # belt over the writer's own braces — never break the request
         logger.debug("provider trace record skipped: %s", e)

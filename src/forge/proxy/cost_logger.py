@@ -1,8 +1,4 @@
-"""Proxy downstream cost record adapter.
-
-The public functions keep the old cost-log API shape while the durable records live
-in the downstream telemetry plane at ``~/.forge/telemetry/downstream``.
-"""
+"""Build and read proxy cost evidence in the downstream telemetry plane."""
 
 from __future__ import annotations
 
@@ -15,7 +11,6 @@ from forge.core.telemetry.downstream import (
     DownstreamRecord,
     mint_downstream_event_id,
     read_downstream_records_with_stats,
-    write_downstream_record,
 )
 from forge.core.usage.vocabulary import Confidence, Reporter
 
@@ -33,7 +28,7 @@ class CostLogReadResult:
     skipped_legacy_schema: int = 0
 
 
-def log_request_cost(
+def build_request_cost_record(
     *,
     proxy_id: str,
     model: str,
@@ -51,49 +46,37 @@ def log_request_cost(
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
-) -> None:
-    """Append a cost record to the downstream telemetry plane.
+) -> DownstreamRecord:
+    """Build detached request-cost evidence for direct or queued persistence.
 
-    ``cost_micros`` is ``None`` when no route reported a cost — distinct from a
-    reported ``0`` (genuinely free). ``confidence`` records the dollar figure's
-    provenance and ``reporter`` who supplied it; together they replace the old
-    always-``estimated`` / ``pricing_source`` pair (the metric-evidence card:
-    Forge is not a cost oracle).
+    ``cost_micros`` is ``None`` when no route reported a cost, distinct from a
+    reported ``0``. ``confidence`` and ``reporter`` carry the dollar figure's
+    provenance rather than treating Forge as a cost oracle.
 
-    ``forge_run_id``/``forge_root_run_id`` (Slice 4g) carry the run-tree identity of
-    the Forge ``claude -p`` subprocess that made this request, read+validated from
-    the ``X-Forge-Run-ID``/``X-Forge-Root-Run-ID`` headers; ``None`` for the
-    interactive harness and any non-Forge-originated traffic. They are the join key
-    that makes proxied ``claude -p`` cost attributable to a run exactly (vs the
-    concurrency-fragile snapshot delta). Additive + defaulted: old readers `.get`
-    them as ``None``, so no ``COST_SCHEMA_VERSION`` bump (same precedent as
-    ``reporter``/``confidence``). Best-effort: write failures are logged but never
-    block the request.
+    Validated run-tree ids join proxied ``claude -p`` requests to their originating
+    Forge run. They remain ``None`` for interactive and non-Forge traffic.
     """
-    downstream_id = downstream_event_id or mint_downstream_event_id()
-    write_downstream_record(
-        DownstreamRecord(
-            kind="attempt",
-            downstream_event_id=downstream_id,
-            request_id=request_id,
-            proxy_id=proxy_id,
-            source_id=proxy_id,
-            source_kind="proxy",
-            backend_id=backend_id,
-            model=model,
-            mapped_model=model,
-            tier=tier,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cached_tokens=cached_tokens,
-            cost_micros=cost_micros,
-            reporter=reporter,
-            confidence=confidence,
-            latency_ms=round(latency_ms, 1),
-            failed=failed,
-            forge_run_id=forge_run_id,
-            forge_root_run_id=forge_root_run_id,
-        )
+    return DownstreamRecord(
+        kind="attempt",
+        downstream_event_id=downstream_event_id or mint_downstream_event_id(),
+        request_id=request_id,
+        proxy_id=proxy_id,
+        source_id=proxy_id,
+        source_kind="proxy",
+        backend_id=backend_id,
+        model=model,
+        mapped_model=model,
+        tier=tier,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=cached_tokens,
+        cost_micros=cost_micros,
+        reporter=reporter,
+        confidence=confidence,
+        latency_ms=round(latency_ms, 1),
+        failed=failed,
+        forge_run_id=forge_run_id,
+        forge_root_run_id=forge_root_run_id,
     )
 
 

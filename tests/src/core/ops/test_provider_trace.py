@@ -20,6 +20,7 @@ from forge.core.ops.context import ExecutionContext
 from forge.core.run_id import derive_provider_session_id
 from forge.proxy import cost_logger
 from forge.proxy import provider_trace_logger as ptl
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 
 @pytest.fixture(autouse=True)
@@ -118,7 +119,7 @@ class TestExplain:
 
     def test_cost_confidence_enriched_in_window(self):
         _record(request_id="req-cost", final_usage_seen=True, reported_cost_micros=1500)
-        cost_logger.log_request_cost(
+        write_request_cost_record(
             proxy_id="crimson-apricot",
             model="openai/gpt-5.5",
             tier="opus",
@@ -137,7 +138,7 @@ class TestExplain:
 
     def test_cost_confidence_ignores_other_request_id(self):
         _record(request_id="req-x", reported_cost_micros=1500)
-        cost_logger.log_request_cost(
+        write_request_cost_record(
             proxy_id="crimson-apricot",
             model="openai/gpt-5.5",
             tier="opus",
