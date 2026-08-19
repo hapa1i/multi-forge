@@ -37,7 +37,8 @@ contract requires an epic.
 and disposition; this report remains the evidence ledger. Waves 1--7 are closed, with their finding counts, corrections,
 and PR ranges retained in the admission records below and in the linked done cards. The residual gate on `bad273ef`
 parked 23 verified rows as 19 members under
-[`epic_wave8_residual_maintenance`](todo/epic_wave8_residual_maintenance/card.md); it activated no implementation.
+[`epic_wave8_residual_maintenance`](doing/epic_wave8_residual_maintenance/card.md); the admission activated no
+implementation, and order 1 later started from pushed closeout `7a2ad4c1`.
 
 ### Finding fields
 
@@ -762,8 +763,8 @@ directly on `main` after PR #206 and before order 28.
 The correctness/security/performance/test-policy/output/documentation residue excluded from Wave 7 was rechecked on
 merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6`. The screen covered D040, D042--D052, D056, O045--O046,
 O072, O074--O091, O097, and the omitted conformance row O100. It admitted 23 finding rows as 19 parked members under
-[`epic_wave8_residual_maintenance`](todo/epic_wave8_residual_maintenance/card.md); no implementation branch or member
-was activated.
+[`epic_wave8_residual_maintenance`](doing/epic_wave8_residual_maintenance/card.md); no implementation branch or member
+was activated by the admission itself. Order 1 later activated from `7a2ad4c1`.
 
 The gate corrected stale and overbroad claims before admission:
 
@@ -786,7 +787,7 @@ direct single-boundary controls named on their cards. No Forge workflow or exter
 
 | Order | Findings       | Accepted member                                                                                   |
 | ----- | -------------- | ------------------------------------------------------------------------------------------------- |
-| 1     | O045           | [`trace_failed_provider_attempts`](todo/trace_failed_provider_attempts/card.md)                   |
+| 1     | O045           | [`trace_failed_provider_attempts`](doing/trace_failed_provider_attempts/card.md)                  |
 | 2     | O046           | [`offload_proxy_accounting_persistence`](todo/offload_proxy_accounting_persistence/card.md)       |
 | 3     | O074           | [`strip_openai_account_response_headers`](todo/strip_openai_account_response_headers/card.md)     |
 | 4     | O089/O090      | [`harden_worktree_config_copy_safety`](todo/harden_worktree_config_copy_safety/card.md)           |
@@ -822,7 +823,7 @@ The linked cards retain acceptance, verification, and closeout detail; this tabl
 | [CLI/proxy/runtime](done/epic_cli_proxy_runtime_correctness/card.md), [diagnostic hygiene](done/epic_proxy_diagnostic_data_hygiene/card.md), and [conversion failure](done/epic_proxy_conversion_failure_handling/card.md) | Closed; Wave 5 shipped.                                                                              |
 | [Wave 6 correctness](done/epic_wave6_correctness_maintenance/card.md)                                                                                                                                                      | Closed at 36 verified findings across 13 members; D033/O020 rejected.                                |
 | [Wave 7 refactor/deletion](done/epic_wave7_refactor_and_deletion/card.md)                                                                                                                                                  | Closed at 32 findings across 35 members; bounded post-merge corrections did not change those counts. |
-| [Wave 8 residual maintenance](todo/epic_wave8_residual_maintenance/card.md)                                                                                                                                                | Parked at 23 verified rows across 19 members; no member activated.                                   |
+| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Order 1 O045 active; the other 18 members remain parked.                                             |
 
 ## Strengths (preserve these)
 

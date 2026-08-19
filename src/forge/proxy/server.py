@@ -907,6 +907,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         await _observe_request_side(request_data.model_dump(), request_id, headers=dict(raw_request.headers))
 
     spend_warning: str | None = None
+    provider_attempt_started = False
+    provider_response_received = False
+    _trace_ctx: dict[str, Any] = {}
 
     resolved_route = _resolve_model_with_alternatives(request_data)
     resolved_tier = resolved_route.tier
@@ -1059,7 +1062,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         # the context -- the auth-retry gap (Defect B) was exactly that kind of omission,
         # and dropping ``**_trace_ctx`` now fails loudly (missing required request_id).
         # Capability gating lives inside ``record_provider_trace``; callers stay unconditional.
-        _trace_ctx: dict[str, Any] = {
+        _trace_ctx = {
             "backend_id": _backend_instance_id(),
             "proxy_id": PROXY_ID or "unknown",
             "mapped_model": actual_model_id,
@@ -1279,7 +1282,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             )
         else:
             try:
+                provider_attempt_started = True
                 openai_response = await client.create_completion(openai_request_dict, request_id)
+                provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
                 if anthropic_response is None:
@@ -1383,7 +1388,10 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # Try refreshing credentials once
                 logger.warning(f"[{request_id}] Auth failed, refreshing credentials")
                 client = await client_factory.invalidate_and_retry(actual_model_id, tier=resolved_tier)
+                provider_attempt_started = True
+                provider_response_received = False
                 openai_response = await client.create_completion(openai_request_dict, request_id)
+                provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
                 if anthropic_response is None:
@@ -1483,6 +1491,22 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             error_type="api_error",
             cost_micros=_err_cost,
         )
+        if provider_attempt_started and not provider_response_received:
+            # The provider call began but yielded no usable response. Keep local
+            # validation/conversion/client-construction failures trace-free, and do not
+            # duplicate a lifecycle after a response reached Forge.
+            record_provider_trace(
+                **_trace_ctx,
+                request_mode="non_streaming",
+                provider_meta=None,
+                stream_started=False,
+                first_chunk_seen=False,
+                final_usage_seen=False,
+                client_disconnected=False,
+                reported_cost_micros=None,
+                latency_ms=duration_ms,
+                downstream_event_id=downstream_event_id,
+            )
 
         asyncio.create_task(
             log_request_response(

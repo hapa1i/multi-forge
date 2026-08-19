@@ -883,16 +883,16 @@ Semantics and invariants:
 - **Metadata-only.** There is deliberately no prompt/completion/tool/body field. `provider_headers` is the Phase 2
   correlation allowlist (`x-request-id` / `x-generation-id` / `x-litellm-call-id` / `x-litellm-model-id`), re-applied at
   the writer so a future caller that bypasses the upstream allowlist still cannot persist auth/cookie headers.
-- **Backend-capability gated.** Written only when the selected backend instance declares provider-trace capability.
-  `openrouter` opts in for v1; gateway-routed OpenRouter through non-capable LiteLLM backend instances writes nothing.
-  The passthrough relay is instrumented with the same lifecycle but remains quiet for current non-capable passthrough
-  backend instances.
-- **`first_chunk_seen`** = first user-visible content chunk; the internal `_provider_meta` carrier (which delivers the
-  `gen-…` id, captured on the **first** stream event) does not count, so a stream cancelled before any content still
-  records the generation id with `first_chunk_seen=false`.
-- **`local_usage_status`** = `available` when the proxy locally saw a final usage chunk or a reported cost, else
-  `unavailable`. Probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely retrievable, so the status is
-  answered from local evidence only — no remote `/generation` lookup.
+- **Backend-capability gated.** Written only for capable backend instances (currently `openrouter` and
+  `codex-responses-local`); other gateway and passthrough routes stay quiet.
+- **Attempt boundary.** Once billable generation dispatch starts, transport/open/non-200 failures write one lifecycle
+  record joined to cost by `downstream_event_id`. Before a usable body/SSE stream, stream/chunk/usage flags stay false;
+  observed header cost survives. Validation, conversion, routing, client construction, and non-generation relays write
+  none.
+- **`first_chunk_seen`** = first user-visible content chunk. The first-event `_provider_meta` carrier does not count, so
+  a pre-content cancellation can retain its generation id with `first_chunk_seen=false`.
+- **`local_usage_status`** = `available` after final usage or reported cost, else `unavailable`. Probe 2
+  (`[REMOTE-ABSENT]`) found aborted streams absent remotely, so this remains local evidence with no `/generation` read.
 - **`timeout_seen` is always `false`.** The proxy observes only its own client disconnect (`client_disconnected`), never
   the parent's `subprocess.run` timeout; the field is a join target for later run-tree correlation, not proxy-populated.
 - **Joins** spend/usage by shared `request_id` + run-tree ids; one `claude -p` run produces many requests, so the

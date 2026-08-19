@@ -228,12 +228,18 @@ async def forward(
             extra_response_headers=extra_response_headers,
         )
 
+    provider_attempt_started = False
+    provider_response_received = False
     try:
         async with httpx.AsyncClient(timeout=_RESPONSES_TIMEOUT) as client:
+            provider_attempt_started = True
             resp = await client.request(method, url, headers=headers, json=body if body is not None else None)
+            provider_response_received = True
     except httpx.HTTPError as e:
         logger.warning("[%s] responses passthrough upstream request failed: %s", request_id, e)
         _safe_on_complete(on_complete, {}, None, True, "upstream_error", request_id)
+        if provider_attempt_started and not provider_response_received:
+            _record_failed_responses_trace(provider_trace_ctx, request_mode="non_streaming")
         return Response(
             status_code=502,
             content=_ERROR_BODY,
@@ -301,14 +307,20 @@ async def _forward_streaming(
 ) -> Response:
     client_cm = httpx.AsyncClient(timeout=_RESPONSES_TIMEOUT)
     stream_cm = None
+    provider_attempt_started = False
+    provider_response_received = False
     try:
         client = await client_cm.__aenter__()
         stream_cm = client.stream("POST", url, headers=headers, json=body)
+        provider_attempt_started = True
         resp = await stream_cm.__aenter__()
+        provider_response_received = True
     except httpx.HTTPError as e:
         logger.warning("[%s] responses passthrough upstream stream failed: %s", request_id, e)
         await client_cm.__aexit__(None, None, None)
         _safe_on_complete(on_complete, {}, None, True, "upstream_error", request_id)
+        if provider_attempt_started and not provider_response_received:
+            _record_failed_responses_trace(provider_trace_ctx, request_mode="streaming")
         return Response(
             status_code=502,
             content=_ERROR_BODY,
@@ -317,6 +329,7 @@ async def _forward_streaming(
         )
 
     if resp.status_code != 200:
+        reported_cost = reported_cost_micros_from_headers(resp.headers)
         read_failed = False
         try:
             upstream_body = await resp.aread()
@@ -331,6 +344,11 @@ async def _forward_streaming(
                 await client_cm.__aexit__(None, None, None)
 
         _safe_on_complete(on_complete, {}, None, True, "upstream_error", request_id)
+        _record_failed_responses_trace(
+            provider_trace_ctx,
+            request_mode="streaming",
+            reported_cost_micros=reported_cost,
+        )
         if read_failed:
             return Response(
                 status_code=502,
@@ -430,6 +448,24 @@ def _record_responses_trace(
         )
     except Exception as e:
         logger.debug("responses passthrough provider trace skipped: %s", e)
+
+
+def _record_failed_responses_trace(
+    provider_trace_ctx: Mapping[str, Any] | None,
+    *,
+    request_mode: RequestMode,
+    reported_cost_micros: int | None = None,
+) -> None:
+    """Record an attempt that produced no usable response stream, chunk, or usage."""
+    _record_responses_trace(
+        provider_trace_ctx,
+        request_mode=request_mode,
+        stream_started=False,
+        first_chunk_seen=False,
+        final_usage_seen=False,
+        client_disconnected=False,
+        reported_cost_micros=reported_cost_micros,
+    )
 
 
 def _safe_on_complete(

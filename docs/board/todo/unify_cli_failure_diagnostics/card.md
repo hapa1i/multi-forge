@@ -1,6 +1,6 @@
 # Unify CLI failure diagnostics
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `todo/` -- accepted Wave 8 order 5; parked.
 

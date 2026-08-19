@@ -1,8 +1,10 @@
 # Epic: Wave 8 verified residual maintenance
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `todo/` -- accepted and parked. This admission activates no implementation member.
+**Lane**: `doing/` -- order 1 is active on `agent/trace-failed-provider-attempts`; orders 2--19 remain parked.
+
+**Execution base**: pushed closeout `7a2ad4c1` on 2026-08-19.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -44,27 +46,27 @@ external model call was used.
 Only one member should be active at a time. Medium-severity observability and event-loop defects lead; security and
 tracked-content safety follow; bounded CLI/state corrections and documentation close the wave.
 
-| Order | Findings       | Member                                                                                          | Review boundary                         |
-| ----- | -------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1     | O045           | [`trace_failed_provider_attempts`](../trace_failed_provider_attempts/card.md)                   | failed provider-attempt trace lifecycle |
-| 2     | O046           | [`offload_proxy_accounting_persistence`](../offload_proxy_accounting_persistence/card.md)       | event-loop vs durable accounting I/O    |
-| 3     | O074           | [`strip_openai_account_response_headers`](../strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
-| 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
-| 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
-| 6     | O072           | [`eliminate_runtime_test_skips`](../eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
-| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../reject_unknown_workflow_policy_keys/card.md)         | strict external config boundary         |
-| 8     | O087           | [`preserve_assistant_block_boundaries`](../preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
-| 9     | O088           | [`report_active_registry_cleanup_failures`](../report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |
-| 10    | O091           | [`serialize_llm_client_initialization`](../serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
-| 11    | O084           | [`fix_cost_breakdown_selectors`](../fix_cost_breakdown_selectors/card.md)                       | CLI selector and unique-run accounting  |
-| 12    | O086           | [`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
-| 13    | O080           | [`align_supervisor_missing_config_exits`](../align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
-| 14    | O077           | [`reject_ambiguous_policy_check_input`](../reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
-| 15    | O076           | [`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
-| 16    | O081           | [`log_forge_info_probe_degradation`](../log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
-| 17    | O085           | [`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
-| 18    | O100           | [`explain_type_suppressions`](../explain_type_suppressions/card.md)                             | typed suppression rationale             |
-| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
+| Order | Findings       | Member                                                                                                  | Review boundary                         |
+| ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1     | O045           | [`trace_failed_provider_attempts`](../trace_failed_provider_attempts/card.md)                           | failed provider-attempt trace lifecycle |
+| 2     | O046           | [`offload_proxy_accounting_persistence`](../../todo/offload_proxy_accounting_persistence/card.md)       | event-loop vs durable accounting I/O    |
+| 3     | O074           | [`strip_openai_account_response_headers`](../../todo/strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
+| 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../todo/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
+| 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../todo/unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
+| 6     | O072           | [`eliminate_runtime_test_skips`](../../todo/eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
+| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../../todo/reject_unknown_workflow_policy_keys/card.md)         | strict external config boundary         |
+| 8     | O087           | [`preserve_assistant_block_boundaries`](../../todo/preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
+| 9     | O088           | [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |
+| 10    | O091           | [`serialize_llm_client_initialization`](../../todo/serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
+| 11    | O084           | [`fix_cost_breakdown_selectors`](../../todo/fix_cost_breakdown_selectors/card.md)                       | CLI selector and unique-run accounting  |
+| 12    | O086           | [`stabilize_proxy_metrics_json`](../../todo/stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
+| 13    | O080           | [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
+| 14    | O077           | [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
+| 15    | O076           | [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
+| 16    | O081           | [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
+| 17    | O085           | [`reuse_transcript_reference_scan`](../../todo/reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
+| 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                             | typed suppression rationale             |
+| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
 
 ## Dependencies and Activation
 
@@ -80,9 +82,10 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 
 ## Separately Parked or Gated
 
-- [`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md) retains its one-line
+- [`align_policy_check_bundle_vocabulary`](../../todo/align_policy_check_bundle_vocabulary/card.md) retains its one-line
   terminal-parser residue as a standalone accepted follow-up; it is not review-row credit for this epic.
-- [`improve_stop_test_failure_excerpts`](../improve_stop_test_failure_excerpts/card.md) remains unrelated parked work.
+- [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md) remains unrelated parked
+  work.
 - D040 remains proposed, and the rejected/resolved rows above are not executable members.
 - This epic does not reopen Wave 7 deletion candidates, release-gated deprecations, or the unverified O092 tail.
 

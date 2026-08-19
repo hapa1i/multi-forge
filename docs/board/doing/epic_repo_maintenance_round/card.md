@@ -16,8 +16,8 @@ bounded, non-overlapping sequencing exception. The bounded
 [`correct_fork_transfer_snapshot_rollback`](../../done/correct_fork_transfer_snapshot_rollback/card.md) correction
 shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273ef` accepted 23 still-live correctness,
 security, performance, test-policy, output, and documentation rows as 19 parked members under
-[`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md); all Wave 8 members remain
-parked.
+[`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); order 1 is active and the other 18
+members remain parked.
 
 ## Goal
 
@@ -100,10 +100,10 @@ and O093 as written, and promoted only the verified O067/O095 subsets. All 32 fi
 correctness/test-policy/output/docs rows outside that admission remain gated.
 
 The post-Wave 7 residual gate rechecked those excluded rows on `bad273ef`, admitted only the 23 evidence-backed scopes
-under [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md), and kept every member
-parked. D040 remains a proposed inheritance decision; D043/O075 and D045--D052 are already resolved; O078/O079 are
-rejected as bugs; and O080/O085/O097 are narrowed to their supported behavior. O100 was also admitted after the old Wave
-7 exclusion list was found to have omitted it.
+under [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md), and initially parked every
+member. Order 1 activated from pushed closeout `7a2ad4c1`. D040 remains a proposed inheritance decision; D043/O075 and
+D045--D052 are already resolved; O078/O079 are rejected as bugs; and O080/O085/O097 are narrowed to their supported
+behavior. O100 was also admitted after the old Wave 7 exclusion list was found to have omitted it.
 
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
@@ -142,7 +142,7 @@ order.
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
 | 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
 | 7    | 32 structural rows  | [`epic_wave7_refactor_and_deletion`](../../done/epic_wave7_refactor_and_deletion/card.md)                           |
-| 8    | 23 residual rows    | [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md)                             |
+| 8    | 23 residual rows    | [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md)                                     |
 
 ## Execution Waves
 
