@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 is closed at 32/32 findings across 35/35 members. D056 and the remaining separately gated rows
-await recheck; no implementation card is active.
+Current focus: correct Wave 7 order 32's transfer-snapshot rollback edge before activating the parked Wave 8 sequence.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -184,6 +183,9 @@ await recheck; no implementation card is active.
   already-resolved rows, and narrow O080/O085/O097 to supported scope without activating implementation.
 - [x] Prepare the Wave 8 admission, member graph, ledger dispositions, and verification record directly on `main`
   without activating implementation.
+- [x] Reproduce order 32's retained transfer snapshot and stale same-name retry, then activate only the bounded
+  `correct_fork_transfer_snapshot_rollback` correction from the pushed Wave 8 admission base.
+- [ ] Merge and close the fork snapshot correction before activating Wave 8 order 1.
 - [ ] When the user selects execution, branch from the pushed admission base and activate only Wave 8 order 1.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
