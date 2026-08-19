@@ -6,7 +6,7 @@
 
 **Retired**: 2026-08-13
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../../done/epic_wave7_refactor_and_deletion/card.md).
 
 **Decision**: [`deletion_compatibility_contract`](../../done/deletion_compatibility_contract/card.md) (DG4; O092).
 
@@ -22,7 +22,7 @@ The admitted subsets now live with their actual compatibility and subsystem owne
 - session helpers: [`remove_dead_session_helpers`](../../done/remove_dead_session_helpers/card.md);
 - verdict wrapper: [`deprecate_supervisor_verdict_wrapper`](../../done/deprecate_supervisor_verdict_wrapper/card.md);
 - transcript guard: [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md);
-- status-line candidates: [`extract_statusline_rendering`](../../doing/extract_statusline_rendering/card.md); and
+- status-line candidates: [`extract_statusline_rendering`](../../done/extract_statusline_rendering/card.md); and
 - mode selector: [`simplify_count_tokens_mode_selector`](../../done/simplify_count_tokens_mode_selector/card.md).
 
 The cap-state branch, converter candidates, and unnamed O5 tail remain excluded rather than inherited by a replacement.

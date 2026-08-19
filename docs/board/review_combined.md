@@ -50,12 +50,12 @@ D054/D055, and all 36 findings across 13 members shipped independently in PRs #1
 subsequently hardened O012 and retention-status failure reporting without adding a finding. The bounded Wave 6 child
 epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set. The post-Wave 6 structural screen on
 `5777192a` initially admitted 31 verified findings as 34 parked members under
-[`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
+[`epic_wave7_refactor_and_deletion`](done/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
 implementation. A post-order-6 audit promoted O098 and the verified cap-state branch subset of O092 as one bounded
-member, so Wave 7 now contains 32 findings across 35 members. Orders 1--34 shipped independently in PRs #178--#184,
-#186--#188, and #190--#213; order 35 is active from `7ea1d1de`. A bounded post-merge correction for empty `TZ` semantics
-shipped in PR #189 without changing either count. D056 and other correctness, security, performance, test-policy,
-output, and documentation rows still require their separately defined Wave 6 gates.
+member, bringing Wave 7 to 32 findings across 35 members. All shipped independently in PRs #178--#184, #186--#188, and
+#190--#214, and the bounded child epic is closed. A post-merge correction for empty `TZ` semantics shipped in PR #189
+without changing either count. D056 and other correctness, security, performance, test-policy, output, and documentation
+rows still require their separately defined Wave 6 gates.
 
 ### Finding fields
 
@@ -739,7 +739,7 @@ duplication, dead-code, structural, or explicitly unverified rows outside its sc
 The structural/deletion candidates were rechecked after Wave 6 on merged `main` at `5777192a`. The screen covered
 O043--O073 and O092--O099 as candidate rows, then checked the remaining live ledger for structurally misclassified work.
 It initially admitted 31 verified finding rows as 34 parked implementation members under
-[`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). No implementation branch or member
+[`epic_wave7_refactor_and_deletion`](done/epic_wave7_refactor_and_deletion/card.md). No implementation branch or member
 was activated. After order 6, a repository-wide residue audit verified O098 and the `caps.py` non-dict branch from O092;
 the user admitted that bounded subset as one new member, bringing the current graph to 32 findings and 35 members.
 
@@ -795,14 +795,13 @@ directly on `main` after PR #206 and before order 28.
 - **[Wave 6 correctness maintenance epic](done/epic_wave6_correctness_maintenance/card.md):** all 36 verified
   CLI/proxy/runtime findings shipped independently across 13 members in PRs #164--#168 and #170--#177; D033/O020 were
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
-- **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
-  are split into 35 members. Orders 1--34 shipped independently in PRs #178--#184, #186--#188, and #190--#213; order 35
-  is active from `7ea1d1de`. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md)
-  post-merge correction shipped in PR #189, and
-  [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order 20's later
-  snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written; O071's
-  `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified
-  scope; and O092's unadmitted tail is not an executable deletion set.
+- **[Wave 7 refactor and deletion epic](done/epic_wave7_refactor_and_deletion/card.md):** all 32 verified structural
+  rows shipped across 35 independent members in PRs #178--#184, #186--#188, and #190--#214. A bounded
+  [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge correction shipped in PR
+  #189, and [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order
+  20's later snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written;
+  O071's `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their
+  verified scope; and O092's unadmitted tail is not an executable deletion set.
 
 ## Strengths (preserve these)
 

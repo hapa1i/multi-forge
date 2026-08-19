@@ -1,7 +1,6 @@
 # Extract status-line rendering checklist
 
-Current focus: order 35 is active on `refactor/extract-statusline-rendering` from pushed `main` at `7ea1d1de`; it is the
-final Wave 7 member.
+Current focus: complete -- order 35 shipped in PR #214 and the bounded Wave 7 epic is closed.
 
 - [x] Close order 34 on pushed `main`, create the order-35 branch from that exact commit, and activate only this member.
 - [x] Reverify the 1,307-line command, 44 definitions, three upward package imports, 16 importing files, nine
@@ -20,7 +19,7 @@ final Wave 7 member.
 - [x] Run all status-line units/regressions plus targeted sidecar/status-line Docker integration coverage.
 - [x] Run `make test-unit`, `make test-regression`, `make pre-commit`, design token checks, board integrity, and
   `git diff --check`.
-- [ ] Publish order 35 independently, then close Wave 7 in a later direct-`main` commit.
+- [x] Merge PR #214 as `4c9dee34`, then close this member and Wave 7 in a direct-`main` commit.
 
 ## Target boundary
 

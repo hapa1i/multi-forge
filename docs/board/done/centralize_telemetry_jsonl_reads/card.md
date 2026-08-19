@@ -1,6 +1,6 @@
 # Centralize tolerant telemetry JSONL reads
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #205 (`5c36f25f`) after all five GitHub checks passed.
 

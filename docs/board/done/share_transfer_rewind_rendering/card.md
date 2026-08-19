@@ -1,6 +1,6 @@
 # Share transfer and rewind rendering primitives
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #208 as `ea5b9103` after focused, full, regression, targeted rewind integration, and
 pre-commit verification.

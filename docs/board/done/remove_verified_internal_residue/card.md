@@ -1,6 +1,6 @@
 # Remove verified internal residue
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #184 (`95488c10`) from order-6 closeout commit `4f167379`.
 

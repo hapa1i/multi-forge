@@ -1,6 +1,6 @@
 # Share instance-safe proxy transport test fakes
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #187 (`be321ad2`) on 2026-08-15.
 

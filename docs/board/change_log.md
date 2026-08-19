@@ -27,19 +27,19 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
-### Extract status-line rendering
+### Close Wave 7
 
-**Goal/outcome**: Put status-line presentation below the process entrypoint.
+**Goal/outcome**: Put status-line presentation below the entrypoint and close Wave 7.
 
 **Key changes**:
 
-- Moved pure formatting and final palette/hardening/wrap/layout into lower modules with public cross-module helpers and
-  `fmt` aliases; the command is now 130 lines with two definitions, and lower modules never import it.
-- Removed ineffective transcript/numstat process caches and three empty layout parameters; retained per-render context
-  caching and file-backed throttles.
+- Moved formatting/layout below the command with public helpers and `fmt`; command is 130 lines/two definitions with no
+  upward imports.
+- Removed ineffective caches/empty parameters, retained caching, and closed the 32-finding/35-member admission without
+  absorbing gated work.
 
 **Verification**: 357 focused; 9,309 unit (one skip, 122 deselected); 925 regression; 17 Docker; pre-commit/diff; design
-29,993/29,970; board 371 docs/894 links. No Forge workflow ran.
+29,993/29,970; board 371 docs/894 links. PR #214 (`4c9dee34`) passed five checks; no Forge workflow ran.
 
 ### Extract status-line source facts
 

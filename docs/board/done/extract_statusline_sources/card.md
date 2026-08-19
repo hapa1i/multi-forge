@@ -1,6 +1,6 @@
 # Extract status-line source facts
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #213 as `e761d0d1` after focused, full, regression, targeted status-line Docker,
 pre-commit, and CI verification.

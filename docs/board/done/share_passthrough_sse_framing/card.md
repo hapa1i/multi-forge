@@ -1,6 +1,6 @@
 # Share passthrough SSE framing
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #209 as `a1efd5d7` after focused, full, regression, targeted proxy integration, and
 pre-commit verification.

@@ -1,6 +1,6 @@
 # Share policy activation rules without merging state owners
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #179 (`435f2bac`) from O043 closeout commit `2a08f009`.
 

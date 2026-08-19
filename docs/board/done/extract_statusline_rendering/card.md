@@ -1,8 +1,9 @@
 # Extract status-line rendering and remove ineffective process caches
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
-**Lane**: `doing/` -- active on `refactor/extract-statusline-rendering` from pushed `main` at `7ea1d1de`.
+**Lane**: `done/` -- shipped in PR #214 as `4c9dee34` after focused, full, regression, targeted status-line Docker,
+pre-commit, and CI verification.
 
 **Findings**: O070 plus O092's status-line cache and `render_categories` parameter subsets.
 

@@ -1,6 +1,7 @@
 # Wave 7 refactor and deletion checklist
 
-Current focus: order 35 `extract_statusline_rendering` is active from `7ea1d1de`; it is the final member.
+Current focus: complete -- all 32 accepted findings shipped across 35 independent members, and the terminal board ledger
+is synchronized.
 
 - [x] Commit the initial bounded admission and 34-member sequence on `main` (`095d8eeb`).
 - [x] Create `refactor/decouple-lane-runtime-vocabulary` from that commit.
@@ -206,5 +207,7 @@ Current focus: order 35 `extract_statusline_rendering` is active from `7ea1d1de`
   publication remains on the active member.
 - [x] Complete order 35's focused, full, regression, targeted status-line Docker, pre-commit, design-size, and
   board-integrity gates without a Forge workflow.
+- [x] Ship order 35 independently in PR #214 (`4c9dee34`) and close its member.
+- [x] Close this bounded epic at 32/32 findings across 35/35 members after synchronizing the parent and review ledger.
 
-Order 35 is the only active Wave 7 member. This checklist does not authorize any separately gated Wave 6 finding.
+Wave 7 is complete. This checklist never authorized any separately gated Wave 6 finding.

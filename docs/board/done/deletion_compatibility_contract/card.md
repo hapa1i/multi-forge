@@ -3,7 +3,7 @@
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG4).
 
 **Lane**: `done/` -- approved on 2026-08-04; the post-Wave 6 screen split admitted work under the parked
-[`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+[`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 ## Problem
 
@@ -120,7 +120,7 @@ one mode destination removes the dead parsed value without deleting the explicit
 
 The initial accepted cleanup was deliberately parked in broad placeholders pending a current-source screen. That screen
 completed on 2026-08-13 and the executable sequence now lives under
-[`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md). In particular:
+[`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md). In particular:
 
 - O049 is split into user-config deprecation and durable-manifest migration;
 - O050 is split into safe fixture migration and only-then public mutator deletion;

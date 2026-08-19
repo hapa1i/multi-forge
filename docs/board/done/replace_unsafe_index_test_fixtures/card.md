@@ -1,6 +1,6 @@
 # Replace unsafe index test fixtures
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #193 (`56dfc27b`) on 2026-08-16.
 

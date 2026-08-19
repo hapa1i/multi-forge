@@ -1,6 +1,6 @@
 # Extract session-fork execution and thin the CLI
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #211 as `e4a62d1b` after focused, full, regression, targeted fork/rewind Docker,
 pre-commit, and CI verification.

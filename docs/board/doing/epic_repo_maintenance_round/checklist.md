@@ -1,6 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 7 order 35 `extract_statusline_rendering` is active from `7ea1d1de`; it is the final member.
+Current focus: Wave 7 is closed at 32/32 findings across 35/35 members. D056 and the remaining separately gated rows
+await recheck; no implementation card is active.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -347,5 +348,7 @@ Current focus: Wave 7 order 35 `extract_statusline_rendering` is active from `7e
   `extract_statusline_rendering` after reverifying the render/cache boundary.
 - [x] Extract and verify Wave 7 order 35's status-line rendering and cache boundary; publication remains on the active
   member.
+- [x] Ship Wave 7 order 35 independently in PR #214 (`4c9dee34`) and close its member.
+- [x] Close the bounded Wave 7 epic after synchronizing all 35 members, the review ledger, and terminal verification.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.

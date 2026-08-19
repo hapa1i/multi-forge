@@ -1,6 +1,6 @@
 # Centralize timestamp, period, and relative-time primitives
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #180 (`659d4966`) from O044 closeout commit `ef9c27c1`.
 

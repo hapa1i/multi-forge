@@ -1,6 +1,6 @@
 # Extract status-line source facts checklist
 
-Current focus: closed -- order 34 shipped in PR #213; order 35 remains parked.
+Current focus: closed -- order 34 shipped in PR #213; order 35 later shipped in PR #214 and closed Wave 7.
 
 - [x] Close order 33 on pushed `main`, create the order-34 branch from that exact commit, and activate only this member.
 - [x] Reverify the 1,789-line command module, three upward package imports, 23 importing files, and 32 concentrated

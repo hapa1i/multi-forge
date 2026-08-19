@@ -1,6 +1,6 @@
 # Decouple lane runtime vocabulary
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #178 (`30f930b0`) from preparation commit `095d8eeb`.
 

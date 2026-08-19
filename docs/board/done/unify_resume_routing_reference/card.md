@@ -1,6 +1,6 @@
 # Unify resume routing-reference resolution
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #203 (`0d041b83`) after all five GitHub checks passed.
 

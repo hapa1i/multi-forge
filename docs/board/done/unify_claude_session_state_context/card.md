@@ -1,6 +1,6 @@
 # Unify Claude session state-context derivation
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #207 (`32c6917b`) after all five GitHub checks passed.
 

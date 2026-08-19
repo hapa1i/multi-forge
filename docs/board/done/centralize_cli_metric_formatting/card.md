@@ -1,6 +1,6 @@
 # Centralize CLI metric formatting policies
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #183 (`cd3e50e8`) from order-5 closeout commit `62055bab`.
 

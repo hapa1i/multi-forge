@@ -1,6 +1,6 @@
 # Centralize installer path and ownership authority
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #182 (`1a450143`) from order-4 closeout commit `56d32945`.
 

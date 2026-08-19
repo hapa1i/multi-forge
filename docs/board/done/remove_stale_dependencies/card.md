@@ -1,6 +1,6 @@
 # Remove a redundant dependency declaration
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- the verified O071 subset shipped in PR #186 (`19dcf9cb`) on 2026-08-15.
 

@@ -1,6 +1,6 @@
 # Decompose the extension install transaction
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #212 as `f1afb30c` after focused, full, regression, targeted installer/runtime-skill
 Docker, build, clean-wheel, pre-commit, and CI verification.

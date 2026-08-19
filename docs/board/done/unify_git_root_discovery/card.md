@@ -1,6 +1,6 @@
 # Unify git-root discovery contracts
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped independently in PR #181 (`a8cff31f`) from order-3 closeout commit `9817cad3`.
 

@@ -1,6 +1,6 @@
 # Share review worker preparation helpers
 
-**Epic**: [`epic_wave7_refactor_and_deletion`](../../doing/epic_wave7_refactor_and_deletion/card.md).
+**Epic**: [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).
 
 **Lane**: `done/` -- shipped in PR #206 (`242ded2d`) after all five GitHub checks passed.
 
