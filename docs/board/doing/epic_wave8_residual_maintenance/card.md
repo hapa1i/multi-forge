@@ -2,7 +2,7 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- order 1 is active on `agent/trace-failed-provider-attempts`; orders 2--19 remain parked.
+**Lane**: `doing/` -- order 1 shipped in PR #216; order 2 is next and remains parked until its branch is active.
 
 **Execution base**: pushed closeout `7a2ad4c1` on 2026-08-19.
 
@@ -48,7 +48,7 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 
 | Order | Findings       | Member                                                                                                  | Review boundary                         |
 | ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1     | O045           | [`trace_failed_provider_attempts`](../trace_failed_provider_attempts/card.md)                           | failed provider-attempt trace lifecycle |
+| 1     | O045           | [`trace_failed_provider_attempts`](../../done/trace_failed_provider_attempts/card.md)                   | failed provider-attempt trace lifecycle |
 | 2     | O046           | [`offload_proxy_accounting_persistence`](../../todo/offload_proxy_accounting_persistence/card.md)       | event-loop vs durable accounting I/O    |
 | 3     | O074           | [`strip_openai_account_response_headers`](../../todo/strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
 | 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../todo/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |

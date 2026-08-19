@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 order 1 `trace_failed_provider_attempts` is active from pushed closeout `7a2ad4c1`.
+Current focus: Wave 8 order 1 shipped in PR #216; order 2 `offload_proxy_accounting_persistence` is next but parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -188,6 +188,7 @@ Current focus: Wave 8 order 1 `trace_failed_provider_attempts` is active from pu
 - [x] Merge and close the fork snapshot correction in PR #215 (`7736d0d0`) before activating Wave 8 order 1.
 - [x] Branch from pushed correction closeout `7a2ad4c1` and activate only Wave 8 order 1
   `trace_failed_provider_attempts`; keep the other 18 members parked.
+- [x] Ship Wave 8 order 1 in PR #216 (`634ff40e`) and close it before activating order 2.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.

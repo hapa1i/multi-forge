@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
+### Trace failed provider attempts
+
+**Goal/outcome**: Preserve provider lifecycle evidence when an upstream attempt fails before normal completion.
+
+**Key changes**:
+
+- Joined failed Messages and Responses traces to their downstream cost event while keeping local pre-dispatch failures
+  trace-free.
+- Distinguished pre-open failures from received non-200 streams so trace explanations retain observed status, cost, and
+  stream facts.
+
+**Verification**: 108 focused plus 10 CLI; 9,309 unit (one skip); 936 regression; six Docker proxy/telemetry checks;
+pre-commit/diff; design 29,990/29,979; board 965 links. PR #216 merged as `634ff40e`; no Forge workflow ran.
+
 ### Correct fork transfer snapshot rollback
 
 **Goal/outcome**: Keep a failed transfer fork from leaving stale immutable child context for a same-name retry.

@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 1 `trace_failed_provider_attempts`; orders 2--19 remain parked.
+Current focus: order 1 shipped in PR #216; order 2 `offload_proxy_accounting_persistence` is next but remains parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -12,4 +12,4 @@ Current focus: order 1 `trace_failed_provider_attempts`; orders 2--19 remain par
   behavior.
 - [x] Complete focused, unit, regression, targeted proxy/telemetry Docker, pre-commit, documentation-size, and board
   gates.
-- [ ] Ship and close order 1 independently before activating order 2.
+- [x] Ship order 1 in PR #216 (`634ff40e`) and close it independently before activating order 2.

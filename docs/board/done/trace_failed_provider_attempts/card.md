@@ -1,8 +1,8 @@
 # Trace failed provider attempts
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/trace-failed-provider-attempts` from pushed closeout `7a2ad4c1`.
+**Lane**: `done/` -- shipped in PR #216 (`634ff40e`).
 
 **Finding**: O045 (MEDIUM).
 

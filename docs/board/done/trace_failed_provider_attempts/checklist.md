@@ -45,4 +45,4 @@ Current focus: O045 implementation and verification are complete; publish it wit
 - [x] Run `make pre-commit`; verify `design.md` at 29,990 Opus-5 tokens, `design_appendix.md` at 29,979, `change_log.md`
   at 24,162, all 965 board links, and staged diff hygiene.
 - [x] Commit, push, and open an independent draft PR.
-- [ ] After merge, close order 1 before activating order 2.
+- [x] After PR #216 merged as `634ff40e`, close order 1 before activating order 2.
