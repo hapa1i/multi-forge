@@ -15,8 +15,9 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import _ANSI_RE, status_line
+from forge.cli.status_line import status_line
 from forge.cli.statusline import sources as status_sources
+from forge.cli.statusline.formatting import _ANSI_RE
 from forge.cli.statusline.types import TranscriptStats
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 

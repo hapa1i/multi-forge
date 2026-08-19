@@ -3,21 +3,16 @@
 Each ``Segment`` pairs a name with a *producer* and an explicit set of expensive
 proxy/session sources. ``status_line()`` resolves the configured order and its
 source union before discovery, then runs the thin producer adapters over the
-``format_*`` helpers in ``forge.cli.status_line`` and routes their output into
+``format_*`` helpers in ``statusline.formatting`` and routes their output into
 two buckets:
 
 - ``where`` — concatenated with no separator (``path`` + ``branch``).
 - ``stream`` — separator-joined (everything else).
 
-The renderer then feeds these to the unchanged ``render_categories()`` so the
-wrap/harden tail is untouched. With the default (empty) config the resolved
-order is ``names.DEFAULT_ORDER``, which reproduces today's exact output — the
-golden guard in ``tests/src/cli/test_statusline_registry.py`` enforces this.
-
-Import direction (avoids a cycle): this module imports ``status_line`` at module
-level; ``status_line()`` imports this module LAZILY, so status_line.py's
-top-level never pulls in the registry. Producers reach helpers via ``sl.<name>``
-(module-attribute lookup at call time), which is also what lets tests patch them.
+The command passes those two buckets to ``statusline.rendering`` for palette,
+hardening, wrapping, and final layout. With the default (empty) config the
+resolved order is ``names.DEFAULT_ORDER``, whose byte-level golden guard lives
+in ``tests/src/cli/test_statusline_registry.py``.
 """
 
 from __future__ import annotations
@@ -27,7 +22,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Callable, Optional
 
-from forge.cli import status_line as sl
+from forge.cli.statusline import formatting as fmt
 from forge.cli.statusline import sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER
@@ -81,51 +76,51 @@ class RenderPlan:
 
 
 def _produce_path(ctx: RenderContext) -> Optional[str]:
-    return f"{sl.GREEN_BOLD}{sl.get_compact_path(ctx.workspace_dir)}{sl.RESET}"
+    return f"{fmt.GREEN_BOLD}{fmt.get_compact_path(ctx.workspace_dir)}{fmt.RESET}"
 
 
 def _produce_branch(ctx: RenderContext) -> Optional[str]:
     branch = ctx.git_branch
     if not branch:
         return None
-    return f" ({sl.YELLOW_BOLD}{branch}{sl.RESET})"
+    return f" ({fmt.YELLOW_BOLD}{branch}{fmt.RESET})"
 
 
 def _produce_breadcrumb(ctx: RenderContext) -> Optional[str]:
     if not ctx.manifest:
         return None
-    breadcrumb = sl.format_breadcrumb(ctx.manifest, ctx.is_session_authoritative)
+    breadcrumb = fmt.format_breadcrumb(ctx.manifest, ctx.is_session_authoritative)
     if not breadcrumb:
         return None
-    return f"{sl.BREADCRUMB_COLOR}{breadcrumb}{sl.RESET}"
+    return f"{fmt.BREADCRUMB_COLOR}{breadcrumb}{fmt.RESET}"
 
 
 def _produce_model(ctx: RenderContext) -> Optional[str]:
     info = ctx.context_info
     glyphs = (ctx.glyphs.filled, ctx.glyphs.empty)
-    model_name = sl.format_model_label(ctx.raw_model_name, ctx.effective_context_window)
+    model_name = fmt.format_model_label(ctx.raw_model_name, ctx.effective_context_window)
 
-    tier_display = sl.get_tier_display(ctx.runtime) if ctx.is_proxy else None
+    tier_display = fmt.get_tier_display(ctx.runtime) if ctx.is_proxy else None
     if tier_display:
-        model_segment = f"[{tier_display}] {sl.get_context_display(info, glyphs)}"
+        model_segment = f"[{tier_display}] {fmt.get_context_display(info, glyphs)}"
     else:
-        detected_tier = sl.get_tier_from_display_name(ctx.raw_model_name)
-        model_color = sl._tier_color(detected_tier, ctx.runtime)
-        model_segment = f"{model_color}[{model_name}]{sl.RESET} {sl.get_context_display(info, glyphs)}"
+        detected_tier = fmt.get_tier_from_display_name(ctx.raw_model_name)
+        model_color = fmt.tier_color(detected_tier, ctx.runtime)
+        model_segment = f"{model_color}[{model_name}]{fmt.RESET} {fmt.get_context_display(info, glyphs)}"
 
     if ctx.is_proxy and ctx.runtime and ctx.runtime.template and ctx.runtime.template != "unknown":
         suffix = "" if ctx.is_proxy_authoritative else "(~)"
-        return f"{sl.TEMPLATE_COLOR}{ctx.runtime.template}{suffix}{sl.RESET} {model_segment}"
+        return f"{fmt.TEMPLATE_COLOR}{ctx.runtime.template}{suffix}{fmt.RESET} {model_segment}"
     return model_segment
 
 
 def _produce_cost(ctx: RenderContext) -> Optional[str]:
     if ctx.is_proxy:
-        return sl.get_session_metrics(ctx.cost_data, True, proxy_cost_usd=ctx.scoped_proxy_cost_usd)
+        return fmt.get_session_metrics(ctx.cost_data, True, proxy_cost_usd=ctx.scoped_proxy_cost_usd)
     # Direct session: dollars are real only under API billing.
     if ctx.billing_mode == "api":
-        return sl.get_session_metrics(ctx.cost_data, False)
-    return sl.format_billing_cost(ctx.billing_mode, ctx.cost_data, ctx.data.get("rate_limits"))
+        return fmt.get_session_metrics(ctx.cost_data, False)
+    return fmt.format_billing_cost(ctx.billing_mode, ctx.cost_data, ctx.data.get("rate_limits"))
 
 
 def _produce_rate_limits(ctx: RenderContext) -> Optional[str]:
@@ -134,34 +129,34 @@ def _produce_rate_limits(ctx: RenderContext) -> Optional[str]:
     # avoid showing the same number twice.
     if ctx.billing_mode in ("subscription", "ambiguous") and "cost" in ctx.active_segments:
         return None
-    return sl.format_rate_limits(ctx.data.get("rate_limits"), ctx.is_proxy, show_reset=True)
+    return fmt.format_rate_limits(ctx.data.get("rate_limits"), ctx.is_proxy, show_reset=True)
 
 
 def _produce_lines(ctx: RenderContext) -> Optional[str]:
-    return sl.format_line_changes(ctx.cost_data, ctx.workspace_dir)
+    return fmt.format_line_changes(*sources.get_line_change_values(ctx.cost_data, ctx.workspace_dir))
 
 
 def _produce_tokens(ctx: RenderContext) -> Optional[str]:
-    input_tokens, output_tokens, cached_tokens = sl.get_token_breakdown_values(ctx.data, ctx.transcript_stats)
-    return sl.format_token_breakdown(input_tokens, output_tokens, cached_tokens)
+    input_tokens, output_tokens, cached_tokens = fmt.get_token_breakdown_values(ctx.data, ctx.transcript_stats)
+    return fmt.format_token_breakdown(input_tokens, output_tokens, cached_tokens)
 
 
 def _produce_think(ctx: RenderContext) -> Optional[str]:
     if ctx.transcript_stats.has_thinking:
-        return f"{sl.BLUE}{sl.THINKING_INDICATOR}{sl.RESET}"
+        return f"{fmt.BLUE}{fmt.THINKING_INDICATOR}{fmt.RESET}"
     return None
 
 
 def _produce_loop(ctx: RenderContext) -> Optional[str]:
     if not ctx.manifest:
         return None
-    return sl.format_verification(ctx.manifest)
+    return fmt.format_verification(ctx.manifest)
 
 
 def _produce_sidecar(ctx: RenderContext) -> Optional[str]:
     if not ctx.manifest:
         return None
-    return sl.format_sidecar(ctx.manifest)
+    return fmt.format_sidecar(ctx.manifest)
 
 
 def _produce_hooks(ctx: RenderContext) -> Optional[str]:
@@ -172,7 +167,7 @@ def _produce_hooks(ctx: RenderContext) -> Optional[str]:
     if not ctx.workspace_dir:
         return None
     diagnostics = diagnose_forge_hook_runtime(Path(ctx.workspace_dir))
-    return sl.format_hook_migration_state(
+    return fmt.format_hook_migration_state(
         diagnostics.double_fire_risk,
         bool(diagnostics.cleanup_registrations),
     )
@@ -199,7 +194,7 @@ def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
         )
     if rate is None:
         return None
-    return sl.format_cache_hit(rate)
+    return fmt.format_cache_hit(rate)
 
 
 def _confirmed_bundles(ctx: RenderContext) -> Optional[list[str]]:
@@ -222,7 +217,7 @@ def _produce_supervisor(ctx: RenderContext) -> Optional[str]:
         return None
     # Append recent fail-open health (ledger-derived, throttled, lazy); None -> no suffix.
     health = ctx.supervisor_health
-    return sl.format_supervisor(
+    return fmt.format_supervisor(
         suspended=bool(supervisor.get("suspended", False)),
         enabled=bool(policy.get("enabled", False)),
         recent_failures=health.recent_failures if health else 0,
@@ -239,11 +234,11 @@ def _produce_policy(ctx: RenderContext) -> Optional[str]:
         bundles = policy.get("bundles")
         if not isinstance(bundles, list) or not bundles:
             return None
-        return sl.format_policy(bundles, enabled=bool(policy.get("enabled", False)))
+        return fmt.format_policy(bundles, enabled=bool(policy.get("enabled", False)))
     bundles = _confirmed_bundles(ctx)
     if bundles is None:
         return None
-    return sl.format_policy(bundles)
+    return fmt.format_policy(bundles)
 
 
 def _produce_audit(ctx: RenderContext) -> Optional[str]:
@@ -256,7 +251,7 @@ def _produce_audit(ctx: RenderContext) -> Optional[str]:
         return None
     intercept = raw.get("intercept")
     thinking_preserved = bool(intercept.get("thinking_blocks_preserved")) if isinstance(intercept, dict) else False
-    return sl.format_audit(mode, thinking_preserved)
+    return fmt.format_audit(mode, thinking_preserved)
 
 
 def _produce_drift(ctx: RenderContext) -> Optional[str]:
@@ -274,13 +269,13 @@ def _produce_drift(ctx: RenderContext) -> Optional[str]:
     model_id = (ctx.data.get("model") or {}).get("id")
     if not model_id:
         return None
-    route_tier = sl.explicit_tier_from_model(str(model_id)) or ctx.runtime.active_tier
+    route_tier = fmt.explicit_tier_from_model(str(model_id)) or ctx.runtime.active_tier
     if not route_tier:
         return None
     backend = mappings.get(route_tier)
     if not backend:
         return None
-    return sl.format_drift(str(model_id), str(backend))
+    return fmt.format_drift(str(model_id), str(backend))
 
 
 def _produce_spend_cap(ctx: RenderContext) -> Optional[str]:
@@ -293,7 +288,7 @@ def _produce_spend_cap(ctx: RenderContext) -> Optional[str]:
     caps = costs.get("caps") if isinstance(costs, dict) else None
     if not isinstance(caps, dict) or not caps:
         return None
-    return sl.format_spend_cap(caps)
+    return fmt.format_spend_cap(caps)
 
 
 def _produce_launch(ctx: RenderContext) -> Optional[str]:
@@ -304,7 +299,7 @@ def _produce_launch(ctx: RenderContext) -> Optional[str]:
     launch = confirmed.get("launch") if isinstance(confirmed, dict) else None
     if not isinstance(launch, dict):
         return None
-    return sl.format_launch(launch)
+    return fmt.format_launch(launch)
 
 
 def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
@@ -346,7 +341,7 @@ def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
         ctx.config.statusline.forge_cost_ttl,
         _compute_session_cost,
     )
-    return sl.format_forge_cost(micros)
+    return fmt.format_forge_cost(micros)
 
 
 # Every segment name now has a producer (no reserved names remain). The

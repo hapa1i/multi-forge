@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
+### Extract status-line rendering
+
+**Goal/outcome**: Put status-line presentation below the process entrypoint.
+
+**Key changes**:
+
+- Moved pure formatting and final palette/hardening/wrap/layout into lower modules with public cross-module helpers and
+  `fmt` aliases; the command is now 130 lines with two definitions, and lower modules never import it.
+- Removed ineffective transcript/numstat process caches and three empty layout parameters; retained per-render context
+  caching and file-backed throttles.
+
+**Verification**: 357 focused; 9,309 unit (one skip, 122 deselected); 925 regression; 17 Docker; pre-commit/diff; design
+29,993/29,970; board 371 docs/894 links. No Forge workflow ran.
+
 ### Extract status-line source facts
 
 **Goal/outcome**: Put status-line sources below the command.
@@ -2135,31 +2149,22 @@ deferred items.
 
 Telemetry backend-attribution and remote-reconciliation arc; detailed history remains in the matching done cards.
 
-- Split telemetry into downstream model-attempt and upstream operation-outcome JSONL planes. Monthly caps bootstrap from
-  the maximum of cap state, downstream data, and legacy data; reset clears every plane and cache. Activity gained its
-  two-pane view and shared measurement resolution.
-- Added the `ModelSource` catalog and made `proxy.source` own endpoint, auth, and lifecycle capabilities. Downstream
-  `backend_id` remains distinct from writer-origin fields; the shared local LiteLLM row is display-only. Custom-template
-  credential preflight remained deferred.
-- Generalized provider grouping beyond OpenRouter and shipped single-source remote reconciliation with metadata-only
-  OpenRouter queries. Remote failures and invalid numeric bodies render as unavailable data. Direct-call grouping uses
-  one global opt-in; the research-preview per-proxy keys were removed with a relocation warning.
-- Verification covered focused suites, live provider-trace and sidecar Docker paths, static checks, and pre-commit;
-  `unified_backend` shipped in PR #39.
+- Split telemetry into downstream attempts and upstream outcomes, added two-pane activity/shared measurement, and made
+  cap bootstrap use the maximum durable source. `ModelSource` owns endpoint/auth/lifecycle; backend identity stays
+  distinct from writer origin and local LiteLLM is display-only.
+- Generalized provider grouping and metadata-only remote reconciliation; failures render unavailable, direct grouping
+  has one global opt-in, and per-proxy preview keys were removed. Custom-template credential preflight stayed deferred.
+  Focused/live provider-trace and sidecar Docker checks, static checks, and pre-commit verified PR #39.
 
 ## 2026-05-22 -- 2026-06-16 (compacted)
 
 Runtime, Codex frontend, transfer, proxy observability, and status-line foundations; detailed history remains in the
 matching done cards and PRs.
 
-- Added origin-rooted run identity, usage accounting, shared invocation, frozen runtime actions, schema-backed transfer,
-  authoritative passports, and opt-in native relocation. Headless Codex hooks remained unavailable, so initial-message
-  delivery and transfer attribution stayed canonical.
-- Shipped Codex start/resume, hook adapters, TUI, enrollment, version/capability guards, supervisor controls, and
-  same-directory transfer. Trust remained scoped and enrollment-gated; app-server transport, fail-open upstream work,
-  PermissionRequest research, path rewriting, sidecar relocation, and default native relocation remained deferred.
-- Added leak-gated provider metadata, cascade/effort launch controls, redacted retained request logs, provider-trace
-  lifecycle and read commands, and usage-backed status-line health. Costs became reported-or-unavailable; direct
-  provider callers and parse/auth fail-opens remained deferred.
-- Verification covered roughly 6.1k--6.4k unit tests, regressions, static checks, pre-commit, and focused real
-  provider/Codex policy, transfer, generation, cancellation, and launch paths.
+- Added rooted run/usage identity, shared invocation, frozen actions, schema-backed transfer, passports, native
+  relocation, Codex lifecycle/TUI/hooks, supervisor controls, redacted provider traces, and status-line health.
+  Initial-message delivery and scoped enrollment stayed canonical; costs became reported-or-unavailable.
+- Deferred app-server transport, upstream fail-open, PermissionRequest research, path rewriting, sidecar/default native
+  relocation, direct provider callers, and parse/auth fail-opens. Roughly 6.1k--6.4k unit tests, regressions, static and
+  pre-commit checks, plus focused real provider/Codex policy, transfer, generation, cancellation, and launch paths
+  verified the arc.

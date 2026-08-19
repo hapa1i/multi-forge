@@ -13,20 +13,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.cli.status_line import (
+from forge.cli.status_line import _get_terminal_width, status_line
+from forge.cli.statusline.formatting import (
     _ANSI_RE,
+    _HARDENED_SEP,
     CTX_CRIT,
     CTX_HIGH,
     CTX_LOW,
     CTX_MED,
     CTX_WARN,
     DEFAULT_TERM_WIDTH,
+    TEMPLATE_COLOR,
     TRAILING_MARGIN,
     _extract_windows,
     _format_reset_countdown,
     _heat_color,
-    _visible_width,
-    _wrap_output,
     format_billing_cost,
     format_breadcrumb,
     format_cache_hit,
@@ -44,6 +45,8 @@ from forge.cli.status_line import (
     parse_context_from_json,
     render_categories,
     truncate_ansi,
+    visible_width,
+    wrap_output,
 )
 from forge.cli.statusline.sources import (
     compute_cache_hit_rate,
@@ -1265,17 +1268,17 @@ class TestFormatLineChanges:
     """Tests for direct line-change formatting."""
 
     def test_formats_added_and_removed(self):
-        result = format_line_changes({"total_lines_added": 12, "total_lines_removed": 3})
+        result = format_line_changes(12, 3)
         assert result is not None
         assert "\033[38;5;28m+12\033[0m" in result
         assert "\033[38;5;124m-3\033[0m" in result
 
     def test_formats_added_only(self):
-        result = format_line_changes({"total_lines_added": 5, "total_lines_removed": 0})
+        result = format_line_changes(5, 0)
         assert result == "\033[38;5;28m+5\033[0m"
 
     def test_zero_changes_returns_none(self):
-        assert format_line_changes({"total_lines_added": 0, "total_lines_removed": 0}) is None
+        assert format_line_changes(0, 0) is None
 
 
 class TestGetLineChangeValues:
@@ -1285,9 +1288,6 @@ class TestGetLineChangeValues:
         assert get_line_change_values({"total_lines_added": 7, "total_lines_removed": 2}, "/tmp/demo") == (7, 2)
 
     def test_falls_back_to_git_numstat(self):
-        from forge.cli.statusline.sources import _numstat_cache
-
-        _numstat_cache.clear()
         unstaged = MagicMock(returncode=0, stdout="3\t1\tfoo.py\n-\t-\timage.png\n")
         staged = MagicMock(returncode=0, stdout="2\t4\tbar.py\n")
 
@@ -1295,16 +1295,10 @@ class TestGetLineChangeValues:
             assert get_line_change_values({}, "/tmp/numstat-test") == (5, 5)
 
     def test_git_timeout_returns_zero(self):
-        from forge.cli.statusline.sources import _numstat_cache
-
-        _numstat_cache.clear()
         with patch("forge.cli.statusline.sources.subprocess.run", side_effect=TimeoutError):
             assert get_line_change_values({}, "/tmp/timeout-test") == (0, 0)
 
     def test_git_failure_returns_zero(self):
-        from forge.cli.statusline.sources import _numstat_cache
-
-        _numstat_cache.clear()
         failed = MagicMock(returncode=128, stdout="")
         with patch("forge.cli.statusline.sources.subprocess.run", return_value=failed):
             assert get_line_change_values({}, "/tmp/failure-test") == (0, 0)
@@ -1439,8 +1433,6 @@ class TestGetContextDisplay:
 
     def test_no_context_returns_ascii_placeholder(self):
         result = get_context_display(None)
-        from forge.cli.status_line import _ANSI_RE
-
         visible = _ANSI_RE.sub("", result)
         assert visible == "---"
 
@@ -1451,10 +1443,7 @@ class TestRenderCategories:
     def test_all_categories_populated(self):
         result = render_categories(
             where=["path", " (main)"],
-            who=["origin > current"],
-            what=["[Model] bar"],
-            metrics=["$0.05 5m"],
-            state=["THINK"],
+            stream=["origin > current", "[Model] bar", "$0.05 5m", "THINK"],
         )
         assert "path (main)" in result
         assert "|" in result
@@ -1462,10 +1451,7 @@ class TestRenderCategories:
     def test_empty_categories_skipped(self):
         result = render_categories(
             where=["path"],
-            who=[],
-            what=["[Model] bar"],
-            metrics=[],
-            state=[],
+            stream=["[Model] bar"],
         )
         # Only where and what — single separator
         assert result.count("|") == 1
@@ -1473,10 +1459,7 @@ class TestRenderCategories:
     def test_where_only(self):
         result = render_categories(
             where=["path"],
-            who=[],
-            what=[],
-            metrics=[],
-            state=[],
+            stream=[],
         )
         assert "path" in result
         assert "|" not in result
@@ -1510,10 +1493,7 @@ class TestOutputHardening:
         """render_categories returns plain output (hardening applied by caller)."""
         result = render_categories(
             where=["path (main)"],
-            who=[],
-            what=["[Model]"],
-            metrics=[],
-            state=[],
+            stream=["[Model]"],
         )
         # Spaces are regular spaces — caller applies non-breaking space replacement
         assert " " in result
@@ -1528,8 +1508,6 @@ class TestOutputHardening:
     def test_trailing_margin_present(self):
         """Actual status_line() output ends with NBSP margin."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import TRAILING_MARGIN, status_line
 
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
@@ -1549,8 +1527,6 @@ class TestOutputHardening:
     def test_status_line_renders_ascii_metrics_and_model_suffix(self):
         """Integration: visible output uses model suffix, direct line counts, and dimmed token labels."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import _ANSI_RE, status_line
 
         input_json = json.dumps(
             {
@@ -1594,8 +1570,6 @@ class TestOutputHardening:
         """CLI rendering: direct cost comes from Claude status-line input."""
         from click.testing import CliRunner
 
-        from forge.cli.status_line import _ANSI_RE, status_line
-
         input_json = json.dumps(
             {
                 "workspace": {"current_dir": "/tmp/demo"},
@@ -1623,8 +1597,6 @@ class TestOutputHardening:
     def test_status_line_renders_proxy_cost_with_estimate_prefix(self):
         """CLI rendering: proxy cost comes from runtime metrics, not direct input cost."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import _ANSI_RE, status_line
 
         input_json = json.dumps(
             {
@@ -1669,8 +1641,6 @@ class TestOutputHardening:
     def test_status_line_merges_template_with_proxy_model_segment(self):
         """Proxy template should render before the proxy model/context in one segment."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import TEMPLATE_COLOR, status_line
 
         input_json = json.dumps(
             {
@@ -1742,8 +1712,6 @@ class TestOutputHardening:
         """Wrapping/truncation is enabled by default — each line fits terminal width."""
         from click.testing import CliRunner
 
-        from forge.cli.status_line import status_line
-
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
         narrow_width = 40
@@ -1753,8 +1721,6 @@ class TestOutputHardening:
         ):
             result = runner.invoke(status_line, input=minimal_json)
         assert result.exit_code == 0
-        from forge.cli.status_line import _ANSI_RE
-
         for line in result.output.rstrip("\n").split("\n"):
             visible = _ANSI_RE.sub("", line)
             assert (
@@ -1764,8 +1730,6 @@ class TestOutputHardening:
     def test_truncation_disabled_by_env(self, monkeypatch: pytest.MonkeyPatch):
         """FORGE_STATUS_TRUNCATE=0 disables truncation."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import status_line
 
         monkeypatch.setenv("FORGE_STATUS_TRUNCATE", "0")
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
@@ -1777,8 +1741,6 @@ class TestOutputHardening:
             result = runner.invoke(status_line, input=minimal_json)
         assert result.exit_code == 0
         line = result.output.rstrip("\n")
-        from forge.cli.status_line import _ANSI_RE
-
         visible = _ANSI_RE.sub("", line)
         # Output should NOT be truncated — exceeds the 10-col "terminal"
         assert len(visible) > 10
@@ -1788,8 +1750,6 @@ class TestOutputHardening:
         """When /dev/tty is unavailable, falls back to DEFAULT_TERM_WIDTH."""
         from click.testing import CliRunner
 
-        from forge.cli.status_line import status_line
-
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
         with (
@@ -1798,8 +1758,6 @@ class TestOutputHardening:
         ):
             result = runner.invoke(status_line, input=minimal_json)
         assert result.exit_code == 0
-        from forge.cli.status_line import _ANSI_RE
-
         for line in result.output.rstrip("\n").split("\n"):
             visible = _ANSI_RE.sub("", line)
             assert (
@@ -1808,8 +1766,6 @@ class TestOutputHardening:
 
     def test_get_terminal_width_dev_tty(self):
         """_get_terminal_width queries /dev/tty when stdout is piped."""
-        from forge.cli.status_line import _get_terminal_width
-
         # Simulate /dev/tty returning 150 cols
         with (
             patch("os.open", return_value=42),
@@ -1820,8 +1776,6 @@ class TestOutputHardening:
 
     def test_get_terminal_width_fallback(self):
         """_get_terminal_width falls back to shutil when /dev/tty fails."""
-        from forge.cli.status_line import _get_terminal_width
-
         with (
             patch("os.open", side_effect=OSError("no tty")),
             patch("shutil.get_terminal_size", return_value=os.terminal_size((80, 24))),
@@ -1830,19 +1784,17 @@ class TestOutputHardening:
 
 
 class TestWrapOutput:
-    """Tests for _wrap_output separator-boundary wrapping."""
+    """Tests for wrap_output separator-boundary wrapping."""
 
     def test_wraps_at_separator_boundary(self):
         """Output splits into two lines at the last separator that fits."""
-        from forge.cli.status_line import _ANSI_RE, _HARDENED_SEP
-
         seg_a = "segment_a"
         seg_b = "segment_b"
         seg_c = "segment_c"
         output = _HARDENED_SEP.join([seg_a, seg_b, seg_c])
         # seg_a(9) + sep(3) + seg_b(9) = 21 fits in 25
         # + sep(3) + seg_c(9) = 33 does NOT fit
-        result = _wrap_output(output, available=25)
+        result = wrap_output(output, available=25)
         lines = result.split("\n")
         assert len(lines) == 2
         vis_1 = _ANSI_RE.sub("", lines[0])
@@ -1855,24 +1807,20 @@ class TestWrapOutput:
 
     def test_no_separators_falls_back_to_truncation(self):
         """When there are no separators, falls back to truncate_ansi."""
-        result = _wrap_output("a_very_long_single_segment_text", available=15)
+        result = wrap_output("a_very_long_single_segment_text", available=15)
         assert "\n" not in result
         assert "..." in result
 
     def test_fits_without_wrapping(self):
         """Returns output unchanged when it fits in available width."""
-        from forge.cli.status_line import _HARDENED_SEP
-
         output = _HARDENED_SEP.join(["ab", "cd"])
-        result = _wrap_output(output, available=100)
+        result = wrap_output(output, available=100)
         assert "\n" not in result
 
     def test_first_segment_exceeds_width(self):
         """Falls back to truncation when even the first segment is too wide."""
-        from forge.cli.status_line import _HARDENED_SEP
-
         output = _HARDENED_SEP.join(["a" * 50, "short"])
-        result = _wrap_output(output, available=20)
+        result = wrap_output(output, available=20)
         # First segment alone is 50 chars, exceeds 20 — split_idx stays at 1,
         # so line1 is the first segment (too long) and line2 is "short".
         # But line1_visible (50) > 0, so it produces two lines with line1 untruncated.
@@ -1882,12 +1830,10 @@ class TestWrapOutput:
 
     def test_line2_truncated_when_too_long(self):
         """Line 2 is truncated with '...' if it still exceeds available width."""
-        from forge.cli.status_line import _ANSI_RE, _HARDENED_SEP
-
         short = "ab"
         long_seg = "x" * 50
         output = _HARDENED_SEP.join([short, long_seg])
-        result = _wrap_output(output, available=20)
+        result = wrap_output(output, available=20)
         lines = result.split("\n")
         assert len(lines) == 2
         vis_2 = _ANSI_RE.sub("", lines[1])
@@ -1897,8 +1843,6 @@ class TestWrapOutput:
     def test_trailing_margin_on_each_line(self):
         """Integration: each output line gets its own trailing margin."""
         from click.testing import CliRunner
-
-        from forge.cli.status_line import status_line
 
         minimal_json = json.dumps({"workspace": {"current_dir": "/tmp"}, "model": {"display_name": "Test"}})
         runner = CliRunner()
@@ -1915,40 +1859,40 @@ class TestWrapOutput:
 
 
 class TestVisibleWidth:
-    """Tests for _visible_width Unicode display width calculation."""
+    """Tests for visible_width Unicode display width calculation."""
 
     def test_ascii_text(self):
-        assert _visible_width("hello world") == 11
+        assert visible_width("hello world") == 11
 
     def test_strips_ansi_codes(self):
-        assert _visible_width("\033[31mred\033[0m") == 3
+        assert visible_width("\033[31mred\033[0m") == 3
 
     def test_supplementary_emoji_two_cols(self):
         """Emoji in supplementary planes count as 2 columns each."""
-        assert _visible_width("\U0001f504") == 2  # 🔄 verification
-        assert _visible_width("\U0001f5d2") == 2  # 🗒 notepad
-        assert _visible_width("\U0001f9e0") == 2  # 🧠 brain
-        assert _visible_width("\U0001f4a1") == 2  # lightbulb
+        assert visible_width("\U0001f504") == 2  # 🔄 verification
+        assert visible_width("\U0001f5d2") == 2  # 🗒 notepad
+        assert visible_width("\U0001f9e0") == 2  # 🧠 brain
+        assert visible_width("\U0001f4a1") == 2  # lightbulb
 
     def test_bmp_emoji_with_vs16(self):
         """BMP chars + VS16 (v^) count as 2 columns each."""
-        assert _visible_width("v\ufe0f") == 2
-        assert _visible_width("^\ufe0f") == 2
+        assert visible_width("v\ufe0f") == 2
+        assert visible_width("^\ufe0f") == 2
 
     def test_supplementary_emoji_with_vs16(self):
         """Supplementary emoji + VS16 (🗒️) still count as 2 columns total."""
-        assert _visible_width("🗒\ufe0f") == 2
+        assert visible_width("🗒\ufe0f") == 2
 
     def test_mixed_ascii_and_emoji(self):
         """Mixed text counts each character correctly."""
-        assert _visible_width("\U0001f50411 \U0001f9e0115") == 10  # 🔄(2)+1+1+space(1)+🧠(2)+1+1+1
+        assert visible_width("\U0001f50411 \U0001f9e0115") == 10  # 🔄(2)+1+1+space(1)+🧠(2)+1+1+1
 
     def test_status_line_ascii_pattern(self):
         """Realistic ASCII token breakdown pattern."""
         text = "in:28.6K out:17.5K cache:24.1M"
-        width = _visible_width(text)
+        width = visible_width(text)
         assert width == 30
 
     def test_progress_bar_chars(self):
         """ASCII progress bar characters are 1 column each."""
-        assert _visible_width("###-----") == 8
+        assert visible_width("###-----") == 8

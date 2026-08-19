@@ -11,7 +11,6 @@ import json
 import logging
 import os
 import subprocess
-import time
 from pathlib import Path
 from typing import Any
 
@@ -31,12 +30,6 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 _EMPTY_STATS = TranscriptStats()
-_NUMSTAT_TTL_SECS = 5.0
-
-# Order 35 decides whether these process-local caches survive. This extraction
-# preserves their current keys, values, and lifetime without widening them.
-_transcript_cache: dict[str, tuple[int, int, TranscriptStats]] = {}
-_numstat_cache: dict[str, tuple[float, tuple[int, int]]] = {}
 
 
 def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
@@ -139,27 +132,8 @@ def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
 
 
 def get_transcript_stats(transcript_path: str) -> TranscriptStats:
-    """Return transcript stats, reusing an unchanged file's process-local scan.
-
-    The cache key remains ``(path, mtime_ns, size)`` until order 35 decides the
-    process-cache disposition.
-    """
-    if not transcript_path:
-        return _EMPTY_STATS
-
-    try:
-        st = Path(transcript_path).stat()
-        key = (st.st_mtime_ns, st.st_size)
-    except OSError:
-        return _EMPTY_STATS
-
-    cached = _transcript_cache.get(transcript_path)
-    if cached is not None and (cached[0], cached[1]) == key:
-        return cached[2]
-
-    stats = scan_transcript(transcript_path)
-    _transcript_cache[transcript_path] = (key[0], key[1], stats)
-    return stats
+    """Return transcript stats for the lazy per-render context property."""
+    return scan_transcript(transcript_path)
 
 
 def scan_transcript(transcript_path: str) -> TranscriptStats:
@@ -401,12 +375,7 @@ def _parse_numstat(output: str) -> tuple[int, int]:
 
 
 def _git_numstat(current_dir: str) -> tuple[int, int]:
-    """Read staged and unstaged Git numstat totals with the existing TTL."""
-    now = time.monotonic()
-    cached = _numstat_cache.get(current_dir)
-    if cached is not None and (now - cached[0]) < _NUMSTAT_TTL_SECS:
-        return cached[1]
-
+    """Read staged and unstaged Git numstat totals for one render."""
     try:
         timeout = _status_timeout()
         unstaged = subprocess.run(
@@ -430,5 +399,4 @@ def _git_numstat(current_dir: str) -> tuple[int, int]:
     except Exception:
         result = (0, 0)
 
-    _numstat_cache[current_dir] = (now, result)
     return result
