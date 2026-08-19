@@ -1043,6 +1043,7 @@ async def test_forward_non_streaming_records_provider_trace(monkeypatch, respons
 
     assert len(traces) == 1
     assert traces[0]["request_mode"] == "non_streaming"
+    assert traces[0]["stream_started"] is True
     assert traces[0]["final_usage_seen"] is True  # the default fake response body carries usage
     assert traces[0]["proxy_id"] == "p1"  # ctx fields forwarded verbatim
 

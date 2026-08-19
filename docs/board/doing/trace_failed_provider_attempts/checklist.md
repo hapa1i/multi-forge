@@ -19,7 +19,8 @@ Current focus: O045 implementation and verification are complete; publish it wit
 - [x] Record the translated Messages failure only after a provider call starts and before a usable response returns;
   preserve the existing auth-retry success record and avoid duplicate post-response traces.
 - [x] Record Responses non-stream transport and streaming-open failures with no observed stream/chunk/usage facts.
-- [x] Record the Responses non-200 streaming response once, preserving its status/body and any reported header cost.
+- [x] Record the Responses non-200 streaming response once, marking the received response as stream-started while
+  preserving its status/body and any reported header cost.
 - [x] Reuse the request's exact `downstream_event_id`, provider capability gate, correlation fields, and best-effort
   write.
 - [x] Keep invalid requests, local conversion, routing, client construction, and non-generation relay failures
@@ -28,19 +29,20 @@ Current focus: O045 implementation and verification are complete; publish it wit
 
 ## Phase 3 -- Verify and publish
 
-| Boundary                       | Fixture                                        | Assertion                                                 | Tier       |
-| ------------------------------ | ---------------------------------------------- | --------------------------------------------------------- | ---------- |
-| Messages call failure          | translated non-stream request; client raises   | one unavailable non-stream trace joins failed cost        | regression |
-| Responses request failure      | generation request; HTTP request raises        | one trace with no stream, chunks, usage, or cost          | regression |
-| Responses open failure         | streaming generation; context entry raises     | one streaming trace with `stream_started=false`           | regression |
-| Responses context construction | stream context creation raises before entry    | response behavior unchanged and zero traces               | regression |
-| Responses non-200              | opened stream with status/body and cost header | status/body unchanged; one unavailable trace retains cost | regression |
-| Pre-dispatch control           | translated request conversion rejects          | HTTP 400 and zero provider traces                         | regression |
+| Boundary                       | Fixture                                        | Assertion                                            | Tier       |
+| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------- | ---------- |
+| Messages call failure          | translated non-stream request; client raises   | one unavailable non-stream trace joins failed cost   | regression |
+| Responses request failure      | generation request; HTTP request raises        | one trace with no stream, chunks, usage, or cost     | regression |
+| Responses open failure         | streaming generation; context entry raises     | one streaming trace with `stream_started=false`      | regression |
+| Responses context construction | stream context creation raises before entry    | response behavior unchanged and zero traces          | regression |
+| Responses non-200              | opened stream with status/body and cost header | status/body unchanged; trace starts and retains cost | regression |
+| Pre-dispatch control           | translated request conversion rejects          | HTTP 400 and zero provider traces                    | regression |
 
-- [x] Run focused proxy, Responses transport, provider-trace, and O045 regression coverage (824 passed).
-- [x] Run `make test-unit` (9,309 passed, 1 skipped), `make test-regression` (935 passed), and targeted Docker
+- [x] Run focused Responses transport/provider-trace and O045/auth-retry coverage (108 passed), plus CLI trace read
+  coverage (10 passed).
+- [x] Run `make test-unit` (9,309 passed, 1 skipped), `make test-regression` (936 passed), and targeted Docker
   proxy/telemetry integration (6 passed).
-- [x] Run `make pre-commit`; verify `design.md` at 29,990 Opus-5 tokens, `design_appendix.md` at 29,970, `change_log.md`
+- [x] Run `make pre-commit`; verify `design.md` at 29,990 Opus-5 tokens, `design_appendix.md` at 29,979, `change_log.md`
   at 24,162, all 965 board links, and staged diff hygiene.
 - [x] Commit, push, and open an independent draft PR.
 - [ ] After merge, close order 1 before activating order 2.

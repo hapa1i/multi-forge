@@ -1058,9 +1058,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             )
 
         # Shared run-tree context for every provider-trace record on this request.
-        # Spreading one dict at each real-call path means a new path cannot silently omit
-        # the context -- the auth-retry gap (Defect B) was exactly that kind of omission,
-        # and dropping ``**_trace_ctx`` now fails loudly (missing required request_id).
+        # Reusing one dict at each real-call path prevents the per-path context drift
+        # that caused the auth-retry gap (Defect B).
         # Capability gating lives inside ``record_provider_trace``; callers stay unconditional.
         _trace_ctx = {
             "backend_id": _backend_instance_id(),
@@ -1491,10 +1490,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             error_type="api_error",
             cost_micros=_err_cost,
         )
-        if provider_attempt_started and not provider_response_received:
+        if provider_attempt_started and not provider_response_received and _trace_ctx:
             # The provider call began but yielded no usable response. Keep local
             # validation/conversion/client-construction failures trace-free, and do not
-            # duplicate a lifecycle after a response reached Forge.
+            # duplicate a lifecycle after a response reached Forge. The context guard
+            # also keeps this error handler safe if dispatch ordering changes later.
             record_provider_trace(
                 **_trace_ctx,
                 request_mode="non_streaming",

@@ -344,9 +344,16 @@ async def _forward_streaming(
                 await client_cm.__aexit__(None, None, None)
 
         _safe_on_complete(on_complete, {}, None, True, "upstream_error", request_id)
-        _record_failed_responses_trace(
+        # The upstream response context opened and exposed status/headers, so the
+        # provider response lifecycle started even though no successful SSE content or
+        # final usage was observed.
+        _record_responses_trace(
             provider_trace_ctx,
             request_mode="streaming",
+            stream_started=True,
+            first_chunk_seen=False,
+            final_usage_seen=False,
+            client_disconnected=False,
             reported_cost_micros=reported_cost,
         )
         if read_failed:

@@ -886,9 +886,9 @@ Semantics and invariants:
 - **Backend-capability gated.** Written only for capable backend instances (currently `openrouter` and
   `codex-responses-local`); other gateway and passthrough routes stay quiet.
 - **Attempt boundary.** Once billable generation dispatch starts, transport/open/non-200 failures write one lifecycle
-  record joined to cost by `downstream_event_id`. Before a usable body/SSE stream, stream/chunk/usage flags stay false;
-  observed header cost survives. Validation, conversion, routing, client construction, and non-generation relays write
-  none.
+  record joined to cost by `downstream_event_id`. Before any provider response, lifecycle flags stay false; a received
+  response sets `stream_started=true`, while content/usage and header cost reflect only observed evidence. Validation,
+  conversion, routing, client construction, and non-generation relays write none.
 - **`first_chunk_seen`** = first user-visible content chunk. The first-event `_provider_meta` carrier does not count, so
   a pre-content cancellation can retain its generation id with `first_chunk_seen=false`.
 - **`local_usage_status`** = `available` after final usage or reported cost, else `unavailable`. Probe 2

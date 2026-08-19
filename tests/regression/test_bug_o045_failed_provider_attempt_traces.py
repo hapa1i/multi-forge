@@ -1,4 +1,9 @@
-"""Regression: failed billable provider attempts must leave one lifecycle trace."""
+"""Regression O045: failed billable provider attempts must leave one lifecycle trace.
+
+Root cause: ``server.py`` and ``responses_passthrough.py`` recorded cost and metrics after a provider dispatch failed
+without recording the same attempt in provider-trace telemetry. The non-200 Responses seam also discarded the observed
+response lifecycle, causing trace explanation to misreport that the request had not left Forge.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,8 @@ import pytest
 from fastapi import HTTPException
 
 import forge.proxy.responses_passthrough as responses_passthrough
+from forge.core.ops import explain_provider_trace, render_explanation_lines
+from forge.core.ops.context import ExecutionContext
 from forge.proxy.converters import RequestConversionError
 from forge.proxy.data_models import Message, MessagesRequest
 from tests.fixtures.proxy_transport import FakeStream, ProxyTransportFake
@@ -121,15 +128,16 @@ def _responses_trace_context(request_id: str) -> dict[str, Any]:
     }
 
 
-def _assert_unavailable_trace(
+def _assert_incomplete_trace(
     trace: dict[str, Any],
     *,
     request_mode: str,
     downstream_event_id: str,
+    stream_started: bool = False,
     reported_cost_micros: int | None = None,
 ) -> None:
     assert trace["request_mode"] == request_mode
-    assert trace["stream_started"] is False
+    assert trace["stream_started"] is stream_started
     assert trace["first_chunk_seen"] is False
     assert trace["final_usage_seen"] is False
     assert trace["client_disconnected"] is False
@@ -155,7 +163,7 @@ async def test_messages_provider_call_failure_records_one_joined_trace(monkeypat
     assert costs[0]["failed"] is True
     assert costs[0]["downstream_event_id"] == "ds_o045_messages"
     assert len(traces) == 1
-    _assert_unavailable_trace(
+    _assert_incomplete_trace(
         traces[0],
         request_mode="non_streaming",
         downstream_event_id="ds_o045_messages",
@@ -203,7 +211,7 @@ async def test_responses_non_stream_request_failure_records_one_trace(
     assert response.status_code == 502
     assert completions == [(True, "upstream_error")]
     assert len(responses_provider_traces) == 1
-    _assert_unavailable_trace(
+    _assert_incomplete_trace(
         responses_provider_traces[0],
         request_mode="non_streaming",
         downstream_event_id="ds_req_o045_nonstream",
@@ -235,7 +243,7 @@ async def test_responses_stream_open_failure_records_one_trace(
 
     assert response.status_code == 502
     assert len(responses_provider_traces) == 1
-    _assert_unavailable_trace(
+    _assert_incomplete_trace(
         responses_provider_traces[0],
         request_mode="streaming",
         downstream_event_id="ds_req_o045_open",
@@ -270,9 +278,16 @@ async def test_responses_stream_context_construction_failure_remains_trace_free(
 @pytest.mark.asyncio
 async def test_responses_non_200_stream_records_cost_without_changing_response(
     monkeypatch: pytest.MonkeyPatch,
-    responses_provider_traces: list[dict[str, Any]],
 ) -> None:
     upstream_body = b'{"error":{"message":"rate limited"}}'
+    responses_provider_traces: list[dict[str, Any]] = []
+    real_record_provider_trace = responses_passthrough.record_provider_trace
+
+    def _capture_and_record(**kwargs: Any) -> None:
+        responses_provider_traces.append(kwargs)
+        real_record_provider_trace(**kwargs)
+
+    monkeypatch.setattr(responses_passthrough, "record_provider_trace", _capture_and_record)
     transport = ProxyTransportFake(
         stream_response=FakeStream(
             status_code=429,
@@ -301,9 +316,16 @@ async def test_responses_non_200_stream_records_cost_without_changing_response(
     assert response.status_code == 429
     assert response.body == upstream_body
     assert len(responses_provider_traces) == 1
-    _assert_unavailable_trace(
+    _assert_incomplete_trace(
         responses_provider_traces[0],
         request_mode="streaming",
         downstream_event_id="ds_req_o045_non200",
+        stream_started=True,
         reported_cost_micros=321,
     )
+
+    explanation = explain_provider_trace(ctx=ExecutionContext.from_cwd(), request_id="req_o045_non200")
+    assert explanation.left_forge is True
+    rendered = "\n".join(render_explanation_lines(explanation))
+    assert "left Forge via proxy proxy_o045" in rendered
+    assert "Stream started; final usage was not observed." in rendered
