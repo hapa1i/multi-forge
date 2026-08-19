@@ -19,7 +19,10 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import (
+from forge.cli.status_line import status_line
+from forge.cli.statusline import sources as status_sources
+from forge.cli.statusline.context import RenderContext
+from forge.cli.statusline.formatting import (
     _ANSI_RE,
     METRICS_COLOR,
     RED,
@@ -32,10 +35,8 @@ from forge.cli.status_line import (
     format_policy,
     format_spend_cap,
     format_supervisor,
-    status_line,
+    get_tier_from_display_name,
 )
-from forge.cli.statusline import sources as status_sources
-from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import render_segments
 from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
@@ -486,7 +487,7 @@ class TestDriftProducer:
         # Fable has no tier word of its own; both the model-id and display-name
         # detectors must classify it as opus (else the status line mis-colors it).
         assert explicit_tier_from_model("claude-fable-5") == "opus"
-        assert sl.get_tier_from_display_name("Claude Fable 5") == "opus"
+        assert get_tier_from_display_name("Claude Fable 5") == "opus"
 
 
 class TestSpendCapFormat:

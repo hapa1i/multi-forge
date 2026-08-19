@@ -53,7 +53,7 @@ epic is closed. O003 already shipped in Wave 3 and is not part of the Wave 5 set
 [`epic_wave7_refactor_and_deletion`](doing/epic_wave7_refactor_and_deletion/card.md). The admission itself activated no
 implementation. A post-order-6 audit promoted O098 and the verified cap-state branch subset of O092 as one bounded
 member, so Wave 7 now contains 32 findings across 35 members. Orders 1--34 shipped independently in PRs #178--#184,
-#186--#188, and #190--#213; order 35 remains parked. A bounded post-merge correction for explicitly empty `TZ` semantics
+#186--#188, and #190--#213; order 35 is active from `7ea1d1de`. A bounded post-merge correction for empty `TZ` semantics
 shipped in PR #189 without changing either count. D056 and other correctness, security, performance, test-policy,
 output, and documentation rows still require their separately defined Wave 6 gates.
 
@@ -797,8 +797,8 @@ directly on `main` after PR #206 and before order 28.
   rejected by executable current-behavior controls, and D056 remains outside this bounded admission.
 - **[Wave 7 refactor and deletion epic](doing/epic_wave7_refactor_and_deletion/card.md):** 32 verified structural rows
   are split into 35 members. Orders 1--34 shipped independently in PRs #178--#184, #186--#188, and #190--#213; order 35
-  remains parked. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md) post-merge
-  correction shipped in PR #189, and
+  is active from `7ea1d1de`. A bounded [`correct_empty_tz_period_bounds`](done/correct_empty_tz_period_bounds/card.md)
+  post-merge correction shipped in PR #189, and
   [`correct_search_index_fingerprint_race`](done/correct_search_index_fingerprint_race/card.md) closed order 20's later
   snapshot race directly on `main`; neither changed those counts. O062/O063/O093 are rejected as written; O071's
   `httpx2` half is rejected; O067/O071/O095/O098 and the cap-state O092 branch are admitted only in their verified

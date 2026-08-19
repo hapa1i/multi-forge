@@ -6,8 +6,8 @@ Expensive derivations (transcript scan, git branch, context parsing) are
 actually accesses them — e.g. ``segments: [path, model]`` does no transcript
 scan and no git subprocess.
 
-Source facts come from the lower ``statusline.sources`` layer. Formatting
-helpers still use ``forge.cli.status_line`` until order 35 moves the render tail.
+Source facts come from ``statusline.sources`` and presentation derives through
+the sibling ``statusline.formatting`` module; neither layer imports the command.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
-from forge.cli import status_line as sl
+from forge.cli.statusline import formatting as fmt
 from forge.cli.statusline import sources
 from forge.cli.statusline.palette import (
     Glyphs,
@@ -162,7 +162,7 @@ class RenderContext:
 
     @cached_property
     def context_info(self) -> dict[str, Any] | None:
-        info = sl.parse_context_from_json(self.data)
+        info = fmt.parse_context_from_json(self.data)
         # Proxy runtime truth overrides the context window when available.
         if self.is_proxy and self.runtime and self.runtime.active_context_window and info:
             tokens = info.get("tokens", 0)
@@ -173,7 +173,7 @@ class RenderContext:
 
     @cached_property
     def effective_context_window(self) -> int | None:
-        return sl.get_effective_context_window(self.data, self.runtime, self.context_info)
+        return fmt.get_effective_context_window(self.data, self.runtime, self.context_info)
 
     @cached_property
     def effective_intent(self) -> dict[str, Any]:

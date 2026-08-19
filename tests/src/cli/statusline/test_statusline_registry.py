@@ -19,6 +19,7 @@ from click.testing import CliRunner
 
 from forge.cli import status_line as sl
 from forge.cli.status_line import status_line
+from forge.cli.statusline import formatting as status_formatting
 from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
@@ -271,7 +272,7 @@ class TestGoldenNoOpGuard:
             session=_manifest_with_proxy_cost_baseline(769_651),
         )
 
-        visible = sl._ANSI_RE.sub("", out)
+        visible = status_formatting._ANSI_RE.sub("", out)
         assert "~$1.28" in visible
         assert "~$2.05" not in visible
 
@@ -283,7 +284,7 @@ class TestGoldenNoOpGuard:
             session=_manifest_with_proxy_cost_baseline(769_651),
         )
 
-        visible = sl._ANSI_RE.sub("", out)
+        visible = status_formatting._ANSI_RE.sub("", out)
         assert "~$0.50" in visible
 
     def test_proxy_cost_uses_current_total_after_proxy_restart_even_above_baseline(
@@ -296,7 +297,7 @@ class TestGoldenNoOpGuard:
             session=_manifest_with_proxy_cost_baseline(5_000_000, started_at="2026-06-17T19:00:00Z"),
         )
 
-        visible = sl._ANSI_RE.sub("", out)
+        visible = status_formatting._ANSI_RE.sub("", out)
         assert "~$6.00" in visible
         assert "~$1.00" not in visible
 
@@ -425,7 +426,9 @@ class TestLazyContext:
 
         detect.assert_called_once()
         assert len(where) == 1
-        assert stream == [f"{sl.YELLOW_BOLD}{sl.HOOK_DOUBLE_FIRE_INDICATOR}{sl.RESET}"]
+        assert stream == [
+            f"{status_formatting.YELLOW_BOLD}{status_formatting.HOOK_DOUBLE_FIRE_INDICATOR}{status_formatting.RESET}"
+        ]
 
     def test_hooks_segment_omits_single_scope(self):
         ctx = _ctx(FIXTURE_MINIMAL)
@@ -441,8 +444,10 @@ class TestLazyContext:
         with patch("forge.install.hooks.diagnose_forge_hook_runtime", return_value=diagnostics):
             _where, stream = render_segments(ctx, ["hooks"])
 
-        assert stream == [f"{sl.YELLOW_BOLD}{sl.HOOK_CLEANUP_INDICATOR}{sl.RESET}"]
-        assert sl.HOOK_DOUBLE_FIRE_INDICATOR not in stream[0]
+        assert stream == [
+            f"{status_formatting.YELLOW_BOLD}{status_formatting.HOOK_CLEANUP_INDICATOR}{status_formatting.RESET}"
+        ]
+        assert status_formatting.HOOK_DOUBLE_FIRE_INDICATOR not in stream[0]
 
     def test_hooks_segment_can_report_cleanup_and_double_fire_together(self):
         ctx = _ctx(FIXTURE_MINIMAL)
@@ -451,5 +456,5 @@ class TestLazyContext:
             _where, stream = render_segments(ctx, ["hooks"])
 
         assert len(stream) == 1
-        assert sl.HOOK_DOUBLE_FIRE_INDICATOR in stream[0]
-        assert sl.HOOK_CLEANUP_INDICATOR in stream[0]
+        assert status_formatting.HOOK_DOUBLE_FIRE_INDICATOR in stream[0]
+        assert status_formatting.HOOK_CLEANUP_INDICATOR in stream[0]

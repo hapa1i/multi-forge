@@ -741,15 +741,17 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   configured/default order into one immutable `RenderPlan` before calling `detect_proxy()` or `discover_session()`, then
   render from that same plan so acquisition and producers cannot drift. `statusline/types.py` owns neutral facts and
   `statusline/sources.py` owns proxy, transcript, session, and Git acquisition; the command module must not redeclare
-  them. A zero-source layout skips both probes; each requested source runs at most once. New segments must extend the
-  exhaustive declaration test, while their own Git, transcript/cache, or hook-diagnostic work remains governed by lazy
-  `RenderContext` access.
+  them. `statusline/formatting.py` owns presentation, visible-width, truncation, and separator-wrap helpers;
+  `statusline/rendering.py` owns palette application, hardening, and final two-bucket layout. These shared formatting
+  helpers use package-public names, and lower modules use the unambiguous `fmt` alias rather than the old command-shaped
+  `sl`. Lower modules never import the command. A zero-source layout skips both probes; each requested source runs at
+  most once. New segments must extend the exhaustive declaration test, while their own Git, transcript/cache, or
+  hook-diagnostic work remains governed by lazy `RenderContext` access.
 - **`DEFAULT_ORDER` is the golden contract**: empty `statusline.segments` reproduces the pre-config bar byte-for-byte
   (`test_statusline_registry.py` golden snapshots). It EXCLUDES `rate_limits` + every opt-in segment.
 - **Lazy `RenderContext`**: derivations are `cached_property`, so a segment not in the active set does zero I/O (no
-  transcript scan, Git subprocess, or proxy-field access). Source facts come from the lower `sources` module; producers
-  still reach `format_*` through `sl.<name>` until the render-tail extraction, keeping that remaining import cycle
-  avoided through lazy entrypoint imports.
+  transcript scan, Git subprocess, or proxy-field access). Producers call sibling `formatting` helpers; the command owns
+  only stdin validation, shared-source acquisition, terminal width, and stdout.
 - **Palette = output-level ANSI remap**: each role emits a unique code; `apply_palette` is a single-pass regex mapping
   default→themed. `default` palette == empty remap == byte-identical no-op (golden-safe). Glyphs thread ONLY into the
   `get_context_display` progress bar (block chars can't be safely output-remapped). Do not thread a `palette` arg
@@ -766,8 +768,10 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   session on a different-default proxy.
 - **Runtime-only state fails open**: the cache-hit throttle (`statusline/throttle.py`, keyed by
   `sha1(session_id|transcript_path)`) and all transcript/manifest reads degrade to recompute/None on any error — the
-  status line must always exit 0. Guard value TYPES at point of use, not just shape at the boundary (a
-  structurally-valid cache entry can carry a wrong-typed field).
+  status line must always exit 0. One-render command processes retain no transcript/numstat module caches;
+  `RenderContext.cached_property` handles within-render reuse and persistent throttles remain file-backed. Guard value
+  TYPES at point of use, not just shape at the boundary (a structurally-valid cache entry can carry a wrong-typed
+  field).
 - **Proxy spend caps**: `_attach_cap_summary` nests `CostTracker.cap_summary()` under `GET / metrics.costs.caps`,
   keeping `ProxyMetrics` decoupled from `CostTracker`. Cap amounts use `_fmt_cap_money` (four decimals below a cent),
   NOT `_fmt_dollars` (whose `int(usd*100)` collapses sub-cent caps to `0c`).

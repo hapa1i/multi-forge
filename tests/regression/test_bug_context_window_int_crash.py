@@ -15,7 +15,7 @@ Affected file: src/forge/cli/status_line.py
 
 import pytest
 
-from forge.cli.status_line import parse_context_from_json
+from forge.cli.statusline.formatting import parse_context_from_json
 
 pytestmark = pytest.mark.regression
 

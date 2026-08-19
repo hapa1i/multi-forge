@@ -12,11 +12,10 @@ Two mechanisms, chosen by how the styled bytes are produced:
   unique tokens), so they're threaded into the one place they're emitted: the
   progress bar in ``get_context_display``.
 
-``DEFAULT_PALETTE`` / ``ASCII_GLYPHS`` are built from ``status_line``'s module
-constants, so they can't drift from the real defaults. Import direction stays
-acyclic: this module imports ``status_line`` at module level; ``status_line``
-imports nothing from here at module level (``apply_palette`` is imported lazily
-inside ``status_line()``).
+``DEFAULT_PALETTE`` / ``ASCII_GLYPHS`` are built from ``formatting`` constants,
+so they cannot drift from the real defaults. Import direction stays acyclic:
+palette depends on formatting, final rendering depends on both, and the command
+depends only downward on the status-line package.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, fields
 
-from forge.cli import status_line as sl
+from forge.cli.statusline import formatting as fmt
 
 
 @dataclass(frozen=True)
@@ -54,24 +53,24 @@ class Palette:
 # Default == today's exact module constants (so the remap is a no-op and a
 # drift-guard test can assert equality).
 DEFAULT_PALETTE = Palette(
-    path=sl.GREEN_BOLD,
-    branch=sl.YELLOW_BOLD,
-    breadcrumb=sl.BREADCRUMB_COLOR,
-    template=sl.TEMPLATE_COLOR,
-    metrics=sl.METRICS_COLOR,
-    think=sl.BLUE,
-    line_add=sl.LINE_ADD_COLOR,
-    line_remove=sl.LINE_REMOVE_COLOR,
-    tier_haiku=sl.TIER_HAIKU,
-    tier_sonnet=sl.TIER_SONNET,
-    tier_sonnet_deep=sl.TIER_SONNET_DEEP,
-    tier_opus=sl.TIER_OPUS,
-    tier_opus_deep=sl.TIER_OPUS_DEEP,
-    ctx_low=sl.CTX_LOW,
-    ctx_med=sl.CTX_MED,
-    ctx_high=sl.CTX_HIGH,
-    ctx_warn=sl.CTX_WARN,
-    ctx_crit=sl.CTX_CRIT,
+    path=fmt.GREEN_BOLD,
+    branch=fmt.YELLOW_BOLD,
+    breadcrumb=fmt.BREADCRUMB_COLOR,
+    template=fmt.TEMPLATE_COLOR,
+    metrics=fmt.METRICS_COLOR,
+    think=fmt.BLUE,
+    line_add=fmt.LINE_ADD_COLOR,
+    line_remove=fmt.LINE_REMOVE_COLOR,
+    tier_haiku=fmt.TIER_HAIKU,
+    tier_sonnet=fmt.TIER_SONNET,
+    tier_sonnet_deep=fmt.TIER_SONNET_DEEP,
+    tier_opus=fmt.TIER_OPUS,
+    tier_opus_deep=fmt.TIER_OPUS_DEEP,
+    ctx_low=fmt.CTX_LOW,
+    ctx_med=fmt.CTX_MED,
+    ctx_high=fmt.CTX_HIGH,
+    ctx_warn=fmt.CTX_WARN,
+    ctx_crit=fmt.CTX_CRIT,
 )
 
 # "Sage & clay" earth tones: moss/sage/clay/stone/ochre, tiers in a green-family
@@ -136,7 +135,7 @@ class Glyphs:
     empty: str
 
 
-ASCII_GLYPHS = Glyphs(filled=sl.PROGRESS_FILLED, empty=sl.PROGRESS_EMPTY)
+ASCII_GLYPHS = Glyphs(filled=fmt.PROGRESS_FILLED, empty=fmt.PROGRESS_EMPTY)
 # U+2588 FULL BLOCK / U+2591 LIGHT SHADE (Block Elements, not emoji). Escaped so
 # the normalize-text hook can't strip them on commit.
 UNICODE_GLYPHS = Glyphs(filled="\u2588", empty="\u2591")

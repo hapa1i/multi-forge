@@ -17,7 +17,7 @@ Source owner: src/forge/cli/statusline/sources.py
 
 import pytest
 
-from forge.cli.status_line import get_effective_context_window
+from forge.cli.statusline.formatting import get_effective_context_window
 from forge.cli.statusline.types import ProxyRuntimeTruth
 
 pytestmark = pytest.mark.regression

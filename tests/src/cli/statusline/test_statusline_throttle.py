@@ -14,8 +14,9 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from forge.cli import status_line as sl
-from forge.cli.status_line import _ANSI_RE, status_line
+from forge.cli.status_line import status_line
 from forge.cli.statusline import sources as status_sources
+from forge.cli.statusline.formatting import _ANSI_RE
 from forge.cli.statusline.throttle import _cache_path, read_or_compute
 from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
 from forge.core.paths import get_forge_home
