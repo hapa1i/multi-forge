@@ -12,8 +12,9 @@ closed order 20's post-merge snapshot race directly on `main` after PR #206 and 
 before order 11; the earlier
 [`correct_post_merge_review_findings`](../../done/correct_post_merge_review_findings/card.md) member shipped five
 verified post-merge corrections in PR #185. The user admitted O098 and the verified cap-state subset of O092 as one
-bounded, non-overlapping sequencing exception; D056 and the other separately gated Wave 6 rows remain outside that
-admission.
+bounded, non-overlapping sequencing exception. The residual gate on merged `main` at `bad273ef` then accepted 23
+still-live correctness, security, performance, test-policy, output, and documentation rows as 19 parked members under
+[`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md); no implementation is active.
 
 ## Goal
 
@@ -95,6 +96,12 @@ DG4 umbrellas and the fork/installer/status-line structural rows into 35 ordered
 and O093 as written, and promoted only the verified O067/O095 subsets. All 32 findings shipped across 35 members;
 correctness/test-policy/output/docs rows outside that admission remain gated.
 
+The post-Wave 7 residual gate rechecked those excluded rows on `bad273ef`, admitted only the 23 evidence-backed scopes
+under [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md), and kept every member
+parked. D040 remains a proposed inheritance decision; D043/O075 and D045--D052 are already resolved; O078/O079 are
+rejected as bugs; and O080/O085/O097 are narrowed to their supported behavior. O100 was also admitted after the old Wave
+7 exclusion list was found to have omitted it.
+
 For that pair, D053 (Wave 6) deliberately sequenced before O007 (Wave 5); the child epic owns this exception to wave
 order.
 
@@ -132,6 +139,7 @@ order.
 | 6    | D053                | [`sanitize_proxy_conversion_failure_logs`](../../done/sanitize_proxy_conversion_failure_logs/card.md)               |
 | 6    | 36 correctness rows | [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md)                       |
 | 7    | 32 structural rows  | [`epic_wave7_refactor_and_deletion`](../../done/epic_wave7_refactor_and_deletion/card.md)                           |
+| 8    | 23 residual rows    | [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md)                             |
 
 ## Execution Waves
 
@@ -142,8 +150,9 @@ The ordering constraint is:
 1. resolve DG1–DG4 and reproduce every CRITICAL/HIGH finding on its execution branch;
 2. ship policy and supervision correctness;
 3. ship Stop/artifact, session/state, installer, and CLI/proxy correctness in dependency order;
-4. process bounded MED/LOW maintenance findings; and
-5. execute the parked Wave 7 sequence only after behavior and compatibility are characterized.
+4. process bounded MED/LOW maintenance findings;
+5. execute the parked Wave 7 sequence only after behavior and compatibility are characterized; and
+6. close the rechecked Wave 8 residuals one member at a time without reopening rejected or decision-gated rows.
 
 New member cards must name their finding IDs and wave. Create a child epic only when multiple independently shippable
 members share a contract or sequencing decision that would otherwise drift.

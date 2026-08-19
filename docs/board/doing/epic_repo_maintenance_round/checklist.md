@@ -179,8 +179,12 @@ await recheck; no implementation card is active.
   written, promote only verified O067/O095 subsets, and keep all unverified symbols excluded.
 - [x] Park the ordered implementation members under `epic_wave7_refactor_and_deletion`, split the DG4 umbrellas and
   large fork/installer/status-line seams, and retire three superseded/invalidated cards without activating work.
-- [ ] Recheck D056 and the remaining separately gated Wave 6 MEDIUM/LOW correctness, security, performance, test-policy,
-  output, and documentation findings before admitting any of them.
+- [x] Recheck D040, D042--D052, D056, O045--O046, O072, O074--O091, O097, and omitted O100 on merged `main` at
+  `bad273ef`; admit 23 verified rows as 19 parked Wave 8 members, leave D040 proposed, reject O078/O079 as bugs, record
+  already-resolved rows, and narrow O080/O085/O097 to supported scope without activating implementation.
+- [x] Prepare the Wave 8 admission, member graph, ledger dispositions, and verification record directly on `main`
+  without activating implementation.
+- [ ] When the user selects execution, branch from the pushed admission base and activate only Wave 8 order 1.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
+### Admit Wave 8 verified residual maintenance
+
+**Goal/outcome**: Convert only evidence-backed post-Wave-7 residue into bounded parked work.
+
+**Key changes**:
+
+- Rechecked the gated ledger on `bad273ef`; admitted 23 findings as 19 members, kept D040 proposed, rejected O078/O079
+  as bugs, and recorded resolved or narrowed scopes.
+- Sequenced proxy observability/I/O, security, tracked-content safety, CLI/state, test-policy, and docs boundaries
+  without activating implementation.
+
+**Verification**: Rich JSON failure reproduced; full pre-commit and diff check passed; 391 board docs/959 local links
+resolve; 19 unique members/23 unique findings; no Forge workflow ran.
+
 ### Close Wave 7
 
 **Goal/outcome**: Put status-line presentation below the entrypoint and close Wave 7.
@@ -2101,49 +2115,26 @@ verification anchors, and deferred items.
 
 ## 2026-06-22 -- 2026-06-30 (compacted)
 
-Consumer-lanes, corrupt-state, CLI-taxonomy, and Codex proxy-launch arc. Detailed card history remains in the matching
-`docs/board/done/` cards and PRs; this summary preserves the decisions, behavior changes, verification anchors, and
-deferred items.
+Consumer lanes, state boundaries, CLI taxonomy, and Codex proxy launch. Detailed evidence remains in the matching done
+cards and PRs.
 
-- **consumer_lanes T0-T7**: introduced runtime-native subscription sources (`chatgpt`, then `claude-max`) and the pure
-  `core.lanes` model, moved the semantic supervisor onto lane resolution, then made codex the first real non-Claude
-  supervisor lane. Later slices added lane observability, persisted/frozen supervisor lane bindings,
-  `forge session lane set/show/clear --consumer`, aux-consumer `claude-max` billing, shadow-curation codex dispatch, and
-  sticky fail-open degrade from exhausted codex subscription lanes back to the default `claude -p` lane. Decisions:
-  runtime-native auth is endpoint semantics, not a relaxed credential; T3 kept Claude byte-identical; T4 bypasses the
-  proxy chain; aux freeze happens on real dispatch while supervisor freeze stays tied to its registered lifecycle;
-  shadow-curation codex failures are fail-loud, not fail-open. Deferred: memory-writer codex dispatch, team-supervisor
-  plan-context/codex arm, live codex subscription-exhaustion trigger, and some release-tier real-API validation.
-  Verification included focused lane/source/supervisor/session/usage suites, full unit sweeps around 7k tests, Docker
-  real-Claude supervisor/handoff coverage, and a host ChatGPT `codex exec` shadow-curation smoke.
-- **State corruption/unreadable handling**: unified durable corruption under `StateCorruptedError` with one reset tip,
-  added `forge clean` corrupt-state recovery, removed legacy baggage, then completed fail-closed GC/reset-tip coverage
-  and strict cost-config validation. Follow-up split transient `OSError` reads into `StateUnreadableError`, so
-  unreadable files surface check/retry guidance and are never deleted as corruption. Decisions: best-effort scan/list
-  sites may still degrade, but specific-target paths propagate corruption/unreadable to the top-level handlers; hook
-  commands emit `{decision:block}` JSON envelopes. Verification: 6.9k-7.3k unit/regression passes, corrupt/unreadable
-  regression files, adversarial review findings fixed, `make pre-commit` clean.
-- **forge_cli_cleanup slices 02-12 + closeout**: moved transfer/memory under `forge session`, moved telemetry under
-  `forge telemetry`, moved backend under `forge model`, removed `forge session context`, removed alias shims
-  (`authentication`, `extensions`), normalized non-leaf behavior, routed Rich errors/tips through output helpers, split
-  `policy supervisor` into explicit leaves, standardized destructive `clean`/`delete`/`reset` prompts, enumerated
-  editable-config verb parity, and drained read-output JSON/stream ledgers. Breaking clean-breaks intentionally return
-  Click native errors; kept aliases are `ext`/`sess`/`mem`/`cfg`, with no new aliases for `telemetry`/`model`. Durable
-  lessons promoted: alias policy and the Python-symbol-vs-CLI-alias trap. Verification included CLI unit sweeps, command
-  tree invariants, JSON shape/stream tests, Docker installer/search/backend integrations, `uv build`, and
-  `make pre-commit`.
-- **forge_codex_command_group Phase 1/3/4 + closeout**: shipped `forge codex status`, the `openai_responses_passthrough`
-  wire shape and Responses ingress, then `forge codex start --proxy`. The transport forwards Codex `/v1/responses*`
-  byte-for-byte to preserve signed reasoning; route/preflight/proxy capability gates all require
-  `wire_shape == openai_responses_passthrough` plus `responses_ingress`; generation-only accounting prevents retrieve
-  double-counting; launcher strips native OpenAI/Codex auth and relies on proxy-owned upstream credentials. Review
-  hardening added proxy identity verification so stale registry entries on reused ports cannot misroute Codex.
-  Verification: status/transport/launcher unit suites, full CLI suite, real codex 0.141.0 routing through Forge to
-  `POST /v1/responses`, proxy identity live-check, and `make pre-commit`; deferred live 200 reasoning round-trip
-  remained blocked by a dead OpenAI key.
-- **2026-06-25 real-checker fix**: the cascade short-circuit E2E was not flaky; its plan said "Create" a file that the
-  harness pre-created, so the conservative checker correctly escalated. The plan now authorizes overwriting the existing
-  file. Verification: Docker real-supervisor E2E 10/10; fixed test passed repeated real-checker runs.
+- **Consumer lanes T0--T7:** added `chatgpt`/`claude-max` subscription sources, pure lane vocabulary, frozen bindings,
+  lane CLI, Codex supervisor/curation dispatch, billing, and sticky fail-open fallback. Runtime-native auth remained
+  endpoint semantics; direct lanes bypass proxies; aux bindings freeze on dispatch. Memory-writer/team-supervisor Codex
+  work and live exhaustion/release checks stayed deferred. Focused suites, ~7k unit tests, Docker real-Claude, and a
+  host Codex curation smoke passed.
+- **State boundaries:** split corruption from transient unreadability, added guarded cleanup/recovery, and made targeted
+  paths propagate actionable failures while best-effort scans may degrade. Corrupt/unreadable regressions, 6.9k--7.3k
+  unit/regression runs, review fixes, and pre-commit passed.
+- **CLI cleanup:** moved session/telemetry/model commands to their durable taxonomy, removed stale aliases/surfaces,
+  normalized groups, errors, destructive prompts, config parity, and JSON streams. Kept aliases are
+  `ext`/`sess`/`mem`/`cfg`; clean breaks use Click errors. CLI invariants, Docker integration, build, and pre-commit
+  passed.
+- **Codex proxy launch:** shipped status, byte-preserving Responses ingress, and proxied start with capability and proxy
+  identity gates, generation-only accounting, and proxy-owned auth. Unit/CLI suites, a real Codex-to-Forge request, and
+  pre-commit passed; a live 200 reasoning round-trip remained blocked by the unavailable key.
+- **Checker fixture:** corrected the plan from create to overwrite; the Docker supervisor E2E passed 10/10 and repeated
+  real-checker runs.
 
 ## 2026-06-18 -- 2026-06-20 (compacted)
 
