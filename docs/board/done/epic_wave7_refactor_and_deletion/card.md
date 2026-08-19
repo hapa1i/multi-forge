@@ -122,7 +122,7 @@ runs last so it lands on the smallest stable surface.
 - D040, D042--D052, D056, O045--O046, O072, O074--O091, and O097 were correctness, security, performance, test-policy,
   output, or documentation work under separate entry gates; they were not prerequisites Wave 7 could absorb silently.
   Their later disposition lives in
-  [`epic_wave8_residual_maintenance`](../../todo/epic_wave8_residual_maintenance/card.md).
+  [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 - O092's converter `system_prompt`/Gemini candidates and approximately 20 unnamed symbols remain unverified and
   excluded.
 - O095's repeated Click option blocks remain local; O099's transcript-selector subset already shipped with D007/D024.

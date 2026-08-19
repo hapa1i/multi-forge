@@ -22,6 +22,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from forge.backend.sources import get_model_source
 from forge.proxy import provider_trace_logger as ptl
@@ -100,8 +101,8 @@ def _stub_server(monkeypatch, server, *, backend: str) -> None:
     monkeypatch.setattr(server.config, "proxy", cfg)
 
 
-def _wire_auth_retry(monkeypatch, server) -> None:
-    """First create_completion 401s; invalidate_and_retry returns a succeeding client."""
+def _wire_auth_retry(monkeypatch, server, *, retry_error: Exception | None = None) -> None:
+    """First create_completion 401s; the refreshed client succeeds unless configured to fail."""
     from forge.core.llm.errors import AuthenticationError
 
     async def _auth_failing_get_client(*args, **kwargs):
@@ -111,12 +112,20 @@ def _wire_auth_retry(monkeypatch, server) -> None:
 
     async def _retry_client(*args, **kwargs):
         client = AsyncMock()
-        client.create_completion = AsyncMock(
-            return_value={
-                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                "usage": {"prompt_tokens": 300, "completion_tokens": 75, "total_tokens": 375, "cached_tokens": 100},
-            }
-        )
+        if retry_error is not None:
+            client.create_completion = AsyncMock(side_effect=retry_error)
+        else:
+            client.create_completion = AsyncMock(
+                return_value={
+                    "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                    "usage": {
+                        "prompt_tokens": 300,
+                        "completion_tokens": 75,
+                        "total_tokens": 375,
+                        "cached_tokens": 100,
+                    },
+                }
+            )
         return client
 
     monkeypatch.setattr(server.client_factory, "get_client", _auth_failing_get_client)
@@ -149,6 +158,35 @@ async def test_auth_retry_capable_backend_writes_readable_trace(monkeypatch, tmp
         assert rec.request_id == "req_retry_cap"
         assert rec.request_mode == "non_streaming"
         assert rec.latency_ms is not None
+    finally:
+        proxy_metrics.reset()
+
+
+@pytest.mark.asyncio
+async def test_auth_retry_failure_writes_one_unavailable_trace(monkeypatch, tmp_path):
+    """A failed refreshed provider call records one trace instead of losing the retry attempt."""
+    import forge.proxy.server as server
+    from forge.proxy.metrics import proxy_metrics
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    ptl._warned_newer_schema = False
+    proxy_metrics.reset()
+    try:
+        _stub_server(monkeypatch, server, backend="openrouter")
+        _wire_auth_retry(monkeypatch, server, retry_error=RuntimeError("retry upstream unavailable"))
+
+        with pytest.raises(HTTPException) as raised:
+            await server.create_message(_make_request_data(), _DummyRawRequest("req_retry_failed"))
+
+        assert raised.value.status_code == 500
+        traces = ptl.read_provider_traces(request_id="req_retry_failed")
+        assert len(traces) == 1
+        rec = traces[0]
+        assert rec.request_mode == "non_streaming"
+        assert rec.stream_started is False
+        assert rec.first_chunk_seen is False
+        assert rec.final_usage_seen is False
+        assert rec.local_usage_status == "unavailable"
     finally:
         proxy_metrics.reset()
 

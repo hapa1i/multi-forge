@@ -1,6 +1,6 @@
 # Log `forge info` probe degradation
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `todo/` -- accepted Wave 8 order 16; parked.
 

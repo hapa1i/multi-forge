@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 1; parked.
+**Lane**: `doing/` -- active on `agent/trace-failed-provider-attempts` from pushed closeout `7a2ad4c1`.
 
 **Finding**: O045 (MEDIUM).
 
