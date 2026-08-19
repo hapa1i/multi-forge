@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
+from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,6 +68,7 @@ class CostTracker:
         daily_cap_usd: float | None = None,
         monthly_cap_usd: float | None = None,
         on_cap_hit: str = "reject",
+        cap_state_persister: Callable[[CapState], Future[bool] | None] | None = None,
     ) -> None:
         self.daily_cap_micros = int(daily_cap_usd * _MICROS_PER_DOLLAR) if daily_cap_usd is not None else None
         self.monthly_cap_micros = int(monthly_cap_usd * _MICROS_PER_DOLLAR) if monthly_cap_usd is not None else None
@@ -77,10 +80,18 @@ class CostTracker:
         self._proxy_id: str | None = None
         self._dirty_cap_records: int = 0
         self._last_cap_persisted_at: float = 0.0
+        self._cap_state_persister = cap_state_persister
+        self._pending_cap_persist: Future[bool] | None = None
+        self._pending_cap_record_count = 0
+        self._cap_persist_retry_required = False
 
     @property
     def has_caps(self) -> bool:
         return self.daily_cap_micros is not None or self.monthly_cap_micros is not None
+
+    def set_cap_state_persister(self, persister: Callable[[CapState], Future[bool] | None] | None) -> None:
+        """Set the snapshot sink; ``None`` restores direct synchronous persistence."""
+        self._cap_state_persister = persister
 
     def bootstrap_from_logs(
         self,
@@ -223,35 +234,73 @@ class CostTracker:
     def _persist_cap_state(self) -> None:
         if not self._proxy_id:
             return
+        self._acknowledge_cap_persist()
+        if self._pending_cap_persist is not None:
+            return
         try:
             self._prune_daily_window()
-            write_cap_state(
-                CapState(
-                    proxy_id=self._proxy_id,
-                    monthly_key=self._monthly_key,
-                    monthly_total_micros=self._monthly_total,
-                    daily_window=list(self._daily_window),
-                )
+            snapshot = CapState(
+                proxy_id=self._proxy_id,
+                monthly_key=self._monthly_key,
+                monthly_total_micros=self._monthly_total,
+                daily_window=list(self._daily_window),
             )
-            self._dirty_cap_records = 0
-            self._last_cap_persisted_at = time.monotonic()
+            if self._cap_state_persister is None:
+                write_cap_state(snapshot)
+                self._dirty_cap_records = 0
+                self._last_cap_persisted_at = time.monotonic()
+                self._cap_persist_retry_required = False
+                return
+
+            future = self._cap_state_persister(snapshot)
+            if future is None:
+                self._cap_persist_retry_required = True
+                return
+            self._pending_cap_persist = future
+            self._pending_cap_record_count = self._dirty_cap_records
         except Exception as e:
+            self._cap_persist_retry_required = True
             logger.warning("Failed to persist spend-cap state for %s: %s", self._proxy_id, e)
+
+    def _acknowledge_cap_persist(self) -> None:
+        """Apply one queued snapshot outcome on the tracker-owning thread."""
+        future = self._pending_cap_persist
+        if future is None or not future.done():
+            return
+
+        try:
+            succeeded = future.result()
+        except Exception as e:
+            logger.warning("Failed to observe spend-cap persistence for %s: %s", self._proxy_id, e)
+            succeeded = False
+
+        if succeeded:
+            self._dirty_cap_records = max(0, self._dirty_cap_records - self._pending_cap_record_count)
+            if self._dirty_cap_records == 0:
+                self._last_cap_persisted_at = time.monotonic()
+            self._cap_persist_retry_required = False
+        else:
+            self._cap_persist_retry_required = True
+        self._pending_cap_persist = None
+        self._pending_cap_record_count = 0
 
     def _maybe_persist_cap_state(self) -> None:
         if not self._proxy_id:
             return
+        self._acknowledge_cap_persist()
         self._dirty_cap_records += 1
         elapsed = time.monotonic() - self._last_cap_persisted_at
         if (
-            self._dirty_cap_records >= _CAP_STATE_PERSIST_EVERY_RECORDS
+            self._cap_persist_retry_required
+            or self._dirty_cap_records >= _CAP_STATE_PERSIST_EVERY_RECORDS
             or elapsed >= _CAP_STATE_PERSIST_INTERVAL_SECONDS
         ):
             self._persist_cap_state()
 
     def flush_cap_state(self) -> None:
         """Persist any throttled spend-cap snapshot before process shutdown."""
-        if self._dirty_cap_records > 0:
+        self._acknowledge_cap_persist()
+        if self._dirty_cap_records > 0 or self._cap_persist_retry_required:
             self._persist_cap_state()
 
     def record(self, cost_micros: int | None) -> None:

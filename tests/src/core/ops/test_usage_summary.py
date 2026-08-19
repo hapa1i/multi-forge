@@ -37,6 +37,7 @@ from forge.session.models import (
     create_session_state,
 )
 from forge.session.store import SessionStore
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 
 def _event(**overrides: object) -> UsageEvent:
@@ -978,8 +979,6 @@ class TestSumForgeAddedCost:
 
 def _cost_record(*, root: str, run: str | None = None, cost_micros: int | None, **overrides: object) -> None:
     """Write one proxy cost record (4g run-tree-stamped) into the isolated FORGE_HOME."""
-    from forge.proxy.cost_logger import log_request_cost
-
     kwargs: dict[str, object] = {
         "proxy_id": "p1",
         "model": "gpt-5.5",
@@ -997,7 +996,7 @@ def _cost_record(*, root: str, run: str | None = None, cost_micros: int | None, 
         "forge_root_run_id": root,
     }
     kwargs.update(overrides)
-    log_request_cost(**kwargs)  # type: ignore[arg-type]
+    write_request_cost_record(**kwargs)
 
 
 class TestRootJoin4g:

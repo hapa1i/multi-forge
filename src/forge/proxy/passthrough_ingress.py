@@ -294,6 +294,7 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
         "provider_session_id": forge_session,
         "provider_command": forge_command,
         "downstream_event_id": downstream_event_id,
+        "record_sink": server._persist_proxy_downstream_record,
     }
 
     return await forward(

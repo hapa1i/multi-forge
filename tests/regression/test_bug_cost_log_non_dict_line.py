@@ -24,7 +24,8 @@ import pytest
 
 from forge.core.paths import get_forge_home
 from forge.proxy.audit_logger import log_audit_record, read_audit_logs
-from forge.proxy.cost_logger import log_request_cost, read_cost_logs
+from forge.proxy.cost_logger import read_cost_logs
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 pytestmark = pytest.mark.regression
 
@@ -34,7 +35,7 @@ _BAD_LINES = ["[]", '"x"', "1", "true", "null"]
 def _shard(*subdir: str) -> Path:
     """Return the current-PID shard path under the isolated FORGE_HOME, parent created.
 
-    ``log_request_cost()`` creates ``telemetry/downstream`` itself, but the verb/audit valid
+    The canonical request-cost writer creates ``telemetry/downstream`` itself, but the verb/audit valid
     records are hand-written, so the directory has to exist before the append.
     """
     month = datetime.now(timezone.utc).strftime("%Y-%m")
@@ -55,7 +56,7 @@ def _now_ts() -> str:
 @pytest.mark.parametrize("bad_line", _BAD_LINES)
 def test_read_cost_logs_skips_non_object_line(bad_line: str) -> None:
     # Valid record via the real writer (proves a full schema'd record still loads).
-    log_request_cost(
+    write_request_cost_record(
         proxy_id="p",
         model="m",
         tier="sonnet",

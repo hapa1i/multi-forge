@@ -223,6 +223,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             "provider_session_id": forge_session,
             "provider_command": forge_command,
             "downstream_event_id": downstream_event_id,
+            "record_sink": server._persist_proxy_downstream_record,
         }
         if is_generation
         else None

@@ -21,6 +21,7 @@ from forge.core.telemetry.downstream import (
 )
 from forge.core.telemetry.upstream import UpstreamOutcome, write_upstream_outcome
 from forge.core.usage.ledger import UsageEvent, log_usage_event
+from tests.fixtures.proxy_telemetry import write_request_cost_record
 
 
 def _activity_args(*args: str) -> list[str]:
@@ -408,8 +409,6 @@ def test_period_week_excludes_nothing_recent(monkeypatch) -> None:
 def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
     # 4g: a proxied run whose exact cost-plane record supersedes its snapshot renders the
     # total WITHOUT the `~` estimate marker, and the footnote reports no-estimates-mixed-in.
-    from forge.proxy.cost_logger import log_request_cost
-
     _patch_resolver(monkeypatch)
     log_usage_event(
         _event(
@@ -422,7 +421,7 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
             cost_micro_usd=999_000,  # snapshot -- superseded
         )
     )
-    log_request_cost(
+    write_request_cost_record(
         proxy_id="p1",
         model="gpt-5.5",
         tier="sonnet",
