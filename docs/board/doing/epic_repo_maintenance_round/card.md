@@ -16,8 +16,8 @@ bounded, non-overlapping sequencing exception. The bounded
 [`correct_fork_transfer_snapshot_rollback`](../../done/correct_fork_transfer_snapshot_rollback/card.md) correction
 shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273ef` accepted 23 still-live correctness,
 security, performance, test-policy, output, and documentation rows as 19 parked members under
-[`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); order 1 shipped in PR #216, order 2 is
-active, and the remaining 17 members remain parked.
+[`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--2 shipped in PRs #216--#217,
+order 3 is next, and all remaining 17 members remain parked.
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 2 `offload_proxy_accounting_persistence`; orders 3--19 remain parked.
+Current focus: orders 1--2 shipped; order 3 `strip_openai_account_response_headers` is next but remains parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -20,4 +20,4 @@ Current focus: order 2 `offload_proxy_accounting_persistence`; orders 3--19 rema
   accounting.
 - [x] Complete focused, unit, regression, targeted proxy/telemetry/cap Docker, pre-commit, documentation-size, and board
   gates.
-- [ ] Ship and close order 2 independently before activating order 3.
+- [x] Ship order 2 in PR #217 (`6b2e0129`) and close it independently before activating order 3.

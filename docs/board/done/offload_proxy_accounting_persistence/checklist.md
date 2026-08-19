@@ -48,4 +48,4 @@ Current focus: implementation and behavior proof are complete; finish the publis
 - [x] Verify documentation size (`design.md` 29,986; appendix 29,976 Opus-5 tokens), all 967 local board links, branch
   diff hygiene, and an independent source/diff review boundary.
 - [x] Commit, push, and open independent draft PR #217.
-- [ ] After merge, close order 2 before activating order 3.
+- [x] After PR #217 merged as `6b2e0129`, close order 2 before activating order 3.

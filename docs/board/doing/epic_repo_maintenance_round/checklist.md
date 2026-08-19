@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 order 2 `offload_proxy_accounting_persistence` is active from pushed closeout `e3def8c3`.
+Current focus: Wave 8 orders 1--2 shipped; order 3 `strip_openai_account_response_headers` is next but parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -191,6 +191,7 @@ Current focus: Wave 8 order 2 `offload_proxy_accounting_persistence` is active f
 - [x] Ship Wave 8 order 1 in PR #216 (`634ff40e`) and close it before activating order 2.
 - [x] Branch from pushed order-1 closeout `e3def8c3` and activate only Wave 8 order 2
   `offload_proxy_accounting_persistence`; keep orders 3--19 parked.
+- [x] Ship Wave 8 order 2 in PR #217 (`6b2e0129`) and close it before activating order 3.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.

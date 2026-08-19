@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-20
+
+### Offload proxy accounting persistence
+
+**Goal/outcome**: Keep proxy completion responsive while cost, lifecycle, and cap evidence reaches durable storage.
+
+**Key changes**:
+
+- Moved detached cost/provider-lifecycle records and coalesced cap snapshots through one FIFO worker while keeping live
+  accounting synchronous.
+- Retained failed cap checkpoints for runtime or shutdown retry, removed the test-only cost writer, and recorded the
+  audit and overload-policy boundaries.
+
+**Verification**: 828 original focused plus 203 review-remediation checks; 9,312 unit (one skip); 942 regression; seven
+Docker proxy/telemetry/cap checks (one workflow case deselected); pre-commit/diff; design 29,986/29,976; board 967
+links. PR #217 merged as `6b2e0129`; no Forge workflow ran.
+
 ## 2026-08-19
 
 ### Trace failed provider attempts

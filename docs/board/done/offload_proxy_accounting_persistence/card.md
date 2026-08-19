@@ -1,8 +1,8 @@
 # Offload proxy accounting persistence
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/offload-proxy-accounting-persistence` from pushed closeout `e3def8c3`.
+**Lane**: `done/` -- shipped in PR #217 (`6b2e0129`).
 
 **Finding**: O046 (MEDIUM).
 
