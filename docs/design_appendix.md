@@ -649,9 +649,9 @@ logging:
 | `logging.requests.stream_chunks`           | bool (default `false`)                       | Opt-in per-chunk debug dumps; off even at `log_level=debug`                                       |
 | `logging.requests.stream_chunk_max_bytes`  | int (default `0` = small cap)                | Truncate each dumped chunk                                                                        |
 
-`src/forge/proxy/response_headers.py` owns raw response metadata. It excludes security/framing, `Connection` extensions,
-and Forge cost/resolution/correlation fields; stamps request ids; and applies overlays case-insensitively. Transports
-own bodies, SSE chunks, accounting, and teardown.
+`src/forge/proxy/response_headers.py` owns raw response metadata: it excludes security/framing,
+`OpenAI-Organization`/`OpenAI-Project`, `Connection` extensions, and Forge cost/resolution/correlation fields; stamps
+request ids; and applies overlays case-insensitively. Transports own bodies, SSE, accounting, and teardown.
 
 Raw transports read non-200 bodies before closing stream and client. A read `httpx.HTTPError` records one failure and
 returns the stable 502 body, never partial content. Other exceptions propagate after cleanup without completion.

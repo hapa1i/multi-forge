@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 # Headers that must never cross from an upstream response to the downstream
-# client. Besides standard hop-by-hop framing, this excludes authentication and
-# cookie material plus Forge-owned correlation identity. Header names nominated
-# by ``Connection`` are added dynamically in ``relay_response_headers``.
+# client. Besides standard hop-by-hop framing, this excludes authentication,
+# account-selection, and cookie material plus Forge-owned correlation identity.
+# Header names nominated by ``Connection`` are added dynamically below.
 _RESPONSE_HEADER_DENYLIST = frozenset(
     {
         "authentication-info",
@@ -17,6 +17,8 @@ _RESPONSE_HEADER_DENYLIST = frozenset(
         "content-length",
         "cookie",
         "keep-alive",
+        "openai-organization",
+        "openai-project",
         "proxy-authenticate",
         "proxy-authentication-info",
         "proxy-authorization",

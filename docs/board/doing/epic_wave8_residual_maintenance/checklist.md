@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: orders 1--2 shipped; order 3 `strip_openai_account_response_headers` is next but remains parked.
+Current focus: order 3 `strip_openai_account_response_headers` is active; orders 4--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -21,3 +21,11 @@ Current focus: orders 1--2 shipped; order 3 `strip_openai_account_response_heade
 - [x] Complete focused, unit, regression, targeted proxy/telemetry/cap Docker, pre-commit, documentation-size, and board
   gates.
 - [x] Ship order 2 in PR #217 (`6b2e0129`) and close it independently before activating order 3.
+- [x] Create `agent/strip-openai-account-response-headers` from pushed order-2 closeout `cddfe5c3`; move only order 3 to
+  `doing/`.
+- [x] Pin O074 in both Messages and Responses relays with mixed-case account header spellings.
+- [x] Strip OpenAI organization/project response metadata at the shared header boundary while preserving safe relay
+  behavior.
+- [x] Complete focused, unit, regression, targeted proxy-routing Docker, pre-commit, documentation-size, and board
+  gates.
+- [ ] Ship and close order 3 independently before activating order 4.

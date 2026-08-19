@@ -539,6 +539,8 @@ def fake_anthropic_upstream() -> Generator[FakeAnthropicUpstream, None, None]:
             self.send_header("Retry-After", "11")
             self.send_header("Anthropic-RateLimit-Requests-Remaining", "0")
             self.send_header("X-Request-ID", "upstream-request-id")
+            self.send_header("OpenAI-Organization", "org-upstream")
+            self.send_header("oPeNaI-pRoJeCt", "project-upstream")
             self.send_header("Set-Cookie", "session=secret")
             self.end_headers()
             self.wfile.write(response_body)

@@ -1731,10 +1731,10 @@ the exact `source_refs.cost_request_id` join when a registered Forge proxy is th
 
 Both raw passthrough transports share one response-header boundary. Safe provider metadata such as `retry-after` and
 rate-limit counters is relayed on successful, error, streaming, and non-streaming upstream responses. Hop-by-hop fields
-(including names nominated by `Connection`), authentication/cookie fields, content length/encoding, and upstream
-proxy-owned fields (`x-request-id`, cost/resolution headers, and `X-Forge-*`) are stripped case-insensitively. Forge
-then overlays its own request id, spend warning, and streaming `Cache-Control` with case-insensitive replacement. Header
-handling never mutates the relayed response body or SSE chunks.
+(including names nominated by `Connection`), authentication/cookie fields, OpenAI account selectors, content
+length/encoding, and upstream proxy-owned fields (`x-request-id`, cost/resolution headers, and `X-Forge-*`) are stripped
+case-insensitively. Forge then overlays its own request id, spend warning, and streaming `Cache-Control` with
+case-insensitive replacement. Header handling never mutates the relayed response body or SSE chunks.
 
 **Observe (`inspect`).** Before forwarding, the proxy records a redacted metadata audit record (hashes of the system
 prompt and tool surface, cache markers, token counts — never plaintext) and runs drift detection: the first observation

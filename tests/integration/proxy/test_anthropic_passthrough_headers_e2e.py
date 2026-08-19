@@ -35,6 +35,8 @@ def test_anthropic_passthrough_relays_safe_error_metadata(
     assert response.headers["retry-after"] == "11"
     assert response.headers["anthropic-ratelimit-requests-remaining"] == "0"
     assert response.headers["x-request-id"] != "upstream-request-id"
+    assert "openai-organization" not in response.headers
+    assert "openai-project" not in response.headers
     assert "set-cookie" not in response.headers
 
     assert len(fake_upstream.requests) == 1
