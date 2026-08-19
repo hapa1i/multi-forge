@@ -1,8 +1,8 @@
 # Correct fork transfer snapshot rollback
 
-**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- active on `agent/fix-fork-snapshot-rollback` from `0d8eb81a` before Wave 8 order 1.
+**Lane**: `done/` -- shipped in PR #215 (`7736d0d0`) before Wave 8 order 1.
 
 **Related shipped member**: [`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md) (Wave
 7 order 32).
@@ -52,3 +52,13 @@ Authority comes from the explicit pre-launch compensation criterion in
 - Do not delete pre-existing snapshots, infer ownership from content equality, or turn transfer cleanup into generic
   session deletion behavior.
 - Keep every Wave 8 member parked until this correction merges and closes.
+
+## Implementation outcome
+
+Fork preparation now records only an exact child snapshot created by the current transfer attempt, including a factory
+that writes and then raises. Successful session compensation removes that owned snapshot; pre-existing snapshots and the
+parent cache remain untouched. Cleanup failures name the retained path and the required recovery action.
+
+Verification passed 104 focused fork/session tests, 9,309 unit tests with one skip and 122 deselected, 929 regressions,
+six targeted Docker fork-lifecycle checks, full pre-commit, the 29,990-token design limit, and the 393-document/965-link
+board audit. No Forge workflow command was used.

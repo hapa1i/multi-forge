@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: correct Wave 7 order 32's transfer-snapshot rollback edge before activating the parked Wave 8 sequence.
+Current focus: PR #215 is closed; Wave 8 remains parked pending order 1 activation from the pushed closeout.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -185,7 +185,7 @@ Current focus: correct Wave 7 order 32's transfer-snapshot rollback edge before 
   without activating implementation.
 - [x] Reproduce order 32's retained transfer snapshot and stale same-name retry, then activate only the bounded
   `correct_fork_transfer_snapshot_rollback` correction from the pushed Wave 8 admission base.
-- [ ] Merge and close the fork snapshot correction before activating Wave 8 order 1.
+- [x] Merge and close the fork snapshot correction in PR #215 (`7736d0d0`) before activating Wave 8 order 1.
 - [ ] When the user selects execution, branch from the pushed admission base and activate only Wave 8 order 1.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.

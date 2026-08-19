@@ -1,6 +1,6 @@
 # Correct fork transfer snapshot rollback checklist
 
-Current focus: implement and verify the bounded order-32 correction without activating Wave 8.
+Current focus: closed in PR #215 (`7736d0d0`) without activating Wave 8.
 
 - [x] Reproduce manifest/index cleanup with a retained child snapshot and stale same-name retry on merged `main`.
 - [x] Create `agent/fix-fork-snapshot-rollback` from `0d8eb81a` and record the correction boundary.
@@ -14,7 +14,7 @@ Current focus: implement and verify the bounded order-32 correction without acti
 - [x] Verify `docs/design.md` at 29,990 Opus-5 tokens, 965 local board links with none broken, diff hygiene, and a clean
   correction-only branch.
 - [x] Prepare the verified correction for an independent draft PR without activating Wave 8 order 1.
-- [ ] After merge, close this card and publish the completed-work record directly on `main`.
+- [x] After merge, close this card and publish the completed-work record directly on `main`.
 
 ## Acceptance coverage
 

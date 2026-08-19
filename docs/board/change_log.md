@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-19
 
+### Correct fork transfer snapshot rollback
+
+**Goal/outcome**: Keep a failed transfer fork from leaving stale immutable child context for a same-name retry.
+
+**Key changes**:
+
+- Tracked only the exact child snapshot created by the current preparation attempt, including write-then-raise
+  factories, and removed it after successful child/session compensation.
+- Preserved pre-existing snapshots and the parent cache; cleanup failures now name the retained path and recovery
+  action.
+
+**Verification**: 104 focused; 9,309 unit (one skip, 122 deselected); 929 regression; six Docker fork-lifecycle checks;
+pre-commit/diff; design 29,990; board 393 docs/965 links. PR #215 merged as `7736d0d0`; no Forge workflow ran.
+
 ### Admit Wave 8 verified residual maintenance
 
 **Goal/outcome**: Convert only evidence-backed post-Wave-7 residue into bounded parked work.
@@ -1518,468 +1532,69 @@ relative board links were checked after the lane move and card creation.
 **Verification**: Focused identity/policy/hook tests passed (304); full regression suite passed (641); `make test-unit`
 passed (8,709 passed, 1 skipped); Docker policy-hook integration passed (21); `make pre-commit` passed.
 
-## 2026-08-04
-
-### Harden semantic supervisor verdict boundary
-
-**Goal**: Prevent malformed external verdict data from denying, escaping into fail-closed handling, or masquerading as a
-clean aligned result.
-
-**Key changes**:
-
-- Made verdict literals exact and observable, degraded malformed confidence to low confidence, filtered invalid
-  violation elements, and shared normalized citations between the displayed violation and block predicate.
-- Made restored throttle reuse strict: only the clean aligned/`1.0` write shape is reused; malformed or non-aligned
-  state re-evaluates.
-- Added one marked regression module for each of D002, D003, D004, and O028, covering direct enforcement, both engine
-  fail modes, cache eligibility, telemetry, shadow classification, and valid controls.
-
-**Verification**: Focused policy/supervision tests passed (321); hook-adapter tests passed (47); full regression suite
-passed (632); `make test-unit` passed (8,702 passed, 1 skipped); Docker policy-hook integration passed (21);
-`make pre-commit` passed after the review follow-up.
-
-### Preserve policy intent on enable
-
-**Goal**: Prevent terminal bundle re-enablement from silently deleting session-owned semantic and team supervisor
-configuration.
-
-**Key changes**:
-
-- Changed `forge policy enable` to update only its four bundle-owned fields on the existing policy intent, creating a
-  default intent only when none exists.
-- Added regressions for preserving non-default supervisor configurations, replacing requested bundle fields, and the
-  absent-policy path; `%policy` override ownership remains unchanged.
-
-**Verification**: Focused policy and hook unit suite passed (252); full regression suite passed (595); Docker
-policy-hook integration passed (21); `make pre-commit` passed.
-
-### Repository maintenance decision wave
-
-**Goal**: Resolve the four design gates from the combined whole-repository review before behavior changes or cleanup
-deletions enter implementation.
-
-**Key changes**:
-
-- Approved the Stop verification latency/schema contract, manifest-owned missing-worktree liveness, global downstream
-  retention ownership, and evidence-based deletion compatibility rubric.
-- Corrected the shipped verification documentation, added the deletion-evidence standard, admitted U002/U003 with
-  severity, and preserved design docs as shipped truth for DG2/DG3 until their code changes land.
-- Created 13 accepted implementation members, moved DG1–DG4 to `done/`, and kept the repository-maintenance epic active
-  for later execution waves.
-
-**Verification**: `make pre-commit-md` and `git diff --check` passed; board links and lane references were checked after
-the moves.
-
-## 2026-08-03
-
-### Git-derived workspace worktree view
-
-**Goal**: Expose the complete Git worktree family with Forge session occupancy, including empty and currently missing
-registered worktrees, without persisting a second workspace identity.
-
-**Key changes**:
-
-- Added a strict `git worktree list --porcelain -z` resolver with common-directory identity, exact path normalization,
-  newline-safe parsing, bare-primary support, independent locked/prunable/availability facts, and a non-Git-only
-  single-directory fallback.
-- Added the UI-agnostic index join and `forge workspace worktrees [--json]`; counts include incognito and legacy index
-  rows, preserve same-name sessions as separate occupants, and use existing active-session liveness.
-- Moved Git executable and logical-repository path discovery into an acyclic leaf shared by execution context and
-  worktree operations, then repointed the branch-in-use guard through the shared parser. Integration coverage preserves
-  both the plain existing-branch error and the carrying-worktree variant.
-- Kept the read exempt from retention cleanup, documented the deliberate one-leaf CLI exception, added end-user/design
-  and QA coverage, and left activity aggregation plus `workspace status` blocked on root-scoped telemetry identity.
-
-**Verification**: focused Git/workspace/session/CLI tests passed (99); `make test-unit` passed (8,680 passed, 1
-skipped); required integration runner passed (38); `make pre-commit` passed. Shipped via PR #122 (`a5aee0a9`);
-post-merge stale-lane sweep, `make pre-commit-md`, and `git diff --check` passed.
-
-## 2026-08-02
-
-### Proxy ingress + config wiring refactor (proxy_ingress_and_config_wiring)
-
-**Goal**: Close the silent-drop bug class in per-proxy config wiring, single-source the wire-shape vocabulary, and
-extract the anthropic passthrough ingress from `server.py` -- one card, five slices (B1, B3, B2, B4, A1).
-
-**Key changes**:
-
-- `core/wire_shapes.py` vocabulary leaf (shapes, `VALID_WIRE_SHAPES`, `PASSTHROUGH_WIRE_SHAPES`, default); all
-  code-literal sites repointed, including env.py's half-centralized local constants.
-- `PROXY_BLOCK_COERCERS`/`PROXY_BLOCK_FIELDS` registry in `config/schema.py` now drives both `__post_init__` coercion
-  sequences, both loader hops, and `create_proxy_file` -- adding a block field is one registry entry, and
-  `tests/src/config/test_proxy_block_wiring.py` forces live-read coverage to grow with it.
-- `forge info` moved to `cli/info.py` (`install/cli.py` deleted); claude-version parse deduped through
-  `install/version.py::get_claude_runtime_version`.
-- `proxy/passthrough_ingress.py` extraction mirroring `responses_ingress.py`'s lazy-import pattern; a characterization
-  test pinned cost->metrics order and wire-byte fidelity before the move (server.py 2361 -> 2088 lines).
-- Three bugs found by the card's guards: `create_proxy_file` dropped template-declared `costs` (regression:
-  `tests/regression/test_bug_create_proxy_file_costs_drop.py`); `gpt-5.5-pro` missing from `OPENAI_MODELS`; the
-  `proxy_server_local_openai` integration fixture never routed `litellm_local` (template-only start, no
-  `FORGE_PROXY_ID`), so it 500'd without `LITELLM_BASE_URL` set -- pre-existing on `main`, fixed by registering the
-  proxy with its isolated upstream.
-
-**Verification**: Full unit suite 8,655 passed; integration gate 12 passed (`test_proxy_local_litellm_e2e.py` +
-`test_session_routing_e2e.py`); `make pre-commit` clean.
-
-### Session orphan manifest repair (`forge session repair`)
-
-**Goal**: Surface and re-index manifest-only session orphans -- invisible to `session list` yet still owning their name
-and conversation binding -- covering both crash-era residue and the live producer (the `list_sessions` prune dropping
-worktree-vanished rows).
-
-**Key changes**:
-
-- New preview-default `forge session repair` (`--yes` to apply, `--json`), scoped to the current Forge root. Six
-  classifications: `repairable`, `missing-worktree` (report-only -- never publish a row the prune immediately deletes),
-  `collision`, `corrupt` (owned by `forge clean`), `unreadable` (owned by neither), `unrepairable`. Per-item apply
-  refusals; exit 1 on any refusal or failure.
-- Apply publishes through `create_session_txn(require_uuid_unbound=True)` with a hash-verified callback
-  (`SessionStore.update_if_unchanged`): apply-time identity is a content hash -- total over id-less manifests -- and a
-  raced manifest fails the callback so compensation removes the row.
-- Row identity derives from the manifest's **recorded** worktree metadata per session shape (ordinary, nested-project
-  worktree, root-level worktree, `--into` guest); a moved ordinary checkout re-derives from its actual location,
-  correcting `worktree.path` and `forge_root` on disk while preserving `confirmed.claude_project_root` (Claude's
-  conversation namespace does not move with the checkout).
-- Collision detection uses the three-source binding scans (`collect_bound_uuids`/`collect_bound_codex_threads` without
-  the per-root orphan walk); review round 3 found column-only maps allowed a second binding when a row lagged its
-  manifest.
-- `SessionStore.read()` now rejects non-object JSON and directory/name mismatches as `ManifestCorruptedError`, giving
-  repair and `forge clean` the same D4 ownership of both shapes.
-
-**Verification**: unit suite 8,639 passed; CIT tier (`-m integration`) 117 passed; Docker `test_session_lifecycle.py` 22
-passed including an end-to-end repair round-trip; `make pre-commit` clean. PR #120.
-
-### Serialize session manifest deletion
-
-**Goal**: Prevent an in-flight manifest update from recreating a deleted session after its index row is removed.
-
-**Key changes**:
-
-- Terminal deletion now holds the index lock while taking the manifest lock, removes the canonical manifest before the
-  index row, and only then cleans up the session directory. A manifest-lock failure leaves the complete session intact;
-  a later cleanup failure leaves only a prunable index row.
-- Adoption rollback uses the same terminal transaction, closing its gap between index-row removal and manifest cleanup.
-- The public storage contract now distinguishes read-first `update`, transaction-owned `create_exclusive`, and
-  unconditional low-level `write`; deletion's possible five-second global-index contention is explicit. The deletion
-  schedule has its own regression file, and adoption rollback reports the defensive replacement-owner outcome.
-
-**Verification**: focused session/adoption coverage (130 passed), `make test-unit` (8587 passed, 1 skipped),
-`make test-regression` (593 passed), component integration (`pytest tests/src -m integration`, 117 passed), Docker
-session/adoption integration (22 passed), and `make pre-commit` clean.
-
-## 2026-08-01
-
-### Crash-atomic session creation
-
-**Goal**: Stop a process killed mid-creation from leaving a session manifest with no index row -- an orphan nothing
-lists, which still owns its name and its conversation binding.
-
-**Key changes**:
-
-- `IndexStore.create_session_txn` holds the index lock across both durable writes, **row first**, then the manifest via
-  a caller-supplied callback, with in-lock compensation if the callback raises. All five creation sites use it
-  (`start_session`, `_persist_resume_child`, `fork_session`, `relaunch_session`, `_restore_previous_target_state`),
-  which collapses their per-site rollback blocks: the manifest write is now the last durable action, so a failure cannot
-  leave one behind.
-- A crash now leaves a prunable row. The transaction self-heals it: row-present + manifest-absent under the held lock
-  can only be residue, so it is pruned and creation proceeds -- a direct same-name retry succeeds with no intervening
-  `session list` or `session delete`. The prune runs before the `require_uuid_unbound` scan, so residue never blocks
-  rebinding its own conversation.
-- New `IndexStore.live_session_exists` (row **and** manifest) replaces the row-only pre-check at all four sites that
-  hard-failed on it; `_name_is_taken` keeps the row-only check, where a residue name costs an auto-name suffix.
-- `collect_bound_codex_threads` now reads the `codex_thread_id` column as well as manifests. Reading only manifests
-  would report an in-flight adopted thread as free once the row precedes its manifest.
-- `_restore_previous_target_state` restores with `create_exclusive`, not `write`: its old unlocked `exists()` guard
-  meant the write never overwrote anything, and keeping `write` let a failed fork clobber a concurrent winner.
-- Compensation keeps the row only on proof that *this* transaction published the manifest: nothing at the path before
-  the callback, something there after. Neither half alone is enough -- an exception does not mean the write failed
-  (`atomic_write_json` makes it durable at `os.replace`, and a signal can arrive later), and a manifest being present
-  does not mean it is ours (a pre-existing orphan owns the path in exactly the case `create_exclusive` rejects).
-  Compensation also never raises, for `BaseException` too, so it cannot replace the error it is unwinding.
-- Deletion is coordinated with creation rather than assumed away. `delete_session` removes the manifest (or the worktree
-  holding it) before its row, so mid-delete the name reads as residue and a concurrent create can reclaim it.
-  `IndexStore.delete_session_txn` now removes the row and runs the manifest delete inside one index-lock scope, and
-  declines outright once a replacement owns the name. The ownership signal is derived from what the delete does --
-  manifest absent at entry, or provably inside the worktree being removed -- not from a filesystem probe, which a
-  replacement can flip.
-- `fork --force` reaches the same window through its own path and now uses the same primitive. After freeing the stale
-  target it cleared the name with an unconditional `delete()`, so a creator that claimed the freed name lost its
-  manifest and then its row to fork's own residue prune -- fork destroying a live session and taking its name. It now
-  declines with `SessionExistsError` instead.
-- design.md §3.2, `session/__init__.py`, and the `create_exclusive` / binding-scan docstrings describe the shipped
-  ordering, including the delete-coordination contract. Repair of pre-existing orphans is split out to
-  `proposed/session_orphan_manifest_repair`, because index identity fields cannot be derived from a manifest.
-
-**Verification**: `tests/src` + `tests/regression` 9176 passed, 1 skipped, plus the component-integration tier
-(`pytest tests/src -m integration`) 117 passed -- that tier is deselected by `-m "not integration"` and hid two
-model-drift failures through two review rounds, so it is part of this card's gate. New
-`tests/regression/test_bug_session_create_crash_atomicity.py` (37 tests) covers compensation and crash-residue as
-separate families, interrupt-after-durable-manifest, compensation-write failure, delete/create coordination, the fork
-stale-target schedule, a `threading.Barrier` double create, the pruner race guard, per-path compensation through the
-real transaction, and the explicit-name retry. Every guard carries a mutation check confirming it is load-bearing.
-Docker `test_session_lifecycle.py` + `test_adopt_binding_contract.py` 22 passed. `make pre-commit` clean.
-
-**Review**: three adversarial rounds found seven defects in the implementation (five HIGH, one MEDIUM, one LOW), all
-reproduced before fixing; see the card checklist's review-round sections. Six of the seven were the same root error -- a
-filesystem probe standing in for a fact about what the operation did.
-
-## 2026-07-31
-
-### Runtime-scoped extension disable
-
-**Goal**: Let users remove one runtime's managed extension surfaces without disabling or rewriting the runtime they
-keep.
-
-**Key changes**:
-
-- `forge extension disable` now accepts repeatable `--runtime claude|codex|all` for one scope or `--all`. Plans narrow
-  to the selected ownership, disclose Codex re-trust and retained legacy residue, and batch summaries distinguish
-  `no-op`, `partial`, and `full`.
-- Removal intersects schema-v3 attribution with tracked ownership, preserves unattributed rows during partial removal,
-  and drops the selected owner pairs so a later sync cannot resurrect the runtime.
-- Claude settings and every ownership sidecar form a reversible smart-unmerge transaction. Codex removal classifies and
-  revalidates marker state, preserves manual outside-marker commands, and refuses malformed or changed blocks.
-- Partial I/O failures reconcile the row to completed removals. A tracking-write failure restores settings ownership
-  before reporting the remaining safe over-claim and retry path.
-- End-user, CLI, design, and QA guidance now cover runtime removal, full-coverage behavior, failure recovery, and trust
-  consequences.
-
-**Verification**: focused install/CLI (`3366 passed, 1 skipped`); unit (`8581 passed, 1 skipped, 117 deselected`);
-regression (`551 passed`); installer Docker integration (`21 passed`), including clean-wheel partial-disable, status,
-and non-resurrection sync checks for both runtime directions; `make pre-commit`.
-
-## 2026-07-30
-
-### Runtime-scoped extension modules
-
-**Goal**: Make `forge extension enable --runtime` govern every runtime-owned extension surface, so Claude-only selection
-cannot mutate Codex state and Codex-only selection needs no module-level workaround.
-
-**Key changes**:
-
-- The live module vocabulary now has six values. `hooks` owns both Claude and Codex hook surfaces, and the released
-  `codex-hooks` value is accepted only by the v1/v2 migration path.
-- Tracking moved to schema v3 with a sorted `(module, runtime)` ownership relation and required tagged attribution on
-  every file and settings row. Frozen v1/v2 readers derive only path- or key-provable ownership; unprovable rows remain
-  explicitly unattributed and cannot become runtime-scoped removal targets.
-- Module planning now applies the shared runtime selection after profile, dependency, and scope resolution. Profile
-  exclusions are visible skips, explicit wrong-owner requests and empty effective selections are blocking conflicts, and
-  `--force` cannot bypass them.
-- Explicit narrowing remains additive: a Claude-only re-enable preserves existing Codex packages, hook registration,
-  ownership pairs, and disable metadata. Sync derives its runtime set from persisted ownership, including hooks-only and
-  successful zero-output module ownership.
-- `extension status --json` moved to schema v3 and reports `managed_runtimes`, `module_owners`, compatibility `modules`,
-  and identity-only `unattributed_surfaces`. Recovery commands, design docs, end-user docs, and QA checks now describe
-  the runtime-wide selector.
-
-**Verification**: focused install/CLI (`3311 passed, 1 skipped`); unit (`8526 passed, 1 skipped, 117 deselected`);
-regression (`551 passed`); installer Docker integration (`20 passed`), including clean-wheel Claude/Codex/all
-enable-sync-status-disable lifecycles and Claude-only narrowing preservation; wheel and sdist built with `uv build`;
-`make pre-commit`.
-
-**Compatibility**: installed-state schema and status JSON both bump from v2 to v3. Existing v1/v2 tracking migrates in
-memory and persists on the next successful mutation; no reset or manual migration is required.
-
-**Deferred**: runtime-scoped removal remains in `extension_disable_runtime`, which can now consume the tagged ownership
-contract without matching unattributed legacy rows.
-
-### Codex disable scope-mismatch refusal
-
-**Goal**: Prevent `forge extension disable` from orphaning an active managed Codex hook block when `$CODEX_HOME` no
-longer maps to the config path recorded at installation.
-
-**Key changes**:
-
-- A typed preflight now refuses the whole operation before removal work, preserves the hook block and tracking row, and
-  names both paths plus recovery. Single-scope disable checks before its plan/prompt; `--all` retains per-scope failure
-  aggregation and continues disabling healthy scopes.
-- The installer keeps the same matching-path, null-path, and user-owned leftover-command behavior.
-
-**Verification**: focused install/CLI (`808 passed, 1 skipped`); unit (`8491 passed, 1 skipped, 117 deselected`);
-regression (`550 passed`); installer Docker integration (`20 passed`); `make pre-commit`.
-
-**Known limitation**: blocks orphaned by an older disable remain untracked and require manual discovery/removal.
-
-## 2026-07-28
-
-### README capability refresh
-
-**Goal**: Make `README.md` advertise what shipped — above all that a read-only `codex exec` can supervise a Claude
-session — and state nothing false.
-
-**Key changes**:
-
-- Four factual errors fixed: the `--into` worktree path (worktrees land at `../<repo-name>-<session-name>`),
-  `forge clean` being dry-run by default, project memory presented as automatic when it is opt-in, and a Quick Start
-  implying `forge proxy create` is required when `--proxy` accepts a template and auto-starts.
-- `Example Workflow` promoted to `## Plan, Execute, Review` with the Codex-supervised fork as its second step, carrying
-  both preconditions that decide whether the lane enforces or fails open: the mandatory plan reload (Codex has no
-  `--resume`) and the cached preflight.
-- Architecture diagram redrawn around consumer lanes, naming each consumer's real runtime support. Review workers are
-  drawn as a separate axis because they are per-invocation `ModelSpec.runtime`, not a frozen lane.
-- New `## Cost and Wire Control`, `## Skills`, and `## Troubleshooting` sections; CLI group table completed from 11 to
-  all 17 groups; pre-OSS upgrade steps relocated to `docs/end-user/README.md`.
-- Stale proxy-template tables corrected in `docs/design_appendix.md` §A.2 (15 of 21 rows listed) and
-  `docs/end-user/proxy.md` (missing `anthropic-passthrough`). Twenty templates are user-facing; `litellm-gemini-test` is
-  test infrastructure.
-
-**Verification**: `make pre-commit-md` clean; all 18 relative links and both fragment anchors resolve; CLI table matches
-`forge --help`; every command and flag shown confirmed against live `--help`. Lane labels, the supervisor throttle
-cache, and the Claude-only `session fork` restriction verified against source.
-
-**Deferred**: the README's Codex-supervisor sequence is verified at code level, not by a live run. It also omits that
-the preflight cache carries a 30-minute TTL relative to the first Write/Edit, not to the fork.
-
-## 2026-07-27
-
-### native_session_adoption: `forge session adopt`
-
-**Goal**: Bind a Forge session to a Claude conversation or Codex thread started outside Forge, so the normal session
-surface (resume, fork, transfer, artifacts, search) applies to it.
-
-**Key changes**:
-
-- New command-core ops `session_adopt.py` (Claude) and `codex_adopt.py` (Codex) behind one CLI leaf. The runtime is
-  chosen by which store holds a matching conversation, never by the shape of the id; a match in both is refused, naming
-  both paths.
-- Bare `forge session adopt` previews unbound Claude conversations launched from the current directory (`--json` for
-  scripting). Both arms verify the conversation's recorded launch directory before binding, and refuse ambiguous or
-  unverifiable rollout matches rather than guessing.
-- One conversation, one manifest, enforced in two layers: a global per-conversation lock spanning adoption's final scan
-  and commit, and a `codex_thread_id` index column checked under the index write lock. Neither alone is sufficient --
-  the lock cannot survive process death, and the index cannot see a killed create's orphan manifest.
-- `SessionStore.create_exclusive` makes the manifest the session-name reservation; an index row cannot reserve, because
-  `list_sessions` prunes rows whose manifest is missing.
-- Adoption inverts transcript ownership, so `delete_session` exempts an adopted session's native transcript from
-  `delete_transcripts` — including the automatic retention sweep that runs on CLI startup.
-- Binding lookups fail closed on the index and on every manifest they read, and are keyed by `(project, name)` because
-  session names are project-scoped.
-
-**Verification**: 9034 unit + regression tests (1 environmental skip); 45 session/codex integration tests; two
-real-Claude Docker gates — the reattach-identity premise (`test_adopt_binding_contract.py`) and end-to-end discover →
-bind → continue against a conversation Forge never launched (`test_adopt_native_conversation.py`). Four review rounds,
-every finding reproduced before it was fixed. `make pre-commit` clean.
-
-**Deferred**: session creation is still not crash-atomic across manifest and index — a kill between `create_exclusive`
-and `add_from_state` leaves an orphan manifest. The conversation lock bounds adoption's exposure to it; removing the
-orphan itself needs its own card.
-
-## 2026-07-26
-
-### July 2026 model refresh (Opus 5 default, K3, Qwen 3.7, Gemini 3.6 Flash)
-
-**Goal**: Catalog and template support for Claude Opus 5 (new default opus tier), Kimi K3, Qwen3.7 Plus/Max, and Gemini
-3.6 Flash, with the tier-1 cascade checker and dead gemini-2.0-flash tagger defaults migrated to 3.6 Flash.
-
-**Key changes**:
-
-- Fixed a latent proxy bug first: derived reasoning efforts now clamp to each model's catalog effort levels and explicit
-  unsupported values are rejected (`forge.proxy.reasoning`, extracted from `server.py` for the size gate). Existing
-  gemini-flash proxies stop receiving derived `xhigh`.
-- Opus 5 replaces Opus 4.8 across catalog defaults, `opus`/`claude-opus` aliases, the four anthropic templates, and the
-  proxy-context estimator pin; 4.8 stays selectable via `model_alternatives` and untouched explicit fixtures.
-- Kimi K3 (`[low, high]` efforts; native `max` unreachable by design — no `max` in Forge's vocabulary) and Qwen3.7
-  Plus/Max take over their family tiers; displaced 3.6-generation models become alternatives. OSS review workers now
-  lock `provider_refs` to each family's derived default.
-- Gemini 3.6 Flash ships with sampling overrides off (Google deprecates temperature/top_p/top_k), thinking default
-  medium, and probe-backed `prompt_caching: false`; flash/haiku tiers, checker defaults, and all gemini-2.0-flash tagger
-  defaults (model shut down 2026-06-01) move to it — zero 2.0-flash references remain in src/.
-- LiteLLM floor raised 1.85.0 -> 1.88.0 (gate-proven; resolution unchanged). gemini-3.6-flash (2026-07-21) is newer than
-  every stable LiteLLM release, so packaged cost-map pricing first ships in the v1.94 line; production relies on the
-  remote cost-map refresh until then. A live gate proves completion/thinking/cost on 1.88.0 through a freshly
-  materialized bundled route; a version-aware pin flips to a packaged-map assert at v1.94.
-
-**Verification**: Full unit suite green per commit; regression suite incl. new effort-floor test; live LiteLLM gate
-passed with GEMINI_API_KEY (cache probe negative, recorded in catalog). OpenRouter live matrix: Opus 5, Kimi K3, and
-Gemini 3.6 Flash completions passed through their new template defaults; the qwen completions are blocked by this
-account's OpenRouter data-policy settings (404 "no endpoints available" for every qwen slug, including the pre-existing
-3.6-flash — environment limit, remediation at openrouter.ai/settings/privacy), so qwen live coverage here is the boot +
-tier-mapping assertion. The pre-existing `test_sonnet_completion_resolves_to_gpt_56_sol` local-LiteLLM e2e fails
-identically on main in this environment (OpenAI upstream 500 through the local backend — account/key limit, not a branch
-regression). `make pre-commit` clean; `uv build` wheel smoke at closeout.
-
-## 2026-07-24
-
-### Policy shared-library seam
-
-**Goal**: Extract the honest shared policy/reactive seams while preserving caller-specific telemetry and failure
-contracts, then correct the team supervisor's routing, confidence, and model-pin behavior.
-
-**Key changes**:
-
-- Added one provider-aware direct-LLM transport helper for the action tagger, plan checker, workflow stages, transfer
-  curation, and team tagger; parsing, telemetry emission, and fail behavior remain caller-owned and matrix-tested.
-- Consolidated the semantic/workflow confidence-plus-citation predicate, supervisor lane resolution, and canonical
-  resume-ID matcher without changing their decisions.
-- Applied the decided D7 team contract: divergent verdicts block only at the shared confidence threshold; lower or
-  malformed confidence allows with diagnostic stderr feedback. Team routing now resolves before commitment, so strict
-  named-route failures skip before lane freeze/usage, while reachable ambient routes become visible to cost and usage.
-- Fixed executor model-pin leakage for every resolved team-supervisor URL without imposing the semantic supervisor's
-  `opus` pin. Added a deterministic Docker fixture covering both team hooks through the tagger HTTP and `claude -p`
-  wires.
-
-**Verification**: Focused acceptance (`449 passed`); `make test-unit` (`8314 passed, 1 skipped, 117 deselected`);
-`make test-regression` (`529 passed`); targeted policy/supervisor/team-hook Docker integration (`32 passed`); mypy,
-pyright, and `make pre-commit`.
-
-## 2026-07-23
-
-### Runtime-neutral workflow workers closeout
-
-**Goal**: Close the shipped runtime-neutral workflow worker card after PR #110 merged to `main`.
-
-**Key changes**:
-
-- Moved the paired card and checklist from `doing/` to `done/`, recorded merge `26122901`, closed the final checklist
-  item, and repointed the inbound cross-runtime-skills link.
-- Promoted the reviewed execution/routing split, readiness snapshot, mixed lifecycle ownership, specialization,
-  runtime-error, and portable-frontend invariants to durable implementation notes.
-
-**Verification**: PR #110 merged as `26122901`; final merged package lifecycle integration (`2 passed, 18 deselected`);
-QA parser v1.0.33 / 596 assertions; walkthrough parser v1.0.6 / 108 assertions; stale-lane and inbound-link audit;
-`make pre-commit-md`; `git diff --check`.
-
-## 2026-07-22
-
-### Runtime-neutral workflow workers (implementation complete; review hold)
-
-**Goal**: Let each panel, analyze, debate, or consensus worker select its own headless runtime while preserving the
-existing Claude-backed defaults and truthful routing, telemetry, and failure semantics.
-
-**Key changes**:
-
-- Added an opt-in `codex` worker with explicit runtime-native routing, one cached readiness snapshot per invocation,
-  read-only sandboxing, runtime-default model reporting, and fail-closed Claude-resume handling. No existing worker name
-  or default quorum changed.
-- Added one grouped five-child lifecycle domain for mixed-runtime fan-out, preserving input order and prompt
-  cancellation. Single-runtime calls retain the existing `run_parallel` shape; shared result mapping now deliberately
-  rejects reliable runtime-error envelopes on both runtimes. Runtime stream text takes precedence on non-zero failures,
-  while an empty result retains its numeric exit code.
-- Kept Codex auth, billing, and downstream-provider identity runtime-owned: worker and downstream records reuse the
-  existing `codex_exec`/OpenAI emitter contract without fabricating a model route, backend, proxy, or cost.
-- Migrated the four workflow frontends to neutral sources, expanding the portable Codex set from five to nine packages,
-  and synchronized design, CLI, end-user, QA, and walkthrough documentation.
-
-**Verification**: focused post-format suites (`731 passed`); `make test-unit`
-(`8277 passed, 1 skipped, 117 deselected`); real Codex-only and mixed-runtime workflow integration (`2 passed`);
-existing Claude workflow parity integration (`13 passed`); clean wheel installs for `--runtime claude`, `codex`, and
-`all`, including status/sync/disable lifecycle; `uv build`; `make pre-commit`; QA parser v1.0.32 / 596 assertions;
-walkthrough parser v1.0.5 / 108 assertions. The card remains in `doing/` for review and merge.
-
-### Unmanaged skill packages
-
-**Goal/outcome**: Detect untracked runtime skill packages and clean only packages with current Forge ownership proof.
-
-**Key changes**:
-
-- Added one-snapshot discovery, per-package recovery, status schema v2, and scope-correct guarded cleanup. Provenance,
-  tree, and ownership checks are repeated before deletion; unsafe roots stay untraversed and report-only without
-  fabricated JSON rows.
-- Kept append-only historical names and names-only status/clean discovery. The provenance marker's one-time cache digest
-  change and status JSON top-level object were research-preview clean breaks.
-
-**Verification**: PR #109 merged as `cbb58e16`; 289 acceptance, 170 related, 8,230 unit (one skip), 522 regression, and
-one wheel-installed Docker lifecycle test passed, with build, pre-commit, QA/walkthrough, link, lane, and diff checks.
+## 2026-07-22 -- 2026-08-04 (compacted)
+
+Session transaction safety, runtime-scoped extensions, proxy/config seams, workspace/adoption surfaces, model and
+workflow refreshes, and the repository-maintenance decision gate. Detailed history remains in the matching done cards
+and PRs; this summary preserves the contracts, verification anchors, compatibility decisions, and deferred items.
+
+- **Maintenance decision and policy boundaries (08-04):** approved the Stop verification, missing-worktree liveness,
+  downstream retention, and evidence-based deletion gates; admitted 13 bounded members while keeping shipped design docs
+  authoritative until implementation. Semantic supervisor verdicts became exact and observable, malformed confidence
+  degrades safely, throttle reuse accepts only clean aligned/1.0 state, and terminal bundle re-enable preserves
+  session-owned supervisor configuration. Verification covered 321 focused policy/supervision, 47 hook-adapter, 8,702
+  unit (one skip), 632 regression, 21 Docker policy-hook checks, Markdown, links, lanes, and pre-commit.
+- **Git-derived workspace worktrees (08-03):** added strict porcelain-z worktree parsing, common-directory identity,
+  occupancy joins, and `forge workspace worktrees [--json]` without persisting a second workspace identity; Git
+  discovery moved to an acyclic shared leaf. Activity aggregation and `workspace status` remained gated on root-scoped
+  telemetry. PR #122 (`a5aee0a9`) passed 99 focused, 8,680 unit (one skip), 38 integration, and pre-commit checks.
+- **Proxy ingress and config wiring (08-02):** centralized wire shapes and proxy-block coercion/field registration,
+  extracted Anthropic passthrough ingress, and moved `forge info` to its CLI owner. The guards exposed and fixed dropped
+  template costs, a missing GPT-5.5 Pro catalog entry, and an unrouted local-LiteLLM fixture. Verification: 8,655 unit,
+  12 proxy/session integration, and pre-commit.
+- **Session orphan repair (08-02):** added preview-default, root-scoped `forge session repair` with explicit repairable,
+  missing-worktree, collision, corrupt, unreadable, and unrepairable outcomes; apply uses hash-verified transactional
+  publication and fails closed on raced identity or bindings. PR #120 passed 8,639 unit, 117 component integration, 22
+  Docker lifecycle/adoption checks, and pre-commit.
+- **Crash-atomic session creation and serialized deletion (08-01--08-02):** made index-row-first `create_session_txn`
+  span all five creation sites with in-lock compensation and residue retry; strengthened binding scans, replacement
+  ownership, adoption rollback, and force-fork/delete coordination. Terminal deletion now holds index then manifest
+  locks and removes the manifest before its row. Review reproduced and fixed seven transaction defects; 9,176
+  unit/regression (one skip), 117 component integration, 22 Docker session/adoption checks, focused deletion coverage,
+  and pre-commit passed. Pre-existing orphan repair shipped separately the next day.
+- **Runtime-scoped extension ownership and disable (07-30--07-31):** schema-v3 `(module, runtime)` attribution now
+  drives enable, sync, status, and partial removal while legacy unattributed rows remain non-targetable. Runtime-scoped
+  disable uses reversible settings/sidecar unmerge, guarded Codex marker removal, truthful partial reconciliation, and
+  recovery when tracking writes fail. A changed `CODEX_HOME` refuses before mutation and names both config paths; older
+  already-orphaned blocks remain a manual limitation. Verification peaked at 3,366 focused, 8,581 unit (one skip, 117
+  deselected), 551 regression, 21 Docker lifecycle checks, builds, and pre-commit.
+- **README capability truth (07-28):** corrected worktree placement, clean preview behavior, opt-in memory, and proxy
+  auto-start guidance; documented Codex-supervised Claude execution, consumer lanes, cost/wire control, skills, and all
+  CLI groups. Links, anchors, live help, lane labels, and Markdown passed. The documented Codex-supervisor sequence
+  remained code-verified rather than live, and the preflight-cache TTL nuance stayed omitted.
+- **Native session adoption (07-27):** added evidence-selected Claude/Codex adoption, directory verification, global
+  conversation locking plus index binding uniqueness, exclusive manifest reservation, and native transcript preservation
+  on deletion. PR coverage included 9,034 unit/regression (one environmental skip), 45 integrations, and two real-Claude
+  Docker gates. Crash atomicity across manifest/index was deferred here and closed by the 08-01 transaction work.
+- **July model refresh (07-26):** promoted Claude Opus 5, Kimi K3, Qwen3.7, and Gemini 3.6 Flash; clamped derived
+  reasoning to catalog-supported efforts, retained displaced models as alternatives, removed dead Gemini 2.0 Flash
+  defaults, and raised LiteLLM to 1.88.0 while relying on remote pricing until v1.94. Live Opus/Kimi/Gemini checks
+  passed; Qwen remained blocked by account data-policy settings and one local OpenAI control failed identically on
+  `main`. Unit, regression, build, live LiteLLM, and pre-commit gates passed.
+- **Policy shared-library seam (07-24):** shared provider-aware direct-LLM transport without moving caller-owned
+  parsing, telemetry, or failure behavior; consolidated confidence/citation, lane, and resume-ID rules; applied the D7
+  team threshold, pre-commit routing, and executor model-pin contracts. Verification: 449 focused, 8,314 unit (one skip,
+  117 deselected), 529 regression, 32 Docker policy/team-hook checks, mypy, pyright, and pre-commit.
+- **Runtime-neutral workflow workers (07-22--07-23):** added opt-in read-only Codex workers, one invocation readiness
+  snapshot, grouped mixed-runtime lifecycle ownership, runtime-native auth/billing/error attribution, and nine portable
+  workflow packages without changing Claude defaults or quorum. PR #110 merged as `26122901`; 731 focused, 8,277 unit
+  (one skip, 117 deselected), Codex/mixed/Claude integrations, clean runtime-scoped wheel lifecycles, QA/walkthrough,
+  build, pre-commit, link, and lane checks passed.
+- **Unmanaged skill packages (07-22):** added one-snapshot discovery, per-package recovery, status schema v2, and
+  provenance/tree/ownership-gated cleanup; unsafe roots remain report-only, while the marker digest and status top-level
+  shape were explicit research-preview breaks. PR #109 merged as `cbb58e16`; 289 acceptance, 170 related, 8,230 unit
+  (one skip), 522 regression, one wheel Docker lifecycle, build, pre-commit, QA/walkthrough, link, lane, and diff checks
+  passed.
 
 ## 2026-07-10 -- 2026-07-17 (compacted)
 
