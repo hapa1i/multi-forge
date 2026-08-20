@@ -8,8 +8,7 @@
 **Authority**:
 [`testing_guidelines.md` Test Maintenance Policy](../../../developer/testing_guidelines.md#test-maintenance-policy).
 
-**Lane**: `doing/` -- active Wave 8 order 6 on `agent/eliminate-runtime-test-skips`, branched from pushed `main` at
-`3c0a3002` on 2026-08-20.
+**Lane**: `done/` -- shipped in PR #221 (`9d6deb7f`) on 2026-08-20.
 
 **Finding**: O072 (MEDIUM test-policy).
 

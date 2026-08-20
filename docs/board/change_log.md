@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Eliminate runtime test skips
+
+**Goal/outcome**: Make the unit suite pass or fail cleanly instead of conditionally skipping credential-template and
+filesystem-identity coverage.
+
+**Key changes**:
+
+- Parameterized every local-template credential expectation and replaced symlink guards with one actionable fixture.
+- Exercised alias and distinct-root semantics deterministically in the registry and rendered dispatcher, with a
+  repository-wide AST guard against runtime skip constructs.
+
+**Verification**: 119 focused with zero skips; 9,326 unit with zero skips and 124 deselected; 961 regression;
+pre-commit/diff; design/appendix 59,979 combined; board 400 documents/972 links. PR #221 merged as `9d6deb7f`; no Forge
+workflow ran.
+
 ### Unify CLI failure diagnostics
 
 **Goal/outcome**: Keep every line of one terminating human CLI diagnostic on stderr without changing successful or JSON

@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 6 is active; orders 1--5 are shipped and closed, and orders 7--19 remain parked.
+Current focus: orders 1--6 are shipped and closed; orders 7--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -50,4 +50,4 @@ Current focus: order 6 is active; orders 1--5 are shipped and closed, and orders
   focused slice passes 119 tests and the 9,326-test unit suite reports zero skips.
 - [x] Complete focused, zero-skip unit, regression, pre-commit, documentation-size, board, and diff gates; 119 focused,
   9,326 unit, and 961 regression tests pass.
-- [ ] Ship order 6 independently and close it before activating order 7.
+- [x] Ship order 6 in PR #221 (`9d6deb7f`) and close it independently before activating order 7.

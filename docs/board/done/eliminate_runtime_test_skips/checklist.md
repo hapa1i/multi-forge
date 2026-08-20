@@ -1,7 +1,6 @@
 # Eliminate runtime test skips checklist
 
-Current focus: implementation and branch quality gates are complete; retain the member in `doing/` until its independent
-ship/merge boundary.
+Current focus: complete -- O072 shipped independently in PR #221 and its Wave 8 member is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -39,5 +38,5 @@ ship/merge boundary.
 - [x] Run `make pre-commit` after Markdown normalization plus an explicit new-file pass; verify all 972 local links
   across 400 board documents, the 5-done/1-doing/13-todo Wave 8 graph, the 59,979-token living design-doc size, and diff
   hygiene.
-- [ ] Add the completed-work change-log entry, synchronize final board evidence, and move the member to `done/` after
-  its independent ship/merge boundary.
+- [x] Add the completed-work change-log entry, synchronize final board evidence, and move the member to `done/` after PR
+  #221 merged as `9d6deb7f`.
