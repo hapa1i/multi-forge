@@ -1,8 +1,8 @@
 # Reject unknown workflow-policy keys
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active Wave 8 order 7; orders 8--19 remain parked.
+**Lane**: `done/` -- shipped in PR #223 (`92d71a6d`) on 2026-08-20.
 
 **Execution**: `agent/reject-unknown-workflow-policy-keys` from pushed `main` at
 `071cfd920f3af9852e06f72fb5cbb1668737e0c5` on 2026-08-20.
@@ -30,5 +30,6 @@ such as `tagger_promt` is discarded and leaves the default empty `tagger_prompt`
 
 ## Verification
 
-Run deterministic/workflow policy tests, full unit/regression suites, targeted policy hook integration, and
-`make pre-commit`. Update policy configuration docs if they currently imply tolerant unknown-key handling.
+The deterministic/workflow slice passed 128 tests, the focused review slice passed 25, and two targeted Docker policy
+hook checks passed. The 9,328-test unit suite, 969 regressions, full pre-commit, documentation-size, board-link, and
+diff checks passed. All five GitHub checks passed on PR #223.

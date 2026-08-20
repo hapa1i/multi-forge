@@ -1,6 +1,6 @@
 # Reject unknown workflow-policy keys checklist
 
-Current focus: implementation and verification are complete; publish order 7 while orders 8--19 remain parked.
+Current focus: complete -- O083 shipped independently in PR #223 and Wave 8 order 7 is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -28,7 +28,8 @@ Current focus: implementation and verification are complete; publish order 7 whi
 - [x] Run 9,328 unit tests with zero skips and 124 deselected, 969 regressions, full pre-commit, the 59,979-token
   design/appendix and 17,920-token workflow design checks, the 403-document/976-link board check, and diff checks.
 - [x] Commit and push the implementation as `47554574`, then open draft PR #223 without activating Wave 8 order 8.
-- [ ] Merge PR #223 and retain this card in `doing/` until its closeout lands on `main`.
+- [x] Merge PR #223 as `92d71a6d`, synchronize the final board evidence, and move this member to `done/` before
+  activating order 8.
 
 ## Review follow-up
 
@@ -43,8 +44,8 @@ Current focus: implementation and verification are complete; publish order 7 whi
 
 | Boundary              | Fixture                                      | Assertion                                                               | Tier        |
 | --------------------- | -------------------------------------------- | ----------------------------------------------------------------------- | ----------- |
-| Top-level workflow    | valid entry with `tagger_promt`              | fails closed and names the entry plus unknown field                     | regression  |
-| Nested workflow       | checker/reviewer entry with a misspelled key | fails closed and names the nested offending field                       | regression  |
+| Top-level workflow    | valid entry with `tagger_promt`              | construction rejects and names the entry plus unknown field             | regression  |
+| Nested workflow       | checker/reviewer entry with a misspelled key | construction rejects and names the nested offending field               | regression  |
 | Malformed entry       | invalid workflow field or entry type         | actionable policy-config error reaches the existing caller boundary     | unit        |
 | Valid/defaulted entry | multiple valid workflows with omitted fields | preserves order, defaults, policy IDs, and lazy workflow-module loading | unit        |
 | Policy hook           | manifest-backed workflow bundle              | open-mode build failure is actionable without traceback or LLM dispatch | integration |

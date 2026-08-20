@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Reject unknown workflow-policy keys
+
+**Goal/outcome**: Stop manifest-backed workflow policy typos from silently selecting permissive defaults.
+
+**Key changes**:
+
+- Strictly deserialized workflow entries and nested stages, with actionable entry and field diagnostics at the existing
+  atomic hook-build boundary.
+- Documented the build-failure blast radius, aligned config-shape tests with production strictness, and parked the
+  analogous TDD unknown-key gap as O101 instead of expanding this member.
+
+**Verification**: 128 focused plus 25 review-follow-up tests; 9,328 unit; 969 regression; two targeted Docker policy
+hook checks; pre-commit/diff; design and board checks. PR #223 merged as `92d71a6d` with all five GitHub checks passing.
+
 ### Correct Wave 8 merged regressions
 
 **Goal/outcome**: Restore the provider-trace, worktree-copy, and dry-run stream contracts after three independently

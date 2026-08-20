@@ -380,4 +380,4 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Ship and close the corrective follow-up in PR #222 (`02e0ced9`) before advancing Wave 8 sequencing.
 - [x] Create `agent/reject-unknown-workflow-policy-keys` from pushed corrective closeout `071cfd92` and activate only
   Wave 8 order 7.
-- [ ] Ship Wave 8 order 7 independently in PR #223 and close it before activating order 8.
+- [x] Ship Wave 8 order 7 independently in PR #223 (`92d71a6d`) and close it before activating order 8.

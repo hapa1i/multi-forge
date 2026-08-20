@@ -2,11 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--6 shipped in PRs #216--#221; the corrective follow-up shipped in PR #222; order 7 is
-active and orders 8--19 remain parked.
+**Lane**: `doing/` -- orders 1--7 shipped in PRs #216--#223; the corrective follow-up shipped in PR #222; orders 8--19
+remain parked.
 
-**Current execution**: [`reject_unknown_workflow_policy_keys`](../reject_unknown_workflow_policy_keys/card.md) on
-`agent/reject-unknown-workflow-policy-keys` from pushed `main` at `071cfd92`; orders 8--19 remain parked.
+**Current execution**: none; order 7 merged as `92d71a6d` on 2026-08-20, and order 8 remains parked.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -56,7 +55,7 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 | 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../done/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
 | 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../done/unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
 | 6     | O072           | [`eliminate_runtime_test_skips`](../../done/eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
-| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../reject_unknown_workflow_policy_keys/card.md)                 | strict external config boundary         |
+| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../../done/reject_unknown_workflow_policy_keys/card.md)         | strict external config boundary         |
 | 8     | O087           | [`preserve_assistant_block_boundaries`](../../todo/preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
 | 9     | O088           | [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |
 | 10    | O091           | [`serialize_llm_client_initialization`](../../todo/serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
