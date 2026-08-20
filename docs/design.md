@@ -1361,9 +1361,9 @@ conflicting/unreadable inputs disable pruning with degraded status. Startup neve
 status exposes configured/effective/source plus deprecations and conflicts.
 
 The legacy `costs/verbs/` writer and reader have been removed. The default `forge telemetry costs show` by-verb view
-derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests remain
-"Interactive"/unattributed. The usage ledger itself remains during the transition for session activity and run-tree
-joins, but it is no longer the durable spend source.
+joins downstream attempts to `usage/events` by `forge_run_id`. Unique joined run IDs count runs; downstream rows count
+requests, and unjoined requests remain "Interactive"/unattributed. The usage ledger itself remains during the transition
+for session activity and run-tree joins, but it is no longer the durable spend source.
 
 The transitional **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)) records which run/workflow/session invoked each

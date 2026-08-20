@@ -18,14 +18,14 @@ implementation.
   interpretation.
 - [x] Make bare `metrics --json` always aggregate by proxy ID; preserve explicit-proxy errors, exit codes, and human
   rendering.
-- [ ] Reconcile the stable JSON envelope in `docs/cli_reference.md` and `docs/end-user/proxy.md` at the Batch 2
+- [x] Reconcile the stable JSON envelope in `docs/cli_reference.md` and `docs/end-user/proxy.md` at the Batch 2
   integration boundary.
 
 ## Phase 3 -- Verify and publish
 
 - [x] Run focused proxy CLI/regression tests and targeted Docker proxy-metrics coverage.
-- [ ] Commit this card without mixing the cost-selector implementation.
-- [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
+- [x] Commit this card without mixing the cost-selector implementation (`e53a96ce`).
+- [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
   head.
 - [ ] Publish with the cost card in one Batch 2 PR; close both cards together only after merge.
 
@@ -39,6 +39,8 @@ Focused evidence (2026-08-20):
 - `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py::TestProxyWithLocalLiteLLM::test_health_endpoint -q`:
   `1 passed`.
 - Repository hooks on the card's source, regression, and checklist plus `git diff --check`: passed.
+- Integrated Batch 2 head: `97` focused, `9,331` unit with `124` deselected, and `1,005` regression tests passed; both
+  targeted Docker boundaries and final `make pre-commit` passed.
 
 ## Acceptance tests
 

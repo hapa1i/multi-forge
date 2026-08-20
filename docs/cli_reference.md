@@ -279,7 +279,7 @@ registered policy check; auxiliary-consumer lanes freeze at first real dispatch.
 | `forge proxy stop <id>`              | Stop server; retain ownership on failure                |
 | `forge proxy delete <id>...`         | Stop then delete; retain last ownership if stop fails   |
 | `forge proxy validate <id>`          | Validate proxy configuration                            |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`; aggregates all when >1) |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`)                         |
 | `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
 | `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
 | `forge proxy template list`          | List available templates                                |
@@ -297,6 +297,11 @@ required stop fails.
 Failed verification exits non-zero while retaining the created/reused/adopted proxy; without `--smoke-test`, the JSON
 shape is unchanged. `--no-start` remains config-only and does not run verification.
 
+Bare `forge proxy metrics --json` always returns a mapping from every registered proxy ID to its metrics object, using
+`null` for an unreachable proxy; this shape is the same for zero, one, or many registrations. Selecting an ID returns
+that proxy's raw metrics object instead. JSON uses a non-rendering stdout path, so whitespace and bracket-rich metric
+values are not wrapped or interpreted as terminal markup.
+
 ### Telemetry
 
 `forge telemetry` groups operator observability surfaces: per-session activity, proxy-scoped cost telemetry, and local
@@ -312,6 +317,10 @@ from the current backend-instance schema instead of reattributed.
 | `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)                                |
 | `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                                           |
 | `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                                                   |
+
+The cost view defaults to the by-verb human table; `--by-verb` is its explicit spelling, and it cannot be combined with
+`--by-model`. A verb's `run(s)` count is the number of unique joined `forge_run_id` values, while `reqs` counts
+downstream request rows. JSON always retains both `by_verb` and `by_model` summaries.
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed

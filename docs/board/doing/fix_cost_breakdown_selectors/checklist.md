@@ -18,14 +18,14 @@ implementation.
   view and leaving the stable JSON envelope selector-independent.
 - [x] Carry validated `forge_run_id` through verb records and count unique run IDs per verb without changing downstream
   request counts or reported-cost precedence.
-- [ ] Reconcile the cost-view wording in `docs/cli_reference.md` and `docs/end-user/proxy.md` at the Batch 2 integration
+- [x] Reconcile the cost-view wording in `docs/cli_reference.md` and `docs/end-user/proxy.md` at the Batch 2 integration
   boundary.
 
 ## Phase 3 -- Verify and publish
 
 - [x] Run focused cost CLI/regression tests and targeted Docker telemetry/cost integration.
-- [ ] Commit this card without mixing the proxy-metrics implementation.
-- [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
+- [x] Commit this card without mixing the proxy-metrics implementation (`424be3c2`).
+- [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
   head.
 - [ ] Publish with the metrics card in one Batch 2 PR; close both cards together only after merge.
 
@@ -38,6 +38,8 @@ Focused evidence (2026-08-20):
 - `./scripts/test-integration.sh tests/integration/proxy/test_cost_visibility_e2e.py::test_panel_with_subprocess_proxy_records_verb_cost -q`:
   `1 passed`.
 - Repository hooks on the card's source, regression, and checklist plus `git diff --check`: passed.
+- Integrated Batch 2 head: `97` focused, `9,331` unit with `124` deselected, and `1,005` regression tests passed; both
+  targeted Docker boundaries and final `make pre-commit` passed.
 
 ## Acceptance tests
 

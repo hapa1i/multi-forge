@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 2 is active on `agent/wave8-batch-2` from pushed Batch 1 closeout `0eb68aea`; O084 and O086 have
-separate checklists and implementation boundaries.
+Current focus: Batch 2 implementation and aggregate verification are complete on `agent/wave8-batch-2` from pushed Batch
+1 closeout `0eb68aea`; shared reconciliation is ready to commit and publish for review.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -79,8 +79,8 @@ separate checklists and implementation boundaries.
 - [x] Create `agent/wave8-batch-2` from pushed closeout `0eb68aea`; move only orders 11--12 to `doing/`, create their
   separate checklists, and assign shared CLI/end-user documentation plus combined-head reconciliation to the batch
   integrator.
-- [ ] Complete and commit each Batch 2 card within its own implementation boundary.
-- [ ] Run combined unit, regression, targeted Docker, pre-commit, board/link, and diff gates on the integrated branch
+- [x] Complete and commit each Batch 2 card within its own implementation boundary (`424be3c2` and `e53a96ce`).
+- [x] Run combined unit, regression, targeted Docker, pre-commit, board/link, and diff gates on the integrated branch
   head.
 - [ ] Publish one Batch 2 review branch; close both cards together only after the batch merges.
 
@@ -90,3 +90,10 @@ also restored the zero-progress GC JSON pin and removed collection-time LLM adap
 Final Markdown and `git diff --check` gates passed after the evidence update; all 1,002 local link targets across 407
 board documents had existing paths, all 214 local paths/fragments across the 11 changed Markdown documents resolved, and
 no stale `todo/` link remained for a Batch 1 card.
+
+Batch 2 pre-publication evidence (2026-08-20): the combined focused CLI/regression slice passed 97 tests;
+`make test-unit` passed 9,331 tests with 124 deselected; `make test-regression` passed 1,005 tests; and the
+cost-visibility and proxy-health Docker boundaries each passed once. The first full pre-commit run reformatted only
+changed Markdown, and the final run passed every hook. All 994 local links across 409 tracked board documents resolved,
+no selected-card lane link was stale, `git diff --check` passed, `docs/cli_reference.md` measured 9,390 tokens, and the
+combined design and appendix measured 59,998 tokens.

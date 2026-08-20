@@ -1650,8 +1650,9 @@ def _display_all_metrics(
 def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
     """Show runtime metrics for a running proxy.
 
-    With no PROXY_ID, shows the sole registered proxy, or an aggregate table when
-    several are registered.
+    With no PROXY_ID, human output shows the sole registered proxy or an aggregate
+    table when several are registered. JSON always maps every registered proxy ID to
+    its metrics or null; selecting a PROXY_ID returns that proxy's raw metrics object.
     """
     import json
 
