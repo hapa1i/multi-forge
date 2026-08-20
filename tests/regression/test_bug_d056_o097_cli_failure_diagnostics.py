@@ -20,13 +20,19 @@ from forge.install.models import InstallPlan, InstallScope
 pytestmark = pytest.mark.regression
 
 
-def _plan(*, has_conflicts: bool = False) -> InstallPlan:
+def _plan(
+    *,
+    has_conflicts: bool = False,
+    requires_claude_version: bool = False,
+    scope: str = "user",
+) -> InstallPlan:
     return InstallPlan(
-        scope="user",
+        scope=scope,
         mode="copy",
         profile="minimal",
         has_conflicts=has_conflicts,
         conflicts=["managed surface conflict"] if has_conflicts else [],
+        requires_claude_version=requires_claude_version,
     )
 
 
@@ -60,6 +66,35 @@ def test_sync_success_keeps_auto_detected_scope_on_stdout(monkeypatch: pytest.Mo
     assert "Auto-detected scope: user" in result.stdout
     assert "Already up to date" in result.stdout
     assert result.stderr == ""
+
+
+def test_auto_detected_enable_buffers_created_notice_with_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".git").mkdir()
+    monkeypatch.chdir(project)
+    plan = _plan(scope="local", requires_claude_version=True)
+
+    def _raise_conflict(**_kwargs: object) -> None:
+        raise SettingsConflictError("permissions.allow", ["Read"], ["Read", "Write"])
+
+    installer = SimpleNamespace(plan=lambda **_kwargs: plan, init=_raise_conflict)
+    monkeypatch.setattr("forge.cli.extensions.Installer", lambda **_kwargs: installer)
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: SimpleNamespace(ok=True),
+    )
+
+    result = CliRunner().invoke(main, ["extension", "enable", "--profile", "minimal"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert result.stderr.index("Auto-detected scope: local") < result.stderr.index("Created ")
+    assert result.stderr.index("Created ") < result.stderr.index("Settings conflict")
+    assert (project / ".claude").is_dir()
 
 
 def test_enable_dry_run_conflict_keeps_creation_preview_on_stderr(

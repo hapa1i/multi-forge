@@ -114,12 +114,22 @@ def _detect_git_project_root(start: Path | None = None) -> Path | None:
     return git_root.resolve()
 
 
-def _create_claude_dir(root: Path) -> None:
-    """Create ``.claude/`` at *root* and log the action."""
+def _create_claude_dir(root: Path, *, announce: bool = True) -> str:
+    """Create ``.claude/`` at *root* and return its human notice."""
     claude_dir = root / ".claude"
     claude_dir.mkdir(exist_ok=True)
     _log.info("Created %s for Forge project", claude_dir)
-    console.print(f"[dim]Created {display_path(claude_dir)}[/dim]")
+    notice = f"[dim]Created {display_path(claude_dir)}[/dim]"
+    if announce:
+        console.print(notice)
+    return notice
+
+
+def _flush_notices(notices: list[str], *, output: Console) -> None:
+    """Emit buffered human notices once, preserving their original order."""
+    for notice in notices:
+        output.print(notice)
+    notices.clear()
 
 
 def _parse_modules(modules_str: str | None) -> set[InstallModule] | None:
@@ -1030,6 +1040,7 @@ def enable_cmd(
         forge extension enable --dry-run                      # Preview changes
     """
     auto_scope_notice: str | None = None
+    pending_notices: list[str] = []
     try:
         anchor = Path(path) if path else None
 
@@ -1067,6 +1078,7 @@ def enable_cmd(
                         project_root = git_root
                         needs_create = not (git_root / ".claude").is_dir()
             auto_scope_notice = f"[dim]Auto-detected scope: {install_scope.value}[/dim]"
+            pending_notices.append(auto_scope_notice)
         else:
             install_scope = InstallScope(scope)
             project_root = _resolve_project_root(install_scope, anchor=anchor, auto_create=False)
@@ -1095,9 +1107,7 @@ def enable_cmd(
 
         if dry_run:
             plan_console = err_console if plan.has_conflicts else console
-            if auto_scope_notice:
-                plan_console.print(auto_scope_notice)
-                auto_scope_notice = None
+            _flush_notices(pending_notices, output=plan_console)
             if needs_forge and project_root is not None:
                 plan_console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
             if needs_create and project_root is not None and plan.requires_claude_version:
@@ -1109,9 +1119,7 @@ def enable_cmd(
                 _print_hook_migration_candidates()
         else:
             if plan.has_conflicts:
-                if auto_scope_notice:
-                    err_console.print(auto_scope_notice)
-                    auto_scope_notice = None
+                _flush_notices(pending_notices, output=err_console)
                 _print_plan(plan, output=err_console)
                 err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
@@ -1121,7 +1129,7 @@ def enable_cmd(
                 diagnostic_prefix=auto_scope_notice,
             )
             if needs_create and project_root is not None and plan.requires_claude_version:
-                _create_claude_dir(project_root)
+                pending_notices.append(_create_claude_dir(project_root, announce=False))
             plan = installer.init(
                 profile=install_profile,
                 mode=install_mode,
@@ -1131,9 +1139,7 @@ def enable_cmd(
                 skill_runtimes=selected_runtimes,
             )
             plan_console = err_console if plan.has_conflicts else console
-            if auto_scope_notice:
-                plan_console.print(auto_scope_notice)
-                auto_scope_notice = None
+            _flush_notices(pending_notices, output=plan_console)
             _print_plan(plan, output=plan_console)
             if plan.has_conflicts:
                 err_console.print("\n[red]Enable failed due to conflicts.[/red]")
@@ -1154,8 +1160,7 @@ def enable_cmd(
     except click.UsageError:
         raise
     except NoClaudeDirectoryError as e:
-        if auto_scope_notice:
-            err_console.print(auto_scope_notice)
+        _flush_notices(pending_notices, output=err_console)
         print_error(f"{e}")
         print_tip(
             "Use --scope user to enable globally, or --root <dir> to target a specific directory.",
@@ -1163,18 +1168,15 @@ def enable_cmd(
         )
         sys.exit(1)
     except SettingsConflictError as e:
-        if auto_scope_notice:
-            err_console.print(auto_scope_notice)
+        _flush_notices(pending_notices, output=err_console)
         err_console.print(f"[red]Settings conflict:[/red] {e}")
         print_tip("Use --force to override.", console=err_console)
         sys.exit(1)
     except (StateCorruptedError, StateUnreadableError):
-        if auto_scope_notice:
-            err_console.print(auto_scope_notice)
+        _flush_notices(pending_notices, output=err_console)
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
-        if auto_scope_notice:
-            err_console.print(auto_scope_notice)
+        _flush_notices(pending_notices, output=err_console)
         print_error(f"{e}")
         sys.exit(1)
 

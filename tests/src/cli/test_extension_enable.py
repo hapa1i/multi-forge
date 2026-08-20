@@ -991,8 +991,11 @@ class TestEnableWithPath:
 
         assert result.exit_code == 0, result.output
         assert "Auto-detected scope: local" in result.output
+        assert result.stdout.index("Auto-detected scope: local") < result.stdout.index("Created ")
+        assert result.stdout.index("Created ") < result.stdout.index("Installation Plan")
         assert "Next steps (runtime hooks):" in result.output
         assert "forge extension enable --scope user" in result.output
+        assert result.stderr == ""
         call_kwargs = MockInstaller.call_args
         assert call_kwargs.kwargs["scope"] == InstallScope.LOCAL
 
