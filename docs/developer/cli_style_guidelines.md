@@ -129,7 +129,8 @@ When adding a new CLI command:
   stdout. Diagnostics, prompts, warnings, and errors go to stderr. A read command's human and `--json` modes use the
   same result stream: do not render the human table on stderr while JSON goes to stdout.
 - **Place the non-recovery categories.** Dry-run previews and `Next steps:` blocks are results (stdout); status lines
-  like `Backup: {path}` are diagnostics (stderr).
+  like `Backup: {path}` are diagnostics (stderr). A conflict-bearing dry-run remains a preview result on stdout even
+  when the command exits non-zero; emit only the terminating failure diagnostic on stderr.
 - A mechanical guard wires this contract: `tests/src/cli/test_output_streams.py` (plain `CliRunner()`, which captures
   stdout and stderr separately) asserts that `--json` mode emits valid JSON on stdout and nothing on stderr for the
   telemetry leaves (`costs show`, `trace list`, seeded `activity`) and `proxy audit show|diff`, and that their human

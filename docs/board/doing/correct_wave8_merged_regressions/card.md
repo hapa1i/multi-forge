@@ -31,7 +31,8 @@ original provider-trace, worktree-copy, or CLI output contracts.
 ## Constraints
 
 - Preserve provider capability gating, cost/metrics accounting, response shapes, and auth-retry trace behavior.
-- Preserve per-file tracked-content decisions and never follow a destination symlink during directory creation or copy.
+- Preserve per-file tracked-content decisions and the existing recheck-based path-safety model; prevent copied file
+  content from escaping through a destination symlink.
 - Do not change non-dry-run conflict diagnostics or successful dry-run output.
 - Do not activate Wave 8 order 7 as part of this correction.
 
