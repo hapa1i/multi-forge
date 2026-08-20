@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active as the second sequential member of Wave 8 Batch 3 on `agent/wave8-batch-3` from `34cbb601`.
+**Lane**: `doing/` -- implemented and locally verified in draft PR #227; await the shared Batch 3 merge before closeout.
 
 **Finding**: O077 (LOW correctness).
 

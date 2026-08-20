@@ -3,15 +3,15 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--12 shipped in PRs #216--#226; the corrective follow-up shipped in PR #222; the external
-Batch 1 Stop follow-up shipped in PR #225; Batch 3 orders 13--14 and its external vocabulary follow-up are active, and
-orders 15--19 remain parked.
+Batch 1 Stop follow-up shipped in PR #225; Batch 3 orders 13--14 and its external vocabulary follow-up are in draft PR
+#227, and orders 15--19 remain parked.
 
-**Current execution**: Batch 3 on `agent/wave8-batch-3`, based on pushed Batch 2 closeout `34cbb601`. Active cards:
+**Current execution**: Batch 3 is locally verified in draft PR #227 from `agent/wave8-batch-3`, based on pushed Batch 2
+closeout `34cbb601`. Review cards:
 [`align_supervisor_missing_config_exits`](../align_supervisor_missing_config_exits/card.md),
 [`reject_ambiguous_policy_check_input`](../reject_ambiguous_policy_check_input/card.md), and external follow-up
-[`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md). One owner executes them in
-that order; the first two share `src/forge/cli/policy.py`, and the last also reconciles direct parsing in
-`src/forge/cli/hooks/direct_commands.py`.
+[`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md). They remain in `doing/` and
+close together only after merge.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

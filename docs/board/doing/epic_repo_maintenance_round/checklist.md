@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 Batch 3 implementation and integrated verification are complete on `agent/wave8-batch-3` from
-pushed closeout `34cbb601`; publish its shared review next while orders 15--19 remain parked.
+Current focus: Wave 8 Batch 3 is locally verified in draft PR #227; keep its three cards in `doing/` until merge while
+orders 15--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -399,4 +399,4 @@ The epic remains in `doing/` after the decision cards close; later execution wav
   sequential shared-policy ownership.
 - [x] Complete the three sequential Batch 3 implementation commits and direct Docker, full unit/regression, pre-commit,
   documentation, board-link, stale-lane, and diff gates without closing cards before merge.
-- [ ] Publish Wave 8 Batch 3 in one draft PR and keep all three cards in `doing/` until merge.
+- [x] Publish Wave 8 Batch 3 in draft PR #227 and keep all three cards in `doing/` until merge.

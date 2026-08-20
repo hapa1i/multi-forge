@@ -1,7 +1,7 @@
 # Align supervisor missing-config exits checklist
 
-Current focus: implementation commit `902f035c` and integrated verification are complete on `agent/wave8-batch-3`; await
-the shared Batch 3 review and merge before closeout.
+Current focus: implementation commit `902f035c` and integrated verification are in draft PR #227; await the shared Batch
+3 merge before closeout.
 
 ## Phase 1 -- Pin enabling failures and idempotent controls
 
@@ -25,7 +25,7 @@ the shared Batch 3 review and merge before closeout.
 - [x] Commit this card before starting the other Batch 3 cards.
 - [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
   head.
-- [ ] Publish all three cards in one Batch 3 PR; close them together only after merge.
+- [x] Publish all three cards in draft PR #227; close them together only after merge.
 
 ## Acceptance tests
 

@@ -2,8 +2,8 @@
 
 **Origin**: Post-implementation review of Wave 7 O044 on `refactor/share-policy-activation-rules` (`d9f0e2c2`).
 
-**Lane**: `doing/` -- active as the final sequential member of Wave 8 Batch 3 on `agent/wave8-batch-3` from `34cbb601`;
-it remains separate from Wave 8 finding credit.
+**Lane**: `doing/` -- implemented and locally verified in draft PR #227; await the shared Batch 3 merge before closeout.
+It remains separate from Wave 8 finding credit.
 
 ## Goal
 
