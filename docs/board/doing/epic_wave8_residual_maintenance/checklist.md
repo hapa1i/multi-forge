@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 5 `unify_cli_failure_diagnostics` is active; orders 6--19 remain parked.
+Current focus: orders 1--5 are shipped and closed; orders 6--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -43,4 +43,4 @@ Current focus: order 5 `unify_cli_failure_diagnostics` is active; orders 6--19 r
 - [x] Route each admitted non-zero human diagnostic wholly to stderr without changing successful or JSON output.
 - [x] Complete final staged pre-commit, documentation-size, board, and diff gates after focused, unit, regression,
   targeted workflow/extension Docker, and clean-wheel verification passed.
-- [ ] Ship and close order 5 independently before activating order 6.
+- [x] Ship order 5 in PR #220 (`61be7d80`) and close it independently before activating order 6.

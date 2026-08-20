@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 order 5 `unify_cli_failure_diagnostics` is active from pushed closeout `2da22c2a`.
+Current focus: Wave 8 orders 1--5 are shipped and closed; orders 6--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -200,6 +200,7 @@ Current focus: Wave 8 order 5 `unify_cli_failure_diagnostics` is active from pus
 - [x] Ship Wave 8 order 4 in PR #219 (`43a3b29c`) and close it before activating order 5.
 - [x] Branch from pushed order-4 closeout `2da22c2a` and activate only Wave 8 order 5 `unify_cli_failure_diagnostics`;
   keep orders 6--19 parked.
+- [x] Ship Wave 8 order 5 in PR #220 (`61be7d80`) and close it before activating order 6.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.

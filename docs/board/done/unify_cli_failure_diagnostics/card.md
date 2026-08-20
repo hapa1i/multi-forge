@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/unify-cli-failure-diagnostics` from pushed closeout `2da22c2a`.
+**Lane**: `done/` -- shipped in PR #220 (`61be7d80`) on 2026-08-20.
 
 **Findings**: D056 (MEDIUM) and the verified failure-stream subset of O097 (LOW).
 

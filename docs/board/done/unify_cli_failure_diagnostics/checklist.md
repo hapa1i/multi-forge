@@ -36,3 +36,4 @@ owner.
 - [x] Run final staged `make pre-commit`; verify design/appendix size (59,979 Opus-5 tokens), all 972 board links,
   stale-lane references, and diff hygiene.
 - [x] Commit, push, and open independent draft PR #220; close order 5 after merge before activating order 6.
+- [x] Ship order 5 in PR #220 (`61be7d80`) and close it before activating order 6.

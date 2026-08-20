@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Unify CLI failure diagnostics
+
+**Goal/outcome**: Keep every line of one terminating human CLI diagnostic on stderr without changing successful or JSON
+output.
+
+**Key changes**:
+
+- Routed workflow preflight details, extension failure plans/recovery, and policy supervisor input tips through the
+  diagnostic console.
+- Buffered extension auto-scope and anchor-creation notices until the outcome was known, preserving first-enable success
+  order while keeping non-zero paths stderr-only.
+
+**Verification**: 239 focused plus 153 post-review stream/order checks; 9,322 unit (one skip); 959 regression; six
+targeted Docker workflow/extension checks; clean-wheel runtime; pre-commit/diff; design/appendix 59,979 combined; board
+972 links. PR #220 merged as `61be7d80`; no Forge workflow ran.
+
 ### Harden worktree config-copy safety
 
 **Goal/outcome**: Keep tracked and user-owned config safe during worktree copy and dirty-worktree cleanup.
