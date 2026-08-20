@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path, find_git_root
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.exceptions import (
@@ -172,7 +172,12 @@ def _print_codex_retrust_tip() -> None:
     )
 
 
-def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | None = None) -> None:
+def _enforce_claude_version_if_required(
+    plan: InstallPlan,
+    project_root: Path | None = None,
+    *,
+    diagnostic_prefix: str | None = None,
+) -> None:
     """Apply the Claude CLI gate only when the plan mutates Claude surfaces."""
 
     if not plan.requires_claude_version:
@@ -181,6 +186,8 @@ def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | 
 
     version_check = check_minimum_version()
     if not version_check.ok:
+        if diagnostic_prefix:
+            err_console.print(diagnostic_prefix)
         print_error(f"{version_check.reason}")
         codex_packages_selected = any(
             package.runtime == _SKILL_RUNTIME_IDS["codex"] and package.action in {"install", "update"}
@@ -191,12 +198,12 @@ def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | 
             command = f"forge extension enable --scope {plan.scope}{root_option} --runtime codex"
             print_tip(
                 f"Install Claude Code, or install only Codex surfaces with '{command}'.",
-                console=console,
+                console=err_console,
             )
         elif version_check.version is None:
-            print_tip("Install Claude Code, then retry.", console=console)
+            print_tip("Install Claude Code, then retry.", console=err_console)
         else:
-            print_tip("Run 'claude update' to upgrade.", console=console)
+            print_tip("Run 'claude update' to upgrade.", console=err_console)
         raise click.exceptions.Exit(1)
 
 
@@ -264,7 +271,11 @@ def _warn_if_modules_have_no_files(
     )
 
 
-def _enforce_project_compatibility(project_root: Path | None) -> None:
+def _enforce_project_compatibility(
+    project_root: Path | None,
+    *,
+    diagnostic_prefix: str | None = None,
+) -> None:
     """Block project-local mutations when `.forge/project.toml` requires it."""
 
     if project_root is None:
@@ -272,8 +283,10 @@ def _enforce_project_compatibility(project_root: Path | None) -> None:
     try:
         enforce_project_compatibility(project_root)
     except ProjectCompatibilityError as e:
+        if diagnostic_prefix:
+            err_console.print(diagnostic_prefix)
         print_error(f"{e.reason}")
-        print_tip(format_project_compatibility_recovery(), console=console)
+        print_tip(format_project_compatibility_recovery(), console=err_console)
         sys.exit(1)
 
 
@@ -559,24 +572,27 @@ def _resolve_project_root(
     return project_root.resolve()
 
 
-def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
+def _print_plan(plan: InstallPlan, dry_run: bool = False, *, output: Console | None = None) -> None:
     """Print installation plan using Rich.
 
     Args:
         plan: The plan to display.
         dry_run: If True, prefix output with "(dry-run)".
+        output: Console that owns the complete plan; defaults to the module result console.
     """
+    if output is None:
+        output = console
     prefix = "[dim](dry-run)[/dim] " if dry_run else ""
 
-    console.print(f"\n{prefix}[bold]Installation Plan[/bold]")
-    console.print(f"  Scope:   {plan.scope}")
-    console.print(f"  Mode:    {plan.mode}")
-    console.print(f"  Profile: {plan.profile}")
-    console.print(f"  Modules: {', '.join(plan.modules)}")
-    console.print(f"  Runtimes: {', '.join(plan.selected_runtimes)}")
+    output.print(f"\n{prefix}[bold]Installation Plan[/bold]")
+    output.print(f"  Scope:   {plan.scope}")
+    output.print(f"  Mode:    {plan.mode}")
+    output.print(f"  Profile: {plan.profile}")
+    output.print(f"  Modules: {', '.join(plan.modules)}")
+    output.print(f"  Runtimes: {', '.join(plan.selected_runtimes)}")
 
     if plan.module_outcomes:
-        console.print(f"\n{prefix}[bold]Modules:[/bold]")
+        output.print(f"\n{prefix}[bold]Modules:[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
         table.add_column("ACTION", style="dim")
         table.add_column("MODULE")
@@ -584,10 +600,10 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         for outcome in plan.module_outcomes:
             style = {"install": "green", "skip": "dim", "conflict": "red"}.get(outcome.action, "")
             table.add_row(outcome.action, outcome.module, outcome.reason or "", style=style)
-        console.print(table)
+        output.print(table)
 
     if plan.skill_packages:
-        console.print(f"\n{prefix}[bold]Skill packages:[/bold]")
+        output.print(f"\n{prefix}[bold]Skill packages:[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
         table.add_column("ACTION", style="dim")
         table.add_column("RUNTIME")
@@ -613,15 +629,15 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
                 reason,
                 style=style,
             )
-        console.print(table)
+        output.print(table)
         for package in plan.skill_packages:
             if package.recovery:
-                console.print(
+                output.print(
                     f"  [yellow]{package.runtime}/{package.skill} recovery:[/yellow] {escape(package.recovery)}"
                 )
 
     if plan.files:
-        console.print(f"\n{prefix}[bold]Files:[/bold]")
+        output.print(f"\n{prefix}[bold]Files:[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
         table.add_column("ACTION", style="dim")
         table.add_column("PATH")
@@ -636,10 +652,10 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
             }.get(f.action, "")
             table.add_row(f.action, display_path(f.target_path), f.reason or "", style=style)
 
-        console.print(table)
+        output.print(table)
 
     if plan.settings:
-        console.print(f"\n{prefix}[bold]Settings:[/bold]")
+        output.print(f"\n{prefix}[bold]Settings:[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
         table.add_column("ACTION", style="dim")
         table.add_column("KEY")
@@ -652,10 +668,10 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
                 value_str = f"current={s.current_value!r}, forge={s.value!r}"
             table.add_row(s.action, s.key_path, value_str, style=style)
 
-        console.print(table)
+        output.print(table)
 
     if plan.codex is not None:
-        console.print(f"\n{prefix}[bold]Codex hooks (config.toml):[/bold]")
+        output.print(f"\n{prefix}[bold]Codex hooks (config.toml):[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
         table.add_column("ACTION", style="dim")
         table.add_column("TARGET")
@@ -669,12 +685,12 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         }.get(plan.codex.action, "")
         target = display_path(plan.codex.config_path) if plan.codex.config_path else ""
         table.add_row(plan.codex.action, target, plan.codex.reason or "", style=style)
-        console.print(table)
+        output.print(table)
 
     if plan.has_conflicts:
-        console.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
+        output.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
         for c in plan.conflicts:
-            console.print(f"  [red]- {c}[/red]")
+            output.print(f"  [red]- {c}[/red]")
         has_policy_conflicts = (
             any(
                 package.action == "conflict" and package.reason in _NON_FORCEABLE_SKILL_CONFLICT_REASONS
@@ -697,21 +713,21 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
             print_tip(
                 "Codex skill packages do not support local scope; retry with "
                 "forge extension enable --scope user --runtime codex.",
-                console=console,
+                console=output,
             )
         elif has_policy_conflicts and has_forceable_conflicts:
             print_tip(
                 "Use --force only for file or settings conflicts; resolve runtime, scope, "
                 "and duplicate-scan conflicts manually.",
-                console=console,
+                console=output,
             )
         elif has_policy_conflicts:
             print_tip(
                 "Resolve runtime, scope, or duplicate-scan conflicts manually; --force does not override them.",
-                console=console,
+                console=output,
             )
         else:
-            print_tip("Use --force to override, or resolve conflicts manually.", console=console)
+            print_tip("Use --force to override, or resolve conflicts manually.", console=output)
 
 
 def _uninstall_all_installations(
@@ -1013,6 +1029,7 @@ def enable_cmd(
         forge extension enable --runtime claude --runtime codex
         forge extension enable --dry-run                      # Preview changes
     """
+    auto_scope_notice: str | None = None
     try:
         anchor = Path(path) if path else None
 
@@ -1049,20 +1066,18 @@ def enable_cmd(
                         install_scope = InstallScope.LOCAL
                         project_root = git_root
                         needs_create = not (git_root / ".claude").is_dir()
-            console.print(f"[dim]Auto-detected scope: {install_scope.value}[/dim]")
+            auto_scope_notice = f"[dim]Auto-detected scope: {install_scope.value}[/dim]"
         else:
             install_scope = InstallScope(scope)
             project_root = _resolve_project_root(install_scope, anchor=anchor, auto_create=False)
             if project_root is not None:
                 needs_create = not (project_root / ".claude").is_dir()
 
-        _enforce_project_compatibility(project_root)
+        _enforce_project_compatibility(project_root, diagnostic_prefix=auto_scope_notice)
 
         # Rule 1 anchor: .forge/ is required for session start.
         # Preview in dry-run; actual creation deferred until installer succeeds.
         needs_forge = project_root is not None and not (project_root / ".forge").is_dir()
-        if needs_forge and dry_run and project_root is not None:
-            console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
 
         install_profile = InstallProfile(profile)
         install_mode = InstallMode(mode)
@@ -1079,19 +1094,32 @@ def enable_cmd(
         )
 
         if dry_run:
+            plan_console = err_console if plan.has_conflicts else console
+            if auto_scope_notice:
+                plan_console.print(auto_scope_notice)
+                auto_scope_notice = None
+            if needs_forge and project_root is not None:
+                plan_console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
             if needs_create and project_root is not None and plan.requires_claude_version:
-                console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
-            _print_plan(plan, dry_run=True)
+                plan_console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
+            _print_plan(plan, dry_run=True, output=plan_console)
             if plan.has_conflicts:
                 sys.exit(1)
             if install_scope == InstallScope.USER:
                 _print_hook_migration_candidates()
         else:
             if plan.has_conflicts:
-                _print_plan(plan)
-                console.print("\n[red]Enable failed due to conflicts.[/red]")
+                if auto_scope_notice:
+                    err_console.print(auto_scope_notice)
+                    auto_scope_notice = None
+                _print_plan(plan, output=err_console)
+                err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
-            _enforce_claude_version_if_required(plan, project_root)
+            _enforce_claude_version_if_required(
+                plan,
+                project_root,
+                diagnostic_prefix=auto_scope_notice,
+            )
             if needs_create and project_root is not None and plan.requires_claude_version:
                 _create_claude_dir(project_root)
             plan = installer.init(
@@ -1102,9 +1130,13 @@ def enable_cmd(
                 force=force,
                 skill_runtimes=selected_runtimes,
             )
-            _print_plan(plan)
+            plan_console = err_console if plan.has_conflicts else console
+            if auto_scope_notice:
+                plan_console.print(auto_scope_notice)
+                auto_scope_notice = None
+            _print_plan(plan, output=plan_console)
             if plan.has_conflicts:
-                console.print("\n[red]Enable failed due to conflicts.[/red]")
+                err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
             else:
                 # Create .forge/ only after installer succeeds (avoids orphaned
@@ -1122,19 +1154,27 @@ def enable_cmd(
     except click.UsageError:
         raise
     except NoClaudeDirectoryError as e:
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         print_error(f"{e}")
         print_tip(
             "Use --scope user to enable globally, or --root <dir> to target a specific directory.",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
     except SettingsConflictError as e:
-        console.print(f"[red]Settings conflict:[/red] {e}")
-        print_tip("Use --force to override.", console=console)
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
+        err_console.print(f"[red]Settings conflict:[/red] {e}")
+        print_tip("Use --force to override.", console=err_console)
         sys.exit(1)
     except (StateCorruptedError, StateUnreadableError):
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         print_error(f"{e}")
         sys.exit(1)
 
@@ -1169,10 +1209,11 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         forge extension sync --scope local      # Sync local scope
         forge extension sync --force            # Force re-sync
     """
+    auto_scope_notice: str | None = None
     try:
         if scope is None:
             install_scope, project_root = find_forge_installation()
-            console.print(f"[dim]Auto-detected scope: {install_scope.value}[/dim]")
+            auto_scope_notice = f"[dim]Auto-detected scope: {install_scope.value}[/dim]"
         else:
             install_scope = InstallScope(scope)
             try:
@@ -1183,20 +1224,31 @@ def sync_cmd(scope: str | None, force: bool) -> None:
                     raise NotInstalledError(install_scope.value) from None
                 project_root = detected_root
 
-        _enforce_project_compatibility(project_root)
+        _enforce_project_compatibility(project_root, diagnostic_prefix=auto_scope_notice)
 
         installer = Installer(scope=install_scope, project_root=project_root)
         preview = installer.plan_update(force=force)
         if preview.has_conflicts:
-            _print_plan(preview)
-            console.print("\n[red]Sync failed due to conflicts.[/red]")
+            if auto_scope_notice:
+                err_console.print(auto_scope_notice)
+                auto_scope_notice = None
+            _print_plan(preview, output=err_console)
+            err_console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
-        _enforce_claude_version_if_required(preview, project_root)
+        _enforce_claude_version_if_required(
+            preview,
+            project_root,
+            diagnostic_prefix=auto_scope_notice,
+        )
         plan = installer.update(force=force)
 
-        _print_plan(plan)
+        plan_console = err_console if plan.has_conflicts else console
+        if auto_scope_notice:
+            plan_console.print(auto_scope_notice)
+            auto_scope_notice = None
+        _print_plan(plan, output=plan_console)
         if plan.has_conflicts:
-            console.print("\n[red]Sync failed due to conflicts.[/red]")
+            err_console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
         else:
             file_actions, settings_actions, codex_actions = _count_actions(plan)
@@ -1222,15 +1274,23 @@ def sync_cmd(scope: str | None, force: bool) -> None:
                 _finish_user_scope_hook_migration(plan)
 
     except NoForgeInstallationError as e:
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         print_error(f"{e}")
         sys.exit(1)
     except NotInstalledError as e:
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         print_error(f"{e}")
-        print_tip("Run 'forge extension enable' first.", console=console)
+        print_tip("Run 'forge extension enable' first.", console=err_console)
         sys.exit(1)
     except (StateCorruptedError, StateUnreadableError):
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
+        if auto_scope_notice:
+            err_console.print(auto_scope_notice)
         print_error(f"{e}")
         sys.exit(1)
 

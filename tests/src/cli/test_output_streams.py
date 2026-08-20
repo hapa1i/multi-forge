@@ -14,13 +14,23 @@ from __future__ import annotations
 import ast
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TypeGuard
 
+import click
 import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.ops.session_context import SessionContextError
+
+
+@click.command()
+def _human_workflow_preflight_failure() -> None:
+    from forge.cli.workflow import _run_preflight
+
+    _run_preflight([])
+
 
 # --json success paths that need no seeded data: empty logs still yield valid JSON.
 _JSON_STDOUT_LEAVES = [
@@ -118,6 +128,50 @@ def test_selectorless_human_session_show_is_stderr_only() -> None:
     assert result.exit_code == 1
     assert result.stdout == ""
     assert "No session specified" in result.stderr
+
+
+def test_human_workflow_preflight_failure_is_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("forge.review.engine.preflight_check", lambda *_args, **_kwargs: ["missing runtime"])
+
+    result = CliRunner().invoke(_human_workflow_preflight_failure)
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Workflow preflight failed" in result.stderr
+    assert "missing runtime" in result.stderr
+    assert "forge workflow list-models" in result.stderr
+
+
+def test_extension_version_failure_is_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = SimpleNamespace(has_conflicts=False, requires_claude_version=True, skill_packages=[])
+    installer = SimpleNamespace(plan=lambda **_kwargs: plan)
+    version_check = SimpleNamespace(ok=False, reason="Claude Code is too old.", version="1.0.0")
+    monkeypatch.setattr("forge.cli.extensions.Installer", lambda **_kwargs: installer)
+    monkeypatch.setattr("forge.install.version.check_minimum_version", lambda: version_check)
+
+    result = CliRunner().invoke(main, ["extension", "enable", "--scope", "user", "--profile", "minimal"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Claude Code is too old" in result.stderr
+    assert "claude update" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        ["policy", "supervisor", "set", "planner", "--checker-model", "flash"],
+        ["policy", "supervisor", "cascade", "on", "--checker-model", "flash"],
+    ),
+    ids=("set", "cascade"),
+)
+def test_policy_supervisor_input_failure_is_stderr_only(command: list[str]) -> None:
+    result = CliRunner().invoke(main, command)
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "prefixed model id" in result.stderr
+    assert "Example: google/gemini-3.6-flash" in result.stderr
 
 
 @pytest.mark.parametrize(

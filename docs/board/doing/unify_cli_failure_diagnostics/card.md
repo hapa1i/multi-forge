@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 5; parked.
+**Lane**: `doing/` -- active on `agent/unify-cli-failure-diagnostics` from pushed closeout `2da22c2a`.
 
 **Findings**: D056 (MEDIUM) and the verified failure-stream subset of O097 (LOW).
 
@@ -18,6 +18,10 @@ split or print red failure text on stdout. JSON workflow failure already uses st
 
 Authority: [`cli_style_guidelines.md` Output Streams](../../../developer/cli_style_guidelines.md) and
 `tests/src/cli/test_output_streams.py`.
+
+The style guide already defines the shipped result/diagnostic stream contract. This member restores implementation
+conformance without changing command shapes, human wording, or JSON schemas, so no new end-user or design semantics are
+required.
 
 ## Acceptance Criteria
 

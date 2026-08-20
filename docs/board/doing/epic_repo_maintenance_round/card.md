@@ -17,7 +17,7 @@ bounded, non-overlapping sequencing exception. The bounded
 shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273ef` accepted 23 still-live correctness,
 security, performance, test-policy, output, and documentation rows as 19 parked members under
 [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--4 shipped in PRs #216--#219,
-and orders 5--19 remain parked.
+order 5 is active, and orders 6--19 remain parked.
 
 ## Goal
 
@@ -91,7 +91,7 @@ in PRs #157--#159. The next bounded MEDIUM set closed under
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
 34 live rows into [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md).
 Follow-up verification expanded that bounded admission with D054/D055, and all 36 findings shipped across 13 independent
-members in PRs #164--#168 and #170--#177. D056 is recorded separately and awaits its own execution gate.
+members in PRs #164--#168 and #170--#177. D056 is active in Wave 8 order 5 after its separate execution gate.
 
 A post-Wave 6 screen on merged `main` at `5777192a` admitted the verified refactor/deletion set under
 [`epic_wave7_refactor_and_deletion`](../../done/epic_wave7_refactor_and_deletion/card.md). The child epic split the old

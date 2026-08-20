@@ -1239,7 +1239,7 @@ def supervisor_set(
     except policy_ops.SupervisorInputError as exc:
         print_error(str(exc))
         if exc.tip:
-            print_tip(exc.tip, blank_before=False, console=console)
+            print_tip(exc.tip, blank_before=False, console=err_console)
         sys.exit(1)
 
     cwd = Path.cwd().resolve()
@@ -1271,7 +1271,7 @@ def supervisor_set(
     except policy_ops.SupervisorInputError as exc:
         print_error(str(exc))
         if exc.tip:
-            print_tip(exc.tip, blank_before=False, console=console)
+            print_tip(exc.tip, blank_before=False, console=err_console)
         sys.exit(1)
     except policy_ops.SupervisorLaneSelectionError as exc:
         print_error(str(exc))
@@ -1462,7 +1462,7 @@ def supervisor_cascade(
     except policy_ops.SupervisorInputError as exc:
         print_error(str(exc))
         if exc.tip:
-            print_tip(exc.tip, blank_before=False, console=console)
+            print_tip(exc.tip, blank_before=False, console=err_console)
         sys.exit(1)
     except policy_ops.SupervisorPlanUnavailableError as exc:
         if exc.tip:

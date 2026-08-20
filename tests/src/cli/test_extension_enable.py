@@ -657,9 +657,10 @@ class TestEnableProjectRegistry:
             result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
 
         assert result.exit_code == 1
-        assert "requires Forge >=9999" in result.output
-        assert "satisfying required_forge" in result.output
-        assert "global Forge" not in result.output
+        assert result.stdout == ""
+        assert "requires Forge >=9999" in result.stderr
+        assert "satisfying required_forge" in result.stderr
+        assert "global Forge" not in result.stderr
         MockInstaller.assert_not_called()
 
 
