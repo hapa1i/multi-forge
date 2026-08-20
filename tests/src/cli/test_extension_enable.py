@@ -657,9 +657,10 @@ class TestEnableProjectRegistry:
             result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
 
         assert result.exit_code == 1
-        assert "requires Forge >=9999" in result.output
-        assert "satisfying required_forge" in result.output
-        assert "global Forge" not in result.output
+        assert result.stdout == ""
+        assert "requires Forge >=9999" in result.stderr
+        assert "satisfying required_forge" in result.stderr
+        assert "global Forge" not in result.stderr
         MockInstaller.assert_not_called()
 
 
@@ -990,8 +991,11 @@ class TestEnableWithPath:
 
         assert result.exit_code == 0, result.output
         assert "Auto-detected scope: local" in result.output
+        assert result.stdout.index("Auto-detected scope: local") < result.stdout.index("Created ")
+        assert result.stdout.index("Created ") < result.stdout.index("Installation Plan")
         assert "Next steps (runtime hooks):" in result.output
         assert "forge extension enable --scope user" in result.output
+        assert result.stderr == ""
         call_kwargs = MockInstaller.call_args
         assert call_kwargs.kwargs["scope"] == InstallScope.LOCAL
 

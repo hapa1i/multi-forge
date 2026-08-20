@@ -108,7 +108,7 @@ def _run_preflight(
     else:
         print_error("Workflow preflight failed:")
         for err in errors:
-            console.print(f"  - {err}")
+            err_console.print(f"  - {err}")
         runtime_tips: list[str] = []
         if any(spec.runtime == "claude_code" for spec in specs):
             runtime_tips.append("Run 'command -v claude' to check the Claude worker runtime.")
@@ -120,7 +120,7 @@ def _run_preflight(
             "Run 'forge auth status' to check auth status.",
             "Run 'forge proxy create <template>' to create a proxy.",
             *runtime_tips,
-            console=console,
+            console=err_console,
         )
     sys.exit(1)
 
