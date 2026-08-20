@@ -22,11 +22,20 @@ directories unconditionally, and cleanup removes those roots with `shutil.rmtree
 - Resolve directory allowlist entries to per-file copy decisions; skip every tracked descendant.
 - Cleanup only files independently proven untracked at cleanup time, and prune empty directories without recursively
   deleting a possibly tracked root.
-- Exclude `.git` and `node_modules` at every depth from glob and directory traversal.
+- Reject symlinked directory components during copy discovery, destination writes, cleanup rechecks, and empty-parent
+  pruning.
+- Exclude `.git` and `node_modules` at every depth from glob results and prune them from directory traversal.
 - Preserve exact-file allowlist behavior, destination-exists protection, metadata-preserving copies, failure reporting,
   and dirty-worktree retry order.
 - Regressions must prove a tracked descendant survives cleanup and nested excluded matches are neither copied nor
   removed.
+
+## Exclusions
+
+- Replacing `Path.glob` with a pruning glob engine. Result filtering closes O090 without changing general glob
+  semantics; traversal optimization remains future performance work.
+- Batching Git tracked-file probes. Directory entries are bounded today, and the second cleanup-time check is an
+  intentional mutation-boundary guard.
 
 ## Verification
 

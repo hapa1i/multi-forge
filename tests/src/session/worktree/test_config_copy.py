@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from forge.session.worktree.config_copy import (
     DEFAULT_CONFIG_ALLOWLIST,
@@ -292,6 +295,22 @@ class TestGetCopiedConfigFilesGlob:
             result = get_copied_config_files(tmp_path)
 
         assert [path.relative_to(tmp_path) for path in result] == [Path("docker/certs/local.pem")]
+
+    def test_directory_walk_failure_is_logged_and_skipped(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        (tmp_path / "docker" / "certs").mkdir(parents=True)
+
+        with (
+            patch("forge.session.worktree.config_copy._directory_files", side_effect=OSError("permission denied")),
+            caplog.at_level(logging.DEBUG, logger="forge.session.worktree.config_copy"),
+        ):
+            result = get_copied_config_files(tmp_path)
+
+        assert result == []
+        assert "Skipping unreadable config directory during cleanup discovery" in caplog.text
 
 
 class TestDefaultAllowlist:

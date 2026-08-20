@@ -1172,11 +1172,11 @@ a genuine duplicate trigger; both may appear.
   fallback for `/clear` and defense-in-depth.
 - `forge hook post-compact` (PostCompact): Records compaction metadata (`last_compact_at`, `last_compact_type`).
 - `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code worktree creation and installs Forge extensions.
-  It strict-checks source, creates the checkout, maps nested roots, then strict-checks target before config
-  copy/enrollment/install. Refusal removes checkout/new branch and reports incomplete cleanup. `config_copy.py` expands
-  directories per file, excluding tracked and nested `.git`/`node_modules` paths; dirty cleanup unlinks rechecked
-  untracked files and `rmdir`-prunes empty directories. `.forge/project.toml` stays uncopied, preserving tracked pins.
-  Prints worktree path to stdout; only this hook exits non-zero.
+  It strict-checks source, creates the checkout, maps nested roots, then strict-checks target before writes. Refusal
+  removes the checkout/branch and reports incomplete cleanup. `config_copy.py` expands only symlink-free directories per
+  file, excluding tracked and nested `.git`/`node_modules` paths; dirty cleanup unlinks rechecked untracked files and
+  `rmdir`-prunes empty directories. `.forge/project.toml` stays uncopied, preserving tracked pins. Prints worktree path
+  to stdout; only this hook exits non-zero.
 - `forge hook subagent-stop` (SubagentStop): Tracks subagent activity (`total_count`, `by_type`, transcript path,
   message preview). Observe-only (phase 1).
 

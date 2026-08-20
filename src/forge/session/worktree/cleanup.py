@@ -9,6 +9,7 @@ Cleanup order:
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,7 +21,13 @@ from ..exceptions import (
     GitWorktreeError,
 )
 from ..git import find_git_binary, get_main_repo_root, get_repo_root
-from .config_copy import get_copied_config_files, is_file_tracked
+from .config_copy import (
+    get_copied_config_files,
+    is_file_tracked,
+    is_symlink_free_config_path,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,6 +86,10 @@ def remove_config_files(worktree_path: Path) -> list[str]:
         except ValueError:
             continue
         if is_file_tracked(relative_path, worktree_path):
+            continue
+        if not is_symlink_free_config_path(worktree_path, relative_path, include_leaf=False):
+            # Cleanup is best effort; recheck after Git I/O so unlink cannot follow a replaced parent.
+            logger.debug("Skipping config cleanup path with a symlinked parent: %s", file_path)
             continue
         try:
             file_path.unlink()
@@ -268,6 +279,12 @@ def cleanup_worktree(
 def _prune_empty_parents(directory: Path, worktree_path: Path) -> None:
     """Remove empty config parent directories without crossing the worktree root."""
     while directory != worktree_path:
+        try:
+            relative_path = directory.relative_to(worktree_path)
+        except ValueError:
+            return
+        if not is_symlink_free_config_path(worktree_path, relative_path):
+            return
         try:
             directory.rmdir()
         except OSError:

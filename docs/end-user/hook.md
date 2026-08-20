@@ -299,8 +299,9 @@ Purpose: replace Claude Code's default worktree creation with auto-install of Fo
   project enrollment, extension install, or session writes
 - rolls back the new checkout and newly created branch if the target pin refuses the operation; if Git cannot complete
   cleanup, stderr reports the incomplete rollback
-- copies allowlisted runtime-config directories file by file, leaving tracked files and nested `.git`/`node_modules`
-  content untouched; dirty cleanup unlinks only individually rechecked untracked files
+- copies allowlisted runtime-config directories file by file without following symlinked directory components, leaving
+  tracked files and nested `.git`/`node_modules` content untouched; dirty cleanup unlinks only individually rechecked
+  untracked files through symlink-free parents
 - never copies `.forge/project.toml`, so a tracked target pin may differ from the source
 - best-effort installs project-owned Forge extensions (status line, skills, and other assets) in the new worktree; the
   existing user dispatcher supplies runtime hooks

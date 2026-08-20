@@ -5,12 +5,14 @@ from the main repository to a new worktree. Safety rules:
 1. Only copy if file exists in source
 2. Only copy if file does NOT already exist in target
 3. Skip files that are tracked by git
+4. Never follow symlinked directory components
 
 Entries support glob patterns (``**/`` prefix) for nested project structures.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -18,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..git import find_git_binary
+
+logger = logging.getLogger(__name__)
 
 # Allowlist of runtime config files/directories to copy (relative to repo root).
 # Entries with glob metacharacters are resolved via Path.glob(); exact paths are
@@ -78,6 +82,29 @@ def is_file_tracked(file_path: Path, cwd: Path) -> bool:
     return result.returncode == 0
 
 
+def is_symlink_free_config_path(
+    root: Path,
+    relative_path: Path,
+    *,
+    include_leaf: bool = True,
+) -> bool:
+    """Return whether a relative config path crosses no symlink below root.
+
+    Absolute paths and parent traversal are unsafe. Callers may exclude the leaf
+    when unlinking a symlink itself is safe but following a symlinked parent is not.
+    """
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        return False
+
+    parts = relative_path.parts if include_leaf else relative_path.parts[:-1]
+    current = root
+    for part in parts:
+        current /= part
+        if current.is_symlink():
+            return False
+    return True
+
+
 def _is_glob_pattern(pattern: str) -> bool:
     """Check if a pattern contains glob metacharacters."""
     return any(c in pattern for c in ("*", "?", "["))
@@ -89,7 +116,7 @@ def _is_excluded_path(relative_path: Path) -> bool:
 
 
 def _resolve_glob(root: Path, pattern: str) -> list[Path]:
-    """Resolve a glob while excluding Git metadata and dependency trees."""
+    """Resolve a glob while filtering Git metadata and dependency-tree matches."""
     matches: list[Path] = []
     for match in root.glob(pattern):
         relative_path = match.relative_to(root)
@@ -103,6 +130,9 @@ def _directory_files(root: Path, relative_dir: Path) -> list[Path]:
     directory = root / relative_dir
     files: list[Path] = []
 
+    if not is_symlink_free_config_path(root, relative_dir):
+        return files
+
     def _raise_walk_error(error: OSError) -> None:
         raise error
 
@@ -112,8 +142,10 @@ def _directory_files(root: Path, relative_dir: Path) -> list[Path]:
         onerror=_raise_walk_error,
         followlinks=False,
     ):
-        dirnames[:] = sorted(name for name in dirnames if name not in _EXCLUDED_CONFIG_DIRS)
         current_path = Path(current)
+        dirnames[:] = sorted(
+            name for name in dirnames if name not in _EXCLUDED_CONFIG_DIRS and not (current_path / name).is_symlink()
+        )
         for name in sorted(filenames):
             relative_path = (current_path / name).relative_to(root)
             if not _is_excluded_path(relative_path):
@@ -133,8 +165,16 @@ def _copy_file(
     source_path = source_root / relative_path
     dest_path = worktree_path / relative_path
 
+    if not is_symlink_free_config_path(source_root, relative_path, include_leaf=False):
+        result.skipped_not_found.append(filename)
+        return
+
     if not source_path.is_file():
         result.skipped_not_found.append(filename)
+        return
+
+    if not is_symlink_free_config_path(worktree_path, relative_path):
+        result.skipped_exists.append(filename)
         return
 
     if dest_path.exists():
@@ -169,7 +209,12 @@ def _copy_single(
 
     if source_path.is_dir():
         dest_path = worktree_path / relative_path
-        if dest_path.is_symlink() or (dest_path.exists() and not dest_path.is_dir()):
+        if not is_symlink_free_config_path(source_root, relative_path):
+            result.skipped_not_found.append(filename)
+            return
+        if not is_symlink_free_config_path(worktree_path, relative_path) or (
+            dest_path.exists() and not dest_path.is_dir()
+        ):
             result.skipped_exists.append(filename)
             return
         try:
@@ -251,9 +296,18 @@ def get_copied_config_files(worktree_path: Path) -> list[Path]:
         for relative_path in resolved:
             file_path = worktree_path / relative_path
             if file_path.is_dir():
+                if not is_symlink_free_config_path(worktree_path, relative_path):
+                    logger.debug("Skipping symlinked config directory during cleanup discovery: %s", file_path)
+                    continue
                 try:
                     candidates = _directory_files(worktree_path, relative_path)
                 except OSError:
+                    # Cleanup discovery is best effort; the worktree-removal retry still reports failure.
+                    logger.debug(
+                        "Skipping unreadable config directory during cleanup discovery: %s",
+                        file_path,
+                        exc_info=True,
+                    )
                     continue
             else:
                 candidates = [relative_path]
