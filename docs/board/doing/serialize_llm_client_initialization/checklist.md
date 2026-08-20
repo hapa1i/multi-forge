@@ -1,7 +1,7 @@
 # Serialize LLM client initialization checklist
 
-Current focus: implementation and focused verification are complete on `agent/wave8-batch-1`; awaiting integrated Batch
-1 verification and commit.
+Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
+`bb809245`; awaiting Batch 1 review and merge.
 
 ## Phase 1 -- Pin the race and cleanup boundary
 
@@ -30,8 +30,10 @@ Current focus: implementation and focused verification are complete on `agent/wa
     4 passed.
   - Focused Ruff, Black, isort, mypy, Pyright, and `git diff --check` -- passed (Pyright printed only its newer-version
     notice).
-- [ ] Run the full unit/regression suites and `make pre-commit` on the integrated Batch 1 head.
-- [ ] Record exact verification evidence and commit this card without mixing another Batch 1 implementation.
+- [x] Run the full unit/regression suites and `make pre-commit` on the integrated Batch 1 head:
+  `9,330 passed, 124 deselected`; `990 passed`; all hooks passed.
+- [x] Record exact verification evidence and commit this card without mixing another Batch 1 implementation
+  (`bb809245`).
 
 ## Acceptance tests
 

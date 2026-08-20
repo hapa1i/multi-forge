@@ -1,7 +1,7 @@
 # Report active-registry cleanup failures checklist
 
-Current focus: active in Wave 8 Batch 1 on `agent/wave8-batch-1`; characterize mixed cleanup results before changing the
-result boundary.
+Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
+`17126b65`; awaiting Batch 1 review and merge.
 
 ## Phase 1 -- Pin the failure
 
@@ -18,8 +18,9 @@ result boundary.
 
 ## Phase 3 -- Verify and publish
 
-- [ ] Run focused core GC and CLI tests, the regression suite, full unit tests, and `make pre-commit`.
-- [ ] Record exact verification evidence and commit this card without mixing another Batch 1 implementation.
+- [x] Run focused core GC and CLI tests, the regression suite, full unit tests, and `make pre-commit`.
+- [x] Record exact verification evidence and commit this card without mixing another Batch 1 implementation
+  (`17126b65`).
 
 Focused evidence (2026-08-20):
 
@@ -29,6 +30,8 @@ Focused evidence (2026-08-20):
 - Targeted regression and scope checks: `4 passed`.
 - `uv run pytest tests/src/core/ops/test_gc.py tests/src/cli/test_gc.py -q`: `100 passed`.
 - Focused Ruff, repository-configured Black, isort hook, and `git diff --check`: passed.
+- Integrated Batch 1 head: `make test-unit` -- `9,330 passed, 124 deselected`; `make test-regression` -- `990 passed`;
+  `make pre-commit` -- passed.
 
 ## Acceptance tests
 

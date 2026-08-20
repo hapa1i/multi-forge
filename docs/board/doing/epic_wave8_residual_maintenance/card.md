@@ -5,7 +5,8 @@
 **Lane**: `doing/` -- orders 1--8 shipped in PRs #216--#224; the corrective follow-up shipped in PR #222; Batch 1 orders
 9--10 are active with one external follow-up, and orders 11--19 remain parked.
 
-**Current execution**: Batch 1 on `agent/wave8-batch-1`, based on `2bc3b56b`. Active cards:
+**Current execution**: Batch 1 on `agent/wave8-batch-1`, based on `2bc3b56b`. Implementation and aggregate verification
+are complete; publication, review, and merge remain. Active cards:
 [`report_active_registry_cleanup_failures`](../report_active_registry_cleanup_failures/card.md),
 [`serialize_llm_client_initialization`](../serialize_llm_client_initialization/card.md), and external follow-up
 [`improve_stop_test_failure_excerpts`](../improve_stop_test_failure_excerpts/card.md).

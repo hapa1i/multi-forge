@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 Batch 1 is active on `agent/wave8-batch-1` from `2bc3b56b`; orders 11--19 remain parked.
+Current focus: Wave 8 Batch 1 is review-ready on `agent/wave8-batch-1` from `2bc3b56b`; orders 11--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -386,3 +386,5 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Ship Wave 8 order 8 independently in PR #224 (`4727deaa`) and close it without activating order 9.
 - [x] Record Wave 8's five-batch execution plan and preserve card-level implementation and closeout boundaries.
 - [x] Activate Wave 8 Batch 1 with separate checklists for orders 9--10 and the external Stop diagnostic follow-up.
+- [x] Complete all three Batch 1 implementation commits and the integrated unit, regression, Docker, pre-commit,
+  board-link, stale-lane, and diff gates without closing the cards before merge.

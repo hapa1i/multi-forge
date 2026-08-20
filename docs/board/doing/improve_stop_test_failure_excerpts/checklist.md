@@ -1,7 +1,7 @@
 # Improve Stop test-suite failure excerpts checklist
 
-Current focus: implementation and focused verification are complete on `agent/wave8-batch-1`; targeted Docker
-verification and the integrated Batch 1 pre-commit run remain with the batch coordinator.
+Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
+`664bb28b`; awaiting Batch 1 review and merge.
 
 ## Phase 1 -- Pin the diagnostic failure
 
@@ -20,9 +20,10 @@ verification and the integrated Batch 1 pre-commit run remain with the batch coo
 ## Phase 3 -- Verify and publish
 
 - [x] Run focused Stop-verification unit/regression tests and scoped static checks.
-- [ ] Run the targeted Docker method and `make pre-commit` on the integrated Batch 1 branch.
+- [x] Run the targeted Docker method and `make pre-commit` on the integrated Batch 1 branch.
 - [x] Record exact focused verification evidence without mixing another Batch 1 implementation.
-- [ ] Commit and close this card through the Batch 1 coordinator.
+- [x] Commit this card without mixing another Batch 1 implementation (`664bb28b`).
+- [ ] Close this card with the other Batch 1 cards after the batch merges.
 
 ## Verification evidence
 
@@ -33,9 +34,11 @@ verification and the integrated Batch 1 pre-commit run remain with the batch coo
   `uv run pytest tests/src/cli/test_stop_verification.py tests/regression/test_bug_d006_stop_test_suite_contract.py -q`
   -- `20 passed in 0.46s`.
 - Static: `uv run ruff check` on the four touched Python files and `git diff --check` both passed.
-- Pending batch validation:
+- Targeted Docker:
   `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py::TestStopVerificationDocker::test_fixed_suite_failure_prefers_late_stdout_summary`
-  and `make pre-commit`.
+  -- `1 passed in 7.56s`.
+- Integrated Batch 1 head: `make test-unit` -- `9,330 passed, 124 deselected`; `make test-regression` -- `990 passed`;
+  `make pre-commit` -- passed.
 
 ## Acceptance tests
 
