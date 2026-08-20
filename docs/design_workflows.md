@@ -271,6 +271,15 @@ a shared tagger classifies the action, branches match by tags (first match wins)
 checker → reviewer stages. The tagger is called once per event and its tags route to all matching downstream checks —
 avoiding redundant classification.
 
+The manifest-backed workflow registry strictly deserializes each `WorkflowConfig` and its nested dataclasses. Unknown
+keys and invalid field types fail engine construction with the workflow entry and offending field instead of silently
+selecting a default.
+
+Hook engine construction is atomic: Forge does not evaluate a partial bundle set. If any bundle cannot be built, the
+Claude and Codex policy hooks emit a diagnostic and allow the action before a `PolicyEngine` exists, regardless of the
+configured `fail_mode`. That pre-existing posture is distinct from evaluation errors, where the constructed engine owns
+the configured fail mode.
+
 **Team extension**: The same library works for team hooks (`TeammateIdle`, `TaskCompleted`) by subscribing to different
 events. Its block bar is deliberately narrower than the semantic supervisor's: a parsed divergent verdict blocks only
 when `confidence` meets the shared threshold (default `0.8`), without a citation predicate. Low, missing, or malformed

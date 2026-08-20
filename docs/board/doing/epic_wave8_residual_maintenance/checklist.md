@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: the corrective follow-up is closed; order 7 is next in sequence and remains parked pending activation.
+Current focus: reject unknown workflow-policy keys in active order 7; orders 8--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -54,3 +54,6 @@ Current focus: the corrective follow-up is closed; order 7 is next in sequence a
 - [x] Reproduce the provider-dispatch, late destination-symlink, and dry-run stream regressions on pushed order-6
   closeout `113b5670`; activate only `correct_wave8_merged_regressions`.
 - [x] Ship and close the corrective follow-up in PR #222 (`02e0ced9`) before deciding whether to activate order 7.
+- [x] Create `agent/reject-unknown-workflow-policy-keys` from pushed corrective closeout `071cfd92`; activate only order
+  7 after reverifying O083's non-strict external-config boundary.
+- [ ] Ship order 7 independently in PR #223 and close it before activating order 8.

@@ -1,7 +1,7 @@
 """Configuration dataclasses for WorkflowPolicy.
 
-Deserialized from ``bundle_config["workflow"]["workflows"]`` dicts
-via ``dacite.from_dict(WorkflowConfig, data)``.
+Deserialized strictly from ``bundle_config["workflow"]["workflows"]`` dicts
+via ``dacite.from_dict(WorkflowConfig, data, config=dacite.Config(strict=True))``.
 """
 
 from __future__ import annotations

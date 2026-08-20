@@ -18,7 +18,8 @@ shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273e
 security, performance, test-policy, output, and documentation rows as 19 parked members under
 [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--6 shipped in PRs #216--#221,
 the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up shipped
-in PR #222, and orders 7--19 remain parked.
+in PR #222. Wave 8 order 7 [`reject_unknown_workflow_policy_keys`](../reject_unknown_workflow_policy_keys/card.md) is
+active, and orders 8--19 remain parked.
 
 ## Goal
 

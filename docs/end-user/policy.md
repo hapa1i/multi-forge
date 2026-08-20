@@ -97,6 +97,14 @@ reviewer stages. Only actions flagged as "architectural" or "migration" reach th
 > `forge session set`). See [`design_workflows.md` §1.2](../design_workflows.md#12-semantic-policy-the-supervisor) for
 > the pipeline architecture.
 
+Workflow entries and their nested branch, filter, checker, and reviewer objects reject unknown keys or invalid field
+types when Forge builds the policy engine. The diagnostic names the workflow entry and offending field rather than
+silently applying a default.
+
+Engine construction is atomic. An invalid workflow entry also prevents other configured bundles from running for that
+hook invocation; the Claude and Codex hooks report the build error and allow the action before the configured fail mode
+applies. Correct the manifest entry before relying on policy enforcement again.
+
 ---
 
 ## CLI reference

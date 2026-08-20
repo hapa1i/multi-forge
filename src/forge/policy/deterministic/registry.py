@@ -68,7 +68,8 @@ def get_bundle_policies(bundle: str, *, config: dict[str, Any] | None = None) ->
         List of policy instances. Empty list if bundle not found.
 
     Raises:
-        ValueError: If config contains invalid types (e.g., ``strict`` is not bool).
+        ValueError: If workflow config contains unknown keys or invalid types, or if the TDD ``strict`` value is not
+            bool.
 
     Example:
         >>> policies = get_bundle_policies("tdd")
@@ -111,8 +112,18 @@ def _build_workflow_policies(config: dict[str, Any] | None) -> list[Policy]:
     if not isinstance(workflows, list):
         raise ValueError(f"bundle_config.workflow.workflows must be a list, got {type(workflows).__name__}")
     policies: list[Policy] = []
-    for wf_dict in workflows:
-        wf_config = dacite.from_dict(WorkflowConfig, wf_dict)
+    strict_config = dacite.Config(strict=True)
+    for index, wf_dict in enumerate(workflows):
+        location = f"bundle_config.workflow.workflows[{index}]"
+        if not isinstance(wf_dict, dict):
+            raise ValueError(f"{location} must be an object, got {type(wf_dict).__name__}")
+        workflow_name = wf_dict.get("name")
+        if isinstance(workflow_name, str) and workflow_name:
+            location = f"{location} ({workflow_name!r})"
+        try:
+            wf_config = dacite.from_dict(WorkflowConfig, wf_dict, config=strict_config)
+        except (dacite.DaciteError, TypeError, ValueError) as exc:
+            raise ValueError(f"{location} is invalid: {exc}") from exc
         policies.append(WorkflowPolicy(config=wf_config))
     return policies
 
