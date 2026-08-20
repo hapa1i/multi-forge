@@ -1,0 +1,41 @@
+# Fix cost-breakdown selectors and run counts checklist
+
+Current focus: active in Wave 8 Batch 2 on `agent/wave8-batch-2` from pushed closeout `0eb68aea`; pin O084 before
+implementation.
+
+## Phase 1 -- Pin selector and attribution failures
+
+- [x] Recheck current `main`: `show_cmd` accepts both selectors, reads telemetry before resolving them, and silently
+  chooses `--by-model`; the request-to-verb join drops `forge_run_id`, so `_aggregate_by_verb` counts request rows as
+  invocations.
+- [ ] Add fail-first coverage proving conflicting selectors raise a Click usage error before any telemetry read.
+- [ ] Add one-run/many-request, many-run, missing-ledger, and reported/unavailable cost-evidence regressions that keep
+  request counts distinct from run counts.
+
+## Phase 2 -- Implement and document
+
+- [ ] Reject `--by-model --by-verb` before telemetry reads while retaining explicit `--by-verb` as the default human
+  view and leaving the stable JSON envelope selector-independent.
+- [ ] Carry validated `forge_run_id` through verb records and count unique run IDs per verb without changing downstream
+  request counts or reported-cost precedence.
+- [ ] Reconcile the cost-view wording in `docs/cli_reference.md` and `docs/end-user/proxy.md` at the Batch 2 integration
+  boundary.
+
+## Phase 3 -- Verify and publish
+
+- [ ] Run focused cost CLI/regression tests and targeted Docker telemetry/cost integration.
+- [ ] Commit this card without mixing the proxy-metrics implementation.
+- [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
+  head.
+- [ ] Publish with the metrics card in one Batch 2 PR; close both cards together only after merge.
+
+## Acceptance tests
+
+| Boundary               | Fixture                                      | Assertion                                                              | Tier            |
+| ---------------------- | -------------------------------------------- | ---------------------------------------------------------------------- | --------------- |
+| Selector conflict      | both human breakdown flags                   | Click usage error occurs before the cost reader runs                   | CLI regression  |
+| Explicit default       | `--by-verb` and no selector                  | both choose the verb table; JSON retains both summaries                | CLI unit        |
+| One run, many requests | two attributed requests with one run ID      | one invocation and two requests with summed reported cost              | unit/regression |
+| Many runs              | distinct run IDs mapped to one verb          | invocation count equals unique runs, not request rows                  | unit/regression |
+| Missing ledger         | request run ID has no matching usage event   | request remains in totals but is absent from attributed verb summaries | unit            |
+| Cost evidence          | reported, free, and unavailable request rows | reported precedence and unavailable counts remain unchanged            | unit/regression |

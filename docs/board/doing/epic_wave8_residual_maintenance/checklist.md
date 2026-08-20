@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 1 shipped in PR #225 (`fd548c8e`) and all three cards are closed; Batch 2 remains parked pending
-activation from the pushed closeout.
+Current focus: Batch 2 is active on `agent/wave8-batch-2` from pushed Batch 1 closeout `0eb68aea`; O084 and O086 have
+separate checklists and implementation boundaries.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -76,6 +76,13 @@ activation from the pushed closeout.
 - [x] Publish one Batch 1 review branch in draft PR #225; close all three cards together only after the batch merges.
 - [x] Merge Batch 1 as `fd548c8e`, confirm all five GitHub checks, add the shared change-log record, repoint inbound
   links, and move all three cards to `done/` before activating Batch 2.
+- [x] Create `agent/wave8-batch-2` from pushed closeout `0eb68aea`; move only orders 11--12 to `doing/`, create their
+  separate checklists, and assign shared CLI/end-user documentation plus combined-head reconciliation to the batch
+  integrator.
+- [ ] Complete and commit each Batch 2 card within its own implementation boundary.
+- [ ] Run combined unit, regression, targeted Docker, pre-commit, board/link, and diff gates on the integrated branch
+  head.
+- [ ] Publish one Batch 2 review branch; close both cards together only after the batch merges.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
