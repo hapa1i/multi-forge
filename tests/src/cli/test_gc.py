@@ -228,6 +228,25 @@ class TestCleanCmdYes:
         assert "Skipped 1 project-owned item" in result.output
         assert "state: incompatible" in result.output
 
+    def test_apply_reports_partial_active_cleanup_and_exits_nonzero(self) -> None:
+        report = _make_report(total=2)
+        clean_result = CleanResult(
+            categories_cleaned={"active_entries": 1},
+            failed=[("blocked::/project-a", "registry is read-only")],
+        )
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean", return_value=clean_result),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--yes"])
+
+        assert result.exit_code == 1
+        assert "Cleaned 1 objects" in result.output
+        assert "Stale active entries:" in result.output
+        assert "1 failures:" in result.output
+        assert "blocked::/project-a: registry is read-only" in result.output
+
     def test_json_apply_reports_structured_skip_and_exits_nonzero(self) -> None:
         import json
 
@@ -250,11 +269,14 @@ class TestCleanCmdYes:
         assert data["skipped_project_compatibility"][0]["root"] == "/project"
         assert data["skipped_project_compatibility"][0]["state"] == "incompatible"
 
-    def test_json_apply_reports_failure_and_exits_nonzero_with_clean_stderr(self) -> None:
+    def test_json_apply_reports_partial_active_cleanup_and_exits_nonzero_with_clean_stderr(self) -> None:
         import json
 
-        report = _make_report(total=1)
-        clean_result = CleanResult(failed=[("/project/stale", "permission denied")])
+        report = _make_report(total=2)
+        clean_result = CleanResult(
+            categories_cleaned={"active_entries": 1},
+            failed=[("blocked::/project-a", "registry is read-only")],
+        )
         with (
             patch("forge.cli.gc.ExecutionContext.from_cwd"),
             patch("forge.cli.gc.collect_clean_report", return_value=report),
@@ -265,8 +287,9 @@ class TestCleanCmdYes:
         assert result.exit_code == 1
         assert result.stderr == ""
         data = json.loads(result.stdout)
-        assert data["deleted"] == 0
-        assert data["failed"] == [{"item": "/project/stale", "error": "permission denied"}]
+        assert data["deleted"] == 1
+        assert data["categories_cleaned"] == {"active_entries": 1}
+        assert data["failed"] == [{"item": "blocked::/project-a", "error": "registry is read-only"}]
         assert data["skipped_project_compatibility"] == []
 
 

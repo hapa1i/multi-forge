@@ -1173,7 +1173,7 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
         elif category.category == "transfer_files":
             cleaned = _clean_transfer_files(category.items, result)
         elif category.category == "active_entries":
-            cleaned = _clean_active_entries(category.items)
+            cleaned = _clean_active_entries(category.items, result)
         elif category.category == "work_queue":
             cleaned = _clean_files(category.items, result)
         elif category.category == "proxies":
@@ -1355,7 +1355,7 @@ def _clean_transfer_files(items: list[str], result: CleanResult) -> int:
     return cleaned
 
 
-def _clean_active_entries(items: list[str]) -> int:
+def _clean_active_entries(items: list[str], result: CleanResult) -> int:
     """Clean only the specific stale active-session entries detected.
 
     Does NOT call list_sessions() which would self-heal the entire
@@ -1374,8 +1374,8 @@ def _clean_active_entries(items: list[str]) -> int:
         try:
             if store.clear_session(name, forge_root=forge_root):
                 cleaned += 1
-        except Exception:
-            pass
+        except Exception as e:
+            result.failed.append((item, str(e)))
     return cleaned
 
 
