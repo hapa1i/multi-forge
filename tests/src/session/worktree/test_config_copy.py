@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from forge.session.worktree.config_copy import (
     DEFAULT_CONFIG_ALLOWLIST,
     ConfigCopyResult,
     _copy_single,
     _is_glob_pattern,
+    _resolve_glob,
     copy_runtime_config,
     get_copied_config_files,
 )
@@ -115,8 +119,86 @@ class TestCopySingle:
         result = ConfigCopyResult()
         _copy_single(source, target, "docker/certs", result)
 
-        assert "docker/certs" in result.copied
+        assert result.copied == ["docker/certs/ca.pem"]
         assert (target / "docker" / "certs" / "ca.pem").read_text() == "cert"
+
+    def test_copies_directory_per_file_with_safety_checks(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        source_certs = source / "docker" / "certs"
+        target_certs = target / "docker" / "certs"
+        source_certs.mkdir(parents=True)
+        target_certs.mkdir(parents=True)
+        for name in ("existing.pem", "tracked.pem", "local.pem"):
+            (source_certs / name).write_text(f"source-{name}")
+        (target_certs / "existing.pem").write_text("target-existing")
+        excluded = source_certs / "node_modules" / "vendor.pem"
+        excluded.parent.mkdir()
+        excluded.write_text("vendor")
+
+        result = ConfigCopyResult()
+        with patch(
+            "forge.session.worktree.config_copy.is_file_tracked",
+            side_effect=lambda path, _cwd: path.name == "tracked.pem",
+        ):
+            _copy_single(source, target, "docker/certs", result)
+
+        assert result.copied == ["docker/certs/local.pem"]
+        assert result.skipped_exists == ["docker/certs/existing.pem"]
+        assert result.skipped_tracked == ["docker/certs/tracked.pem"]
+        assert (target_certs / "existing.pem").read_text() == "target-existing"
+        assert not (target_certs / "tracked.pem").exists()
+        assert not (target_certs / "node_modules").exists()
+
+    def test_directory_does_not_merge_through_destination_symlink(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        outside = tmp_path / "outside"
+        (source / "docker" / "certs").mkdir(parents=True)
+        (source / "docker" / "certs" / "ca.pem").write_text("cert")
+        (target / "docker").mkdir(parents=True)
+        outside.mkdir()
+        (target / "docker" / "certs").symlink_to(outside, target_is_directory=True)
+
+        result = ConfigCopyResult()
+        _copy_single(source, target, "docker/certs", result)
+
+        assert result.skipped_exists == ["docker/certs"]
+        assert not (outside / "ca.pem").exists()
+
+    def test_copy_failure_is_reported_per_directory_file(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        (source / "docker" / "certs").mkdir(parents=True)
+        (source / "docker" / "certs" / "ca.pem").write_text("cert")
+        target.mkdir()
+
+        result = ConfigCopyResult()
+        with (
+            patch("forge.session.worktree.config_copy.is_file_tracked", return_value=False),
+            patch("forge.session.worktree.config_copy.shutil.copy2", side_effect=OSError("disk full")),
+        ):
+            _copy_single(source, target, "docker/certs", result)
+
+        assert result.failed == [("docker/certs/ca.pem", "disk full")]
+
+
+class TestResolveGlob:
+    def test_excludes_git_and_node_modules_components(self, tmp_path: Path) -> None:
+        included = tmp_path / "app" / ".mcp.json"
+        included.parent.mkdir()
+        included.write_text("included")
+        for relative in (
+            Path("node_modules/pkg/.mcp.json"),
+            Path("nested/node_modules/pkg/.mcp.json"),
+            Path(".git/cache/.mcp.json"),
+            Path("nested/.git/cache/.mcp.json"),
+        ):
+            path = tmp_path / relative
+            path.parent.mkdir(parents=True)
+            path.write_text("excluded")
+
+        assert _resolve_glob(tmp_path, "**/.mcp.json") == [Path("app/.mcp.json")]
 
 
 class TestCopyRuntimeConfigGlob:
@@ -196,6 +278,39 @@ class TestGetCopiedConfigFilesGlob:
 
         paths = [str(p.relative_to(tmp_path)) for p in result]
         assert "sub/.claude/settings.local.json" in paths
+
+    def test_directory_entry_returns_only_untracked_non_excluded_files(self, tmp_path: Path) -> None:
+        certs = tmp_path / "docker" / "certs"
+        certs.mkdir(parents=True)
+        for name in ("tracked.pem", "local.pem"):
+            (certs / name).write_text(name)
+        excluded = certs / "node_modules" / "vendor.pem"
+        excluded.parent.mkdir()
+        excluded.write_text("vendor")
+
+        with patch(
+            "forge.session.worktree.config_copy.is_file_tracked",
+            side_effect=lambda path, _cwd: path.name == "tracked.pem",
+        ):
+            result = get_copied_config_files(tmp_path)
+
+        assert [path.relative_to(tmp_path) for path in result] == [Path("docker/certs/local.pem")]
+
+    def test_directory_walk_failure_is_logged_and_skipped(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        (tmp_path / "docker" / "certs").mkdir(parents=True)
+
+        with (
+            patch("forge.session.worktree.config_copy._directory_files", side_effect=OSError("permission denied")),
+            caplog.at_level(logging.DEBUG, logger="forge.session.worktree.config_copy"),
+        ):
+            result = get_copied_config_files(tmp_path)
+
+        assert result == []
+        assert "Skipping unreadable config directory during cleanup discovery" in caplog.text
 
 
 class TestDefaultAllowlist:

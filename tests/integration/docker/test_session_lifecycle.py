@@ -683,11 +683,21 @@ print('keep_ok')
         assert "keep_ok" in check.stdout, f"Keep-worktree check failed: {check.stderr}"
 
     def test_worktree_config_copy(self, forge_workspace: ContainerLike) -> None:
-        """Verify .env is copied from main repo to worktree on creation."""
+        """Verify runtime files are copied safely from the main repo on worktree creation."""
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
 
-        # Create .env in main repo (untracked)
+        # Create untracked root and directory config plus a tracked directory sibling.
         forge_workspace.write_file("/workspace/.env", "SECRET_KEY=test123\nDB_URL=localhost\n")
+        setup = forge_workspace.exec("""
+            cd /workspace
+            mkdir -p docker/certs/node_modules
+            printf tracked > docker/certs/tracked.pem
+            git add docker/certs/tracked.pem
+            git commit -m 'Track certificate'
+            printf local > docker/certs/local.pem
+            printf vendor > docker/certs/node_modules/vendor.pem
+        """)
+        assert setup.returncode == 0, f"Config setup failed: {setup.stderr}"
 
         result = forge_workspace.exec("cd /workspace && forge session start config-sess --worktree")
         assert result.returncode == 0, f"Session start failed: {result.stderr}"
@@ -707,6 +717,11 @@ assert env_file.exists(), f'.env missing in worktree: {wt_path}'
 content = env_file.read_text()
 assert 'SECRET_KEY=test123' in content, f'.env content mismatch: {content}'
 assert 'DB_URL=localhost' in content, f'.env content mismatch: {content}'
+
+certs = wt_path / 'docker/certs'
+assert (certs / 'tracked.pem').read_text() == 'tracked', 'tracked certificate changed'
+assert (certs / 'local.pem').read_text() == 'local', 'untracked certificate was not copied'
+assert not (certs / 'node_modules/vendor.pem').exists(), 'excluded certificate was copied'
 
 print('config_ok')
 "

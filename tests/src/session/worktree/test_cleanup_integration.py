@@ -154,6 +154,44 @@ print(json.dumps({
         # File should still exist
         assert result.data["envrc_exists"] is True
 
+    def test_directory_cleanup_removes_only_untracked_files(self, worktree_workspace: "WorktreeWorkspace") -> None:
+        """Directory allowlist cleanup must preserve tracked and excluded descendants."""
+        result = worktree_workspace.run_python("""
+import json
+import subprocess
+from pathlib import Path
+from forge.session.worktree.create import create_worktree
+from forge.session.worktree.cleanup import remove_config_files
+
+source_certs = Path('/workspace/docker/certs')
+source_certs.mkdir(parents=True)
+(source_certs / 'tracked.pem').write_text('tracked')
+subprocess.run(['git', 'add', 'docker/certs/tracked.pem'], cwd='/workspace', check=True, capture_output=True)
+subprocess.run(['git', 'commit', '-m', 'Track certificate'], cwd='/workspace', check=True, capture_output=True)
+
+wt = create_worktree('directory-cleanup', cwd=Path('/workspace'))
+wt_path = Path(wt.worktree_path)
+target_certs = wt_path / 'docker/certs'
+(target_certs / 'local.pem').write_text('local')
+(target_certs / 'node_modules').mkdir()
+(target_certs / 'node_modules/vendor.pem').write_text('vendor')
+
+removed = remove_config_files(wt_path)
+
+print(json.dumps({
+    'removed': removed,
+    'tracked': (target_certs / 'tracked.pem').read_text(),
+    'local_exists': (target_certs / 'local.pem').exists(),
+    'excluded': (target_certs / 'node_modules/vendor.pem').read_text(),
+}))
+""")
+        assert result.ok, f"Failed: {result.stderr}"
+        assert result.data is not None
+        assert result.data["removed"] == ["docker/certs/local.pem"]
+        assert result.data["tracked"] == "tracked"
+        assert result.data["local_exists"] is False
+        assert result.data["excluded"] == "vendor"
+
     def test_returns_empty_for_no_config_files(self, worktree_workspace: "WorktreeWorkspace") -> None:
         """Should return empty list when no config files exist."""
         result = worktree_workspace.run_python("""

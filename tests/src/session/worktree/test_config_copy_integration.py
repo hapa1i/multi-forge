@@ -122,6 +122,49 @@ print(json.dumps({
         assert result.data["env_content"] == "SECRET=value"
         assert result.data["envrc_content"] == "source_env"
 
+    def test_directory_allowlist_applies_per_file_guards(self, worktree_workspace: "WorktreeWorkspace") -> None:
+        """Directory entries copy untracked files without replacing tracked or excluded descendants."""
+        result = worktree_workspace.run_python("""
+import json
+import os
+import subprocess
+from pathlib import Path
+from forge.session.worktree.create import create_worktree
+from forge.session.worktree.config_copy import copy_runtime_config
+
+source_certs = Path('/workspace/docker/certs')
+source_certs.mkdir(parents=True)
+(source_certs / 'tracked.pem').write_text('tracked')
+subprocess.run(['git', 'add', 'docker/certs/tracked.pem'], cwd='/workspace', check=True, capture_output=True)
+subprocess.run(['git', 'commit', '-m', 'Track certificate'], cwd='/workspace', check=True, capture_output=True)
+(source_certs / 'local.pem').write_text('local')
+os.chmod(source_certs / 'local.pem', 0o640)
+(source_certs / 'node_modules').mkdir()
+(source_certs / 'node_modules/vendor.pem').write_text('vendor')
+
+wt = create_worktree('directory-config', cwd=Path('/workspace'))
+wt_path = Path(wt.worktree_path)
+result = copy_runtime_config(Path('/workspace'), wt_path)
+target_certs = wt_path / 'docker/certs'
+
+print(json.dumps({
+    'copied': result.copied,
+    'skipped_exists': result.skipped_exists,
+    'tracked': (target_certs / 'tracked.pem').read_text(),
+    'local': (target_certs / 'local.pem').read_text(),
+    'local_mode': (target_certs / 'local.pem').stat().st_mode & 0o777,
+    'excluded_exists': (target_certs / 'node_modules/vendor.pem').exists(),
+}))
+""")
+        assert result.ok, f"Failed: {result.stderr}"
+        assert result.data is not None
+        assert result.data["copied"] == ["docker/certs/local.pem"]
+        assert "docker/certs/tracked.pem" in result.data["skipped_exists"]
+        assert result.data["tracked"] == "tracked"
+        assert result.data["local"] == "local"
+        assert result.data["local_mode"] == 0o640
+        assert result.data["excluded_exists"] is False
+
     def test_skips_nonexistent_files(self, worktree_workspace: "WorktreeWorkspace") -> None:
         """Should skip files that don't exist in source."""
         result = worktree_workspace.run_python("""

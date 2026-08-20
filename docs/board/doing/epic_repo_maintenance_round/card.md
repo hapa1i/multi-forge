@@ -17,7 +17,7 @@ bounded, non-overlapping sequencing exception. The bounded
 shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273ef` accepted 23 still-live correctness,
 security, performance, test-policy, output, and documentation rows as 19 parked members under
 [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--3 shipped in PRs #216--#218,
-order 4 is next, and the remaining 16 members remain parked.
+order 4 is active, and orders 5--19 remain parked.
 
 ## Goal
 
