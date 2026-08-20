@@ -224,7 +224,7 @@ class TestGetLastAssistantTextForVerification:
         assert result == "Last message"
 
     def test_multiple_content_blocks(self, tmp_path: Path) -> None:
-        """Should concatenate multiple text blocks."""
+        """Should keep a logical line boundary between multiple text blocks."""
         transcript = tmp_path / "transcript.jsonl"
         lines = [
             json.dumps(
@@ -242,8 +242,7 @@ class TestGetLastAssistantTextForVerification:
         ]
         transcript.write_text("\n".join(lines))
         result = _get_last_assistant_text_for_verification(str(transcript))
-        # Implementation joins text blocks without separator
-        assert result == "Part 1Part 2"
+        assert result == "Part 1\nPart 2"
 
     def test_nonexistent_file(self) -> None:
         """Should return None for nonexistent file."""

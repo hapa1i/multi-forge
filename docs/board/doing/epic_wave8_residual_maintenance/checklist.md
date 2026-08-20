@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 7 is closed; order 8 is next and remains parked until its execution branch is created.
+Current focus: preserve assistant block boundaries in active order 8; orders 9--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -57,3 +57,10 @@ Current focus: order 7 is closed; order 8 is next and remains parked until its e
 - [x] Create `agent/reject-unknown-workflow-policy-keys` from pushed corrective closeout `071cfd92`; activate only order
   7 after reverifying O083's non-strict external-config boundary.
 - [x] Ship order 7 independently in PR #223 (`92d71a6d`) and close it before activating order 8.
+- [x] Create `agent/preserve-assistant-block-boundaries` from pushed order-7 closeout `d196b866`; activate only order 8
+  after reverifying O087's two boundary-collapsing joins.
+- [x] Preserve needed assistant text-block line boundaries in both transcript projections without fabricating a promise
+  split across blocks; keep single-block and existing-boundary content unchanged.
+- [x] Complete focused, unit, regression, targeted Docker Stop-hook, pre-commit, documentation-size, board, and diff
+  gates; 77 focused, 9,328 unit, and 983 regression tests pass.
+- [ ] Ship order 8 independently and close it before activating order 9.

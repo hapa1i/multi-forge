@@ -2,7 +2,10 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 8; parked.
+**Lane**: `doing/` -- active Wave 8 order 8; orders 9--19 remain parked.
+
+**Execution**: `agent/preserve-assistant-block-boundaries` from pushed `main` at
+`d196b86665c5df047f7395bfc03f8af3d3fed0f3` on 2026-08-20.
 
 **Finding**: O087 (LOW correctness).
 

@@ -332,7 +332,45 @@ class TestPolicyCheckDocker:
 
 
 class TestStopVerificationDocker:
-    """Fixed test-suite verification at the real containerized Stop boundary."""
+    """Completion-promise and fixed-suite verification at the real containerized Stop boundary."""
+
+    def test_completion_promise_preserves_assistant_block_boundary(
+        self,
+        policy_workspace: ContainerLike,
+    ) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["verification"] = {
+            "type": "completion_promise",
+            "promise": "VERIFICATION COMPLETE",
+            "on_incomplete": "block",
+        }
+        policy_workspace.write_json(manifest_path, manifest)
+        policy_workspace.write_file(
+            "/tmp/stop-transcript.jsonl",
+            json.dumps(
+                {
+                    "requestId": "request-1",
+                    "timestamp": "2026-08-20T12:00:00Z",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "text", "text": "Implementation finished."},
+                            {"type": "text", "text": "VERIFICATION COMPLETE"},
+                        ],
+                    },
+                }
+            )
+            + "\n",
+        )
+
+        exit_code, stdout, stderr = invoke_stop(policy_workspace)
+
+        assert exit_code == 0, f"Expected completion promise to allow Stop. stderr: {stderr}"
+        assert json.loads(stdout)["success"] is True
+        assert "Verification incomplete" not in stderr
+        confirmed = read_manifest(policy_workspace)["confirmed"]["verification"]
+        assert confirmed["last_result"] == "passed"
 
     def test_fixed_suite_runs_from_resolved_session_worktree(self, policy_workspace: ContainerLike) -> None:
         manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
