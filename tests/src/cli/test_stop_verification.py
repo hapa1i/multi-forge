@@ -428,13 +428,14 @@ class TestSessionEndHook:
 class TestTestSuiteVerification:
     """Tests for test_suite verification type."""
 
-    def _make_mock_result(self, returncode: int, stderr: str = "") -> object:
+    def _make_mock_result(self, returncode: int, stderr: str = "", stdout: str = "") -> object:
         """Create mock subprocess.CompletedProcess-like object."""
         from unittest.mock import Mock
 
         mock = Mock()
         mock.returncode = returncode
         mock.stderr = stderr.encode("utf-8")
+        mock.stdout = stdout.encode("utf-8")
         return mock
 
     def test_test_suite_passes_when_tests_pass(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
