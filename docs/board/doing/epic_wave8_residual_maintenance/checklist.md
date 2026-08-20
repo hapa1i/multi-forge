@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: the five-batch plan is recorded, no batch is active, and all Batch 1 cards remain parked pending explicit
-activation.
+Current focus: Batch 1 is active on `agent/wave8-batch-1` from `2bc3b56b`; the three selected cards have separate
+checklists and implementation boundaries.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -68,3 +68,8 @@ activation.
 - [x] Record five remaining review batches and the epic-authorized batch process without activating any selected card;
   Markdown hooks, 999 board link paths, 101 changed-document paths/fragments, parked-lane, stale-sequencing, and diff
   checks pass.
+- [x] Activate Batch 1 from `2bc3b56b`; move orders 9--10 and the external Stop follow-up to `doing/`, create separate
+  checklists, and record the shared branch and base.
+- [ ] Complete and commit each Batch 1 card within its own implementation boundary.
+- [ ] Run combined unit, regression, pre-commit, board/link, and diff gates on the integrated branch head.
+- [ ] Publish one Batch 1 review branch/PR, then close all three cards together only after the batch merges.

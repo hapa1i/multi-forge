@@ -3,7 +3,10 @@
 **Origin**: Post-implementation review of
 [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md).
 
-**Lane**: `todo/` -- accepted diagnostic-quality follow-up, parked.
+**Batch coordinator**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md) (execution/review
+association only; not Wave 8 finding credit).
+
+**Lane**: `doing/` -- active in Wave 8 Batch 1 on `agent/wave8-batch-1` from `2bc3b56b`.
 
 ## Goal
 

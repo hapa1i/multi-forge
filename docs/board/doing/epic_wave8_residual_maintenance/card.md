@@ -2,12 +2,13 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--8 shipped in PRs #216--#224; the corrective follow-up shipped in PR #222; orders 9--19
-remain parked under the five-batch execution plan below.
+**Lane**: `doing/` -- orders 1--8 shipped in PRs #216--#224; the corrective follow-up shipped in PR #222; Batch 1 orders
+9--10 are active with one external follow-up, and orders 11--19 remain parked.
 
-**Current execution**: none. Order 8
-[`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224
-(`4727deaa`); Batch 1 is next, pending explicit activation of all three selected cards.
+**Current execution**: Batch 1 on `agent/wave8-batch-1`, based on `2bc3b56b`. Active cards:
+[`report_active_registry_cleanup_failures`](../report_active_registry_cleanup_failures/card.md),
+[`serialize_llm_client_initialization`](../serialize_llm_client_initialization/card.md), and external follow-up
+[`improve_stop_test_failure_excerpts`](../improve_stop_test_failure_excerpts/card.md).
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -50,38 +51,37 @@ The member order remains the finding-provenance sequence. Remaining execution us
 with only one batch active at a time. Every card remains a separate implementation unit with its own checklist, commit
 boundary, acceptance evidence, and closeout record.
 
-| Order | Findings       | Member                                                                                                  | Review boundary                         |
-| ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1     | O045           | [`trace_failed_provider_attempts`](../../done/trace_failed_provider_attempts/card.md)                   | failed provider-attempt trace lifecycle |
-| 2     | O046           | [`offload_proxy_accounting_persistence`](../../done/offload_proxy_accounting_persistence/card.md)       | event-loop vs durable accounting I/O    |
-| 3     | O074           | [`strip_openai_account_response_headers`](../../done/strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
-| 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../done/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
-| 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../done/unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
-| 6     | O072           | [`eliminate_runtime_test_skips`](../../done/eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
-| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../../done/reject_unknown_workflow_policy_keys/card.md)         | strict external config boundary         |
-| 8     | O087           | [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
-| 9     | O088           | [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |
-| 10    | O091           | [`serialize_llm_client_initialization`](../../todo/serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
-| 11    | O084           | [`fix_cost_breakdown_selectors`](../../todo/fix_cost_breakdown_selectors/card.md)                       | CLI selector and unique-run accounting  |
-| 12    | O086           | [`stabilize_proxy_metrics_json`](../../todo/stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
-| 13    | O080           | [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
-| 14    | O077           | [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
-| 15    | O076           | [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
-| 16    | O081           | [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
-| 17    | O085           | [`reuse_transcript_reference_scan`](../../todo/reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
-| 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                             | typed suppression rationale             |
-| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
+| Order | Findings       | Member                                                                                              | Review boundary                         |
+| ----- | -------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1     | O045           | [`trace_failed_provider_attempts`](../../done/trace_failed_provider_attempts/card.md)               | failed provider-attempt trace lifecycle |
+| 2     | O046           | [`offload_proxy_accounting_persistence`](../../done/offload_proxy_accounting_persistence/card.md)   | event-loop vs durable accounting I/O    |
+| 3     | O074           | [`strip_openai_account_response_headers`](../../done/strip_openai_account_response_headers/card.md) | upstream account metadata relay         |
+| 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../done/harden_worktree_config_copy_safety/card.md)       | per-file copy/cleanup ownership         |
+| 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../done/unify_cli_failure_diagnostics/card.md)                 | one diagnostic, one stderr stream       |
+| 6     | O072           | [`eliminate_runtime_test_skips`](../../done/eliminate_runtime_test_skips/card.md)                   | deterministic unit coverage             |
+| 7     | O083           | [`reject_unknown_workflow_policy_keys`](../../done/reject_unknown_workflow_policy_keys/card.md)     | strict external config boundary         |
+| 8     | O087           | [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md)     | transcript promise-line reconstruction  |
+| 9     | O088           | [`report_active_registry_cleanup_failures`](../report_active_registry_cleanup_failures/card.md)     | best-effort cleanup result truth        |
+| 10    | O091           | [`serialize_llm_client_initialization`](../serialize_llm_client_initialization/card.md)             | one lazy async client per adapter       |
+| 11    | O084           | [`fix_cost_breakdown_selectors`](../../todo/fix_cost_breakdown_selectors/card.md)                   | CLI selector and unique-run accounting  |
+| 12    | O086           | [`stabilize_proxy_metrics_json`](../../todo/stabilize_proxy_metrics_json/card.md)                   | byte-safe stable JSON                   |
+| 13    | O080           | [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md) | required-state failure semantics        |
+| 14    | O077           | [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md)     | mutually exclusive input selectors      |
+| 15    | O076           | [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md)                     | positive bounded list limits            |
+| 16    | O081           | [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md)           | observable best-effort fallback         |
+| 17    | O085           | [`reuse_transcript_reference_scan`](../../todo/reuse_transcript_reference_scan/card.md)             | native-relocate delete scan reuse       |
+| 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                         | typed suppression rationale             |
+| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)     | shipped docs and source commentary      |
 
 ## Batch Execution Plan
 
 Execute these batches in order on one branch and PR per batch:
 
 1. **Batch 1 -- independent correctness**: order 9
-   [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md), order 10
-   [`serialize_llm_client_initialization`](../../todo/serialize_llm_client_initialization/card.md), and the external
-   accepted follow-up [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md).
-   These can be implemented in parallel because their GC, core LLM adapter, and Stop-verification write/test scopes are
-   disjoint.
+   [`report_active_registry_cleanup_failures`](../report_active_registry_cleanup_failures/card.md), order 10
+   [`serialize_llm_client_initialization`](../serialize_llm_client_initialization/card.md), and the external accepted
+   follow-up [`improve_stop_test_failure_excerpts`](../improve_stop_test_failure_excerpts/card.md). These can be
+   implemented in parallel because their GC, core LLM adapter, and Stop-verification write/test scopes are disjoint.
 2. **Batch 2 -- proxy and telemetry read surfaces**: order 11
    [`fix_cost_breakdown_selectors`](../../todo/fix_cost_breakdown_selectors/card.md) and order 12
    [`stabilize_proxy_metrics_json`](../../todo/stabilize_proxy_metrics_json/card.md). Their code and focused-test scopes
@@ -128,8 +128,8 @@ credit and do not change this epic's 23 findings or 19-member accounting.
 - [`align_policy_check_bundle_vocabulary`](../../todo/align_policy_check_bundle_vocabulary/card.md) retains its one-line
   terminal-parser residue as a standalone accepted follow-up. It joins Batch 3 without becoming review-row credit for
   this epic.
-- [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md) joins Batch 1 as an
-  unrelated accepted follow-up without becoming Wave 8 finding credit.
+- [`improve_stop_test_failure_excerpts`](../improve_stop_test_failure_excerpts/card.md) joins Batch 1 as an unrelated
+  accepted follow-up without becoming Wave 8 finding credit.
 - D040 remains proposed, and the rejected/resolved rows above are not executable members.
 - This epic does not reopen Wave 7 deletion candidates, release-gated deprecations, or the unverified O092 tail.
 
