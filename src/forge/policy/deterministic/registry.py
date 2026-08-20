@@ -68,7 +68,8 @@ def get_bundle_policies(bundle: str, *, config: dict[str, Any] | None = None) ->
         List of policy instances. Empty list if bundle not found.
 
     Raises:
-        ValueError: If config contains unknown keys or invalid types (e.g., ``strict`` is not bool).
+        ValueError: If workflow config contains unknown keys or invalid types, or if the TDD ``strict`` value is not
+            bool.
 
     Example:
         >>> policies = get_bundle_policies("tdd")

@@ -50,7 +50,7 @@ class TestWorkflowConfig:
                 }
             ],
         }
-        config = dacite.from_dict(WorkflowConfig, data)
+        config = dacite.from_dict(WorkflowConfig, data, config=dacite.Config(strict=True))
         assert config.name == "divergence"
         assert len(config.branches) == 1
         branch = config.branches[0]
@@ -66,12 +66,12 @@ class TestWorkflowConfig:
     def test_intent_defaults_to_empty_string(self):
         """Configs without intent field deserialize with empty default."""
         data = {"name": "legacy", "description": "No intent field", "branches": []}
-        config = dacite.from_dict(WorkflowConfig, data)
+        config = dacite.from_dict(WorkflowConfig, data, config=dacite.Config(strict=True))
         assert config.intent == ""
 
     def test_missing_required_fields(self):
         with pytest.raises(dacite.MissingValueError):
-            dacite.from_dict(WorkflowConfig, {"name": "test"})
+            dacite.from_dict(WorkflowConfig, {"name": "test"}, config=dacite.Config(strict=True))
 
     def test_branch_defaults(self):
         config = BranchConfig(name="test", match_tags=["foo"])
@@ -88,7 +88,7 @@ class TestWorkflowConfig:
             "intent": "Allow routine changes",
             "branches": [{"name": "allow-all", "match_tags": ["routine"]}],
         }
-        config = dacite.from_dict(WorkflowConfig, data)
+        config = dacite.from_dict(WorkflowConfig, data, config=dacite.Config(strict=True))
         branch = config.branches[0]
         assert branch.filter is None
         assert branch.checker is None

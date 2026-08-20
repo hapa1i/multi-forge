@@ -30,6 +30,15 @@ Current focus: implementation and verification are complete; publish order 7 whi
 - [x] Commit and push the implementation as `47554574`, then open draft PR #223 without activating Wave 8 order 8.
 - [ ] Merge PR #223 and retain this card in `doing/` until its closeout lands on `main`.
 
+## Review follow-up
+
+- [x] Qualify `get_bundle_policies` documentation to distinguish strict workflow parsing from TDD's narrower value
+  validation, and record the verified TDD unknown-key gap separately as parked O101.
+- [x] Record the pre-existing atomic-build tradeoff: construction errors diagnose and allow before engine-owned
+  `fail_mode`, without evaluating a partial policy set.
+- [x] Align workflow dataclass-shape tests with the strict `dacite` configuration used by production.
+- [x] Rerun the focused review slice (25 passed), Markdown hooks, full pre-commit, and diff checks.
+
 ## Acceptance tests
 
 | Boundary              | Fixture                                      | Assertion                                                               | Tier        |
