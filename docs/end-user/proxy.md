@@ -733,9 +733,9 @@ values. Requests whose thinking budget already satisfies the floor are not chang
 
 Anthropic passthrough also preserves safe upstream response metadata. Retry guidance and Anthropic rate-limit headers
 reach the client on both successful and failed requests, including responses to streaming requests. Forge removes
-upstream cookies/authentication challenges, `OpenAI-Organization`/`OpenAI-Project`, hop-by-hop framing, content
-length/encoding, and the upstream proxy-owned request/cost/resolution fields; the proxy's own request id, spend warning,
-and streaming cache policy take precedence. Response bodies and SSE chunks remain unchanged.
+upstream cookies/authentication challenges, account-selection metadata, hop-by-hop framing, content length/encoding, and
+the upstream proxy-owned request/cost/resolution fields; the proxy's own request id, spend warning, and streaming cache
+policy take precedence. Response bodies and SSE chunks remain unchanged.
 
 Quick start (observe):
 

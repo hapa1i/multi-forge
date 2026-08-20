@@ -23,6 +23,11 @@ returned through both supported proxy transports.
 - Retain safe provider metadata, rate-limit/retry headers, connection-token filtering, and Forge's canonical request ID.
 - Pin both Messages and Responses relays and mixed-case header spellings.
 
+## Boundary
+
+The shared relay remains deny-by-name. Adding a provider or wire shape requires re-enumerating its account-identity
+response headers; this member closes only the verified OpenAI selectors.
+
 ## Verification
 
 Run focused response-header and passthrough tests, full unit/regression suites, targeted Docker proxy routing coverage,

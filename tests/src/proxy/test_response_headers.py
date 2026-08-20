@@ -17,6 +17,8 @@ def test_relay_response_headers_strips_fixed_and_connection_nominated_fields() -
         "Authorization": "Bearer secret",
         "X-API-Key": "secret",
         "Cookie": "session=secret",
+        "OpenAI-Organization": "org-upstream",
+        "oPeNaI-pRoJeCt": "project-upstream",
         "Set-Cookie": "session=secret",
         "Set-Cookie2": "legacy=secret",
         "WWW-Authenticate": "Bearer realm=secret",

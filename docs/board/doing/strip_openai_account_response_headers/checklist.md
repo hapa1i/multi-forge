@@ -14,10 +14,13 @@ Current focus: prove and close O074 at the shared response-header boundary witho
 ## Phase 2 -- Implement
 
 - [x] Add both OpenAI account headers to the shared case-insensitive response denylist.
+- [x] Pin both new names directly in the shared policy-level exact-equality unit test.
 - [x] Preserve safe provider metadata, rate-limit/retry headers, connection-token filtering, and Forge's canonical
   request ID overlay.
 - [x] Synchronize the normative response-relay contract without broadening this member into request policy or general
   header allowlisting.
+- [x] Record that future providers and wire shapes must re-enumerate account-identity response headers for the
+  deny-by-name policy.
 
 ## Phase 3 -- Verify and publish
 
