@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Strip OpenAI account response headers
+
+**Goal/outcome**: Keep upstream OpenAI account identity from crossing the shared proxy response boundary.
+
+**Key changes**:
+
+- Added organization/project selectors to the shared case-insensitive response denylist while retaining safe provider
+  metadata, connection-token filtering, and Forge's canonical request ID.
+- Pinned the shared policy plus Messages, Responses, and packaged proxy behavior, and recorded the re-enumeration
+  requirement for future providers and wire shapes.
+
+**Verification**: 135 focused; 9,312 unit (one skip); 944 regression; eight Docker proxy-routing checks;
+pre-commit/diff; design 29,991/29,988; board 968 links. PR #218 merged as `4cd859cb`; no Forge workflow ran.
+
 ### Offload proxy accounting persistence
 
 **Goal/outcome**: Keep proxy completion responsive while cost, lifecycle, and cap evidence reaches durable storage.

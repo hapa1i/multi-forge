@@ -37,4 +37,4 @@ Current focus: prove and close O074 at the shared response-header boundary witho
 - [x] Verify documentation size (`design.md` 29,991; appendix 29,988 Opus-5 tokens), all 968 local board links, branch
   diff hygiene, and a source/diff boundary review.
 - [x] Commit, push, and open independent draft PR #218.
-- [ ] After merge, close order 3 before activating order 4.
+- [x] Ship order 3 in PR #218 (`4cd859cb`) and close it before activating order 4.

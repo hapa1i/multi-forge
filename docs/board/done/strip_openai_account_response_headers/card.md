@@ -1,8 +1,8 @@
 # Strip OpenAI account response headers
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/strip-openai-account-response-headers` from pushed closeout `cddfe5c3`.
+**Lane**: `done/` -- shipped in PR #218 (`4cd859cb`) on 2026-08-20.
 
 **Finding**: O074 (LOW security).
 

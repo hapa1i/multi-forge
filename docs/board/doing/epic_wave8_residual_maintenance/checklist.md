@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 3 `strip_openai_account_response_headers` is active; orders 4--19 remain parked.
+Current focus: orders 1--3 shipped; order 4 `harden_worktree_config_copy_safety` is next but remains parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -28,4 +28,4 @@ Current focus: order 3 `strip_openai_account_response_headers` is active; orders
   behavior.
 - [x] Complete focused, unit, regression, targeted proxy-routing Docker, pre-commit, documentation-size, and board
   gates.
-- [ ] Ship and close order 3 independently before activating order 4.
+- [x] Ship order 3 in PR #218 (`4cd859cb`) and close it independently before activating order 4.
