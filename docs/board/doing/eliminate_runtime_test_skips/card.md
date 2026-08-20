@@ -8,7 +8,8 @@
 **Authority**:
 [`testing_guidelines.md` Test Maintenance Policy](../../../developer/testing_guidelines.md#test-maintenance-policy).
 
-**Lane**: `todo/` -- accepted Wave 8 order 6; parked.
+**Lane**: `doing/` -- active Wave 8 order 6 on `agent/eliminate-runtime-test-skips`, branched from pushed `main` at
+`3c0a3002` on 2026-08-20.
 
 **Finding**: O072 (MEDIUM test-policy).
 
@@ -19,12 +20,12 @@ so the unit suite passes or fails cleanly on every supported test environment.
 
 ## Evidence
 
-- `tests/src/core/auth/test_capabilities.py` calls `pytest.skip()` inside a loop; one absent expected template aborts
-  validation of every remaining template.
-- `tests/src/install/test_hook_dispatcher.py` and `tests/src/install/test_project_registry.py` contain five conditional
-  skips for unavailable symlinks and host filesystem case semantics.
-- On the current case-insensitive filesystem, the targeted installer run reports 76 passed and one skip at
-  `tests/src/install/test_project_registry.py:59`; the symlink probes run successfully.
+- At activation, `tests/src/core/auth/test_capabilities.py` called `pytest.skip()` inside a loop; one absent expected
+  template aborted validation of every remaining template.
+- At activation, `tests/src/install/test_hook_dispatcher.py` and `tests/src/install/test_project_registry.py` contained
+  five conditional skips for unavailable symlinks and host filesystem case semantics.
+- On the activation baseline's case-insensitive filesystem, the three-file focused run reports 114 passed and one skip
+  at `tests/src/install/test_project_registry.py:59`; the symlink probes run successfully.
 - The Stop-verification branch adds no skip or skip-if construct. This is pre-existing debt, not part of D006/U002/U003.
 
 ## Acceptance Criteria

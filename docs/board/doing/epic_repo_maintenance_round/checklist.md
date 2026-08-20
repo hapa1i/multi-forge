@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 orders 1--5 are shipped and closed; orders 6--19 remain parked.
+Current focus: Wave 8 order 6 is active; orders 1--5 are shipped and closed, and orders 7--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -201,6 +201,9 @@ Current focus: Wave 8 orders 1--5 are shipped and closed; orders 6--19 remain pa
 - [x] Branch from pushed order-4 closeout `2da22c2a` and activate only Wave 8 order 5 `unify_cli_failure_diagnostics`;
   keep orders 6--19 parked.
 - [x] Ship Wave 8 order 5 in PR #220 (`61be7d80`) and close it before activating order 6.
+- [x] Branch from pushed order-5 closeout `3c0a3002` and activate only Wave 8 order 6 `eliminate_runtime_test_skips`;
+  keep orders 7--19 parked.
+- [ ] Ship Wave 8 order 6 independently and close it before activating order 7.
 - [x] Commit the Wave 7 admission on `main` (`095d8eeb`), branch from that exact commit, and activate only order 1
   `decouple_lane_runtime_vocabulary`; keep the other 33 members parked.
 - [x] Ship O043 independently and close its member before activating Wave 7 order 2.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Callable, Generator
 
 import pytest
 
@@ -16,6 +16,25 @@ from forge.install.models import (
 )
 from forge.install.ownership import attributed
 from forge.install.tracking import TrackingStore
+
+
+@pytest.fixture
+def directory_symlink() -> Callable[[Path, Path], Path]:
+    """Create a directory symlink or fail with an actionable environment error."""
+
+    def create(target: Path, link: Path) -> Path:
+        try:
+            link.symlink_to(target, target_is_directory=True)
+        except OSError as exc:
+            pytest.fail(
+                f"could not create required directory symlink '{link}' -> '{target}': {exc}",
+                pytrace=False,
+            )
+        assert link.is_symlink(), f"directory symlink fixture did not create '{link}'"
+        assert link.resolve(strict=True) == target.resolve(strict=True)
+        return link
+
+    return create
 
 
 @pytest.fixture

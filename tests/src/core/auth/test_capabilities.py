@@ -48,19 +48,20 @@ class TestTemplateCoverage:
                     c.name == "openrouter" for c in creds
                 ), f"Template '{name}' should need 'openrouter' credential"
 
-    def test_litellm_local_templates_use_upstream_credential(self):
-        expected = {
-            "litellm-anthropic-local": "anthropic-api",
-            "litellm-gemini-local": "gemini-api",
-            "litellm-openai-local": "openai-api",
-        }
-        for template, cred_name in expected.items():
-            if template not in TEMPLATE_ENV_VARS:
-                pytest.skip(f"Template '{template}' not shipped")
-            creds = credentials_for_template(template)
-            assert any(
-                c.name == cred_name for c in creds
-            ), f"Template '{template}' should need '{cred_name}' credential"
+    @pytest.mark.parametrize(
+        ("template", "credential_name"),
+        [
+            ("litellm-anthropic-local", "anthropic-api"),
+            ("litellm-gemini-local", "gemini-api"),
+            ("litellm-openai-local", "openai-api"),
+        ],
+    )
+    def test_litellm_local_template_uses_upstream_credential(self, template: str, credential_name: str):
+        assert template in TEMPLATE_ENV_VARS, f"Expected local template '{template}' is not shipped"
+        creds = credentials_for_template(template)
+        assert any(
+            credential.name == credential_name for credential in creds
+        ), f"Template '{template}' should need '{credential_name}' credential"
 
     def test_litellm_remote_templates_use_litellm_remote_credential(self):
         remote_templates = [
@@ -180,9 +181,21 @@ class TestCredentialRegistry:
         """Fresh interpreters catch hidden cycles that in-process imports can mask."""
 
         orders = (
-            ("forge.backend.sources", "forge.core.auth.template_secrets", "forge.core.auth.capabilities"),
-            ("forge.core.auth.template_secrets", "forge.backend.sources", "forge.core.auth.capabilities"),
-            ("forge.core.auth.capabilities", "forge.core.auth.template_secrets", "forge.backend.sources"),
+            (
+                "forge.backend.sources",
+                "forge.core.auth.template_secrets",
+                "forge.core.auth.capabilities",
+            ),
+            (
+                "forge.core.auth.template_secrets",
+                "forge.backend.sources",
+                "forge.core.auth.capabilities",
+            ),
+            (
+                "forge.core.auth.capabilities",
+                "forge.core.auth.template_secrets",
+                "forge.backend.sources",
+            ),
         )
 
         for order in orders:

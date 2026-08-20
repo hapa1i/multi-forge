@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
+from forge.install import project_registry
 from forge.install.project_registry import (
     PROJECT_REGISTRY_VERSION,
     ProjectRegistryCorruptedError,
@@ -16,15 +18,14 @@ from forge.install.project_registry import (
 )
 
 
-def test_enroll_canonicalizes_symlink_and_lookup_hits_inside_root(tmp_path: Path) -> None:
+def test_enroll_canonicalizes_symlink_and_lookup_hits_inside_root(
+    tmp_path: Path,
+    directory_symlink: Callable[[Path, Path], Path],
+) -> None:
     repo = tmp_path / "repo"
     (repo / ".forge").mkdir(parents=True)
     (repo / "src").mkdir()
-    link = tmp_path / "repo-link"
-    try:
-        link.symlink_to(repo, target_is_directory=True)
-    except OSError:
-        pytest.skip("symlinks unavailable")
+    link = directory_symlink(repo, tmp_path / "repo-link")
 
     store = ProjectRegistryStore(tmp_path / "projects.json")
     result = store.enroll(link, "enable")
@@ -36,33 +37,43 @@ def test_enroll_canonicalizes_symlink_and_lookup_hits_inside_root(tmp_path: Path
     assert lookup.enrolled_root == str(repo.resolve())
 
 
-def test_case_variant_samefile_unifies_on_case_insensitive_filesystem(tmp_path: Path) -> None:
-    repo = tmp_path / "Repo"
-    repo.mkdir()
-    variant = repo.with_name("repo")
-    if not variant.exists():
-        pytest.skip("filesystem is case-sensitive")
-    store = ProjectRegistryStore(tmp_path / "projects.json")
-
-    store.enroll(repo, "enable")
-
-    assert store.contains_root(variant)
-
-
-def test_case_variant_distinct_roots_do_not_collide_on_case_sensitive_filesystem(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "paths_refer_to_same_file",
+    [True, False],
+    ids=["case-insensitive-alias", "case-sensitive-distinct-roots"],
+)
+def test_case_variant_identity_follows_filesystem_semantics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    paths_refer_to_same_file: bool,
+) -> None:
     trusted = tmp_path / "Repo"
-    hostile = tmp_path / "repo"
-    (trusted / ".forge").mkdir(parents=True)
-    try:
-        (hostile / ".forge").mkdir(parents=True)
-    except FileExistsError:
-        pytest.skip("filesystem is case-insensitive")
+    variant = tmp_path / "repo"
+    monkeypatch.setattr(
+        project_registry,
+        "canonicalize_project_path",
+        lambda path: str(Path(path).expanduser().absolute()),
+    )
+    monkeypatch.setattr(
+        project_registry,
+        "_same_existing_path",
+        lambda _left, _right: paths_refer_to_same_file,
+    )
+    monkeypatch.setattr("forge.core.ops.context.find_forge_root", lambda _start: variant)
     store = ProjectRegistryStore(tmp_path / "projects.json")
 
-    store.enroll(trusted, "enable")
+    first = store.enroll(trusted, "enable")
 
-    assert not store.contains_root(hostile)
-    assert store.lookup_enrolled_root(hostile).enrolled is False
+    assert first.entry.canonical_path == str(trusted)
+    assert store.contains_root(variant) is paths_refer_to_same_file
+
+    lookup = store.lookup_enrolled_root(variant)
+    assert lookup.enrolled is paths_refer_to_same_file
+    assert lookup.enrolled_root == (str(trusted) if paths_refer_to_same_file else None)
+
+    second = store.enroll(variant, "enable")
+    assert second.created is not paths_refer_to_same_file
+    assert len(store.read_strict().projects) == (1 if paths_refer_to_same_file else 2)
 
 
 def test_relative_and_trailing_paths_are_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,7 +92,10 @@ def test_relative_and_trailing_paths_are_idempotent(tmp_path: Path, monkeypatch:
 
 def test_strict_read_rejects_unknown_schema_version(tmp_path: Path) -> None:
     path = tmp_path / "projects.json"
-    path.write_text(json.dumps({"schema_version": PROJECT_REGISTRY_VERSION + 1, "projects": []}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"schema_version": PROJECT_REGISTRY_VERSION + 1, "projects": []}),
+        encoding="utf-8",
+    )
     store = ProjectRegistryStore(path)
 
     with pytest.raises(ProjectRegistryCorruptedError, match="incompatible schema_version"):
