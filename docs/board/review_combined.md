@@ -793,7 +793,7 @@ direct single-boundary controls named on their cards. No Forge workflow or exter
 | 4     | O089/O090      | [`harden_worktree_config_copy_safety`](done/harden_worktree_config_copy_safety/card.md)           |
 | 5     | D056/O097      | [`unify_cli_failure_diagnostics`](done/unify_cli_failure_diagnostics/card.md)                     |
 | 6     | O072           | [`eliminate_runtime_test_skips`](done/eliminate_runtime_test_skips/card.md)                       |
-| 7     | O083           | [`reject_unknown_workflow_policy_keys`](todo/reject_unknown_workflow_policy_keys/card.md)         |
+| 7     | O083           | [`reject_unknown_workflow_policy_keys`](doing/reject_unknown_workflow_policy_keys/card.md)        |
 | 8     | O087           | [`preserve_assistant_block_boundaries`](todo/preserve_assistant_block_boundaries/card.md)         |
 | 9     | O088           | [`report_active_registry_cleanup_failures`](todo/report_active_registry_cleanup_failures/card.md) |
 | 10    | O091           | [`serialize_llm_client_initialization`](todo/serialize_llm_client_initialization/card.md)         |

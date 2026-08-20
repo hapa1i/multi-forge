@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: the Wave 8 corrective follow-up is closed; order 7 is next and remains parked pending activation.
+Current focus: reject unknown workflow-policy keys in active Wave 8 order 7; orders 8--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -378,3 +378,5 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 
 - [x] Activate only the bounded `correct_wave8_merged_regressions` follow-up from pushed order-6 closeout `113b5670`.
 - [x] Ship and close the corrective follow-up in PR #222 (`02e0ced9`) before advancing Wave 8 sequencing.
+- [x] Create `agent/reject-unknown-workflow-policy-keys` from pushed corrective closeout `071cfd92` and activate only
+  Wave 8 order 7.

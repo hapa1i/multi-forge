@@ -1,8 +1,11 @@
 # Reject unknown workflow-policy keys
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 7; parked.
+**Lane**: `doing/` -- active Wave 8 order 7; orders 8--19 remain parked.
+
+**Execution**: `agent/reject-unknown-workflow-policy-keys` from pushed `main` at
+`071cfd920f3af9852e06f72fb5cbb1668737e0c5` on 2026-08-20.
 
 **Finding**: O083 (LOW external-data correctness).
 
