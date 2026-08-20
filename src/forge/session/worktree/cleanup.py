@@ -9,7 +9,6 @@ Cleanup order:
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,7 +20,7 @@ from ..exceptions import (
     GitWorktreeError,
 )
 from ..git import find_git_binary, get_main_repo_root, get_repo_root
-from .config_copy import get_copied_config_files
+from .config_copy import get_copied_config_files, is_file_tracked
 
 
 @dataclass
@@ -76,14 +75,18 @@ def remove_config_files(worktree_path: Path) -> list[str]:
 
     for file_path in config_files:
         try:
-            if file_path.is_dir():
-                shutil.rmtree(file_path)
-            else:
-                file_path.unlink()
+            relative_path = file_path.relative_to(worktree_path)
+        except ValueError:
+            continue
+        if is_file_tracked(relative_path, worktree_path):
+            continue
+        try:
+            file_path.unlink()
             try:
                 removed.append(str(file_path.relative_to(worktree_path)))
             except ValueError:
                 removed.append(file_path.name)
+            _prune_empty_parents(file_path.parent, worktree_path)
         except OSError:
             pass  # Best effort
 
@@ -260,3 +263,13 @@ def cleanup_worktree(
             result.errors.append(str(e))
 
     return result
+
+
+def _prune_empty_parents(directory: Path, worktree_path: Path) -> None:
+    """Remove empty config parent directories without crossing the worktree root."""
+    while directory != worktree_path:
+        try:
+            directory.rmdir()
+        except OSError:
+            return
+        directory = directory.parent

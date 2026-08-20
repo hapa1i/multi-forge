@@ -640,10 +640,12 @@ chat history is not replayed.
 
 Managed worktree creation checks the source pin before creating the checkout, then checks the equivalent target Forge
 root before copying runtime config or writing project state. If a tracked target pin is incompatible, Forge removes the
-new checkout and branch. Runtime config copying intentionally excludes `.forge/project.toml`, so an ignored source pin
-is not copied into the worktree and a tracked target pin remains authoritative. When `fork --worktree --force` targets a
-stale Forge-owned child, Forge checks that child's existing pin, the exact replacement commit, and branch safety before
-removing anything. A refusal preserves its checkout, branch, dirty files, and session state.
+new checkout and branch. Runtime config copying handles allowlisted directories file by file: tracked files and nested
+`.git`/`node_modules` content remain untouched, and dirty cleanup removes only individually rechecked untracked files.
+It also excludes `.forge/project.toml`, so an ignored source pin is not copied into the worktree and a tracked target
+pin remains authoritative. When `fork --worktree --force` targets a stale Forge-owned child, Forge checks that child's
+existing pin, the exact replacement commit, and branch safety before removing anything. A refusal preserves its
+checkout, branch, dirty files, and session state.
 
 **Resume mode (`--resume-mode`):** cross-directory forks (`--worktree`/`--into`) default to `transfer` — the assembled,
 editable context file above. For a byte-faithful alternative, pass `--resume-mode native-relocate`: Forge relocates the

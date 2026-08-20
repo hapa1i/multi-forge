@@ -1,8 +1,8 @@
 # Harden worktree config-copy safety
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 4; parked.
+**Lane**: `doing/` -- active on `agent/harden-worktree-config-copy-safety` from pushed closeout `3f50012c`.
 
 **Findings**: O089 and O090 (LOW safety/correctness).
 

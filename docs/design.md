@@ -1171,12 +1171,12 @@ a genuine duplicate trigger; both may appear.
   `confirmed.compaction.transcript_snapshots`. This is the canonical compaction snapshot; SessionStart rollover is
   fallback for `/clear` and defense-in-depth.
 - `forge hook post-compact` (PostCompact): Records compaction metadata (`last_compact_at`, `last_compact_type`).
-- `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code's default `git worktree add` to auto-install Forge
-  extensions. It strict-checks the source Forge root before creating a checkout, maps a nested source root to the same
-  relative path in the new checkout, then strict-checks that target before config copy, enrollment, or install. A target
-  refusal removes the checkout and any branch created for it; incomplete Git cleanup is surfaced on stderr. Runtime
-  config copying never copies the ignored `.forge/project.toml`; a tracked target pin is authoritative. Prints the
-  worktree path to stdout on success. Only hook that exits non-zero on failure.
+- `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code worktree creation and installs Forge extensions.
+  It strict-checks source, creates the checkout, maps nested roots, then strict-checks target before config
+  copy/enrollment/install. Refusal removes checkout/new branch and reports incomplete cleanup. `config_copy.py` expands
+  directories per file, excluding tracked and nested `.git`/`node_modules` paths; dirty cleanup unlinks rechecked
+  untracked files and `rmdir`-prunes empty directories. `.forge/project.toml` stays uncopied, preserving tracked pins.
+  Prints worktree path to stdout; only this hook exits non-zero.
 - `forge hook subagent-stop` (SubagentStop): Tracks subagent activity (`total_count`, `by_type`, transcript path,
   message preview). Observe-only (phase 1).
 

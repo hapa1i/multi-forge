@@ -11,6 +11,7 @@ Entries support glob patterns (``**/`` prefix) for nested project structures.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -31,6 +32,8 @@ DEFAULT_CONFIG_ALLOWLIST: tuple[str, ...] = (
     "**/.mcp.json",
     "**/.mcp.local.json",
 )
+
+_EXCLUDED_CONFIG_DIRS: frozenset[str] = frozenset({".git", "node_modules"})
 
 
 @dataclass
@@ -80,34 +83,55 @@ def _is_glob_pattern(pattern: str) -> bool:
     return any(c in pattern for c in ("*", "?", "["))
 
 
+def _is_excluded_path(relative_path: Path) -> bool:
+    """Return whether a relative config path crosses an excluded directory."""
+    return any(part in _EXCLUDED_CONFIG_DIRS for part in relative_path.parts)
+
+
 def _resolve_glob(root: Path, pattern: str) -> list[Path]:
-    """Resolve a glob pattern relative to root.
+    """Resolve a glob while excluding Git metadata and dependency trees."""
+    matches: list[Path] = []
+    for match in root.glob(pattern):
+        relative_path = match.relative_to(root)
+        if not _is_excluded_path(relative_path):
+            matches.append(relative_path)
+    return sorted(matches)
 
-    Returns sorted relative paths matching the pattern.
-    """
-    return sorted(match.relative_to(root) for match in root.glob(pattern))
+
+def _directory_files(root: Path, relative_dir: Path) -> list[Path]:
+    """Return file candidates below a directory without entering excluded trees."""
+    directory = root / relative_dir
+    files: list[Path] = []
+
+    def _raise_walk_error(error: OSError) -> None:
+        raise error
+
+    for current, dirnames, filenames in os.walk(
+        directory,
+        topdown=True,
+        onerror=_raise_walk_error,
+        followlinks=False,
+    ):
+        dirnames[:] = sorted(name for name in dirnames if name not in _EXCLUDED_CONFIG_DIRS)
+        current_path = Path(current)
+        for name in sorted(filenames):
+            relative_path = (current_path / name).relative_to(root)
+            if not _is_excluded_path(relative_path):
+                files.append(relative_path)
+
+    return files
 
 
-def _copy_single(
+def _copy_file(
     source_root: Path,
     worktree_path: Path,
-    filename: str,
+    relative_path: Path,
     result: ConfigCopyResult,
 ) -> None:
-    """Copy a single file or directory from source to worktree with safety checks."""
-    source_path = source_root / filename
-    dest_path = worktree_path / filename
-
-    if source_path.is_dir():
-        if dest_path.exists():
-            result.skipped_exists.append(filename)
-            return
-        try:
-            shutil.copytree(source_path, dest_path)
-            result.copied.append(filename)
-        except OSError as e:
-            result.failed.append((filename, str(e)))
-        return
+    """Copy one file after applying destination and tracked-file guards."""
+    filename = str(relative_path)
+    source_path = source_root / relative_path
+    dest_path = worktree_path / relative_path
 
     if not source_path.is_file():
         result.skipped_not_found.append(filename)
@@ -117,7 +141,7 @@ def _copy_single(
         result.skipped_exists.append(filename)
         return
 
-    if is_file_tracked(Path(filename), worktree_path):
+    if is_file_tracked(relative_path, worktree_path):
         result.skipped_tracked.append(filename)
         return
 
@@ -127,6 +151,37 @@ def _copy_single(
         result.copied.append(filename)
     except OSError as e:
         result.failed.append((filename, str(e)))
+
+
+def _copy_single(
+    source_root: Path,
+    worktree_path: Path,
+    filename: str,
+    result: ConfigCopyResult,
+) -> None:
+    """Copy a single file or directory from source to worktree with safety checks."""
+    relative_path = Path(filename)
+    source_path = source_root / relative_path
+
+    if _is_excluded_path(relative_path):
+        result.skipped_not_found.append(filename)
+        return
+
+    if source_path.is_dir():
+        dest_path = worktree_path / relative_path
+        if dest_path.is_symlink() or (dest_path.exists() and not dest_path.is_dir()):
+            result.skipped_exists.append(filename)
+            return
+        try:
+            directory_files = _directory_files(source_root, relative_path)
+        except OSError as e:
+            result.failed.append((filename, str(e)))
+            return
+        for child_path in directory_files:
+            _copy_file(source_root, worktree_path, child_path, result)
+        return
+
+    _copy_file(source_root, worktree_path, relative_path, result)
 
 
 def copy_runtime_config(
@@ -184,20 +239,31 @@ def get_copied_config_files(worktree_path: Path) -> list[Path]:
         List of existing untracked config file paths.
     """
     config_files: list[Path] = []
+    seen: set[Path] = set()
 
     for entry in DEFAULT_CONFIG_ALLOWLIST:
         if _is_glob_pattern(entry):
-            for rel_path in _resolve_glob(worktree_path, entry):
-                file_path = worktree_path / rel_path
-                if file_path.is_dir():
-                    config_files.append(file_path)
-                elif file_path.is_file() and not is_file_tracked(rel_path, worktree_path):
-                    config_files.append(file_path)
+            resolved = _resolve_glob(worktree_path, entry)
         else:
-            file_path = worktree_path / entry
+            relative_path = Path(entry)
+            resolved = [] if _is_excluded_path(relative_path) else [relative_path]
+
+        for relative_path in resolved:
+            file_path = worktree_path / relative_path
             if file_path.is_dir():
-                config_files.append(file_path)
-            elif file_path.is_file() and not is_file_tracked(Path(entry), worktree_path):
-                config_files.append(file_path)
+                try:
+                    candidates = _directory_files(worktree_path, relative_path)
+                except OSError:
+                    continue
+            else:
+                candidates = [relative_path]
+
+            for candidate in candidates:
+                candidate_path = worktree_path / candidate
+                if candidate in seen or not candidate_path.is_file():
+                    continue
+                if not is_file_tracked(candidate, worktree_path):
+                    seen.add(candidate)
+                    config_files.append(candidate_path)
 
     return config_files
