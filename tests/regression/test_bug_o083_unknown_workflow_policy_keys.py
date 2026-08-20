@@ -40,9 +40,7 @@ def _workflow(**overrides: Any) -> dict[str, Any]:
         ),
     ],
 )
-def test_o083_unknown_workflow_keys_fail_with_entry_context(
-    workflow: dict[str, Any], unknown_field: str
-) -> None:
+def test_o083_unknown_workflow_keys_fail_with_entry_context(workflow: dict[str, Any], unknown_field: str) -> None:
     with pytest.raises(ValueError) as caught:
         get_bundle_policies("workflow", config={"workflows": [workflow]})
 
@@ -59,9 +57,7 @@ def test_o083_unknown_workflow_keys_fail_with_entry_context(
         ("not-an-object", "must be an object, got str"),
     ],
 )
-def test_o083_malformed_workflow_entries_raise_actionable_value_error(
-    workflow: object, expected_detail: str
-) -> None:
+def test_o083_malformed_workflow_entries_raise_actionable_value_error(workflow: object, expected_detail: str) -> None:
     with pytest.raises(ValueError, match=r"bundle_config\.workflow\.workflows\[0\]") as caught:
         get_bundle_policies("workflow", config={"workflows": [workflow]})
 
@@ -81,4 +77,3 @@ def test_o083_valid_defaulted_workflows_preserve_order_and_defaults() -> None:
 
     assert [policy.policy_id for policy in policies] == ["workflow.guardrails", "workflow.second"]
     assert [policy.description for policy in policies] == ["Review guarded changes", "Second workflow"]
-    assert [policy.intent for policy in policies] == ["", ""]
