@@ -27,7 +27,8 @@ Current focus: implementation and verification are complete; publish order 7 whi
 - [x] Run the new unknown-key and unchanged TDD policy-hook Docker checks: two passed.
 - [x] Run 9,328 unit tests with zero skips and 124 deselected, 969 regressions, full pre-commit, the 59,979-token
   design/appendix and 17,920-token workflow design checks, the 403-document/976-link board check, and diff checks.
-- [ ] Commit and push one reviewable implementation, then open one draft PR without activating Wave 8 order 8.
+- [x] Commit and push the implementation as `47554574`, then open draft PR #223 without activating Wave 8 order 8.
+- [ ] Merge PR #223 and retain this card in `doing/` until its closeout lands on `main`.
 
 ## Acceptance tests
 

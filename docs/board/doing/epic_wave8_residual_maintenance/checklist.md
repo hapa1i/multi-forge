@@ -56,3 +56,4 @@ Current focus: reject unknown workflow-policy keys in active order 7; orders 8--
 - [x] Ship and close the corrective follow-up in PR #222 (`02e0ced9`) before deciding whether to activate order 7.
 - [x] Create `agent/reject-unknown-workflow-policy-keys` from pushed corrective closeout `071cfd92`; activate only order
   7 after reverifying O083's non-strict external-config boundary.
+- [ ] Ship order 7 independently in PR #223 and close it before activating order 8.
