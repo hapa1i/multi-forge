@@ -20,7 +20,7 @@ security, performance, test-policy, output, and documentation rows as 19 parked 
 and the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up
 shipped in PR #222. Wave 8 order 8
 [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224;
-orders 9--19 remain parked.
+orders 9--19 remain parked under five recorded review batches.
 
 ## Goal
 
@@ -158,7 +158,8 @@ The ordering constraint is:
 3. ship Stop/artifact, session/state, installer, and CLI/proxy correctness in dependency order;
 4. process bounded MED/LOW maintenance findings;
 5. execute the parked Wave 7 sequence only after behavior and compatibility are characterized; and
-6. close the rechecked Wave 8 residuals one member at a time without reopening rejected or decision-gated rows.
+6. close the rechecked Wave 8 residuals through five epic-authorized batches without merging member scope, provenance,
+   or closeout records, and without reopening rejected or decision-gated rows.
 
 New member cards must name their finding IDs and wave. Create a child epic only when multiple independently shippable
 members share a contract or sequencing decision that would otherwise drift.

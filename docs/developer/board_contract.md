@@ -89,6 +89,34 @@ retirement rationale and successor or folded-into evidence on the epic and retir
 outcome is itself cancelled, superseded, folded elsewhere, or invalidated before it ships, move the epic to `retired/`
 instead of `done/`. Until one of those terminal conditions is met, keep the epic in `doing/` as the living coordinator.
 
+### Epic-Authorized Batch Execution
+
+Per-card execution branches and PRs remain the default. An active epic may explicitly authorize review batches of two or
+three accepted cards on a shared branch and PR, including a named adjacent follow-up that is not finding credit for the
+epic. Before activation, the epic must record the fixed batch membership and order, the branch base, whether each card
+can be implemented in parallel or must be sequenced, any shared file or contract boundaries, and the integrator
+responsible for shared documentation, board edits, and final reconciliation.
+
+For an epic-authorized batch:
+
+1. Create or switch to the shared batch branch, then move every selected card from `todo/` to `doing/`.
+2. Give every card its own checklist, acceptance evidence, and closeout record; the epic checklist names the active
+   batch and branch base.
+3. Implement cards in parallel only when their write and test scopes are disjoint. Cards that share a source file,
+   command declaration, schema, or other contract boundary use one owner and execute sequentially even when reviewed in
+   the same batch.
+4. Keep each card in a distinct commit or contiguous commit series on the batch branch. Do not mix different cards in
+   one commit; an integration-only commit may reconcile shared documentation, board state, or merge conflicts.
+5. Run each card's focused and risk-required verification, then run the applicable aggregate unit, regression,
+   pre-commit, and board/link checks on the integrated branch head.
+6. Merge only when every included card is complete. Then close each card's checklist and change-log record and move all
+   completed cards to `done/` in the batch closeout. If one card must leave the batch, remove or revert only its
+   changes, return unstarted work to `todo/` or partially completed work to `paused/`, and update the epic before
+   review.
+
+Batch association does not merge card scope, provenance, finding credit, or implementation ownership. Unless an active
+epic records this exception, use the per-card activation workflow in [Lanes](#lanes).
+
 ## Checklist Contract
 
 Add `checklist.md` when a card needs an execution plan.

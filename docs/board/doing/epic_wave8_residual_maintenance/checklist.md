@@ -1,6 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 8 is closed in PR #224; orders 9--19 remain parked.
+Current focus: the five-batch plan is recorded, no batch is active, and all Batch 1 cards remain parked pending explicit
+activation.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -64,3 +65,6 @@ Current focus: order 8 is closed in PR #224; orders 9--19 remain parked.
 - [x] Complete focused, unit, regression, targeted Docker Stop-hook, pre-commit, documentation-size, board, and diff
   gates; 77 focused, 9,328 unit, and 983 regression tests pass.
 - [x] Ship order 8 independently in PR #224 (`4727deaa`) and close it without activating order 9.
+- [x] Record five remaining review batches and the epic-authorized batch process without activating any selected card;
+  Markdown hooks, 999 board link paths, 101 changed-document paths/fragments, parked-lane, stale-sequencing, and diff
+  checks pass.

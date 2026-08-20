@@ -28,6 +28,11 @@ Epic slugs start with `epic_`; an active epic belongs in `doing/` with a lightwe
 cards should link the epic near the top of their `card.md`. Retired former members are not live and do not count as
 shipped; their retirement rationale and successor or folded-into evidence remain linked from the epic.
 
+Per-card branches and PRs are the default. An active epic may explicitly authorize a two- or three-card review batch on
+one branch and PR under the [epic batch contract](../developer/board_contract.md#epic-authorized-batch-execution); every
+included card still moves to `doing/` and retains its own checklist, implementation boundary, verification, and closeout
+record.
+
 ## Lane Semantics
 
 Summary only; see the [contract](../developer/board_contract.md#lanes) for the full operating rules.

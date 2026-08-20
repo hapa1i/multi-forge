@@ -3,11 +3,11 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--8 shipped in PRs #216--#224; the corrective follow-up shipped in PR #222; orders 9--19
-remain parked.
+remain parked under the five-batch execution plan below.
 
 **Current execution**: none. Order 8
 [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224
-(`4727deaa`); order 9 remains parked pending explicit activation.
+(`4727deaa`); Batch 1 is next, pending explicit activation of all three selected cards.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -46,8 +46,9 @@ external model call was used.
 
 ## Members and Sequence
 
-Only one member should be active at a time. Medium-severity observability and event-loop defects lead; security and
-tracked-content safety follow; bounded CLI/state corrections and documentation close the wave.
+The member order remains the finding-provenance sequence. Remaining execution uses the epic-authorized batches below,
+with only one batch active at a time. Every card remains a separate implementation unit with its own checklist, commit
+boundary, acceptance evidence, and closeout record.
 
 | Order | Findings       | Member                                                                                                  | Review boundary                         |
 | ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -71,24 +72,64 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 | 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                             | typed suppression rationale             |
 | 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
 
+## Batch Execution Plan
+
+Execute these batches in order on one branch and PR per batch:
+
+1. **Batch 1 -- independent correctness**: order 9
+   [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md), order 10
+   [`serialize_llm_client_initialization`](../../todo/serialize_llm_client_initialization/card.md), and the external
+   accepted follow-up [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md).
+   These can be implemented in parallel because their GC, core LLM adapter, and Stop-verification write/test scopes are
+   disjoint.
+2. **Batch 2 -- proxy and telemetry read surfaces**: order 11
+   [`fix_cost_breakdown_selectors`](../../todo/fix_cost_breakdown_selectors/card.md) and order 12
+   [`stabilize_proxy_metrics_json`](../../todo/stabilize_proxy_metrics_json/card.md). Their code and focused-test scopes
+   are parallel; the batch integrator owns any shared `docs/cli_reference.md` edits and final CLI reconciliation.
+3. **Batch 3 -- policy CLI**: order 13
+   [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md), order 14
+   [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md), and the external
+   accepted follow-up [`align_policy_check_bundle_vocabulary`](../../todo/align_policy_check_bundle_vocabulary/card.md).
+   Review these together, but use one owner and implement them sequentially: all three touch `src/forge/cli/policy.py`,
+   and the last two share the `policy check` declaration.
+4. **Batch 4 -- isolated runtime fixes**: order 15
+   [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md), order 16
+   [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md), and order 17
+   [`reuse_transcript_reference_scan`](../../todo/reuse_transcript_reference_scan/card.md). These can be implemented in
+   parallel across proxy audit, global info, and session-manager seams.
+5. **Batch 5 -- final conformance**: order 18
+   [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md) and order 19
+   [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md). These can be
+   implemented in parallel only after Batches 1--4 close, so the suppression sweep sees final production code and the
+   documentation pass sees final CLI behavior.
+
+The two external accepted follow-ups join their batches only for execution and review. They do not become Wave 8 finding
+credit and do not change this epic's 23 findings or 19-member accounting.
+
 ## Dependencies and Activation
 
 - Order 2 follows order 1 because both touch proxy completion accounting; trace lifecycle must be pinned before durable
   writes move off-loop. Order 11 follows order 2 because it reads the same downstream cost/run evidence.
 - Order 4 requires targeted session/worktree Docker integration. Orders 1--3 require targeted proxy/telemetry
   integration. Order 5 requires workflow plus extension/installer integration for the touched paths.
-- Before activation, recheck the member's cited lines on current `main`, create its checklist, record the execution
-  branch/base here, and add the fail-first regression named by the card.
+- Before activating a batch, recheck every selected card's cited lines on current `main`, create the shared branch from
+  the recorded base, move all selected cards to `doing/`, create their individual checklists, and record the active
+  branch/base in this epic and its checklist.
+- Keep card changes in distinct commits or contiguous commit series. The named batch integrator owns shared docs and
+  board edits plus combined-head reconciliation; same-file cards remain sequential even though they share a review.
+- Run each card's focused and risk-required verification, then run the applicable combined unit, regression, pre-commit,
+  and board/link gates on the integrated branch head.
 - Architecture, CLI JSON, config, proxy/session, or Day 1 changes update the applicable normative and end-user docs in
   the same member. Package-loaded or installer changes also run clean-wheel verification where the repository rules
   require it.
 
-## Separately Parked or Gated
+## External Batch Members and Gated Work
 
 - [`align_policy_check_bundle_vocabulary`](../../todo/align_policy_check_bundle_vocabulary/card.md) retains its one-line
-  terminal-parser residue as a standalone accepted follow-up; it is not review-row credit for this epic.
-- [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md) remains unrelated parked
-  work.
+  terminal-parser residue as a standalone accepted follow-up. It joins Batch 3 without becoming review-row credit for
+  this epic.
+- [`improve_stop_test_failure_excerpts`](../../todo/improve_stop_test_failure_excerpts/card.md) joins Batch 1 as an
+  unrelated accepted follow-up without becoming Wave 8 finding credit.
 - D040 remains proposed, and the rejected/resolved rows above are not executable members.
 - This epic does not reopen Wave 7 deletion candidates, release-gated deprecations, or the unverified O092 tail.
 
@@ -99,4 +140,5 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 - Keep `core/ops` UI-free; diagnostics and exits remain owned by CLI adapters.
 - Preserve strict durable-state reads, fail-closed tracked-content boundaries, and best-effort continuation only when
   failures remain visible in the result or logs.
-- Do not collapse the members into one cleanup PR. Each must ship and close independently before the next is activated.
+- Do not collapse implementation ownership within a batch: retain each card's checklist, commit boundary, acceptance
+  evidence, and closeout record. Close one complete batch before activating the next.

@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 order 8 is closed in PR #224; orders 9--19 remain parked.
+Current focus: Wave 8 order 8 is closed in PR #224; five remaining review batches are recorded, and no batch is active.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -384,3 +384,4 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Branch from pushed order-7 closeout `d196b866` and activate only Wave 8 order 8
   `preserve_assistant_block_boundaries`.
 - [x] Ship Wave 8 order 8 independently in PR #224 (`4727deaa`) and close it without activating order 9.
+- [x] Record Wave 8's five-batch execution plan and preserve card-level implementation and closeout boundaries.
