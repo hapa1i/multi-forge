@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 13; parked.
+**Lane**: `doing/` -- active as the first sequential member of Wave 8 Batch 3 on `agent/wave8-batch-3` from `34cbb601`.
 
 **Finding**: narrowed O080 (LOW correctness).
 
