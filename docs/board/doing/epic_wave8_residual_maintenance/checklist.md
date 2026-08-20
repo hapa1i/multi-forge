@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: order 4 `harden_worktree_config_copy_safety` is active; orders 5--19 remain parked.
+Current focus: orders 1--4 are shipped and closed; orders 5--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -35,4 +35,4 @@ Current focus: order 4 `harden_worktree_config_copy_safety` is active; orders 5-
 - [x] Enforce per-file copy/cleanup ownership while preserving exact-file and dirty-retry behavior.
 - [x] Complete focused, unit, regression, targeted session/worktree Docker, pre-commit, documentation-size, and board
   gates.
-- [ ] Ship and close order 4 independently before activating order 5.
+- [x] Ship order 4 in PR #219 (`43a3b29c`) and close it independently before activating order 5.

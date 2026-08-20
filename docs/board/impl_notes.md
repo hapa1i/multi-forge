@@ -36,6 +36,16 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Worktree config cleanup must reject symlinked directory components (shipped 2026-08-20)
+
+- Lexical containment and Git tracking checks do not make a path safe when a parent component is a symlink: filesystem
+  writes and unlinks can still resolve outside the worktree or reach a tracked file under a different repository path.
+- Config discovery, destination writes, cleanup, and empty-parent pruning therefore reject symlinked directory
+  components. Cleanup repeats the parent check after Git I/O, immediately before unlinking, so a concurrent swap cannot
+  turn an earlier ownership decision into deletion authority.
+- `os.walk(..., followlinks=False)` does not protect a symlink supplied as the walk root; callers must reject that root
+  before walking it.
+
 ### Repository maintenance gates are ownership decisions, not cleanup permission (approved 2026-08-04)
 
 - **Stop verification has two supported modes.** `completion_promise` stays on the ordinary under-100-ms path;

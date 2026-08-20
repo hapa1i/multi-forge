@@ -42,4 +42,4 @@ retry order.
 - [x] Verify documentation size (`design.md` 29,991; appendix 29,988 Opus-5 tokens), all 970 local board links,
   stale-lane references, and diff hygiene.
 - [x] Commit, push, and open independent draft PR #219.
-- [ ] After merge, close order 4 before activating order 5.
+- [x] Ship order 4 in PR #219 (`43a3b29c`) and close it before activating order 5.

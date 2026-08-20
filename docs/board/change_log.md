@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Harden worktree config-copy safety
+
+**Goal/outcome**: Keep tracked and user-owned config safe during worktree copy and dirty-worktree cleanup.
+
+**Key changes**:
+
+- Replaced directory-level ownership assumptions with per-file copy and cleanup decisions while preserving exact-file
+  behavior and dirty-retry ordering.
+- Rejected symlinked directory components before discovery, writes, unlink, and pruning; excluded nested repository
+  metadata and dependency trees without widening cleanup authority.
+
+**Verification**: 39 focused; 9,318 unit (one skip); 955 regression; 35 targeted Docker worktree/session checks;
+pre-commit/diff; design 29,991/29,988; board 970 links. PR #219 merged as `43a3b29c`; no Forge workflow ran.
+
 ### Strip OpenAI account response headers
 
 **Goal/outcome**: Keep upstream OpenAI account identity from crossing the shared proxy response boundary.
