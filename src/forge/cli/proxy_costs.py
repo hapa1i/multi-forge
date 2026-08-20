@@ -96,6 +96,9 @@ def show_cmd(
     Pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
     metered provider usage within a monthly budget.
     """
+    if by_model and by_verb:
+        raise click.UsageError("Options --by-model and --by-verb cannot be used together.")
+
     from forge.proxy.cost_logger import read_cost_logs_with_stats
 
     if period == "all":
@@ -160,6 +163,7 @@ def _verb_records_from_request_records(
         records.append(
             {
                 "verb": command,
+                "forge_run_id": run_id,
                 "total_cost_micros": cost_micros,
                 "cost_measured": cost_micros is not None,
                 "request_count": 1,
@@ -185,10 +189,12 @@ def _aggregate_by_verb(verb_records: list[dict]) -> dict[str, dict]:
     """Fold verb cost records into per-verb totals (cost-evidence aware).
 
     ``reported`` flips True only when a record carries measured cost
-    (:func:`_verb_cost_reported`); an unmeasured window contributes invocations and
-    request counts but never a fabricated $0. Shared by table + JSON surfaces.
+    (:func:`_verb_cost_reported`); an unmeasured request contributes to request counts
+    but never a fabricated $0. Logical invocations are unique validated run IDs, not
+    downstream request rows. Shared by table + JSON surfaces.
     """
     verb_costs: dict[str, dict] = {}
+    run_ids_by_verb: dict[str, set[str]] = {}
     for v in verb_records:
         verb = v.get("verb", "unknown")
         if verb not in verb_costs:
@@ -202,7 +208,11 @@ def _aggregate_by_verb(verb_records: list[dict]) -> dict[str, dict]:
             verb_costs[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
             verb_costs[verb]["reported"] = True
         verb_costs[verb]["request_count"] += v.get("request_count", 0)
-        verb_costs[verb]["invocations"] += 1
+        run_id = v.get("forge_run_id")
+        if isinstance(run_id, str):
+            run_ids_by_verb.setdefault(verb, set()).add(run_id)
+    for verb, costs in verb_costs.items():
+        costs["invocations"] = len(run_ids_by_verb.get(verb, set()))
     return verb_costs
 
 
