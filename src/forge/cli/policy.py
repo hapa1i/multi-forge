@@ -640,7 +640,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
     "bundles",
     multiple=True,
     required=True,
-    type=click.Choice(["tdd", "coding_standards"]),
+    type=_POLICY_BUNDLE_CHOICES,
     help="Policy bundles to evaluate (can be repeated)",
 )
 @click.option(
