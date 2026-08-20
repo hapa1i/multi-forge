@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active Wave 8 order 8; orders 9--19 remain parked.
+**Lane**: `done/` -- shipped in PR #224 (`4727deaa`) on 2026-08-20.
 
 **Execution**: `agent/preserve-assistant-block-boundaries` from pushed `main` at
 `d196b86665c5df047f7395bfc03f8af3d3fed0f3` on 2026-08-20.
@@ -28,5 +28,6 @@ reinject verification instructions.
 
 ## Verification
 
-Run focused verification-hook tests, full unit/regression suites, targeted Docker hook/session coverage, and
-`make pre-commit`.
+The focused helper/Stop slice passed 77 tests, including all 14 O087 regressions, and two targeted Docker Stop-hook
+checks passed. The 9,328-test unit suite reported zero skips and 124 deselected; 983 regressions, full pre-commit,
+documentation-size, board-link, and diff checks passed. All five GitHub checks passed on PR #224.

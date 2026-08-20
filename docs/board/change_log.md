@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Preserve assistant block boundaries
+
+**Goal/outcome**: Keep standalone completion promises recognizable across separate assistant text blocks without
+creating false matches across block boundaries.
+
+**Key changes**:
+
+- Applied one shared boundary-preserving join to both supported Claude transcript projections.
+- Retained single-block and existing-newline behavior while pinning later-block promises, split-block false positives,
+  and the real Stop-hook path.
+
+**Verification**: 77 focused tests including 14 O087 regressions; 9,328 unit with zero skips; 983 regression; two
+targeted Docker Stop-hook checks; pre-commit/diff; design-size and board-link checks. PR #224 merged as `4727deaa` with
+all five GitHub checks passing.
+
 ### Reject unknown workflow-policy keys
 
 **Goal/outcome**: Stop manifest-backed workflow policy typos from silently selecting permissive defaults.

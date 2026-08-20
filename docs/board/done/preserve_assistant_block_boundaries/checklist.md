@@ -1,6 +1,6 @@
 # Preserve assistant block boundaries checklist
 
-Current focus: characterize and correct O087 on active Wave 8 order 8; orders 9--19 remain parked.
+Current focus: complete -- O087 shipped independently in PR #224 and Wave 8 order 8 is closed.
 
 ## Phase 1 -- Characterize and activate
 
@@ -27,7 +27,8 @@ Current focus: characterize and correct O087 on active Wave 8 order 8; orders 9-
   full changed-file and repository pre-commit, the 59,979-token design/appendix and 18,052-token workflow design checks,
   the 404-document/977-link board check, and diff hygiene.
 - [x] Commit and push the implementation as `e4d184fa`, then open draft PR #224 without activating Wave 8 order 9.
-- [ ] Merge PR #224 and retain this card in `doing/` until its closeout lands on `main`.
+- [x] Merge PR #224 as `4727deaa`, synchronize the final board evidence, verify all 978 links across 404 board
+  documents, and move this member to `done/` without activating Wave 8 order 9.
 
 ## Acceptance tests
 

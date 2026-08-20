@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: preserve assistant block boundaries in active order 8; orders 9--19 remain parked.
+Current focus: order 8 is closed in PR #224; orders 9--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -63,4 +63,4 @@ Current focus: preserve assistant block boundaries in active order 8; orders 9--
   split across blocks; keep single-block and existing-boundary content unchanged.
 - [x] Complete focused, unit, regression, targeted Docker Stop-hook, pre-commit, documentation-size, board, and diff
   gates; 77 focused, 9,328 unit, and 983 regression tests pass.
-- [ ] Ship order 8 independently in PR #224 and close it before activating order 9.
+- [x] Ship order 8 independently in PR #224 (`4727deaa`) and close it without activating order 9.
