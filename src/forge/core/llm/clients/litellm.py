@@ -10,6 +10,7 @@ GPT-5 Models:
     tools for GPT-5).
 """
 
+import asyncio
 import json
 import logging
 import ssl
@@ -107,6 +108,7 @@ class LiteLLMClient:
         self._credentials = credentials or CredentialManager.default()
         self._default_hyperparams = default_hyperparams
         self._client: AsyncOpenAI | None = None
+        self._client_init_lock = asyncio.Lock()
 
     @property
     def model(self) -> str:
@@ -118,23 +120,41 @@ class LiteLLMClient:
         if self._client is not None:
             return self._client
 
-        creds = await self._credentials.get_credentials(self._provider)
+        async with self._client_init_lock:
+            if self._client is not None:
+                return self._client
 
-        http_client = None
-        ssl_cert = creds.get("ssl_cert")
-        if ssl_cert:
-            # Custom SSL certificate (e.g., remote proxy root CA)
-            ssl_context = ssl.create_default_context(cafile=ssl_cert)
-            http_client = httpx.AsyncClient(verify=ssl_context)
+            creds = await self._credentials.get_credentials(self._provider)
 
-        version = get_runtime_config().user_agent_claude_code_version or "unknown"
-        self._client = AsyncOpenAI(
-            api_key=creds["api_key"],
-            base_url=creds["base_url"],
-            http_client=http_client,
-            default_headers={"User-Agent": f"claude-cli/{version} (external, cli)"},
-        )
-        return self._client
+            http_client = None
+            ssl_cert = creds.get("ssl_cert")
+            if ssl_cert:
+                # Custom SSL certificate (e.g., remote proxy root CA)
+                ssl_context = ssl.create_default_context(cafile=ssl_cert)
+                http_client = httpx.AsyncClient(verify=ssl_context)
+
+            version = get_runtime_config().user_agent_claude_code_version or "unknown"
+            try:
+                client = AsyncOpenAI(
+                    api_key=creds["api_key"],
+                    base_url=creds["base_url"],
+                    http_client=http_client,
+                    default_headers={"User-Agent": f"claude-cli/{version} (external, cli)"},
+                )
+            except Exception:
+                if http_client is not None:
+                    try:
+                        await http_client.aclose()
+                    except Exception as cleanup_error:
+                        logger.warning(
+                            "Failed to close custom-CA HTTP transport after LLM client construction failure; "
+                            "exception_type=%s",
+                            type(cleanup_error).__name__,
+                        )
+                raise
+
+            self._client = client
+            return client
 
     _is_retryable_error = staticmethod(is_retryable_error)
 

@@ -1,27 +1,36 @@
 # Serialize LLM client initialization checklist
 
-Current focus: active in Wave 8 Batch 1 on `agent/wave8-batch-1`; pin concurrent cold-start behavior for both adapters.
+Current focus: implementation and focused verification are complete on `agent/wave8-batch-1`; awaiting integrated Batch
+1 verification and commit.
 
 ## Phase 1 -- Pin the race and cleanup boundary
 
 - [x] Recheck current `main`: both adapter `_get_client` methods await credential resolution between an unlocked cache
   check and client assignment, allowing duplicate cold-start construction.
-- [ ] Add deterministic concurrent cold-start regressions for LiteLLM and OpenRouter that require one credential lookup,
+- [x] Add deterministic concurrent cold-start regressions for LiteLLM and OpenRouter that require one credential lookup,
   one `AsyncOpenAI` construction, and one shared returned client.
-- [ ] Add a LiteLLM construction-failure regression proving a separately created custom-CA HTTP transport is closed.
+- [x] Add a LiteLLM construction-failure regression proving a separately created custom-CA HTTP transport is closed.
+  Before implementation, the focused regression file failed deterministically at all three boundaries: both adapters
+  performed two credential lookups, and the LiteLLM custom-CA transport was not closed.
 
 ## Phase 2 -- Implement
 
-- [ ] Add per-instance async initialization serialization and a second cache check after acquiring it in both adapters.
-- [ ] Close a separately created LiteLLM HTTP transport if `AsyncOpenAI` construction fails, preserving the original
+- [x] Add per-instance async initialization serialization and a second cache check after acquiring it in both adapters.
+- [x] Close a separately created LiteLLM HTTP transport if `AsyncOpenAI` construction fails, preserving the original
   exception.
-- [ ] Preserve hot-cache, auth invalidation/retry, provider header, custom-CA, and request behavior without expanding
+- [x] Preserve hot-cache, auth invalidation/retry, provider header, custom-CA, and request behavior without expanding
   credential-invalidation ownership.
 
 ## Phase 3 -- Verify and publish
 
-- [ ] Run focused LLM client and auth-retry tests, the no-`.env` credential path, regression and full unit suites, and
-  `make pre-commit`.
+- [x] Run focused LLM client and auth-retry tests plus the no-`.env` file-credential path:
+  - `uv run pytest tests/src/core/llm tests/regression/test_bug_o091_llm_client_initialization.py tests/regression/test_bug_stale_client_after_invalidation.py tests/regression/test_bug_proxy_retry_lock_deadlock.py tests/regression/test_bug_local_litellm_openai_creds.py -q`
+    -- 211 passed.
+  - `uv run pytest tests/integration/core/test_auth_credential_resolution.py::TestCredentialManagerFileResolution -q` --
+    4 passed.
+  - Focused Ruff, Black, isort, mypy, Pyright, and `git diff --check` -- passed (Pyright printed only its newer-version
+    notice).
+- [ ] Run the full unit/regression suites and `make pre-commit` on the integrated Batch 1 head.
 - [ ] Record exact verification evidence and commit this card without mixing another Batch 1 implementation.
 
 ## Acceptance tests
