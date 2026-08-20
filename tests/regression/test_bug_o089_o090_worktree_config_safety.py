@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from forge.session.worktree import cleanup as cleanup_module
+from forge.session.worktree import config_copy as config_copy_module
 from forge.session.worktree.cleanup import _prune_empty_parents, remove_config_files
 from forge.session.worktree.config_copy import copy_runtime_config
 
@@ -177,6 +178,33 @@ def test_bug_o089_copy_skips_symlinked_destination_ancestor(tmp_path: Path) -> N
 
     assert result.copied == []
     assert result.skipped_exists == ["docker/certs"]
+    assert not (outside / "certs").exists()
+
+
+def test_bug_o089_copy_rechecks_destination_after_tracked_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    outside = tmp_path / "outside-late-symlink"
+    source_file = source / "docker" / "certs" / "ca.pem"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_text("private")
+    (target / "docker").mkdir(parents=True)
+    outside.mkdir()
+
+    def _replace_parent_with_symlink(_path: Path, _root: Path) -> bool:
+        (target / "docker").rmdir()
+        (target / "docker").symlink_to(outside, target_is_directory=True)
+        return False
+
+    monkeypatch.setattr(config_copy_module, "is_file_tracked", _replace_parent_with_symlink)
+
+    result = copy_runtime_config(source, target, allowlist=("docker/certs",))
+
+    assert result.copied == []
+    assert result.skipped_exists == ["docker/certs/ca.pem"]
     assert not (outside / "certs").exists()
 
 

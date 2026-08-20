@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 orders 1--6 are shipped and closed; orders 7--19 remain parked.
+Current focus: correct three verified regressions from shipped Wave 8 orders 1, 4, and 5; orders 7--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -375,3 +375,6 @@ Current focus: Wave 8 orders 1--6 are shipped and closed; orders 7--19 remain pa
 - [x] Close the bounded Wave 7 epic after synchronizing all 35 members, the review ledger, and terminal verification.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
+
+- [x] Activate only the bounded `correct_wave8_merged_regressions` follow-up from pushed order-6 closeout `113b5670`.
+- [ ] Ship and close the corrective follow-up before advancing Wave 8 sequencing.

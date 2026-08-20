@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable
 from unittest.mock import AsyncMock
 
 import pytest
@@ -20,13 +20,27 @@ class _CapturingClient:
     def __init__(self, captured: dict[str, Any]) -> None:
         self._captured = captured
 
-    async def create_completion(self, openai_request: dict[str, Any], _request_id: str) -> dict[str, Any]:
+    async def create_completion(
+        self,
+        openai_request: dict[str, Any],
+        _request_id: str,
+        *,
+        on_provider_dispatch: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         self._captured["request"] = openai_request
         return {"choices": [{"message": {"content": "ok"}}], "usage": {}}
 
     async def create_streaming_completion(
-        self, openai_request: dict[str, Any], _request_id: str
+        self,
+        openai_request: dict[str, Any],
+        _request_id: str,
+        *,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> AsyncIterator[bytes]:
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         self._captured["request"] = openai_request
         yield b"data: {}\n\n"
 

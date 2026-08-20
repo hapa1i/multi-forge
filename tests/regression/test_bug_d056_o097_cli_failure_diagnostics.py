@@ -1,8 +1,10 @@
 """Regression D056/O097: terminating CLI diagnostics were split across streams.
 
 Root cause: workflow, extension, and policy adapters printed their error header with
-the shared stderr helper but kept details, plans, or recovery tips on stdout.
-Affected files: ``forge/cli/workflow.py``, ``extensions.py``, and ``policy.py``.
+the shared stderr helper but kept details, plans, or recovery tips on stdout. Dry-run
+preview output remains a result even when its plan contains a conflict; only the
+terminating diagnostic belongs on stderr. Affected files: ``forge/cli/workflow.py``,
+``extensions.py``, and ``policy.py``.
 """
 
 from __future__ import annotations
@@ -97,7 +99,7 @@ def test_auto_detected_enable_buffers_created_notice_with_failure(
     assert (project / ".claude").is_dir()
 
 
-def test_enable_dry_run_conflict_keeps_creation_preview_on_stderr(
+def test_enable_dry_run_conflict_keeps_preview_on_stdout_and_failure_on_stderr(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -112,10 +114,13 @@ def test_enable_dry_run_conflict_keeps_creation_preview_on_stderr(
     )
 
     assert result.exit_code == 1
-    assert result.stdout == ""
-    assert "Would create" in result.stderr
-    assert ".forge" in result.stderr
-    assert "managed surface conflict" in result.stderr
+    assert "Installation Plan" in result.stdout
+    assert "Would create" in result.stdout
+    assert ".forge" in result.stdout
+    assert "managed surface conflict" in result.stdout
+    assert "Enable failed due to conflicts" in result.stderr
+    assert "Installation Plan" not in result.stderr
+    assert "managed surface conflict" not in result.stderr
 
 
 def test_enable_settings_conflict_and_recovery_stay_together_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:

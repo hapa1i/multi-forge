@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 import pytest
 
@@ -114,7 +114,14 @@ def _install_server_stubs(monkeypatch: pytest.MonkeyPatch, case: ResolutionCase)
     async def _fake_get_client(model: str, *, tier: str):
         captured["client_calls"].append({"model": model, "tier": tier})
 
-        async def _create_completion(openai_request: dict[str, Any], request_id: str) -> dict[str, Any]:
+        async def _create_completion(
+            openai_request: dict[str, Any],
+            request_id: str,
+            *,
+            on_provider_dispatch: Callable[[], None] | None = None,
+        ) -> dict[str, Any]:
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             captured["openai_request"] = openai_request
             captured["completion_request_id"] = request_id
             return {

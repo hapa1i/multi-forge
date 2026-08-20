@@ -105,27 +105,47 @@ def _wire_auth_retry(monkeypatch, server, *, retry_error: Exception | None = Non
     """First create_completion 401s; the refreshed client succeeds unless configured to fail."""
     from forge.core.llm.errors import AuthenticationError
 
+    def _mark_dispatch(kwargs: dict[str, Any]) -> None:
+        on_provider_dispatch = kwargs.get("on_provider_dispatch")
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
+
     async def _auth_failing_get_client(*args, **kwargs):
         client = AsyncMock()
-        client.create_completion = AsyncMock(side_effect=AuthenticationError("openai", "token expired"))
+        error = AuthenticationError("openai", "token expired")
+
+        async def _auth_failure(*_call_args: Any, **call_kwargs: Any) -> dict[str, Any]:
+            _mark_dispatch(call_kwargs)
+            raise error
+
+        client.create_completion = AsyncMock(side_effect=_auth_failure)
         return client
 
     async def _retry_client(*args, **kwargs):
         client = AsyncMock()
         if retry_error is not None:
-            client.create_completion = AsyncMock(side_effect=retry_error)
+
+            async def _retry_failure(*_call_args: Any, **call_kwargs: Any) -> dict[str, Any]:
+                _mark_dispatch(call_kwargs)
+                raise retry_error
+
+            client.create_completion = AsyncMock(side_effect=_retry_failure)
         else:
-            client.create_completion = AsyncMock(
-                return_value={
-                    "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                    "usage": {
-                        "prompt_tokens": 300,
-                        "completion_tokens": 75,
-                        "total_tokens": 375,
-                        "cached_tokens": 100,
-                    },
-                }
-            )
+            result = {
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": 300,
+                    "completion_tokens": 75,
+                    "total_tokens": 375,
+                    "cached_tokens": 100,
+                },
+            }
+
+            async def _retry_success(*_call_args: Any, **call_kwargs: Any) -> dict[str, Any]:
+                _mark_dispatch(call_kwargs)
+                return result
+
+            client.create_completion = AsyncMock(side_effect=_retry_success)
         return client
 
     monkeypatch.setattr(server.client_factory, "get_client", _auth_failing_get_client)

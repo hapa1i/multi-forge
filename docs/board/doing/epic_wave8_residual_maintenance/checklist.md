@@ -1,6 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: orders 1--6 are shipped and closed; orders 7--19 remain parked.
+Current focus: correct three verified regressions from shipped orders 1, 4, and 5; orders 7--19 remain parked.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -51,3 +51,6 @@ Current focus: orders 1--6 are shipped and closed; orders 7--19 remain parked.
 - [x] Complete focused, zero-skip unit, regression, pre-commit, documentation-size, board, and diff gates; 119 focused,
   9,326 unit, and 961 regression tests pass.
 - [x] Ship order 6 in PR #221 (`9d6deb7f`) and close it independently before activating order 7.
+- [x] Reproduce the provider-dispatch, late destination-symlink, and dry-run stream regressions on pushed order-6
+  closeout `113b5670`; activate only `correct_wave8_merged_regressions`.
+- [ ] Ship and close the corrective follow-up before deciding whether to activate order 7.

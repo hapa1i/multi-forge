@@ -1106,14 +1106,14 @@ def enable_cmd(
         )
 
         if dry_run:
-            plan_console = err_console if plan.has_conflicts else console
-            _flush_notices(pending_notices, output=plan_console)
+            _flush_notices(pending_notices, output=console)
             if needs_forge and project_root is not None:
-                plan_console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
+                console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
             if needs_create and project_root is not None and plan.requires_claude_version:
-                plan_console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
-            _print_plan(plan, dry_run=True, output=plan_console)
+                console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
+            _print_plan(plan, dry_run=True, output=console)
             if plan.has_conflicts:
+                err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
             if install_scope == InstallScope.USER:
                 _print_hook_migration_candidates()
