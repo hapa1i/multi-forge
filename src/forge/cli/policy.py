@@ -686,6 +686,9 @@ def check(
         forge policy check --bundle tdd --bundle coding_standards -f src/foo.py --json
         git diff | forge policy check --bundle coding_standards --diff
     """
+    if file_path and use_diff:
+        raise click.UsageError("Options --file and --diff cannot be used together.")
+
     from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, extract_added_lines
