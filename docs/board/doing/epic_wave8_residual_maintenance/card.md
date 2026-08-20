@@ -2,9 +2,10 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--5 shipped in PRs #216--#220; orders 6--19 remain parked.
+**Lane**: `doing/` -- orders 1--5 shipped in PRs #216--#220; order 6 is active; orders 7--19 remain parked.
 
-**Execution base**: pushed closeout `7a2ad4c1` on 2026-08-19.
+**Current execution**: order 6, `eliminate_runtime_test_skips`, on `agent/eliminate-runtime-test-skips` from pushed
+`main` at `3c0a3002` on 2026-08-20.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -53,7 +54,7 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 | 3     | O074           | [`strip_openai_account_response_headers`](../../done/strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
 | 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../done/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
 | 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../done/unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
-| 6     | O072           | [`eliminate_runtime_test_skips`](../../todo/eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
+| 6     | O072           | [`eliminate_runtime_test_skips`](../eliminate_runtime_test_skips/card.md)                               | deterministic unit coverage             |
 | 7     | O083           | [`reject_unknown_workflow_policy_keys`](../../todo/reject_unknown_workflow_policy_keys/card.md)         | strict external config boundary         |
 | 8     | O087           | [`preserve_assistant_block_boundaries`](../../todo/preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
 | 9     | O088           | [`report_active_registry_cleanup_failures`](../../todo/report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |

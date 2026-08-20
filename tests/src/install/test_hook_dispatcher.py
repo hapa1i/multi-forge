@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
@@ -655,15 +656,15 @@ def test_subdirectory_cwd_dispatches(
     ]
 
 
-def test_symlinked_root_parity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_symlinked_root_parity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    directory_symlink: Callable[[Path, Path], Path],
+) -> None:
     fake_forge, record_path = _make_fake_forge(tmp_path)
     dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
     repo = _forge_project(tmp_path / "repo")
-    link = tmp_path / "repo-link"
-    try:
-        link.symlink_to(repo, target_is_directory=True)
-    except OSError:
-        pytest.skip("symlinks unavailable")
+    link = directory_symlink(repo, tmp_path / "repo-link")
     _enroll(link)
     cwd = repo / "src"
     cwd.mkdir()
@@ -677,23 +678,32 @@ def test_symlinked_root_parity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert record_path.exists()
 
 
-def test_case_variant_samefile_parity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    repo = _forge_project(tmp_path / "Repo")
-    variant = repo.with_name("repo")
-    if not variant.exists():
-        pytest.skip("filesystem is case-sensitive")
-
-    fake_forge, record_path = _make_fake_forge(tmp_path)
+@pytest.mark.parametrize(
+    "paths_refer_to_same_file",
+    [True, False],
+    ids=["case-insensitive-alias", "case-sensitive-distinct-roots"],
+)
+def test_case_variant_samefile_parity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    paths_refer_to_same_file: bool,
+) -> None:
+    fake_forge, _record_path = _make_fake_forge(tmp_path)
     dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
-    _enroll(repo)
-    env = _env(tmp_path, _forge_home())
-    env["FORGE_FAKE_RECORD"] = str(record_path)
+    namespace = runpy.run_path(str(dispatcher), run_name="forge_hook_test")
+    paths_match = namespace["_paths_match"]
+    monkeypatch.setitem(
+        paths_match.__globals__,
+        "_canonicalize",
+        lambda path: str(Path(path).expanduser().absolute()),
+    )
+    monkeypatch.setitem(
+        paths_match.__globals__,
+        "_same_existing_path",
+        lambda _left, _right: paths_refer_to_same_file,
+    )
 
-    result = _run_dispatcher(dispatcher, variant, env)
-
-    assert _lookup(variant) is True
-    assert result.returncode == 0, result.stderr
-    assert record_path.exists()
+    assert paths_match(tmp_path / "Repo", tmp_path / "repo") is paths_refer_to_same_file
 
 
 @pytest.mark.parametrize(
@@ -1160,7 +1170,7 @@ def test_recording_selector_replaces_legacy_venv_with_discovered_non_venv(
     install_hook_dispatcher(
         argv0=argv0,
         environ={"HOME": str(tmp_path), "PATH": "/custom/bin"},
-        which=lambda *_a, **_k: str(replacement) if discovery_source == "which" else None,
+        which=lambda *_a, **_k: (str(replacement) if discovery_source == "which" else None),
     )
 
     metadata = read_runtime_metadata()
@@ -1220,7 +1230,7 @@ def test_recording_selector_replaces_legacy_venv_with_known_global(
     install_hook_dispatcher(
         argv0=argv0,
         environ={"HOME": str(home), "PATH": str(venv_forge.parent)},
-        which=lambda *_a, **_k: str(venv_forge) if discovery_source == "which" else None,
+        which=lambda *_a, **_k: (str(venv_forge) if discovery_source == "which" else None),
     )
 
     metadata = read_runtime_metadata()
@@ -1241,7 +1251,7 @@ def test_recording_selector_clears_legacy_venv_without_fallback(
     install_hook_dispatcher(
         argv0=argv0,
         environ={"HOME": str(tmp_path / "empty-home"), "PATH": str(venv_forge.parent)},
-        which=lambda *_a, **_k: str(venv_forge) if discovery_source == "which" else None,
+        which=lambda *_a, **_k: (str(venv_forge) if discovery_source == "which" else None),
     )
 
     metadata = read_runtime_metadata()
