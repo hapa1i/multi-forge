@@ -35,4 +35,4 @@ owner.
   workflow-worker/extension checks, and the clean-wheel runtime smoke.
 - [x] Run final staged `make pre-commit`; verify design/appendix size (59,979 Opus-5 tokens), all 972 board links,
   stale-lane references, and diff hygiene.
-- [ ] Commit, push, and open one independent draft PR; close order 5 after merge before activating order 6.
+- [x] Commit, push, and open independent draft PR #220; close order 5 after merge before activating order 6.
