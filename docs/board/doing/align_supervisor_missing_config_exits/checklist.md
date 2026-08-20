@@ -1,7 +1,7 @@
 # Align supervisor missing-config exits checklist
 
-Current focus: active first in Wave 8 Batch 3 on `agent/wave8-batch-3` from pushed closeout `34cbb601`; pin O080's
-missing-prerequisite stream and exit matrix before implementation.
+Current focus: implementation commit `902f035c` and integrated verification are complete on `agent/wave8-batch-3`; await
+the shared Batch 3 review and merge before closeout.
 
 ## Phase 1 -- Pin enabling failures and idempotent controls
 
@@ -21,9 +21,9 @@ missing-prerequisite stream and exit matrix before implementation.
 ## Phase 3 -- Verify and publish
 
 - [x] Run focused supervisor/output/regression tests.
-- [ ] Run targeted policy integration on the integrated Batch 3 head.
+- [x] Run targeted policy integration on the integrated Batch 3 head.
 - [x] Commit this card before starting the other Batch 3 cards.
-- [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
+- [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
   head.
 - [ ] Publish all three cards in one Batch 3 PR; close them together only after merge.
 
@@ -43,3 +43,5 @@ missing-prerequisite stream and exit matrix before implementation.
   enabling-action failures and three passing idempotent controls (`2 failed, 3 passed`).
 - Final: the complete supervisor, O080 regression, and output-stream files passed (`133 passed`).
 - Focused Ruff passed for the changed source and test files; repository-pinned format hooks run before the card commit.
+- Integrated: the direct container-boundary missing-supervisor matrix passed with the other two Batch 3 contracts
+  (`3 passed` total); full unit, regression, and pre-commit gates passed on the combined head.

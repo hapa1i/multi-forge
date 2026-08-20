@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 3 is active on `agent/wave8-batch-3` from pushed Batch 2 closeout `34cbb601`; O080, O077, and the
-external vocabulary follow-up have separate checklists and execute sequentially.
+Current focus: Batch 3 implementation and integrated verification are complete on `agent/wave8-batch-3` from pushed
+Batch 2 closeout `34cbb601`; publish its shared review next.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -87,8 +87,9 @@ external vocabulary follow-up have separate checklists and execute sequentially.
   links, and move both cards to `done/` before activating Batch 3.
 - [x] Create `agent/wave8-batch-3` from pushed closeout `34cbb601`; move only orders 13--14 and the external vocabulary
   follow-up to `doing/`, create separate checklists, and correct the stale one-line/direct-parser scope before work.
-- [ ] Complete and commit each Batch 3 card sequentially within its own implementation boundary.
-- [ ] Run combined unit, regression, targeted policy integration, pre-commit, board/link, and diff gates on the
+- [x] Complete and commit each Batch 3 card sequentially within its own implementation boundary (`902f035c`, `71c2ed11`,
+  and `5ee6a6dc`).
+- [x] Run combined unit, regression, targeted policy integration, pre-commit, board/link, and diff gates on the
   integrated branch head.
 - [ ] Publish one Batch 3 review branch; close all three cards together only after the batch merges.
 
@@ -105,3 +106,10 @@ cost-visibility and proxy-health Docker boundaries each passed once. The first f
 changed Markdown, and the final run passed every hook. All 994 local links across 409 tracked board documents resolved,
 no selected-card lane link was stale, `git diff --check` passed, `docs/cli_reference.md` measured 9,390 tokens, and the
 combined design and appendix measured 59,988 tokens.
+
+Batch 3 pre-publication evidence (2026-08-21): direct container-boundary coverage passed all three policy CLI contracts;
+`make test-unit` passed 9,331 tests with 124 deselected; `make test-regression` passed 1,015 tests; and
+`make pre-commit` passed every hook. All 995 local links across 412 tracked board documents resolved, all 227 local
+paths/fragments across the 13 changed Markdown documents resolved, no selected-card `todo/` link remained, and
+`git diff --check` passed. `docs/cli_reference.md` measured 9,415 tokens, the combined design and appendix measured
+59,988 tokens, and the review ledger remained below its ceiling at 29,988 tokens.

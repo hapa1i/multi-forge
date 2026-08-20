@@ -1,7 +1,7 @@
 # Reject ambiguous policy-check input checklist
 
-Current focus: queued second in Wave 8 Batch 3 on `agent/wave8-batch-3` from pushed closeout `34cbb601`; O080 executes
-first on the shared terminal policy CLI.
+Current focus: implementation commit `71c2ed11` and integrated verification are complete on `agent/wave8-batch-3`; await
+the shared Batch 3 review and merge before closeout.
 
 ## Phase 1 -- Pin ambiguous input
 
@@ -19,9 +19,9 @@ first on the shared terminal policy CLI.
 ## Phase 3 -- Verify and publish
 
 - [x] Run focused policy-check/output/regression tests.
-- [ ] Run targeted policy integration on the integrated Batch 3 head.
+- [x] Run targeted policy integration on the integrated Batch 3 head.
 - [x] Commit this card after O080 and before the vocabulary follow-up.
-- [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
+- [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
   head.
 - [ ] Publish all three cards in one Batch 3 PR; close them together only after merge.
 
@@ -43,3 +43,5 @@ first on the shared terminal policy CLI.
 - Final: the policy-check, O077 regression, and output-stream files passed (`67 passed`).
 - Focused Ruff passed for the changed source and regression; repository-pinned format and Markdown hooks run before the
   card commit.
+- Integrated: the real container command rejected simultaneous file/diff selectors with exit 2; full unit, regression,
+  and pre-commit gates passed on the combined head.

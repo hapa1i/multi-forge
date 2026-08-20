@@ -1,7 +1,7 @@
 # Align policy-check bundle vocabulary checklist
 
-Current focus: queued last in Wave 8 Batch 3 on `agent/wave8-batch-3` from pushed closeout `34cbb601`; O080 and O077
-execute first on the shared terminal policy CLI.
+Current focus: implementation commit `5ee6a6dc` and integrated verification are complete on `agent/wave8-batch-3`; await
+the shared Batch 3 review and merge before closeout.
 
 ## Phase 1 -- Pin the corrected residue
 
@@ -21,7 +21,7 @@ execute first on the shared terminal policy CLI.
 
 - [x] Run focused terminal/direct policy-check tests and regression coverage.
 - [x] Commit this card after O080 and O077 without mixing shared documentation or board reconciliation.
-- [ ] Run the combined unit, regression, targeted policy integration, pre-commit, documentation, board/link, and diff
+- [x] Run the combined unit, regression, targeted policy integration, pre-commit, documentation, board/link, and diff
   gates on the integrated Batch 3 head.
 - [ ] Publish all three cards in one Batch 3 PR; close them together only after merge.
 
@@ -41,3 +41,5 @@ execute first on the shared terminal policy CLI.
 - Final: terminal/direct policy-check, vocabulary regression, and output-stream files passed (`170 passed`).
 - Focused Ruff passed for both changed sources and the regression; repository-pinned format and type hooks run before
   the card commit.
+- Integrated: the containerized `%policy check --bundle tdd` command reached the clean Git-diff result; full unit,
+  regression, and pre-commit gates passed on the combined head.
