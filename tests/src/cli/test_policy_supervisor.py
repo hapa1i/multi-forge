@@ -1487,7 +1487,7 @@ class TestSupervisorCascade:
         sup = _read_supervisor(store)
         assert sup.cascade is False
 
-    def test_cascade_without_supervisor_reports_not_configured(
+    def test_cascade_on_without_supervisor_fails_with_recovery(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -1496,8 +1496,10 @@ class TestSupervisorCascade:
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
-        assert result.exit_code == 0
-        assert "no supervisor configured" in result.output.lower()
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "no supervisor configured" in result.stderr.lower()
+        assert "forge policy supervisor set <target>" in result.stderr
 
     def test_cascade_rejects_bad_state(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         """`cascade` takes a positional on|off; anything else is a Click usage error."""

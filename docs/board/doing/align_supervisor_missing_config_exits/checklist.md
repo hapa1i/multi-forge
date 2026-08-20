@@ -7,21 +7,22 @@ missing-prerequisite stream and exit matrix before implementation.
 
 - [x] Recheck current `main`: `supervisor on` and `cascade on` catch `SupervisorNotConfiguredError`, print the setup
   recovery on stdout, and return zero; `reload` already uses stderr and exit 1.
-- [ ] Add fail-first regression coverage proving `on` and `cascade on` emit the actionable setup recovery only on stderr
+- [x] Add fail-first regression coverage proving `on` and `cascade on` emit the actionable setup recovery only on stderr
   and exit 1 when no supervisor is configured.
-- [ ] Pin `off`, `remove`, and `cascade off` as idempotent exit-0 stdout results, plus configured on/cascade behavior.
+- [x] Pin `off`, `remove`, and `cascade off` as idempotent exit-0 stdout results, plus configured on/cascade behavior.
 
 ## Phase 2 -- Implement
 
-- [ ] Route only enabling-action missing-config failures through the CLI error stream and non-zero exit without changing
+- [x] Route only enabling-action missing-config failures through the CLI error stream and non-zero exit without changing
   command-core mutation semantics.
-- [ ] Preserve compatibility checks, input validation precedence, configured behavior, and all direct `%policy`
+- [x] Preserve compatibility checks, input validation precedence, configured behavior, and all direct `%policy`
   contracts.
 
 ## Phase 3 -- Verify and publish
 
-- [ ] Run focused supervisor/output/regression tests and targeted policy integration.
-- [ ] Commit this card before starting the other Batch 3 cards.
+- [x] Run focused supervisor/output/regression tests.
+- [ ] Run targeted policy integration on the integrated Batch 3 head.
+- [x] Commit this card before starting the other Batch 3 cards.
 - [ ] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
   head.
 - [ ] Publish all three cards in one Batch 3 PR; close them together only after merge.
@@ -35,3 +36,10 @@ missing-prerequisite stream and exit matrix before implementation.
 | Idempotent teardown  | off/remove/cascade off           | stdout notice, empty stderr, exit 0                     | CLI regression |
 | Configured mutations | suspended or supervised session  | existing resume/cascade state transitions remain intact | existing unit  |
 | Compatibility        | incompatible project contract    | refusal still precedes mutation                         | existing unit  |
+
+## Focused evidence (2026-08-21)
+
+- Fail first: `uv run pytest tests/regression/test_bug_o080_supervisor_missing_config_exits.py -q` reported exactly two
+  enabling-action failures and three passing idempotent controls (`2 failed, 3 passed`).
+- Final: the complete supervisor, O080 regression, and output-stream files passed (`133 passed`).
+- Focused Ruff passed for the changed source and test files; repository-pinned format hooks run before the card commit.

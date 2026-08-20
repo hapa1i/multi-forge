@@ -1345,8 +1345,11 @@ def supervisor_on(session_name: str | None) -> None:
     try:
         policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=5.0)
     except policy_ops.SupervisorNotConfiguredError:
-        console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
-        return
+        print_error(
+            "No supervisor configured. Use 'forge policy supervisor set <target>' to set one.",
+            console=err_console,
+        )
+        sys.exit(1)
 
     console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")
 
@@ -1457,8 +1460,12 @@ def supervisor_cascade(
             lock_timeout_s=5.0,
         )
     except policy_ops.SupervisorNotConfiguredError:
-        console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
-        return
+        message = "No supervisor configured. Use 'forge policy supervisor set <target>' to set one."
+        if state == "off":
+            console.print(message)
+            return
+        print_error(message, console=err_console)
+        sys.exit(1)
     except policy_ops.SupervisorInputError as exc:
         print_error(str(exc))
         if exc.tip:
