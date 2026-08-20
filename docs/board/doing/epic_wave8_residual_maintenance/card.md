@@ -2,14 +2,11 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--10 shipped in PRs #216--#225; the corrective follow-up shipped in PR #222; the external
-Batch 1 Stop follow-up shipped in PR #225; Batch 2 orders 11--12 are review-ready in draft PR #226, and orders 13--19
-remain parked.
+**Lane**: `doing/` -- orders 1--12 shipped in PRs #216--#226; the corrective follow-up shipped in PR #222; the external
+Batch 1 Stop follow-up shipped in PR #225, and orders 13--19 remain parked.
 
-**Current execution**: Batch 2 implementation and verification are complete on `agent/wave8-batch-2`, based on pushed
-Batch 1 closeout `0eb68aea`, and published in draft PR #226. Active cards:
-[`fix_cost_breakdown_selectors`](../fix_cost_breakdown_selectors/card.md) and
-[`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md) remain in `doing/` pending review and merge.
+**Current execution**: no member is active. Batch 2 shipped in PR #226 (`5f02bb0f`), and its two cards closed together.
+Batch 3 is next but remains parked until it is activated from the pushed Batch 2 closeout.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -64,8 +61,8 @@ boundary, acceptance evidence, and closeout record.
 | 8     | O087           | [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md)         | transcript promise-line reconstruction  |
 | 9     | O088           | [`report_active_registry_cleanup_failures`](../../done/report_active_registry_cleanup_failures/card.md) | best-effort cleanup result truth        |
 | 10    | O091           | [`serialize_llm_client_initialization`](../../done/serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
-| 11    | O084           | [`fix_cost_breakdown_selectors`](../fix_cost_breakdown_selectors/card.md)                               | CLI selector and unique-run accounting  |
-| 12    | O086           | [`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md)                               | byte-safe stable JSON                   |
+| 11    | O084           | [`fix_cost_breakdown_selectors`](../../done/fix_cost_breakdown_selectors/card.md)                       | CLI selector and unique-run accounting  |
+| 12    | O086           | [`stabilize_proxy_metrics_json`](../../done/stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
 | 13    | O080           | [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
 | 14    | O077           | [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
 | 15    | O076           | [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
@@ -85,10 +82,10 @@ Execute these batches in order on one branch and PR per batch:
    These can be implemented in parallel because their GC, core LLM adapter, and Stop-verification write/test scopes are
    disjoint.
 2. **Batch 2 -- proxy and telemetry read surfaces**: order 11
-   [`fix_cost_breakdown_selectors`](../fix_cost_breakdown_selectors/card.md) and order 12
-   [`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md). Their code and focused-test scopes are
-   parallel; the batch integrator owns shared `docs/cli_reference.md` and `docs/end-user/proxy.md` edits plus final CLI
-   reconciliation.
+   [`fix_cost_breakdown_selectors`](../../done/fix_cost_breakdown_selectors/card.md) and order 12
+   [`stabilize_proxy_metrics_json`](../../done/stabilize_proxy_metrics_json/card.md). Their code and focused-test scopes
+   are parallel; the batch integrator owns shared `docs/cli_reference.md` and `docs/end-user/proxy.md` edits plus final
+   CLI reconciliation.
 3. **Batch 3 -- policy CLI**: order 13
    [`align_supervisor_missing_config_exits`](../../todo/align_supervisor_missing_config_exits/card.md), order 14
    [`reject_ambiguous_policy_check_input`](../../todo/reject_ambiguous_policy_check_input/card.md), and the external

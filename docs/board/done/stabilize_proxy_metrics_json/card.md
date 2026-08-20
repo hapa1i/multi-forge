@@ -2,8 +2,9 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation and verification are complete in draft PR #226 on `agent/wave8-batch-2`; close with
-the cost card only after the batch merges.
+**Lane**: `done/` -- shipped with the cost card in Batch 2 PR #226 (`5f02bb0f`) on 2026-08-20.
+
+**Execution**: `agent/wave8-batch-2` from pushed `main` at `0eb68aea`.
 
 **Finding**: O086 (LOW correctness/scriptability).
 
@@ -28,5 +29,6 @@ Bare `metrics --json` returns raw metrics for one proxy but a proxy-ID mapping f
 
 ## Verification
 
-Run focused proxy-command tests, full unit/regression suites, targeted Docker proxy metrics coverage, and
-`make pre-commit`. Update `docs/cli_reference.md` and `docs/end-user/proxy.md` for the stable bare JSON envelope.
+Focused proxy CLI/regression coverage passed 67 tests. The integrated Batch 2 head passed 97 focused tests, 9,331 unit
+tests with 124 deselected, 1,005 regressions, a targeted live proxy-health Docker boundary, full pre-commit, board/link
+checks, and all five GitHub checks. The stable bare JSON envelope is documented in the CLI reference and proxy guide.

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Close Wave 8 Batch 2 telemetry reads
+
+**Goal/outcome**: Make cost-breakdown selection unambiguous and proxy-metrics JSON byte-safe with one stable bare shape.
+
+**Key changes**:
+
+- Rejected conflicting cost selectors before telemetry reads and counted unique joined Forge run IDs separately from
+  downstream request rows.
+- Bypassed terminal rendering for metrics JSON and kept the bare zero/one/many-proxy result as one proxy-ID mapping.
+
+**Verification**: 97 focused CLI/regression tests; 9,331 unit with 124 deselected; 1,005 regression; targeted
+cost-visibility and live proxy-health Docker boundaries; pre-commit/diff and board/link gates. PR #226 merged as
+`5f02bb0f` with all five GitHub checks passing.
+
 ### Close Wave 8 Batch 1 correctness fixes
 
 **Goal/outcome**: Make cleanup failures truthful, lazy LLM client initialization singular, and failed Stop diagnostics

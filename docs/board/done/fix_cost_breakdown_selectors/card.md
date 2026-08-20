@@ -2,8 +2,9 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation and verification are complete in draft PR #226 on `agent/wave8-batch-2`; close with
-the metrics card only after the batch merges.
+**Lane**: `done/` -- shipped with the metrics card in Batch 2 PR #226 (`5f02bb0f`) on 2026-08-20.
+
+**Execution**: `agent/wave8-batch-2` from pushed `main` at `0eb68aea`.
 
 **Finding**: O084 (LOW correctness).
 
@@ -29,5 +30,6 @@ labels that count `run(s)`.
 
 ## Verification
 
-Run focused telemetry-cost tests, full unit/regression suites, targeted Docker telemetry/cost integration, and
-`make pre-commit`. Sync CLI/end-user cost-view docs if selector or detail wording is explicit there.
+Focused cost CLI/regression coverage passed 76 tests. The integrated Batch 2 head passed 97 focused tests, 9,331 unit
+tests with 124 deselected, 1,005 regressions, targeted Docker cost visibility, full pre-commit, board/link checks, and
+all five GitHub checks.
