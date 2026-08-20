@@ -16,9 +16,9 @@ Current focus: review and merge the verified corrective PR.
 
 ## Acceptance tests
 
-| Test | Fixture | Assertion | Test file |
-| ---- | ------- | --------- | --------- |
-| Local adapter validation | invalid `temperature=3.0`, real adapter, mocked upstream | no provider await and no trace in streaming or non-streaming mode | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
-| Failed provider dispatch | callback-aware failing provider fake | exactly one incomplete joined trace remains | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
-| Late destination swap | parent replaced during `is_file_tracked` | no copied file or directory appears outside the worktree | `tests/regression/test_bug_o089_o090_worktree_config_safety.py` |
-| Conflicting dry-run streams | local enable plan with one conflict | preview is stdout; terminating diagnostic is stderr | `tests/regression/test_bug_d056_o097_cli_failure_diagnostics.py` |
+| Test                        | Fixture                                                  | Assertion                                                         | Test file                                                          |
+| --------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Local adapter validation    | invalid `temperature=3.0`, real adapter, mocked upstream | no provider await and no trace in streaming or non-streaming mode | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
+| Failed provider dispatch    | callback-aware failing provider fake                     | exactly one incomplete joined trace remains                       | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
+| Late destination swap       | parent replaced during `is_file_tracked`                 | no copied file or directory appears outside the worktree          | `tests/regression/test_bug_o089_o090_worktree_config_safety.py`    |
+| Conflicting dry-run streams | local enable plan with one conflict                      | preview is stdout; terminating diagnostic is stderr               | `tests/regression/test_bug_d056_o097_cli_failure_diagnostics.py`   |

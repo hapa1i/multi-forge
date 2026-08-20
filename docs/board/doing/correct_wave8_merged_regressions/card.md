@@ -4,8 +4,8 @@
 
 **Lane**: `doing/` -- corrective follow-up to shipped Wave 8 orders 1, 4, and 5; order 7 remains parked.
 
-**Execution**: `agent/fix-automated-review-regressions` from pushed `main` at
-`113b5670713a0338d97aa5b24259e9d8d14a33b8` on 2026-08-20.
+**Execution**: `agent/fix-automated-review-regressions` from pushed `main` at `113b5670713a0338d97aa5b24259e9d8d14a33b8`
+on 2026-08-20.
 
 ## Goal
 
@@ -14,11 +14,11 @@ original provider-trace, worktree-copy, or CLI output contracts.
 
 ## Verified Failures
 
-| Origin | Boundary | Reproduction |
-| ------ | -------- | ------------ |
+| Origin  | Boundary                              | Reproduction                                                                                                                        |
+| ------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | PR #216 | translated Messages provider dispatch | `temperature=3.0` fails adapter validation before upstream I/O but writes a false provider trace; streaming has the same root cause |
-| PR #219 | worktree runtime-config destination | replacing a destination parent with a symlink during the Git tracked-file probe creates and writes outside the worktree |
-| PR #220 | `extension enable --dry-run` output | a conflict routes the complete preview to stderr even though dry-run previews are stdout results |
+| PR #219 | worktree runtime-config destination   | replacing a destination parent with a symlink during the Git tracked-file probe creates and writes outside the worktree             |
+| PR #220 | `extension enable --dry-run` output   | a conflict routes the complete preview to stderr even though dry-run previews are stdout results                                    |
 
 ## Scope
 
