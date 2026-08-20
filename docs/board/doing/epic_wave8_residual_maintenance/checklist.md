@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 2 implementation and aggregate verification are complete on `agent/wave8-batch-2` from pushed Batch
-1 closeout `0eb68aea`; shared reconciliation is ready to commit and publish for review.
+Current focus: Batch 2 is review-ready in draft PR #226 on `agent/wave8-batch-2`; both cards remain in `doing/` pending
+review and merge.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -82,7 +82,7 @@ Current focus: Batch 2 implementation and aggregate verification are complete on
 - [x] Complete and commit each Batch 2 card within its own implementation boundary (`424be3c2` and `e53a96ce`).
 - [x] Run combined unit, regression, targeted Docker, pre-commit, board/link, and diff gates on the integrated branch
   head.
-- [ ] Publish one Batch 2 review branch; close both cards together only after the batch merges.
+- [x] Publish one Batch 2 review branch in draft PR #226; close both cards together only after the batch merges.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
@@ -96,4 +96,4 @@ Batch 2 pre-publication evidence (2026-08-20): the combined focused CLI/regressi
 cost-visibility and proxy-health Docker boundaries each passed once. The first full pre-commit run reformatted only
 changed Markdown, and the final run passed every hook. All 994 local links across 409 tracked board documents resolved,
 no selected-card lane link was stale, `git diff --check` passed, `docs/cli_reference.md` measured 9,390 tokens, and the
-combined design and appendix measured 59,998 tokens.
+combined design and appendix measured 59,988 tokens.

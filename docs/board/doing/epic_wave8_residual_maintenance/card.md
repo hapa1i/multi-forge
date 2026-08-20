@@ -3,12 +3,13 @@
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `doing/` -- orders 1--10 shipped in PRs #216--#225; the corrective follow-up shipped in PR #222; the external
-Batch 1 Stop follow-up shipped in PR #225; Batch 2 orders 11--12 are active, and orders 13--19 remain parked.
+Batch 1 Stop follow-up shipped in PR #225; Batch 2 orders 11--12 are review-ready in draft PR #226, and orders 13--19
+remain parked.
 
-**Current execution**: Batch 2 on `agent/wave8-batch-2`, based on pushed Batch 1 closeout `0eb68aea`. Active cards:
+**Current execution**: Batch 2 implementation and verification are complete on `agent/wave8-batch-2`, based on pushed
+Batch 1 closeout `0eb68aea`, and published in draft PR #226. Active cards:
 [`fix_cost_breakdown_selectors`](../fix_cost_breakdown_selectors/card.md) and
-[`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md). Their code and focused-test scopes are
-disjoint; the batch integrator owns shared CLI/end-user documentation and combined-head reconciliation.
+[`stabilize_proxy_metrics_json`](../stabilize_proxy_metrics_json/card.md) remain in `doing/` pending review and merge.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

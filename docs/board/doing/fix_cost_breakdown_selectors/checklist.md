@@ -1,7 +1,7 @@
 # Fix cost-breakdown selectors and run counts checklist
 
-Current focus: active in Wave 8 Batch 2 on `agent/wave8-batch-2` from pushed closeout `0eb68aea`; pin O084 before
-implementation.
+Current focus: review-ready in draft PR #226 on `agent/wave8-batch-2`; keep this card in `doing/` until the batch
+merges.
 
 ## Phase 1 -- Pin selector and attribution failures
 
@@ -27,7 +27,7 @@ implementation.
 - [x] Commit this card without mixing the proxy-metrics implementation (`424be3c2`).
 - [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
   head.
-- [ ] Publish with the metrics card in one Batch 2 PR; close both cards together only after merge.
+- [x] Publish with the metrics card in draft PR #226; close both cards together only after merge.
 
 Focused evidence (2026-08-20):
 

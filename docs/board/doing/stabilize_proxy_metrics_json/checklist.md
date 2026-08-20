@@ -1,7 +1,7 @@
 # Stabilize proxy metrics JSON checklist
 
-Current focus: active in Wave 8 Batch 2 on `agent/wave8-batch-2` from pushed closeout `0eb68aea`; pin O086 before
-implementation.
+Current focus: review-ready in draft PR #226 on `agent/wave8-batch-2`; keep this card in `doing/` until the batch
+merges.
 
 ## Phase 1 -- Pin byte and shape failures
 
@@ -27,7 +27,7 @@ implementation.
 - [x] Commit this card without mixing the cost-selector implementation (`e53a96ce`).
 - [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 2
   head.
-- [ ] Publish with the cost card in one Batch 2 PR; close both cards together only after merge.
+- [x] Publish with the cost card in draft PR #226; close both cards together only after merge.
 
 Focused evidence (2026-08-20):
 
