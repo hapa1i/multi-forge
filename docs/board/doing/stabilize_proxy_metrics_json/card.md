@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 12; parked.
+**Lane**: `doing/` -- implementation and verification are complete in draft PR #226 on `agent/wave8-batch-2`; close with
+the cost card only after the batch merges.
 
 **Finding**: O086 (LOW correctness/scriptability).
 

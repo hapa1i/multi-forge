@@ -585,8 +585,13 @@ forge proxy metrics my-proxy
 forge proxy metrics
 
 # JSON output (for scripting)
-forge proxy metrics --json
+forge proxy metrics --json            # {proxy_id: metrics | null} for every registered proxy
+forge proxy metrics my-proxy --json   # Raw metrics object for one selected proxy
 ```
+
+The bare JSON form always uses the proxy-ID mapping for zero, one, or many registrations, with `null` for an unreachable
+proxy. Selecting a proxy keeps the raw metrics object. Both forms write JSON directly to stdout without terminal
+wrapping or markup interpretation, so long or bracket-rich values remain valid data.
 
 Metrics are also available via the proxy's `GET /` endpoint under the `metrics` key:
 
@@ -623,6 +628,7 @@ human cost/activity views print a note when records in the selected window were 
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb
+forge telemetry costs show --by-verb          # Explicit spelling of the default view
 forge telemetry costs show --by-model         # Today's costs, by model
 forge telemetry costs show --period week      # This week
 forge telemetry costs show openrouter-anthropic    # Filter by proxy
@@ -630,6 +636,10 @@ forge telemetry costs show openrouter-anthropic    # Filter by proxy
 forge telemetry costs reset                   # Wipe ALL cost + usage telemetry to zero (prompts; --yes to skip)
 forge telemetry costs reset --dry-run         # Preview what would be removed, delete nothing
 ```
+
+`--by-verb` and `--by-model` are mutually exclusive. In the verb table, `run(s)` counts unique Forge run IDs and `reqs`
+counts downstream requests, so one workflow run that makes several model requests remains one run. The JSON form keeps
+both `by_verb` and `by_model` summaries regardless of the selected human breakdown.
 
 `today`, `week`, and `month` are local-calendar windows. Forge honors a process `TZ` supplied as an IANA key, an
 absolute or colon-prefixed TZif path, or a POSIX rule string; invalid values fall back to `/etc/localtime`.

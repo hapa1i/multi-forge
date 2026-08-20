@@ -20,8 +20,8 @@ security, performance, test-policy, output, and documentation rows as 19 parked 
 and the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up
 shipped in PR #222. Wave 8 order 8
 [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224;
-orders 9--10 and the external Batch 1 Stop follow-up shipped in PR #225, and orders 11--19 remain parked under the
-recorded batch plan.
+orders 9--10 and the external Batch 1 Stop follow-up shipped in PR #225. Batch 2 orders 11--12 are review-ready in draft
+PR #226 on `agent/wave8-batch-2`; orders 13--19 remain parked under the recorded batch plan.
 
 ## Goal
 
