@@ -18,7 +18,9 @@ shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273e
 security, performance, test-policy, output, and documentation rows as 19 parked members under
 [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--7 shipped in PRs #216--#223,
 and the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up
-shipped in PR #222. Wave 8 order 8 is next, and orders 8--19 remain parked.
+shipped in PR #222. Wave 8 order 8
+[`preserve_assistant_block_boundaries`](../preserve_assistant_block_boundaries/card.md) is active, and orders 9--19
+remain parked.
 
 ## Goal
 

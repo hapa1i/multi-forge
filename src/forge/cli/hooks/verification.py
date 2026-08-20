@@ -386,6 +386,16 @@ def _run_verification_check(
             )
 
 
+def _join_assistant_text_blocks(texts: list[str]) -> str:
+    """Join distinct text blocks without collapsing or doubling their line boundary."""
+    joined = texts[0]
+    for text in texts[1:]:
+        if not joined.endswith(("\n", "\r")) and not text.startswith(("\n", "\r")):
+            joined += "\n"
+        joined += text
+    return joined
+
+
 def _get_last_assistant_text_for_verification(
     transcript_path: str | Path,
     *,
@@ -444,7 +454,7 @@ def _get_last_assistant_text_for_verification(
                                 if isinstance(t, str) and t:
                                     texts.append(t)
                         if texts:
-                            joined = "".join(texts)
+                            joined = _join_assistant_text_blocks(texts)
                             if ts >= latest_ts:
                                 latest_ts = ts
                                 latest_text = joined
@@ -472,7 +482,7 @@ def _get_last_assistant_text_for_verification(
                                 texts.append(t)
 
                     if texts:
-                        joined = "".join(texts)
+                        joined = _join_assistant_text_blocks(texts)
                         if ts >= latest_ts:
                             latest_ts = ts
                             latest_text = joined

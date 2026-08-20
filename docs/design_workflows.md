@@ -350,6 +350,9 @@ To avoid false positives (promise appearing in quoted files, code examples, or e
 
 1. **Check only the last assistant message** — ignore tool results and conversation history
 2. **Require standalone line** — promise must appear on its own line, not embedded in prose
+3. **Preserve text-block boundaries** — adjacent non-empty assistant text blocks receive one newline only when neither
+   edge already supplies one. A promise that starts a later block therefore remains standalone, while promise text split
+   across blocks cannot be reconstructed into a false match.
 
 The re-inject prompt should instruct Claude accordingly:
 
