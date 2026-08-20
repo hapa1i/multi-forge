@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Callable
 from unittest.mock import AsyncMock
 
 import pytest
@@ -25,7 +26,15 @@ async def test_bug_o001_translated_litellm_route_carries_user_agent(monkeypatch:
     captured: dict[str, object] = {}
 
     class _Client:
-        async def create_completion(self, openai_request: dict[str, object], _request_id: str) -> dict[str, object]:
+        async def create_completion(
+            self,
+            openai_request: dict[str, object],
+            _request_id: str,
+            *,
+            on_provider_dispatch: Callable[[], None] | None = None,
+        ) -> dict[str, object]:
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             captured.update(openai_request)
             return {"choices": [{"message": {"content": "ok"}}], "usage": {}}
 

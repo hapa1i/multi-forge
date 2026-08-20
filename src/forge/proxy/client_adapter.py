@@ -13,7 +13,7 @@ Supports LiteLLM providers via core.llm's get_client().
 import json
 import logging
 import time
-from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Literal, Optional
 
 from forge.core.llm import (
     CompletionResponse,
@@ -64,7 +64,9 @@ class CoreLLMClientAdapter:
 
     The proxy expects clients with:
     - create_completion(openai_request, request_id) -> dict
-    - create_streaming_completion(openai_request, request_id) -> AsyncGenerator[dict, None]
+    - create_streaming_completion(openai_request, request_id) -> async dict stream
+
+    Both accept an optional ``on_provider_dispatch`` callback for attempt telemetry.
 
     This adapter wraps core.llm clients to provide that interface.
     Supports LiteLLM providers (remote and local).
@@ -234,12 +236,19 @@ class CoreLLMClientAdapter:
             result["_provider_meta"] = response.provider_meta.model_dump(exclude_none=True)
         return result
 
-    async def create_completion(self, openai_request: Dict[str, Any], request_id: str) -> Dict[str, Any]:
+    async def create_completion(
+        self,
+        openai_request: Dict[str, Any],
+        request_id: str,
+        *,
+        on_provider_dispatch: Callable[[], None] | None = None,
+    ) -> Dict[str, Any]:
         """Create a non-streaming completion.
 
         Args:
             openai_request: Request in OpenAI format.
             request_id: Request ID for logging.
+            on_provider_dispatch: Callback invoked immediately before provider I/O.
 
         Returns:
             Response in OpenAI format.
@@ -284,6 +293,8 @@ class CoreLLMClientAdapter:
 
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         response = await self._client.complete(messages, tools=tools, hyperparams=hyperparams)
 
         if response.usage:
@@ -304,13 +315,18 @@ class CoreLLMClientAdapter:
         return self._core_response_to_openai(response, self.model_name)
 
     async def create_streaming_completion(
-        self, openai_request: Dict[str, Any], request_id: str
+        self,
+        openai_request: Dict[str, Any],
+        request_id: str,
+        *,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Create a streaming completion.
 
         Args:
             openai_request: Request in OpenAI format.
             request_id: Request ID for logging.
+            on_provider_dispatch: Callback invoked immediately before provider I/O.
 
         Yields:
             Streaming chunks in OpenAI format.
@@ -361,6 +377,8 @@ class CoreLLMClientAdapter:
         final_usage: dict[str, int] = {}
         provider_meta_carried = False  # emit the trace-meta carrier chunk at most once
 
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         async for event in self._client.stream(messages, tools=tools, hyperparams=hyperparams):
             # Emit the provider-trace metadata as its own internal-only chunk the instant it
             # first appears (Phase 2). The core client publishes it on the FIRST content/tool

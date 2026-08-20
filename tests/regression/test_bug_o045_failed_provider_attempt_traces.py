@@ -1,15 +1,16 @@
 """Regression O045: failed billable provider attempts must leave one lifecycle trace.
 
-Root cause: ``server.py`` and ``responses_passthrough.py`` recorded cost and metrics after a provider dispatch failed
+Root causes: ``server.py`` and ``responses_passthrough.py`` recorded cost and metrics after a provider dispatch failed
 without recording the same attempt in provider-trace telemetry. The non-200 Responses seam also discarded the observed
-response lifecycle, causing trace explanation to misreport that the request had not left Forge.
+response lifecycle, causing trace explanation to misreport that the request had not left Forge. A later marker placed
+before adapter validation then mislabeled local request rejection as provider dispatch.
 """
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -17,6 +18,7 @@ from fastapi import HTTPException
 import forge.proxy.responses_passthrough as responses_passthrough
 from forge.core.ops import explain_provider_trace, render_explanation_lines
 from forge.core.ops.context import ExecutionContext
+from forge.proxy.client_adapter import CoreLLMClientAdapter
 from forge.proxy.converters import RequestConversionError
 from forge.proxy.data_models import Message, MessagesRequest
 from tests.fixtures.proxy_transport import FakeStream, ProxyTransportFake
@@ -50,10 +52,12 @@ class _ProxyConfig:
         return SimpleNamespace(tier_overrides={})
 
 
-def _message_request() -> MessagesRequest:
+def _message_request(*, stream: bool = False, temperature: float | None = None) -> MessagesRequest:
     return MessagesRequest(
         model="openai/gpt-5.5",
         max_tokens=16,
+        stream=stream,
+        temperature=temperature,
         messages=[Message(role="user", content="hello")],
     )
 
@@ -61,6 +65,7 @@ def _message_request() -> MessagesRequest:
 def _install_message_stubs(
     monkeypatch: pytest.MonkeyPatch,
     *,
+    client: Any | None = None,
     completion_error: Exception | None = None,
     conversion_error: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], AsyncMock, AsyncMock]:
@@ -68,8 +73,18 @@ def _install_message_stubs(
 
     traces: list[dict[str, Any]] = []
     costs: list[dict[str, Any]] = []
-    completion = AsyncMock(side_effect=completion_error)
-    get_client = AsyncMock(return_value=SimpleNamespace(create_completion=completion))
+
+    async def _complete(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        on_provider_dispatch = kwargs.get("on_provider_dispatch")
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
+        if completion_error is not None:
+            raise completion_error
+        return {}
+
+    completion = AsyncMock(side_effect=_complete)
+    test_client = client if client is not None else SimpleNamespace(create_completion=completion)
+    get_client = AsyncMock(return_value=test_client)
 
     async def _no_op_async(*_args: Any, **_kwargs: Any) -> None:
         return None
@@ -183,6 +198,53 @@ async def test_messages_pre_dispatch_conversion_failure_remains_trace_free(monke
     get_client.assert_not_awaited()
     completion.assert_not_awaited()
     assert costs == []
+    assert traces == []
+
+
+@pytest.mark.asyncio
+async def test_messages_adapter_validation_before_dispatch_remains_trace_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import forge.proxy.server as server
+
+    upstream_complete = AsyncMock()
+    adapter = CoreLLMClientAdapter.__new__(CoreLLMClientAdapter)
+    adapter.model_name = "openai/gpt-5.5"
+    adapter.max_tokens_override = None
+    adapter._client = MagicMock(complete=upstream_complete)  # type: ignore[assignment]
+    traces, costs, _get_client, _completion = _install_message_stubs(monkeypatch, client=adapter)
+
+    with pytest.raises(HTTPException) as raised:
+        await server.create_message(_message_request(temperature=3.0), cast(Any, _RawRequest()))
+
+    assert raised.value.status_code == 500
+    upstream_complete.assert_not_awaited()
+    assert len(costs) == 1
+    assert traces == []
+
+
+@pytest.mark.asyncio
+async def test_messages_streaming_adapter_validation_before_dispatch_remains_trace_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import forge.proxy.server as server
+
+    upstream_stream = MagicMock()
+    adapter = CoreLLMClientAdapter.__new__(CoreLLMClientAdapter)
+    adapter.model_name = "openai/gpt-5.5"
+    adapter.max_tokens_override = None
+    adapter._client = MagicMock(stream=upstream_stream)  # type: ignore[assignment]
+    traces, costs, _get_client, _completion = _install_message_stubs(monkeypatch, client=adapter)
+
+    response = await server.create_message(
+        _message_request(stream=True, temperature=3.0),
+        cast(Any, _RawRequest()),
+    )
+    _ = [chunk async for chunk in response.body_iterator]
+
+    assert response.status_code == 200
+    upstream_stream.assert_not_called()
+    assert len(costs) == 1
     assert traces == []
 
 

@@ -1110,6 +1110,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             "record_sink": _persist_proxy_downstream_record,
         }
 
+        def _mark_provider_dispatch() -> None:
+            """Mark the request only when the adapter is about to perform provider I/O."""
+            nonlocal provider_attempt_started
+            provider_attempt_started = True
+
         def _fail_non_streaming_conversion(openai_response: dict[str, Any], duration_ms: float) -> NoReturn:
             """Record a completed provider attempt whose response cannot reach the client."""
             raw_usage = openai_response.get("usage")
@@ -1201,7 +1206,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             # Streaming response
             async def stream_generator():
                 try:
-                    async for chunk in client.create_streaming_completion(openai_request_dict, request_id):
+                    async for chunk in client.create_streaming_completion(
+                        openai_request_dict,
+                        request_id,
+                        on_provider_dispatch=_mark_provider_dispatch,
+                    ):
                         yield chunk
                 except ProxyStreamError as e:
                     logger.error(f"[{request_id}] ProxyStreamError ({e.error_type}): {e}")
@@ -1291,18 +1300,19 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # a stream cancelled before the final usage chunk still carries the generation id here.
                 _trace = usage.get("_provider_trace") or {}
                 _lc = _trace.get("lifecycle", {})
-                record_provider_trace(
-                    **_trace_ctx,
-                    request_mode="streaming",
-                    provider_meta=_trace.get("provider_meta"),
-                    stream_started=_lc.get("stream_started", False),
-                    first_chunk_seen=_lc.get("first_chunk_seen", False),
-                    final_usage_seen=_lc.get("final_usage_seen", False),
-                    client_disconnected=_lc.get("client_disconnected", False),
-                    reported_cost_micros=usage.get("reported_cost_micros"),
-                    latency_ms=elapsed,
-                    downstream_event_id=downstream_event_id,
-                )
+                if provider_attempt_started:
+                    record_provider_trace(
+                        **_trace_ctx,
+                        request_mode="streaming",
+                        provider_meta=_trace.get("provider_meta"),
+                        stream_started=_lc.get("stream_started", False),
+                        first_chunk_seen=_lc.get("first_chunk_seen", False),
+                        final_usage_seen=_lc.get("final_usage_seen", False),
+                        client_disconnected=_lc.get("client_disconnected", False),
+                        reported_cost_micros=usage.get("reported_cost_micros"),
+                        latency_ms=elapsed,
+                        downstream_event_id=downstream_event_id,
+                    )
 
             _stream_log_cfg = _request_log_config()
             return StreamingResponse(
@@ -1319,8 +1329,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             )
         else:
             try:
-                provider_attempt_started = True
-                openai_response = await client.create_completion(openai_request_dict, request_id)
+                openai_response = await client.create_completion(
+                    openai_request_dict,
+                    request_id,
+                    on_provider_dispatch=_mark_provider_dispatch,
+                )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 
@@ -1425,9 +1438,12 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # Try refreshing credentials once
                 logger.warning(f"[{request_id}] Auth failed, refreshing credentials")
                 client = await client_factory.invalidate_and_retry(actual_model_id, tier=resolved_tier)
-                provider_attempt_started = True
                 provider_response_received = False
-                openai_response = await client.create_completion(openai_request_dict, request_id)
+                openai_response = await client.create_completion(
+                    openai_request_dict,
+                    request_id,
+                    on_provider_dispatch=_mark_provider_dispatch,
+                )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
 

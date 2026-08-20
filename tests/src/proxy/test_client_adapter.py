@@ -7,7 +7,7 @@ Anthropic-style history into OpenAI-like messages and then into core.llm types.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -119,6 +119,49 @@ def _make_adapter_with_mock_client() -> CoreLLMClientAdapter:
     adapter = CoreLLMClientAdapter(model="openai/gpt-5.2", provider="litellm_remote")
     adapter._client = MagicMock()
     return adapter
+
+
+@pytest.mark.asyncio
+async def test_create_completion_marks_dispatch_immediately_before_provider_call() -> None:
+    adapter = _make_adapter_with_mock_client()
+    dispatches: list[str] = []
+
+    async def _complete(*_args: Any, **_kwargs: Any) -> CompletionResponse:
+        assert dispatches == ["provider"]
+        return CompletionResponse(text="ok")
+
+    adapter._client = MagicMock(complete=AsyncMock(side_effect=_complete))  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+        request_id="req-dispatch",
+        on_provider_dispatch=lambda: dispatches.append("provider"),
+    )
+
+    assert dispatches == ["provider"]
+
+
+@pytest.mark.asyncio
+async def test_create_streaming_completion_marks_dispatch_immediately_before_provider_call() -> None:
+    adapter = _make_adapter_with_mock_client()
+    dispatches: list[str] = []
+
+    async def _stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[StreamEvent]:
+        assert dispatches == ["provider"]
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_stream)  # type: ignore[assignment]
+
+    _ = [
+        chunk
+        async for chunk in adapter.create_streaming_completion(
+            {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+            request_id="req-stream-dispatch",
+            on_provider_dispatch=lambda: dispatches.append("provider"),
+        )
+    ]
+
+    assert dispatches == ["provider"]
 
 
 @pytest.mark.asyncio

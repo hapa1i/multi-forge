@@ -2,9 +2,11 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--6 shipped in PRs #216--#221; orders 7--19 remain parked.
+**Lane**: `doing/` -- orders 1--6 shipped in PRs #216--#221; one corrective follow-up is active; orders 7--19 remain
+parked.
 
-**Current execution**: none; order 6 merged as `9d6deb7f` on 2026-08-20, and order 7 remains parked.
+**Current execution**: [`correct_wave8_merged_regressions`](../correct_wave8_merged_regressions/card.md) on
+`agent/fix-automated-review-regressions` from pushed `main` at `113b5670`; order 7 remains parked.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

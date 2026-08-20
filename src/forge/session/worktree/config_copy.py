@@ -185,8 +185,17 @@ def _copy_file(
         result.skipped_tracked.append(filename)
         return
 
+    # Git I/O gives another process time to replace a destination component.
+    # Recheck both the path and the no-overwrite invariant before any filesystem mutation.
+    if not is_symlink_free_config_path(worktree_path, relative_path) or dest_path.exists():
+        result.skipped_exists.append(filename)
+        return
+
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
+        if not is_symlink_free_config_path(worktree_path, relative_path) or dest_path.exists():
+            result.skipped_exists.append(filename)
+            return
         shutil.copy2(source_path, dest_path)
         result.copied.append(filename)
     except OSError as e:
