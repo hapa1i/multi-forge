@@ -1624,7 +1624,7 @@ def _display_all_metrics(
         for entry in proxies:
             info = _fetch_proxy_info(entry.base_url)
             results[entry.proxy_id] = info.metrics if info else None
-        console.print(json.dumps(results, indent=2))
+        click.echo(json.dumps(results, indent=2))
         return
 
     show_sep = len(proxies) > 1
@@ -1661,16 +1661,16 @@ def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
 
     if not proxy_id:
         proxies = store.list_proxies()
+        if as_json:
+            _display_all_metrics(console, proxies, as_json=True)
+            return
         if len(proxies) == 1:
             proxy_id = proxies[0].proxy_id
         elif len(proxies) == 0:
-            if as_json:
-                console.print(json.dumps({}, indent=2))
-            else:
-                console.print("[dim]No proxies registered.[/dim]")
+            console.print("[dim]No proxies registered.[/dim]")
             return
         else:
-            _display_all_metrics(console, proxies, as_json=as_json)
+            _display_all_metrics(console, proxies, as_json=False)
             return
 
     assert proxy_id is not None
@@ -1691,7 +1691,7 @@ def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
         sys.exit(1)
 
     if as_json:
-        console.print(json.dumps(info.metrics, indent=2))
+        click.echo(json.dumps(info.metrics, indent=2))
     else:
         _display_metrics(console, proxy_id, entry.base_url, info)
 
