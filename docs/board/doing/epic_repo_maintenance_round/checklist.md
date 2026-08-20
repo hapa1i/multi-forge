@@ -383,4 +383,4 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Ship Wave 8 order 7 independently in PR #223 (`92d71a6d`) and close it before activating order 8.
 - [x] Branch from pushed order-7 closeout `d196b866` and activate only Wave 8 order 8
   `preserve_assistant_block_boundaries`.
-- [ ] Ship Wave 8 order 8 independently and close it before activating order 9.
+- [ ] Ship Wave 8 order 8 independently in PR #224 and close it before activating order 9.

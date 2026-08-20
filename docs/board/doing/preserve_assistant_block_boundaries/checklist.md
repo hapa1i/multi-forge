@@ -26,8 +26,8 @@ Current focus: characterize and correct O087 on active Wave 8 order 8; orders 9-
 - [x] Run two targeted Docker Stop-hook checks, 9,328 unit tests with 124 deselected and zero skips, 983 regressions,
   full changed-file and repository pre-commit, the 59,979-token design/appendix and 18,052-token workflow design checks,
   the 404-document/977-link board check, and diff hygiene.
-- [ ] Commit and push the implementation, then open one draft PR without activating Wave 8 order 9.
-- [ ] Merge the PR and retain this card in `doing/` until its closeout lands on `main`.
+- [x] Commit and push the implementation as `e4d184fa`, then open draft PR #224 without activating Wave 8 order 9.
+- [ ] Merge PR #224 and retain this card in `doing/` until its closeout lands on `main`.
 
 ## Acceptance tests
 

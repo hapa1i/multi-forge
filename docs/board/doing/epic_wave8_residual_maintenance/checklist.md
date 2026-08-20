@@ -63,4 +63,4 @@ Current focus: preserve assistant block boundaries in active order 8; orders 9--
   split across blocks; keep single-block and existing-boundary content unchanged.
 - [x] Complete focused, unit, regression, targeted Docker Stop-hook, pre-commit, documentation-size, board, and diff
   gates; 77 focused, 9,328 unit, and 983 regression tests pass.
-- [ ] Ship order 8 independently and close it before activating order 9.
+- [ ] Ship order 8 independently in PR #224 and close it before activating order 9.
