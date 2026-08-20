@@ -1,8 +1,8 @@
 # Strip OpenAI account response headers
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 3; parked.
+**Lane**: `doing/` -- active on `agent/strip-openai-account-response-headers` from pushed closeout `cddfe5c3`.
 
 **Finding**: O074 (LOW security).
 
@@ -22,6 +22,11 @@ returned through both supported proxy transports.
 - Drop `OpenAI-Organization` and `OpenAI-Project` response headers case-insensitively in the shared relay policy.
 - Retain safe provider metadata, rate-limit/retry headers, connection-token filtering, and Forge's canonical request ID.
 - Pin both Messages and Responses relays and mixed-case header spellings.
+
+## Boundary
+
+The shared relay remains deny-by-name. Adding a provider or wire shape requires re-enumerating its account-identity
+response headers; this member closes only the verified OpenAI selectors.
 
 ## Verification
 

@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--2 shipped in PRs #216--#217; order 3 is next and all remaining 17 members are parked.
+**Lane**: `doing/` -- orders 1--2 shipped in PRs #216--#217; order 3 is active on
+`agent/strip-openai-account-response-headers` and orders 4--19 remain parked.
 
 **Execution base**: pushed closeout `7a2ad4c1` on 2026-08-19.
 
@@ -50,7 +51,7 @@ tracked-content safety follow; bounded CLI/state corrections and documentation c
 | ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | 1     | O045           | [`trace_failed_provider_attempts`](../../done/trace_failed_provider_attempts/card.md)                   | failed provider-attempt trace lifecycle |
 | 2     | O046           | [`offload_proxy_accounting_persistence`](../../done/offload_proxy_accounting_persistence/card.md)       | event-loop vs durable accounting I/O    |
-| 3     | O074           | [`strip_openai_account_response_headers`](../../todo/strip_openai_account_response_headers/card.md)     | upstream account metadata relay         |
+| 3     | O074           | [`strip_openai_account_response_headers`](../strip_openai_account_response_headers/card.md)             | upstream account metadata relay         |
 | 4     | O089, O090     | [`harden_worktree_config_copy_safety`](../../todo/harden_worktree_config_copy_safety/card.md)           | per-file copy/cleanup ownership         |
 | 5     | D056, O097     | [`unify_cli_failure_diagnostics`](../../todo/unify_cli_failure_diagnostics/card.md)                     | one diagnostic, one stderr stream       |
 | 6     | O072           | [`eliminate_runtime_test_skips`](../../todo/eliminate_runtime_test_skips/card.md)                       | deterministic unit coverage             |
