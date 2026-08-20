@@ -412,12 +412,16 @@ class TestStopVerificationDocker:
         policy_workspace.write_json(manifest_path, manifest)
 
         failure_id = "FAILED tests/integration/test_widget.py::test_late_failure"
+        captured_error = "ERROR    root:mod.py:10 captured error noise " + ("x" * 80)
         policy_workspace.mkdir("/tmp/verification-bin")
         policy_workspace.write_file(
             "/tmp/verification-bin/uv",
             "#!/bin/bash\n"
             "printf '%080d\\n' 0\n"
             "printf '%080d\\n' 0\n"
+            f"printf '%s\\n' '{captured_error}'\n"
+            f"printf '%s\\n' '{captured_error}'\n"
+            "printf '%s\\n' '=========================== short test summary info ============================'\n"
             f"printf '%s\\n' '{failure_id} - AssertionError: expected true'\n"
             "printf '%s\\n' '1 failed in 0.01s'\n"
             "printf '%s\\n' 'third-party plugin warning: unrelated cache notice' >&2\n"
@@ -436,6 +440,7 @@ class TestStopVerificationDocker:
         persisted = confirmed["last_error"]
         assert confirmed["last_result"] == "incomplete"
         assert failure_id in persisted
+        assert "captured error noise" not in persisted
         assert "third-party plugin warning" not in persisted
         assert len(persisted) <= 200
         assert f"Error: {persisted}\n\n" in stderr

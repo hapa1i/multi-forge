@@ -31,9 +31,11 @@ Current focus: implementation and aggregate verification are complete on `agent/
   - Focused Ruff, Black, isort, mypy, Pyright, and `git diff --check` -- passed (Pyright printed only its newer-version
     notice).
 - [x] Run the full unit/regression suites and `make pre-commit` on the integrated Batch 1 head:
-  `9,330 passed, 124 deselected`; `990 passed`; all hooks passed.
+  `9,331 passed, 124 deselected`; `992 passed`; all hooks passed.
 - [x] Record exact verification evidence and commit this card without mixing another Batch 1 implementation
   (`bb809245`).
+- [x] Address PR review test isolation: instantiate each parameterized adapter inside its test with explicit stub
+  credentials; importing the regression module leaves `CredentialManager._default_instance` unset.
 
 ## Acceptance tests
 

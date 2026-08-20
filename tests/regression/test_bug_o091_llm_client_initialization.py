@@ -8,6 +8,7 @@ resolution. Concurrent first callers could therefore construct different
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -21,24 +22,24 @@ pytestmark = pytest.mark.regression
 
 
 def _make_litellm_client() -> LiteLLMClient:
-    return LiteLLMClient(model="openai/gpt-5.5", provider="litellm_remote")
+    return LiteLLMClient(model="openai/gpt-5.5", provider="litellm_remote", credentials=MagicMock())
 
 
 def _make_openrouter_client() -> OpenRouterClient:
-    return OpenRouterClient(model="openai/gpt-5.5", provider="openrouter")
+    return OpenRouterClient(model="openai/gpt-5.5", provider="openrouter", credentials=MagicMock())
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("client", "client_module", "credentials"),
+    ("client_factory", "client_module", "credentials"),
     [
         (
-            _make_litellm_client(),
+            _make_litellm_client,
             litellm,
             {"api_key": "litellm-key", "base_url": "https://litellm.example.test"},
         ),
         (
-            _make_openrouter_client(),
+            _make_openrouter_client,
             openrouter,
             {
                 "api_key": "openrouter-key",
@@ -50,11 +51,12 @@ def _make_openrouter_client() -> OpenRouterClient:
 )
 async def test_concurrent_cold_start_constructs_one_client(
     monkeypatch: pytest.MonkeyPatch,
-    client: LiteLLMClient | OpenRouterClient,
+    client_factory: Callable[[], LiteLLMClient | OpenRouterClient],
     client_module: Any,
     credentials: dict[str, str],
 ) -> None:
     """A second cold caller must reuse the first caller's initialized client."""
+    client = client_factory()
     release_credentials = asyncio.Event()
     credential_calls = 0
 
@@ -131,14 +133,15 @@ async def test_litellm_constructor_failure_closes_custom_ca_transport(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "client",
-    [_make_litellm_client(), _make_openrouter_client()],
+    "client_factory",
+    [_make_litellm_client, _make_openrouter_client],
     ids=("litellm", "openrouter"),
 )
 async def test_hot_cache_skips_credential_resolution(
-    client: LiteLLMClient | OpenRouterClient,
+    client_factory: Callable[[], LiteLLMClient | OpenRouterClient],
 ) -> None:
     """An initialized adapter must keep its lock-free cache-hit path."""
+    client = client_factory()
     cached_client = MagicMock()
     client._client = cached_client
     credentials_manager = MagicMock()

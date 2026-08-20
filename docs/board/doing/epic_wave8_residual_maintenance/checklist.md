@@ -75,8 +75,9 @@ and published in draft PR #225; the three cards remain in `doing/` pending revie
 - [x] Run combined unit, regression, pre-commit, board/link, and diff gates on the integrated branch head.
 - [x] Publish one Batch 1 review branch in draft PR #225; close all three cards together only after the batch merges.
 
-Batch 1 review evidence (2026-08-20): the targeted Stop Docker method passed once; `make test-unit` passed 9,330 tests
-with 124 deselected; `make test-regression` passed 990 tests; and `make pre-commit` passed every hook. Final Markdown,
-and `git diff --check` gates passed after the evidence update; all 1,002 local link targets across 407 board documents
-had existing paths, all 214 local paths/fragments across the 11 changed Markdown documents resolved, and no stale
-`todo/` link remained for a Batch 1 card.
+Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
+tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
+also restored the zero-progress GC JSON pin and removed collection-time LLM adapter/default-credential construction.
+Final Markdown and `git diff --check` gates passed after the evidence update; all 1,002 local link targets across 407
+board documents had existing paths, all 214 local paths/fragments across the 11 changed Markdown documents resolved, and
+no stale `todo/` link remained for a Batch 1 card.

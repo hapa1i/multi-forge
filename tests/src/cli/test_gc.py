@@ -269,6 +269,26 @@ class TestCleanCmdYes:
         assert data["skipped_project_compatibility"][0]["root"] == "/project"
         assert data["skipped_project_compatibility"][0]["state"] == "incompatible"
 
+    def test_json_apply_reports_zero_progress_failure_and_exits_nonzero_with_clean_stderr(self) -> None:
+        import json
+
+        report = _make_report(total=1)
+        clean_result = CleanResult(failed=[("/project/stale", "permission denied")])
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean", return_value=clean_result),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--yes", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stderr == ""
+        data = json.loads(result.stdout)
+        assert data["deleted"] == 0
+        assert data["categories_cleaned"] == {}
+        assert data["failed"] == [{"item": "/project/stale", "error": "permission denied"}]
+        assert data["skipped_project_compatibility"] == []
+
     def test_json_apply_reports_partial_active_cleanup_and_exits_nonzero_with_clean_stderr(self) -> None:
         import json
 

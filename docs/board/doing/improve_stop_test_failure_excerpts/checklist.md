@@ -32,13 +32,16 @@ Current focus: implementation and aggregate verification are complete on `agent/
   failed because warning-only stderr displaced the late stdout failure ID.
 - Focused:
   `uv run pytest tests/src/cli/test_stop_verification.py tests/regression/test_bug_d006_stop_test_suite_contract.py -q`
-  -- `20 passed in 0.46s`.
+  -- `22 passed in 0.39s`.
+- PR review fail-first: the captured-log regression failed because `ERROR root:...` records consumed the 200-character
+  bound before the later `FAILED <node-id>` summary. The final selector anchors on pytest's short-summary marker and
+  prefers `FAILED` over `ERROR` in its markerless fallback; the same coverage also pins an ERROR-only short summary.
 - Static: `uv run ruff check` on the four touched Python files and `git diff --check` both passed.
 - Targeted Docker:
   `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py::TestStopVerificationDocker::test_fixed_suite_failure_prefers_late_stdout_summary`
-  -- `1 passed in 7.56s`.
-- Integrated Batch 1 head: `make test-unit` -- `9,330 passed, 124 deselected`; `make test-regression` -- `990 passed`;
-  `make pre-commit` -- passed.
+  -- `1 passed in 10.37s` with captured ERROR-log noise ahead of the short summary.
+- Integrated Batch 1 head after PR review: `make test-unit` -- `9,331 passed, 124 deselected`; `make test-regression` --
+  `992 passed`; `make pre-commit` -- passed.
 
 ## Acceptance tests
 

@@ -28,10 +28,11 @@ Focused evidence (2026-08-20):
   `uv run pytest tests/src/core/ops/test_gc.py::TestRunClean::test_active_cleanup_records_failure_and_continues_scoped_removals -q`
   failed at the missing `CleanResult.failed` assertion (`1 failed`).
 - Targeted regression and scope checks: `4 passed`.
-- `uv run pytest tests/src/core/ops/test_gc.py tests/src/cli/test_gc.py -q`: `100 passed`.
+- `uv run pytest tests/src/core/ops/test_gc.py tests/src/cli/test_gc.py -q`: `101 passed`, including the restored
+  zero-progress JSON failure pin requested in PR review.
 - Focused Ruff, repository-configured Black, isort hook, and `git diff --check`: passed.
-- Integrated Batch 1 head: `make test-unit` -- `9,330 passed, 124 deselected`; `make test-regression` -- `990 passed`;
-  `make pre-commit` -- passed.
+- Integrated Batch 1 head after PR review: `make test-unit` -- `9,331 passed, 124 deselected`; `make test-regression` --
+  `992 passed`; `make pre-commit` -- passed.
 
 ## Acceptance tests
 

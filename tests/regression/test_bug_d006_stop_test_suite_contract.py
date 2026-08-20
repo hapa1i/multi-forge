@@ -180,6 +180,61 @@ def test_failed_test_diagnostic_prefers_late_stdout_summary_after_redaction(
     assert f"Error: {persisted}\n\n" in message
 
 
+def test_failed_test_diagnostic_ignores_captured_error_logs_before_short_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, manifest, _ = _configured_store(tmp_path)
+    transcript = _write_transcript(tmp_path / "transcript.jsonl")
+    failure_id = "FAILED tests/regression/test_stop_failure_excerpts.py::test_logged_failure"
+    captured_logs = "\n".join(
+        f"ERROR    root:mod.py:{line} captured error noise " + ("x" * 80) for line in range(10, 14)
+    )
+    stdout = (
+        "=================================== FAILURES ===================================\n"
+        "------------------------------ Captured log call -------------------------------\n"
+        f"{captured_logs}\n"
+        "=========================== short test summary info ============================\n"
+        f"{failure_id} - AssertionError: expected true\n"
+        "============================== 1 failed in 0.01s ===============================\n"
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_kwargs: subprocess.CompletedProcess(
+            cmd,
+            1,
+            stdout=stdout.encode(),
+            stderr=b"third-party plugin warning\n",
+        ),
+    )
+
+    allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+    assert allow is False and message is not None
+    confirmed = store.read().confirmed.verification
+    assert confirmed is not None
+    persisted = confirmed.last_error
+    assert persisted is not None
+    assert failure_id in persisted
+    assert "captured error noise" not in persisted
+    assert len(persisted) <= 200
+    assert f"Error: {persisted}\n\n" in message
+
+
+def test_failure_excerpt_keeps_error_only_short_summary() -> None:
+    error_id = "ERROR tests/regression/test_stop_failure_excerpts.py::test_setup_failure"
+    stdout = (
+        "ERROR    root:mod.py:10 captured error noise\n"
+        "=========================== short test summary info ============================\n"
+        f"{error_id} - RuntimeError: fixture failed\n"
+    )
+
+    assert verification._select_test_failure_excerpt(stdout, "plugin warning\n") == (
+        f"{error_id} - RuntimeError: fixture failed"
+    )
+
+
 def test_incomplete_result_fails_open_when_state_cannot_be_persisted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
