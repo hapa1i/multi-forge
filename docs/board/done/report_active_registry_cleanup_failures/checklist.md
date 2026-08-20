@@ -1,7 +1,6 @@
 # Report active-registry cleanup failures checklist
 
-Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
-`17126b65`; awaiting Batch 1 review and merge.
+Current focus: complete -- O088 shipped in Batch 1 PR #225 and the card is closed.
 
 ## Phase 1 -- Pin the failure
 
@@ -21,6 +20,7 @@ Current focus: implementation and aggregate verification are complete on `agent/
 - [x] Run focused core GC and CLI tests, the regression suite, full unit tests, and `make pre-commit`.
 - [x] Record exact verification evidence and commit this card without mixing another Batch 1 implementation
   (`17126b65`).
+- [x] Merge Batch 1 as `fd548c8e`, confirm all five GitHub checks, record the closeout, and move this card to `done/`.
 
 Focused evidence (2026-08-20):
 

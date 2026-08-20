@@ -1,7 +1,6 @@
 # Serialize LLM client initialization checklist
 
-Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
-`bb809245`; awaiting Batch 1 review and merge.
+Current focus: complete -- O091 shipped in Batch 1 PR #225 and the card is closed.
 
 ## Phase 1 -- Pin the race and cleanup boundary
 
@@ -36,6 +35,7 @@ Current focus: implementation and aggregate verification are complete on `agent/
   (`bb809245`).
 - [x] Address PR review test isolation: instantiate each parameterized adapter inside its test with explicit stub
   credentials; importing the regression module leaves `CredentialManager._default_instance` unset.
+- [x] Merge Batch 1 as `fd548c8e`, confirm all five GitHub checks, record the closeout, and move this card to `done/`.
 
 ## Acceptance tests
 

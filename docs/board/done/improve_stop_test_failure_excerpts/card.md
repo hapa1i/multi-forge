@@ -3,10 +3,12 @@
 **Origin**: Post-implementation review of
 [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md).
 
-**Batch coordinator**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md) (execution/review
-association only; not Wave 8 finding credit).
+**Batch coordinator**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md)
+(execution/review association only; not Wave 8 finding credit).
 
-**Lane**: `doing/` -- active in Wave 8 Batch 1 on `agent/wave8-batch-1` from `2bc3b56b`.
+**Lane**: `done/` -- shipped in Batch 1 PR #225 (`fd548c8e`) on 2026-08-20.
+
+**Execution**: `agent/wave8-batch-1` from pushed `main` at `2bc3b56b`.
 
 ## Goal
 
@@ -29,4 +31,6 @@ summary and stderr contains only plugin or warning noise.
 - Displayed and persisted diagnostics remain at most 200 characters and use the same content.
 - The fixed `uv run pytest` argv, no-shell execution, result classification, and fail-open infrastructure posture do not
   change.
-- Focused Stop-verification tests and `make pre-commit` pass.
+- Focused Stop-verification coverage passed 22 tests and the strengthened Docker boundary passed once. The integrated
+  Batch 1 head passed 9,331 unit tests with 124 deselected, 992 regressions, full pre-commit, board/link checks, and all
+  five GitHub checks.

@@ -1,7 +1,6 @@
 # Improve Stop test-suite failure excerpts checklist
 
-Current focus: implementation and aggregate verification are complete on `agent/wave8-batch-1` in card commit
-`664bb28b`; awaiting Batch 1 review and merge.
+Current focus: complete -- the Stop diagnostic follow-up shipped in Batch 1 PR #225 and the card is closed.
 
 ## Phase 1 -- Pin the diagnostic failure
 
@@ -23,7 +22,8 @@ Current focus: implementation and aggregate verification are complete on `agent/
 - [x] Run the targeted Docker method and `make pre-commit` on the integrated Batch 1 branch.
 - [x] Record exact focused verification evidence without mixing another Batch 1 implementation.
 - [x] Commit this card without mixing another Batch 1 implementation (`664bb28b`).
-- [ ] Close this card with the other Batch 1 cards after the batch merges.
+- [x] Merge Batch 1 as `fd548c8e`, confirm all five GitHub checks, record the closeout, and move this card to `done/`
+  with the other Batch 1 cards.
 
 ## Verification evidence
 

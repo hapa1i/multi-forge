@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 1 implementation and aggregate verification are complete on `agent/wave8-batch-1` from `2bc3b56b`
-and published in draft PR #225; the three cards remain in `doing/` pending review and merge.
+Current focus: Batch 1 shipped in PR #225 (`fd548c8e`) and all three cards are closed; Batch 2 remains parked pending
+activation from the pushed closeout.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -74,6 +74,8 @@ and published in draft PR #225; the three cards remain in `doing/` pending revie
   `664bb28b`).
 - [x] Run combined unit, regression, pre-commit, board/link, and diff gates on the integrated branch head.
 - [x] Publish one Batch 1 review branch in draft PR #225; close all three cards together only after the batch merges.
+- [x] Merge Batch 1 as `fd548c8e`, confirm all five GitHub checks, add the shared change-log record, repoint inbound
+  links, and move all three cards to `done/` before activating Batch 2.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review

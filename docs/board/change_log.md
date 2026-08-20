@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Close Wave 8 Batch 1 correctness fixes
+
+**Goal/outcome**: Make cleanup failures truthful, lazy LLM client initialization singular, and failed Stop diagnostics
+retain the useful pytest summary.
+
+**Key changes**:
+
+- Reported scoped active-registry cleanup failures while continuing later removals and counting only confirmed work.
+- Serialized concurrent LiteLLM/OpenRouter cold starts and closed a custom-CA transport when construction fails.
+- Selected redacted pytest short-summary failures across mixed streams without captured ERROR logs displacing node IDs.
+
+**Verification**: 101 focused GC/CLI, 211 focused LLM/auth, 22 focused Stop, four no-`.env` credential, and one targeted
+Docker test; 9,331 unit with 124 deselected; 992 regression; pre-commit/diff and board/link gates. PR #225 merged as
+`fd548c8e` with all five GitHub checks passing.
+
 ### Preserve assistant block boundaries
 
 **Goal/outcome**: Keep standalone completion promises recognizable across separate assistant text blocks without

@@ -786,31 +786,32 @@ width was hard-wrapped and failed `json.loads`. O083's reported typo behavior wa
 `dacite.from_dict` call; contrary to the old annotation, that call is non-strict. The remaining admitted LOW rows have
 direct single-boundary controls named on their cards. No Forge workflow or external model call was used.
 
-| Order | Findings       | Accepted member                                                                                    |
-| ----- | -------------- | -------------------------------------------------------------------------------------------------- |
-| 1     | O045           | [`trace_failed_provider_attempts`](done/trace_failed_provider_attempts/card.md)                    |
-| 2     | O046           | [`offload_proxy_accounting_persistence`](done/offload_proxy_accounting_persistence/card.md)        |
-| 3     | O074           | [`strip_openai_account_response_headers`](done/strip_openai_account_response_headers/card.md)      |
-| 4     | O089/O090      | [`harden_worktree_config_copy_safety`](done/harden_worktree_config_copy_safety/card.md)            |
-| 5     | D056/O097      | [`unify_cli_failure_diagnostics`](done/unify_cli_failure_diagnostics/card.md)                      |
-| 6     | O072           | [`eliminate_runtime_test_skips`](done/eliminate_runtime_test_skips/card.md)                        |
-| 7     | O083           | [`reject_unknown_workflow_policy_keys`](done/reject_unknown_workflow_policy_keys/card.md)          |
-| 8     | O087           | [`preserve_assistant_block_boundaries`](done/preserve_assistant_block_boundaries/card.md)          |
-| 9     | O088           | [`report_active_registry_cleanup_failures`](doing/report_active_registry_cleanup_failures/card.md) |
-| 10    | O091           | [`serialize_llm_client_initialization`](doing/serialize_llm_client_initialization/card.md)         |
-| 11    | O084           | [`fix_cost_breakdown_selectors`](todo/fix_cost_breakdown_selectors/card.md)                        |
-| 12    | O086           | [`stabilize_proxy_metrics_json`](todo/stabilize_proxy_metrics_json/card.md)                        |
-| 13    | O080           | [`align_supervisor_missing_config_exits`](todo/align_supervisor_missing_config_exits/card.md)      |
-| 14    | O077           | [`reject_ambiguous_policy_check_input`](todo/reject_ambiguous_policy_check_input/card.md)          |
-| 15    | O076           | [`validate_proxy_audit_limits`](todo/validate_proxy_audit_limits/card.md)                          |
-| 16    | O081           | [`log_forge_info_probe_degradation`](todo/log_forge_info_probe_degradation/card.md)                |
-| 17    | O085           | [`reuse_transcript_reference_scan`](todo/reuse_transcript_reference_scan/card.md)                  |
-| 18    | O100           | [`explain_type_suppressions`](todo/explain_type_suppressions/card.md)                              |
-| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](todo/sync_residual_runtime_documentation/card.md)          |
+| Order | Findings       | Accepted member                                                                                   |
+| ----- | -------------- | ------------------------------------------------------------------------------------------------- |
+| 1     | O045           | [`trace_failed_provider_attempts`](done/trace_failed_provider_attempts/card.md)                   |
+| 2     | O046           | [`offload_proxy_accounting_persistence`](done/offload_proxy_accounting_persistence/card.md)       |
+| 3     | O074           | [`strip_openai_account_response_headers`](done/strip_openai_account_response_headers/card.md)     |
+| 4     | O089/O090      | [`harden_worktree_config_copy_safety`](done/harden_worktree_config_copy_safety/card.md)           |
+| 5     | D056/O097      | [`unify_cli_failure_diagnostics`](done/unify_cli_failure_diagnostics/card.md)                     |
+| 6     | O072           | [`eliminate_runtime_test_skips`](done/eliminate_runtime_test_skips/card.md)                       |
+| 7     | O083           | [`reject_unknown_workflow_policy_keys`](done/reject_unknown_workflow_policy_keys/card.md)         |
+| 8     | O087           | [`preserve_assistant_block_boundaries`](done/preserve_assistant_block_boundaries/card.md)         |
+| 9     | O088           | [`report_active_registry_cleanup_failures`](done/report_active_registry_cleanup_failures/card.md) |
+| 10    | O091           | [`serialize_llm_client_initialization`](done/serialize_llm_client_initialization/card.md)         |
+| 11    | O084           | [`fix_cost_breakdown_selectors`](todo/fix_cost_breakdown_selectors/card.md)                       |
+| 12    | O086           | [`stabilize_proxy_metrics_json`](todo/stabilize_proxy_metrics_json/card.md)                       |
+| 13    | O080           | [`align_supervisor_missing_config_exits`](todo/align_supervisor_missing_config_exits/card.md)     |
+| 14    | O077           | [`reject_ambiguous_policy_check_input`](todo/reject_ambiguous_policy_check_input/card.md)         |
+| 15    | O076           | [`validate_proxy_audit_limits`](todo/validate_proxy_audit_limits/card.md)                         |
+| 16    | O081           | [`log_forge_info_probe_degradation`](todo/log_forge_info_probe_degradation/card.md)               |
+| 17    | O085           | [`reuse_transcript_reference_scan`](todo/reuse_transcript_reference_scan/card.md)                 |
+| 18    | O100           | [`explain_type_suppressions`](todo/explain_type_suppressions/card.md)                             |
+| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](todo/sync_residual_runtime_documentation/card.md)         |
 
 The separately parked policy-check vocabulary and Stop-excerpt cards are not review-row credit for this admission.
-Members remain one-at-a-time review boundaries; provider tracing precedes accounting offload, and both precede the
-cost-view correction that reads their durable evidence.
+Members retain separate implementation, acceptance, and closeout boundaries when an epic-authorized batch shares one
+review; provider tracing precedes accounting offload, and both precede the cost-view correction that reads their durable
+evidence.
 
 ### Coordination boundaries
 
@@ -824,7 +825,7 @@ The linked cards retain acceptance, verification, and closeout detail; this tabl
 | [CLI/proxy/runtime](done/epic_cli_proxy_runtime_correctness/card.md), [diagnostic hygiene](done/epic_proxy_diagnostic_data_hygiene/card.md), and [conversion failure](done/epic_proxy_conversion_failure_handling/card.md) | Closed; Wave 5 shipped.                                                                              |
 | [Wave 6 correctness](done/epic_wave6_correctness_maintenance/card.md)                                                                                                                                                      | Closed at 36 verified findings across 13 members; D033/O020 rejected.                                |
 | [Wave 7 refactor/deletion](done/epic_wave7_refactor_and_deletion/card.md)                                                                                                                                                  | Closed at 32 findings across 35 members; bounded post-merge corrections did not change those counts. |
-| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--8 shipped; order 9 and the remaining ten members are parked.                               |
+| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--10 shipped; Batch 2 is next and orders 11--19 remain parked.                               |
 
 ## Strengths (preserve these)
 

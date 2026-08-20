@@ -2,7 +2,9 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active in Wave 8 Batch 1 on `agent/wave8-batch-1` from `2bc3b56b`.
+**Lane**: `done/` -- shipped in Batch 1 PR #225 (`fd548c8e`) on 2026-08-20.
+
+**Execution**: `agent/wave8-batch-1` from pushed `main` at `2bc3b56b`.
 
 **Finding**: O091 (LOW race/resource leak).
 
@@ -26,5 +28,6 @@ still owns its pool.
 
 ## Verification
 
-Add deterministic concurrent cold-start tests for both adapters plus construction-failure cleanup. Run focused core LLM
-and auth-retry tests, full unit/regression suites, the relevant no-`.env` auth path, and `make pre-commit`.
+The focused LLM/auth slice passed 211 tests and the no-`.env` file-credential path passed four. The integrated Batch 1
+head passed 9,331 unit tests with 124 deselected, 992 regressions, full pre-commit, board/link checks, and all five
+GitHub checks.

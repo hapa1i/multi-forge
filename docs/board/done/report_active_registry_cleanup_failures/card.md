@@ -2,7 +2,9 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active in Wave 8 Batch 1 on `agent/wave8-batch-1` from `2bc3b56b`.
+**Lane**: `done/` -- shipped in Batch 1 PR #225 (`fd548c8e`) on 2026-08-20.
+
+**Execution**: `agent/wave8-batch-1` from pushed `main` at `2bc3b56b`.
 
 **Finding**: O088 (LOW correctness).
 
@@ -25,4 +27,5 @@ exit status.
 
 ## Verification
 
-Run focused GC/CLI tests, full unit/regression suites, and `make pre-commit`.
+Focused GC/CLI coverage passed 101 tests. The integrated Batch 1 head passed 9,331 unit tests with 124 deselected, 992
+regressions, full pre-commit, board/link checks, and all five GitHub checks.
