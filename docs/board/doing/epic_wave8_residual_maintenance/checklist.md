@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: the five-batch plan is recorded, no batch is active, and all Batch 1 cards remain parked pending explicit
-activation.
+Current focus: Batch 1 implementation and aggregate verification are complete on `agent/wave8-batch-1` from `2bc3b56b`
+and published in draft PR #225; the three cards remain in `doing/` pending review and merge.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -68,3 +68,16 @@ activation.
 - [x] Record five remaining review batches and the epic-authorized batch process without activating any selected card;
   Markdown hooks, 999 board link paths, 101 changed-document paths/fragments, parked-lane, stale-sequencing, and diff
   checks pass.
+- [x] Activate Batch 1 from `2bc3b56b`; move orders 9--10 and the external Stop follow-up to `doing/`, create separate
+  checklists, and record the shared branch and base.
+- [x] Complete and commit each Batch 1 card within its own implementation boundary (`17126b65`, `bb809245`, and
+  `664bb28b`).
+- [x] Run combined unit, regression, pre-commit, board/link, and diff gates on the integrated branch head.
+- [x] Publish one Batch 1 review branch in draft PR #225; close all three cards together only after the batch merges.
+
+Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
+tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
+also restored the zero-progress GC JSON pin and removed collection-time LLM adapter/default-credential construction.
+Final Markdown and `git diff --check` gates passed after the evidence update; all 1,002 local link targets across 407
+board documents had existing paths, all 214 local paths/fragments across the 11 changed Markdown documents resolved, and
+no stale `todo/` link remained for a Batch 1 card.

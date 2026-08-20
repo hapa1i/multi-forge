@@ -402,6 +402,49 @@ class TestStopVerificationDocker:
         confirmed = read_manifest(policy_workspace)["confirmed"]["verification"]
         assert confirmed["last_result"] == "passed"
 
+    def test_fixed_suite_failure_prefers_late_stdout_summary(self, policy_workspace: ContainerLike) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["verification"] = {
+            "type": "test_suite",
+            "on_incomplete": "block",
+        }
+        policy_workspace.write_json(manifest_path, manifest)
+
+        failure_id = "FAILED tests/integration/test_widget.py::test_late_failure"
+        captured_error = "ERROR    root:mod.py:10 captured error noise " + ("x" * 80)
+        policy_workspace.mkdir("/tmp/verification-bin")
+        policy_workspace.write_file(
+            "/tmp/verification-bin/uv",
+            "#!/bin/bash\n"
+            "printf '%080d\\n' 0\n"
+            "printf '%080d\\n' 0\n"
+            f"printf '%s\\n' '{captured_error}'\n"
+            f"printf '%s\\n' '{captured_error}'\n"
+            "printf '%s\\n' '=========================== short test summary info ============================'\n"
+            f"printf '%s\\n' '{failure_id} - AssertionError: expected true'\n"
+            "printf '%s\\n' '1 failed in 0.01s'\n"
+            "printf '%s\\n' 'third-party plugin warning: unrelated cache notice' >&2\n"
+            "exit 1\n",
+        )
+        policy_workspace.exec("chmod +x /tmp/verification-bin/uv")
+        policy_workspace.write_file(
+            "/tmp/stop-transcript.jsonl",
+            '{"timestamp":"2026-08-05T00:00:00Z","message":{"role":"assistant","content":[{"text":"done"}]}}',
+        )
+
+        exit_code, _stdout, stderr = invoke_stop(policy_workspace)
+
+        assert exit_code == 2
+        confirmed = read_manifest(policy_workspace)["confirmed"]["verification"]
+        persisted = confirmed["last_error"]
+        assert confirmed["last_result"] == "incomplete"
+        assert failure_id in persisted
+        assert "captured error noise" not in persisted
+        assert "third-party plugin warning" not in persisted
+        assert len(persisted) <= 200
+        assert f"Error: {persisted}\n\n" in stderr
+
 
 # =============================================================================
 # CodexPolicyCheck Tests

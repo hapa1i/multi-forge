@@ -31,6 +31,8 @@ _MAX_DIAGNOSTIC_CHARS = 200
 _FORGE_OVERHEAD_WARNING_SECONDS = 0.1
 _SECRET_ASSIGNMENT_RE = re.compile(r"(?im)\b(api[_-]?key|token|secret|password|authorization)\b(\s*[:=]\s*)([^\r\n]*)")
 _TOKEN_PREFIX_RE = re.compile(r"\b(?:sk|gh[pousr])-[A-Za-z0-9_-]{8,}\b|\bgh[pousr]_[A-Za-z0-9_]{8,}\b")
+_PYTEST_FAILURE_SUMMARY_RE = re.compile(r"^\s*(?P<kind>FAILED|ERROR)\s+\S")
+_PYTEST_SHORT_SUMMARY_MARKER_RE = re.compile(r"^\s*=+\s+short test summary info\s+=+\s*$", re.IGNORECASE)
 
 _VerificationStatus = Literal["passed", "incomplete", "misconfigured", "infrastructure_error"]
 
@@ -59,8 +61,8 @@ def _warn_if_forge_overhead_exceeded(*, started: float, external_seconds: float,
         )
 
 
-def _bounded_diagnostic(value: str | bytes | None) -> str:
-    """Redact known credentials and bound untrusted verification diagnostics."""
+def _redacted_diagnostic(value: str | bytes | None) -> str:
+    """Decode and redact untrusted verification diagnostics without truncating them."""
     if value is None:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
@@ -71,7 +73,55 @@ def _bounded_diagnostic(value: str | bytes | None) -> str:
                 text = text.replace(secret, "[REDACTED]")
     text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text)
     text = _TOKEN_PREFIX_RE.sub("[REDACTED]", text)
-    return text[:_MAX_DIAGNOSTIC_CHARS]
+    return text
+
+
+def _bounded_diagnostic(value: str | bytes | None) -> str:
+    """Redact known credentials and bound untrusted verification diagnostics."""
+    return _redacted_diagnostic(value)[:_MAX_DIAGNOSTIC_CHARS]
+
+
+def _pytest_failure_lines(stream: str, *, after_short_summary_marker: bool) -> list[tuple[str, str]]:
+    lines = stream.splitlines()
+    if after_short_summary_marker:
+        marker_indexes = [index for index, line in enumerate(lines) if _PYTEST_SHORT_SUMMARY_MARKER_RE.match(line)]
+        if not marker_indexes:
+            return []
+        lines = lines[marker_indexes[-1] + 1 :]
+
+    matches: list[tuple[str, str]] = []
+    for line in lines:
+        match = _PYTEST_FAILURE_SUMMARY_RE.match(line)
+        if match:
+            matches.append((match.group("kind"), line.strip()))
+    return matches
+
+
+def _preferred_pytest_failure_lines(matches: list[tuple[str, str]]) -> str:
+    failed = [line for kind, line in matches if kind == "FAILED"]
+    selected = failed or [line for kind, line in matches if kind == "ERROR"]
+    return "\n".join(selected)
+
+
+def _select_test_failure_excerpt(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
+    """Select pytest summary lines before falling back to the prior stderr-first posture."""
+    # Redact complete streams before selecting lines or applying a character
+    # boundary. Truncating first could leave an unmatched fragment of a secret.
+    redacted_stdout = _redacted_diagnostic(stdout)
+    redacted_stderr = _redacted_diagnostic(stderr)
+    streams = (redacted_stdout, redacted_stderr)
+    summary_matches = [
+        match for stream in streams for match in _pytest_failure_lines(stream, after_short_summary_marker=True)
+    ]
+    if summary_matches:
+        return _preferred_pytest_failure_lines(summary_matches)
+
+    fallback_matches = [
+        match for stream in streams for match in _pytest_failure_lines(stream, after_short_summary_marker=False)
+    ]
+    if fallback_matches:
+        return _preferred_pytest_failure_lines(fallback_matches)
+    return redacted_stderr or redacted_stdout
 
 
 def _check_completion_promise(ver: VerificationConfig, transcript_path: Path) -> _VerificationOutcome:
@@ -129,8 +179,7 @@ def _check_test_suite(ver: VerificationConfig, worktree: Path) -> _VerificationO
         external_seconds = perf_counter() - external_started
         if result.returncode == 0:
             return _VerificationOutcome("passed", external_seconds=external_seconds)
-        raw_diagnostic = result.stderr or result.stdout
-        diagnostic = _bounded_diagnostic(raw_diagnostic)
+        diagnostic = _select_test_failure_excerpt(result.stdout, result.stderr)
         detail = f"Tests failed (exit {result.returncode})"
         if diagnostic:
             detail = f"{detail}: {diagnostic}"

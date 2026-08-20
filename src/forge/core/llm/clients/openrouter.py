@@ -5,6 +5,7 @@ OpenRouter is OpenAI-compatible, so this is a thin wrapper that adds
 OpenRouter-specific headers and translates parameters to OpenRouter's format.
 """
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncGenerator
@@ -57,6 +58,7 @@ class OpenRouterClient:
         self._credentials = credentials or CredentialManager.default()
         self._default_hyperparams = default_hyperparams
         self._client: AsyncOpenAI | None = None
+        self._client_init_lock = asyncio.Lock()
 
     @property
     def model(self) -> str:
@@ -66,14 +68,19 @@ class OpenRouterClient:
         if self._client is not None:
             return self._client
 
-        creds = await self._credentials.get_credentials(self._provider)
+        async with self._client_init_lock:
+            if self._client is not None:
+                return self._client
 
-        self._client = AsyncOpenAI(
-            api_key=creds["api_key"],
-            base_url=creds["base_url"],
-            default_headers=creds.get("extra_headers", {}),
-        )
-        return self._client
+            creds = await self._credentials.get_credentials(self._provider)
+
+            client = AsyncOpenAI(
+                api_key=creds["api_key"],
+                base_url=creds["base_url"],
+                default_headers=creds.get("extra_headers", {}),
+            )
+            self._client = client
+            return client
 
     @staticmethod
     def _translate_params(kwargs: dict[str, Any]) -> dict[str, Any]:

@@ -8,7 +8,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -751,6 +751,38 @@ class TestRunClean:
         result = run_clean(ctx=ctx, scope="workspace")
         assert result.deleted_count == 0
         assert not result.failed
+
+    def test_active_cleanup_records_failure_and_continues_scoped_removals(self, tmp_path: Path) -> None:
+        failed_target = "blocked::/project-a"
+        cleared_target = "cleared::/project-b"
+        report = CleanReport(
+            categories=[
+                OrphanCategory(
+                    category="active_entries",
+                    description="Stale active entries",
+                    count=2,
+                    items=[failed_target, cleared_target],
+                )
+            ],
+            scope="workspace",
+        )
+        store_error = OSError("registry is read-only")
+
+        with (
+            patch("forge.core.ops.gc.collect_clean_report", return_value=report),
+            patch("forge.session.active.ActiveSessionStore") as store_cls,
+        ):
+            store_cls.return_value.clear_session.side_effect = [store_error, True]
+
+            result = run_clean(ctx=_make_ctx(tmp_path), scope="workspace")
+
+        assert result.categories_cleaned == {"active_entries": 1}
+        assert result.failed == [(failed_target, "registry is read-only")]
+        assert store_cls.return_value.clear_session.call_args_list == [
+            call("blocked", forge_root="/project-a"),
+            call("cleared", forge_root="/project-b"),
+        ]
+        store_cls.return_value.list_sessions.assert_not_called()
 
     @staticmethod
     def _category(report: CleanReport) -> OrphanCategory:

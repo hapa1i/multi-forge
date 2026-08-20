@@ -136,6 +136,105 @@ def test_failed_test_diagnostic_is_bounded_and_redacted(
     assert "[REDACTED]" in displayed
 
 
+def test_failed_test_diagnostic_prefers_late_stdout_summary_after_redaction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, manifest, _ = _configured_store(tmp_path)
+    transcript = _write_transcript(tmp_path / "transcript.jsonl")
+    secret = "boundary-secret-material-" + ("s" * 80)
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    failure_id = "FAILED tests/regression/test_stop_failure_excerpts.py::test_late_failure"
+    detail_prefix = f"Tests failed (exit 1): {failure_id} - "
+    filler = "x" * (185 - len(detail_prefix))
+    failure_summary = f"{failure_id} - {filler}{secret} useful tail context " + ("y" * 100)
+    # Before redaction the configured secret crosses the 200-character detail
+    # boundary. Selecting or truncating first would leave a secret fragment.
+    assert len(detail_prefix + filler) == 185
+    stdout = (("=" * 80 + "\n") * 4) + failure_summary + "\n1 failed in 0.01s\n"
+    stderr = "third-party plugin warning: unrelated cache notice\n"
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_kwargs: subprocess.CompletedProcess(
+            cmd,
+            1,
+            stdout=stdout.encode(),
+            stderr=stderr.encode(),
+        ),
+    )
+
+    allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+    assert allow is False and message is not None
+    confirmed = store.read().confirmed.verification
+    assert confirmed is not None
+    assert confirmed.last_result == "incomplete"
+    persisted = confirmed.last_error
+    assert persisted is not None
+    assert failure_id in persisted
+    assert "third-party plugin warning" not in persisted
+    assert len(persisted) == 200
+    assert "[REDACTED]" in persisted
+    assert secret[:20] not in persisted
+    assert f"Error: {persisted}\n\n" in message
+
+
+def test_failed_test_diagnostic_ignores_captured_error_logs_before_short_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, manifest, _ = _configured_store(tmp_path)
+    transcript = _write_transcript(tmp_path / "transcript.jsonl")
+    failure_id = "FAILED tests/regression/test_stop_failure_excerpts.py::test_logged_failure"
+    captured_logs = "\n".join(
+        f"ERROR    root:mod.py:{line} captured error noise " + ("x" * 80) for line in range(10, 14)
+    )
+    stdout = (
+        "=================================== FAILURES ===================================\n"
+        "------------------------------ Captured log call -------------------------------\n"
+        f"{captured_logs}\n"
+        "=========================== short test summary info ============================\n"
+        f"{failure_id} - AssertionError: expected true\n"
+        "============================== 1 failed in 0.01s ===============================\n"
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_kwargs: subprocess.CompletedProcess(
+            cmd,
+            1,
+            stdout=stdout.encode(),
+            stderr=b"third-party plugin warning\n",
+        ),
+    )
+
+    allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+    assert allow is False and message is not None
+    confirmed = store.read().confirmed.verification
+    assert confirmed is not None
+    persisted = confirmed.last_error
+    assert persisted is not None
+    assert failure_id in persisted
+    assert "captured error noise" not in persisted
+    assert len(persisted) <= 200
+    assert f"Error: {persisted}\n\n" in message
+
+
+def test_failure_excerpt_keeps_error_only_short_summary() -> None:
+    error_id = "ERROR tests/regression/test_stop_failure_excerpts.py::test_setup_failure"
+    stdout = (
+        "ERROR    root:mod.py:10 captured error noise\n"
+        "=========================== short test summary info ============================\n"
+        f"{error_id} - RuntimeError: fixture failed\n"
+    )
+
+    assert verification._select_test_failure_excerpt(stdout, "plugin warning\n") == (
+        f"{error_id} - RuntimeError: fixture failed"
+    )
+
+
 def test_incomplete_result_fails_open_when_state_cannot_be_persisted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
