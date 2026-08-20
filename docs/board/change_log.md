@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-20
 
+### Correct Wave 8 merged regressions
+
+**Goal/outcome**: Restore the provider-trace, worktree-copy, and dry-run stream contracts after three independently
+reproduced post-merge regressions.
+
+**Key changes**:
+
+- Moved provider-attempt marking to the adapter's actual dispatch seam for both request modes while retaining failed
+  dispatch and auth-retry traces.
+- Rechecked worktree destination safety after Git I/O and before copying, and kept conflict-bearing dry-run previews on
+  stdout with only the terminating diagnostic on stderr.
+
+**Verification**: 72 direct plus 57 adjacent focused tests; 9,328 unit; 964 regression; four targeted Docker checks;
+pre-commit/diff; design/appendix 59,979 combined; board 402 documents/975 links. PR #222 merged as `02e0ced9` with all
+five GitHub checks passing; no Forge workflow ran.
+
 ### Eliminate runtime test skips
 
 **Goal/outcome**: Make the unit suite pass or fail cleanly instead of conditionally skipping credential-template and

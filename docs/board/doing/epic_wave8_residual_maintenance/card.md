@@ -2,11 +2,12 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--6 shipped in PRs #216--#221; one corrective follow-up is active; orders 7--19 remain
-parked.
+**Lane**: `doing/` -- orders 1--6 shipped in PRs #216--#221; the corrective follow-up shipped in PR #222; orders 7--19
+remain parked.
 
-**Current execution**: [`correct_wave8_merged_regressions`](../correct_wave8_merged_regressions/card.md) on
-`agent/fix-automated-review-regressions` from pushed `main` at `113b5670`; order 7 remains parked.
+**Current execution**: No implementation member is active. The bounded
+[`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up is closed at
+`02e0ced9`; order 7 remains parked pending activation.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

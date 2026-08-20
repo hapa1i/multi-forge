@@ -1,6 +1,6 @@
 # Correct Wave 8 merged regressions checklist
 
-Current focus: review and merge the verified corrective PR.
+Current focus: complete -- the three verified corrections shipped in PR #222 (`02e0ced9`) and the follow-up is closed.
 
 - [x] Branch from pushed order-6 closeout `113b5670` without activating Wave 8 order 7.
 - [x] Independently reproduce all three automated-review findings on merged code.
@@ -12,7 +12,8 @@ Current focus: review and merge the verified corrective PR.
 - [x] Pass four targeted proxy/session/extension Docker integration checks.
 - [x] Pass 9,328 unit tests, 964 regression tests, pre-commit, the 59,979-token design-doc size check, the 402-document/
   975-link board check, and diff checks.
-- [ ] Merge the corrective PR and retain this card in `doing/` until its closeout lands on `main`.
+- [x] Merge the corrective PR as `02e0ced9`, record the verified outcome, and move this card to `done/` before
+  activating Wave 8 order 7.
 
 ## Acceptance tests
 

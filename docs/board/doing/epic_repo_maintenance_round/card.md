@@ -17,8 +17,8 @@ bounded, non-overlapping sequencing exception. The bounded
 shipped in PR #215 before Wave 8. The residual gate on merged `main` at `bad273ef` accepted 23 still-live correctness,
 security, performance, test-policy, output, and documentation rows as 19 parked members under
 [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md); orders 1--6 shipped in PRs #216--#221,
-the bounded [`correct_wave8_merged_regressions`](../correct_wave8_merged_regressions/card.md) follow-up is active, and
-orders 7--19 remain parked.
+the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) follow-up shipped
+in PR #222, and orders 7--19 remain parked.
 
 ## Goal
 

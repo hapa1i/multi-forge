@@ -1,8 +1,8 @@
 # Correct Wave 8 merged regressions
 
-**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- corrective follow-up to shipped Wave 8 orders 1, 4, and 5; order 7 remains parked.
+**Lane**: `done/` -- shipped in PR #222 (`02e0ced9`) on 2026-08-20.
 
 **Execution**: `agent/fix-automated-review-regressions` from pushed `main` at `113b5670713a0338d97aa5b24259e9d8d14a33b8`
 on 2026-08-20.
@@ -43,3 +43,10 @@ original provider-trace, worktree-copy, or CLI output contracts.
 - A destination-parent swap during the tracked-file probe copies nothing and creates nothing outside the worktree.
 - A conflicting dry-run exits non-zero with the preview on stdout and only its failure diagnostic on stderr.
 - Focused, unit, regression, required integration, pre-commit, board-link, and diff checks pass.
+
+## Verification
+
+The 72-test direct regression slice, 57-test adjacent proxy-routing/auth slice, four targeted Docker integration tests,
+9,328 unit tests, and 964 regression tests passed. Pre-commit, the 59,979-token living design-doc check, the
+402-document/975-link board check, and diff checks passed. PR #222 merged as `02e0ced9` with all five GitHub checks
+passing.
