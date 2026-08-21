@@ -37,6 +37,7 @@ def test_claude_hook_entries_are_pinned_by_event_matcher_command_and_timeout() -
     """Pin entries, not just command strings, so matcher/timeout drift is visible."""
     assert _rendered_hook_entries() == [
         ("SessionStart", None, "$FORGE_HOME/bin/forge-hook session-start", None),
+        ("PreToolUse", None, "$FORGE_HOME/bin/forge-hook authority-check", 60),
         ("PreToolUse", "Read", "$FORGE_HOME/bin/forge-hook read-hygiene", 5),
         (
             "PreToolUse",
@@ -74,7 +75,14 @@ def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
     for event_key, entries in settings["hooks"].items():
         for entry in entries:
             for hook in entry.get("hooks", []):
-                sidecar_rows.append((event_key, entry.get("matcher"), hook["command"], hook.get("timeout")))
+                sidecar_rows.append(
+                    (
+                        event_key,
+                        entry.get("matcher"),
+                        hook["command"],
+                        hook.get("timeout"),
+                    )
+                )
 
     assert [(event, matcher, timeout) for event, matcher, _command, timeout in sidecar_rows] == [
         (event, matcher, timeout) for event, matcher, _command, timeout in host_rows

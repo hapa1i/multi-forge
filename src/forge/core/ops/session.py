@@ -409,6 +409,11 @@ def set_session_override(
     store = resolved.store
     _enforce_session_mutation_compatibility(store)
 
+    if key.split(".", 1)[0] == "authority":
+        from .session_authority import refuse_generic_authority_mutation
+
+        refuse_generic_authority_mutation(resolved=resolved, operation="set")
+
     try:
         # Validate key before acquiring lock (wildcards handled by set_override)
         if "*" not in key:
@@ -469,6 +474,11 @@ def reset_session_overrides(
     resolved = resolve_session(ctx=ctx, session_name=session_name)
     store = resolved.store
     _enforce_session_mutation_compatibility(store)
+
+    if key is not None and key.split(".", 1)[0] == "authority":
+        from .session_authority import refuse_generic_authority_mutation
+
+        refuse_generic_authority_mutation(resolved=resolved, operation="clear")
 
     try:
         if key:

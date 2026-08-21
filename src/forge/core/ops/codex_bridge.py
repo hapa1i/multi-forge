@@ -223,7 +223,12 @@ _RUN_ENV_LOCK = threading.Lock()
 
 @contextmanager
 def _temporary_run_env(
-    identity: RunIdentity, session: str, forge_root: str | None = None
+    identity: RunIdentity,
+    session: str,
+    forge_root: str | None = None,
+    *,
+    extra_vars: dict[str, str] | None = None,
+    unset_vars: tuple[str, ...] = (),
 ) -> Generator[None, None, None]:
     """Make ``identity`` + ``session`` the ambient run-tree env for the block.
 
@@ -248,13 +253,16 @@ def _temporary_run_env(
             "_temporary_run_env is already active in this process; "
             "bridge runs cannot overlap (run-tree env is process-global)."
         )
-    keys = (
+    ordered_keys = [
         FORGE_RUN_ID_VAR,
         FORGE_ROOT_RUN_ID_VAR,
         FORGE_PARENT_RUN_ID_VAR,
         _FORGE_SESSION_VAR,
         _FORGE_FORGE_ROOT_VAR,
-    )
+    ]
+    ordered_keys.extend((extra_vars or {}).keys())
+    ordered_keys.extend(unset_vars)
+    keys = tuple(dict.fromkeys(ordered_keys))
     saved = {key: os.environ.get(key) for key in keys}
     try:
         os.environ[FORGE_RUN_ID_VAR] = identity.run_id
@@ -263,14 +271,18 @@ def _temporary_run_env(
         os.environ[_FORGE_SESSION_VAR] = session
         if forge_root is not None:
             os.environ[_FORGE_FORGE_ROOT_VAR] = forge_root
+        for key in unset_vars:
+            os.environ.pop(key, None)
+        for key, value in (extra_vars or {}).items():
+            os.environ[key] = value
         yield
     finally:
         try:
-            for key, value in saved.items():
-                if value is None:
+            for key, saved_value in saved.items():
+                if saved_value is None:
                     os.environ.pop(key, None)
                 else:
-                    os.environ[key] = value
+                    os.environ[key] = saved_value
         finally:
             _RUN_ENV_LOCK.release()
 
@@ -291,6 +303,8 @@ def bridge_session_to_codex(
     preflight: CodexPreflight | None = None,
     output_root: Path | None = None,
     staged_context_path: Path | None = None,
+    run_identity: RunIdentity | None = None,
+    authority_marker: str | None = None,
 ) -> CodexBridgeResult:
     """Hand ``parent``'s curated transfer to a headless ``codex exec`` run implementing ``task``.
 
@@ -343,7 +357,7 @@ def bridge_session_to_codex(
         except CodexPreflightError as e:
             raise ForgeOpError(f"Codex runtime not ready: {e}") from e
 
-    root = new_root_run_identity()
+    root = run_identity or new_root_run_identity()
     sess = session or parent
     if child is None:
         # Unique per run: ``ensure_child`` "leaves an existing child alone" (a durability
@@ -355,7 +369,14 @@ def bridge_session_to_codex(
     # The CHILD's forge_root (transfer_root): codex hook subprocesses resolve the
     # session store from FORGE_FORGE_ROOT, and a worktree session's manifest lives
     # under the child root, not the payload cwd's.
-    with _temporary_run_env(root, sess, forge_root=str(transfer_root)):
+    marker_env = {"FORGE_AUTHORITY_MARKER": authority_marker} if authority_marker is not None else None
+    with _temporary_run_env(
+        root,
+        sess,
+        forge_root=str(transfer_root),
+        extra_vars=marker_env,
+        unset_vars=("FORGE_AUTHORITY_MARKER",) if marker_env is None else (),
+    ):
         assembly = assemble_codex_transfer(
             ctx=ctx,
             parent=parent,

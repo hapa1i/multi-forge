@@ -36,6 +36,7 @@ from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
+from .session_authority import session_authority  # noqa: E402
 from .session_lane import session_lane  # noqa: E402
 from .session_memory import session_memory  # noqa: E402
 from .status_line import status_line  # noqa: E402
@@ -253,7 +254,11 @@ def _process_pending_work_best_effort() -> None:
             except StateError as e:
                 # Index state is optimization bookkeeping, not the searchable source.
                 # Do the idempotent writes; the strict final mark retains the marker.
-                logger.debug("Index-state guard unavailable for %s; indexing without it: %s", transcript_abs, e)
+                logger.debug(
+                    "Index-state guard unavailable for %s; indexing without it: %s",
+                    transcript_abs,
+                    e,
+                )
                 unchanged = False
             if unchanged:
                 return
@@ -482,6 +487,7 @@ main.add_command(workspace, name="workspace")
 session.add_command(transfer_cmd, name="transfer")
 session.add_command(session_memory, name="memory")
 session.add_command(session_lane, name="lane")
+session.add_command(session_authority, name="authority")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402

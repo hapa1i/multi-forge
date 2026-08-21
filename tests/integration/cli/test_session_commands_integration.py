@@ -164,6 +164,36 @@ class TestSessionStart:
         assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-8" in env_text
         assert "ANTHROPIC_BASE_URL=" not in env_text
 
+    def test_human_courier_authority_flow_uses_independent_sessions(self, mock_claude_workspace: ContainerLike) -> None:
+        planner = mock_claude_workspace.exec(
+            "cd /workspace && forge session start planner --no-launch --authority advisory"
+        )
+        producer = mock_claude_workspace.exec(
+            "cd /workspace && forge session start producer --no-launch --worktree --authority producer"
+        )
+
+        assert planner.returncode == 0, planner.stderr
+        assert producer.returncode == 0, producer.stderr
+        planner_manifest = json.loads(
+            mock_claude_workspace.read_file("/workspace/.forge/sessions/planner/forge.session.json")
+        )
+        producer_manifest = json.loads(
+            mock_claude_workspace.read_file("/workspace/.forge/sessions/producer/forge.session.json")
+        )
+
+        assert planner_manifest["intent"]["authority"] == {
+            "role": "advisory",
+            "tier": "shell_closed",
+        }
+        assert producer_manifest["intent"]["authority"] == {
+            "role": "producer",
+            "tier": None,
+        }
+        assert producer_manifest["parent_session"] is None
+        assert producer_manifest["confirmed"]["derivation"] is None
+        assert producer_manifest["worktree"]["path"] != planner_manifest["worktree"]["path"]
+        assert not mock_claude_workspace.file_exists("/workspace/.forge/prev_sessions/planner/children/producer.md")
+
 
 class TestSessionDelete:
     """Tests for 'forge session delete' command."""

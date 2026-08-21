@@ -9,6 +9,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from forge.core.reactive.env import RunIdentity
+
 
 def invoke_claude(
     *,
@@ -22,6 +24,7 @@ def invoke_claude(
     unset_env_vars: list[str] | None = None,
     cwd: str | None = None,
     extra_args: list[str] | None = None,
+    run_identity: RunIdentity | None = None,
 ) -> int:
     """Invoke the Claude Code CLI binary.
 
@@ -81,7 +84,11 @@ def invoke_claude(
         extra_args=extra_args,
     )
 
-    env = _build_environment(env_vars, unset_env_vars)
+    env = (
+        _build_environment(env_vars, unset_env_vars)
+        if run_identity is None
+        else _build_environment(env_vars, unset_env_vars, run_identity=run_identity)
+    )
 
     return _run_claude(cmd, env=env, cwd=cwd)
 
@@ -162,6 +169,8 @@ def _build_command(
 def _build_environment(
     extra_vars: dict[str, str] | None = None,
     unset_vars: list[str] | None = None,
+    *,
+    run_identity: RunIdentity | None = None,
 ) -> dict[str, str]:
     """Build the environment for an interactive Claude process.
 
@@ -188,10 +197,12 @@ def _build_environment(
         new_root_run_identity,
     )
 
-    root = new_root_run_identity()
+    root = run_identity or new_root_run_identity()
     merged = {**(extra_vars or {}), **root.as_env()}
     env = build_claude_env(extra_vars=merged, derive_run_identity=False, interactive=True)
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a root has no parent; scrub any inherited
+    if not extra_vars or "FORGE_AUTHORITY_MARKER" not in extra_vars:
+        env.pop("FORGE_AUTHORITY_MARKER", None)
     for key in unset_vars or ():
         env.pop(key, None)
     apply_attribution_header_policy(env)

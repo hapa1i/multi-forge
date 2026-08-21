@@ -107,6 +107,20 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
+def test_session_authority_show_json_owns_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
+    report = SimpleNamespace(to_dict=lambda: {"session": "planner", "role": None})
+    monkeypatch.setattr(
+        "forge.cli.session_authority.get_session_authority_report",
+        lambda **_kwargs: report,
+    )
+
+    result = CliRunner().invoke(main, ["session", "authority", "show", "planner", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"session": "planner", "role": None}
+    assert result.stderr == ""
+
+
 def test_bare_root_help_is_a_stderr_usage_error() -> None:
     """A missing root command follows Click's no-args usage-error contract."""
     result = CliRunner().invoke(main, [])

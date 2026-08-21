@@ -133,6 +133,7 @@ forge session start [name] \
   [--proxy <proxy_id>] [--no-proxy] \
   [--worktree/-w] [--branch/-b <branch>] \
   [--incognito/-i] \
+  [--authority advisory|producer] [--authority-tier named_tools|shell_closed] \
   [--system-prompt/-s <text>] \
   [--system-prompt-file/-S <path>] \
   [--sidecar|--host-proxy] [--mount <host:container>] [--image <name>] \
@@ -150,6 +151,7 @@ forge session resume <name> --fresh
 # Derive a fresh child session (PARENT optional; interactive picker)
 forge session resume [parent] --fresh \
   [--child-name/-n <child_name>] \
+  [--authority advisory|producer] [--authority-tier named_tools|shell_closed] \
   [--strategy/-s minimal|structured|full|ai-curated] \
   [--depth/-d <N|all>] \
   [--resume-mode native|transfer] \
@@ -177,7 +179,7 @@ forge telemetry activity [name] --period week --json
 forge telemetry activity [name] --period all
 
 # Fork (conversation branching)
-forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
+forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--authority advisory|producer] [--authority-tier named_tools|shell_closed] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
 
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
@@ -196,6 +198,12 @@ forge session incognito [name] [--proxy <proxy_id>] [--no-proxy]
 # Mid-session toggles (session-local only)
 forge session set <key> <value> [--session <name>]
 forge session reset [key] [--all] [--session <name>]
+
+# Artifact authority (human terminal only for mutations)
+forge session authority show [name] [--json]
+forge session authority set <name> --role advisory [--tier named_tools|shell_closed]
+forge session authority set <name> --role producer
+forge session authority clear <name>
 
 # Sandboxed session shell
 forge session shell [name]
@@ -233,6 +241,11 @@ forge config set session_retention_days=90    # Auto-clean sessions > 90 days on
 
 Auto-cleanup runs opportunistically on each `forge` command (same pattern as log retention). It never deletes worktrees
 or branches automatically.
+
+Authority journals are Forge artifacts under `.forge/artifacts/<session>/authority/events.jsonl`. Delete and clean do
+not selectively remove them, and `--keep-transcripts` does not change their lifetime. They remain when the recorded
+Forge root remains. If deletion removes an owned worktree that contains that Forge root (for example, a nested Forge
+project in a worktree), the journal disappears with the containing checkout.
 
 ### Repairing invisible sessions
 
@@ -339,6 +352,92 @@ those families because their stored `project_root` identity is not yet common ac
 When forking `--into` another worktree, the child session lands at the **equivalent position** — if the parent was at
 `monorepo/packages/app`, the child lands at `target-worktree/packages/app`. The target must have Forge enabled at that
 path. Forge strict-checks that target root before routing/proxy preflight and again before manager writes.
+
+---
+
+## Artifact authority for managed sessions
+
+Artifact authority separates sessions that may produce project changes from sessions intended only for inspection,
+reasoning, planning, or review. It is an explicit property of a managed session, independent of provider, model,
+consumer lane, and ordinary policy configuration:
+
+- `advisory` denies covered runtime-tool requests before ordinary policy evaluation;
+- `producer` is a positive human designation that allows the runtime to proceed to its normal permissions and policy;
+- no designation means `unmarked`, which preserves legacy behavior and makes no authority claim.
+
+The default advisory tier is `shell_closed`. For Claude, only the exact read and conversation/control tools printed by
+`authority show` decline the authority gate; mutation, shell, delegation, skill, MCP, and unknown tools are denied. For
+Codex, `Bash`, `apply_patch`, and unknown tools are denied, so a shell-closed advisory Codex run reasons over context
+already in its conversation. The weaker `named_tools` tier denies only `Write`, `Edit`, `NotebookEdit`, and
+`apply_patch`; its report names shell and external surfaces as uncovered.
+
+### One-time runtime setup
+
+Authority depends on the runtime delivering a Forge hook, so enable user-scoped runtime hooks before creating an
+advisory session:
+
+```bash
+forge extension enable --scope user --runtime all
+forge extension doctor --json
+
+# Codex only: verifies enrollment by running one cheap codex exec turn
+forge runtime preflight codex --verify-enrollment
+```
+
+Claude advisory launch requires the current executable Forge dispatcher and exactly one catch-all `authority-check`
+registration. Codex advisory launch empirically verifies hook enrollment on **every launch attempt**; each headless
+resume turn therefore spends an additional Codex turn of latency and quota. Static registration is not enough because an
+unenrolled Codex home silently omits hooks. Advisory sidecar launch is unsupported in v1. Producer and unmarked sidecars
+retain their existing behavior.
+
+### Assign, inherit, and inspect authority
+
+Assign a role at creation or while an existing session is inactive:
+
+```bash
+forge session start planner --authority advisory
+forge session start implementer --worktree --authority producer
+
+forge session authority set existing --role advisory --tier shell_closed
+forge session authority clear existing
+forge session authority show existing --json
+```
+
+These are human control-plane operations. Authority-bearing creation, set, and clear refuse from inside any managed
+session; set/clear also refuse an active target. Stop the session, change it from another terminal, then resume. Generic
+`session set` and keyed `session reset` cannot mutate authority intent.
+
+Fresh resumes and forks inherit advisory authority and its tier. Producer authority is deliberately not inherited: a
+derived child is unmarked unless the human gives it an explicit role, and an explicit child role wins before launch.
+In-place resume rejects authority flags. `session adopt` also creates an unmarked session: stop the native client, adopt
+it, set authority while inactive, and only then resume through Forge.
+
+`authority show` is read-only. It reports configured role/tier, exact covered/read/control inventories, the locally
+observed configuration epoch and denials, and one of four launch-support states: `verified`, `unverified`,
+`unsupported`, or `not_running`. A marked session whose journal is missing or inconsistent reports its configuration
+history as `unproven`; malformed journals are errors. The local append-only journal is not tamper-proof.
+
+### Human-courier planner/producer workflow
+
+The supported v1 workflow keeps both the checkout and conversation independent:
+
+```bash
+forge session start planner --authority advisory
+# Human reviews the planner's findings and ends the session.
+
+forge session start implementer --worktree --authority producer
+# Human gives the producer only the requirements/findings they choose.
+```
+
+Do not use `resume --fresh`, `fork`, or transfer context for this boundary: those are derivation surfaces and advisory
+authority would inherit. Forge does not automatically courier a transcript, generated patch, transfer snapshot, or
+model-curated handoff from advisory to producer.
+
+The guarantee is intentionally narrow. During a preflighted Forge-managed advisory run, a functioning authority handler
+denies every delivered request covered by the active tier, including malformed or unnormalizable mutation envelopes. It
+does not provide OS-level read-only filesystems, protect against raw runtimes/editors/humans, prove byte authorship or
+semantic independence, or decide admission. Runtime hook non-delivery, timeout, dispatcher failure, and a runtime
+discarding valid deny output remain disclosed fail-open seams.
 
 ---
 
@@ -914,6 +1013,10 @@ contains `runtime`, and `launch.*`; create a new session with `--runtime` instea
 null clears remain supported, while `session reset launch.runtime` and `session reset launch` can remove stale illegal
 overrides written by an older Forge.
 
+Artifact authority is intent, not an override. `session set` rejects `authority`, `authority.*`, and concrete authority
+leaves; keyed `session reset` rejects the same paths. `session reset --all` only clears overrides and cannot remove
+authority intent. Use `forge session authority set|clear` from outside a managed session while the target is inactive.
+
 **Policy/TDD enforcement** is managed separately via the Policy CLI, not session set:
 
 ```bash
@@ -932,6 +1035,7 @@ forge policy status                                 # Show current policy state
 - policy enforcement (`forge policy enable/disable`)
 - memory behavior (`memory.*`) — see [`memory.md`](memory.md) for automatic doc updates
 - artifact capture settings
+- artifact authority (`forge session authority ...`, inactive target only)
 - worktree association
 - session metadata
 

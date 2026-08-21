@@ -88,7 +88,7 @@ from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
     _validate_proxy_model_pin,
 )
-from forge.session.models import session_runtime
+from forge.session.models import AuthorityIntent, session_runtime
 from forge.session.prev_sessions import (
     ensure_notes_overlay,
     notes_for_snapshot,
@@ -98,6 +98,10 @@ from forge.session.transfer import ResumeStrategy, parse_lineage_depth
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
+from forge.cli.session_authority_options import (  # noqa: E402
+    authority_creation_options,
+    parse_creation_authority,
+)
 from forge.cli.session_codex import (  # noqa: E402
     codex_resume_options,
     codex_start_options,
@@ -679,6 +683,8 @@ def launch_new_session(
     subprocess_proxy: str | None = None,
     direct_model: str | None = None,
     memory_flag: bool | None = None,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> int:
     """Create a new session and launch Claude.
 
@@ -809,6 +815,8 @@ def launch_new_session(
             memory_flag=memory_flag,
             subprocess_proxy=subprocess_proxy,
             supervisor=supervisor_wiring,
+            authority=authority,
+            authority_explicit=authority_explicit,
             presenter=_ClaudeStartCliPresenter(session_name=name),
         )
     except ClaudeStartError as e:
@@ -898,6 +906,7 @@ def launch_new_session(
     default=None,
     help="Enable/disable memory auto-update for this session (default: off).",
 )
+@authority_creation_options
 @codex_start_options
 def start(
     name: str | None,
@@ -926,6 +935,8 @@ def start(
     supervisor_runtime: str | None,
     subprocess_proxy: str | None,
     memory_flag: str | None,
+    authority_role: str | None,
+    authority_tier: str | None,
     runtime: str,
     resume_from: str | None,
     task: str | None,
@@ -960,6 +971,12 @@ def start(
     """
     if runtime == "codex":
         sys.exit(run_codex_start(click.get_current_context()))
+
+    try:
+        authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
+    except ValueError as e:
+        print_error(str(e))
+        sys.exit(1)
 
     # Codex-only flags are meaningless on the Claude path: reject, don't ignore.
     codex_rc = reject_codex_flags_for_claude(click.get_current_context().params)
@@ -1049,6 +1066,8 @@ def start(
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
             memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     )
 
@@ -1137,6 +1156,7 @@ def start(
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@authority_creation_options
 @codex_resume_options
 @click.pass_context
 def resume(
@@ -1154,6 +1174,8 @@ def resume(
     review: bool,
     force: bool,
     memory_flag: str | None,
+    authority_role: str | None,
+    authority_tier: str | None,
     task: str | None,
 ) -> None:
     """Resume a session.
@@ -1227,6 +1249,15 @@ def resume(
         print_error(
             "--memory requires --fresh (creates a new child session). Add --fresh or omit --memory.",
         )
+        sys.exit(1)
+
+    if (authority_role is not None or authority_tier is not None) and not fresh:
+        print_error("--authority and --authority-tier require --fresh")
+        sys.exit(1)
+    try:
+        authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
+    except ValueError as e:
+        print_error(str(e))
         sys.exit(1)
 
     if review and not fresh:
@@ -1414,6 +1445,8 @@ def resume(
                     direct=direct,
                     direct_model_override=normalized_direct_model,
                     memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
+                    authority=authority,
+                    authority_explicit=authority_explicit,
                 )
                 return
             assert drop_last is not None
@@ -1427,6 +1460,8 @@ def resume(
                 direct=direct,
                 direct_model_override=normalized_direct_model,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
+                authority=authority,
+                authority_explicit=authority_explicit,
             )
         elif effective_resume_mode == "native":
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
@@ -1447,6 +1482,8 @@ def resume(
                 direct=direct,
                 direct_model_override=normalized_direct_model,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
+                authority=authority,
+                authority_explicit=authority_explicit,
             )
         else:
             try:
@@ -1466,6 +1503,8 @@ def resume(
                 review=review,
                 direct_model_override=normalized_direct_model,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
+                authority=authority,
+                authority_explicit=authority_explicit,
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -1777,6 +1816,8 @@ def _resume_fresh(
     review: bool = False,
     direct_model_override: str | None = None,
     memory_flag: bool | None = None,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
@@ -1803,6 +1844,8 @@ def _resume_fresh(
             token_estimate_multiplier=token_multiplier,
             forge_root=parent_state.forge_root,
             memory_flag=memory_flag,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except ForgeSessionError as e:
         handle_session_error(e)
@@ -1921,6 +1964,7 @@ def _resume_fresh(
     default=None,
     help="Auto-install extensions in worktree (default: inherit from parent)",
 )
+@authority_creation_options
 def incognito(
     name: str | None,
     proxy_name: str | None,
@@ -1935,6 +1979,8 @@ def incognito(
     mounts: tuple[str, ...],
     image: str | None,
     extensions: bool | None,
+    authority_role: str | None,
+    authority_tier: str | None,
 ) -> None:
     """Start an incognito session.
 
@@ -1949,6 +1995,12 @@ def incognito(
     """
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
+        sys.exit(1)
+
+    try:
+        authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
+    except ValueError as e:
+        print_error(str(e))
         sys.exit(1)
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,
@@ -1996,5 +2048,7 @@ def incognito(
             proxy_display=routing.proxy_id if routing else None,
             context_limit_override=routing.context_limit if routing else None,
             direct_model=direct_model,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     )

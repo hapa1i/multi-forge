@@ -3,8 +3,9 @@
 Each function is a Click command registered on the ``hooks`` group.
 Heavy logic is delegated to submodules (verification, direct_commands, policy).
 
-CRITICAL: Always exit 0 on errors — don't break Claude.
-Exception: WorktreeCreate exits 1 on failure (replaces Claude's default git behavior).
+Most lifecycle handlers exit 0 on errors so they do not break Claude. WorktreeCreate
+exits 1 because it replaces Claude's default git behavior; authority-check exits 2
+when a launch-marked advisory request must be denied.
 """
 
 from __future__ import annotations
@@ -63,6 +64,7 @@ from ._helpers import (
     _output_result,
     _read_stdin_json,
 )
+from .authority import evaluate_authority_guard, journal_authority_denial
 from .codex_policy import (
     CodexHookAdapter,
     CodexHookResponder,
@@ -913,7 +915,10 @@ def pre_compact() -> None:
     except TranscriptArtifactStateError as e:
         # Fail open, but durable-state corruption must remain visible at this
         # best-effort writer boundary.
-        logger.warning("pre-compact: transcript artifact state is malformed; manifest update skipped: %s", e)
+        logger.warning(
+            "pre-compact: transcript artifact state is malformed; manifest update skipped: %s",
+            e,
+        )
     except Exception as e:
         # Fail-open: never block compaction
         logger.debug("pre-compact: snapshot failed: %s", e)
@@ -1384,21 +1389,55 @@ def policy_check() -> None:
     sys.exit(responder.ALLOW_EXIT)
 
 
+@hooks.command(name="authority-check")
+def authority_check() -> None:
+    """Deny covered Claude tool requests for a preflighted advisory run."""
+    data, _err = _read_stdin_json()
+    guard = evaluate_authority_guard(data, runtime="claude_code")
+    if not guard.marker_present or not guard.deny:
+        sys.exit(0)
+    if not journal_authority_denial(guard, runtime="claude_code"):
+        print(
+            "[forge] Authority denial journal write failed; request remains denied.",
+            file=sys.stderr,
+        )
+    print(
+        "Artifact authority denied this tool request for the managed advisory session.",
+        file=sys.stderr,
+    )
+    sys.exit(ClaudeHookResponder.BLOCK_EXIT)
+
+
 @hooks.command(name="codex-policy-check")
 def codex_policy_check() -> None:
-    """Evaluate policies on a Codex PreToolUse apply_patch action.
+    """Evaluate authority, then policies, for a Codex PreToolUse action.
 
     Wire contract (probe-pinned, codex-cli 0.138.0): a block is a strict
     ``hookSpecificOutput`` deny JSON on stdout with exit 0; an allow emits NO
     stdout. Codex FAILS OPEN on malformed hook output, so stdout carries only
     ``json.dumps`` wire strings -- diagnostics go to stderr, but only once a Forge
-    session is resolved (an unresolvable session means Forge is not managing this
-    turn and must stay silent: a user-scope registration fires for every Codex
-    session). Fail-open on every internal error, matching policy-check. A
-    multi-file patch is evaluated per file with cross-file precedence
-    deny > needs_review > warn/allow.
+    session is resolved (an unresolvable unmarked session means Forge is not
+    managing this turn and must stay silent: a user-scope registration fires for
+    every Codex session). A launch-marked authority guard denies on resolution or
+    classification errors before the ordinary policy handler's fail-open posture.
+    A multi-file patch is evaluated per file with cross-file precedence deny >
+    needs_review > warn/allow.
     """
-    data, err = _read_stdin_json()
+    data, _err = _read_stdin_json()
+    guard = evaluate_authority_guard(data, runtime="codex")
+    if guard.deny:
+        if not journal_authority_denial(guard, runtime="codex"):
+            print(
+                "[forge] Authority denial journal write failed; request remains denied.",
+                file=sys.stderr,
+            )
+        print(
+            CodexHookResponder().format_error_deny(
+                "Artifact authority denied this tool request for the managed advisory session."
+            ),
+            file=sys.stdout,
+        )
+        sys.exit(CodexHookResponder.BLOCK_EXIT)
     if data is None:
         sys.exit(0)
 
@@ -1432,7 +1471,10 @@ def codex_policy_check() -> None:
     try:
         effective = compute_effective_intent(manifest)
     except Exception as e:
-        print(f"[forge] Policy check: cannot compute effective intent: {e}", file=sys.stderr)
+        print(
+            f"[forge] Policy check: cannot compute effective intent: {e}",
+            file=sys.stderr,
+        )
         sys.exit(0)
 
     if not effective.policy or not effective.policy.enabled:
@@ -1458,7 +1500,10 @@ def codex_policy_check() -> None:
     contexts = CodexHookAdapter().build_contexts(data, tool_name, manifest)
     if not contexts:
         # Covers malformed patches, delete-only patches, and non-dict tool_input.
-        print("[forge] Policy check: no evaluable file operations in apply_patch", file=sys.stderr)
+        print(
+            "[forge] Policy check: no evaluable file operations in apply_patch",
+            file=sys.stderr,
+        )
         sys.exit(0)
     contexts = sort_contexts_tests_first(contexts)
 
@@ -1486,7 +1531,10 @@ def codex_policy_check() -> None:
             if fail_mode == "closed":
                 # Wire JSON goes explicitly to stdout; everything else in this
                 # command rides stderr (Codex fails OPEN on malformed stdout).
-                print(responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"), file=sys.stdout)
+                print(
+                    responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"),
+                    file=sys.stdout,
+                )
                 sys.exit(responder.BLOCK_EXIT)
             continue  # fail-open: skip this file
         aggregated_state.update(engine.get_collected_state())
@@ -1877,7 +1925,12 @@ def _team_supervisor_hook(log_label: str, handler: Callable[..., tuple[int, str]
     def _freeze() -> None:
         # Fires from _run_supervisor's on_dispatch, so the lane freezes only on a real dispatch
         # (not a cache/tagger/depth skip). Short HOOK_LOCK_TIMEOUT_S keeps the hook responsive (T6a).
-        persist_lane_freeze(store, TEAM_SUPERVISOR_CONSUMER, dispatched_lane, timeout_s=HOOK_LOCK_TIMEOUT_S)
+        persist_lane_freeze(
+            store,
+            TEAM_SUPERVISOR_CONSUMER,
+            dispatched_lane,
+            timeout_s=HOOK_LOCK_TIMEOUT_S,
+        )
 
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(

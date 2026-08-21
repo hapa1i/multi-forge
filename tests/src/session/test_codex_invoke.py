@@ -129,6 +129,17 @@ class TestEnvAndProcess:
         assert env[FORGE_RUN_ID_VAR] == "run_cccccccccccc"
         assert env[FORGE_ROOT_RUN_ID_VAR] == "run_cccccccccccc"
 
+    def test_authority_marker_is_explicit_and_stale_ambient_value_is_scrubbed(
+        self, mock_run: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FORGE_AUTHORITY_MARKER", "stale")
+
+        _invoke(mock_run, authority_marker="validated")
+        assert mock_run.call_args.kwargs["env"]["FORGE_AUTHORITY_MARKER"] == "validated"
+
+        _invoke(mock_run)
+        assert "FORGE_AUTHORITY_MARKER" not in mock_run.call_args.kwargs["env"]
+
     def test_env_sanitized_and_depth_incremented(self, mock_run: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "stale")
         monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://proxy")

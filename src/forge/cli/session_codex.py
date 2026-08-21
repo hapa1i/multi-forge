@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypedDict
 
 import click
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import _get_active_session_entry, console
+from forge.cli.session_authority_options import parse_creation_authority
 from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.naming import generate_unique_name
@@ -39,9 +40,15 @@ from forge.core.ops.codex_session import (
 from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.session import SessionManager, SessionState
+from forge.session.models import AuthorityIntent
 from forge.session.transfer import TRANSFER_CONTEXT_STRATEGY_VALUES
 
 logger = logging.getLogger(__name__)
+
+
+class _AuthorityLaunchKwargs(TypedDict, total=False):
+    authority: AuthorityIntent | None
+    authority_explicit: bool
 
 
 def _codex_ok(codex: HeadlessResult) -> bool:
@@ -131,6 +138,11 @@ def run_codex_start(ctx: click.Context) -> int:
     without a parent.
     """
     p = ctx.params
+    try:
+        authority, authority_explicit = parse_creation_authority(p["authority_role"], p["authority_tier"])
+    except ValueError as e:
+        print_error(str(e))
+        return 1
     if p["task"] and not p["resume_from"]:
         print_error(
             "--task requires --resume-from <parent> -- headless Codex turns "
@@ -182,6 +194,10 @@ def run_codex_start(ctx: click.Context) -> int:
         print_error("--branch requires --worktree")
         return 1
 
+    authority_kwargs: _AuthorityLaunchKwargs = (
+        {"authority": authority, "authority_explicit": True} if authority_explicit else {}
+    )
+
     from forge.cli.guards import require_main_repo_root, require_repo_root
 
     if p["worktree"]:
@@ -204,6 +220,7 @@ def run_codex_start(ctx: click.Context) -> int:
             worktree=p["worktree"],
             branch=p["branch"],
             context_delivery=p["context_delivery"] or "initial-message",
+            **authority_kwargs,
         )
     return launch_codex_session(
         name=name,
@@ -215,6 +232,7 @@ def run_codex_start(ctx: click.Context) -> int:
         worktree=p["worktree"],
         branch=p["branch"],
         context_delivery=p["context_delivery"] or "initial-message",
+        **authority_kwargs,
     )
 
 
@@ -294,6 +312,8 @@ def launch_codex_session(
     worktree: bool,
     branch: str | None,
     context_delivery: ContextDeliveryMode = "initial-message",
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> int:
     """Run ``forge session start --runtime codex``; returns the process exit code."""
     try:
@@ -308,6 +328,8 @@ def launch_codex_session(
             create_worktree=worktree,
             branch=branch,
             context_delivery=context_delivery,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -355,6 +377,8 @@ def launch_interactive_codex_session(
     worktree: bool,
     branch: str | None,
     context_delivery: ContextDeliveryMode = "initial-message",
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> int:
     """Run the interactive (no ``--task``) form of ``session start --runtime codex``."""
     try:
@@ -368,6 +392,8 @@ def launch_interactive_codex_session(
             create_worktree=worktree,
             branch=branch,
             context_delivery=context_delivery,
+            authority=authority,
+            authority_explicit=authority_explicit,
             announce=_render_interactive_launch,
         )
     except ForgeOpError as e:

@@ -180,6 +180,22 @@ class TestTemporaryRunEnv:
         assert os.environ["FORGE_PARENT_RUN_ID"] == "stale_parent"
         assert "FORGE_SESSION" not in os.environ
 
+    def test_authority_marker_is_explicitly_set_or_scrubbed_and_restored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_AUTHORITY_MARKER", "outer")
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+
+        with _temporary_run_env(
+            ident,
+            "sess",
+            extra_vars={"FORGE_AUTHORITY_MARKER": "validated"},
+        ):
+            assert os.environ["FORGE_AUTHORITY_MARKER"] == "validated"
+        assert os.environ["FORGE_AUTHORITY_MARKER"] == "outer"
+
+        with _temporary_run_env(ident, "sess", unset_vars=("FORGE_AUTHORITY_MARKER",)):
+            assert "FORGE_AUTHORITY_MARKER" not in os.environ
+        assert os.environ["FORGE_AUTHORITY_MARKER"] == "outer"
+
     def test_restores_pre_existing_values_on_exception(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "outer")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "outer_root")

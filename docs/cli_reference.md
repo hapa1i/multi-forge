@@ -144,21 +144,24 @@ update of an already tracked package can be repaired by sync.
 
 ### Session management
 
-| Command                                 | Purpose                                                                                                                                                                                                                                      |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `forge session start [name]`            | Create and start a new session (auto-named if omitted)                                                                                                                                                                                       |
-| `forge session resume [name]`           | Reattach to an existing session (default), or derive a fresh child with `--fresh`                                                                                                                                                            |
-| `forge session fork <parent> [--name]`  | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context)                                                                                                                  |
-| `forge session adopt [conversation-id]` | Bind a Forge session to an existing native Claude conversation or Codex thread (`--name`, `--model`, `--yes`); the runtime is detected from on-disk evidence. Bare lists unbound Claude candidates (`--json`). Run from its launch directory |
-| `forge session show [session]`          | Show session details and derived launchability (`--json`, `--field`); accepts name or UUID                                                                                                                                                   |
-| `forge session list`                    | List sessions with derived launchability (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                                                                                                                  |
-| `forge session set <key> <value>`       | Set a mid-session override; immutable `launch.runtime` cannot be introduced directly, through `launch`, or through `launch.*`                                                                                                                |
-| `forge session reset [key]`             | Reset overrides to intent                                                                                                                                                                                                                    |
-| `forge session delete <name>...`        | Delete one or more sessions (`--all` for bulk deletion)                                                                                                                                                                                      |
-| `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                                        |
-| `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                                             |
-| `forge session incognito [name]`        | Start an ephemeral session (auto-delete on exit)                                                                                                                                                                                             |
-| `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                                              |
+| Command                                 | Purpose                                                                                                                                                                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge session start [name]`            | Create and start a new session (auto-named if omitted); new sessions accept `--authority advisory\|producer` and advisory `--authority-tier`                                                                            |
+| `forge session resume [name]`           | Reattach to an existing session (default), or derive a fresh child with `--fresh`; authority flags apply only with `--fresh`                                                                                            |
+| `forge session fork <parent> [--name]`  | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context); accepts authority flags                                                                    |
+| `forge session adopt [conversation-id]` | Bind an unmarked Forge session to an existing native Claude conversation or Codex thread (`--name`, `--model`, `--yes`); the runtime is detected from on-disk evidence. Bare lists unbound Claude candidates (`--json`) |
+| `forge session show [session]`          | Show session details and derived launchability (`--json`, `--field`); accepts name or UUID                                                                                                                              |
+| `forge session list`                    | List sessions with derived launchability (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                                                                                             |
+| `forge session set <key> <value>`       | Set a mid-session override; immutable `launch.runtime` and authority intent cannot be introduced through overrides                                                                                                      |
+| `forge session reset [key]`             | Reset overrides to intent; keyed authority paths are rejected and `--all` does not clear authority intent                                                                                                               |
+| `forge session authority show [name]`   | Show the configured role, exact coverage inventory, journal support, and live launch support (`--json`)                                                                                                                 |
+| `forge session authority set <name>`    | Assign `--role advisory\|producer` to an inactive session; advisory `--tier` defaults to `shell_closed`                                                                                                                 |
+| `forge session authority clear <name>`  | Remove the complete authority designation from an inactive session                                                                                                                                                      |
+| `forge session delete <name>...`        | Delete one or more sessions (`--all` for bulk deletion)                                                                                                                                                                 |
+| `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                   |
+| `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                        |
+| `forge session incognito [name]`        | Start an ephemeral session (auto-delete on exit)                                                                                                                                                                        |
+| `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                         |
 
 `session list --json` and `session show --json` include an additive `launchability` field: `launchable`,
 `missing_worktree`, or `unknown` when no validated recorded path is available. A valid manifest whose recorded worktree
@@ -166,6 +169,17 @@ is missing remains listed and keeps its name and conversation bindings. Human li
 and recovery. Resume, fork, and launch refuse before session mutation until the checkout reappears; `session delete`
 remains available, `session repair --yes` can restore a missing index row without recreating the checkout, and
 `forge clean` reports but does not remove the valid degraded session.
+
+Authority intent is a human control-plane setting. Authority-bearing creation, `authority set`, and `authority clear`
+refuse inside a managed agent process; set/clear also require an inactive target. Advisory authority inherits across
+`resume --fresh` and forks, while producer authority does not. An explicitly supplied child role wins. Adoption is
+deliberately excluded: stop the native client, adopt it unmarked, then set authority before its first managed resume.
+In-place resume accepts no authority flags.
+
+`shell_closed` (the advisory default) denies every delivered tool except Claude's printed inspection and
+conversation/control allowlists; Codex has no shell-backed inspection allowlist. `named_tools` denies only direct
+mutation tools and reports shell/delegation/MCP/external-process gaps. See
+[session authority](end-user/session.md#artifact-authority-for-managed-sessions) for setup, guarantees, and limits.
 
 Note: `session resume --fresh --review` opens the per-child user-notes overlay (`children/<child>.notes.md`) in
 `$EDITOR` before launching Claude; the AI snapshot stays read-only. Session-scoped memory activation lives under

@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.authority import read_authority_events
 from forge.session.models import VerificationConfig
 from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
@@ -111,6 +112,29 @@ class TestSessionSetOverride:
         assert result.exit_code == 1
         # Should mention no active session or session not found
 
+    def test_set_authority_is_refused_by_control_plane_and_journaled(self, runner: CliRunner, temp_env: Path) -> None:
+        with successful_claude_launch():
+            runner.invoke(main, ["session", "start", "authority-override"])
+
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "set",
+                "--session",
+                "authority-override",
+                "authority.role",
+                "producer",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "session authority set" in result.output
+        events = read_authority_events(str(temp_env), "authority-override")
+        assert len(events) == 1
+        assert events[0].event_type == "mutation_refused"
+        assert events[0].reason_code == "generic_authority_override_refused"
+
     def test_set_with_session_option(self, runner: CliRunner, temp_env: Path) -> None:
         """Should accept --session option."""
         with successful_claude_launch():
@@ -206,7 +230,11 @@ class TestSessionSetOverride:
         ("key", "value", "expected_values"),
         [
             ("verification.type", "custom_command", "completion_promise, test_suite"),
-            ("verification", '{"type":"custom_command"}', "completion_promise, test_suite"),
+            (
+                "verification",
+                '{"type":"custom_command"}',
+                "completion_promise, test_suite",
+            ),
             ("verification.on_incomplete", "re_inject", "block, warn, allow"),
         ],
     )
@@ -294,11 +322,25 @@ class TestSessionSetOverride:
 
         parent_result = runner.invoke(
             main,
-            ["session", "set", "--session", "launch-siblings", "launch", '{"mode":"sidecar"}'],
+            [
+                "session",
+                "set",
+                "--session",
+                "launch-siblings",
+                "launch",
+                '{"mode":"sidecar"}',
+            ],
         )
         clear_result = runner.invoke(
             main,
-            ["session", "set", "--session", "launch-siblings", "launch.direct_model", "null"],
+            [
+                "session",
+                "set",
+                "--session",
+                "launch-siblings",
+                "launch.direct_model",
+                "null",
+            ],
         )
 
         assert parent_result.exit_code == 0, parent_result.output
@@ -386,6 +428,21 @@ class TestSessionReset:
         result = runner.invoke(main, ["session", "reset", "--session", "nonexistent", "policy.fail_mode"])
 
         assert result.exit_code == 1
+
+    def test_reset_authority_is_refused_by_control_plane_and_journaled(self, runner: CliRunner, temp_env: Path) -> None:
+        with successful_claude_launch():
+            runner.invoke(main, ["session", "start", "authority-reset"])
+
+        result = runner.invoke(
+            main,
+            ["session", "reset", "--session", "authority-reset", "authority.role"],
+        )
+
+        assert result.exit_code == 1
+        assert "session authority clear" in result.output
+        event = read_authority_events(str(temp_env), "authority-reset")[0]
+        assert event.event_type == "mutation_refused"
+        assert event.operation == "clear"
 
     def test_reset_key_and_all_errors(self, runner: CliRunner, temp_env: Path) -> None:
         """Should error when both key and --all provided."""

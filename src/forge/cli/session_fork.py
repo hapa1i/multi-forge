@@ -18,6 +18,10 @@ from forge.cli.session import (  # noqa: E402
     console,
     handle_session_error,
 )
+from forge.cli.session_authority_options import (
+    authority_creation_options,
+    parse_creation_authority,
+)
 from forge.cli.session_lifecycle import (  # noqa: E402
     _post_exit_render,
     _print_branch_exists_tip,
@@ -296,6 +300,7 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@authority_creation_options
 @click.pass_context
 def fork(
     ctx: click.Context,
@@ -325,6 +330,8 @@ def fork(
     supervisor_runtime: str | None,
     force: bool,
     memory_flag: str | None,
+    authority_role: str | None,
+    authority_tier: str | None,
 ) -> None:
     """Fork an existing session.
 
@@ -352,6 +359,11 @@ def fork(
     strategy_explicit = ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
     drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
     inline_plan_explicit = ctx.get_parameter_source("inline_plan") == click.core.ParameterSource.COMMANDLINE
+    try:
+        authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
+    except ValueError as e:
+        print_error(str(e))
+        sys.exit(1)
 
     manager = SessionManager()
     forge_root = _cwd_forge_root()
@@ -387,6 +399,8 @@ def fork(
         strategy_explicit=strategy_explicit,
         drop_last_explicit=drop_last_explicit,
         inline_plan_explicit=inline_plan_explicit,
+        authority=authority,
+        authority_explicit=authority_explicit,
     )
     preflight_notices: list[ForkPreflightNotice] = []
     try:

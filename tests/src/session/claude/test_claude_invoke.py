@@ -174,6 +174,27 @@ class TestBuildEnvironment:
         # A root has no parent — the inherited parent must be scrubbed.
         assert FORGE_PARENT_RUN_ID_VAR not in env
 
+    def test_caller_root_and_authority_marker_are_used_verbatim(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.reactive.env import RunIdentity
+
+        monkeypatch.setenv("FORGE_AUTHORITY_MARKER", "stale")
+        identity = RunIdentity(
+            run_id="run_aaaaaaaaaaaa",
+            parent_run_id=None,
+            root_run_id="run_aaaaaaaaaaaa",
+        )
+
+        marked = _build_environment(
+            {"FORGE_AUTHORITY_MARKER": "validated"},
+            run_identity=identity,
+        )
+        unmarked = _build_environment(run_identity=identity)
+
+        assert marked[FORGE_RUN_ID_VAR] == identity.run_id
+        assert marked[FORGE_ROOT_RUN_ID_VAR] == identity.root_run_id
+        assert marked["FORGE_AUTHORITY_MARKER"] == "validated"
+        assert "FORGE_AUTHORITY_MARKER" not in unmarked
+
 
 class TestRunClaude:
     """Tests for _run_claude()."""

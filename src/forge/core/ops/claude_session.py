@@ -26,7 +26,9 @@ from forge.core.reactive.env import (
     FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
     InteractiveApiKeyDecision,
+    RunIdentity,
     compute_interactive_api_key_decision,
+    new_root_run_identity,
 )
 from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -44,6 +46,7 @@ from forge.session.addendum import (
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
 )
+from forge.session.authority import AUTHORITY_MARKER_ENV
 from forge.session.claude import build_claude_args, invoke_claude
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.exceptions import (
@@ -72,9 +75,13 @@ from forge.session.launch_confirmation import (
 )
 from forge.session.launchability import require_session_worktree
 from forge.session.model_pin import _apply_direct_model_env_if_supported
-from forge.session.models import session_runtime
+from forge.session.models import AuthorityIntent, session_runtime
 
 from .session import ForgeOpError
+from .session_authority_launch import (
+    AuthorityLaunchAttempt,
+    authority_launch_transaction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -425,6 +432,7 @@ def launch_claude_session(
     name: str | None = None,
     extra_args: list[str] | None = None,
     proxy_id: str | None = None,
+    authority_operation: str = "resume",
     before_launch: Callable[[Path], None] | None = None,
     on_sidecar_launch: Callable[[ClaudeSidecarLaunch], None] | None = None,
     invoke: Callable[..., int] | None = None,
@@ -476,80 +484,101 @@ def launch_claude_session(
     if runtime_base_url is not None:
         apply_proxy_context_model_defaults(env_vars, context_limit)
 
-    if before_launch is not None:
-        before_launch(forge_root)
-
-    addendum_content = resolve_addendum_content_for_proxy(proxy_id)
-    if addendum_content:
-        addendum_path = write_managed_addendum(forge_root, manifest.name, addendum_content)
-        prompt_files = [addendum_path]
-        if system_prompt_file:
-            prompt_files.append(Path(system_prompt_file))
-        system_prompt_file = _combine_prompt_files(
-            worktree_path=worktree_path,
-            session_name=manifest.name,
-            prompt_files=prompt_files,
-        )
-
     store = state_context.store
-
-    if not manifest.confirmed.claude_project_root:
-        _lr = str(launch_root)
-        _update_manifest_best_effort(
-            store,
-            mutate=lambda m: setattr(m.confirmed, "claude_project_root", _lr),
-            label="claude_project_root preseed",
-        )
-
-    launch_started_at = datetime.now(timezone.utc)
-    active_runner = run_active or run_with_active_session
-    warnings: list[str] = []
-
-    if use_sidecar:
-        return _run_sidecar_claude_session(
-            manifest=manifest,
-            store=store,
-            session_id=session_id,
-            resume_id=resume_id,
-            effective_template=effective_template,
-            runtime_base_url=runtime_base_url,
-            context_limit=context_limit,
-            mounts=mounts,
-            image=image,
-            fork_session=fork_session,
-            system_prompt_file=system_prompt_file,
-            name=name,
-            extra_args=extra_args,
-            proxy_id=proxy_id,
-            worktree_path=worktree_path,
-            launch_root=launch_root,
-            launch_started_at=launch_started_at,
-            env_vars=env_vars,
-            active_runner=active_runner,
-            on_sidecar_launch=on_sidecar_launch,
-            warnings=warnings,
-        )
-
-    return _run_host_claude_session(
-        manifest=manifest,
+    root = new_root_run_identity()
+    launch_mode = LAUNCH_MODE_SIDECAR if use_sidecar else LAUNCH_MODE_HOST
+    with authority_launch_transaction(
         store=store,
-        session_id=session_id,
-        resume_id=resume_id,
-        runtime_base_url=runtime_base_url,
-        proxy_id=proxy_id,
-        fork_session=fork_session,
-        system_prompt_file=system_prompt_file,
-        name=name,
-        extra_args=extra_args,
+        root=root,
+        operation=authority_operation,
+        launch_mode=launch_mode,
         worktree_path=worktree_path,
-        launch_root=launch_root,
-        launch_started_at=launch_started_at,
-        env_vars=env_vars,
-        unset_env_vars=unset_env_vars,
-        active_runner=active_runner,
-        invoke=invoke or invoke_claude,
-        warnings=warnings,
-    )
+        claude_session_id=session_id,
+        state_hint=manifest,
+    ) as authority_attempt:
+        env_vars.pop(AUTHORITY_MARKER_ENV, None)
+        if authority_attempt is not None and authority_attempt.marker is not None:
+            env_vars[AUTHORITY_MARKER_ENV] = authority_attempt.marker
+
+        if before_launch is not None:
+            before_launch(forge_root)
+
+        addendum_content = resolve_addendum_content_for_proxy(proxy_id)
+        if addendum_content:
+            addendum_path = write_managed_addendum(forge_root, manifest.name, addendum_content)
+            prompt_files = [addendum_path]
+            if system_prompt_file:
+                prompt_files.append(Path(system_prompt_file))
+            system_prompt_file = _combine_prompt_files(
+                worktree_path=worktree_path,
+                session_name=manifest.name,
+                prompt_files=prompt_files,
+            )
+
+        if not manifest.confirmed.claude_project_root:
+            _lr = str(launch_root)
+            _update_manifest_best_effort(
+                store,
+                mutate=lambda m: setattr(m.confirmed, "claude_project_root", _lr),
+                label="claude_project_root preseed",
+            )
+
+        launch_started_at = datetime.now(timezone.utc)
+        active_runner = run_active or run_with_active_session
+        warnings: list[str] = []
+
+        if use_sidecar:
+            result = _run_sidecar_claude_session(
+                manifest=manifest,
+                store=store,
+                session_id=session_id,
+                resume_id=resume_id,
+                effective_template=effective_template,
+                runtime_base_url=runtime_base_url,
+                context_limit=context_limit,
+                mounts=mounts,
+                image=image,
+                fork_session=fork_session,
+                system_prompt_file=system_prompt_file,
+                name=name,
+                extra_args=extra_args,
+                proxy_id=proxy_id,
+                worktree_path=worktree_path,
+                launch_root=launch_root,
+                launch_started_at=launch_started_at,
+                env_vars=env_vars,
+                active_runner=active_runner,
+                on_sidecar_launch=on_sidecar_launch,
+                warnings=warnings,
+                run_identity=root,
+                authority_attempt=authority_attempt,
+            )
+        else:
+            result = _run_host_claude_session(
+                manifest=manifest,
+                store=store,
+                session_id=session_id,
+                resume_id=resume_id,
+                runtime_base_url=runtime_base_url,
+                proxy_id=proxy_id,
+                fork_session=fork_session,
+                system_prompt_file=system_prompt_file,
+                name=name,
+                extra_args=extra_args,
+                worktree_path=worktree_path,
+                launch_root=launch_root,
+                launch_started_at=launch_started_at,
+                env_vars=env_vars,
+                unset_env_vars=unset_env_vars,
+                active_runner=active_runner,
+                invoke=invoke or invoke_claude,
+                warnings=warnings,
+                run_identity=root,
+                authority_attempt=authority_attempt,
+            )
+        if authority_attempt is not None:
+            authority_attempt.complete(result.exit_code)
+        return result
 
 
 def start_claude_session(
@@ -577,6 +606,8 @@ def start_claude_session(
     memory_flag: bool | None,
     subprocess_proxy: str | None,
     supervisor: SupervisorWiring | None,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
     presenter: ClaudeStartPresenter,
     invoke: Callable[..., int] | None = None,
     run_active: Callable[..., int] | None = None,
@@ -607,6 +638,8 @@ def start_claude_session(
         image=image,
         normalized_direct_model=normalized_direct_model,
         pre_seeded_uuid=pre_seeded_uuid,
+        authority=authority,
+        authority_explicit=authority_explicit,
     )
 
     operation_cwd = Path.cwd()
@@ -643,15 +676,15 @@ def start_claude_session(
             proxy_display=proxy_display,
             effective_template=effective_template,
             runtime_base_url=runtime_base_url,
-            worktree_path=manifest.worktree.path if is_worktree and manifest.worktree else None,
-            worktree_branch=manifest.worktree.branch if is_worktree and manifest.worktree else None,
+            worktree_path=(manifest.worktree.path if is_worktree and manifest.worktree else None),
+            worktree_branch=(manifest.worktree.branch if is_worktree and manifest.worktree else None),
             supervise_target=supervisor.target if supervisor is not None else None,
         )
     )
     presenter.on_extensions(
         ClaudeStartExtensions(
             is_worktree=is_worktree,
-            extension_root=_resolve_worktree_extension_root(manifest) if is_worktree else None,
+            extension_root=(_resolve_worktree_extension_root(manifest) if is_worktree else None),
             extensions_flag=extensions,
         )
     )
@@ -687,6 +720,7 @@ def start_claude_session(
                 name=manifest.name,
                 extra_args=extra_args,
                 proxy_id=proxy_id,
+                authority_operation="incognito" if incognito else "start",
                 before_launch=presenter.before_launch,
                 on_sidecar_launch=presenter.on_sidecar_launch,
                 invoke=invoke or invoke_claude,
@@ -802,9 +836,10 @@ def resume_claude_session(
             mounts=preferences.mounts,
             image=preferences.image,
             fork_session=plan.fork_session,
-            system_prompt_file=str(plan.prompt_file) if plan.prompt_file is not None else None,
+            system_prompt_file=(str(plan.prompt_file) if plan.prompt_file is not None else None),
             name=manifest.name,
             proxy_id=effective_proxy_id,
+            authority_operation="resume",
             before_launch=presenter.before_launch,
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
@@ -864,9 +899,10 @@ def fork_claude_session(
             image=preferences.image,
             fork_session=plan.fork_session,
             register_fork=plan.register_fork,
-            system_prompt_file=str(plan.prompt_file) if plan.prompt_file is not None else None,
+            system_prompt_file=(str(plan.prompt_file) if plan.prompt_file is not None else None),
             name=manifest.name,
             proxy_id=plan.proxy_id,
+            authority_operation="incognito" if plan.incognito else "fork",
             before_launch=presenter.before_launch,
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
@@ -1083,6 +1119,8 @@ def _create_claude_session(
     image: str | None,
     normalized_direct_model: str | None,
     pre_seeded_uuid: str,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> SessionState:
     """Create the session (row 1), mapping create failures to structured op errors."""
     try:
@@ -1099,6 +1137,8 @@ def _create_claude_session(
             sidecar_image=image if use_sidecar else None,
             direct_model=normalized_direct_model,
             claude_session_id=pre_seeded_uuid,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except SessionExistsError as e:
         raise ClaudeStartError(
@@ -1262,6 +1302,8 @@ def _run_sidecar_claude_session(
     active_runner: Callable[..., int],
     on_sidecar_launch: Callable[[ClaudeSidecarLaunch], None] | None,
     warnings: list[str],
+    run_identity: RunIdentity,
+    authority_attempt: AuthorityLaunchAttempt | None,
 ) -> ClaudeSessionLaunchResult:
     if effective_template is None or runtime_base_url is None:
         raise ForgeOpError("Direct sessions are not supported with --sidecar")
@@ -1370,8 +1412,8 @@ def _run_sidecar_claude_session(
         proxy_id=proxy_id,
         base_url=runtime_base_url,
         decision=_sidecar_key,
-        proxy_cost_baseline_micros=_sidecar_cost_baseline.cost_micros if _sidecar_cost_baseline else None,
-        proxy_cost_baseline_started_at=_sidecar_cost_baseline.started_at if _sidecar_cost_baseline else None,
+        proxy_cost_baseline_micros=(_sidecar_cost_baseline.cost_micros if _sidecar_cost_baseline else None),
+        proxy_cost_baseline_started_at=(_sidecar_cost_baseline.started_at if _sidecar_cost_baseline else None),
     )
 
     sidecar_image = image or _runtime_config.sidecar_image
@@ -1385,13 +1427,9 @@ def _run_sidecar_claude_session(
     )
 
     try:
-        sidecar_exit = active_runner(
-            session_name=manifest.name,
-            worktree_path=worktree_path,
-            launch_mode=LAUNCH_MODE_SIDECAR,
-            forge_root=manifest.forge_root,
-            claude_session_id=session_id,
-            runner=lambda: run_sidecar_session(
+
+        def runner() -> int:
+            return run_sidecar_session(
                 image=sidecar_image,
                 template=effective_template,
                 session_name=manifest.name,
@@ -1401,8 +1439,20 @@ def _run_sidecar_claude_session(
                 context_limit=context_limit,
                 env_vars=container_env,
                 claude_args=claude_args,
-            ),
-        )
+                run_identity=run_identity,
+            )
+
+        if authority_attempt is not None:
+            sidecar_exit = runner()
+        else:
+            sidecar_exit = active_runner(
+                session_name=manifest.name,
+                worktree_path=worktree_path,
+                launch_mode=LAUNCH_MODE_SIDECAR,
+                forge_root=manifest.forge_root,
+                claude_session_id=session_id,
+                runner=runner,
+            )
     except ContainerExistsError as e:
         _update_manifest_best_effort(
             store,
@@ -1464,6 +1514,8 @@ def _run_host_claude_session(
     active_runner: Callable[..., int],
     invoke: Callable[..., int],
     warnings: list[str],
+    run_identity: RunIdentity,
+    authority_attempt: AuthorityLaunchAttempt | None,
 ) -> ClaudeSessionLaunchResult:
     _update_manifest_best_effort(
         store,
@@ -1484,8 +1536,8 @@ def _run_host_claude_session(
         proxy_id=proxy_id,
         base_url=runtime_base_url,
         decision=compute_interactive_api_key_decision(interactive=True),
-        proxy_cost_baseline_micros=_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None,
-        proxy_cost_baseline_started_at=_proxy_cost_baseline.started_at if _proxy_cost_baseline else None,
+        proxy_cost_baseline_micros=(_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None),
+        proxy_cost_baseline_started_at=(_proxy_cost_baseline.started_at if _proxy_cost_baseline else None),
     )
 
     if runtime_base_url is None:
@@ -1511,18 +1563,25 @@ def _run_host_claude_session(
         "unset_env_vars": unset_env_vars,
         "extra_args": extra_args,
         "cwd": str(launch_root),
+        "run_identity": run_identity,
     }
     if fork_session is not None:
         invoke_kwargs["fork_session"] = fork_session
 
-    exit_code = active_runner(
-        session_name=manifest.name,
-        worktree_path=worktree_path,
-        launch_mode=LAUNCH_MODE_HOST,
-        forge_root=manifest.forge_root,
-        claude_session_id=session_id,
-        runner=lambda: invoke(**invoke_kwargs),
-    )
+    def runner() -> int:
+        return invoke(**invoke_kwargs)
+
+    if authority_attempt is not None:
+        exit_code = runner()
+    else:
+        exit_code = active_runner(
+            session_name=manifest.name,
+            worktree_path=worktree_path,
+            launch_mode=LAUNCH_MODE_HOST,
+            forge_root=manifest.forge_root,
+            claude_session_id=session_id,
+            runner=runner,
+        )
     if exit_code == 0 and fork_session is False:
         _infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
 

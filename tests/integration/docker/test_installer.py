@@ -216,6 +216,16 @@ import json
 from pathlib import Path
 settings = json.loads(Path.home().joinpath('.claude/settings.json').read_text())
 assert 'hooks' in settings, 'hooks key missing'
+rows = [
+    (event, entry.get('matcher'), hook.get('command'), hook.get('timeout'))
+    for event, entries in settings['hooks'].items()
+    for entry in entries
+    for hook in entry.get('hooks', [])
+]
+authority = [row for row in rows if row[2].endswith('forge-hook authority-check')]
+assert len(authority) == 1, authority
+assert authority[0][0:2] == ('PreToolUse', None), authority
+assert authority[0][3] == 60, authority
 print('hooks present')
 "
         """)

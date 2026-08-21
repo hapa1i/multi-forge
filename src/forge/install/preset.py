@@ -68,6 +68,15 @@ def _build_builtin_preset(hook_command: Callable[[str], str]) -> dict[str, Any]:
             ],
             "PreToolUse": [
                 {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_command("authority-check"),
+                            "timeout": 60,
+                        }
+                    ],
+                },
+                {
                     "matcher": "Read",
                     "hooks": [
                         {

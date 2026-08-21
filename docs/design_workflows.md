@@ -367,6 +367,13 @@ auditable). Both time limits matter: `max_iterations` catches fast-failing loops
 
 ### 1.4 Action context
 
+Artifact authority is a separate, earlier guard for a launch-marked managed advisory session. It classifies the raw
+runtime tool name and validates the launch marker/session digests before an `ActionContext` exists. A covered request or
+authority-resolution failure produces the runtime deny immediately; `intent.policy.fail_mode`, policy enablement, bundle
+availability, supervisor state, and adapter parse success cannot weaken it. If authority declines to deny, that is not
+an allow: the request continues through runtime permission and the ordinary policy composition below. Producer and
+unmarked sessions follow the existing policy path.
+
 Policies operate on a normalized, origin-tagged view of what a runtime is doing (an `ActionContext`), for example:
 
 - `origin` — which actor produced the action (`claude_code`, `codex`, or `forge_cli` for manual on-demand checks)
@@ -384,7 +391,9 @@ adapter normalizes each `apply_patch` file operation to the tool names every pol
 `Write`, Update File → `Edit`; deletions skipped; `Bash` passes through), keeping runtime truth in `origin="codex"` +
 `tool_args`; files compose deny > needs_review > warn/allow, and unparseable patches fail open. Enforcement requires a
 registered + trust-enrolled Codex PreToolUse hook: `forge extension enable` registers it (Codex-owned `hooks`, §5);
-enrollment remains the user's one-time interactive trust ceremony, which Forge can neither perform nor verify.
+enrollment remains the user's one-time interactive trust ceremony. Forge cannot perform that ceremony, but
+`runtime preflight codex --verify-enrollment` verifies its effect with a real probe turn; marked advisory launch repeats
+that empirical check for every attempt.
 
 ### 1.5 Policy composition
 

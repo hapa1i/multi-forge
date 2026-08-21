@@ -45,6 +45,7 @@ def _env(tmp_path: Path, forge_home: Path) -> dict[str, str]:
     env["FORGE_HOME"] = str(forge_home)
     env["PATH"] = "/usr/bin:/bin"
     env.pop("FORGE_SESSION", None)
+    env.pop("FORGE_AUTHORITY_MARKER", None)
     return env
 
 
@@ -209,6 +210,42 @@ def test_dispatcher_resolves_recorded_global_forge_without_path(
     record = _read_fake_record(record_path)
     assert record["argv"] == [str(fake_forge), "hook", "policy-check"]
     assert record["stdin"] == '{"tool":"Read"}'
+
+
+def test_authority_absent_marker_is_noop_before_project_gate_or_forge_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing_forge = tmp_path / "missing-forge"
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, missing_forge)
+    cwd = tmp_path / "not-enrolled"
+    cwd.mkdir()
+    env = _env(tmp_path, _forge_home())
+
+    result = _run_dispatcher(dispatcher, cwd, env, hook_name="authority-check", stdin="not json")
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_authority_present_marker_forwards_even_without_project_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_forge, record_path = _make_fake_forge(tmp_path)
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
+    cwd = tmp_path / "not-enrolled"
+    cwd.mkdir()
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_AUTHORITY_MARKER"] = "malformed-but-present"
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, cwd, env, hook_name="authority-check", stdin="payload")
+
+    assert result.returncode == 0
+    assert _read_fake_record(record_path) == {
+        "argv": [str(fake_forge), "hook", "authority-check"],
+        "stdin": "payload",
+    }
 
 
 def test_stale_target_falls_back_to_known_user_tool_location(

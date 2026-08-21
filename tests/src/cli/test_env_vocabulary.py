@@ -13,6 +13,7 @@ ENV_CLASSES = {
     "FORGE_DEV": "public",
     "FORGE_DEBUG": "public-diagnostic",
     "FORGE_STATUS_TRUNCATE": "public-diagnostic",
+    "FORGE_AUTHORITY_MARKER": "internal-wiring",
     "FORGE_CODEX_PROXY_TOKEN": "internal-wiring",
     "FORGE_COMMAND": "internal-wiring",
     "FORGE_DEFAULT_PROXY_BASE_URL": "internal-wiring",

@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 _FORGE_SESSION_VAR = "FORGE_SESSION"
 _FORGE_FORGE_ROOT_VAR = "FORGE_FORGE_ROOT"
+_FORGE_AUTHORITY_MARKER_VAR = "FORGE_AUTHORITY_MARKER"
 
 # Sessionless proxy-launch env scrub: the session-managed identity AND the native OpenAI
 # account/routing vars, on top of the shared codex child strip set. Because the proxy owns
@@ -79,6 +80,7 @@ def invoke_codex_interactive(
     sandbox: CodexSandbox = "workspace-write",
     resume_thread_id: str | None = None,
     initial_prompt: str | None = None,
+    authority_marker: str | None = None,
 ) -> int:
     """Run the ``codex`` TUI in the foreground; return its exit code.
 
@@ -115,6 +117,9 @@ def invoke_codex_interactive(
     env[FORGE_RUN_ID_VAR] = run_identity.run_id
     env[FORGE_ROOT_RUN_ID_VAR] = run_identity.root_run_id
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # an interactive launch is its own root
+    env.pop(_FORGE_AUTHORITY_MARKER_VAR, None)
+    if authority_marker is not None:
+        env[_FORGE_AUTHORITY_MARKER_VAR] = authority_marker
 
     logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
     result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
@@ -137,7 +142,12 @@ def invoke_codex_bare_proxy(
     """
     argv = _build_codex_proxy_argv(base_url=base_url, sandbox=sandbox, model=model, passthrough=passthrough)
     env = _build_codex_proxy_env()
-    logger.debug("Launching proxy-backed codex (base_url=%s, sandbox=%s, model=%s)", base_url, sandbox, model)
+    logger.debug(
+        "Launching proxy-backed codex (base_url=%s, sandbox=%s, model=%s)",
+        base_url,
+        sandbox,
+        model,
+    )
     result = subprocess.run(argv, env=env, cwd=cwd or os.getcwd(), stdin=None, stdout=None, stderr=None)
     return result.returncode
 

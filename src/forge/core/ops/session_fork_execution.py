@@ -250,10 +250,15 @@ def execute_session_fork(
         memory_flag=({"on": True, "off": False}.get(request.memory_flag) if request.memory_flag else None),
         resume_mode=plan.manager_resume_mode,
         warnings_sink=fork_warnings,
+        authority=request.authority,
+        authority_explicit=request.authority_explicit,
     )
 
     events: list[ForkExecutionEvent] = [
-        ForkExecutionNotice("warning" if warning.startswith("[warn]") else "status", warning.removeprefix("[warn]"))
+        ForkExecutionNotice(
+            "warning" if warning.startswith("[warn]") else "status",
+            warning.removeprefix("[warn]"),
+        )
         for warning in fork_warnings
     ]
     compensation = _ForkCompensation()
@@ -390,7 +395,10 @@ def _prepare_created_fork(
     launch_register_fork = False
     if plan.rewind_requested and request.drop_last == 0:
         events.append(
-            ForkExecutionNotice("status", "--drop-last 0 uses plain native-relocate; no rewind context generated.")
+            ForkExecutionNotice(
+                "status",
+                "--drop-last 0 uses plain native-relocate; no rewind context generated.",
+            )
         )
 
     if native_relocate:
@@ -606,7 +614,10 @@ def _prepare_native_relocation(
             mutate=lambda state: setattr(state.confirmed, "claude_project_root", fork_cwd),
         )
     except Exception:
-        logger.debug("native-relocate claude_project_root pre-seed failed (hook will reconcile)", exc_info=True)
+        logger.debug(
+            "native-relocate claude_project_root pre-seed failed (hook will reconcile)",
+            exc_info=True,
+        )
 
 
 def _apply_direct_model_override(
@@ -731,7 +742,10 @@ def _detect_parent_extensions(parent_project_root: Path) -> tuple[str, str] | No
         if user_install is not None:
             return user_install.profile, user_install.mode
     except Exception:
-        logger.debug("Tracking store lookup failed, falling through to hook detection", exc_info=True)
+        logger.debug(
+            "Tracking store lookup failed, falling through to hook detection",
+            exc_info=True,
+        )
 
     try:
         if has_forge_hooks(parent_project_root):

@@ -6,12 +6,11 @@
 
 ## Current focus
 
-The checklist was ratified on 2026-08-21. Implementation remains paused at the user-requested review boundary, and no
-implementation or commit has begun. When the user explicitly continues, Phase 1 starts with the authority-neutral shared
-event/journal seam. M2 remains proposed; this branch does not add route history, marking metadata, model selection, or a
-status-line segment.
+Implementation and local verification completed on 2026-08-21; the branch is being prepared for review. M1 remains in
+`doing/` until merge and post-merge lane/link closeout. M2 remains proposed; this branch adds no route history, marking
+metadata, model selection, or status-line segment.
 
-## Verified baseline
+## Verified pre-implementation baseline
 
 - `SessionIntent` has no authority field (`src/forge/session/models.py`); its strict dacite schema is additive at
   version 1, and `session/overrides.py` derives accepted override paths from that dataclass.
@@ -96,42 +95,42 @@ Ratified decisions:
 
 ## Phase 1 -- Shared session-event journal foundation (epic C1-C4)
 
-- [ ] Add one authority-neutral `forge.session` event-journal module rather than an authority-local writer.
+- [x] Add one authority-neutral `forge.session` event-journal module rather than an authority-local writer.
   - Assertion: it owns the schema-v1 envelope, `sevt_` id minting, UTC RFC 3339 timestamps, frozen
     `origin_surface`/`operation`/`outcome` enums, required/nullability validation, and domain-payload validation hooks.
   - Assertion: authority and the later M2 consumer can select separate domain paths without duplicating enums, ids,
     locks, serialization, or absence vocabulary.
-- [ ] Add contained artifact-path construction for `.forge/artifacts/<validated-session>/<domain>/events.jsonl` with an
+- [x] Add contained artifact-path construction for `.forge/artifacts/<validated-session>/<domain>/events.jsonl` with an
   explicit domain allowlist.
   - Assertion: absolute names, separators, `.`/`..`, symlink escapes, unknown domains, and roots outside the owning
     `forge_root` are rejected before directory creation or append.
   - Assertion: authority events resolve only to `authority/events.jsonl`; no routing path is created by M1.
-- [ ] Implement required append under one dedicated per-journal lock using strict JSON-compatible values, compact UTF-8
+- [x] Implement required append under one dedicated per-journal lock using strict JSON-compatible values, compact UTF-8
   JSON plus one newline, secure directory/file modes, flush, and durability sync before success returns.
   - Assertion: concurrent processes produce complete, individually parseable records with unique ids and no interleaved
     bytes; append/open/lock/fsync failures propagate as typed errors.
   - Assertion: arbitrary `default=str` serialization is not used, so unsupported objects cannot silently stringify
     secrets or source-bearing values.
-- [ ] Implement a strict ordered reader.
+- [x] Implement a strict ordered reader.
   - Assertion: missing file is represented to the domain reader as absence, while unreadable files, truncated/non-object
     lines, unknown fields, invalid enums/nullability/timestamps/ids, and newer schema versions raise a record/line
     diagnostic; no bad line is skipped.
-- [ ] Pin the authority payload schema: role, nullable tier, effective-config SHA-256, nullable hook-registration
+- [x] Pin the authority payload schema: role, nullable tier, effective-config SHA-256, nullable hook-registration
   SHA-256, and nullable covered tool; reject prompt/tool payload/patch/source fields and unknown payload keys.
-- [ ] Add neutral tests in `tests/src/session/test_session_events.py`; name the helper contract in the epic checklist so
+- [x] Add neutral tests in `tests/src/session/test_session_events.py`; name the helper contract in the epic checklist so
   M2 must consume rather than fork it.
-- [ ] Sync the shared event ownership, paths, lock/failure behavior, local-tamper caveat, and C4 absence vocabulary into
+- [x] Sync the shared event ownership, paths, lock/failure behavior, local-tamper caveat, and C4 absence vocabulary into
   `docs/design.md`/`docs/design_appendix.md` with M1 described as the sole shipped consumer.
 
 ## Phase 2 -- Authority intent, coverage inventory, and human control plane
 
-- [ ] Add typed `AuthorityIntent(role, tier)` under `SessionIntent.authority`, defaulting to `None` (unmarked), without
+- [x] Add typed `AuthorityIntent(role, tier)` under `SessionIntent.authority`, defaulting to `None` (unmarked), without
   a manifest schema bump if old and new strict round trips remain compatible.
   - Assertion: only `advisory | producer` are accepted; advisory defaults to `shell_closed`; producer plus a tier is an
     error; direct malformed/newer manifest values fail strict reads.
   - Assertion: `session_state_to_dict` and strict store reads preserve exact role/tier values, while legacy manifests
     remain unmarked and behavior-compatible.
-- [ ] Add one versioned, runtime-specific coverage inventory and pure classifier used by launch markers, hooks, and
+- [x] Add one versioned, runtime-specific coverage inventory and pure classifier used by launch markers, hooks, and
   `authority show`.
   - Assertion: `named_tools` covers raw `Write`, `Edit`, `NotebookEdit`, and `apply_patch` only; Bash, delegation, MCP,
     skill, unknown, and external-process surfaces are printed as uncovered.
@@ -139,54 +138,54 @@ Ratified decisions:
     denies every other tool; Codex denies `Bash`, `apply_patch`, and every unknown/new tool because it has no
     shell-backed inspection allowlist.
   - Assertion: “decline” never emits an authority allow/grant and ordinary permission/policy hooks still run.
-- [ ] Add UI-free authority operations and a typed `forge session authority show|set|clear` CLI subgroup with stable
+- [x] Add UI-free authority operations and a typed `forge session authority show|set|clear` CLI subgroup with stable
   `--json` on `show` and stdout/stderr behavior following the CLI style contract.
   - Assertion: `set` defaults advisory tier, rejects producer tier, and `clear` removes the complete subtree; both use
     workspace-scoped target resolution and target-project compatibility checks.
   - Assertion: `show` may resolve the current `FORGE_SESSION`, but `set`/`clear` require the explicit target shown in
     the card and never expose a mutating direct `%authority` command.
-- [ ] Enforce the human control plane before mutation and again at the serialized write boundary.
+- [x] Enforce the human control plane before mutation and again at the serialized write boundary.
   - Assertion: authority-bearing creation, set, and clear refuse when `FORGE_SESSION` is present; set/clear refuse a
     live target; every well-formed target-resolved refusal appends `mutation_refused` with the applicable run
     id/origin/reason.
   - Assertion: malformed or unresolved commands emit diagnostics without creating an attacker-chosen journal path.
-- [ ] Statically reject `authority`, `authority.*`, and concrete authority leaves in both generic `session set` and
+- [x] Statically reject `authority`, `authority.*`, and concrete authority leaves in both generic `session set` and
   keyed `session reset`; a target-resolved attempt appends `mutation_refused`. `reset --all` remains an override-only
   operation and cannot clear session intent.
-- [ ] Implement role-specific derivation across fresh resume, same/worktree/`--into` fork, relaunch helpers, and Codex
+- [x] Implement role-specific derivation across fresh resume, same/worktree/`--into` fork, relaunch helpers, and Codex
   child creation.
   - Assertion: advisory and its tier inherit; producer yields an unmarked child; frozen/confirmed runtime state is not
     copied as authority intent.
   - Assertion: an explicit child role replaces inherited authority before first launch and writes `authority_configured`
     from `external_cli`; implicit advisory writes `authority_inherited` from `session_derivation`; both use
     `run_id: null`.
-- [ ] Journal successful configured/cleared/inherited transitions with a canonical config digest and no source-bearing
+- [x] Journal successful configured/cleared/inherited transitions with a canonical config digest and no source-bearing
   data; required append failure follows D4 and never reports success.
-- [ ] Sync session ownership/inheritance/control-plane semantics into `docs/design.md` and generic override restrictions
+- [x] Sync session ownership/inheritance/control-plane semantics into `docs/design.md` and generic override restrictions
   into `docs/end-user/session.md` as the code lands.
 
 ## Phase 3 -- One launch identity, preflight, marker, and lifecycle
 
-- [ ] Introduce one runtime-neutral launch-attempt value carrying operation, runtime, root `RunIdentity`, effective
+- [x] Introduce one runtime-neutral launch-attempt value carrying operation, runtime, root `RunIdentity`, effective
   authority config, and preflight evidence.
   - Assertion: root identity is minted once before member preflight for Claude host, supported sidecar paths, Codex
     headless start/resume, Codex TUI start/reattach, fresh resume, fork, and incognito; it is passed into the existing
     invoker/container instead of being reminted there.
   - Assertion: every interactive attempt has `run_id == root_run_id` and no inherited parent id; preflight failure may
     consume the id without producing a usage event or `run_started`.
-- [ ] Implement role-aware preflight without imposing authority work on unmarked sessions.
+- [x] Implement role-aware preflight without imposing authority work on unmarked sessions.
   - Assertion: advisory launch validates role/tier, exact runtime hook seam, dispatcher/registration digest, and D3
     empirical requirements before invocation; absent, malformed, stale, unregistered, unverified, or unsupported seams
     refuse with actionable recovery.
   - Assertion: producer records its configuration/run posture but does not require an enforcement seam; unmarked
     sessions keep current launch behavior and create no authority claim.
-- [ ] Canonicalize the effective config and registration tuples and compute lowercase SHA-256 digests from secret-free
+- [x] Canonicalize the effective config and registration tuples and compute lowercase SHA-256 digests from secret-free
   bytes; pin digest stability and drift behavior in tests.
-- [ ] Stamp the D2 advisory-only marker into Claude/Codex child environments, including the existing sidecar env-file
+- [x] Stamp the D2 advisory-only marker into Claude/Codex child environments, including the existing sidecar env-file
   transport only if sidecar advisory support is ratified.
   - Assertion: the marker is built from the validated preflight result, remains byte-fixed for the run, and cannot be
     supplied by session overrides or a user-facing option.
-- [ ] Append `launch_preflight`, `run_started`, `run_ended`, and `launch_aborted` with the same run id and correct
+- [x] Append `launch_preflight`, `run_started`, `run_ended`, and `launch_aborted` with the same run id and correct
   start/resume/fork/incognito operation.
   - Assertion: preflight and start records commit before child invocation; normal exit, spawned-child nonzero exit,
     cancellation, and launcher exception each produce the exact terminal outcome and reason.
@@ -194,9 +193,9 @@ Ratified decisions:
     `child_exited_nonzero`, and reads distinguish both from a preflight/commit abort, which has no `run_started` event.
   - Assertion: the launch orchestration exposes M2's future “authority then routing projection” insertion point and can
     append same-run compensating aborts, but M1 adds no routing event or projection.
-- [ ] Serialize launch activation with authority mutation per D4, while retaining existing active-session cleanup after
+- [x] Serialize launch activation with authority mutation per D4, while retaining existing active-session cleanup after
   child exit; marker/config mismatch during a live run can only tighten to denial.
-- [ ] Pin journal tree lifetime through normal delete, clean with either transcript flag, failed launch, and incognito
+- [x] Pin journal tree lifetime through normal delete, clean with either transcript flag, failed launch, and incognito
   cleanup.
   - Assertion: delete/clean never selectively removes `authority/`; `--keep-transcripts` has no effect, and the journal
     survives whenever the recorded `forge_root` remains, including root-level `session start --worktree`, `--into`, and
@@ -204,81 +203,81 @@ Ratified decisions:
   - Assertion: when deletion removes an owning checkout that contains the recorded `forge_root`, as for a nested-project
     worktree or worktree fork, the journal disappears with the complete `.forge/artifacts/<session>` tree. Tests pin
     both sides of this containing-tree boundary rather than promising retention outside it.
-- [ ] Sync the one-root-id/preflight/lifecycle/retention architecture into `docs/design.md` and the runtime-specific
+- [x] Sync the one-root-id/preflight/lifecycle/retention architecture into `docs/design.md` and the runtime-specific
   seam details into `docs/design_appendix.md`.
 
 ## Phase 4 -- Runtime authority guards and ordinary-policy preservation
 
-- [ ] Add Claude's dedicated `forge hook authority-check` command with raw PreToolUse evaluation and the existing valid
+- [x] Add Claude's dedicated `forge hook authority-check` command with raw PreToolUse evaluation and the existing valid
   Claude block response/exit contract.
   - Assertion: marker and manifest resolution, digest/run-id consistency, and tier classification happen before any
     per-file/path normalization or ordinary policy check; malformed mutation envelopes, delete/rename operations, and
     outside/`.forge`/unnormalizable targets remain denied by tool name.
   - Assertion: valid advisory guard exceptions, unreadable state, and marker mismatch deny; request-journal failure
     emits a diagnostic but never changes the deny.
-- [ ] Add one Claude PreToolUse registration with omitted matcher for `authority-check`; keep both existing
+- [x] Add one Claude PreToolUse registration with omitted matcher for `authority-check`; keep both existing
   `policy-check` Write/Edit rows intact and update host/sidecar inventories plus pinned event/matcher/command/timeout
   contracts.
-- [ ] Move the rendered dispatcher's handler parse and advisory-marker presence gate ahead of `_should_dispatch`, dev
+- [x] Move the rendered dispatcher's handler parse and advisory-marker presence gate ahead of `_should_dispatch`, dev
   override resolution, runtime metadata reads, Forge launcher resolution, import, and exec.
   - Assertion: absent marker for producer/unmarked `authority-check` exits 0 structurally without resolving/importing/
     executing Forge; a present or malformed marker dispatches for full validation; every other hook keeps current
     resolution and error behavior.
   - Assertion: the 50-run/40-registry/depth-5 benchmark remains at p95 \<= 30 ms on the reference host; unit tests
     assert structural no-resolve/no-import/no-exec behavior rather than a flaky time bound.
-- [ ] Put the Codex authority guard at the top of the existing `codex-policy-check` command, before the raw tool-name
+- [x] Put the Codex authority guard at the top of the existing `codex-policy-check` command, before the raw tool-name
   `apply_patch` filter, `policy.enabled`, bundle/supervisor gates, and `CodexHookAdapter`.
   - Assertion: advisory raw `apply_patch`, `Bash`, malformed mutation envelopes, and unknown tools receive Codex's
     strict deny JSON even with policy disabled/open or no bundles; guard errors deny whenever valid output can be
     emitted.
   - Assertion: `get_builtin_codex_entries()` and rendered managed-block bytes are unchanged, so existing trust
     enrollment is not invalidated and no second Codex hook is registered.
-- [ ] Prove producer/unmarked compatibility for both runtimes.
+- [x] Prove producer/unmarked compatibility for both runtimes.
   - Assertion: Claude's authority-only row declines and existing Write/Edit policy rows still decide; Codex without an
     advisory marker follows its current apply_patch policy path byte-for-byte; allowlist declines never override runtime
     prompts or other hooks.
-- [ ] Append `request_denied` with valid marker run id, runtime hook origin, `tool_request`, stable reason, config/hook
+- [x] Append `request_denied` with valid marker run id, runtime hook origin, `tool_request`, stable reason, config/hook
   digests, and covered tool only -- never the raw envelope, command, patch, prompt, or path.
-- [ ] Extend Docker hook and installer coverage for real registered rows, both runtime wire responses, disabled/open
+- [x] Extend Docker hook and installer coverage for real registered rows, both runtime wire responses, disabled/open
   ordinary policy, malformed inputs, journal failure, and the host dispatcher fast path.
-- [ ] Sync the authority-before-policy boundary and fail-closed-vs-runtime-non-delivery limitation into
+- [x] Sync the authority-before-policy boundary and fail-closed-vs-runtime-non-delivery limitation into
   `docs/design_workflows.md`, `docs/design_appendix.md`, and `docs/end-user/hook.md`.
 
 ## Phase 5 -- Honest authority posture read
 
-- [ ] Build a pure report operation that combines current manifest intent, strict journal history, runtime coverage,
+- [x] Build a pure report operation that combines current manifest intent, strict journal history, runtime coverage,
   non-repairing active state, and launch-preflight evidence without persisting derived state.
-- [ ] Emit the same stable fields for advisory, producer, and unmarked sessions: `session`, `role`, `tier`, `runtime`,
+- [x] Emit the same stable fields for advisory, producer, and unmarked sessions: `session`, `role`, `tier`, `runtime`,
   `active`, `launch_support`, `configuration_history`, `configured_epoch`, `covered_tools`, `read_only_tools`,
   `control_tools`, `observed_denials`, and `limitations`.
   - Assertion: not-applicable values are `null`/empty collections, not omitted; human output labels the same facts and
     never compresses them into an overall badge.
-- [ ] Derive configuration epochs and denials from ordered events.
+- [x] Derive configuration epochs and denials from ordered events.
   - Assertion: continuous matching configured/inherited/cleared history is `supported`; a currently marked manifest with
     absent or inconsistent history is `unproven`; unmarked plus no journal is `null`; malformed/unreadable/newer history
     is a command error rather than `unproven` or a skipped line.
-- [ ] Implement D5 launch-support precedence and keep it independent from configuration history.
+- [x] Implement D5 launch-support precedence and keep it independent from configuration history.
   - Assertion: a valid unavailable seam is a successful `unsupported` read; only launch attempts refuse. Verified does
     not claim later hook delivery, response handling, authorship, admission, or tamper resistance.
-- [ ] Use `ActiveSessionStore.peek_session()` and strict reads; compare hashes/mtimes before and after human and JSON
+- [x] Use `ActiveSessionStore.peek_session()` and strict reads; compare hashes/mtimes before and after human and JSON
   `show` to prove no manifest, journal, index, active registry, or report file changed.
-- [ ] Keep authority absent from status-line sources/registration/tests and keep all marking terminology out of the
+- [x] Keep authority absent from status-line sources/registration/tests and keep all marking terminology out of the
   authority report.
 
 ## Phase 6 -- User flow and documentation
 
-- [ ] Add CLI reference entries for the subgroup, JSON contract, creation flags, validation matrix, generic override
+- [x] Add CLI reference entries for the subgroup, JSON contract, creation flags, validation matrix, generic override
   rejection, and external-human-only mutation rules.
-- [ ] Update `docs/end-user/session.md` with Day 1 setup/recovery: enable and sync user hooks, verify Codex enrollment,
+- [x] Update `docs/end-user/session.md` with Day 1 setup/recovery: enable and sync user hooks, verify Codex enrollment,
   stop an active session before set/clear, and understand unmarked vs positive producer intent.
-- [ ] Update `docs/end-user/policy.md` and `docs/end-user/hook.md` to distinguish authority fail-closed decisions from
+- [x] Update `docs/end-user/policy.md` and `docs/end-user/hook.md` to distinguish authority fail-closed decisions from
   ordinary policy fail mode and to disclose command timeout/non-delivery/dispatcher/malformed-output gaps.
-- [ ] Document the supported producer flow exactly: a fresh producer session in a distinct worktree, no `--resume-from`,
+- [x] Document the supported producer flow exactly: a fresh producer session in a distinct worktree, no `--resume-from`,
   transfer snapshot, transcript forwarding, generated patch, or model-curated handoff; the human carries
   requirements/findings and decides admission.
-- [ ] Preserve the card's claim boundaries in every surface: managed tool requests only; no OS immutability, authorship,
+- [x] Preserve the card's claim boundaries in every surface: managed tool requests only; no OS immutability, authorship,
   Git-range, provider compliance, semantic independence, watermark detection, merge, or admission attestation.
-- [ ] Verify no authority status-line segment, combined marking badge, delegation command, producer lane, or generic
+- [x] Verify no authority status-line segment, combined marking badge, delegation command, producer lane, or generic
   model-routing change entered the diff.
 
 ## Acceptance tests (fixture-grounded)
@@ -315,30 +314,46 @@ Ratified decisions:
 
 ## Phase 7 -- Verification and closeout
 
-- [ ] Run focused unit suites for the new session-event/authority modules, session models/store/inheritance, launch ops,
+- [x] Run focused unit suites for the new session-event/authority modules, session models/store/inheritance, launch ops,
   CLI subgroup/flags/output streams, both hook handlers, preset/Codex registrations, dispatcher, cleanup, and
-  status-line non-regression; record exact results here.
-- [ ] Run `make test-unit` and `make test-regression`; fix failures rather than skipping them.
-- [ ] Run the risk-required targeted integration set through `./scripts/test-integration.sh`: authority additions in
+  status-line non-regression; record exact results here. The broad focused pass completed 357 tests, and the final
+  journal/history/creation-lock review pass completed 108 tests after its edge-case fixes.
+- [x] Run `make test-unit` and `make test-regression`; fix failures rather than skipping them. Final results: 9,528
+  passed with 124 deselected, and 1,064 passed, respectively.
+- [x] Run the risk-required targeted integration set through `./scripts/test-integration.sh`: authority additions in
   `tests/integration/docker/test_policy_hooks.py`, `test_installer.py`, `test_session_lifecycle.py`,
   `tests/integration/cli/test_session_commands_integration.py`, the relevant Codex session smoke, and sidecar hook tests
-  if D3 support is added.
-- [ ] Run the live runtime checks appropriate to configured credentials: `forge extension doctor --json`,
+  if D3 support is added. The final targeted run passed seven cases, including both runtime deny wires, producer policy
+  preservation, installed registrations, the complete advisory Claude launch lifecycle, and the independent producer
+  worktree flow. Advisory sidecar remains unsupported by D3, so no sidecar-launch success case applies.
+- [x] Run the live runtime checks appropriate to configured credentials: `forge extension doctor --json`,
   `forge extension sync`, `forge runtime preflight codex --verify-enrollment`, one advisory Claude deny, one advisory
   Codex deny, producer ordinary-policy behavior, and `authority show --json` before/during/after a run. Record any
-  unavailable external prerequisite rather than substituting a mock claim.
-- [ ] Re-run `scripts/experiments/hook-dispatcher/benchmark.py` with 50 runs, 40 registry entries, and depth 5; record
-  p50/p95 and require p95 \<= 30 ms.
-- [ ] Build wheel/sdist with `uv build`, install the wheel in a clean path, enable/sync user hooks, and verify the
-  packaged dispatcher, Claude catch-all row, unchanged Codex command, and authority CLI/hook entry points.
-- [ ] Run `make pre-commit`, `git diff --check`, a relative Markdown-link sweep, and
-  `./scripts/count-tokens.py docs/board/doing/artifact_authority_mode/checklist.md`; record results.
-- [ ] Review the final diff against every card acceptance item 01-12 and epic C1-C5; explicitly confirm M2/non-goal
-  exclusions and no unrelated user changes.
-- [ ] Add a proportionate completed-work entry to `docs/board/change_log.md`; propose only stable, human-approved
+  unavailable external prerequisite rather than substituting a mock claim. Isolated user-scope enable/sync and
+  dispatcher diagnosis passed; Docker exercised Claude/Codex advisory denial, producer ordinary policy, read-only show,
+  and the advisory Claude lifecycle. The host Codex enrollment check refused before a turn because the configured
+  `$CODEX_HOME` lacks the `codex-session-start` registration (`attempted=false`); no empirical Codex launch claim is
+  substituted for that unavailable prerequisite.
+- [x] Re-run `scripts/experiments/hook-dispatcher/benchmark.py` with 50 runs, 40 registry entries, and depth 5; record
+  p50/p95 and require p95 \<= 30 ms. Final shim results: p50 24.8923 ms, p95 26.7895 ms, maximum 27.14 ms; the full
+  Forge import measured 617.5 ms p95 and is not on the absent-marker path.
+- [x] Build wheel/sdist with `uv build`, install the wheel in a clean path, enable/sync user hooks, and verify the
+  packaged dispatcher, Claude catch-all row, unchanged Codex command, and authority CLI/hook entry points. The final
+  0.9.4 wheel/sdist built; an isolated wheel install completed idempotent user-scope enable/sync, exposed both authority
+  command groups, installed an executable dispatcher, and produced exactly one catch-all `PreToolUse` row at 60 s.
+- [x] Run `make pre-commit`, `git diff --check`, a relative Markdown-link sweep, and
+  `./scripts/count-tokens.py docs/board/doing/artifact_authority_mode/checklist.md`; record results. All hooks passed on
+  the fully staged tree, both diff checks passed, all relative targets in the ten changed Markdown files resolved, and
+  the checklist remained below 8k tokens.
+- [x] Review the final diff against every card acceptance item 01-12 and epic C1-C5; explicitly confirm M2/non-goal
+  exclusions and no unrelated user changes. The review found and fixed strict UTC/JSON coercion, record-context,
+  inconsistent-history, pre-active marker, typed preflight-error, and creation/publication-lock edge cases. M2, route
+  projection, model marking, status-line additions, delegation, attestations, and admission remain absent.
+- [x] Add a proportionate completed-work entry to `docs/board/change_log.md`; propose only stable, human-approved
   lessons for `docs/board/impl_notes.md`.
-- [ ] Update the epic checklist with M1 evidence and shared-helper ownership. After merge, move M1 `doing/ -> done/` and
-  repoint every inbound board link; leave M2 proposed until separately accepted.
+- [x] Update the epic checklist with M1 evidence and shared-helper ownership; leave M2 proposed until separately
+  accepted.
+- [ ] After merge, move M1 `doing/ -> done/` and repoint every inbound board link.
 
 ## Deferred and out of scope
 
