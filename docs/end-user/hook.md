@@ -220,7 +220,8 @@ compatibility diagnostic per invocation before the first write. An incompatible,
 unsupported-schema `.forge/project.toml` produces one debug-log entry and the hook proceeds; no compatibility text is
 added to stdout or stderr, and exit/JSON contracts do not change. Doctor is the user-facing diagnostic surface. This
 fail-open posture does not apply to explicit mutations delivered through hooks: mutating `%` commands and WorktreeCreate
-fail closed.
+fail closed. It also does not weaken a launch-marked advisory authority request: authority is evaluated before ordinary
+policy compatibility and fail-mode gates.
 
 ### session-start
 
@@ -325,12 +326,41 @@ Purpose: evaluate TDD/policy bundles before file writes.
 
 - enforces policy bundles (TDD, coding standards) when enabled via `forge policy enable`
 
-### codex-policy-check (Codex PreToolUse:apply_patch)
+### authority-check (Claude PreToolUse, catch-all)
 
-Purpose: the same policy enforcement for **Codex** sessions (`forge session start --runtime codex`).
+Purpose: deny every tool request covered by a preflighted managed advisory session's authority tier before ordinary
+policy parsing.
 
-- evaluates each file operation in a Codex `apply_patch` action against the session's policy bundles and supervisor;
-  shell (`Bash`) actions pass through unevaluated
+- registered once at user scope with an omitted matcher and a 60-second timeout; the existing `policy-check` Write/Edit
+  rows remain separate and unchanged
+- absent advisory marker exits in the standalone dispatcher before project gates, launcher resolution, imports, or Forge
+  execution, so producer and unmarked runs pay only the environment-presence check
+- a present marker, including malformed data, reaches Forge for full manifest, run-id, config-digest, hook-digest, and
+  raw tool classification
+- a covered request, malformed input, marker mismatch, unreadable state, or guard exception returns Claude's blocking
+  exit; denial-journal failure is diagnostic only and cannot turn the decision into an allow
+- `shell_closed` evaluates the raw tool name before paths or payloads; direct mutation stays denied for deletes,
+  renames, `.forge/` targets, outside paths, and unnormalizable input
+
+Launch preflight requires this exact catch-all row and the current executable dispatcher. Authority does not protect a
+raw `claude` process or a session launched after the registration is removed. Hook non-delivery, the 60-second command
+timeout, dispatcher startup/execution failure, and Claude discarding a malformed response are disclosed fail-open seams
+outside the handler's decision boundary.
+
+Claude sidecars do not have an equivalent pre-spawn proof for the selected image, so advisory sidecar launch is
+unsupported in v1. Producer and unmarked sidecars continue to use their existing hook inventory; Forge deliberately does
+not stage the catch-all `authority-check` row in a sidecar, where its bare CLI command would lack the host dispatcher's
+absent-marker fast path.
+
+### codex-policy-check (Codex PreToolUse, catch-all)
+
+Purpose: run the Codex authority guard first, then apply ordinary policy to supported `apply_patch` requests.
+
+- for a launch-marked advisory run, validates the marker/manifest and classifies the raw tool name before the
+  `apply_patch` filter, `policy.enabled`, bundle/supervisor gates, or patch adapter; `Bash`, `apply_patch`, and unknown
+  tools are denied under `shell_closed`
+- after the authority guard declines, evaluates each file operation in a Codex `apply_patch` action against the
+  session's policy bundles and supervisor; shell (`Bash`) actions pass through ordinary policy unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
 - **registered by `forge extension enable --scope user`** (Codex-owned half of the `hooks` module): the installer writes
@@ -339,7 +369,14 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
   registration verification or the final install record fails, Forge restores the prior config bytes/mode or removes a
   config created by that attempt; a later edit is preserved and named for manual recovery.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
-  prompted) — Codex hooks only fire from trust-enrolled registrations
+  prompted) — Codex hooks only fire from trust-enrolled registrations. Advisory launch first requires the exact
+  no-matcher `codex-policy-check` row, then verifies SessionStart enrollment empirically on every launch attempt with
+  one cheap Codex turn; this per-attempt latency/quota cost is intentional because static registration cannot prove
+  delivery
+
+The managed Codex registration command bytes do not change for authority mode. This preserves existing trust enrollment;
+the authority guard is an earlier branch inside the same handler. As with Claude, runtime hook non-delivery, timeout,
+dispatcher failure, or Codex discarding malformed deny output remains outside Forge's fail-closed handler boundary.
 
 ### codex-session-start (Codex SessionStart)
 

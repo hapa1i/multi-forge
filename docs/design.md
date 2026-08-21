@@ -187,22 +187,27 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 ### 3.2 Contract files (authoritative paths)
 
-| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                 |
-| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, and field-owned `confirmed` runtime facts                |
-| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
-| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
-| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
-| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
-| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
-| Project registry     | `~/.forge/projects.json`                                         | Forge Installer          | Versioned trusted-root registry for user-scope hook gating                              |
-| Project compat pin   | `<forge_root>/.forge/project.toml`                               | User / Forge Installer   | Optional `required_forge` guardrail for project-local state mutations                   |
-| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff, shadow)                                    |
-| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
-| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
+| Artifact              | Path                                                             | Owned by                 | Purpose                                                                                 |
+| --------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| Session file          | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, and field-owned `confirmed` runtime facts                |
+| Global session index  | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
+| Active session index  | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
+| Session event journal | `<forge_root>/.forge/artifacts/<session>/<domain>/events.jsonl`  | Forge Session            | Durable domain events using the shared schema-v1 envelope and required append seam      |
+| Proxy registry        | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
+| Runtime config        | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
+| Installed manifest    | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
+| Project registry      | `~/.forge/projects.json`                                         | Forge Installer          | Versioned trusted-root registry for user-scope hook gating                              |
+| Project compat pin    | `<forge_root>/.forge/project.toml`                               | User / Forge Installer   | Optional `required_forge` guardrail for project-local state mutations                   |
+| Work queue            | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff, shadow)                                    |
+| Usage ledger          | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
+| Optional events       | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
 
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
+
+Marked authority launches add the root run id and authority config/hook digests to their active entry. Those fields are
+current-run evidence used by `session authority show`; they are not durable history and do not replace the session event
+journal.
 
 **Session liveness and launchability are separate.** A valid session manifest is the durable reservation for its name,
 provenance, and conversation bindings. The global index is a derived publication layer: readers may prune a row only
@@ -430,6 +435,19 @@ launch:
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
 
+**`intent.authority`**: optional, session-owned artifact authority:
+
+```yaml
+authority:
+  role: advisory        # advisory | producer
+  tier: shell_closed    # advisory only; named_tools | shell_closed
+```
+
+Absence is `unmarked` and retains legacy behavior. Advisory defaults to `shell_closed`; producer must not carry a tier.
+The role is provider- and model-neutral. It is mutated only by authority-bearing creation flags or the typed inactive-
+session `authority set|clear` operations, never by generic overrides. Fresh derivation inherits advisory authority and
+its tier; producer authority is deliberately dropped. An explicit child designation wins before first launch.
+
 **`intent.subprocess_proxy`**: optional proxy ID used only by Forge-spawned subprocesses:
 
 ```yaml
@@ -467,6 +485,8 @@ started_with_proxy:
 - `intent.launch.runtime` is immutable dispatch identity: set rejects the direct key, a parent `launch` object carrying
   `runtime`, and `launch.*` before mutation. A whole-launch null clear remains valid because the section is optional and
   dispatch reads raw intent; reset accepts `launch` or `launch.runtime` so stale illegal overrides remain recoverable.
+- `intent.authority` is not overrideable: set and keyed reset reject the parent, wildcard, and concrete leaves.
+  `reset --all` clears only overrides and cannot alter authority intent.
 
 > **Note:** There is no "merging"—overrides simply win. The only subtlety is nested dicts: you can override
 > `memory.tags` without losing `memory.auto_recall`. This applies to session-owned fields only (`tdd_mode`, `memory.*`,
@@ -551,6 +571,9 @@ To avoid writer conflicts:
   - `intent` + `overrides` sections in `<forge_root>/.forge/sessions/<session_name>/forge.session.json`
   - `intent.launch` records relaunch mode plus sidecar-specific options (image, extra mounts) when the session is
     created or derived
+  - `intent.authority` records an optional advisory/producer designation. Creation, set/clear, and derivation serialize
+    intent mutation with marked launch preflight under the session authority lock; a required journal failure rolls the
+    manifest transition back (or removes a newly created session) before returning an error
   - `intent.consumer_lanes.<consumer>` (a `LaneRecord`) when a command requests a non-default lane for a consumer:
     `forge session lane set --consumer <id> --runtime/--backend` is the general surface for all four consumers
     (supervisor, memory-writer, shadow-curation, team-supervisor); the supervisor also has
@@ -584,6 +607,10 @@ To avoid writer conflicts:
     creation, imposes it via `--session-id`) and the SessionStart hook validates it. **Native** fork launches
     (`--resume-mode native`, `--fork-session`) do **not** pre-seed — Claude mints the child UUID and the hook records
     it; Stop/StopFailure reconcile when native fork launches materialize a child UUID after startup.
+- Shared session-event storage (`forge.session.events`) owns contained domain paths, schema-v1 envelopes, ids, enums,
+  strict ordered reads, and lock/fsync-backed required appends. Authority control, launch, and hook surfaces are M1's
+  sole shipped domain consumer; they write only `.forge/artifacts/<session>/authority/events.jsonl`. The reserved
+  `routing` domain exists for the proposed M2 consumer but M1 never creates it.
 - Hooks write:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
@@ -879,6 +906,26 @@ Notes:
 - Cross-project operations (resume from a different checkout) read parent artifacts by **absolute path** via
   `parent_forge_root` in the derivation record (see §3.9).
 
+**Session event journals:**
+
+- The authority domain writes `<forge_root>/.forge/artifacts/{session_name}/authority/events.jsonl`. The shared
+  authority-neutral `forge.session.events` module owns the schema-v1 envelope, `sevt_` ids, UTC timestamps, frozen
+  origin/operation/outcome enums, strict JSON validation, and domain payload hook. M1 is the only shipped consumer;
+  route history remains proposed and no routing journal is created.
+- Path construction validates the session name, uses an explicit domain allowlist, resolves beneath the owning
+  `forge_root`, and rejects absolute/traversal/symlink escape shapes before creation. Each journal has its own lock.
+  Appends write one compact UTF-8 JSON object plus newline, reject non-JSON values, flush/fsync the file and directory,
+  and propagate lock/open/write/fsync failure to required callers. The reader rejects unreadable, truncated, unknown,
+  malformed, duplicate-id, and newer-schema records without skipping a line.
+- Authority configuration, inheritance, preflight, and lifecycle appends are required transactions. Denial logging is
+  best effort only after the runtime deny is already fixed; a journal failure cannot weaken it.
+- Absence is not proof. A marked session with missing or manifest-inconsistent history reports `unproven`; an unmarked
+  session with no journal reports `null`. Malformed history is an error. The append-only convention is local evidence,
+  not tamper resistance against humans or external processes.
+- Session delete/clean never selectively removes the authority directory, regardless of transcript flags. The journal
+  follows its containing Forge root: root-level worktree sessions retain it in the parent root, while deleting an owned
+  checkout that contains a nested/forked Forge root removes the complete artifact tree with that checkout.
+
 **Plan snapshots:**
 
 - We capture **approved** plan snapshots only (no drafts).
@@ -1109,6 +1156,26 @@ UUID `<R>`, not the parent's UUID.
 **Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
 `--proxy <name>` overrides.
 
+**Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
+authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child
+lifetime, preventing a concurrent control-plane command from assigning authority after the launcher committed to an
+unmarked environment; its existing active registration remains best-effort. A marked launch instead proves the runtime
+seam, requires active registration, and durably appends `launch_preflight` then `run_started` under the lock before
+releasing it and invoking the child. Set/clear use the same lock and turn live-launch contention into a short,
+actionable refusal. The invoker does not remint the identity. Forge always attempts same-run `run_ended` and clears
+marked active state. A failed preflight produces `launch_aborted` and no started claim. A spawn exception after the
+commit is `child_never_spawned`; a spawned child returning nonzero is `child_exited_nonzero`, so `run_started` means
+“Forge committed to invoke,” not “the child was observed alive.”
+
+Advisory Claude requires the exact catch-all registration and current executable dispatcher. Advisory Codex requires
+exactly one user-scope no-matcher `codex-policy-check` row with the installed command bytes and timeout, then performs
+the empirical `codex-session-start` enrollment check for every attempt. Advisory sidecar is unsupported until its
+selected image has an equivalent pre-spawn proof; Forge therefore does not stage the host-only authority catch-all in
+sidecar settings. Producer launches record config/lifecycle posture without requiring an enforcement seam; unmarked
+launches keep the legacy path and create no authority events. Only a validated advisory attempt receives the internal
+marker, containing session/runtime, the one root run id, and config/hook digests. The transaction exposes the future M2
+insertion point after authority preflight, but M1 writes no routing journal or projection.
+
 ### 3.10 Hook handlers
 
 The session manager writes `intent` and user `overrides`; CLI launch/derivation paths and hooks write their field-owned
@@ -1125,12 +1192,26 @@ Before their first project-owned write, lifecycle, policy, team, and Codex hooks
 diagnostic for all Forge roots that invocation may write. An incompatible, malformed, unreadable, or newer-schema pin is
 debug-logged once and the hook proceeds with its existing stdout, stderr, JSON, and exit-code contract unchanged.
 
+**Authority precedes ordinary policy.** Claude installs a dedicated catch-all `authority-check` at 60 seconds while
+retaining the existing Write/Edit `policy-check` rows. The standalone dispatcher examines only marker presence before
+project gating or Forge resolution: absent returns immediately; present, even malformed, dispatches for fail-closed
+validation. Codex keeps its trust-sensitive no-matcher `codex-policy-check` registration bytes unchanged and evaluates
+authority at the top of that handler, before tool filtering, `policy.enabled`, bundles/supervisor, and its patch
+adapter. Both guards classify the raw tool name before path/payload normalization. A covered request or guard failure
+denies; denial-journal failure is diagnostic and cannot change that decision. An authority decline never grants
+permission and ordinary runtime permission/policy behavior continues.
+
+The guarantee ends at a functioning delivered handler response. Runtime non-delivery, command timeout, dispatcher
+startup/execution failure, and a runtime discarding malformed output remain fail-open seams. This is not OS-level
+immutability or an authorship/admission attestation.
+
 **Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). Runtime hook registrations are
 user-scoped and contain the literal absolute dispatcher command `<forge-home>/bin/forge-hook <name>`; project/local
 installs do not write hook blocks. The hidden hook-handler surface remains `forge hook <name>`, so runtime + deps live
-with the Forge package (single upgrade surface). The dispatcher first applies its no-op gate: a managed session
-dispatches regardless of cwd, while an unmanaged launch dispatches only from an enrolled root. After validating the
-handler name, a present `FORGE_DEV` selects exactly `<absolute-checkout-root>/.venv/bin/forge`; an empty, relative,
+with the Forge package (single upgrade surface). For `authority-check`, the advisory-marker fast gate described above
+runs before every ordinary dispatcher check. For other hooks, the dispatcher first applies its no-op gate: a managed
+session dispatches regardless of cwd, while an unmanaged launch dispatches only from an enrolled root. After validating
+the handler name, a present `FORGE_DEV` selects exactly `<absolute-checkout-root>/.venv/bin/forge`; an empty, relative,
 missing, non-executable, or unlaunchable target exits 127 without falling back. When the variable is absent, the
 dispatcher resolves a durable `forge` launcher from `~/.forge/runtime.json` and then known user-tool locations, without
 consulting the inherited `PATH`. It `exec`s `forge hook <name>` with stdin/stdout/stderr/exit code preserved.
@@ -1663,14 +1744,16 @@ multi-forge/
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
 `--host-proxy`. The launch checkout supplies `.claude/`, while the session manifest's Forge root supplies `.forge/`;
 Forge mounts both at their corresponding paths under `/workspace`. It does NOT mount all of `~/.forge` (UID issues,
-undermines port isolation). The launcher stages the canonical Claude runtime-hook inventory at
+undermines port isolation). The launcher stages the canonical sidecar-compatible Claude runtime-hook inventory at
 `<forge_root>/.forge/sidecar-home/settings.json`, mounted as the in-container user scope at
 `/root/.claude/settings.json`. Those entries use the image-resolvable bare form (`forge hook <name>`), because every
-sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The file is replaced on
-every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project `.claude/settings*.json` bytes are
-never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
-host checkout and manifest-owned Forge root separately. Stop therefore probes for pending shadow candidates through the
-mounted `/workspace` Forge root and translates only the resulting marker payload back to host-resolvable paths.
+sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The unsupported advisory
+authority catch-all is host-only and omitted from this inventory because its bare command lacks the dispatcher fast
+gate. The file is replaced on every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project
+`.claude/settings*.json` bytes are never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads,
+while deferred-work markers retain the host checkout and manifest-owned Forge root separately. Stop therefore probes for
+pending shadow candidates through the mounted `/workspace` Forge root and translates only the resulting marker payload
+back to host-resolvable paths.
 
 The host `~/.forge/pending-work/` queue is mounted read-write at `/root/.forge/pending-work/`, so Stop-enqueued
 index/memory/shadow markers survive `--rm` for host-CLI draining. **Narrow exception (§7.x audit path):** a proxy-id

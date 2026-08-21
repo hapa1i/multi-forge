@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.core.reactive.env import (
+    FORGE_AUTHORITY_MARKER_VAR,
     FORGE_DEPTH_VAR,
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
@@ -129,6 +130,17 @@ class TestEnvAndProcess:
         assert env[FORGE_RUN_ID_VAR] == "run_cccccccccccc"
         assert env[FORGE_ROOT_RUN_ID_VAR] == "run_cccccccccccc"
 
+    def test_authority_marker_is_explicit_and_stale_ambient_value_is_scrubbed(
+        self, mock_run: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FORGE_AUTHORITY_MARKER", "stale")
+
+        _invoke(mock_run, authority_marker="validated")
+        assert mock_run.call_args.kwargs["env"]["FORGE_AUTHORITY_MARKER"] == "validated"
+
+        _invoke(mock_run)
+        assert "FORGE_AUTHORITY_MARKER" not in mock_run.call_args.kwargs["env"]
+
     def test_env_sanitized_and_depth_incremented(self, mock_run: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "stale")
         monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://proxy")
@@ -241,6 +253,7 @@ _BARE_STRIP_VARS = [
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
+    FORGE_AUTHORITY_MARKER_VAR,
     "CODEX_API_KEY",
     "CODEX_ACCESS_TOKEN",
     "ANTHROPIC_API_KEY",

@@ -43,6 +43,9 @@ class ActiveSessionEntry:
     claude_session_id: str | None = None
     container_name: str | None = None
     forge_root: str | None = None  # Scope axis (matches durable index)
+    authority_run_id: str | None = None
+    authority_config_sha256: str | None = None
+    authority_hook_registration_sha256: str | None = None
 
 
 @dataclass
@@ -142,6 +145,9 @@ class ActiveSessionStore:
         claude_session_id: str | None = None,
         container_name: str | None = None,
         forge_root: str | None = None,
+        authority_run_id: str | None = None,
+        authority_config_sha256: str | None = None,
+        authority_hook_registration_sha256: str | None = None,
     ) -> ActiveSessionEntry:
         """Create or replace a live-session entry."""
         from forge.session.identity import make_scoped_key
@@ -159,6 +165,9 @@ class ActiveSessionStore:
                 claude_session_id=claude_session_id,
                 container_name=container_name,
                 forge_root=effective_forge_root,
+                authority_run_id=authority_run_id,
+                authority_config_sha256=authority_config_sha256,
+                authority_hook_registration_sha256=authority_hook_registration_sha256,
             )
             key = make_scoped_key(session_name, effective_forge_root)
             index.sessions[key] = entry

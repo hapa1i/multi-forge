@@ -55,6 +55,52 @@ def _simulate_hook_uuid(workspace: ContainerLike, session_name: str, uuid: str =
     )
 
 
+class TestAuthorityLifecycle:
+    """Authority intent and journal survive the real container CLI boundary."""
+
+    def test_no_launch_creation_and_external_control_plane(self, forge_workspace: ContainerLike) -> None:
+        forge_workspace.exec("forge extension enable --scope user --profile standard")
+        created = forge_workspace.exec("cd /workspace && forge session start planner --no-launch --authority advisory")
+        assert created.returncode == 0, created.stderr
+
+        shown = forge_workspace.exec("cd /workspace && forge session authority show planner --json")
+        report = json.loads(shown.stdout)
+        assert report["role"] == "advisory"
+        assert report["tier"] == "shell_closed"
+        assert report["launch_support"] == "not_running"
+        assert report["configuration_history"] == "supported"
+
+        refused = forge_workspace.exec("cd /workspace && FORGE_SESSION=caller " "forge session authority clear planner")
+        assert refused.returncode == 1
+        journal = forge_workspace.read_file("/workspace/.forge/artifacts/planner/authority/events.jsonl")
+        assert [json.loads(line)["event_type"] for line in journal.splitlines()] == [
+            "authority_configured",
+            "mutation_refused",
+        ]
+
+    def test_advisory_host_launch_commits_one_run_lifecycle(self, forge_workspace: ContainerLike) -> None:
+        enabled = forge_workspace.exec("forge extension enable --scope user --profile standard")
+        assert enabled.returncode == 0, enabled.stderr
+
+        launched = forge_workspace.exec("cd /workspace && forge session start launched-advisory --authority advisory")
+
+        assert launched.returncode == 0, launched.stderr
+        journal = forge_workspace.read_file("/workspace/.forge/artifacts/launched-advisory/authority/events.jsonl")
+        events = [json.loads(line) for line in journal.splitlines()]
+        assert [event["event_type"] for event in events] == [
+            "authority_configured",
+            "launch_preflight",
+            "run_started",
+            "run_ended",
+        ]
+        run_ids = {event["run_id"] for event in events[1:]}
+        assert len(run_ids) == 1
+        assert None not in run_ids
+        assert events[-1]["outcome"] == "success"
+        active = forge_workspace.read_json("$HOME/.forge/sessions/active.json")
+        assert active["sessions"] == {}
+
+
 class TestWorktreeSemantics:
     """Tests for worktree ownership and --worktree flag."""
 

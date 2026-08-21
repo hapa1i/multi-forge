@@ -37,6 +37,7 @@ def test_claude_hook_entries_are_pinned_by_event_matcher_command_and_timeout() -
     """Pin entries, not just command strings, so matcher/timeout drift is visible."""
     assert _rendered_hook_entries() == [
         ("SessionStart", None, "$FORGE_HOME/bin/forge-hook session-start", None),
+        ("PreToolUse", None, "$FORGE_HOME/bin/forge-hook authority-check", 60),
         ("PreToolUse", "Read", "$FORGE_HOME/bin/forge-hook read-hygiene", 5),
         (
             "PreToolUse",
@@ -65,8 +66,11 @@ def test_claude_hook_entries_are_pinned_by_event_matcher_command_and_timeout() -
     ]
 
 
-def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
-    host_rows = _rendered_hook_entries()
+def test_sidecar_hook_entries_omit_unsupported_authority_and_use_bare_commands() -> None:
+    # Advisory sidecars are refused before spawn, and the bare CLI command has
+    # no dispatcher fast path. Staging the catch-all there would add latency to
+    # every tool request without providing an enforceable posture.
+    host_rows = [row for row in _rendered_hook_entries() if not row[2].endswith(" authority-check")]
     sidecar_rows: list[tuple[str, Any, str, int | None]] = []
     settings = get_sidecar_hook_settings()
 
@@ -74,7 +78,14 @@ def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
     for event_key, entries in settings["hooks"].items():
         for entry in entries:
             for hook in entry.get("hooks", []):
-                sidecar_rows.append((event_key, entry.get("matcher"), hook["command"], hook.get("timeout")))
+                sidecar_rows.append(
+                    (
+                        event_key,
+                        entry.get("matcher"),
+                        hook["command"],
+                        hook.get("timeout"),
+                    )
+                )
 
     assert [(event, matcher, timeout) for event, matcher, _command, timeout in sidecar_rows] == [
         (event, matcher, timeout) for event, matcher, _command, timeout in host_rows
@@ -83,6 +94,7 @@ def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
         f"forge hook {command.rsplit(' ', 1)[-1]}" for _event, _matcher, command, _timeout in host_rows
     ]
     assert all("forge-hook" not in command for _event, _matcher, command, _timeout in sidecar_rows)
+    assert all(not command.endswith(" authority-check") for _event, _matcher, command, _timeout in sidecar_rows)
 
 
 def test_statusline_command_is_pinned() -> None:

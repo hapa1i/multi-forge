@@ -17,6 +17,7 @@ from forge.core.paths import get_forge_home
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
+    RunIdentity,
     apply_attribution_header_policy,
     new_root_run_identity,
     resolve_proxy_wire_shape,
@@ -80,6 +81,7 @@ def run_sidecar_session(
     context_limit: int = 200000,
     env_vars: dict[str, str] | None = None,
     claude_args: list[str] | None = None,
+    run_identity: RunIdentity | None = None,
 ) -> int:
     """Run Claude + proxy in a Docker container. Returns exit code.
 
@@ -112,7 +114,7 @@ def run_sidecar_session(
     # The sidecar is a run-tree root (an interactive session in a container), so it
     # mints a fresh identity with no parent — host env inheritance does not cross the
     # container boundary, and a sidecar session begins its own run tree.
-    run_identity = new_root_run_identity()
+    run_identity = run_identity or new_root_run_identity()
     attribution_env = _sidecar_attribution_header_env(template=template, proxy_id=proxy_id)
 
     cmd = [
@@ -154,7 +156,14 @@ def run_sidecar_session(
     # the proxy id (entrypoint.sh passes --proxy-id when FORGE_PROXY_ID is set) and
     # resolves ~/.forge to the mounted location.
     if proxy_id is not None:
-        cmd.extend(["-e", f"FORGE_PROXY_ID={proxy_id}", "-e", f"FORGE_HOME={_SIDECAR_FORGE_HOME}"])
+        cmd.extend(
+            [
+                "-e",
+                f"FORGE_PROXY_ID={proxy_id}",
+                "-e",
+                f"FORGE_HOME={_SIDECAR_FORGE_HOME}",
+            ]
+        )
 
     if sys.platform == "linux":
         uid, gid = os.getuid(), os.getgid()
@@ -220,7 +229,11 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
     """
     forge_home = get_forge_home()
     mounts: list[tuple[str, str, str]] = [
-        (str(forge_home / "proxies" / proxy_id), f"{_SIDECAR_FORGE_HOME}/proxies/{proxy_id}", "ro"),
+        (
+            str(forge_home / "proxies" / proxy_id),
+            f"{_SIDECAR_FORGE_HOME}/proxies/{proxy_id}",
+            "ro",
+        ),
     ]
 
     for subdir in ("audit", "costs", "usage", "telemetry"):

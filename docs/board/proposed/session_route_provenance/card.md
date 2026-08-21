@@ -2,9 +2,9 @@
 
 **Status**: Proposed (2026-08-20).
 
-**Epic**: M2 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
-owns the shared event envelope, run correlation, and presentation boundaries with
-[Artifact Authority Mode](../artifact_authority_mode/card.md).
+**Epic**: M2 member of [Epic: Session Authority and Provenance](../../doing/epic_session_authority_provenance/card.md),
+which owns the shared event envelope, run correlation, and presentation boundaries with
+[Artifact Authority Mode](../../doing/artifact_authority_mode/card.md).
 
 **Relationship**: authority mode decides which managed session may mutate project artifacts. This card reports how a
 managed session was routed and the provider-declared text-marking posture of the selected or mapped model. It adds no

@@ -78,9 +78,16 @@ from forge.session.codex_invoke import invoke_codex_interactive
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import SessionWorktreeMissingError
 from forge.session.launchability import require_session_worktree
-from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
+from forge.session.models import (
+    AuthorityIntent,
+    CodexConfirmed,
+    Derivation,
+    SessionIndexEntry,
+)
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
+
+from .session_authority_launch import authority_launch_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +139,8 @@ def start_interactive_codex_session(
     create_worktree: bool = False,
     branch: str | None = None,
     context_delivery: ContextDeliveryMode = "initial-message",
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
     announce: Callable[[CodexInteractiveLaunch], None] | None = None,
     invoke: Callable[..., int] = invoke_codex_interactive,
 ) -> CodexInteractiveResult:
@@ -198,6 +207,8 @@ def start_interactive_codex_session(
             direct=True,
             runtime=CODEX_RUNTIME,
             parent_session=parent,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest/index -> top-level reset handler
@@ -218,7 +229,12 @@ def start_interactive_codex_session(
         except Exception:
             # Nothing of ours is on disk yet: remove only the session (a referenced
             # pre-existing snapshot is another session's property).
-            _rollback_created_session(manager, name, forge_root=str(child_forge_root), delete_branch=create_worktree)
+            _rollback_created_session(
+                manager,
+                name,
+                forge_root=str(child_forge_root),
+                delete_branch=create_worktree,
+            )
             raise
 
     root = new_root_run_identity()
@@ -256,7 +272,7 @@ def start_interactive_codex_session(
                     session=name,
                     parent=parent,
                     worktree_path=state.worktree.path if state.worktree else None,
-                    transfer_path=assembly.transfer_path if assembly is not None else None,
+                    transfer_path=(assembly.transfer_path if assembly is not None else None),
                     context_delivery=context_delivery if parent is not None else None,
                 )
             )
@@ -266,29 +282,46 @@ def start_interactive_codex_session(
             manager,
             name,
             forge_root=str(child_forge_root),
-            snapshot=child_path(transfer_root, parent, name) if parent is not None else None,
-            notes=child_notes_path(transfer_root, parent, name) if parent is not None else None,
+            snapshot=(child_path(transfer_root, parent, name) if parent is not None else None),
+            notes=(child_notes_path(transfer_root, parent, name) if parent is not None else None),
             delete_branch=create_worktree,
         )
         raise
 
     # The TUI launch: NO rollback past this point -- the session is the user's.
-    exit_code = run_with_active_session(
-        session_name=name,
-        worktree_path=Path(cwd),
+    with authority_launch_transaction(
+        store=store,
+        root=root,
+        operation="start",
         launch_mode=LAUNCH_MODE_HOST,
-        forge_root=str(child_forge_root),
-        claude_session_id=None,
-        runner=lambda: invoke(
-            preflight=preflight,
-            session_name=name,
-            forge_root=str(child_forge_root),
-            cwd=cwd,
-            run_identity=root,
-            sandbox=sandbox,
-            initial_prompt=initial_prompt,
-        ),
-    )
+        worktree_path=Path(cwd),
+        codex_preflight=preflight,
+    ) as authority_attempt:
+
+        def runner() -> int:
+            return invoke(
+                preflight=preflight,
+                session_name=name,
+                forge_root=str(child_forge_root),
+                cwd=cwd,
+                run_identity=root,
+                sandbox=sandbox,
+                initial_prompt=initial_prompt,
+                authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+            )
+
+        if authority_attempt is not None:
+            exit_code = runner()
+            authority_attempt.complete(exit_code)
+        else:
+            exit_code = run_with_active_session(
+                session_name=name,
+                worktree_path=Path(cwd),
+                launch_mode=LAUNCH_MODE_HOST,
+                forge_root=str(child_forge_root),
+                claude_session_id=None,
+                runner=runner,
+            )
 
     # Post-exit reconciliation: receipts first (codex-reported, exact), discovery last.
     receipt_thread: str | None = None
@@ -422,22 +455,39 @@ def reattach_codex_session(
             )
         )
 
-    exit_code = run_with_active_session(
-        session_name=name,
-        worktree_path=Path(cwd),
+    with authority_launch_transaction(
+        store=store,
+        root=root,
+        operation="resume",
         launch_mode=LAUNCH_MODE_HOST,
-        forge_root=session_forge_root,
-        claude_session_id=None,
-        runner=lambda: invoke(
-            preflight=preflight,
-            session_name=name,
-            forge_root=session_forge_root,
-            cwd=cwd,
-            run_identity=root,
-            sandbox=sandbox,
-            resume_thread_id=thread_id,
-        ),
-    )
+        worktree_path=Path(cwd),
+        codex_preflight=preflight,
+    ) as authority_attempt:
+
+        def runner() -> int:
+            return invoke(
+                preflight=preflight,
+                session_name=name,
+                forge_root=session_forge_root,
+                cwd=cwd,
+                run_identity=root,
+                sandbox=sandbox,
+                resume_thread_id=thread_id,
+                authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+            )
+
+        if authority_attempt is not None:
+            exit_code = runner()
+            authority_attempt.complete(exit_code)
+        else:
+            exit_code = run_with_active_session(
+                session_name=name,
+                worktree_path=Path(cwd),
+                launch_mode=LAUNCH_MODE_HOST,
+                forge_root=session_forge_root,
+                claude_session_id=None,
+                runner=runner,
+            )
 
     # Post-exit: an enrolled hook's observation receipt cross-checks the thread
     # (drift recorded, the continue_codex_session stance) and supersedes glob
@@ -492,7 +542,9 @@ def reattach_codex_session(
     )
 
 
-def _reconcile_interactive_hook_delivery(session_dir: Path) -> tuple[str, str | None, str | None]:
+def _reconcile_interactive_hook_delivery(
+    session_dir: Path,
+) -> tuple[str, str | None, str | None]:
     """Reconcile hook delivery after an interactive bridge start.
 
     Interactive turns have no stream thread to cross-check against (the headless
@@ -521,7 +573,11 @@ def _discover_thread_post_exit(
     """
     candidates = find_rollouts_since(since, cwd=cwd)
     if len(candidates) == 1:
-        return candidates[0].thread_id, str(candidates[0].path), ROLLOUT_SOURCE_POST_EXIT
+        return (
+            candidates[0].thread_id,
+            str(candidates[0].path),
+            ROLLOUT_SOURCE_POST_EXIT,
+        )
     if not candidates:
         warnings.append("No Codex rollout appeared during this run; the thread could not be discovered.")
     else:

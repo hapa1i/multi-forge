@@ -294,14 +294,19 @@ def _resolve_forge() -> tuple[Path | None, list[Path]]:
 
 _DISPATCHER_SOURCE = r"""
 def main() -> int:
-    try:
-        should_dispatch = _should_dispatch()
-    except Exception:
-        return 0
-    if not should_dispatch:
-        return 0
-
     argv = sys.argv[1:]
+    if argv and argv[0] == "authority-check":
+        if "FORGE_AUTHORITY_MARKER" not in os.environ:
+            return 0
+        should_dispatch = True
+    else:
+        try:
+            should_dispatch = _should_dispatch()
+        except Exception:
+            return 0
+        if not should_dispatch:
+            return 0
+
     if not argv:
         sys.stderr.write("forge hook dispatcher: missing hook name\n")
         return 2

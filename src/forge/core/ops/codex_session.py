@@ -37,7 +37,7 @@ from forge.core.ops.codex_thread_index import sync_codex_thread_to_index
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import referenced_transfer_context_paths
 from forge.core.ops.session import ForgeOpError
-from forge.core.reactive.env import new_root_run_identity
+from forge.core.reactive.env import FORGE_AUTHORITY_MARKER_VAR, new_root_run_identity
 from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     CodexPreflightError,
@@ -63,6 +63,7 @@ from forge.session.exceptions import (
 )
 from forge.session.launchability import require_session_worktree
 from forge.session.models import (
+    AuthorityIntent,
     CodexConfirmed,
     Derivation,
     SessionIndexEntry,
@@ -71,6 +72,8 @@ from forge.session.models import (
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import MANIFEST_FILENAME, SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
+
+from .session_authority_launch import authority_launch_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +195,8 @@ def start_codex_session(
     branch: str | None = None,
     timeout_seconds: int = 600,
     context_delivery: ContextDeliveryMode = "initial-message",
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> CodexSessionStartResult:
     """Create a Codex-runtime session derived from ``parent`` and run its first turn.
 
@@ -254,6 +259,8 @@ def start_codex_session(
             direct=True,
             runtime=CODEX_RUNTIME,
             parent_session=parent,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest/index -> top-level reset handler
@@ -276,7 +283,12 @@ def start_codex_session(
     except Exception:
         # Nothing of ours is on disk yet: remove only the session. A referenced
         # pre-existing snapshot is another session's property -- never delete it.
-        _rollback_created_session(manager, name, forge_root=str(child_forge_root), delete_branch=create_worktree)
+        _rollback_created_session(
+            manager,
+            name,
+            forge_root=str(child_forge_root),
+            delete_branch=create_worktree,
+        )
         raise
 
     try:
@@ -337,21 +349,34 @@ def _run_first_codex_turn(
     staged_context_path = pending_context_path(store.session_dir) if context_delivery == "hook" else None
 
     cwd = state.worktree.path if state.worktree else str(ctx.cwd)
-    bridge = bridge_session_to_codex(
-        ctx=ctx,
-        parent=parent,
-        task=task,
-        cwd=cwd,
-        strategy=strategy,
-        sandbox=sandbox,
-        depth=depth,
-        session=name,
-        timeout_seconds=timeout_seconds,
-        child=name,
-        preflight=preflight,
-        output_root=output_root,
-        staged_context_path=staged_context_path,
-    )
+    root = new_root_run_identity()
+    with authority_launch_transaction(
+        store=store,
+        root=root,
+        operation="start",
+        launch_mode="host",
+        worktree_path=Path(cwd),
+        codex_preflight=preflight,
+    ) as authority_attempt:
+        bridge = bridge_session_to_codex(
+            ctx=ctx,
+            parent=parent,
+            task=task,
+            cwd=cwd,
+            strategy=strategy,
+            sandbox=sandbox,
+            depth=depth,
+            session=name,
+            timeout_seconds=timeout_seconds,
+            child=name,
+            preflight=preflight,
+            output_root=output_root,
+            staged_context_path=staged_context_path,
+            run_identity=root,
+            authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+        )
+        if authority_attempt is not None:
+            authority_attempt.complete(bridge.codex.returncode)
 
     delivery_fact = CONTEXT_DELIVERY_INITIAL
     effective_thread_id = bridge.thread_id
@@ -503,18 +528,40 @@ def continue_codex_session(
         warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
 
     root = new_root_run_identity()
-    with _temporary_run_env(root, name, forge_root=entry.forge_root):
-        request = prepare_codex_request(
-            prompt=task,
-            preflight=preflight,
-            attribution=Attribution(command="codex-resume", session=name),
-            cwd=state.worktree.path if state.worktree else str(ctx.cwd),
-            sandbox=sandbox,
-            timeout_seconds=timeout_seconds,
-            label="codex-resume",
-            resume_thread_id=thread_id,
+    cwd = state.worktree.path if state.worktree else str(ctx.cwd)
+    with authority_launch_transaction(
+        store=store,
+        root=root,
+        operation="resume",
+        launch_mode="host",
+        worktree_path=Path(cwd),
+        codex_preflight=preflight,
+    ) as authority_attempt:
+        marker_env = (
+            {FORGE_AUTHORITY_MARKER_VAR: authority_attempt.marker}
+            if authority_attempt is not None and authority_attempt.marker is not None
+            else None
         )
-        result = CodexHeadlessInvoker().run(request)
+        with _temporary_run_env(
+            root,
+            name,
+            forge_root=entry.forge_root,
+            extra_vars=marker_env,
+            unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
+        ):
+            request = prepare_codex_request(
+                prompt=task,
+                preflight=preflight,
+                attribution=Attribution(command="codex-resume", session=name),
+                cwd=cwd,
+                sandbox=sandbox,
+                timeout_seconds=timeout_seconds,
+                label="codex-resume",
+                resume_thread_id=thread_id,
+            )
+            result = CodexHeadlessInvoker().run(request)
+        if authority_attempt is not None:
+            authority_attempt.complete(result.returncode)
 
     effective_thread_id = thread_id
     if result.runtime_session_id and result.runtime_session_id != thread_id:
@@ -621,7 +668,11 @@ def _remove_lock_only_session_dir(session_dir: Path) -> None:
             entry.unlink()
         session_dir.rmdir()
     except OSError:
-        logger.debug("Could not remove lock-only deleted session directory %s", session_dir, exc_info=True)
+        logger.debug(
+            "Could not remove lock-only deleted session directory %s",
+            session_dir,
+            exc_info=True,
+        )
 
 
 def _rollback_created_session(
@@ -652,4 +703,7 @@ def _rollback_created_session(
         try:
             leftover.unlink(missing_ok=True)
         except OSError:
-            logger.debug("Codex start rollback: snapshot cleanup failed (non-critical)", exc_info=True)
+            logger.debug(
+                "Codex start rollback: snapshot cleanup failed (non-critical)",
+                exc_info=True,
+            )

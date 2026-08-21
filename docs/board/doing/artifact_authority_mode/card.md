@@ -1,15 +1,16 @@
 # Artifact Authority Mode
 
-**Status**: Proposed (2026-08-13; narrowed after design review). This card covers per-session artifact authority,
-handler-level fail-closed decisions on declared runtime-tool surfaces, launch preflight, disclosed runtime fail-open
-seams, and an honest posture read. It does not add delegation, cross-runtime context transfer, Git-range attestation,
-textual-overlap analysis, or an admission gate. Forge adds no courier; the supported advisory-to-producer flow is
-human-only.
+**Status**: Active (2026-08-21; proposed 2026-08-13 and narrowed after design review). This is M1 and the first active
+member of its epic; execution is sequenced in [checklist.md](checklist.md). The card covers per-session artifact
+authority, handler-level fail-closed decisions on declared runtime-tool surfaces, launch preflight, disclosed runtime
+fail-open seams, and an honest posture read. It does not add delegation, cross-runtime context transfer, Git-range
+attestation, textual-overlap analysis, or an admission gate. Forge adds no courier; the supported advisory-to-producer
+flow is human-only.
 
 **Epic**: M1 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
 owns the shared journal envelope, run identity, absence-state vocabulary, and presentation boundary with
-[Session Route Provenance and Marking](../session_route_provenance/card.md). The cards remain independently shippable;
-authority mode does not require route history, model selection, or marking metadata.
+[Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md). The cards remain independently
+shippable; authority mode does not require route history, model selection, or marking metadata.
 
 **References**: [design.md §3.9](../../../design.md#39-session-resume-context-management) (Codex session lifecycle),
 [design.md §3.10](../../../design.md#310-hook-handlers) (managed hook dispatch),
@@ -197,8 +198,9 @@ Verified seam changes required by v1:
   trust. V1 therefore extends that command instead of adding another registration or changing its dispatcher command.
   The command currently exits unless the tool is `apply_patch`; `CodexHookAdapter` then skips malformed and delete-only
   patches. Authority mode evaluates raw `apply_patch`, `Bash`, and unknown tool envelopes before the tool filter,
-  `policy.enabled`, and adapter gates. An advisory Codex launch requires empirically verified hook enrollment; static
-  registration alone is insufficient.
+  `policy.enabled`, and adapter gates. An advisory Codex launch requires exactly one static no-matcher
+  `codex-policy-check` row with the installed command bytes and timeout plus empirically verified SessionStart hook
+  enrollment; either signal alone is insufficient.
 
 ## Authority journal and posture read
 
@@ -277,8 +279,9 @@ authority:
 
 The JSON shape is stable and contains the same fields for advisory, producer, and unmarked sessions, using `null` or an
 empty list where a field does not apply. Missing sessions, invalid state, unreadable manifests, and malformed journals
-are command errors. A valid session with an unavailable hook seam is a successful read with
-`launch_support: unsupported`; attempting to launch that session as advisory is an error.
+are command errors. A valid session whose recorded launch mode has a statically incapable hook seam is a successful read
+with `launch_support: unsupported`; attempting to launch that session as advisory is an error. A capable host seam with
+missing registration is checked at launch and does not turn an inactive report into `unsupported`.
 
 `configuration_history: supported` means only that Forge's recorded authority configuration is continuous between its
 journaled events. It does not mean that Forge observed every filesystem mutation or every process during that interval.

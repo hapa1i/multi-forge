@@ -23,6 +23,7 @@ from forge.install.codex_hooks import (
     codex_registration_keys,
     get_builtin_codex_entries,
     get_codex_config_path,
+    inspect_codex_hook_registration,
     plan_codex_merge,
     plan_codex_remove,
     plan_codex_runtime_remove,
@@ -71,6 +72,50 @@ class TestBuiltinEntries:
 
     def test_builtin_events_are_known(self) -> None:
         validate_codex_events(_entries())
+
+
+class TestRegistrationInspection:
+    def test_requires_one_byte_exact_policy_row(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        config.write_text(render_codex_block(_entries()), encoding="utf-8")
+        expected = next(entry for entry in _entries() if entry.event == "PreToolUse")
+
+        inspection = inspect_codex_hook_registration(config, expected)
+
+        assert inspection.exactly_one is True
+        assert inspection.registration_count == 1
+        assert inspection.exact_count == 1
+
+    @pytest.mark.parametrize(
+        "installed_policy",
+        [
+            lambda expected: replace(expected, matcher="apply_patch"),
+            lambda expected: replace(expected, timeout=5),
+            lambda expected: replace(expected, command="forge hook codex-policy-check"),
+            lambda expected: replace(expected, event="SessionStart"),
+        ],
+    )
+    def test_rejects_policy_row_drift(self, tmp_path: Path, installed_policy) -> None:
+        config = tmp_path / "config.toml"
+        expected = next(entry for entry in _entries() if entry.event == "PreToolUse")
+        config.write_text(render_codex_block((installed_policy(expected),)), encoding="utf-8")
+
+        inspection = inspect_codex_hook_registration(config, expected)
+
+        assert inspection.exactly_one is False
+        assert inspection.registration_count == 1
+        assert inspection.exact_count == 0
+
+    def test_rejects_duplicate_policy_rows(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        expected = next(entry for entry in _entries() if entry.event == "PreToolUse")
+        config.write_text(render_codex_block((expected, expected)), encoding="utf-8")
+
+        inspection = inspect_codex_hook_registration(config, expected)
+
+        assert inspection.exactly_one is False
+        assert inspection.registration_count == 2
+        assert inspection.exact_count == 2
 
 
 class TestEventValidation:

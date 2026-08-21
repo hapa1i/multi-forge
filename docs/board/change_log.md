@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-21
 
+### Enforce managed-session artifact authority
+
+**Goal/outcome**: Give humans an explicit advisory/producer session designation with honest managed-tool enforcement and
+local evidence, while leaving route provenance, authorship, and admission outside the claim.
+
+**Key changes**:
+
+- Added strict session-owned authority intent, external inactive mutation controls, advisory-only inheritance, and one
+  authority-neutral durable event-journal seam reusable by later route provenance.
+- Preflighted and journaled one root launch attempt across Claude and Codex, enforced advisory requests before ordinary
+  policy, preserved producer/unmarked behavior, and exposed a read-only posture report plus the human-courier workflow.
+- Closed review-found enforcement gaps with exact Codex policy-row attestation, full-lifetime unmarked launch locking,
+  sidecar authority-row exclusion, marker isolation, and event-specific journal validation.
+
+**Verification**: 212 repaired authority-contract tests; 9,447 unit with 117 deselected; 1,053 regression; eight
+targeted Docker and CLI integration boundaries; full pre-commit; wheel/sdist build plus isolated packaged enable/sync;
+dispatcher p95 26.79 ms across 50 runs with 40 registry entries at depth 5. The design-size gate was intentionally
+deferred.
+
 ### Remove the experimental manifest WorkflowPolicy
 
 **Goal/outcome**: Retire the stale CLI-graduation proposal and remove a hidden semantic-policy pipeline whose blocking

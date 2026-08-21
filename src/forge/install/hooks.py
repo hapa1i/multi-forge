@@ -23,6 +23,7 @@ class ForgeHookRegistration:
     handler: str
     command: str
     matcher: str | None = None
+    timeout: int | None = None
 
 
 @dataclass(frozen=True)
@@ -223,15 +224,15 @@ def _entry_forge_hook_registrations(
     handler: str | None = None,
     *,
     require_command_type: bool = False,
-) -> list[tuple[str, str, str | None]]:
+) -> list[tuple[str, str, str | None, int | None]]:
     if not isinstance(entry, dict):
         return []
 
     matcher = _entry_matcher(entry)
-    registrations: list[tuple[str, str, str | None]] = []
+    registrations: list[tuple[str, str, str | None, int | None]] = []
     if found := _entry_command_registration(entry, handler, require_command_type=require_command_type):
         found_handler, command = found
-        registrations.append((found_handler, command, matcher))
+        registrations.append((found_handler, command, matcher, _entry_timeout(entry)))
 
     hooks = entry.get("hooks")
     if isinstance(hooks, list):
@@ -246,6 +247,7 @@ def _entry_forge_hook_registrations(
                         found_handler,
                         command,
                         matcher if hook_matcher is None else hook_matcher,
+                        _entry_timeout(hook),
                     )
                 )
     return registrations
@@ -256,6 +258,11 @@ def _entry_matcher(entry: dict[str, Any]) -> str | None:
     if isinstance(matcher, str):
         return matcher
     return None
+
+
+def _entry_timeout(entry: dict[str, Any]) -> int | None:
+    timeout = entry.get("timeout")
+    return timeout if type(timeout) is int else None
 
 
 def _settings_path_has_forge_hook(
@@ -289,7 +296,12 @@ def _settings_path_forge_hook_registrations(
             if not hook_entries or not isinstance(hook_entries, list):
                 continue
             for entry in hook_entries:
-                for found_handler, command, matcher in _entry_forge_hook_registrations(entry, handler):
+                for (
+                    found_handler,
+                    command,
+                    matcher,
+                    timeout,
+                ) in _entry_forge_hook_registrations(entry, handler):
                     registrations.append(
                         ForgeHookRegistration(
                             scope=scope,
@@ -298,6 +310,7 @@ def _settings_path_forge_hook_registrations(
                             handler=found_handler,
                             command=command,
                             matcher=matcher,
+                            timeout=timeout,
                         )
                     )
         return registrations

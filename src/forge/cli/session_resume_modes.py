@@ -12,6 +12,7 @@ from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.launch import _combine_prompt_files, resolve_manifest_prompt_file
+from forge.session.models import AuthorityIntent
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -27,6 +28,8 @@ def _resume_fresh_rewind(
     direct: bool,
     direct_model_override: str | None = None,
     memory_flag: bool | None = None,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> None:
     """Create a child session that resumes from a truncated parent transcript copy."""
     from forge.cli.session_lifecycle import (
@@ -48,6 +51,8 @@ def _resume_fresh_rewind(
             resume_mode="native",
             forge_root=parent_state.forge_root,
             memory_flag=memory_flag,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except ForgeSessionError as e:
         handle_session_error(e)
@@ -140,6 +145,8 @@ def _resume_fresh_native(
     direct: bool,
     direct_model_override: str | None = None,
     memory_flag: bool | None = None,
+    authority: AuthorityIntent | None = None,
+    authority_explicit: bool = False,
 ) -> None:
     """Create a child session with native conversation resume."""
     from forge.cli.session_lifecycle import (
@@ -160,6 +167,8 @@ def _resume_fresh_native(
             resume_mode="native",
             forge_root=parent_state.forge_root,
             memory_flag=memory_flag,
+            authority=authority,
+            authority_explicit=authority_explicit,
         )
     except ForgeSessionError as e:
         handle_session_error(e)

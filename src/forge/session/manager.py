@@ -9,7 +9,9 @@ The CLI layer should be thin and delegate to this class for all operations.
 from __future__ import annotations
 
 import logging
+import os
 import re
+from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -51,6 +53,7 @@ from .index import IndexStore
 from .launchability import require_session_worktree
 from .models import (
     AdoptionConfirmed,
+    AuthorityIntent,
     CodexConfirmed,
     Derivation,
     LaunchIntent,
@@ -115,6 +118,11 @@ def _append_unique_string(values: list[str], value: Any) -> None:
         values.append(value)
 
 
+def _delete_session_manifest(store: SessionStore) -> None:
+    """Delete one session manifest while discarding the store's bool result."""
+    store.delete()
+
+
 def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
     """Return the launch intent a derived session should inherit."""
     if parent_state.intent.launch is not None:
@@ -131,13 +139,101 @@ def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
 
 def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState) -> None:
     """Copy intent fields that derived sessions inherit from their parent."""
-    for field_name in ("subprocess_proxy", "policy", "memory", "system_prompt", "verification", "consumer_lanes"):
+    for field_name in (
+        "subprocess_proxy",
+        "policy",
+        "memory",
+        "system_prompt",
+        "verification",
+        "consumer_lanes",
+    ):
         parent_val = getattr(parent_state.intent, field_name, None)
         if parent_val is not None:
             setattr(child_state.intent, field_name, deepcopy(parent_val))
     inherited_launch = _inherited_launch_intent(parent_state)
     if inherited_launch is not None:
         child_state.intent.launch = inherited_launch
+    parent_authority = parent_state.intent.authority
+    child_state.intent.authority = (
+        deepcopy(parent_authority) if parent_authority is not None and parent_authority.role == "advisory" else None
+    )
+
+
+def _append_created_authority_event(
+    state: SessionState,
+    store: SessionStore,
+    *,
+    operation: str,
+    explicit: bool,
+    lock_held: bool = False,
+) -> None:
+    """Commit the required configuration event for a newly published marked session."""
+    if state.intent.authority is None:
+        return
+    from .authority import (
+        append_authority_event,
+        authority_session_lock,
+        new_authority_event,
+    )
+
+    event = new_authority_event(
+        state,
+        event_type="authority_configured" if explicit else "authority_inherited",
+        run_id=None,
+        origin_surface="external_cli" if explicit else "session_derivation",
+        operation=operation,
+        outcome="success",
+    )
+    if lock_held:
+        append_authority_event(str(store.forge_root), event)
+        return
+    with authority_session_lock(store.session_dir):
+        append_authority_event(str(store.forge_root), event)
+
+
+def _publish_created_session(
+    index_store: IndexStore,
+    state: SessionState,
+    store: SessionStore,
+    project_root: str,
+    *,
+    checkout_root: str | None,
+    forge_root: str | None,
+    relative_path: str | None,
+    operation: str,
+    authority_explicit: bool,
+    require_uuid_unbound: bool = False,
+) -> None:
+    """Publish a session and its required first authority record atomically to launchers."""
+    from .authority import authority_session_lock
+
+    creation_lock = authority_session_lock(store.session_dir) if state.intent.authority is not None else nullcontext()
+    with creation_lock:
+        index_store.create_session_txn(
+            state,
+            project_root,
+            checkout_root=checkout_root,
+            forge_root=forge_root,
+            relative_path=relative_path,
+            require_uuid_unbound=require_uuid_unbound,
+            write_manifest=lambda: store.create_exclusive(state),
+        )
+        try:
+            _append_created_authority_event(
+                state,
+                store,
+                operation=operation,
+                explicit=authority_explicit,
+                lock_held=True,
+            )
+        except Exception:
+            index_store.delete_session_txn(
+                state.name,
+                forge_root=str(store.forge_root),
+                expect_manifest_absent=False,
+                delete_manifest=lambda: _delete_session_manifest(store),
+            )
+            raise
 
 
 def _tracked_transcript_session_ids(state: SessionState) -> list[str]:
@@ -511,6 +607,8 @@ class SessionManager:
         runtime: str = "claude_code",
         parent_session: str | None = None,
         require_uuid_unbound: bool = False,
+        authority: AuthorityIntent | None = None,
+        authority_explicit: bool = False,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -547,6 +645,8 @@ class SessionManager:
                 is given. Only meaningful when binding a **pre-existing** conversation
                 (`forge session adopt`); the ordinary start paths mint a fresh id that
                 cannot collide.
+            authority: Optional authority to apply before the first launch.
+            authority_explicit: Whether authority came from an external creation flag.
 
         Returns:
             The created session state with candidate UUID.
@@ -560,6 +660,11 @@ class SessionManager:
             WorktreePathExistsError: If worktree path exists (when create_worktree=True).
             InvalidBranchNameError: If explicit branch name is invalid.
         """
+        if authority_explicit and authority is None:
+            raise ForgeSessionError("explicit child authority requires a role")
+        if authority_explicit and os.environ.get("FORGE_SESSION"):
+            raise ForgeSessionError("authority-bearing session creation is only available outside a managed session")
+
         # Compute forge_root early for scoped collision check.
         # For worktree sessions, use launch CWD (before worktree creation).
         # For non-worktree sessions, use explicit worktree_path if provided.
@@ -569,6 +674,15 @@ class SessionManager:
         _early_search = Path(worktree_path).resolve() if worktree_path and not create_worktree else launch_cwd
         _early_forge_root = find_forge_root(_early_search)
         _early_fr_str = str(_early_forge_root) if _early_forge_root else None
+
+        if parent_session is not None and not authority_explicit:
+            parent_state = self.get_session(parent_session, forge_root=_early_fr_str)
+            parent_authority = parent_state.intent.authority
+            authority = (
+                deepcopy(parent_authority)
+                if parent_authority is not None and parent_authority.role == "advisory"
+                else None
+            )
 
         # live_session_exists, not session_exists: a bare row is crash residue that
         # create_session_txn prunes and reuses, so rejecting on it would refuse a
@@ -734,6 +848,7 @@ class SessionManager:
             sidecar_image=sidecar_image,
             direct_model=direct_model,
             runtime=runtime,
+            authority=deepcopy(authority),
         )
 
         if claude_session_id:
@@ -761,24 +876,24 @@ class SessionManager:
             # concurrent creates of one name both reach here; the transaction
             # picks the winner and the loser gets SessionExistsError without
             # touching the winner's state.
-            self.index_store.create_session_txn(
+            _publish_created_session(
+                self.index_store,
                 state,
+                store,
                 str(project_root),
                 checkout_root=checkout_root_str,
                 forge_root=forge_root_str,
                 relative_path=relative_path_str,
                 require_uuid_unbound=require_uuid_unbound,
-                write_manifest=lambda: store.create_exclusive(state),
+                operation=("incognito" if is_incognito else "resume" if parent_session else "start"),
+                authority_explicit=authority_explicit,
             )
 
             return state
 
         except Exception:
-            # Only the worktree is left to unwind. The manifest write is the last
-            # durable action in the transaction, so it either succeeded (and this
-            # block never runs) or never happened; and the transaction removes its
-            # own row before re-raising. Adding work after the transaction would
-            # reintroduce the need for a manifest rollback here.
+            # Forge state publication rolls itself back. Only an externally created
+            # worktree remains for this outer operation to unwind.
             _rollback_worktree(resolved_worktree_path=worktree_path)
 
             raise
@@ -795,6 +910,8 @@ class SessionManager:
         resume_mode: str = "transfer",
         forge_root: str | None = None,
         memory_flag: bool | None = None,
+        authority: AuthorityIntent | None = None,
+        authority_explicit: bool = False,
     ) -> tuple[SessionState, TransferResult]:
         """Create a new session derived from a parent with context assembly.
 
@@ -827,6 +944,10 @@ class SessionManager:
             ContextBudgetExceededError: If full strategy exceeds context limit.
             ValueError: If transfer mode receives an unsupported strategy.
         """
+        if authority_explicit and authority is None:
+            raise ForgeSessionError("explicit child authority requires a role")
+        if authority_explicit and os.environ.get("FORGE_SESSION"):
+            raise ForgeSessionError("authority-bearing session creation is only available outside a managed session")
         if resume_mode not in {"transfer", "native"}:
             raise ValueError(f"Unsupported resume_mode: {resume_mode}")
 
@@ -883,6 +1004,8 @@ class SessionManager:
                 parent_proxy_template=parent_proxy_template,
                 parent_proxy_base_url=parent_proxy_base_url,
                 memory_flag=memory_flag,
+                authority=authority,
+                authority_explicit=authority_explicit,
                 warnings_sink=inh_warnings_native,
             )
             # Resolve parent transcript path for traceability (best-effort)
@@ -918,6 +1041,7 @@ class SessionManager:
                 parent_entry=parent_entry,
                 project_root=project_root,
                 name_was_auto=name_was_auto,
+                authority_explicit=authority_explicit,
             )
             return child_state, transfer_result
 
@@ -964,6 +1088,8 @@ class SessionManager:
             parent_proxy_template=parent_proxy_template,
             parent_proxy_base_url=parent_proxy_base_url,
             memory_flag=memory_flag,
+            authority=authority,
+            authority_explicit=authority_explicit,
             warnings_sink=inh_warnings_transfer,
         )
 
@@ -988,6 +1114,7 @@ class SessionManager:
             parent_entry=parent_entry,
             project_root=project_root,
             name_was_auto=name_was_auto,
+            authority_explicit=authority_explicit,
         )
         if final_child_name != child_name:
             transfer_result.context_file = child_path(parent_artifact_root, parent_name, final_child_name)
@@ -1007,18 +1134,22 @@ class SessionManager:
         parent_proxy_base_url: str | None,
         memory_flag: bool | None = None,
         warnings_sink: list[str] | None = None,
+        authority: AuthorityIntent | None = None,
+        authority_explicit: bool = False,
     ) -> SessionState:
         """Create a child SessionState for resume (shared by native and transfer)."""
         child_state = create_session_state(
             name=child_name,
             proxy_template=inherited_proxy or parent_proxy_template,
-            proxy_base_url=parent_proxy_base_url if (inherited_proxy or parent_proxy_template) else None,
+            proxy_base_url=(parent_proxy_base_url if (inherited_proxy or parent_proxy_template) else None),
             is_incognito=parent_state.is_incognito,
             worktree_path=parent_entry.worktree_path,
-            worktree_branch=parent_state.worktree.branch if parent_state.worktree else None,
+            worktree_branch=(parent_state.worktree.branch if parent_state.worktree else None),
         )
 
         _inherit_intent_fields(child_state, parent_state)
+        if authority_explicit:
+            child_state.intent.authority = deepcopy(authority)
 
         child_state.parent_session = parent_name
         child_state.is_fork = False  # Same worktree, context continuation (not a fork)
@@ -1046,6 +1177,7 @@ class SessionManager:
         parent_entry: SessionIndexEntry,
         project_root: Path,
         name_was_auto: bool,
+        authority_explicit: bool,
     ) -> str:
         """Write child session to disk and index (shared by native and transfer).
 
@@ -1066,13 +1198,16 @@ class SessionManager:
                 # loser it never owned the name. Both claims can still report the collision
                 # -- the index row check and create_exclusive -- and both surface as
                 # SessionExistsError, so both feed the one retry below.
-                self.index_store.create_session_txn(
+                _publish_created_session(
+                    self.index_store,
                     child_state,
+                    child_store,
                     str(project_root),
                     checkout_root=parent_entry.checkout_root,
                     forge_root=parent_entry.forge_root,
                     relative_path=parent_entry.relative_path,
-                    write_manifest=lambda: child_store.create_exclusive(child_state),
+                    operation="resume",
+                    authority_explicit=authority_explicit,
                 )
             except SessionExistsError:
                 # Only the curated transfer snapshot (children/<child>.md, written by
@@ -1098,7 +1233,11 @@ class SessionManager:
                         ):
                             orphan_context.unlink()
                     except OSError:
-                        logger.debug("Could not remove orphaned retry context file %s", orphan_context, exc_info=True)
+                        logger.debug(
+                            "Could not remove orphaned retry context file %s",
+                            orphan_context,
+                            exc_info=True,
+                        )
 
                 child_name = self._generate_resume_name(parent_name, forge_root=parent_forge_root)
                 validate_name(child_name)
@@ -1194,6 +1333,8 @@ class SessionManager:
         memory_flag: bool | None = None,
         resume_mode: str | None = None,
         warnings_sink: list[str] | None = None,
+        authority: AuthorityIntent | None = None,
+        authority_explicit: bool = False,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
 
@@ -1228,6 +1369,10 @@ class SessionManager:
             BranchInUseError: If branch is checked out elsewhere (force only).
             BranchNotMergedError: If branch has unmerged work (force only).
         """
+        if authority_explicit and authority is None:
+            raise ForgeSessionError("explicit child authority requires a role")
+        if authority_explicit and os.environ.get("FORGE_SESSION"):
+            raise ForgeSessionError("authority-bearing session creation is only available outside a managed session")
         parent = self.get_session(parent_name, forge_root=forge_root)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
@@ -1290,7 +1435,11 @@ class SessionManager:
                     )
                 return list(cleanup_result.errors)
             except Exception as e:
-                logger.warning("Fork rollback cleanup failed for '%s': %s", rollback_worktree_path, e)
+                logger.warning(
+                    "Fork rollback cleanup failed for '%s': %s",
+                    rollback_worktree_path,
+                    e,
+                )
                 return [str(e)]
 
         if into_path is not None:
@@ -1471,6 +1620,8 @@ class SessionManager:
         )
 
         _inherit_intent_fields(fork_state, parent)
+        if authority_explicit:
+            fork_state.intent.authority = deepcopy(authority)
         # Direct mode: force host launch (sidecar requires a proxy)
         if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
             fork_state.intent.launch.mode = LAUNCH_MODE_HOST
@@ -1659,7 +1810,11 @@ class SessionManager:
 
                     ActiveSessionStore().clear_session(fork_name, forge_root=effective_fork_root)
                 except Exception as e:
-                    logger.debug("Failed to clear active session '%s' (non-critical): %s", fork_name, e)
+                    logger.debug(
+                        "Failed to clear active session '%s' (non-critical): %s",
+                        fork_name,
+                        e,
+                    )
 
                 replaced_target_state = True
 
@@ -1670,13 +1825,16 @@ class SessionManager:
             # deleted above, and a fresh fork_name has none. create_exclusive keeps
             # that true under concurrency, and the transaction's row check makes
             # the loser fail before it can touch the winner's manifest.
-            self.index_store.create_session_txn(
+            _publish_created_session(
+                self.index_store,
                 fork_state,
+                fork_store,
                 project_root,
                 checkout_root=fork_checkout_root,
                 forge_root=fork_forge_root,
                 relative_path=fork_relative_path,
-                write_manifest=lambda: fork_store.create_exclusive(fork_state),
+                operation="incognito" if is_incognito else "fork",
+                authority_explicit=authority_explicit,
             )
 
             return parent, fork_state
@@ -1760,13 +1918,16 @@ class SessionManager:
         child_store = SessionStore(parent_entry.forge_root or parent_worktree_path, child_name)
         # No rollback block: the transaction removes its own row, and the manifest
         # write is its last durable action, so a failure leaves neither behind.
-        self.index_store.create_session_txn(
+        _publish_created_session(
+            self.index_store,
             child_state,
+            child_store,
             project_root,
             checkout_root=parent_entry.checkout_root,
             forge_root=parent_entry.forge_root,
             relative_path=parent_entry.relative_path,
-            write_manifest=lambda: child_store.create_exclusive(child_state),
+            operation="resume",
+            authority_explicit=False,
         )
 
         return parent, child_state
@@ -2114,7 +2275,11 @@ class SessionManager:
                     try:
                         _reloc_path.unlink(missing_ok=True)
                     except OSError as exc:
-                        logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
+                        logger.warning(
+                            "Failed to remove relocated parent transcript %s: %s",
+                            _reloc_path,
+                            exc,
+                        )
 
             if _deriv is not None and _deriv.rewind_relocated_session_id:
                 _rewind_root = _transcript_cleanup_project_root(

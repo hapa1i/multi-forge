@@ -40,6 +40,7 @@ FORGE_MAX_DEPTH = 2
 FORGE_RUN_ID_VAR = "FORGE_RUN_ID"
 FORGE_PARENT_RUN_ID_VAR = "FORGE_PARENT_RUN_ID"
 FORGE_ROOT_RUN_ID_VAR = "FORGE_ROOT_RUN_ID"
+FORGE_AUTHORITY_MARKER_VAR = "FORGE_AUTHORITY_MARKER"
 
 # Provider session/command correlation. FORGE_SESSION
 # (the human session name, already set by the session-start path) and FORGE_COMMAND (the

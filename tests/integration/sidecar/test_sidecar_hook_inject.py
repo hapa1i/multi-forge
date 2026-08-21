@@ -154,6 +154,13 @@ def test_entrypoint_merges_api_helper_into_hooks_idempotently(tmp_path: Path, si
         first_settings = json.loads(first_bytes)
         assert first_settings["apiKeyHelper"] == "/root/.claude/forge_api_key_helper.sh"
         assert first_settings["hooks"]
+        staged_commands = [
+            hook["command"]
+            for entries in first_settings["hooks"].values()
+            for entry in entries
+            for hook in entry.get("hooks", [])
+        ]
+        assert "forge hook authority-check" not in staged_commands
 
         second = subprocess.run(command, text=True, capture_output=True, timeout=60)
         assert second.returncode == 0, second.stderr

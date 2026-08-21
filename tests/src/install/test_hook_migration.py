@@ -454,8 +454,8 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     user_install = tracking.get_installation(InstallScope.USER.value)
     assert user_install is not None
     assert has_module_owner(user_install, InstallModule.HOOKS, "claude_code")
-    assert len([entry for entry in user_install.settings_entries if entry.key_path.startswith("hooks.")]) == len(
-        KNOWN_LEGACY_HOOK_SHAPES
+    assert len([entry for entry in user_install.settings_entries if entry.key_path.startswith("hooks.")]) == (
+        len(KNOWN_LEGACY_HOOK_SHAPES) + 1
     )
     assert result.removed_hooks == 1
     assert result.enrollment_created is True

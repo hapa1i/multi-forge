@@ -73,7 +73,11 @@ def _collect_paths(cls: type | Any, prefix: str, paths: set[str]) -> None:
     try:
         hints = get_type_hints(cls)
     except Exception as e:
-        logger.debug("Cannot get type hints for %s: %s (using field names)", getattr(cls, "__name__", cls), e)
+        logger.debug(
+            "Cannot get type hints for %s: %s (using field names)",
+            getattr(cls, "__name__", cls),
+            e,
+        )
         hints = {}
 
     for f in fields(cls):
@@ -122,6 +126,13 @@ def expand_wildcard(pattern: str, valid_paths: set[str] | None = None) -> list[s
         )
 
     prefix = parts[0]
+
+    if prefix == "authority":
+        raise InvalidOverrideKeyError(
+            pattern,
+            "authority is managed by the session authority control plane, not overrides",
+            hint="use 'forge session authority set' or 'forge session authority clear'",
+        )
 
     if prefix == "custom":
         raise InvalidOverrideKeyError(pattern, "custom.* is not supported")
@@ -197,6 +208,13 @@ def validate_key(key: str) -> list[str]:
 
     if first_part == "custom":
         raise InvalidOverrideKeyError(key, "custom.* is not supported")
+
+    if first_part == "authority":
+        raise InvalidOverrideKeyError(
+            key,
+            "authority is managed by the session authority control plane, not overrides",
+            hint="use 'forge session authority set' or 'forge session authority clear'",
+        )
 
     if key == "launch.runtime":
         _reject_launch_runtime_override(key)

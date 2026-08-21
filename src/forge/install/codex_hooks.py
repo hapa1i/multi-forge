@@ -77,6 +77,21 @@ class CodexHookEntry:
     matcher: str | None = None
 
 
+@dataclass(frozen=True)
+class CodexHookRegistrationInspection:
+    """Exact installed-row evidence for one Forge-owned Codex hook handler."""
+
+    config_path: str
+    registration_count: int
+    exact_count: int
+    error: str | None = None
+
+    @property
+    def exactly_one(self) -> bool:
+        """Whether one registration exists and exactly matches the expected row."""
+        return self.error is None and self.registration_count == 1 and self.exact_count == 1
+
+
 def get_builtin_codex_entries() -> tuple[CodexHookEntry, ...]:
     """Return the Forge-managed Codex hook registrations.
 
@@ -856,3 +871,62 @@ def codex_registration_keys(config_path: Path) -> set[CodexRegistrationKey]:
     except tomllib.TOMLDecodeError:
         return set()
     return _collect_registration_keys(parsed)
+
+
+def inspect_codex_hook_registration(
+    config_path: Path,
+    expected: CodexHookEntry,
+) -> CodexHookRegistrationInspection:
+    """Inspect one handler across events and require one byte-exact installed row.
+
+    Logical handler identity counts legacy and wrong-event registrations so a
+    duplicate or misplaced row cannot be hidden by one otherwise exact entry.
+    The exact comparison includes event, matcher, command bytes, and timeout.
+    """
+    path_text = str(config_path)
+    if not config_path.is_file():
+        return CodexHookRegistrationInspection(path_text, 0, 0, "config file is missing")
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        return CodexHookRegistrationInspection(path_text, 0, 0, f"config file is unreadable ({type(exc).__name__})")
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return CodexHookRegistrationInspection(path_text, 0, 0, "config file is invalid TOML")
+
+    expected_handler = forge_hook_handler(expected.command)
+    if expected_handler is None:
+        raise ValueError("expected Codex hook command is not a Forge handler")
+
+    registration_count = 0
+    exact_count = 0
+    hooks = parsed.get("hooks")
+    if isinstance(hooks, dict):
+        for event, event_entries in hooks.items():
+            if not isinstance(event_entries, list):
+                continue
+            for event_entry in event_entries:
+                if not isinstance(event_entry, dict):
+                    continue
+                inner = event_entry.get("hooks")
+                if not isinstance(inner, list):
+                    continue
+                for hook in inner:
+                    if not isinstance(hook, dict) or hook.get("type") != "command":
+                        continue
+                    command = hook.get("command")
+                    if not isinstance(command, str) or forge_hook_handler(command) != expected_handler:
+                        continue
+                    registration_count += 1
+                    timeout = hook.get("timeout")
+                    if (
+                        event == expected.event
+                        and event_entry.get("matcher") == expected.matcher
+                        and command == expected.command
+                        and type(timeout) is int
+                        and timeout == expected.timeout
+                    ):
+                        exact_count += 1
+
+    return CodexHookRegistrationInspection(path_text, registration_count, exact_count)

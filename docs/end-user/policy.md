@@ -384,6 +384,19 @@ reload is an auditable moment where the plan's authority changed.
 wasn't in the plan, you can turn the supervisor off (`%policy supervisor off`), apply the change, and optionally reload
 an updated plan. The deviation goes through *you* — not silently absorbed by the executor.
 
+### Artifact authority runs before policy
+
+Artifact authority is a separate session-intent boundary, not a policy bundle or a policy fail mode. In a launch-marked
+advisory session, the raw authority guard runs before tool filtering, path normalization, `policy.enabled`, bundle and
+supervisor gates, and the runtime-specific policy adapter. A covered request is denied even when policy is disabled,
+permissive, absent, or configured to fail open.
+
+An authority decline is not an `allow`: runtime permissions and ordinary policy still evaluate afterward. A producer
+designation likewise grants no policy exemption; it only lets the request reach the existing permission/policy path.
+Consequently, `%policy disable`, `forge policy disable`, and supervisor toggles cannot unblock an authority denial. The
+human must stop the session and use `forge session authority set|clear` from another terminal. See
+[Artifact authority for managed sessions](session.md#artifact-authority-for-managed-sessions).
+
 ---
 
 ## Stuck playbook (when policies block repeatedly)

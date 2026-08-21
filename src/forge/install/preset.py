@@ -40,7 +40,11 @@ def get_preset_path() -> Path:
     return get_forge_home() / PRESET_FILENAME
 
 
-def _build_builtin_preset(hook_command: Callable[[str], str]) -> dict[str, Any]:
+def _build_builtin_preset(
+    hook_command: Callable[[str], str],
+    *,
+    include_authority: bool = True,
+) -> dict[str, Any]:
     """Build the preset from the canonical hook inventory.
 
     Contains only essential Forge infrastructure:
@@ -48,7 +52,7 @@ def _build_builtin_preset(hook_command: Callable[[str], str]) -> dict[str, Any]:
     - statusLine: forge status-line command
     - permissions: Write/Edit (the memory writer needs these for claude -p)
     """
-    return {
+    preset: dict[str, Any] = {
         "permissions": {
             "allow": [
                 "Write",
@@ -232,6 +236,20 @@ def _build_builtin_preset(hook_command: Callable[[str], str]) -> dict[str, Any]:
             "padding": 0,
         },
     }
+    if include_authority:
+        preset["hooks"]["PreToolUse"].insert(
+            0,
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": hook_command("authority-check"),
+                        "timeout": 60,
+                    }
+                ],
+            },
+        )
+    return preset
 
 
 def get_builtin_preset() -> dict[str, Any]:
@@ -243,11 +261,17 @@ def get_sidecar_hook_settings() -> dict[str, Any]:
     """Return the Forge-owned user settings staged for a sidecar launch.
 
     Sidecars are always managed sessions, so they do not need the host dispatcher's
-    project-enrollment gate or binary resolver. Only the hook block is staged here;
-    project-scoped statusLine and permissions continue to come from the mounted
-    project settings.
+    project-enrollment gate or binary resolver. Advisory sidecars are unsupported,
+    so the catch-all authority row is deliberately omitted: its bare CLI form has
+    no absent-marker fast path. Only the hook block is staged here; project-scoped
+    statusLine and permissions continue to come from mounted project settings.
     """
-    return {"hooks": _build_builtin_preset(_sidecar_hook_command)["hooks"]}
+    return {
+        "hooks": _build_builtin_preset(
+            _sidecar_hook_command,
+            include_authority=False,
+        )["hooks"]
+    }
 
 
 def get_builtin_preset_json() -> str:

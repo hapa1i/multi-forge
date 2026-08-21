@@ -399,6 +399,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_PROFILE`                    | Public            | User-settable credential profile selector                           |
 | `FORGE_DEBUG`                      | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces |
 | `FORGE_STATUS_TRUNCATE`            | Public diagnostic | User-settable status-line troubleshooting toggle                    |
+| `FORGE_AUTHORITY_MARKER`           | Internal wiring   | Advisory run id plus authority config/hook digests                  |
 | `FORGE_CODEX_PROXY_TOKEN`          | Internal wiring   | Loopback proxy bearer between Forge and Codex                       |
 | `FORGE_COMMAND`                    | Internal wiring   | Forge-spawned command attribution                                   |
 | `FORGE_DEFAULT_PROXY_BASE_URL`     | Internal wiring   | Legacy/default session proxy wiring                                 |
@@ -1059,8 +1060,9 @@ User enable/sync consolidates exact released direct hooks in both user settings 
 candidates. Discovery is read-only: no candidate checkout, tracking row, `projects.json`, or ambient dispatcher state is
 touched.
 
-**Sidecar exception.** Sidecars stage canonical hooks plus `apiKeyHelper` in `.forge/sidecar-home` without an install
-row. They mount project skills, not host-user or Codex skill targets.
+**Sidecar exception.** Sidecars stage the sidecar-compatible canonical hooks plus `apiKeyHelper` in
+`.forge/sidecar-home` without an install row. The host-only authority catch-all is omitted while advisory sidecar is
+unsupported. They mount project skills, not host-user or Codex skill targets.
 
 ### C.3 Settings merge rules
 
@@ -1256,6 +1258,10 @@ Hooks and skills share runtime selection but not availability. `$CODEX_HOME` sel
 
 Project/local installs write no block. Codex hashes command bytes, so changing the dispatcher registration requires
 one-time re-trust.
+
+Artifact authority does not add or alter a Codex registration. The existing no-matcher `codex-policy-check` command
+keeps byte-identical trust material; its handler evaluates the advisory marker and raw tool name before its existing
+ordinary-policy branches. Static block presence remains insufficient evidence that Codex will deliver the hook.
 
 Legacy `cleanup-project` validates config and tracked path first. It backs up/removes one balanced block while
 preserving outside TOML; absence clears stale ownership, while partial markers or matching manual registration block
@@ -1855,3 +1861,86 @@ operator-facing guards backstop version churn and the unverifiable trust ceremon
   no turn when the answer is already knowable (not ready / not registered); a turn that fails to complete reports
   `UNVERIFIED`, not "not enrolled". Tests **user** scope only (path-stable, one-ceremony-covers-all); project-scope
   hooks need a turn inside the project.
+
+Artifact-authority launch first requires exactly one user-scope, no-matcher `codex-policy-check` row with the installed
+dispatcher command bytes and timeout. That proves the policy handler is statically present; it does not prove Codex
+trust. Launch therefore also invokes the empirical `codex-session-start` verifier for **every advisory Codex launch
+attempt**, including each `session resume --task` turn. A 20-turn headless advisory workflow therefore pays roughly 20
+additional probe turns of latency and quota. The existing readiness cache observes binary and auth/credential mtimes
+plus a TTL; it is not proven to observe trust revocation. Any future enrollment cache requires separate probe evidence
+locating the trust state and demonstrating sound invalidation.
+
+### I.4 Artifact-authority runtime seam
+
+Authority preflight and hooks share canonical, secret-free digests:
+
+- the effective-config digest hashes coverage version, runtime, role, and nullable tier as sorted compact JSON;
+- Claude's hook digest covers the `PreToolUse` event, omitted matcher, exact dispatcher command, 60-second timeout, and
+  current generated-dispatcher source digest;
+- Codex's hook digest covers the code-owned built-in registration entries while preserving their existing command bytes.
+
+The launcher mints one root run identity before preflight. A validated advisory attempt sets the compact schema-v1
+`FORGE_AUTHORITY_MARKER` only in the child environment; stale inherited copies are explicitly removed from producer,
+unmarked, and bare invocations. The marker contains `session`, `runtime`, `run_id`, `effective_config_sha256`, and
+`hook_registration_sha256`. It carries no prompt, path, payload, patch, source, or credential, and has no public
+configuration surface.
+
+Claude host preflight requires exactly one current executable catch-all `authority-check` registration. The generated
+dispatcher parses enough argv to recognize that handler and checks only whether the marker is absent before project
+registry lookup, contributor override resolution, imports, or exec. Any present value, including malformed JSON, is
+forwarded to Forge so marker/schema/session/digest mismatches deny in the handler. Advisory Claude sidecar remains
+`unsupported`: staged settings do not prove that the selected image can execute the handler before spawn. The
+sidecar-owned hook inventory omits this host-only catch-all because its bare `forge hook authority-check` form has no
+dispatcher fast gate and could never enforce an advisory launch in v1.
+
+Codex uses the same launch identity and marker for headless start/resume and interactive TUI start/reattach. Preflight
+requires both the exact installed policy row and a positive empirical SessionStart enrollment probe. Its combined
+handler evaluates authority before `apply_patch` filtering or adapter normalization and emits the probe-pinned strict
+deny JSON. Handler-internal resolution/classification failures deny when the runtime can receive a response.
+Non-delivery, command timeout, dispatcher failure, and runtime rejection of malformed output remain outside this handler
+boundary and are disclosed as fail-open seams.
+
+## J. Session Event Journal Reference
+
+`forge.session.events` is the authority-neutral owner of the schema-v1 event envelope and storage mechanics. Artifact
+authority is the sole shipped consumer. `routing` is reserved as a separate allowed domain for the proposed route-
+provenance card; M1 does not create its path.
+
+```json
+{
+  "schema_version": 1,
+  "event_id": "sevt_<32-lowercase-hex>",
+  "timestamp": "<RFC-3339 UTC>",
+  "session": "<validated session name>",
+  "runtime": "claude_code|codex",
+  "event_type": "<domain token>",
+  "run_id": "<Forge run id|null>",
+  "origin_surface": "external_cli|session_derivation|launcher|claude_authority_hook|codex_policy_hook",
+  "operation": "start|resume|fork|incognito|set|clear|tool_request|runtime_event|null",
+  "outcome": "success|denied|refused|cancelled|error",
+  "reason_code": "<lowercase token|null>",
+  "payload": {}
+}
+```
+
+Unknown or missing envelope fields, invalid ids/timestamps/enums/nullability, non-JSON values, duplicate event ids,
+blank/truncated/non-object lines, non-UTF-8 bytes, and newer schema versions are errors. A domain supplies exact payload
+and full-event validators; authority uses the latter to enforce each event type's run-id, origin, operation, outcome,
+reason-code nullability, and runtime-hook correspondence. The shared layer never serializes arbitrary objects with
+`default=str`.
+
+The authority payload has exactly `role`, `tier`, `effective_config_sha256`, `hook_registration_sha256`, and
+`covered_tool`. It stores no prompt, raw tool payload, candidate patch, source bytes, command text, or candidate path.
+The authority event set is `authority_configured`, `authority_cleared`, `authority_inherited`, `launch_preflight`,
+`launch_aborted`, `run_started`, `run_ended`, `request_denied`, and `mutation_refused`.
+
+The contained path is `.forge/artifacts/<session>/<domain>/events.jsonl`. Path resolution requires an existing Forge
+root, validates the session and domain before creating directories, rejects existing symlink components, and uses one
+per-journal lock. Required append opens without following symlinks, accepts only a singly linked regular file, enforces
+private modes, writes one compact UTF-8 record plus newline, and fsyncs both file and containing directory. Failures are
+typed and propagated. The ordered reader returns an empty sequence only when the file is absent; it skips no malformed
+record.
+
+Domain readers preserve three distinct absence meanings: an unmarked session with no journal makes no claim (`null`), a
+currently marked session without consistent configuration history is `unproven`, and malformed/unreadable history is an
+error. Local append-only storage is not a tamper-proof audit log.

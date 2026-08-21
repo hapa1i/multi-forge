@@ -65,11 +65,48 @@ def invoke_policy_check(
     return result.returncode, result.stdout, result.stderr
 
 
+def _authority_marker(workspace: ContainerLike, session_name: str, runtime: str) -> str:
+    """Build the same marker a successful launch preflight gives the child."""
+    command = (
+        'cd /workspace && /forge/.venv/bin/python -c "'
+        "from forge.session.authority import authority_hook_contract_sha256, build_authority_marker; "
+        "from forge.session.store import SessionStore; "
+        f"state=SessionStore('/workspace','{session_name}').read(); "
+        f"print(build_authority_marker(state,'run_0123456789ab',authority_hook_contract_sha256('{runtime}')))\""
+    )
+    result = workspace.exec(command)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+def invoke_authority_check(
+    workspace: ContainerLike,
+    *,
+    marker: str,
+    session_name: str,
+    tool_name: str,
+) -> tuple[int, str, str]:
+    payload = {
+        "session_id": "authority-claude-session",
+        "cwd": "/workspace",
+        "hook_event_name": "PreToolUse",
+        "tool_name": tool_name,
+        "tool_input": {"file_path": "/workspace/src/generated.py"},
+    }
+    result = workspace.exec(
+        f"cd /workspace && export FORGE_SESSION={session_name}"
+        f" && export FORGE_AUTHORITY_MARKER='{marker}'"
+        f" && printf '%s' '{json.dumps(payload)}' | forge hook authority-check"
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
 def invoke_codex_policy_check(
     workspace: ContainerLike,
     patch_command: str,
     session_name: str = "policy-test",
     tool_name: str = "apply_patch",
+    authority_marker: str | None = None,
 ) -> tuple[int, str, str]:
     """Invoke forge hook codex-policy-check and return (exit_code, stdout, stderr).
 
@@ -89,8 +126,10 @@ def invoke_codex_policy_check(
         "tool_use_id": "call_docker_test",
     }
     payload_json = json.dumps(payload)
+    marker_export = f" && export FORGE_AUTHORITY_MARKER='{authority_marker}'" if authority_marker is not None else ""
     result = workspace.exec(
         f"cd /workspace && export FORGE_SESSION={session_name}"
+        f"{marker_export}"
         f" && printf '%s' '{payload_json}' | forge hook codex-policy-check"
     )
     return result.returncode, result.stdout, result.stderr
@@ -323,6 +362,75 @@ class TestPolicyCheckDocker:
         assert "policy.bundle_config.workflow" in stderr
         assert "forge session reset policy" in stderr
         assert "Traceback" not in stderr
+
+
+class TestAuthorityCheckDocker:
+    """Authority denies on both runtime wires before ordinary policy."""
+
+    def test_claude_advisory_denies_write_with_policy_disabled(self, policy_workspace: ContainerLike) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["policy"]["enabled"] = False
+        policy_workspace.write_json(manifest_path, manifest)
+        configured = policy_workspace.exec("cd /workspace && forge session authority set policy-test --role advisory")
+        assert configured.returncode == 0, configured.stderr
+        marker = _authority_marker(policy_workspace, "policy-test", "claude_code")
+
+        exit_code, stdout, stderr = invoke_authority_check(
+            policy_workspace,
+            marker=marker,
+            session_name="policy-test",
+            tool_name="Write",
+        )
+
+        assert exit_code == 2
+        assert stdout == ""
+        assert "Artifact authority denied" in stderr
+        journal = policy_workspace.read_file("/workspace/.forge/artifacts/policy-test/authority/events.jsonl")
+        events = [json.loads(line) for line in journal.splitlines()]
+        assert [event["event_type"] for event in events] == [
+            "authority_configured",
+            "request_denied",
+        ]
+        assert events[-1]["payload"]["covered_tool"] == "Write"
+
+    def test_codex_advisory_denies_bash_with_policy_disabled(self, policy_workspace: ContainerLike) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["launch"]["runtime"] = "codex"
+        manifest["intent"]["policy"]["enabled"] = False
+        policy_workspace.write_json(manifest_path, manifest)
+        configured = policy_workspace.exec("cd /workspace && forge session authority set policy-test --role advisory")
+        assert configured.returncode == 0, configured.stderr
+        marker = _authority_marker(policy_workspace, "policy-test", "codex")
+
+        exit_code, stdout, stderr = invoke_codex_policy_check(
+            policy_workspace,
+            "echo should-not-run",
+            tool_name="Bash",
+            authority_marker=marker,
+        )
+
+        assert exit_code == 0
+        assert stderr == ""
+        wire = json.loads(stdout)["hookSpecificOutput"]
+        assert wire["permissionDecision"] == "deny"
+        assert "Artifact authority denied" in wire["permissionDecisionReason"]
+
+    def test_producer_still_reaches_ordinary_tdd_policy(self, policy_workspace: ContainerLike) -> None:
+        configured = policy_workspace.exec("cd /workspace && forge session authority set policy-test --role producer")
+        assert configured.returncode == 0, configured.stderr
+
+        exit_code, stdout, stderr = invoke_policy_check(
+            policy_workspace,
+            tool_name="Write",
+            file_path="src/producer.py",
+            content="generated = True",
+        )
+
+        assert exit_code == 2
+        assert stdout == ""
+        assert "tdd.tests-before-impl" in stderr
 
 
 class TestStopVerificationDocker:

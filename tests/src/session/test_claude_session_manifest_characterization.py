@@ -106,6 +106,7 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,
@@ -182,6 +183,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,
@@ -257,6 +259,7 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,
@@ -347,6 +350,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,
@@ -435,6 +439,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,
@@ -520,6 +525,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
       "direct_model": null,
       "runtime": "claude_code"
     },
+    "authority": null,
     "system_prompt": null,
     "memory": null,
     "policy": null,

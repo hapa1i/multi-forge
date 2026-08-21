@@ -66,7 +66,7 @@ from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
     _validate_template_model_pin,
 )
-from forge.session.models import SessionIndexEntry
+from forge.session.models import AuthorityIntent, SessionIndexEntry
 from forge.session.transfer import (
     estimate_transcript_tokens,
     resolve_transfer_transcript_source,
@@ -172,6 +172,8 @@ class ForkPreflightRequest:
     strategy_explicit: bool = False
     drop_last_explicit: bool = False
     inline_plan_explicit: bool = False
+    authority: AuthorityIntent | None = None
+    authority_explicit: bool = False
 
 
 @dataclass(frozen=True)

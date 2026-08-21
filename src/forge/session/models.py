@@ -85,6 +85,30 @@ class LaunchIntent:
     runtime: str = "claude_code"
 
 
+AUTHORITY_ROLES = frozenset({"advisory", "producer"})
+AUTHORITY_TIERS = frozenset({"named_tools", "shell_closed"})
+DEFAULT_AUTHORITY_TIER = "shell_closed"
+
+
+@dataclass
+class AuthorityIntent:
+    """Human-assigned artifact authority for a managed session."""
+
+    role: str
+    tier: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.role not in AUTHORITY_ROLES:
+            raise ValueError(f"authority role must be one of: {', '.join(sorted(AUTHORITY_ROLES))}")
+        if self.role == "advisory":
+            if self.tier is None:
+                self.tier = DEFAULT_AUTHORITY_TIER
+            if self.tier not in AUTHORITY_TIERS:
+                raise ValueError(f"authority tier must be one of: {', '.join(sorted(AUTHORITY_TIERS))}")
+        elif self.tier is not None:
+            raise ValueError("producer authority does not accept a tier")
+
+
 @dataclass
 class MemoryWriterConfig:
     """Memory writer configuration for automatic memory doc updates.
@@ -329,6 +353,7 @@ class SessionIntent:
     proxy: ProxyIntent | None = None
     subprocess_proxy: str | None = None  # proxy_id for routing subprocesses (supervisor, panel, etc.)
     launch: LaunchIntent | None = None
+    authority: AuthorityIntent | None = None
     system_prompt: SystemPromptIntent | None = None
     memory: MemoryIntent | None = None
     policy: PolicyIntent | None = None
@@ -756,6 +781,7 @@ def create_session_state(
     sidecar_image: str | None = None,
     direct_model: str | None = None,
     runtime: str = "claude_code",
+    authority: AuthorityIntent | None = None,
 ) -> SessionState:
     """Create a new session state with defaults.
 
@@ -773,6 +799,7 @@ def create_session_state(
         sidecar_image: Optional sidecar image override to persist for relaunch.
         direct_model: Optional Claude Code env-ready direct model pin.
         runtime: Runtime registry id driving launcher dispatch ("claude_code" | "codex").
+        authority: Optional human-assigned artifact authority.
 
     Returns:
         A new SessionState with timestamps set to now.
@@ -812,6 +839,7 @@ def create_session_state(
         intent=SessionIntent(
             proxy=proxy,
             launch=launch,
+            authority=authority,
         ),
         confirmed=SessionConfirmed(),
     )
