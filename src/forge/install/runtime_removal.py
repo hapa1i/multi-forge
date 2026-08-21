@@ -6,7 +6,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from forge.core.runtime_vocab import (
     AGENT_RUNTIME_IDS,
@@ -524,7 +524,8 @@ class RuntimeRemovalExecutor:
         codex_preflight: CodexRuntimeRemovePlan | None = None
         if plan.remove_codex_block:
             validate_codex_config_scope(existing, scope=self._scope, project_root=self._project_root)
-            tracked = Path(existing.codex_config_path)  # type: ignore[arg-type]
+            # TrackingStore enforces hooks/codex ownership iff this path is present before planning.
+            tracked = Path(cast(str, existing.codex_config_path))
             codex_preflight = plan_codex_runtime_remove(tracked, get_builtin_codex_entries())
             if codex_preflight.action == "conflict":
                 raise ForgeInstallError(

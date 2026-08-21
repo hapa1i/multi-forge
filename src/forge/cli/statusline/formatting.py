@@ -887,10 +887,10 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
             entry.get("current_usd"),
             entry.get("limit_usd"),
         )
-        if not all(isinstance(v, (int, float)) for v in (pct, cur, lim)):
+        if not isinstance(pct, (int, float)) or not isinstance(cur, (int, float)) or not isinstance(lim, (int, float)):
             continue
-        if binding is None or float(pct) > binding[0]:  # type: ignore[arg-type]  # guarded above
-            binding = (float(pct), window[0], float(cur), float(lim))  # type: ignore[arg-type]
+        if binding is None or float(pct) > binding[0]:
+            binding = (float(pct), window[0], float(cur), float(lim))
     if binding is None:
         return None
     pct, marker, cur, lim = binding

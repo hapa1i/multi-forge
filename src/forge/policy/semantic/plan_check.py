@@ -162,7 +162,7 @@ def _normalize_checker_provider(provider: str | None) -> ProviderType | None:
             f"Unsupported checker provider {provider!r}; expected one of "
             f"{', '.join(sorted(DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER))}"
         )
-    return normalized  # type: ignore[return-value]
+    return cast(ProviderType, normalized)
 
 
 def resolve_plan_check_route(config: SupervisorConfig | None) -> _PlanCheckRoute:

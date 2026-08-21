@@ -17,7 +17,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 import click
 from rich.console import Console
@@ -691,7 +691,7 @@ def check(
 
     from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.engine import build_engine
-    from forge.policy.types import ActionContext, extract_added_lines
+    from forge.policy.types import ActionContext, FailMode, extract_added_lines
 
     if not file_path and not use_diff:
         print_error("Provide --file or --diff", console=err_console)
@@ -747,7 +747,7 @@ def check(
     )
 
     try:
-        engine = build_engine(list(bundles), fail_mode=fail_mode)  # type: ignore[arg-type]
+        engine = build_engine(list(bundles), fail_mode=cast(FailMode, fail_mode))
         result = engine.evaluate(context)
     except Exception as e:
         if as_json:

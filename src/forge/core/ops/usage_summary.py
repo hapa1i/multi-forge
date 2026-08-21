@@ -43,6 +43,7 @@ from forge.core.telemetry.downstream import (
 from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
+from forge.session.models import SessionState
 
 logger = logging.getLogger(__name__)
 
@@ -1012,7 +1013,7 @@ def _activity_notes(summary: SessionActivitySummary) -> list[str]:
     return notes
 
 
-def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[no-untyped-def]
+def _load_manifest(session_name: str, forge_root: str | None) -> SessionState | None:
     """Re-read the session manifest from disk (fresh hook-written state). None on failure."""
     try:
         from forge.session import SessionManager, SessionStore
@@ -1025,11 +1026,10 @@ def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[n
         return None
 
 
-def _policy_activity(
-    manifest, since: datetime | None, session_name: str
-) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
+def _policy_activity(manifest: SessionState | None, since: datetime | None, session_name: str) -> PolicyActivity | None:
     try:
-        decisions = manifest.confirmed.policy.decisions if manifest is not None else []
+        policy = manifest.confirmed.policy if manifest is not None else None
+        decisions = policy.decisions if policy is not None else []
     except Exception:
         decisions = []
 

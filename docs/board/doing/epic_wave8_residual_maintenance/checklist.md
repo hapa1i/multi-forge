@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: the independent `correct_daily_review_regressions` follow-up shipped in PR #229 (`da34bcb3`) with all
-five GitHub checks passing; Batch 5 remains parked until activation from the pushed closeout.
+Current focus: Batch 5 orders 18--19 are under review in draft PR #230 from `agent/wave8-batch-5`; keep both cards in
+`doing/` until their shared review merges.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -108,6 +108,13 @@ five GitHub checks passing; Batch 5 remains parked until activation from the pus
   and diff verification; keep Batch 5 parked until merge and closeout.
 - [x] Merge and close the independent correction as `da34bcb3`, add its change-log record, and repoint inbound links
   before activating Batch 5.
+- [x] Reverify O100 and D042/D044/O082 on `1e0e664c`, create `agent/wave8-batch-5`, move only orders 18--19 to `doing/`,
+  and create their separate checklists.
+- [x] Complete order 18's production suppression cleanup and source guard in its own commit boundary (`eebfbc45`).
+- [x] Complete order 19's design, CLI-reference, and source-comment sync in its own commit boundary (`1b04e8f7`).
+- [x] Run combined type-check, unit, regression, targeted integration, pre-commit, documentation-size, board/link, and
+  diff gates.
+- [x] Publish one Batch 5 review branch in draft PR #230; close both cards and this epic together only after merge.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
@@ -140,3 +147,12 @@ internal scan contract, so no behavior prose changed. All 995 local links across
 the one changed local fragment resolved, no selected-card `todo/` link remained, and `git diff --check` passed. The CLI
 reference measured 9,415 tokens, design plus appendix measured 59,988, and the review ledger remained below its ceiling
 at 29,981.
+
+Batch 5 pre-publication evidence (2026-08-21): order 18's focused slice passed 446 tests, mypy reported no issues across
+349 source files, and pyright reported zero errors or warnings; order 19's focused CLI/documentation slice passed 203
+tests. The combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, and three targeted
+integration boundaries for cross-runtime install/disable/sync, session repair, and fake-upstream OpenAI routing.
+`make pre-commit` passed every hook. After PR review clarified the proxy-id mount condition and the immediate
+`ModelHyperparameters` validation boundary, `design.md` measured 29,993 Opus tokens and `cli_reference.md` measured
+9,551; all 1,022 local paths across 422 board documents and all 1,209 local paths across 447 documentation files
+resolved. No selected-card `todo/` link remained, and `git diff --check` passed.

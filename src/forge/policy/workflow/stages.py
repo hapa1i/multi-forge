@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 from forge.core.reactive.structured_output import extract_json_from_response
 from forge.policy.semantic.verdict import meets_block_bar
@@ -28,7 +28,7 @@ def _normalize_severity(raw: str) -> Severity:
     """Coerce arbitrary severity string to a valid Severity literal."""
     normalized = raw.lower().strip()
     if normalized in _VALID_SEVERITIES:
-        return normalized  # type: ignore[return-value]
+        return cast(Severity, normalized)
     return "medium"
 
 

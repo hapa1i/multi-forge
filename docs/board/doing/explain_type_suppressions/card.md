@@ -1,8 +1,8 @@
 # Explain or remove type suppressions
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 18; parked.
+**Lane**: `doing/` -- under shared review in draft PR #230 as Wave 8 Batch 5 order 18.
 
 **Finding**: narrowed O100 (LOW conformance).
 
@@ -28,4 +28,5 @@ Authority: [`coding_standards.md` Comments](../../../developer/coding_standards.
 
 ## Verification
 
-Run the suppression guard, focused touched tests, `make type-check`, full unit/regression suites, and `make pre-commit`.
+Run the suppression guard, focused touched tests, the configured mypy and pyright commands, full unit/regression suites,
+and `make pre-commit`.

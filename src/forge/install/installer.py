@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from functools import partial
 from importlib.resources import files
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from forge.core.paths import find_git_root
 from forge.core.runtime import installed_runtimes
@@ -2245,7 +2245,7 @@ class Installer:
         Returns:
             The resulting installed-file ledger record.
         """
-        source = Path(file_plan.source_path)  # type: ignore[arg-type]  # source_path is always non-None in execute context
+        source = Path(cast(str, file_plan.source_path))  # install/update plans always carry a source
         target = Path(file_plan.target_path)
 
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -2264,7 +2264,7 @@ class Installer:
     def _installed_file_record(file_plan: FilePlan) -> InstalledFile:
         """Build current ownership metadata for an installed or unchanged file."""
 
-        source = Path(file_plan.source_path)  # type: ignore[arg-type]
+        source = Path(cast(str, file_plan.source_path))  # callers admit only source-backed actions
         target = Path(file_plan.target_path)
         return InstalledFile(
             target_path=str(target),

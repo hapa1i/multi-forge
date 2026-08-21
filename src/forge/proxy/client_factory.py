@@ -11,12 +11,17 @@ import os
 import time
 from enum import Enum
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from urllib.parse import urlparse
 
 from forge.config import config
 from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
-from forge.core.llm.types import ModelHyperparameters
+from forge.core.llm.types import (
+    ModelHyperparameters,
+    ReasoningEffort,
+    ThinkingConfig,
+    Verbosity,
+)
 from forge.core.models import (
     ModelCatalogError,
     get_max_output_tokens,
@@ -357,8 +362,6 @@ class TierClientFactory:
 
         Fields left as None fall through to core.llm's own defaults.
         """
-        from forge.core.llm.types import ThinkingConfig
-
         if provider == ModelProvider.LITELLM:
             provider_cfg = config.proxy.litellm
         elif provider == ModelProvider.OPENROUTER:
@@ -372,34 +375,30 @@ class TierClientFactory:
         catalog_strict = provider != ModelProvider.OPENROUTER
         max_tokens_override = _enforce_max_output_tokens_cap(model_name, None, strict=catalog_strict)
 
+        tier_reasoning: ReasoningEffort | None
         if tier_override and tier_override.reasoning_effort is not None:
-            tier_reasoning = tier_override.reasoning_effort
+            tier_reasoning = cast(ReasoningEffort, tier_override.reasoning_effort)  # validated by ModelHyperparameters
         else:
             tier_reasoning = None
 
+        tier_verbosity: Verbosity | None
         if tier_override and tier_override.verbosity is not None:
-            tier_verbosity = tier_override.verbosity
+            tier_verbosity = cast(Verbosity, tier_override.verbosity)  # validated by ModelHyperparameters
         else:
             tier_verbosity = None
 
-        tier_thinking: dict[str, str | int] | None
+        thinking_config: ThinkingConfig | None = None
         if tier_override and tier_override.thinking_budget_tokens is not None:
-            if tier_override.thinking_budget_tokens <= 0:
-                tier_thinking = None
-            else:
-                tier_thinking = {
-                    "type": "enabled",
-                    "budget_tokens": tier_override.thinking_budget_tokens,
-                }
-        else:
-            tier_thinking = None
-
-        thinking_config = ThinkingConfig(**tier_thinking) if tier_thinking else None  # type: ignore[arg-type]
+            if tier_override.thinking_budget_tokens > 0:
+                thinking_config = ThinkingConfig(
+                    type="enabled",
+                    budget_tokens=tier_override.thinking_budget_tokens,
+                )
 
         default_hyperparams = ModelHyperparameters(
             max_tokens=max_tokens_override,
-            reasoning_effort=tier_reasoning,  # type: ignore[arg-type]
-            verbosity=tier_verbosity,  # type: ignore[arg-type]
+            reasoning_effort=tier_reasoning,
+            verbosity=tier_verbosity,
             thinking=thinking_config,
         )
 

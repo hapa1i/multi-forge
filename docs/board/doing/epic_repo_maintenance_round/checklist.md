@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: the independent post-Batch-4 correction shipped in PR #229 (`da34bcb3`) with all five GitHub checks
-passing; Wave 8 Batch 5 orders 18--19 are next after the pushed closeout.
+Current focus: Wave 8 Batch 5 orders 18--19 are under review in draft PR #230 from `agent/wave8-batch-5`; keep both
+cards open through their shared review.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -411,4 +411,7 @@ The epic remains in `doing/` after the decision cards close; later execution wav
   post-merge edge cases; keep Wave 8 Batch 5 parked.
 - [x] Publish the independent correction in draft PR #229 while keeping its card in `doing/` and Batch 5 parked.
 - [x] Merge and close the independent correction as `da34bcb3` before activating Wave 8 Batch 5.
-- [ ] Activate Wave 8 Batch 5 from the pushed correction closeout with separate O100 and D042/D044/O082 checklists.
+- [x] Activate Wave 8 Batch 5 from pushed correction closeout `1e0e664c` with separate O100 and D042/D044/O082
+  checklists.
+- [x] Complete and publish the two-card Batch 5 review with distinct implementation commits and integrated evidence in
+  draft PR #230.

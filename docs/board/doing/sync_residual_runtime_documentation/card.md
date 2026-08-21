@@ -1,8 +1,8 @@
 # Sync residual runtime documentation
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 19; parked.
+**Lane**: `doing/` -- under shared review in draft PR #230 as Wave 8 Batch 5 order 19.
 
 **Findings**: D042, narrowed D044, and O082 (LOW documentation/comment drift).
 

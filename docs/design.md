@@ -1675,21 +1675,20 @@ never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads
 host checkout and manifest-owned Forge root separately. Stop therefore probes for pending shadow candidates through the
 mounted `/workspace` Forge root and translates only the resulting marker payload back to host-resolvable paths.
 
-The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so
-index/memory/shadow markers enqueued at Stop survive `--rm` and are drained only by the host CLI. **Narrow exception
-(§7.x audit path):** when a session launches with a proxy id, the sidecar additionally mounts that proxy's
-`~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and `~/.forge/audit/`,
-`~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost files,
-downstream/upstream telemetry, cap state, and the usage-attribution ledger persist on the host instead of dying with the
-`--rm` container — the ledger is the only record of the in-container supervisor/verb activity, and it feeds
-`forge telemetry activity` and the session-end summary for sidecar sessions). These are the only global `~/.forge`
-subdirectories mounted, preserving the port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`;
-that uid has no passwd entry, so the launcher pins `HOME=/root` and the image makes `/root` traversable/writable
-(`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for
-the ephemeral single-session `--rm` sandbox, **not** a security-sandbox guarantee. Sidecar sessions also persist their
-launch mode, extra mounts, and image in `intent.launch` so `forge session resume <name>` can replay the same runtime
-wiring later. Project-scoped `statusLine` remains the D3 exception to user-scope hook ownership and resolves through the
-sidecar image's `PATH`.
+The host `~/.forge/pending-work/` queue is mounted read-write at `/root/.forge/pending-work/`, so Stop-enqueued
+index/memory/shadow markers survive `--rm` for host-CLI draining. **Narrow exception (§7.x audit path):** a proxy-id
+session also mounts its `~/.forge/proxies/<id>/` read-only for intercept/audit config and, when the host file exists,
+`~/.forge/config.yaml` read-only at `/root/.forge/config.yaml` for global runtime settings. It mounts `~/.forge/audit/`,
+`~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write so legacy audit/cost files,
+downstream/upstream telemetry, cap state, and the usage-attribution ledger survive container removal. That ledger is the
+only record of in-container supervisor/verb activity and feeds `forge telemetry activity` and the session-end summary
+for sidecar sessions. These are the only global `~/.forge` subdirectories mounted, preserving the port-isolation
+rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins
+`HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the
+`/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox, **not** a
+security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch`
+so `forge session resume <name>` can replay the same runtime wiring later. Project-scoped `statusLine` remains the D3
+exception to user-scope hook ownership and resolves through the sidecar image's `PATH`.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.
