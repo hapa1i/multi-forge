@@ -32,8 +32,6 @@ from forge.policy.types import ActionContext, PolicyDecision
 from forge.runtime_config import RuntimeConfig, RuntimeProviderTraceConfig
 from forge.session.models import SupervisorConfig
 
-# --- Fixtures ---
-
 
 def _patch_inject_flag(monkeypatch, enabled: bool) -> None:
     """Force the global provider_trace.inject_provider_user toggle for a test."""
@@ -83,9 +81,6 @@ def _assert_escalation(decision: PolicyDecision, rule_id: str) -> None:
     assert decision.violations[0].severity == "low"
 
 
-# --- parse_plan_check_verdict ---
-
-
 class TestParsePlanCheckVerdict:
     def test_aligned_true(self) -> None:
         v = parse_plan_check_verdict('{"aligned": true, "reason": "matches step 2"}')
@@ -120,9 +115,6 @@ class TestParsePlanCheckVerdict:
     def test_non_string_reason_coerced(self) -> None:
         v = parse_plan_check_verdict('{"aligned": false, "reason": 42}')
         assert v is not None and v.reason == "42"
-
-
-# --- run_plan_check (mocked core.llm, tagger test pattern) ---
 
 
 def _prompt_of(mock_complete: MagicMock) -> str:
@@ -513,9 +505,6 @@ class TestRunPlanCheck:
         assert hp.extra["openai"]["extra_headers"]["X-Request-ID"].startswith("req_")
 
 
-# --- applies_to ---
-
-
 class TestRunPlanCheckProviderUser:
     """OpenRouter `user`-grouping injection: opt-in, OpenRouter-only, hash-only id."""
 
@@ -673,9 +662,6 @@ class TestPlanCheckAppliesTo:
         assert policy.applies_to(_make_context("Write")) is False
 
 
-# --- _evaluate verdict mapping ---
-
-
 class TestPlanCheckEvaluate:
     @patch("forge.policy.semantic.plan_check.run_plan_check")
     def test_aligned_allows_cleanly(self, mock_check: MagicMock, tmp_path: Path) -> None:
@@ -778,9 +764,6 @@ class TestPlanCheckEvaluate:
         assert mock_check.call_args.kwargs["budget_tokens"] == 64_000
 
 
-# --- Cache behavior ---
-
-
 class TestPlanCheckCache:
     @patch("forge.policy.semantic.plan_check.run_plan_check")
     def test_clean_allow_cached(self, mock_check: MagicMock, tmp_path: Path) -> None:
@@ -842,9 +825,6 @@ class TestPlanCheckCache:
         restored.set_state({"cache": {"key2": {"aligned": True, "checked_at": now_iso()}}})
         assert restored._cache.check("key1") is None
         assert restored._cache.check("key2") is not None
-
-
-# --- Reasoning effort (launch controls) ---
 
 
 class TestPlanCheckEffort:
@@ -920,9 +900,6 @@ class TestPlanCheckEffort:
         assert cache_key_for("low") != cache_key_for("high")
         assert "|effort:low" in cache_key_for("low")
         assert "|effort:default" in cache_key_for(None)
-
-
-# --- Shadow sampling capture seam (Slice 1) ---
 
 
 class TestShadowCapture:

@@ -90,7 +90,6 @@ class TestPlanWriteHook:
         assert output["success"] is True
         assert output["action"] == "recorded"
 
-        # Verify manifest was updated
         result = mock_claude_workspace.exec("cat /workspace/.forge/sessions/test-session/forge.session.json")
         manifest = json.loads(result.stdout)
         assert manifest["confirmed"]["latest_plan_path"] == ".claude/plans/foo.md"
@@ -127,11 +126,10 @@ class TestExitPlanModeHook:
         """Create a session with a plan file."""
         workspace.exec(f"cd /workspace && forge session start {session_name}")
 
-        # Create plan file
         workspace.exec("mkdir -p /workspace/.claude/plans")
         workspace.exec(f"echo '{plan_content}' > /workspace/.claude/plans/test-plan.md")
 
-        # Record the plan in manifest (simulating plan-write hook)
+        # Simulate the plan-write hook state consumed by exit-plan-mode.
         result = workspace.exec(f"cat /workspace/.forge/sessions/{session_name}/forge.session.json")
         manifest = json.loads(result.stdout)
         manifest["confirmed"]["latest_plan_path"] = ".claude/plans/test-plan.md"
@@ -170,12 +168,10 @@ class TestExitPlanModeHook:
         assert output["success"] is True
         assert output["action"] == "snapshotted"
 
-        # Verify artifact was created
         result = mock_claude_workspace.exec(
             "ls /workspace/.forge/artifacts/test-session/plans/ 2>/dev/null || echo 'no-artifacts'"
         )
         assert "no-artifacts" not in result.stdout
-        # Should have at least one snapshot file
 
     def test_records_plan_artifact_in_manifest(self, mock_claude_workspace: ContainerLike) -> None:
         """Should record plan artifact in manifest."""
@@ -188,7 +184,6 @@ class TestExitPlanModeHook:
             },
         )
 
-        # Verify manifest was updated
         result = mock_claude_workspace.exec("cat /workspace/.forge/sessions/test-session/forge.session.json")
         manifest = json.loads(result.stdout)
 
@@ -209,10 +204,8 @@ class TestExitPlanModeHook:
             session_name="no-plan-session",
         )
 
-        # Hook reports success=False when there's no plan to snapshot
-        # This is valid - the hook exits 0 but indicates nothing was done
+        # A skipped hook exits successfully but reports that it did no work.
         assert output["success"] is False or output.get("action") == "skip"
-        # Should indicate why it couldn't proceed
         assert "no_plan" in str(output).lower() or "error" in output
 
 
@@ -231,11 +224,9 @@ class TestStopHookArtifacts:
         """Create a session with a transcript file."""
         workspace.exec(f"cd /workspace && forge session start {session_name}")
 
-        # Create transcript file
         workspace.exec("mkdir -p /tmp/claude")
         workspace.exec('echo \'{"type": "assistant"}\' > /tmp/claude/transcript.jsonl')
 
-        # Update manifest with transcript path and session ID
         result = workspace.exec(f"cat /workspace/.forge/sessions/{session_name}/forge.session.json")
         manifest = json.loads(result.stdout)
         manifest["confirmed"]["transcript_path"] = "/tmp/claude/transcript.jsonl"
@@ -277,7 +268,6 @@ class TestStopHookArtifacts:
         assert output["success"] is True
         assert output["action"] == "copied"
 
-        # Verify transcript was copied
         result = mock_claude_workspace.exec(
             "ls /workspace/.forge/artifacts/test-session/transcripts/ 2>/dev/null || echo 'no-transcripts'"
         )
@@ -296,7 +286,6 @@ class TestStopHookArtifacts:
             },
         )
 
-        # Verify manifest was updated
         result = mock_claude_workspace.exec("cat /workspace/.forge/sessions/test-session/forge.session.json")
         manifest = json.loads(result.stdout)
 
@@ -369,9 +358,7 @@ class TestStopHookArtifacts:
         assert output["success"] is True
         assert output.get("queued") is True
 
-        # Verify pending-work marker exists
         result = mock_claude_workspace.exec("ls ~/.forge/pending-work/ 2>/dev/null || echo 'no-pending'")
-        # Marker may exist - depends on implementation
         assert result.returncode == 0
 
     def test_repeated_unchanged_stop_drain_keeps_search_index_byte_stable(
@@ -428,7 +415,7 @@ class TestStopHookArtifacts:
             session_name="marker-info-test",
         )
 
-        # Check marker content (schema v2: session fields are inside payload)
+        # Schema v2 stores session fields inside the payload.
         result = mock_claude_workspace.exec("cat ~/.forge/pending-work/uuid-456.json")
         assert result.returncode == 0, "Pending-work marker was not created"
 

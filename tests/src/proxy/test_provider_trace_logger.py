@@ -119,8 +119,7 @@ class TestGateAndRoundTrip:
 
 class TestHeaderBypassGuard:
     def test_writer_refilters_headers_even_if_caller_bypasses_allowlist(self):
-        # A future caller hands raw headers including secrets; the writer re-applies the
-        # Phase 2 allowlist, so only allowlisted names+values can persist.
+        # The writer reapplies the header allowlist so callers cannot persist secret headers.
         _record(
             provider_meta={
                 "provider": "openrouter",

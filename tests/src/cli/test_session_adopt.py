@@ -1,4 +1,4 @@
-"""Tests for the `forge session adopt` CLI leaf (native_session_adoption Slice 2)."""
+"""Tests for the `forge session adopt` CLI leaf."""
 
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ class TestAdoptCli:
         assert "forge search rebuild-index" in result.output
 
     def test_adopted_session_reattaches_with_no_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
-        """The card's headline claim: reattach needs zero new resume code."""
+        """An adopted session resumes through the existing resume path."""
         _write_transcript(temp_env)
         assert runner.invoke(main, ["session", "adopt", _UUID, "--name", "adopted"]).exit_code == 0
 

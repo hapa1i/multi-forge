@@ -1,11 +1,11 @@
-"""Slices 2 + 3 (proxy_log_hygiene): bounded per-chunk dumps + a compact lifecycle summary.
+"""Tests for bounded per-chunk dumps and a compact lifecycle summary.
 
-Slice 2: the per-chunk debug dumps at the SSE seam are bounded (``smart_format_str``) and
+Per-chunk debug dumps at the SSE seam are bounded with ``smart_format_str`` and
 guarded by ``logger.isEnabledFor(DEBUG)`` so no formatting cost is paid on the hot loop when
 DEBUG is off.
 
-Slice 3: the bare per-stream "conversion finished" INFO line is replaced by one compact
-lifecycle summary (chunk count + flags + outcome) -- DEBUG for a clean stream, INFO for an
+One compact lifecycle summary replaces the bare per-stream "conversion finished" line.
+It logs at DEBUG for a clean stream and INFO for an
 error or client disconnect. ``format_stream_lifecycle_summary`` is the shared renderer.
 """
 
@@ -75,9 +75,6 @@ _CLEAN_CHUNKS: list[dict[str, Any]] = [
 ]
 
 
-# --- Slice 3: the pure summary renderer -------------------------------------------------
-
-
 def test_summary_renders_clean_outcome() -> None:
     line = format_stream_lifecycle_summary(
         "rid",
@@ -131,9 +128,6 @@ def test_summary_never_contains_chunk_bodies() -> None:
     assert "Hello" not in line and "content" not in line
 
 
-# --- Slice 2: bounded + guarded per-chunk dumps -----------------------------------------
-
-
 def _spy_format(monkeypatch) -> dict[str, int]:
     calls = {"n": 0}
     real = converters.smart_format_str
@@ -184,9 +178,6 @@ async def test_huge_chunk_dump_is_truncated_when_opted_in(caplog) -> None:
     assert len(dumps[0]) < len(huge)
 
 
-# --- Slice 3: the emitted summary line --------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_clean_stream_logs_debug_summary(caplog) -> None:
     caplog.set_level(logging.DEBUG, logger=_LOGGER_NAME)
@@ -214,8 +205,7 @@ async def test_disconnect_logs_info_summary(caplog) -> None:
     assert "chunks=1" in infos[0].getMessage()
 
 
-# --- Claim-A regression: per-delta + malformed-chunk logs are content-free even at DEBUG ---
-#
+# Per-delta and malformed-chunk logs must remain content-free at DEBUG.
 # stream_chunks defaults off, yet the per-delta "Sent text delta" / tool-args logs and the
 # malformed-chunk WARNINGs must NOT emit completion/tool-arg text or dump the raw chunk body.
 # Full content is only available through the opt-in stream_chunks dump. These assert ABSENCE of
@@ -336,7 +326,7 @@ async def test_malformed_chunk_warning_dumps_keys_not_body(caplog) -> None:
     assert "payload" in warnings[0].getMessage()  # key names are safe to surface
 
 
-# --- O037/O038/O042: non-streaming converter diagnostics ------------------------------
+# Non-streaming converter diagnostics
 
 
 def _close_created_coroutine(coroutine: Any) -> None:

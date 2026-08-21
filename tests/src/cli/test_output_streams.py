@@ -1,7 +1,7 @@
 """Stream-ownership guard: read leaves keep ``--json`` on stdout with clean stderr.
 
-Slice 07 (forge_cli_cleanup): results and every ``--json`` payload go to stdout;
-diagnostics go to stderr. Click 8.3 removed ``CliRunner(mix_stderr=...)`` -- the
+Results and every ``--json`` payload go to stdout; diagnostics go to stderr.
+Click 8.3 removed ``CliRunner(mix_stderr=...)`` -- the
 plain runner already separates ``result.stdout`` / ``result.stderr``.
 
 Covers the leaves that previously split their streams (``proxy audit`` rendered
@@ -57,12 +57,7 @@ def test_json_payload_on_stdout_with_clean_stderr(args: list[str]) -> None:
 def test_shadows_review_bare_json_keeps_stdout_jq_safe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Bare ``memory shadows review --for X --json`` forwards ``as_json`` (no human/Tip leak).
-
-    Regression (forge_cli_cleanup review): the bare-review path ``ctx.invoke``d
-    ``shadows_show`` without ``as_json`` and then ``print_tip``ped to stdout, leaking
-    non-JSON under ``--json``. Now it forwards ``as_json`` and gates the tip.
-    """
+    """The bare review path forwards ``as_json`` and suppresses human tips."""
     monkeypatch.setattr("forge.cli.memory._collect_shadow_entries", lambda scope: ([], []))
     result = CliRunner().invoke(main, ["memory", "shadows", "review", "--for", "docs/x.md", "--json"])
     assert result.exit_code == 0, result.output
@@ -212,7 +207,7 @@ def _seed_audit_logs(monkeypatch: pytest.MonkeyPatch, records: list[dict]) -> No
 
 
 def test_audit_show_human_table_on_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The human audit table lands on stdout (Slice 07 flipped the shared console off stderr)."""
+    """The human audit table lands on stdout."""
     _seed_audit_logs(
         monkeypatch,
         [
@@ -256,12 +251,9 @@ def test_audit_diff_human_table_on_stdout(monkeypatch: pytest.MonkeyPatch) -> No
     assert result.stderr == ""
 
 
-# --- Failure paths: --json read leaves keep stdout clean, diagnostics on stderr -
-# The Slice 07 stream contract also governs *errors*: a `--json` read-leaf failure
-# must not emit non-JSON (Rich `Error:`/`Tip:`) on stdout, or a script piping stdout
-# into a JSON parser chokes on the diagnostic. The error goes to stderr (err_console),
-# stdout stays empty, exit is non-zero. Regression guard for the stdout-diagnostic
-# leak fixed in model.py / trace.py / session_memory.py.
+# JSON read-leaf failures keep stdout clean and diagnostics on stderr.
+# A `--json` read-leaf failure must not emit non-JSON diagnostics on stdout.
+# Send the diagnostic to stderr, keep stdout empty, and exit non-zero.
 
 
 def test_model_catalog_json_failure_keeps_stdout_clean(
@@ -343,7 +335,7 @@ def test_session_list_json_failure_keeps_stdout_clean() -> None:
     assert "--older-than must be >= 1" in result.stderr
 
 
-# --- Broader sweep: every --json command keeps stdout clean on a pre-flight error.
+# Every JSON command keeps stdout clean on a preflight error.
 # Each argv triggers a validation/lookup error that fires before the command's
 # `as_json` branch. The diagnostic must land on stderr; stdout must stay empty
 # so a script piping `--json` stdout into a parser never sees diagnostic text.

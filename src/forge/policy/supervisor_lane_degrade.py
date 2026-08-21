@@ -1,4 +1,4 @@
-"""Supervisor lane-degrade overlay (epic consumer_lanes T7).
+"""Supervisor lane-degrade overlay.
 
 When the supervisor's bound codex subscription lane exhausts mid-session, a sticky marker
 in ``confirmed.policy.policy_states`` records the degrade so subsequent checks route to the

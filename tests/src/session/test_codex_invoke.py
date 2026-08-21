@@ -1,4 +1,4 @@
-"""Tests for the interactive Codex TUI launcher (codex_frontend Phase 5)."""
+"""Tests for the interactive Codex TUI launcher."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ class TestEnvAndProcess:
         assert env["CODEX_API_KEY"] == "resolved-key"
 
 
-# --- proxy-backed bare launch (forge codex start --proxy) ------------------
+# Proxy-backed bare launch (`forge codex start --proxy`)
 
 _PROXY_BASE = "http://127.0.0.1:8084"
 _PROXY_BASE_ARGV = [

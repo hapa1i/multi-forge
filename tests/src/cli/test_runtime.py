@@ -1,4 +1,4 @@
-"""Tests for the `forge runtime` CLI (Phase 4e).
+"""Tests for the `forge runtime` CLI.
 
 Hermetic: PATH presence and the Claude version probe are stubbed so no real
 ``claude/codex --version`` subprocess runs.
@@ -45,7 +45,7 @@ def test_list_json_carries_capability_fields() -> None:
     codex = next(d for d in data if d["id"] == "codex")
     assert (
         codex["pretool_policy"] == "partial"
-    )  # Phase 1: deny + updatedInput confirmed; enrollment-gated + fails open -> not "full"
+    )  # Trust enrollment gates hooks, and malformed output fails open; this policy is partial rather than full.
     # Hooks are enrollment_gated (fire only once trust-enrolled); the floor stays
     # machine-readable but is not a firing guarantee.
     assert codex["native_hooks"] == "enrollment_gated"
@@ -60,8 +60,6 @@ def test_list_json_carries_capability_fields() -> None:
     assert claude["install_scopes"] == ["user", "project", "local"]
     assert claude["skill_scopes"] == ["user", "project", "local"]
 
-
-# ── forge runtime preflight (Phase 5a) ────────────────────────────
 
 _READY = CodexPreflight(
     installed=True,
@@ -149,7 +147,7 @@ class TestPreflightCmd:
         assert "scripts/experiments/codex-hooks/" in result.output
 
     def test_direct_preflight_writes_cache(self, monkeypatch) -> None:
-        """A direct (no --proxy) preflight persists the cache the supervisor's codex lane reads (T4)."""
+        """A direct preflight persists the cache that the supervisor's Codex lane reads."""
         from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
 
         monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)

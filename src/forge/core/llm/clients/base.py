@@ -110,6 +110,6 @@ def estimate_message_tokens(messages: list[dict[str, object]]) -> int:
             for part in content:
                 if isinstance(part, dict) and part.get("type") == "text":
                     total += estimate_tokens_simple(str(part.get("text", "")))
-        # Add overhead per message
+        # Account for per-message protocol overhead.
         total += 10
     return total

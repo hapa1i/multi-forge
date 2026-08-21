@@ -25,9 +25,8 @@ from forge.session.models import LaneRecord
 logger = logging.getLogger(__name__)
 
 
-# Consumer-lane identity (epic consumer_lanes, T0/T6b). Two non-default lanes: claude-max
-# (claude_code runtime, subscription posture) and codex (the T6b dispatch arm). backend_id is
-# load-bearing for billing only; model is nominal on the codex lane (codex picks its own model).
+# Non-default lanes are claude-max (claude_code runtime, subscription billing) and codex.
+# backend_id determines billing. The codex model is nominal because Codex selects its own model.
 SHADOW_CURATION_CONSUMER = Consumer(
     id="shadow_curation",
     capability_floor="tool_agent",
@@ -63,8 +62,8 @@ class CurationResult:
     success: bool
     report_path: Path | None
     stdout: str
-    # Actionable failure hint surfaced by the CLI (human + --json), e.g. a cold-codex-preflight
-    # refresh hint (T6b). stdout stays the human-only zero-schema fallback; error is the carrier.
+    # error carries actionable hints in human and JSON output.
+    # stdout is an unstructured fallback for human output.
     error: str | None = None
 
 
@@ -297,7 +296,7 @@ def run_shadow_curation(
 
     The caller (CLI) resolves routing via ``resolve_writer_base_url()`` and passes ``base_url`` +
     ``direct``. ``reasoning_effort`` is the ``claude --effort`` level for the curation ``claude -p``
-    run. ``lane_record`` is the consumer-lane binding (``read_bound_lane``, epic consumer_lanes T6b);
+    run. ``lane_record`` is the consumer-lane binding from ``read_bound_lane``;
     it is validated against ``SHADOW_CURATION_CONSUMER``'s declared candidates and its runtime selects
     the dispatch arm: ``"claude_code"`` runs ``claude -p``; ``"codex"`` runs ``codex exec`` via
     ``_dispatch_codex_shadow_curation`` (read-only, blind/inlined prompt, fail-loud on a cold
@@ -314,12 +313,9 @@ def run_shadow_curation(
         shadow_entries=shadow_entries,
     )
 
-    # Validate the bound lane against the consumer's declared candidates BEFORE selecting an arm
-    # (mirrors the supervisor's LaneRecord -> Lane -> resolve_lane guard, supervisor.py). A
-    # LaneRecord is Forge-owned durable state, so a stale/corrupt explicit binding -- a codex
-    # runtime paired with a non-codex backend, or an unknown runtime -- must fail loud as a no-call,
-    # never silently dispatch the wrong arm or degrade to claude. A None binding (no placement)
-    # resolves to the default claude lane with no error.
+    # Validate the bound lane against the consumer's declared candidates before selecting an arm.
+    # LaneRecord is durable state. An invalid explicit binding returns failure without dispatch;
+    # it never silently selects another runtime. None selects the default claude lane.
     try:
         override = None if lane_record is None else record_to_lane(lane_record)
         runtime_id = resolve_lane(SHADOW_CURATION_CONSUMER, override=override).runtime_id
@@ -336,9 +332,7 @@ def run_shadow_curation(
             ),
         )
 
-    # Runtime-keyed dispatch (epic consumer_lanes T6b): the codex arm is a self-contained early
-    # return that owns its own preflight gate, freeze timing, and (auto) emission, so the claude
-    # path below stays byte-identical to pre-T6b.
+    # The codex arm owns its preflight gate, freeze timing, and invoker emission.
     if runtime_id == "codex":
         return _dispatch_codex_shadow_curation(
             prompt=prompt,
@@ -353,8 +347,7 @@ def run_shadow_curation(
 
     tracking_urls = [base_url] if base_url else []
 
-    # Committed to a claude -p dispatch -- notify the caller so the consumer-lane freeze
-    # records only a lane that actually ran (epic consumer_lanes T6a).
+    # Notify the caller only after the run commits to a claude -p dispatch.
     if on_dispatch is not None:
         on_dispatch()
 
@@ -431,10 +424,10 @@ def _dispatch_codex_shadow_curation(
     timeout_seconds: int,
     on_dispatch: Callable[[], None] | None,
 ) -> CurationResult:
-    """Run shadow curation on the codex-exec lane (epic consumer_lanes T6b).
+    """Run shadow curation on the codex-exec lane.
 
     Mirrors ``_dispatch_codex_supervisor`` but maps codex failure into shadow-curation's
-    **fail-loud** degrade (D3), not the supervisor's fail-open: this is a user-invoked consumer,
+    **fail-loud** degrade, not the supervisor's fail-open: this is a user-invoked consumer,
     so a cold/stale/unready preflight or a failed codex turn returns ``success=False`` with a
     CLI-visible refresh hint -- it never silently falls back to claude.
 

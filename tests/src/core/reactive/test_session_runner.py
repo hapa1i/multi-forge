@@ -35,7 +35,7 @@ class TestSessionResult:
 
 
 class TestRunIdentitySurfacing:
-    """SessionResult carries the subprocess's run-tree identity (Phase 4a)."""
+    """SessionResult carries the subprocess run-tree identity."""
 
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_success_surfaces_run_id(self, mock_run):
@@ -73,14 +73,13 @@ class TestRunClaudeSession:
             stderr="",
             returncode=0,
         )
-        # output_format=None isolates base-flag construction from the Phase 5
-        # --output-format json default (which has its own tests below).
+        # output_format=None isolates base-flag construction from the JSON default tested below.
         result = run_claude_session("hello", output_format=None)
         assert result.success
         assert result.stdout == "response text"
         assert result.returncode == 0
 
-        # Verify command (no ANTHROPIC_API_KEY in test env → no --bare)
+        # The test environment has no ANTHROPIC_API_KEY, so the command must omit --bare.
         call_args = mock_run.call_args
         cmd = call_args[0][0]
         assert cmd == ["claude", "-p"]

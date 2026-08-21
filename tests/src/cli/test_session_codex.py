@@ -303,7 +303,7 @@ class TestStartCodexDispatch:
 
 
 class TestStartInteractiveDispatch:
-    """Bare and --resume-from-only starts route to the interactive launcher (Phase 5)."""
+    """Bare and --resume-from-only starts route to the interactive launcher."""
 
     def test_bare_start_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
         with (
@@ -393,7 +393,7 @@ class TestStartInteractiveDispatch:
         assert result.exit_code == 3
 
     def test_task_still_dispatches_headless(self, runner: CliRunner, project: Path) -> None:
-        """--task keeps the Phase 2 headless path; the interactive launcher is untouched."""
+        """--task keeps the headless path and does not call the interactive launcher."""
         with (
             patch("forge.cli.guards.require_repo_root"),
             patch("forge.cli.session_codex.launch_codex_session", return_value=0) as headless,

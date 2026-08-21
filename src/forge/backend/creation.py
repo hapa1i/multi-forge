@@ -31,10 +31,8 @@ def create_backend_config(
     backend_dir = get_forge_home() / "backends" / adapter_type
     backend_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine source config
     if source_config is None:
-        # Use convention-based path: defaults/backends/{adapter}.yaml
-        defaults_dir = get_defaults_dir()  # src/forge/config/defaults/
+        defaults_dir = get_defaults_dir()
         source_config = defaults_dir / "backends" / f"{adapter_type}.yaml"
 
     if not source_config.exists():
@@ -82,7 +80,7 @@ def is_backend_config_outdated(adapter_type: str) -> bool:
 
     default = get_defaults_dir() / "backends" / f"{adapter_type}.yaml"
     if not default.exists():
-        return False  # No default to compare against
+        return False
 
     installed_digest = hashlib.sha256(installed.read_bytes()).hexdigest()
     default_digest = hashlib.sha256(default.read_bytes()).hexdigest()

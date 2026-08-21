@@ -44,14 +44,12 @@ class TestPhase0IdentityFields:
         result = forge_workspace.exec("cd /workspace && forge session start identity-test")
         assert result.returncode == 0, f"Session start failed: {result.stderr}"
 
-        # Read the global session index and check identity fields
         index = forge_workspace.read_json("$HOME/.forge/sessions/index.json")
         entry = _entry_by_name(index, "identity-test")
 
         assert entry["forge_root"], "forge_root should be populated"
         assert entry["checkout_root"], "checkout_root should be populated"
         assert entry["relative_path"], "relative_path should be populated"
-        # For a session at repo root, forge_root == checkout_root and relative_path == "."
         assert entry["forge_root"] == entry["checkout_root"]
         assert entry["relative_path"] == "."
 
@@ -73,7 +71,6 @@ class TestPhase1IndexShapeValidation:
         """A pre-OSS v1 bare-key index should fail with reset instructions."""
         forge_workspace.exec("cd /workspace && forge extension enable --scope local --profile minimal")
 
-        # Ensure the index directory exists
         forge_workspace.mkdir("$HOME/.forge/sessions")
 
         # Write the old pre-OSS v1 shape manually. Public v1 keeps the same
@@ -94,7 +91,7 @@ class TestPhase1IndexShapeValidation:
         }
         forge_workspace.write_json("$HOME/.forge/sessions/index.json", v1_index)
 
-        # Also create the manifest so self-healing doesn't prune it
+        # Preserve the legacy entry long enough for shape validation to read it.
         forge_workspace.mkdir("/workspace/.forge/sessions/legacy-session")
         forge_workspace.write_file(
             "/workspace/.forge/sessions/legacy-session/forge.session.json",
@@ -111,7 +108,6 @@ class TestPhase1IndexShapeValidation:
             ),
         )
 
-        # Trigger a read by listing sessions
         result = forge_workspace.exec("cd /workspace && forge session list")
         assert result.returncode != 0
         combined = result.stdout + result.stderr
@@ -127,19 +123,14 @@ class TestPhase2NoCwdFallback:
         """Status line should not detect sessions via CWD when FORGE_SESSION is unset."""
         forge_workspace.exec("cd /workspace && forge extension enable --scope local --profile minimal")
 
-        # Create a session (creates .forge/sessions/ in CWD)
         forge_workspace.exec("cd /workspace && forge session start cwd-test")
 
-        # Run status line WITHOUT FORGE_SESSION set
-        # Feed it the minimal JSON that Claude Code sends
         result = forge_workspace.exec("""
             unset FORGE_SESSION
             cd /workspace && echo '{"cwd":"/workspace","session_id":"test-uuid"}' | forge status-line
         """)
         assert result.returncode == 0
 
-        # The session name should NOT appear in the status line output
-        # (no CWD fallback means no session detected)
         assert "cwd-test" not in result.stdout, (
             f"Status line should not show session without FORGE_SESSION env var. " f"Output: {result.stdout}"
         )
@@ -149,13 +140,11 @@ class TestPhase2NoCwdFallback:
         forge_workspace.exec("cd /workspace && forge extension enable --scope local --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start env-test")
 
-        # Run status line WITH FORGE_SESSION set
         result = forge_workspace.exec("""
             export FORGE_SESSION=env-test
             cd /workspace && echo '{"cwd":"/workspace","session_id":"test-uuid"}' | forge status-line
         """)
         assert result.returncode == 0
-        # Session name should appear in breadcrumb
         assert "env-test" in result.stdout, (
             f"Status line should show session when FORGE_SESSION is set. " f"Output: {result.stdout}"
         )
@@ -164,10 +153,8 @@ class TestPhase2NoCwdFallback:
         """Hook session resolution should return None without FORGE_SESSION (no CWD scan)."""
         forge_workspace.exec("cd /workspace && forge extension enable --scope local --profile minimal")
 
-        # Create a session and its manifest
         forge_workspace.exec("cd /workspace && forge session start hook-test")
 
-        # Run a python snippet that tests resolve_session_for_hook without env vars
         result = forge_workspace.exec("""
             unset FORGE_SESSION
             unset FORGE_FORK_NAME
@@ -233,7 +220,6 @@ class TestPhase7Rule1Enforcement:
 
     def test_enable_then_start_succeeds(self, forge_workspace: ContainerLike) -> None:
         """Full flow: enable creates .forge/, then session start succeeds."""
-        # Start from a completely clean repo (no .forge/, no .claude/)
         result = forge_workspace.exec("""
             cd /workspace
             forge extension enable --scope local --profile minimal
@@ -241,7 +227,6 @@ class TestPhase7Rule1Enforcement:
         """)
         assert result.returncode == 0, f"Enable+start failed: {result.stderr}"
 
-        # Verify .forge/ was created by enable and session landed there
         assert forge_workspace.file_exists("/workspace/.forge/sessions/rule1-test/forge.session.json")
 
     def test_start_fails_without_enable(self, forge_workspace: ContainerLike) -> None:
@@ -259,7 +244,6 @@ class TestPhase7Rule1Enforcement:
         result = forge_workspace.exec("cd /workspace && forge session start wt-rule1 --worktree --no-proxy --no-launch")
         assert result.returncode == 0, f"Worktree start failed: {result.stderr}\n{result.stdout}"
 
-        # Session manifest should live under the parent's .forge/, not the worktree's
         assert forge_workspace.file_exists("/workspace/.forge/sessions/wt-rule1/forge.session.json")
 
 
@@ -268,7 +252,6 @@ class TestPhase8ForkIntoRelativePath:
 
     def test_fork_into_worktree_project(self, forge_workspace: ContainerLike) -> None:
         """Fork --into a real git worktree with .forge/ lands correctly."""
-        # Create parent session
         forge_workspace.exec("cd /workspace && forge session start parent-fork --no-launch")
 
         # Create a real git worktree (--into requires an existing worktree, not a standalone repo)
@@ -277,26 +260,22 @@ class TestPhase8ForkIntoRelativePath:
             mkdir -p /tmp/target-wt/.forge
         """)
 
-        # Fork into the worktree
         result = forge_workspace.exec(
             "cd /workspace && forge session fork parent-fork --name child-fork --into /tmp/target-wt --no-launch"
         )
         assert result.returncode == 0, f"Fork --into failed: {result.stderr}\n{result.stdout}"
 
-        # Verify child index entry
         index_data = forge_workspace.read_json("$HOME/.forge/sessions/index.json")
         child = _entry_by_name(index_data, "child-fork")
         assert child["forge_root"] == "/tmp/target-wt"
         assert child["relative_path"] == "."
 
-        # Verify manifest exists at target forge_root
         assert forge_workspace.file_exists("/tmp/target-wt/.forge/sessions/child-fork/forge.session.json")
 
     def test_fork_into_missing_forge_fails(self, forge_workspace: ContainerLike) -> None:
         """Fork --into fails with clear error when target worktree has no .forge/."""
         forge_workspace.exec("cd /workspace && forge session start parent-nf --no-launch")
 
-        # Create a real worktree without .forge/
         forge_workspace.exec("cd /workspace && git worktree add /tmp/bare-wt -b bare-target")
 
         result = forge_workspace.exec(

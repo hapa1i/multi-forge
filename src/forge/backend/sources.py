@@ -443,9 +443,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
     ),
     # ChatGPT subscription reached through the codex runtime. Endpoint and auth are
     # owned by codex (codex login --device-auth -> chatgpt_tokens), so there is no
-    # Forge URL and no Forge credential. Billing is the subscription's quota;
-    # reachable only via codex (the runtime that holds the login). First
-    # runtime_native source (epic consumer_lanes, T2).
+    # Forge URL and no Forge credential. Billing is the subscription's quota.
+    # Only codex can reach this source because that runtime holds the login.
     ModelSource(
         id="chatgpt",
         kind="remote",
@@ -457,9 +456,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
     ),
     # Claude Max/Pro subscription reached through the claude_code runtime. Endpoint
     # and auth are owned by claude -p (keychain OAuth login), so there is no Forge
-    # URL and no Forge credential. Billing is the subscription's quota; reachable
-    # only via claude_code (the runtime that holds the login). The claude_code
-    # analog of chatgpt (epic consumer_lanes, T0).
+    # URL and no Forge credential. Billing is the subscription's quota.
+    # Only claude_code can reach this source because that runtime holds the login.
     ModelSource(
         id="claude-max",
         kind="remote",

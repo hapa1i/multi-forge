@@ -369,9 +369,6 @@ class TestLoadConfig:
         assert config.proxy.openrouter.tiers.sonnet != ""
         assert config.proxy.litellm.tiers.sonnet == ""
 
-    # NOTE: User config file support removed
-    # Proxies own full config; no ~/.claude/forge.config.yaml
-
 
 class TestTemplateFamilyMetadata:
     """Every shipped template must declare a model family."""
@@ -653,11 +650,9 @@ class TestProxyFileIO:
             created_at="2025-01-04T12:00:00Z",
         )
 
-        # Write
         path = write_proxy_instance_config("my-proxy", original)
         assert path.exists()
 
-        # Load
         loaded = load_proxy_instance_config("my-proxy")
         assert loaded is not None
         assert loaded.proxy_format == 1
@@ -981,10 +976,8 @@ class TestProxyFileIO:
 
         path = write_proxy_instance_config("test-proxy", config)
 
-        # Check file exists
         assert path.exists()
 
-        # Check permissions (0600 = owner read/write only)
         mode = path.stat().st_mode & 0o777
         assert mode == 0o600
 
@@ -1013,7 +1006,6 @@ class TestLoadConfigWithProxy:
 
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Create proxy.yaml
         proxy_config = ProxyInstanceConfig(
             proxy_format=1,
             template="test-template",
@@ -1031,10 +1023,8 @@ class TestLoadConfigWithProxy:
         )
         write_proxy_instance_config("my-proxy", proxy_config)
 
-        # Load with proxy_id
         config = load_config(proxy_id="my-proxy")
 
-        # Should use proxy config values
         assert config.proxy.default_port == 9999
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_tier == "opus"
@@ -1078,7 +1068,6 @@ class TestLoadConfigWithProxy:
 
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Load with non-existent proxy_id - should raise ValueError
         with pytest.raises(ValueError, match="Proxy not found"):
             load_config(proxy_id="nonexistent")
 

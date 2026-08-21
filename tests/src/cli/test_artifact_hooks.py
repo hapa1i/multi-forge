@@ -471,7 +471,7 @@ class TestStopHook:
 
 
 class TestAdoptionProvenanceSurvivesHooks:
-    """`confirmed.adoption` outlives hook-written facts (native_session_adoption Slice 1).
+    """`confirmed.adoption` outlives hook-written facts.
 
     Adoption binds a manifest to a pre-existing native conversation. Both assertions
     here protect that binding against the hooks that run afterwards.

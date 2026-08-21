@@ -50,11 +50,9 @@ def detect_provider(model: str) -> ProviderType:
     """
     clean_name = model.lower()
 
-    # Check for remote LiteLLM prefixes
     if any(clean_name.startswith(prefix) for prefix in LITELLM_REMOTE_PREFIXES):
         return "litellm_remote"
 
-    # Check for local LiteLLM prefixes
     if any(clean_name.startswith(prefix) for prefix in LITELLM_LOCAL_PREFIXES):
         return "litellm_local"
 

@@ -44,9 +44,7 @@ from forge.session.models import create_session_state
 from forge.session.store import SessionStore
 from tests.fixtures.session_state import publish_session
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 
 def _forge_home() -> Path:
@@ -150,9 +148,7 @@ def _claim_project_package(project: Path, package: Path, *, runtime: str = "code
     )
 
 
-# ---------------------------------------------------------------------------
 # _resolve_tracked_roots
-# ---------------------------------------------------------------------------
 
 
 class TestResolveTrackedRoots:
@@ -183,9 +179,7 @@ class TestResolveTrackedRoots:
         assert fr2 in roots
 
 
-# ---------------------------------------------------------------------------
 # _detect_orphan_session_dirs
-# ---------------------------------------------------------------------------
 
 
 class TestDetectOrphanSessionDirs:
@@ -240,7 +234,7 @@ class TestDetectOrphanSessionDirs:
         assert str(orphan_dir) in result.items[0]
 
     def test_codex_handoff_files_in_indexed_session_not_flagged(self, tmp_path: Path) -> None:
-        """Phase 4 staged-handoff files live INSIDE the session dir, so an indexed
+        """Staged-handoff files live inside the session directory, so an indexed
         session carrying codex/pending-context.md + context-receipt.json is never an
         orphan, and session deletion removes them with the dir."""
         from forge.session import SessionStore
@@ -264,9 +258,7 @@ class TestDetectOrphanSessionDirs:
         assert not receipt_path(session_dir).exists()
 
 
-# ---------------------------------------------------------------------------
 # _detect_orphan_transfer_files
-# ---------------------------------------------------------------------------
 
 
 class TestDetectOrphanHandoffFiles:
@@ -391,9 +383,7 @@ class TestDetectOrphanHandoffFiles:
         assert result.count == 0
 
 
-# ---------------------------------------------------------------------------
-# Codex-session transfer pinning (codex_frontend Phase 2)
-# ---------------------------------------------------------------------------
+# Codex-session transfer pinning
 
 
 def _seed_codex_child_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
@@ -423,17 +413,14 @@ def _seed_codex_child_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     real_child.write_text("# Codex transfer context")
     notes = children / "impl.notes.md"
     notes.write_text("# User notes")
-    # Pre-Phase-2 manual bridge runs keyed snapshots by synthetic per-run child
-    # names; no derivation references them, so they are plain orphans.
+    # Legacy manual bridge runs used synthetic child names. No derivation references them, so they are orphans.
     synthetic = children / "planner-codex-abc123.md"
     synthetic.write_text("# Synthetic child")
     return fr, real_child, notes, synthetic
 
 
 class TestCodexTransferPinning:
-    """The Phase 2 start op keys snapshots by real session name; GC must keep
-    those (and their notes overlays) while still sweeping the synthetic
-    per-run children the manual bridge used to leak."""
+    """GC keeps session-keyed snapshots and notes while sweeping synthetic bridge leftovers."""
 
     def test_synthetic_child_flagged_real_child_and_notes_survive(self, tmp_path: Path) -> None:
         fr, _real_child, _notes, synthetic = _seed_codex_child_files(tmp_path)
@@ -455,9 +442,7 @@ class TestCodexTransferPinning:
         assert notes.is_file()
 
 
-# ---------------------------------------------------------------------------
 # _detect_stale_active_entries
-# ---------------------------------------------------------------------------
 
 
 class TestDetectStaleActiveEntries:
@@ -483,9 +468,7 @@ class TestDetectStaleActiveEntries:
         assert any(item.startswith("dead-session::") for item in result.items)
 
 
-# ---------------------------------------------------------------------------
 # _detect_stale_work_queue
-# ---------------------------------------------------------------------------
 
 
 class TestDetectStaleWorkQueue:
@@ -571,9 +554,7 @@ class TestDetectStaleWorkQueue:
         assert _detect_stale_work_queue(worktree_ref_set, {tmp_path}).count == 0
 
 
-# ---------------------------------------------------------------------------
 # _path_in_roots
-# ---------------------------------------------------------------------------
 
 
 class TestPathInRoots:
@@ -590,13 +571,11 @@ class TestPathInRoots:
         assert _path_in_roots(other, {tmp_path}) is False
 
     def test_empty_roots_matches_nothing(self, tmp_path: Path) -> None:
-        """Empty root set returns False to prevent scope widening (P1 fix)."""
+        """An empty root set returns False to prevent scope widening."""
         assert _path_in_roots(tmp_path, set()) is False
 
 
-# ---------------------------------------------------------------------------
 # collect_clean_report
-# ---------------------------------------------------------------------------
 
 
 class TestCollectCleanReport:
@@ -684,9 +663,7 @@ class TestCollectCleanReport:
         assert session_cat.items == [str(orphan)]
 
 
-# ---------------------------------------------------------------------------
 # run_clean
-# ---------------------------------------------------------------------------
 
 
 class TestRunClean:
@@ -1371,9 +1348,7 @@ class TestRunClean:
         assert result.skipped_project_compatibility[0].forge_root == str(forge_root.resolve())
 
 
-# ---------------------------------------------------------------------------
-# Edge case tests (P1-P3 fixes)
-# ---------------------------------------------------------------------------
+# Edge cases
 
 
 class TestEmptyRootRepoScope:
@@ -1538,9 +1513,7 @@ class TestCrossRootNameReuse:
         assert result.count == 1
 
 
-# ---------------------------------------------------------------------------
 # Helpers for CLI tests
-# ---------------------------------------------------------------------------
 
 
 class TestDetectDeadInstallations:
@@ -1618,9 +1591,7 @@ class TestDetectDeadInstallations:
         assert len([i for _k, i in manifest.installations.items() if i.project_path == "/nonexistent/dead"]) == 0
 
 
-# ---------------------------------------------------------------------------
 # Helpers for CLI tests
-# ---------------------------------------------------------------------------
 
 
 def _make_report_with_orphans(total: int) -> CleanReport:
@@ -1639,9 +1610,7 @@ def _make_report_with_orphans(total: int) -> CleanReport:
     return CleanReport(categories=cats, scope="workspace")
 
 
-# ---------------------------------------------------------------------------
 # Corrupt-state detection (forge clean removes corrupt Forge state)
-# ---------------------------------------------------------------------------
 
 
 def _category(report: CleanReport, name: str) -> OrphanCategory:

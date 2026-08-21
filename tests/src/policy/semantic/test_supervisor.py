@@ -7,7 +7,7 @@ Tests cover:
 - applies_to() filtering
 - Engine integration (supervisor + deterministic composition)
 - Hook warning output
-- Policy state generalization round-trip (M25)
+- Policy state generalization round-trip
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import LaneRecord, SupervisorConfig, create_session_state
 from tests.fixtures.codex_result import codex_result
 
-# --- Fixtures ---
+# Fixtures
 
 
 def _make_context(tool_name: str = "Write", target_path: str = "src/main.py") -> ActionContext:
@@ -105,7 +105,7 @@ def _deny_decision(msg: str = "Divergent from plan") -> PolicyDecision:
     )
 
 
-# --- applies_to() Tests ---
+# applies_to
 
 
 class TestSupervisorAppliesTo:
@@ -153,7 +153,7 @@ def test_edit_prompt_content_is_bounded_and_preserves_both_fragments() -> None:
     assert "new-start" in content
 
 
-# --- _evaluate() and Caching Tests ---
+# Evaluation and caching
 
 
 class TestSupervisorEvaluate:
@@ -247,7 +247,7 @@ class TestSupervisorEvaluate:
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_warn_outcome_not_cached(self, mock_invoke: MagicMock) -> None:
-        """Warn outcomes should NOT be cached (M26 fix)."""
+        """Warn outcomes are not cached."""
         mock_invoke.return_value = _warn_decision()
         policy = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
 
@@ -261,7 +261,7 @@ class TestSupervisorEvaluate:
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_allow_with_warnings_not_cached(self, mock_invoke: MagicMock) -> None:
-        """Allow-with-warnings (e.g., timeout) should NOT be cached (M26 fix)."""
+        """Allow-with-warnings outcomes, such as timeouts, are not cached."""
         mock_invoke.return_value = PolicyDecision(
             decision="allow",
             policy_id="semantic.supervisor",
@@ -276,7 +276,7 @@ class TestSupervisorEvaluate:
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_deny_not_cached(self, mock_invoke: MagicMock) -> None:
-        """Denials should NOT be cached (allows re-evaluation after fix)."""
+        """Denials are not cached so the next check can re-evaluate them."""
         mock_invoke.return_value = _deny_decision()
         policy = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
 
@@ -296,7 +296,7 @@ class TestSupervisorEvaluate:
         assert mock_invoke.call_count == 2
 
 
-# --- State Persistence Tests ---
+# State persistence
 
 
 class TestSupervisorState:
@@ -352,7 +352,7 @@ class TestSupervisorState:
         assert result["verdict"] == "aligned"
 
 
-# --- FORGE_DEPTH Guard Tests ---
+# FORGE_DEPTH guard
 
 
 class TestSupervisorDepthGuard:
@@ -392,7 +392,7 @@ class TestSupervisorDepthGuard:
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_stamps_provider_trace_identity_env(self, mock_run: MagicMock) -> None:
-        """Phase 1: the fork spawn is tagged with the session name + supervisor role."""
+        """The fork spawn carries the session name and supervisor role."""
         from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
         from forge.core.reactive.session_runner import SessionResult
         from forge.policy.semantic.supervisor import invoke_supervisor
@@ -773,16 +773,13 @@ class TestSupervisorResumeTargetResolution:
         assert result.decision.telemetry_run_id == "run_parse_fail"
 
 
-# --- Lane Dispatch Tests (T3) ---
+# Lane dispatch
 
 
 class TestSupervisorLaneDispatch:
-    """T3: the supervisor is a Consumer whose lane is resolved then dispatched.
+    """The supervisor resolves and dispatches through its Consumer lane.
 
-    The default lane is ``claude_code`` and the run stays byte-identical -- the
-    existing ``TestSupervisorResumeTargetResolution`` cases now exercise the seam
-    end-to-end. These add the lane-binding, single-emission, and stubbed-arm
-    contracts specific to T3.
+    These tests cover lane binding, single emission, and the stubbed runtime arms.
     """
 
     def test_supervisor_consumer_resolves_to_claude_lane(self) -> None:
@@ -795,19 +792,18 @@ class TestSupervisorLaneDispatch:
         )
 
     def test_supervisor_consumer_allows_codex_override(self) -> None:
-        """T4: the codex-exec lane is a declared candidate, so an override resolves (not LaneError)."""
+        """A declared Codex lane resolves as an override instead of raising LaneError."""
         from forge.core.lanes import Lane, resolve_lane
         from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
 
         codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
         assert codex_lane in SUPERVISOR_CONSUMER.allowed_lanes
         assert resolve_lane(SUPERVISOR_CONSUMER, override=codex_lane) == codex_lane
-        # Default (no override) stays claude_code -- byte-identical to T3.
+        # Without an override, the default remains Claude Code.
         assert resolve_lane(SUPERVISOR_CONSUMER).runtime_id == "claude_code"
 
     def test_supervisor_lane_runtimes_derive_from_consumer(self) -> None:
-        """T1b: the --supervisor-runtime/--runtime CLI choices come from the consumer's declared
-        lanes (default first), so there is no separate runtime allow-list to drift."""
+        """CLI runtime choices come from the consumer's declared lanes, with the default first."""
         from forge.policy.semantic.supervisor import (
             SUPERVISOR_CONSUMER,
             supervisor_lane_runtimes,
@@ -856,7 +852,7 @@ class TestSupervisorLaneDispatch:
     def test_codex_arm_dispatches_through_invoker(
         self, mock_read: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
     ) -> None:
-        """T4 codex arm: reads the cached preflight (no doctor in the hook), builds a read-only request, runs invoker."""
+        """The Codex arm reads cached preflight state and invokes a read-only request."""
         from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
             _dispatch_supervisor,
@@ -878,7 +874,7 @@ class TestSupervisorLaneDispatch:
             usage_command="supervisor",
         )
 
-        # Cached read, NOT a live doctor probe (the whole point of the T4 review fix).
+        # Supervisor dispatch reads cached readiness and does not run a live doctor probe.
         mock_read.assert_called_once_with()
         mock_invoker_cls.return_value.run.assert_called_once()
         # Read-only sandbox + no model pin (codex picks its own); plan-bearing prompt passed through.
@@ -887,7 +883,7 @@ class TestSupervisorLaneDispatch:
         assert mock_prepare.call_args.kwargs["prompt"] == "check this"
         # The ACTION repo (context.repo_root), not the planner's source_cwd.
         assert mock_prepare.call_args.kwargs["cwd"] == "/workspace"
-        # T5/WS1: operation=None suppresses the invoker's upstream-outcome row, so this arm's
+        # operation=None suppresses the invoker's upstream-outcome row, so this arm's
         # only upstream row is the engine's policy.evaluate (no double-count). The suppression
         # itself is proven in tests/src/core/invoker/test_codex_invoker.py.
         assert mock_prepare.call_args.kwargs["attribution"].operation is None
@@ -1016,7 +1012,7 @@ class TestSupervisorLaneDispatch:
 
         Critically NOT a bare LaneError: run_supervisor_check's dispatch except catches only
         _SupervisorRoutingError, so a LaneError here would escape uncaught -> engine policy_error
-        -> DENY under fail_mode='closed' (M2 regression guard).
+        -> DENY under fail_mode='closed'.
         """
         from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
@@ -1038,13 +1034,12 @@ class TestSupervisorLaneDispatch:
         assert exc.value.failure_type == "configuration_error"
 
 
-# --- Codex Supervisor Lane Tests (T4) ---
+# Codex supervisor lane
 
 _CODEX_UUID = "12345678-1234-1234-1234-123456789abc"
 
 
-# The codex lane as a consumer-lane binding (T1b): dispatch now reads the injected lane_record,
-# not a config field, so the codex tests pass this instead of SupervisorConfig.supervisor_runtime.
+# Dispatch reads the injected consumer-lane record instead of SupervisorConfig.supervisor_runtime.
 _CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")
 
 
@@ -1052,7 +1047,7 @@ def _codex_config(**overrides: Any) -> SupervisorConfig:
     """A supervisor config for codex-lane dispatch tests (resume_id present, raw-UUID path).
 
     The codex lane itself is injected via ``lane_record=_CODEX_LANE_RECORD`` at the call site
-    (T1b); it is no longer stored on the config.
+    because it is no longer stored on the config.
     """
     base: dict[str, Any] = {"resume_id": _CODEX_UUID, "direct": True}
     base.update(overrides)
@@ -1060,7 +1055,7 @@ def _codex_config(**overrides: Any) -> SupervisorConfig:
 
 
 class TestInjectedLaneBinding:
-    """T1b: the supervisor lane is an injected consumer-lane binding, not a config field."""
+    """The supervisor lane is an injected consumer-lane binding, not a config field."""
 
     @patch("forge.core.usage.emit_usage_for_session_result")
     @patch("forge.policy.semantic.supervisor.run_claude_session")
@@ -1154,9 +1149,7 @@ class TestInjectedLaneBinding:
     @patch("forge.core.usage.emit_usage_for_session_result")
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_degraded_default_lane_still_enforces_a_deny(self, mock_claude: MagicMock, _mock_emit: MagicMock) -> None:
-        """T7 'degraded supervisor enforces': lane_record=None (the degraded route) dispatches the
-        default claude lane and produces a REAL verdict -- a high-confidence cited divergence still
-        DENIES, not a fail-open. Degrade restores enforcement on claude; it is not a silent skip."""
+        """A degraded route dispatches the default Claude lane and still enforces its verdict."""
         from forge.core.reactive.session_runner import SessionResult
         from forge.policy.semantic.supervisor import run_supervisor_check
 
@@ -1172,7 +1165,7 @@ class TestInjectedLaneBinding:
 
 
 class TestCodexSupervisorLane:
-    """T4: run_supervisor_check end-to-end on the codex lane override.
+    """Run ``run_supervisor_check`` end to end with the Codex lane override.
 
     Every non-claude failure (bad lane, unready preflight, plan-absent, in-stream
     runtime error) must fail OPEN -- the supervisor's contract (design_workflows 1.2).
@@ -1267,7 +1260,7 @@ class TestCodexSupervisorLane:
 
     @patch("forge.policy.semantic.supervisor.resolve_lane")
     def test_no_adapter_lane_fails_open_not_uncaught(self, mock_resolve: MagicMock) -> None:
-        """A resolved lane with no dispatch adapter fails open, never escapes uncaught (M2 regression).
+        """A resolved lane without a dispatch adapter fails open instead of escaping uncaught.
 
         Drives the no-adapter branch through the real dispatch try/except: it must catch the
         _SupervisorRoutingError(configuration_error) the arm raises, NOT let a bare LaneError escape
@@ -1332,12 +1325,11 @@ class TestCodexSupervisorLane:
         mock_invoker_cls: MagicMock,
         mock_plan: MagicMock,
     ) -> None:
-        """T7: a codex turn that fails on the subscription quota wall classifies as
-        ``subscription_exhausted`` (not the generic ``exit_N``/``subprocess_error``), still
-        fail-open -- the handoff Phase 2 consumes to degrade the spent lane. Models the
-        REALISTIC shape: a failed turn exits **non-zero**, so the fold in
-        ``_headless_to_session_result`` does NOT fire (``error`` stays None) and the provider
-        reason rides ``stderr`` -- the classifier must read ``error or stderr``."""
+        """A Codex quota failure maps to ``subscription_exhausted`` and still fails open.
+
+        Failed turns exit non-zero with the provider reason on ``stderr`` while ``error``
+        stays None. The classifier must inspect both fields.
+        """
         from forge.policy.semantic.supervisor import run_supervisor_check
 
         mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
@@ -1509,7 +1501,7 @@ class TestCodexSupervisorLane:
         assert failed_blank.error
 
 
-# --- Engine Integration Tests ---
+# Engine integration
 
 
 class TestSupervisorEngineIntegration:
@@ -1560,7 +1552,7 @@ class TestSupervisorEngineIntegration:
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_empty_bundles_supervisor_only(self, mock_invoke: MagicMock) -> None:
-        """Supervisor should run even with empty bundles (gating fix verification)."""
+        """The supervisor runs even when the bundle list is empty."""
         mock_invoke.return_value = _allow_decision()
         engine = build_engine([], fail_mode="open")
         engine.register(SemanticSupervisorPolicy(config=_make_config()))
@@ -1582,11 +1574,11 @@ class TestSupervisorEngineIntegration:
         assert "cache" in collected["semantic.supervisor"]
 
 
-# --- Verdict Integration Tests (L13 fix verification) ---
+# Verdict integration
 
 
 class TestFailOpenWithWarning:
-    """Verify that empty/unparseable responses produce warn, not silent allow (L13 fix)."""
+    """Empty or unparseable responses produce warn rather than silent allow."""
 
     def test_empty_response_produces_warn(self) -> None:
         """Empty supervisor response should map to warn decision."""
@@ -1609,7 +1601,7 @@ class TestFailOpenWithWarning:
         assert len(decision.warnings) > 0
 
 
-# --- Policy State Generalization (M25) ---
+# Policy-state generalization
 
 
 class TestPolicyStateGeneralization:
@@ -1687,7 +1679,7 @@ class TestPolicyStateGeneralization:
         assert "k1" in updated["policy_states"]["semantic.supervisor"]["cache"]
 
 
-# --- Setup Helper Tests ---
+# Setup helpers
 
 
 class TestValidateSupervisorTarget:
@@ -2011,7 +2003,7 @@ class TestShouldSupervisorUseDirect:
         assert should_supervisor_use_direct(state) is False
 
 
-# --- Suspended supervisor tests (applies_to + _evaluate guard) ---
+# Suspended-supervisor guards
 
 
 class TestSupervisorSuspended:
@@ -2043,7 +2035,7 @@ class TestSupervisorSuspended:
         mock_invoke.assert_not_called()
 
 
-# --- Plan override tests ---
+# Plan overrides
 
 
 class TestLoadPlanOverride:
@@ -2186,7 +2178,7 @@ class TestPlanOverrideCache:
         assert mock_invoke.call_count == 2
 
 
-# --- Reasoning effort (launch controls) ---
+# Reasoning effort
 
 
 class TestSupervisorEffort:

@@ -293,8 +293,6 @@ def enhance_tool_description(tool_name: str, original_description: str, schema: 
         enhanced_description += example
         logger.debug("Enhanced MultiEdit tool description with usage example")
 
-    # Add more tool examples as needed based on failure patterns in logs
-
     return enhanced_description
 
 
@@ -496,8 +494,7 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
             if openai_message.get("content") is not None or openai_message.get("tool_calls"):
                 openai_messages.append(openai_message)
             elif msg.role == "assistant" and not openai_message.get("content") and not openai_message.get("tool_calls"):
-                # Handle case where assistant message might be empty (e.g., after tool call)
-                # OpenAI format expects content: null or content: ""
+                # OpenAI requires a content field even when the assistant message is empty.
                 openai_message["content"] = ""
                 openai_messages.append(openai_message)
 
@@ -645,10 +642,10 @@ def convert_openai_to_anthropic(
     Returns:
         Optional[MessagesResponse]: Response in Anthropic format, or None if conversion fails
     """
-    request_id = response_chunk.get("request_id", "unknown")  # Get request ID if passed through
+    request_id = response_chunk.get("request_id", "unknown")
     logger.info(f"[{request_id}] Converting adapted OpenAI response to Anthropic MessagesResponse format.")
     try:
-        # Ensure input is a dictionary
+        # Normalize SDK response objects to a mapping.
         resp_dict = {}
         if isinstance(response_chunk, dict):
             resp_dict = response_chunk
@@ -768,7 +765,6 @@ def convert_openai_to_anthropic(
                             unknown_keys,
                         )
 
-        # Ensure there's always at least one content block (even if empty text)
         # Anthropic requires content to be a non-empty list.
         if not anthropic_content:
             logger.warning(f"[{request_id}] No content generated, adding empty text block.")
@@ -987,7 +983,7 @@ async def convert_openai_to_anthropic_sse(
                 completion_tokens = chunk_usage.get("completion_tokens", 0)
 
                 if prompt_tokens > 0 and final_usage["input_tokens"] == 0:
-                    # First time seeing input_tokens - send immediately
+                    # Emit input tokens once, when the stream first reports them.
                     final_usage["input_tokens"] = prompt_tokens
                     usage_update_event = {
                         "type": "message_delta",

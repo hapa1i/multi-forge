@@ -73,8 +73,7 @@ repos:
   rev: 1.0.0
   hooks:
     - id: mdformat
-      # Plugins pinned: unpinned deps let CI float to newer versions that re-wrap
-      # lines differently than a stale local cache, breaking pre-commit only in CI.
+      # Pin plugins so local and CI caches use the same line-wrapping behavior.
       additional_dependencies:
         - mdformat-gfm==1.0.0            # GitHub-Flavored Markdown support - see https://github.github.com/gfm
         - mdformat-gfm-alerts==2.0.0     # GitHub admonitions ([!WARNING], [!NOTE], etc.)

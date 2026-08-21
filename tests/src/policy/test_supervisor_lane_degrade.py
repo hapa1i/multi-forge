@@ -1,4 +1,4 @@
-"""Unit tests for the supervisor lane-degrade overlay (epic consumer_lanes T7)."""
+"""Unit tests for the supervisor lane-degrade overlay."""
 
 from __future__ import annotations
 

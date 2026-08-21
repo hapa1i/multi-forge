@@ -1,15 +1,8 @@
-"""Integration: sidecar honors interactive_anthropic_api_key=omit (Phase 4 / G4).
+"""Verify that a sidecar can withhold upstream credentials from Claude.
 
-Spawns the REAL sidecar image + entrypoint with ``FORGE_OMIT_INTERACTIVE_KEY=1`` and a
-``claude`` sleeper. The entrypoint starts the in-container proxy *before* configuring
-Claude auth, then unsets ``ANTHROPIC_API_KEY`` for the Claude process only. We assert the
-end-to-end property the slice promises by reading ``/proc/<pid>/environ`` inside the live
-container:
-
-- Claude (PID 1 after ``exec claude``) has NO ``ANTHROPIC_API_KEY`` — it routes through the
-  local proxy without a real key (its apiKeyHelper returns the dummy passthrough).
-- The proxy process kept ``ANTHROPIC_API_KEY`` — it captured the upstream credential before
-  the unset, so upstream auth survives for every template (including anthropic-upstream).
+The entrypoint starts the proxy before it removes ``ANTHROPIC_API_KEY`` from the
+Claude process. The test reads each process environment to confirm that Claude
+has no key and the proxy retains its upstream credential.
 """
 
 from __future__ import annotations
@@ -48,7 +41,7 @@ def _claude_path(image: str) -> str:
     return path
 
 
-# Reads /proc inside the container: which processes still carry ANTHROPIC_API_KEY.
+# Report which container processes retain ANTHROPIC_API_KEY.
 _PROC_PROBE = (
     "import glob\n"
     "def has(pid):\n"
@@ -98,9 +91,7 @@ def test_sidecar_omit_withholds_key_from_claude_but_proxy_keeps_it(sidecar_image
         started = _docker(*run_cmd)
         assert started.returncode == 0, f"docker run failed: {started.stderr}"
 
-        # Wait until the sleeper is PID 1: that means the entrypoint started the proxy,
-        # passed its health check, unset the key, and `exec claude`'d -- the whole flow,
-        # including the omit unset. Polling this avoids racing the entrypoint's output.
+        # PID 1 becomes the sleeper only after the proxy is healthy and the key is removed.
         ready = False
         for _ in range(60):
             cmd = _docker("exec", CONTAINER, "cat", "/proc/1/cmdline")

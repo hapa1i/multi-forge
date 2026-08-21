@@ -899,7 +899,7 @@ class TestProxyInstanceConfigValidation:
 
 
 class TestInterceptAuditConfig:
-    """Tests for Phase 2 intercept/audit/wire_shape config on ProxyInstanceConfig."""
+    """Tests for intercept, audit, and wire_shape fields on ProxyInstanceConfig."""
 
     @staticmethod
     def _make(**overrides):
@@ -973,7 +973,7 @@ class TestInterceptAuditConfig:
         with pytest.raises(ValueError, match="audit.retention_days"):
             self._make(audit={"retention_days": -1})
 
-    # --- provider_trace plane retention + provider-user grouping opt-in ---
+    # Provider-trace retention and provider-user grouping
 
     def test_provider_trace_defaults_are_inert(self):
         from forge.config.schema import ProviderTraceConfig

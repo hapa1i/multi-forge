@@ -1,4 +1,4 @@
-"""Tests for direct-path request correlation primitives (Phase 4c).
+"""Tests for direct-path request-correlation primitives.
 
 ``with_forge_request_id`` forwards an ``X-Request-ID`` without clobbering or
 mutating the caller's hyperparameters; ``target_is_forge_proxy`` only returns

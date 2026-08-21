@@ -37,7 +37,7 @@ def _state_script(request: pytest.FixtureRequest) -> None:
     pc = _load_state_script(request.param)
 
 
-# --- Fixtures ---
+# Fixtures
 
 MINIMAL_CHECKLIST = """\
 # Test Checklist
@@ -373,7 +373,7 @@ def initialized_state(checklist_path, state_path, parsed):
     return state_path
 
 
-# --- Parser tests ---
+# Parser tests
 
 
 class TestParseChecklist:
@@ -447,7 +447,7 @@ class TestParseChecklist:
         assert "Do something in your terminal:" in sub["instructions"]
 
     def test_instructions_after_code(self, parsed):
-        """Prose after code blocks is captured (P1 fix)."""
+        """Prose after code blocks is captured."""
         sub = parsed["_all_subs"][1]  # 0.2
         assert "Extra instructions after the code block." in sub["instructions"]
 
@@ -515,7 +515,7 @@ class TestAnnotationSelection:
         assert sub["annotation"] == "human:confirm"
 
 
-# --- Read-only command tests ---
+# Read-only command tests
 
 
 class TestCmdIndex:
@@ -560,7 +560,7 @@ class TestCmdSummary:
         assert result["sections"][0]["expected"] == 3
 
 
-# --- State command tests ---
+# State command tests
 
 
 class TestCmdInit:
@@ -885,7 +885,7 @@ class TestCmdReport:
         assert result["warnings"]["changed_steps"][0]["id"] == "0.1"
 
 
-# --- Hash utility test ---
+# Hash utility test
 
 
 class TestStepHash:

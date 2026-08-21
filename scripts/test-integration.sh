@@ -9,13 +9,11 @@
 
 set -euo pipefail
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Helper functions
 error() {
     echo -e "${RED}ERROR: $*${NC}" >&2
 }
@@ -28,7 +26,6 @@ warn() {
     echo -e "${YELLOW}WARN: $*${NC}"
 }
 
-# Find repo root (directory containing pyproject.toml)
 find_repo_root() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
@@ -51,7 +48,6 @@ if [[ -f ".env" ]]; then
     source .env
 fi
 
-# Detect Claude Code version from installed binary
 if command -v claude &>/dev/null; then
     CLAUDE_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
 fi
@@ -76,7 +72,6 @@ get_forge_rev() {
 
 FORGE_REV="$(get_forge_rev)"
 
-# Validate Docker is available
 if ! command -v docker &> /dev/null; then
     error "Docker command not found. Please install Docker."
     error "Visit: https://docs.docker.com/get-docker/"
@@ -90,7 +85,6 @@ fi
 
 info "Using Docker image: $IMAGE_NAME (Claude Code $CLAUDE_VERSION)"
 
-# Check if image exists, build if missing or stale
 needs_build=false
 if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
     needs_build=true
@@ -149,26 +143,22 @@ fi
 ensure_local_litellm() {
     local TEST_PORT=4001
 
-    # Check if port 4001 is already listening
     if lsof -i :${TEST_PORT} -t &>/dev/null; then
         info "Local LiteLLM already running on port ${TEST_PORT}"
         return 0
     fi
 
-    # Check if we have the required API key
     if [[ -z "${GEMINI_API_KEY:-}" ]]; then
         warn "GEMINI_API_KEY not set - local LiteLLM tests will fail"
         warn "Add to .env or ~/.forge/.env"
         return 0  # Don't block tests - let them fail with clear error
     fi
 
-    # Ensure backend config exists
     if ! uv run forge model backend create litellm 2>/dev/null; then
         # Config already exists or creation failed - either way, try to start
         :
     fi
 
-    # Start local LiteLLM in background on test port 4001
     info "Starting local LiteLLM on port ${TEST_PORT} (test instance)..."
     if ! uv run forge model backend start litellm --port ${TEST_PORT}; then
         warn "Failed to start local LiteLLM - tests requiring it will fail"
@@ -178,10 +168,8 @@ ensure_local_litellm() {
     info "Local LiteLLM started successfully on port ${TEST_PORT}"
 }
 
-# Ensure local LiteLLM prerequisite (test template uses port 4001 for isolation)
 ensure_local_litellm
 
-# Run pytest on host - it will spawn Docker containers via fixtures
 # Pass through all command-line arguments to pytest
 info "Running integration tests (pytest will spawn Docker containers)..."
 
@@ -213,5 +201,4 @@ else
     fi
 fi
 
-# Run pytest on host with uv
 exec uv run pytest "${PYTEST_ARGS[@]}"

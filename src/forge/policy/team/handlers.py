@@ -36,9 +36,8 @@ from forge.policy.team.prompts import (
 _log = logging.getLogger(__name__)
 
 
-# Consumer-lane identity (epic consumer_lanes, T0): the team supervisor is a DISTINCT consumer
-# from the semantic supervisor (different config/contract). claude-max is its only non-default
-# lane (claude_code runtime, subscription posture); backend_id is load-bearing for billing only.
+# The team supervisor has a different configuration and contract from the semantic supervisor.
+# claude-max is its only non-default lane. backend_id determines billing only.
 TEAM_SUPERVISOR_CONSUMER = Consumer(
     id="team_supervisor",
     capability_floor="tool_agent",
@@ -263,14 +262,12 @@ def _run_supervisor(
         event_type=event_type,
         task_context=task_context,
     )
-    # Instrument like the semantic supervisor (Phase 5): snapshot proxy cost around the
-    # run, then emit one verb-level UsageEvent so the team supervisor's claude -p spend is
-    # attributed too (direct -> claude_code self-report; proxied -> forge_proxy snapshot).
+    # Snapshot proxy cost around the run, then emit one verb-level UsageEvent.
+    # Direct runs use the claude_code self-report; proxied runs use the forge_proxy snapshot.
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.usage import emit_usage_for_session_result
 
-    # Past the depth + proxy guards: committed to a claude -p dispatch. Notify the caller so the
-    # consumer-lane freeze records only a lane that actually ran (epic consumer_lanes T6a).
+    # Notify the caller only after the run commits to a claude -p dispatch.
     if on_dispatch is not None:
         on_dispatch()
 

@@ -36,7 +36,6 @@ class TestForkDirectFromSidecarParent:
         from forge.session.index import IndexStore
         from forge.session.manager import SessionManager
 
-        # Create parent with sidecar launch intent + proxy
         index = IndexStore()
         manager = SessionManager(index_store=index)
 
@@ -53,7 +52,7 @@ class TestForkDirectFromSidecarParent:
             worktree_path=str(worktree),
             launch_mode=LAUNCH_MODE_SIDECAR,
         )
-        # Simulate a confirmed Claude session (required for fork)
+        # Fork requires the parent to have a confirmed Claude session.
         from forge.session import SessionStore
 
         store = SessionStore(str(worktree), "sidecar-parent")
@@ -61,18 +60,14 @@ class TestForkDirectFromSidecarParent:
         state.confirmed.claude_session_id = "parent-uuid-123"
         store.write(state)
 
-        # Fork with direct=True
         _parent_out, fork = manager.fork_session("sidecar-parent", "direct-child", direct=True)
 
-        # Proxy intent must be None (direct mode)
         assert fork.intent.proxy is None
 
-        # Launch mode must be host, not sidecar; inert sidecar payload cleared
         assert fork.intent.launch is not None
         assert fork.intent.launch.mode == LAUNCH_MODE_HOST
         assert fork.intent.launch.sidecar is None
 
-        # Fork lineage preserved
         assert fork.is_fork is True
         assert fork.parent_session == "sidecar-parent"
 

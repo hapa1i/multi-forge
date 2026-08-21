@@ -130,7 +130,7 @@ def atomic_write_bytes(
     if create_parents:
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create temp file in same directory for atomic rename
+    # Keep the temporary file beside the target so os.replace remains atomic.
     fd, temp_path = tempfile.mkstemp(
         dir=str(path.parent),
         prefix=f".{path.stem}.",

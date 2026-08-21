@@ -311,10 +311,8 @@ def local_litellm() -> Generator[str, None, None]:
     if not has_key:
         pytest.fail(f"GEMINI_API_KEY not set and local LiteLLM not running on port {test_port}")
 
-    # Ensure backend config exists
     subprocess.run(["uv", "run", "forge", "model", "backend", "create", "litellm"], check=False)
 
-    # Start LiteLLM on test port using forge model backend CLI
     result = subprocess.run(
         ["uv", "run", "forge", "model", "backend", "start", "litellm", "--port", str(test_port)],
         check=False,
@@ -328,7 +326,6 @@ def local_litellm() -> Generator[str, None, None]:
 
     yield base_url
 
-    # Cleanup - stop the test instance
     subprocess.run(
         ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
         check=False,
@@ -594,10 +591,8 @@ def proxy_server(local_litellm: str, module_forge_home: Path, tmp_path_factory) 
     """
     port = allocate_ephemeral_port()
 
-    # Create an isolated working directory (acts like a temp repo root)
     cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
 
-    # Build environment with required variables
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)  # Session config location
     env["LITELLM_LOCAL_BASE_URL"] = local_litellm  # Override .env dev URL with test URL
@@ -623,7 +618,6 @@ def proxy_server(local_litellm: str, module_forge_home: Path, tmp_path_factory) 
 
     yield proxy_base_url
 
-    # Robust cleanup
     kill_process(proc.pid)
 
 

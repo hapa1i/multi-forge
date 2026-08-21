@@ -1,4 +1,4 @@
-"""Unit tests for `forge codex start --proxy` (Phase 4 launcher).
+"""Unit tests for `forge codex start --proxy`.
 
 The orchestration is exercised end-to-end through the CLI with the proxy/runtime/invoke
 seams patched: `get_runtime` (installed + version), `ensure_proxy` (resolve/start),

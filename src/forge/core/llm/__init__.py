@@ -120,7 +120,6 @@ def get_client(
     resolved_provider = provider or detect_provider(model)
     creds_manager = credentials or CredentialManager.default()
 
-    # Check if provider is implemented
     if not is_implemented(resolved_provider):
         if resolved_provider == "anthropic":
             raise NotImplementedError(

@@ -1,6 +1,6 @@
-"""Tests for the Claude->Codex bridge (Slice 5e).
+"""Tests for the Claude-to-Codex bridge.
 
-The bridge composes shipped Phase 5 parts (curated transfer + ``CodexHeadlessInvoker``) into
+The bridge composes curated transfer and ``CodexHeadlessInvoker`` into
 the "plan in Claude -> implement in Codex" hop. These tests are hermetic: the curation LLM and
 the ``codex exec`` subprocess are both mocked, and the autouse ``isolate_forge_home`` gives a
 clean usage ledger so the run-tree join can be asserted. The real-codex stack is covered in
@@ -107,11 +107,7 @@ def _ctx(tmp_path: Path, *, forge_root: Path | None) -> ExecutionContext:
     return ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path, forge_root=forge_root)
 
 
-# --- compose_codex_initial_message ------------------------------------------------------
-
-
-# The default delivery path's exact bytes: hook-mode staging (Phase 4) reuses the framing
-# half, so this golden pins that the split refactor never changes the initial message.
+# Hook-mode staging reuses this framing, so pin the default delivery path's exact bytes.
 _GOLDEN_INITIAL_MESSAGE = (
     "# Handoff context (curated transfer from a prior planning session)\n"
     "\n"
@@ -150,7 +146,7 @@ class TestComposeInitialMessage:
 
 
 class TestComposeInteractiveContext:
-    """Phase 5: the TUI positional prompt starts a model turn, so the framing must hold it."""
+    """The TUI positional prompt starts a model turn, so the framing must hold it."""
 
     def test_framed_body_with_hold_instructions(self) -> None:
         msg = compose_codex_interactive_context("CURATED-BODY")
@@ -162,9 +158,6 @@ class TestComposeInteractiveContext:
     def test_headless_compose_functions_unchanged(self) -> None:
         # The interactive variant must not perturb the golden-pinned headless framing.
         assert compose_codex_initial_message("CURATED-BODY", "TASK-TEXT") == _GOLDEN_INITIAL_MESSAGE
-
-
-# --- _temporary_run_env -----------------------------------------------------------------
 
 
 class TestTemporaryRunEnv:
@@ -243,9 +236,6 @@ class TestTemporaryRunEnv:
                 raise ValueError("boom")
         with _temporary_run_env(ident, "sess"):
             pass
-
-
-# --- bridge_session_to_codex ------------------------------------------------------------
 
 
 class TestBridgeSessionToCodex:
@@ -329,7 +319,6 @@ class TestBridgeSessionToCodex:
         assert "FORGE_RUN_ID" not in os.environ
         assert "FORGE_ROOT_RUN_ID" not in os.environ
 
-        # The seed thread_id from the fixture stream surfaces on the result (Phase 2).
         assert result.thread_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
 
 
@@ -363,7 +352,7 @@ def _run_bridge(tmp_path: Path, **bridge_kwargs: Any) -> tuple[CodexBridgeResult
 
 
 class TestBridgeHookDelivery:
-    """Phase 4 staging param: hook mode stages the framed body; default is byte-identical."""
+    """Hook mode stages the framed body; default delivery stays byte-identical."""
 
     def _run(self, tmp_path: Path, **bridge_kwargs: Any) -> tuple[CodexBridgeResult, dict[str, Any]]:
         """Like _run_bridge, but the Popen mock snapshots staging state + env at spawn time."""
@@ -437,7 +426,7 @@ class TestBridgeHookDelivery:
 
 
 class TestBridgePhase2Extensions:
-    """Phase 2 bridge params: explicit child key, provided preflight, output_root."""
+    """Tests explicit child keys, provided preflight results, and output roots."""
 
     def test_explicit_child_key_honored(self, tmp_path: Path) -> None:
         result, _ = _run_bridge(tmp_path, child="impl")

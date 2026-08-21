@@ -1,6 +1,6 @@
 """Unit tests for the shared headless-JSON capability + conversion helpers.
 
-Covers ``src/forge/core/reactive/headless_json.py`` (Phase 5): the USD->micros
+Covers the USD-to-micros
 conversion (``usd_to_micros``), the retry-once-and-latch capability guard
 (``should_request_json`` / ``prepare_json_argv`` / ``is_json_flag_rejection`` /
 ``mark_json_output_unsupported``), and the spike-verdict constants.
@@ -83,11 +83,8 @@ class TestUsdToMicros:
             assert hj.usd_to_micros(usd) == proxy_round(usd), usd
 
     def test_known_half_micro_divergence_is_pinned_not_silent(self) -> None:
-        # DOCUMENTED, bounded discrepancy (<=1 micro = $0.000001), only at exact
-        # half-micro fractions real cost reports never emit: truncate (ledger) vs
-        # round-half-even (proxy). Pinned here so aligning the two later is a
-        # deliberate, test-visible decision -- not a silent change. See Phase 5
-        # change-log follow-up note.
+        # This bounded discrepancy occurs only at exact half-micro values that real cost reports do not emit.
+        # Pin it so a change from ledger truncation to proxy rounding stays test-visible.
         assert hj.usd_to_micros(1.5e-6) == 1  # truncates
         assert round(1.5e-6 * 1_000_000) == 2  # banker's-rounds up
         assert hj.usd_to_micros(1.0000005) == 1_000_000

@@ -417,7 +417,6 @@ def create_cmd(
     # port scanning for the default create path).
     user_port = port
 
-    # Get default port from template if not specified
     if port is None:
         try:
             cfg = load_config(template=template)
@@ -454,7 +453,6 @@ def create_cmd(
     )
 
     if not no_start:
-        # Check if proxy already exists when user provided --name
         if name is not None:
             proxy_path = get_proxy_file_path(proxy_name)
             if proxy_path.exists():
@@ -908,7 +906,6 @@ def edit_cmd(proxy_id: str) -> None:
 
     editor_argv = resolve_editor_argv()
 
-    # Copy to temp file for safe editing
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
         tmp.write(proxy_path.read_text())
         tmp_path = Path(tmp.name)

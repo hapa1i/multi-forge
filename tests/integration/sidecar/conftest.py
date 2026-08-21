@@ -57,7 +57,6 @@ def temp_project(tmp_path: Path) -> Path:
     project = tmp_path / "workspace"
     project.mkdir()
 
-    # Initialize git repo
     subprocess.run(
         ["git", "init"],
         cwd=project,
@@ -75,7 +74,7 @@ def temp_project(tmp_path: Path) -> Path:
         capture_output=True,
     )
 
-    # Create initial commit (some operations require at least one commit)
+    # Some session operations require a repository with a commit.
     readme = project / "README.md"
     readme.write_text("# Test Project\n")
     subprocess.run(["git", "add", "."], cwd=project, capture_output=True)
@@ -124,5 +123,5 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             if cid:
                 subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
     except FileNotFoundError:
-        # Docker not available (e.g., running inside container without DinD)
+        # A container without Docker cannot have host test containers to clean up.
         pass

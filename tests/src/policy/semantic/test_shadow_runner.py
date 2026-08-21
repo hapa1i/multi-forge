@@ -1,8 +1,7 @@
-"""Tests for supervisor shadow sampling -- drain side (Slice 2).
+"""Tests for the supervisor shadow-sampling drain side.
 
 Covers:
-- classify_shadow(): the four statuses, with parse-failure distinguished from a real
-  low-confidence inconclusive (Finding 3)
+- classify_shadow(): the four statuses, with parse failure distinct from a low-confidence inconclusive
 - reconstruct_context()/reconstruct_config(): a captured candidate rebuilds the SAME
   frontier SUPERVISOR_PROMPT it would have produced at hook time (capture/check split)
 - run_shadow_candidate(): atomic-claim at-most-once, status persisted, never enforces,
@@ -46,9 +45,6 @@ DIVERGENT_BLOCKING_JSON = (
     '```json\n{"verdict": "divergent", "confidence": 0.9, "violations": ['
     '{"severity": "high", "evidence": "ignored the plan", "citations": ["Step 2"]}]}\n```'
 )
-
-
-# --- Fixtures ---
 
 
 def _ctx(**kw: object) -> ActionContext:
@@ -119,9 +115,6 @@ def _run(verdict: SupervisorVerdict | None, *, run_ok: bool, parsed: bool) -> Su
     return SupervisorRun(decision=decision, verdict=verdict, run_ok=run_ok, parsed=parsed)
 
 
-# --- classify_shadow ---
-
-
 class TestClassifyShadow:
     def test_aligned_is_agree(self) -> None:
         run = _run(SupervisorVerdict(verdict="aligned", confidence=0.95), run_ok=True, parsed=True)
@@ -161,16 +154,12 @@ class TestClassifyShadow:
         assert classify_shadow(run) == STATUS_ERROR
 
     def test_parse_failure_is_error_not_inconclusive(self) -> None:
-        """Finding 3: an unparseable frontier response collapses to divergent+0.0 warn,
-        but parsed=False must classify as error -- NOT a real low-confidence inconclusive."""
+        """An unparseable frontier response is an error, not a low-confidence inconclusive result."""
         fallback = SupervisorVerdict(verdict="divergent", confidence=0.0, violations=[{"citations": []}])
         run = _run(fallback, run_ok=True, parsed=False)
         # The bare verdict would look inconclusive; the parsed flag rescues the distinction.
         assert run.decision.decision == "warn"
         assert classify_shadow(run) == STATUS_ERROR
-
-
-# --- reconstruction fidelity ---
 
 
 class TestReconstruction:
@@ -244,9 +233,6 @@ class TestReconstruction:
         mock_run.assert_called_once()
         actual = mock_run.call_args.args[0] if mock_run.call_args.args else mock_run.call_args.kwargs["prompt"]
         assert actual == expected
-
-
-# --- run_shadow_candidate (frontier mocked) ---
 
 
 class TestRunShadowCandidate:
@@ -334,9 +320,6 @@ class TestRunShadowCandidate:
         assert run_shadow_candidate(path) == STATUS_DISAGREE
 
 
-# --- run_shadow_for_session ---
-
-
 class TestRunShadowForSession:
     def test_missing_dir_returns_empty(self, tmp_path: Path) -> None:
         assert run_shadow_for_session("sess", str(tmp_path)) == {}
@@ -356,9 +339,6 @@ class TestRunShadowForSession:
         again = run_shadow_for_session("sess", str(tmp_path))
         assert again == {}
         assert mock_run.call_count == 3  # no extra frontier calls
-
-
-# --- deterministic post-claim failures finalize as .done error (no orphaned .processing) ---
 
 
 class TestPostClaimFailure:

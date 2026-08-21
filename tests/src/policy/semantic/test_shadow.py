@@ -1,10 +1,10 @@
-"""Tests for supervisor shadow sampling -- capture side (Slice 1).
+"""Tests for the supervisor shadow-sampling capture side.
 
 Covers:
 - should_sample(): determinism, rate boundaries (0 never / 1 always), threshold, seed sensitivity
 - count_existing_candidates(): counts all lifecycle states, excludes the .plan.md sidecar
 - capture_candidate(): raw-field freeze + plan copy, dedup across states, capture-time cap, lazy mkdir
-- SupervisorConfig range validation + effective-path wrapping (Finding 4)
+- SupervisorConfig range validation and effective-path wrapping
 """
 
 from __future__ import annotations
@@ -27,8 +27,6 @@ from forge.policy.types import ActionContext
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import InvalidOverrideValueError
 from forge.session.models import SupervisorConfig, create_session_state
-
-# --- Fixtures ---
 
 
 def _ctx(session: str = "sess", **kw: object) -> ActionContext:
@@ -71,9 +69,6 @@ def _shadow_dir(tmp_path: Path, session: str = "sess") -> Path:
     return tmp_path / ".forge" / "artifacts" / session / "shadow"
 
 
-# --- should_sample ---
-
-
 class TestShouldSample:
     def test_determinism(self) -> None:
         c = SupervisorConfig(resume_id="r", shadow_sample_rate=0.5)
@@ -108,9 +103,6 @@ class TestShouldSample:
         assert should_sample(c, _ctx(), "k") is False
 
 
-# --- count_existing_candidates ---
-
-
 class TestCountExisting:
     def test_empty_or_missing(self, tmp_path: Path) -> None:
         assert count_existing_candidates(tmp_path / "nope") == 0
@@ -134,9 +126,6 @@ class TestCountExisting:
         (d / "xxx.json").write_text("{}")
         (d / "xxx.processing").write_text("{}")
         assert count_existing_candidates(d) == 1
-
-
-# --- capture_candidate ---
 
 
 class TestCaptureCandidate:
@@ -364,9 +353,6 @@ class TestCaptureCandidate:
     def test_candidate_hash_stable(self) -> None:
         assert candidate_hash("ck") == candidate_hash("ck")
         assert candidate_hash("ck") != candidate_hash("ck2")
-
-
-# --- Config range validation (Finding 4) ---
 
 
 class TestConfigValidation:

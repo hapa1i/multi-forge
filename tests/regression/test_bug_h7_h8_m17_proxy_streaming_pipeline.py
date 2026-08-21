@@ -186,11 +186,9 @@ class TestStreamingErrorFormat:
         async for event in convert_openai_to_anthropic_sse(error_stream(), request, "req-err"):
             events.append(event)
 
-        # Should have message_start, then error event
         error_events = [e for e in events if "event: error" in e]
         assert len(error_events) == 1
 
-        # Parse the error SSE
         error_line = error_events[0]
         data_line = [line for line in error_line.split("\n") if line.startswith("data: ")][0]
         error_data = json.loads(data_line[6:])  # Strip "data: " prefix
@@ -218,7 +216,6 @@ class TestStreamingErrorFormat:
         async for event in convert_openai_to_anthropic_sse(error_then_data_stream(), request, "req-term"):
             events.append(event)
 
-        # Should have message_start + error only, no content_block events
         content_events = [e for e in events if "content_block_delta" in e]
         assert len(content_events) == 0
 
@@ -282,7 +279,6 @@ class TestTextAfterToolResult:
         result = convert_anthropic_to_openai(request)
         messages = result["messages"]
 
-        # Should have: tool message + user message with trailing text
         tool_msgs = [m for m in messages if m["role"] == "tool"]
         user_msgs = [m for m in messages if m["role"] == "user"]
 
@@ -313,14 +309,11 @@ class TestTextAfterToolResult:
         result = convert_anthropic_to_openai(request)
         messages = result["messages"]
 
-        # Should have: user("Before tool") → tool(result) → user("After tool")
         assert len(messages) >= 3
 
-        # Find the messages in order
         roles = [m["role"] for m in messages]
         assert roles == ["user", "tool", "user"]
 
-        # Verify content
         assert "Before tool" in str(messages[0]["content"])
         assert messages[1]["content"] == "tool output"
         assert "After tool" in str(messages[2]["content"])

@@ -248,7 +248,7 @@ class VerificationConfig:
     test_timeout_seconds: int = 300  # 5 minutes default (test_suite only)
 
 
-# --- Consumer lanes (epic consumer_lanes, T1b) ---
+# --- Consumer lanes ---
 
 
 @dataclass(frozen=True)
@@ -273,9 +273,8 @@ class LaneRecord:
             ("backend_id", self.backend_id),
             ("model", self.model),
         ):
-            # Enforce the `str` annotation at runtime, not just truthiness: Slice 2
-            # setters build LaneRecord directly (bypassing dacite's type check), and
-            # a non-str like 123 is truthy.
+            # Setters construct LaneRecord directly and bypass dacite's type check, so
+            # enforce the `str` annotation at runtime instead of relying on truthiness.
             if not isinstance(value, str) or not value:
                 raise ValueError(f"LaneRecord requires a non-empty string {name}")
 
@@ -284,9 +283,7 @@ class LaneRecord:
 class ConsumerLaneIntent:
     """Requested per-consumer lane overrides (session-owned intent).
 
-    Named field per consumer (never a ``dict``) so strict deserialization and
-    override-path validation stay per-field. T1b wired the supervisor; T0 added the
-    three sibling consumers for subscription billing.
+    Named fields keep strict deserialization and override-path validation per consumer.
     """
 
     supervisor: LaneRecord | None = None
@@ -302,7 +299,7 @@ class ConsumerLaneBinding:
     Inert record plus the anchor the "already bound" reject checks. A binding exists
     iff an *explicit* lane choice was frozen (the default lane never freezes), so
     ``source`` is currently always ``"intent"``; it stays a plain ``str`` per the
-    fail-open ``*Confirmed`` style and as a forward slot for future provenance (T6).
+    fail-open ``*Confirmed`` style and as a forward slot for future provenance.
     """
 
     lane: LaneRecord
@@ -651,8 +648,8 @@ class SessionConfirmed:
     # namespace (~/.claude/projects/<encoded-cwd>/).
     claude_project_root: str | None = None
 
-    # Frozen consumer-lane bindings (epic consumer_lanes, T1b). Written at each
-    # consumer's commitment/dispatch seam; general intent clearing preserves the freeze.
+    # Each consumer writes its frozen lane at the commitment or dispatch seam.
+    # General intent clearing preserves the freeze.
     consumer_lanes: ConsumerLaneConfirmed | None = None
 
     confirmed_at: str | None = None  # ISO8601 string

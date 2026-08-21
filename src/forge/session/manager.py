@@ -750,7 +750,6 @@ class SessionManager:
         if create_worktree and state.worktree:
             state.worktree.is_worktree = True
 
-        # Set forge_root on session state for downstream consumers
         state.forge_root = forge_root_str
 
         # Commit phase: write Forge state only after external worktree creation succeeded.
@@ -1918,7 +1917,7 @@ class SessionManager:
                     "(transcript/worktree cleanup may be incomplete)"
                 )
 
-        # Build cleanup hints from raw data when state is unavailable
+        # Fall back to raw manifest fields when full deserialization fails.
         _claude_session_id: str | None = None
         _worktree_info: dict[str, Any] | None = None
         if state:

@@ -108,9 +108,6 @@ def _invoke_supervisor_with_spies(
     return outcome, run, emit_usage, dispatch
 
 
-# --- _is_fresh ---
-
-
 class TestIsFresh:
     def test_fresh_entry(self):
         entry = {"checked_at": now_iso()}
@@ -128,9 +125,6 @@ class TestIsFresh:
 
     def test_naive_timestamp_is_not_interpreted_in_host_timezone(self):
         assert _is_fresh({"checked_at": "2999-01-01T00:00:00"}, throttle_seconds=60) is False
-
-
-# --- _classify_event ---
 
 
 class TestClassifyEvent:
@@ -178,7 +172,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_emits_team_tagger_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: the team tagger emits a team-tagger usage event, session-tagged from FORGE_SESSION."""
+        """The team tagger emits a usage event tagged from FORGE_SESSION."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
         monkeypatch.setenv("FORGE_SESSION", "team-sess")
@@ -204,7 +198,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_exception_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: a team-tagger LLM exception emits a status=error event and still returns routine."""
+        """A team-tagger LLM exception emits an error event and still returns routine."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
         mock_adapter = MagicMock()
@@ -220,7 +214,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_emits_ambient_when_no_forge_session(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: with no FORGE_SESSION, the team tagger emits ambient (session=None), not crash."""
+        """Without FORGE_SESSION, the team tagger emits an ambient event with no session."""
         monkeypatch.delenv("FORGE_SESSION", raising=False)
         monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
@@ -236,9 +230,6 @@ class TestClassifyEvent:
         assert len(events) == 1
         assert events[0].command == "team-tagger"
         assert events[0].session is None  # ambient: no FORGE_SESSION to attribute
-
-
-# --- _run_supervisor ---
 
 
 class TestRunSupervisor:
@@ -510,9 +501,6 @@ class TestRunSupervisorRoutingMatrix:
         emit_usage.assert_called_once()
 
 
-# --- usage attribution (Phase 5: the team supervisor is now instrumented) ---
-
-
 class TestRunSupervisorUsageEmission:
     """The team supervisor's `claude -p` run is attributed to the usage ledger,
     mirroring the semantic supervisor (direct -> claude_code self-report)."""
@@ -564,9 +552,6 @@ class TestRunSupervisorUsageEmission:
         assert events[0].cost_micro_usd is None
 
 
-# --- FORGE_DEPTH guard for _run_supervisor ---
-
-
 class TestRunSupervisorDepthGuard:
     """Verify _run_supervisor skips at FORGE_DEPTH >= MAX_DEPTH."""
 
@@ -591,9 +576,6 @@ class TestRunSupervisorDepthGuard:
             exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 0
         mock_run.assert_called_once()
-
-
-# --- handle_teammate_idle ---
 
 
 class TestHandleTeammateIdle:
@@ -645,9 +627,6 @@ class TestHandleTeammateIdle:
         events = read_usage_events(command="team-supervisor")
         assert len(events) == 1
         assert events[0].billing_mode == "subscription_quota"
-
-
-# --- handle_task_completed ---
 
 
 class TestHandleTaskCompleted:
@@ -722,9 +701,6 @@ class TestHandleTaskCompleted:
         assert exit_code == 0
 
 
-# --- _safe_cache_key ---
-
-
 class TestSafeCacheKey:
     def test_valid_uuid(self):
         assert _safe_cache_key("abc-123-def") == "abc-123-def"
@@ -748,9 +724,6 @@ class TestSafeCacheKey:
         assert _safe_cache_key("session.2026_02") == "session.2026_02"
 
 
-# --- Built-in hook registration ---
-
-
 class TestHookInstallConfig:
     def test_teammate_idle_in_config(self):
         from forge.install.preset import get_builtin_preset
@@ -769,9 +742,6 @@ class TestHookInstallConfig:
         assert any(
             h.get("command", "").endswith("forge-hook task-completed") for group in hooks for h in group["hooks"]
         )
-
-
-# --- per-caller reasoning effort ---
 
 
 class TestRunSupervisorEffort:

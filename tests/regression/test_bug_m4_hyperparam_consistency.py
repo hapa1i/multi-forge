@@ -23,12 +23,6 @@ from forge.core.llm.types import ModelHyperparameters
 pytestmark = pytest.mark.regression
 
 
-# ---------------------------------------------------------------------------
-# Minimal config stubs — mirrors the real ProviderConfig fields used by
-# _resolve_tier_hyperparams()
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class _ProviderCfg:
     top_p: float | None = None
@@ -43,11 +37,6 @@ class _ProxyCfg:
 @dataclass
 class _Config:
     proxy: _ProxyCfg = field(default_factory=_ProxyCfg)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def _assert_consistency(
@@ -74,11 +63,9 @@ async def _assert_consistency(
         lambda _model, req, **_kwargs: req if req is not None else 4096,
     )
 
-    # Reset singleton for clean state
     cf_mod.TierClientFactory._instance = None
     factory = cf_mod.TierClientFactory()
 
-    # Capture the default_hyperparams passed to CoreLLMClientAdapter
     captured_hyperparams: list[ModelHyperparameters] = []
 
     class FakeAdapter:
@@ -86,30 +73,26 @@ async def _assert_consistency(
             if "default_hyperparams" in kwargs:
                 captured_hyperparams.append(kwargs["default_hyperparams"])
 
-    # Stub client class import
     factory._client_classes[cf_mod.ModelProvider.LITELLM] = FakeAdapter
 
-    # For LiteLLM, mock core provider detection
+    # Keep provider detection independent of the host test environment.
     if provider_name == "litellm":
         monkeypatch.setattr(
             "forge.core.llm.detection.detect_provider",
             lambda _model: "litellm_remote",
         )
 
-    # Call get_client() — uses pytest-asyncio's managed event loop
     await factory.get_client(model_name, tier=tier)
 
     assert len(captured_hyperparams) == 1, "CoreLLMClientAdapter should have been called once"
     client_hp = captured_hyperparams[0]
 
-    # Call get_default_hyperparams_for_tier()
     truth_hp = factory.get_default_hyperparams_for_tier(
         provider=provider_name,
         tier=tier,
         model_name=model_name,
     )
 
-    # The invariant: both must be equal
     assert client_hp == truth_hp, (
         f"Hyperparameter divergence for {provider_name}/{tier}/{model_name}:\n"
         f"  get_client():                     {client_hp}\n"
@@ -117,11 +100,6 @@ async def _assert_consistency(
     )
 
     return truth_hp
-
-
-# ---------------------------------------------------------------------------
-# Tests: LiteLLM consistency
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -144,7 +122,6 @@ async def test_litellm_tier_override_consistent(
 
     hp = await _assert_consistency(monkeypatch, "litellm", "opus", "openai/gpt-5.2", cfg)
 
-    # Verify the tier override was actually applied
     assert hp.reasoning_effort == "high"
     assert hp.temperature == 0.3
     assert hp.thinking is not None

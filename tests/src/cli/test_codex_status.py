@@ -203,7 +203,6 @@ def test_codex_group_registered_and_visible():
     assert "codex" in top.output
     group = CliRunner().invoke(main, ["codex", "--help"])
     assert group.exit_code == 0
-    # Two visible leaves now that the Phase 4 launcher shipped (card forge_codex_command_group).
     assert "status" in group.output
     assert "start" in group.output
     # `start` is a registered subcommand: invoking it without the required --proxy is a

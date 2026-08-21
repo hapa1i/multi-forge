@@ -195,15 +195,11 @@ def test_cli_rich_tips_go_through_output_helpers() -> None:
     assert not stale, f"payload gone -- prune from CLI_TIP_PAYLOAD_ALLOWLIST: {sorted(stale)}"
 
 
-# Drained empty by forge_cli_cleanup Slice 11 (finding #9): every hand-rolled
-# red-styled `Error:` now routes through print_error. Kept as a locked, never-grow
-# ledger -- a new offender makes `new` (below) non-empty and fails the test.
+# Keep this allowlist empty so each hand-rolled red-styled `Error:` fails the test.
 CLI_ERROR_MARKUP_ALLOWLIST: set[str] = set()
 
 # Any Rich red style tag (`[red]`, `[bold red]`, `[bright_red]`, ...) immediately
-# before `Error:`. The original guard matched only the exact `[red]Error:[/red]`
-# literal, so a `[bold red]Error:[/bold red]` site slipped the net (forge_cli_cleanup
-# review M2). Plain `Error:` (no markup) is out of scope, and non-error red phrases
+# before `Error:`. Plain `Error:` without markup is out of scope, and non-error red phrases
 # (`[bold red]Conflicts detected:`) do not match. Closing tags (`[/red]`) can't match
 # because `/` is outside the char class.
 _RED_ERROR_MARKUP = re.compile(r"\[[\w ]*red\]\s*Error:")

@@ -210,7 +210,6 @@ class TestForgeExtensionEnable:
         result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile standard")
         assert result.returncode == 0
 
-        # Parse settings.json and verify hooks key exists
         check = synced_container.exec("""
             cd /forge && uv run python -c "
 import json
@@ -249,11 +248,9 @@ print('hooks present')
         """Verify running extension enable twice doesn't error."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        # First init
         result1 = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result1.returncode == 0
 
-        # Second init (should succeed)
         result2 = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result2.returncode == 0
 
@@ -349,10 +346,8 @@ class TestForgeExtensionSync:
         """Verify update doesn't clobber user customizations."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        # Init first
         synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
 
-        # Add user customization to settings (preserve existing structure)
         synced_container.exec("""
             cd /forge && uv run python -c "
 import json
@@ -364,11 +359,9 @@ settings_path.write_text(json.dumps(settings, indent=2))
 "
         """)
 
-        # Update
         result = synced_container.exec("cd /forge && uv run forge extension sync --scope user")
         assert result.returncode == 0
 
-        # User key should still be there
         check = synced_container.exec("""
             cd /forge && uv run python -c "
 import json
@@ -1348,10 +1341,8 @@ class TestForgeExtensionDisable:
         """Verify forge extension disable removes installed files."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        # Init first
         synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
 
-        # Verify installation exists
         check1 = synced_container.exec("test -d ~/.claude && echo 'exists'")
         assert "exists" in check1.stdout
 
@@ -1359,7 +1350,6 @@ class TestForgeExtensionDisable:
         result = synced_container.exec("cd /forge && uv run forge extension disable --scope user --yes")
         assert result.returncode == 0
 
-        # Verify tracking entry removed (file may still exist but scope entry gone)
         check2 = synced_container.exec("""
             cd /forge && uv run python -c "
 import json

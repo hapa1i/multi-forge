@@ -47,7 +47,6 @@ def project_with_session(
     """
     monkeypatch.chdir(git_repo)
 
-    # Create session state
     session_name = "test-session"
     manifest = create_session_state(
         session_name,
@@ -55,7 +54,6 @@ def project_with_session(
         proxy_base_url="http://localhost:8080",
     )
 
-    # Write manifest
     store = SessionStore(str(git_repo), "test-session")
     store.write(manifest)
 
@@ -80,7 +78,6 @@ def project_with_policy(
     """
     repo_path, store = project_with_session
 
-    # Read, modify, write manifest
     manifest = store.read()
     manifest.intent.policy = PolicyIntent(
         enabled=True,
@@ -141,18 +138,15 @@ def local_runtime_truth_server() -> Generator[str, None, None]:
     port = allocate_ephemeral_port()
     server = ThreadingHTTPServer(("127.0.0.1", port), RuntimeTruthHandler)
 
-    # Start server in daemon thread
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    # Wait for server to be ready
     if not wait_for_port(port, timeout=5.0):
         server.shutdown()
         pytest.fail(f"Runtime truth server failed to start on port {port}")
 
     yield f"http://127.0.0.1:{port}"
 
-    # Cleanup
     server.shutdown()
 
 
@@ -172,7 +166,6 @@ def project_with_proxy_session(
     """
     monkeypatch.chdir(git_repo)
 
-    # Create session state with proxy pointing to local server
     session_name = "test-proxy-session"
     manifest = create_session_state(
         session_name,
@@ -180,7 +173,6 @@ def project_with_proxy_session(
         proxy_base_url=local_runtime_truth_server,
     )
 
-    # Write manifest
     store = SessionStore(str(git_repo), "test-proxy-session")
     store.write(manifest)
 

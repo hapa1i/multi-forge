@@ -25,9 +25,7 @@ from forge.session.shadow_curation import (
 from tests.fixtures.codex_result import codex_result
 from tests.fixtures.session_state import publish_session
 
-# ---------------------------------------------------------------------------
 # build_curation_prompt
-# ---------------------------------------------------------------------------
 
 
 class TestBuildCurationPrompt:
@@ -101,9 +99,7 @@ class TestBuildCurationPrompt:
         assert "`````\n````\nshadow proposal\n````\n`````" in prompt
 
 
-# ---------------------------------------------------------------------------
 # _doc_slug
-# ---------------------------------------------------------------------------
 
 
 class TestDocSlug:
@@ -132,9 +128,7 @@ class TestDocSlug:
         assert ".md" not in slug
 
 
-# ---------------------------------------------------------------------------
 # curation_report_dir / persist / glob
-# ---------------------------------------------------------------------------
 
 
 class TestReportPersistence:
@@ -199,9 +193,7 @@ class TestReportPersistence:
         assert len(matches) == 0
 
 
-# ---------------------------------------------------------------------------
 # run_shadow_curation
-# ---------------------------------------------------------------------------
 
 
 class TestRunShadowCuration:
@@ -349,9 +341,7 @@ class TestRunShadowCuration:
         assert outcomes[0].root_run_id is None
 
 
-# ---------------------------------------------------------------------------
 # collect_shadow_entries
-# ---------------------------------------------------------------------------
 
 
 class TestCollectShadowEntries:
@@ -500,9 +490,7 @@ class TestCollectShadowEntries:
         assert str(forge_root) in roots
 
 
-# ---------------------------------------------------------------------------
 # Import layering
-# ---------------------------------------------------------------------------
 
 
 class TestImportLayering:
@@ -523,9 +511,7 @@ class TestImportLayering:
         assert not new_cli_imports, f"shadow_curation imported CLI modules: {new_cli_imports}"
 
 
-# ---------------------------------------------------------------------------
 # run_shadow_curation reasoning effort
-# ---------------------------------------------------------------------------
 
 
 class TestRunShadowCurationEffort:
@@ -558,9 +544,7 @@ class TestRunShadowCurationEffort:
         assert call_kwargs.kwargs.get("reasoning_effort") == "medium"
 
 
-# ---------------------------------------------------------------------------
-# Codex dispatch arm (epic consumer_lanes T6b)
-# ---------------------------------------------------------------------------
+# Codex dispatch arm
 
 _CODEX_LANE = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
 _CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-lane manifest DTO
@@ -811,8 +795,7 @@ class TestCodexShadowCuration:
     def test_unknown_runtime_fails_loud_not_silent_claude(
         self, mock_read: MagicMock, mock_claude: MagicMock, tmp_path: Path
     ) -> None:
-        """An unknown runtime in a stale binding must fail loud, NOT silently fall through to the
-        claude arm -- the pre-fix hazard of selecting the arm from a raw, unvalidated runtime_id."""
+        """An unknown runtime in a stale binding fails instead of selecting the Claude arm."""
         result = self._run(tmp_path, lane_record=LaneRecord("vllm", "chatgpt", "gpt-5-codex"))
 
         assert result.success is False

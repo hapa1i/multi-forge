@@ -309,9 +309,7 @@ def test_proxy_create_human_smoke_keeps_existing_status_and_diagnostic(
     assert result.stderr == ""
 
 
-# --------------------------------------------------------------------------
 # Show / Edit / Set / Delete / Create / Validate tests
-# --------------------------------------------------------------------------
 
 
 def _create_proxy_file(temp_env: Path, proxy_id: str, content: str) -> Path:
@@ -2056,9 +2054,7 @@ class TestProxyRegistryCorruption:
         assert "error" in result.output.lower()
 
 
-# --------------------------------------------------------------------------
 # Metrics tests
-# --------------------------------------------------------------------------
 
 _SAMPLE_METRICS = {
     "started_at": "2026-03-23T00:00:00+00:00",
@@ -2198,7 +2194,7 @@ class TestProxyMetrics:
         assert data["proxy-b"] is None  # unreachable
 
     def test_metrics_all_flag_removed(self, runner: CliRunner) -> None:
-        """`--all` was removed (Slice 12) -- bare `metrics` already aggregates. Clean break: exit 2."""
+        """Bare `metrics` already aggregates, so the removed `--all` option exits 2."""
         result = runner.invoke(main, ["proxy", "metrics", "--all"])
         assert result.exit_code == 2
         assert "No such option" in result.stderr
@@ -2390,9 +2386,7 @@ class TestProxyMetrics:
         assert "----" in result.output  # separator between proxies
 
 
-# -----------------------------------------------------------------------------
 # Adopted proxy lifecycle (kill-by-port, health guard, --no-kill)
-# -----------------------------------------------------------------------------
 
 
 class TestDeleteAdoptedProxy:
@@ -2881,9 +2875,7 @@ class TestSharedPortByPortNotUrl:
         assert "proxy-b" in result.output
 
 
-# =============================================================================
 # Template subgroup tests
-# =============================================================================
 
 
 class TestProxyTemplate:

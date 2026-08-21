@@ -4,17 +4,14 @@ Loads environment variables from .env file for all tests.
 Provides shared fixtures for all test modules.
 """
 
-# IMPORTANT: Load .env FIRST, before any other imports
-# Some modules (e.g., tests.fixtures.docker) read env vars at import time
+# Load .env before imports because some fixtures read environment variables at import time.
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Repo root for loading .env file (explicit path, not cwd-relative)
 _repo_root = Path(__file__).parent.parent
 
-# Load environment variables from .env (secrets only: API keys, workspace ID)
-# Shell environment takes precedence (override=False)
+# Preserve shell-provided secrets and load missing values from the repository's .env file.
 load_dotenv(_repo_root / ".env", override=False)
 
 # ruff: noqa: E402 — Imports below MUST come after load_dotenv() because
@@ -22,8 +19,7 @@ load_dotenv(_repo_root / ".env", override=False)
 
 import pytest
 
-# Pytest hook for Docker log capture on failure (must be in conftest.py scope)
-# Docker fixtures for in-container testing
+# Keep the Docker report hook in conftest.py so pytest discovers it.
 from tests.fixtures.docker import pytest_runtest_makereport  # noqa: F401
 from tests.fixtures.docker import (
     base_git_repo,
@@ -33,9 +29,6 @@ from tests.fixtures.docker import (
     local_claude_available,
     synced_container,
 )
-
-# Import shared fixtures to make them globally available
-# These are re-exported so pytest can discover them by name
 from tests.fixtures.repos import (
     claude_home,
     forge_home,
@@ -43,7 +36,6 @@ from tests.fixtures.repos import (
     git_repo_with_claude,
 )
 
-# Fixtures listed here for pytest discovery (hooks are discovered via module scope)
 __all__ = [
     # Repos
     "git_repo",

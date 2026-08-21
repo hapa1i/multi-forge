@@ -343,10 +343,10 @@ class ToolEventMetadata:
         return record
 
 
-# Create an asyncio Lock to ensure thread-safe writing to the JSONL file
+# Serialize JSONL writes within this event loop.
 _tool_events_lock = asyncio.Lock()
 
-# Request/Response Logger for JSONL file
+# Keep request logging independent from tool-event logging.
 _request_response_lock = asyncio.Lock()
 
 

@@ -99,7 +99,7 @@ def strip_preview_memory_doc_lists(data: dict[str, Any], session_name: str = "")
 
 
 def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "") -> None:
-    """Strip the removed ``supervisor_runtime`` field from T4/T5 manifests (epic consumer_lanes, T1b).
+    """Strip the removed ``supervisor_runtime`` field from legacy manifests.
 
     The supervisor lane moved from ``SupervisorConfig.supervisor_runtime`` to the ``consumer_lanes``
     binding. An old manifest (or override) carrying the field would fail the strict read, so drop it
@@ -467,7 +467,6 @@ class SessionStore:
         """
         missing: list[str] = []
 
-        # Check schema version
         if "schema_version" not in data:
             missing.append("schema_version")
         elif data["schema_version"] not in _SUPPORTED_SCHEMA_VERSIONS:
@@ -500,7 +499,7 @@ class SessionStore:
             if intent_obj is None or not isinstance(intent_obj, dict):
                 raise ManifestCorruptedError(str(self._manifest_path), "intent must be an object")
             intent = intent_obj
-        # Check intent.proxy fields (optional; but if present must be complete)
+        # If intent.proxy is present, both template and base_url are required.
         proxy = intent.get("proxy")
         if proxy is not None:
             if not isinstance(proxy, dict):

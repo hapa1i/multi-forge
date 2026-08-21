@@ -42,7 +42,6 @@ class TestCommandRecognition:
 
     def test_cancel_verification_recognized(self, mock_claude_workspace: ContainerLike) -> None:
         """cancel-verification requires a session; test it separately."""
-        # Create a session so the command can find it
         mock_claude_workspace.exec("cd /workspace && forge session start test-session")
         payload = json.dumps({"prompt": "%cancel-verification", "transcript_path": ""})
         result = mock_claude_workspace.exec(
@@ -134,7 +133,6 @@ class TestCancelVerification:
         """Create a session with verification policy configured."""
         workspace.exec(f"cd /workspace && forge session start {session_name}")
 
-        # Read manifest and add verification config
         result = workspace.exec(f"cat /workspace/.forge/sessions/{session_name}/forge.session.json")
         manifest = json.loads(result.stdout)
         manifest["intent"]["verification"] = {
@@ -168,7 +166,6 @@ class TestCancelVerification:
 
         self._invoke_cancel_verification(mock_claude_workspace)
 
-        # Verify override was set in manifest
         result = mock_claude_workspace.exec("cat /workspace/.forge/sessions/test-session/forge.session.json")
         manifest = json.loads(result.stdout)
 

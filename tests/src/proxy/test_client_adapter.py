@@ -56,9 +56,7 @@ def test_openai_messages_to_core_handles_tool_calls_with_null_content() -> None:
     assert core_messages[0].tool_calls[0].arguments == {"file_path": "/tmp/a"}
 
 
-# ---------------------------------------------------------------------------
 # _extract_cache_info tests
-# ---------------------------------------------------------------------------
 
 
 class TestExtractCacheInfo:
@@ -108,9 +106,7 @@ class TestExtractCacheInfo:
         assert result["cache_hit_rate"] == pytest.approx(25.0)
 
 
-# ---------------------------------------------------------------------------
 # Cache hit logging integration tests
-# ---------------------------------------------------------------------------
 
 
 def _make_adapter_with_mock_client() -> CoreLLMClientAdapter:
@@ -254,13 +250,10 @@ async def test_create_streaming_completion_logs_cache_info(
             chunks.append(chunk)
 
     assert len(chunks) >= 2  # text_delta + usage + response_end
-    # Verify cache info appeared in post-stream log
     assert any("cached_tokens=1500" in msg and "75.0% cache hit" in msg for msg in caplog.messages)
 
 
-# ---------------------------------------------------------------------------
-# Reported-cost threading tests (Phase 2 Step 2)
-# ---------------------------------------------------------------------------
+# Reported-cost threading tests
 
 
 class TestReportedCostThreading:
@@ -384,8 +377,10 @@ class TestProviderMetaThreading:
 
     @pytest.mark.asyncio
     async def test_streaming_emits_provider_meta_carrier_chunk(self) -> None:
-        """provider_meta rides its own carrier chunk (choices=[]) the instant it first appears,
-        not nested in the usage chunk -- so the Phase 3 seam stashes it before any cancellation."""
+        """provider_meta uses its own carrier chunk as soon as it appears.
+
+        The metadata is not nested in the usage chunk, so it is available before cancellation.
+        """
         adapter = _make_adapter_with_mock_client()
 
         async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
@@ -450,9 +445,7 @@ class TestProviderMetaThreading:
         assert carrier[0]["_provider_meta"]["provider_generation_id"] == "gen-cut"
 
 
-# ---------------------------------------------------------------------------
 # tool_choice forwarding tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -509,9 +502,7 @@ async def test_streaming_completion_forwards_required_tool_choice() -> None:
     assert captured_hyperparams[0].extra["openai"]["tool_choice"] == "required"
 
 
-# ---------------------------------------------------------------------------
 # User-Agent forwarding tests
-# ---------------------------------------------------------------------------
 
 
 class TestSanitizeHeaderValue:
@@ -652,9 +643,7 @@ async def test_streaming_completion_sanitizes_and_caps_user_agent() -> None:
     assert len(forwarded) == 256
 
 
-# ---------------------------------------------------------------------------
 # _forge_user -> extra["openai"]["user"] forwarding (provider-user grouping)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -758,9 +747,7 @@ async def test_create_completion_no_forge_user_no_user_key() -> None:
     assert "user" not in hp.extra["openai"]
 
 
-# ---------------------------------------------------------------------------
 # cached_tokens propagation tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

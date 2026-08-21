@@ -91,6 +91,5 @@ def test_list_shows_session_and_delete_can_remove_it(tmp_path: Path, monkeypatch
     assert delete_result.exit_code == 0
     assert "Deleted" in delete_result.output
 
-    # Verify it's gone
     list_after = runner.invoke(main, ["session", "list"])
     assert "remote-sess" not in list_after.output

@@ -1,4 +1,4 @@
-"""Tests for the dispatch-time lane freeze helper (epic consumer_lanes T6a).
+"""Tests for the dispatch-time lane-freeze helper.
 
 ``persist_lane_freeze`` is the CLI/hook-boundary wrapper the aux consumers call from their
 ``on_dispatch`` hook. It must (1) freeze the *threaded* dispatched lane (not a fresh read,

@@ -13,7 +13,6 @@ class TestCreateBackendConfig:
 
     def test_creates_config_from_default(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify config is created from default template."""
-        # Redirect FORGE_HOME to tmp_path
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
         config_path = create_backend_config(adapter_type="litellm")
@@ -22,7 +21,6 @@ class TestCreateBackendConfig:
         assert config_path.parent.name == "litellm"
         assert config_path.name == "config.yaml"
 
-        # Verify content looks like LiteLLM config
         content = config_path.read_text()
         assert "model_list:" in content
         assert "gemini" in content.lower()
@@ -79,7 +77,6 @@ class TestCreateBackendConfig:
         """Verify config can be created from custom source."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Create custom source config
         custom_config = tmp_path / "custom.yaml"
         custom_config.write_text("custom: config\nkey: value\n")
 
@@ -98,7 +95,6 @@ class TestCreateBackendConfig:
 
         config_path = create_backend_config(adapter_type="litellm")
 
-        # Check permissions (owner read/write only)
         mode = config_path.stat().st_mode & 0o777
         assert mode == 0o600
 
@@ -106,15 +102,12 @@ class TestCreateBackendConfig:
         """Verify creating config overwrites existing file."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Create initial config
         config_path = create_backend_config(adapter_type="litellm")
         initial_content = config_path.read_text()
 
-        # Create custom source
         custom_config = tmp_path / "custom.yaml"
         custom_config.write_text("different: content\n")
 
-        # Overwrite with custom
         config_path = create_backend_config(
             adapter_type="litellm",
             source_config=custom_config,
@@ -159,6 +152,5 @@ class TestGetBackendConfigPath:
 
         path = get_backend_config_path("litellm")
 
-        # Path should be returned even though it doesn't exist
         assert not path.exists()
         assert path.name == "config.yaml"

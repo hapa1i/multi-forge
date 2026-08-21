@@ -39,12 +39,10 @@ class TestMountSemantics:
         container_cleanup: str,
     ) -> None:
         """Verify host project directory is readable at /workspace in container."""
-        # Create a test file on host
         test_file = temp_project / "mount_test.txt"
         test_content = "mounted successfully from host"
         test_file.write_text(test_content)
 
-        # Start container with mount
         subprocess.run(
             [
                 "docker",
@@ -64,7 +62,6 @@ class TestMountSemantics:
             capture_output=True,
         )
 
-        # Read file from inside container
         result = subprocess.run(
             ["docker", "exec", container_name, "cat", "/workspace/mount_test.txt"],
             capture_output=True,
@@ -81,7 +78,6 @@ class TestMountSemantics:
         container_cleanup: str,
     ) -> None:
         """Verify changes made in container appear on host (bi-directional mount)."""
-        # Start container with mount
         subprocess.run(
             [
                 "docker",
@@ -101,7 +97,6 @@ class TestMountSemantics:
             capture_output=True,
         )
 
-        # Create file from inside container
         container_content = "created inside container"
         subprocess.run(
             [
@@ -116,7 +111,6 @@ class TestMountSemantics:
             capture_output=True,
         )
 
-        # Verify file exists on host
         host_file = temp_project / "from_container.txt"
         assert host_file.exists(), "File created in container should appear on host"
         assert container_content in host_file.read_text()
@@ -140,7 +134,6 @@ class TestEnvVarPropagation:
         context_limit = "200000"
         session_name = "test-session"
 
-        # Run container with env vars, override entrypoint to get shell
         result = subprocess.run(
             [
                 "docker",
@@ -179,7 +172,6 @@ class TestShellAccess:
         container_cleanup: str,
     ) -> None:
         """Verify can exec command into running container."""
-        # Start a container
         subprocess.run(
             [
                 "docker",
@@ -195,7 +187,6 @@ class TestShellAccess:
             capture_output=True,
         )
 
-        # Exec a command
         result = subprocess.run(
             ["docker", "exec", container_name, "echo", "shell-access-works"],
             capture_output=True,
@@ -211,7 +202,7 @@ class TestShellAccess:
         container_cleanup: str,
     ) -> None:
         """Verify exec fails gracefully when container is not running."""
-        # Create container that exits immediately (no --rm so it stays as stopped)
+        # Keep the exited container for the exec assertion.
         subprocess.run(
             [
                 "docker",
@@ -219,16 +210,14 @@ class TestShellAccess:
                 "--name",
                 container_name,
                 "alpine",
-                "true",  # Exits immediately
+                "true",
             ],
             check=True,
             capture_output=True,
         )
 
-        # Wait for container to exit
         subprocess.run(["docker", "wait", container_name], capture_output=True)
 
-        # Exec should fail
         result = subprocess.run(
             ["docker", "exec", container_name, "echo", "test"],
             capture_output=True,

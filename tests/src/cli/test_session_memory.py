@@ -60,11 +60,6 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
     return forge_root, "s1"
 
 
-# ---------------------------------------------------------------------------
-# enable / disable
-# ---------------------------------------------------------------------------
-
-
 class TestSessionMemoryEnable:
     """Session-scoped enable (``--session`` or ``$FORGE_SESSION``)."""
 
@@ -176,7 +171,7 @@ class TestSessionMemoryEnable:
 
 
 class TestMemoryActivationCleanBreak:
-    """Activation/report verbs moved to ``forge session memory`` (Slice 02 clean break)."""
+    """Activation and report verbs exist only under ``forge session memory``."""
 
     @pytest.mark.parametrize(
         "argv",
@@ -191,11 +186,6 @@ class TestMemoryActivationCleanBreak:
         result = runner.invoke(main, argv)
         assert result.exit_code == 2  # Click "No such command", no tombstone
         assert "No such command" in result.output
-
-
-# ---------------------------------------------------------------------------
-# status
-# ---------------------------------------------------------------------------
 
 
 class TestSessionMemoryStatus:

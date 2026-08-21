@@ -45,8 +45,6 @@ def _assert_ledger(violations: set[str], allowlist: set[str], rule: str) -> None
     assert not fixed, f"{rule}: these were fixed -- remove them from the allowlist: {sorted(fixed)}"
 
 
-# --- Rule: read surfaces bind `--json` to dest `as_json` ----------------------
-# Drained in Slice 07 (forge_cli_cleanup): every read-surface `--json` now binds dest `as_json`.
 JSON_DEST_ALLOWLIST: set[str] = set()
 
 
@@ -61,10 +59,8 @@ def test_json_option_dest_is_as_json() -> None:
     _assert_ledger(violations, JSON_DEST_ALLOWLIST, "--json must bind dest `as_json`")
 
 
-# --- Rule: a group earns a path segment only with >=2 visible leaves ----------
-# Hidden groups (internal workers) are exempt. ``forge workspace`` deliberately
-# starts with one read leaf: ``status`` is blocked on root-scoped telemetry
-# identity and must not ship as a placeholder (workspace_scope Slice 2).
+# Hidden internal-worker groups are exempt. ``forge workspace`` has one read leaf because
+# ``status`` requires root-scoped telemetry identity; a placeholder must not satisfy this rule.
 SINGLE_LEAF_GROUP_ALLOWLIST: set[str] = {"forge workspace"}
 
 
@@ -92,7 +88,6 @@ def test_workspace_group_shape_and_no_alias() -> None:
     assert CliRunner().invoke(main, ["ws"]).exit_code == 2
 
 
-# --- Rule: no confusable sibling leaves (prefix collision / long shared prefix)
 SHARED_PREFIX_MIN = 6
 
 
@@ -107,8 +102,6 @@ def _confusable(a: str, b: str) -> bool:
     return common >= SHARED_PREFIX_MIN
 
 
-# Drained in Slice 10 (forge_cli_cleanup): `forge policy supervise` was removed and the
-# one-shot `supervisor` leaf became the `supervisor` group, dissolving the collision.
 LEAF_NAMING_ALLOWLIST: set[str] = set()
 
 
@@ -127,13 +120,8 @@ def test_no_confusable_sibling_leaves() -> None:
     _assert_ledger(violations, LEAF_NAMING_ALLOWLIST, "sibling leaves must not be confusable")
 
 
-# --- Rule: read leaves (catalog/list/report/show/status/profiles/diff) expose `--json`
-# `report` is here because `forge session memory report` was flattened from a
-# `show` leaf in Slice 02; without it the read-surface debt would escape the guard.
-# `profiles`/`diff` were added in Slice 07 once `auth profiles` and
-# `session transfer diff` grew `--json` (the only previously-bare leaves with those names).
+# Treat `report`, `profiles`, and `diff` as read leaves alongside list, show, and status.
 _READ_LEAVES = {"catalog", "list", "report", "show", "status", "profiles", "diff"}
-# Drained in Slice 07 (forge_cli_cleanup): every read leaf now exposes `--json`.
 JSON_MISSING_ALLOWLIST: set[str] = set()
 
 
@@ -156,12 +144,9 @@ def test_memory_passport_upgrade_is_a_reachable_mutation_leaf() -> None:
     assert not _json_dests(command), "mutating upgrade leaf should not expose --json"
 
 
-# --- Rule: editable config objects expose the core {show, edit, reset} vocabulary
-# Tiered decision (forge_cli_cleanup Slice 08 / D7): editable-config objects share a
-# core verb set; lifecycle resources follow the sibling-verbs rule instead. This guard
-# covers ONLY the mandatory core on the three editable-config objects, plus a boundary
-# lock that `proxy`/`model backend` carry no `reset`. Optional verbs (`set`/`validate`)
-# and the exception rationale are review-only (see cli_style_guidelines.md).
+# Editable config objects share a core verb set. Lifecycle resources follow the sibling-verbs rule instead.
+# This guard covers the mandatory core and ensures that `proxy` and `model backend` do not expose `reset`.
+# Optional verbs and exception rationale remain review-only; see cli_style_guidelines.md.
 _EDITABLE_CONFIG_OBJECTS = ("forge config", "forge proxy template", "forge claude preset")
 _CORE_CONFIG_VERBS = {"show", "edit", "reset"}
 
@@ -186,11 +171,7 @@ def test_editable_config_objects_share_core_verbs() -> None:
         )
 
 
-# --- Rule: `clean` verbs preview by default and mutate only with --yes ---------
-# Destructive decision (forge_cli_cleanup Slice 09 / F3): a `clean` leaf previews by
-# default and mutates only with `--yes`. Preview-by-default makes `--dry-run` redundant,
-# so a clean leaf must carry `--yes` and must NOT carry `--dry-run`. (`forge proxy clean`
-# was removed as redundant in the same slice.)
+# A `clean` leaf previews by default and mutates only with `--yes`; `--dry-run` is redundant.
 def _option_dests(cmd: click.Command) -> set[str]:
     return {p.name for p in cmd.params if isinstance(p, click.Option) and p.name is not None}
 
@@ -206,8 +187,7 @@ def test_clean_verbs_preview_by_default() -> None:
         assert "dry_run" not in dests, f"{path}: clean leaf must not carry --dry-run (preview is already the default)"
 
 
-# --- Rule: delete/reset leaves expose the --yes confirmation-bypass ------------
-# One confirmation-bypass flag name across the CLI (Slice 09 / F3). `forge session reset`
+# Use one confirmation-bypass flag name across the CLI. `forge session reset`
 # resets the session override layer (a persisted but non-deleting config rewind -- it
 # removes no sessions, worktrees, or artifacts); it acts immediately by design and is the
 # one permanent exemption.
@@ -224,11 +204,7 @@ def test_destructive_prompt_verbs_use_yes() -> None:
         assert "yes" in _option_dests(cmd), f"{path}: delete/reset leaf must expose the --yes confirmation-bypass"
 
 
-# --- Rule: removed aliases are clean breaks, not tombstones --------------------
-# forge_cli_cleanup Slice 05 (D6): `auth` is the canonical command name (the
-# `authentication` alias is gone) and the `extensions` -> `extension` rename shim
-# is removed. Both old paths -- bare group and a real old leaf -- must fail through
-# Click's native "No such command", and the canonical names must still resolve.
+# Removed aliases must fail through Click's native "No such command" path while canonical names still resolve.
 _REMOVED_ALIAS_ARGVS = (
     ["authentication"],
     ["authentication", "status"],

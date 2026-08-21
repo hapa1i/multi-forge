@@ -1,7 +1,7 @@
 """Tests for the run-id format leaf module (mint + validate).
 
 The proxy validates inbound ``X-Forge-Run-ID``/``X-Forge-Root-Run-ID`` headers with
-``is_valid_run_id`` before logging them (Slice 4g), so the format guard must reject
+``is_valid_run_id`` before logging them, so the format guard must reject
 malformed, spoofed, and header-injection values -- not just accept well-formed ones.
 """
 
@@ -54,7 +54,7 @@ def test_rejects_malformed_and_injection(value: str | None) -> None:
     assert not is_valid_run_id(value)
 
 
-# --- Provider session/command labels ---
+# Provider session and command labels
 
 
 @pytest.mark.parametrize(

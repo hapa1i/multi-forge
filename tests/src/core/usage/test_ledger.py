@@ -1,4 +1,4 @@
-"""Tests for the usage-attribution ledger (Phase 4b).
+"""Tests for the usage-attribution ledger.
 
 Mirrors the audit-logger contract: versioned, PID-sharded, owner-only, strictly read
 (unknown fields are corruption), best-effort writes. The autouse ``isolate_forge_home``
@@ -256,11 +256,10 @@ class TestBestEffort:
 
 
 class TestMetricVocabulary:
-    """Phase 1 metric-evidence fields: route/reporter/confidence (additive, schema v1)."""
+    """Metric-evidence fields are additive to schema v1."""
 
     def test_v1_record_loads_with_defaults(self) -> None:
-        # A pre-Phase-1 record carries none of the new keys; the additive fields fill
-        # from their defaults (this is why no schema bump is needed to read old records).
+        # Schema-v1 records without metric evidence use field defaults, so no schema bump is required.
         _append_raw(
             {
                 "schema_version": 1,

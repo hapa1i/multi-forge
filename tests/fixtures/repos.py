@@ -39,7 +39,6 @@ def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
     repo = tmp_path / "test-repo"
     repo.mkdir()
 
-    # Initialize with explicit branch name
     subprocess.run(
         ["git", "init", "-b", "main"],
         cwd=str(repo),
@@ -47,7 +46,6 @@ def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
         capture_output=True,
     )
 
-    # Configure user for commits
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
         cwd=str(repo),
@@ -61,7 +59,6 @@ def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
         capture_output=True,
     )
 
-    # Create initial commit
     readme = repo / "README.md"
     readme.write_text("# Test Repository\n")
     subprocess.run(
@@ -79,7 +76,7 @@ def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
 
     yield repo
 
-    # Cleanup: remove any worktrees created during test
+    # Remove linked worktrees before pytest deletes the temporary repository.
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain"],
         cwd=str(repo),
@@ -91,7 +88,6 @@ def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
         for line in result.stdout.strip().split("\n"):
             if line.startswith("worktree "):
                 worktrees.append(line.split(" ", 1)[1])
-        # Remove all worktrees except the main one
         for wt_path in worktrees:
             if wt_path != str(repo):
                 subprocess.run(
@@ -118,7 +114,6 @@ def git_repo_with_claude(git_repo: Path) -> Path:
     claude_dir = git_repo / ".claude"
     claude_dir.mkdir()
 
-    # Create empty settings file
     settings = claude_dir / "settings.local.json"
     settings.write_text("{}\n")
 

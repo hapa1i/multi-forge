@@ -49,9 +49,8 @@ from forge.session.validation import is_safe_designated_doc_path
 logger = logging.getLogger(__name__)
 
 
-# Consumer-lane identity (epic consumer_lanes, T0/T6a/T6c). Non-default lanes: claude-max
-# (claude_code runtime, subscription posture) and codex (the T6c dispatch arm). backend_id is
-# load-bearing for billing only; model is nominal on the codex lane (codex picks its own model).
+# Non-default lanes are claude-max (claude_code runtime, subscription billing) and codex.
+# backend_id determines billing. The codex model is nominal because Codex selects its own model.
 MEMORY_WRITER_CONSUMER = Consumer(
     id="memory_writer",
     capability_floor="tool_agent",
@@ -404,7 +403,7 @@ def run_memory_writer(
             reason_code="below_min_turns",
             message=f"{turn_count} turns < min_turns={config.min_turns}",
         )
-        return True  # Not a failure — just below threshold
+        return True  # Below the threshold is a successful no-op.
 
     _VALID_MODES = {"augment", "review-only"}
     if config.mode not in _VALID_MODES:
@@ -412,10 +411,9 @@ def run_memory_writer(
         record_memory_writer_outcome(session_name, "error", reason_code="unknown_mode", message=config.mode)
         return False
 
-    # Resolve the bound lane -> runtime (epic consumer_lanes T6c). Validate the LaneRecord against
-    # the consumer's declared candidates (mirror shadow_curation's guard): a stale/corrupt explicit
-    # binding fails as a no-call degrade (best-effort async), never a silent wrong-arm dispatch.
-    # None -> the default claude lane.
+    # Validate the bound lane against the consumer's declared candidates. An invalid explicit
+    # binding records a failure without dispatch; it never silently selects another runtime.
+    # None selects the default claude lane.
     try:
         override = None if lane_record is None else record_to_lane(lane_record)
         runtime_id = resolve_lane(MEMORY_WRITER_CONSUMER, override=override).runtime_id
@@ -424,8 +422,7 @@ def run_memory_writer(
         record_memory_writer_outcome(session_name, "error", reason_code="invalid_lane", message=str(e))
         return False
 
-    # Claude availability is a claude-arm precondition only; a codex-bound run must not require it
-    # (epic consumer_lanes T6c, Finding 2).
+    # Claude availability is a claude-arm precondition only. A codex-bound run must not require it.
     if runtime_id == "claude_code" and not is_claude_available():
         logger.warning("Memory writer: claude CLI not found in PATH")
         record_memory_writer_outcome(session_name, "error", reason_code="claude_unavailable")
@@ -441,7 +438,6 @@ def run_memory_writer(
 
     safe_docs = _validate_designated_docs(designated_docs, forge_root)
 
-    # Read passports and filter by writer authorization
     passport_resolved: list[tuple[DesignatedDoc, Passport | None]] = []
     for doc in safe_docs:
         passport_source = resolve_passport_source(doc)
@@ -478,7 +474,6 @@ def run_memory_writer(
 
         passport_resolved.append((doc, passport))
 
-    # Resolve effective doc specs and check file existence
     ready_specs: list[ResolvedDocSpec] = []
     for doc, passport in passport_resolved:
         spec = resolve_doc_spec(doc, passport)
@@ -523,9 +518,7 @@ def run_memory_writer(
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
     tracking_url = base_url
 
-    # Runtime-keyed dispatch (epic consumer_lanes T6c): the codex arm is a self-contained early
-    # return that owns its own preflight gate, freeze timing, and (invoker) emission, so the claude
-    # path below stays byte-identical to pre-T6c.
+    # The codex arm owns its preflight gate, freeze timing, and invoker emission.
     if runtime_id == "codex":
         return _dispatch_codex_memory_writer(
             prompt=prompt,
@@ -537,8 +530,7 @@ def run_memory_writer(
             on_dispatch=on_dispatch,
         )
 
-    # Past every skip-return: this run is committed to a claude -p dispatch. Notify the caller
-    # so a consumer-lane freeze records only a lane that actually ran (epic consumer_lanes T6a).
+    # Notify the caller only after the run commits to a claude -p dispatch.
     if on_dispatch is not None:
         on_dispatch()
 
@@ -641,7 +633,7 @@ def _dispatch_codex_memory_writer(
     timeout_seconds: int,
     on_dispatch: Callable[[], None] | None,
 ) -> bool:
-    """Run the memory writer on the codex-exec lane (epic consumer_lanes T6c).
+    """Run the memory writer on the codex-exec lane.
 
     Mirrors ``_dispatch_codex_shadow_curation`` but maps codex failure into the memory writer's
     **best-effort-async** degrade (log + ``record_memory_writer_outcome`` + ``return False``), not
@@ -650,15 +642,15 @@ def _dispatch_codex_memory_writer(
 
     Sandbox is per mode: ``review-only`` -> ``read-only`` (reads the transcript + docs, prints proposed
     changes to stdout, writes nothing); ``augment`` -> ``workspace-write`` (edits the memory docs in
-    place -- the epic's first repo-write lane). Phase 0 confirmed codex honors workspace-write for
-    in-project writes; an out-of-project write is auto-rejected but rides ``turn.completed`` (NOT
-    ``runtime_is_error``), so no Claude-style permission scan is ported (D4) -- an in-project doc update
+    place). Codex honors workspace-write for in-project writes. An out-of-project write is
+    auto-rejected but rides ``turn.completed``, not ``runtime_is_error``. Therefore, this path does
+    not use a Claude-style permission scan. An in-project doc update
     (cwd=forge_root) never hits that path, and provider/turn failures still fold via ``runtime_is_error``.
 
-    Outcome recording (T6c Finding 1): the invoker's ``_emit_codex`` records BOTH the usage event
-    AND the upstream outcome row (success + error) via the pinned ``Attribution``. So this arm calls
-    ``record_memory_writer_outcome`` ONLY for no-spawn setup/preflight failures (the invoker never
-    ran); a spawned run relies on the invoker row -- recording here too would double-count.
+    The invoker's ``_emit_codex`` records both the usage event and the upstream outcome row via
+    the pinned ``Attribution``. This arm calls ``record_memory_writer_outcome`` only for setup or
+    preflight failures when the invoker did not run. A spawned run relies on the invoker row;
+    recording here too would double-count.
 
     Freeze: ``on_dispatch`` fires only *after* the preflight gate passes -- a cold-preflight
     skip-return never spawns codex, so it must not freeze; a spawned turn that fails still freezes
@@ -674,13 +666,12 @@ def _dispatch_codex_memory_writer(
 
     refresh_hint = "Run 'forge runtime preflight codex' to refresh."
 
-    # Sandbox per mode (T6c Phase 0 GO): augment edits the docs in place -> workspace-write; review-only
-    # only prints proposals -> read-only. A workspace-write run auto-rejects out-of-project writes, but
-    # the docs live under cwd=forge_root so an in-project update is auto-approved (Phase 0 probe).
+    # Augment mode edits documents in place. Review-only mode only prints proposals.
+    # The documents live under cwd=forge_root, so workspace-write permits their updates.
     sandbox: CodexSandbox = "workspace-write" if mode == "augment" else "read-only"
 
     # Setup (preflight gate + request shaping). A failure here is a no-spawn skip-return: the invoker
-    # never runs, so record the outcome manually (Finding 1) and do NOT freeze.
+    # never runs, so record the outcome manually and do not freeze the lane.
     try:
         preflight = read_fresh_codex_preflight()
         if preflight is None or not preflight.ready:
@@ -719,7 +710,7 @@ def _dispatch_codex_memory_writer(
 
     # HeadlessResult.success is returncode-only; fold runtime_is_error so an exit-0-but-failed turn
     # degrades instead of persisting an empty report. The invoker already recorded the upstream
-    # outcome (success + error) via the pinned Attribution, so do NOT record here (Finding 1).
+    # outcome via the pinned Attribution, so do not record it again here.
     if not result.success or result.runtime_is_error:
         reason = result.error or (result.stderr.strip()[:200] if result.stderr.strip() else "codex turn failed")
         logger.warning("Memory writer codex turn failed for %s: %s", session_name, reason)

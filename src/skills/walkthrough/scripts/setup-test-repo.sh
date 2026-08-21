@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Setup script for Forge walkthrough test repo.
-# Creates an isolated test workspace with hermetic Forge, Claude, and Codex settings homes.
+# Create an isolated walkthrough workspace with separate Forge, Claude, and Codex settings homes.
 #
 # Usage:
 #   setup-test-repo.sh           # Create test repo (default location)
@@ -14,12 +13,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 FORGE_TEST_REPO="${FORGE_TEST_REPO:-${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough/test-repo}"
-# Resolve to absolute path (and expand leading "~"), even if parent dirs don't exist yet.
 FORGE_TEST_REPO="$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$FORGE_TEST_REPO")"
 
 MARKER_FILE="$FORGE_TEST_REPO/.forge-walkthrough-marker"
 
-# --- Safety: refuse known-bad paths ---
+# Refuse paths that are unsafe to replace.
 check_safe_path() {
     local resolved
     resolved="$(realpath "$1" 2>/dev/null || echo "$1")"
@@ -35,7 +33,7 @@ check_safe_path() {
 
 check_safe_path "$FORGE_TEST_REPO"
 
-# --- Generate env.sh (defined early, used by both --reset and fresh init) ---
+# Both reset and initialization generate env.sh.
 generate_env() {
     mkdir -p "$FORGE_TEST_REPO/.forge/walkthrough" "$FORGE_TEST_REPO/.claude-user" "$FORGE_TEST_REPO/.codex-user"
     cat > "$FORGE_TEST_REPO/.forge/walkthrough/env.sh" << ENVEOF
@@ -55,17 +53,16 @@ echo "  FORGE_DEBUG = \$FORGE_DEBUG (sandbox debug logging)" >&2
 ENVEOF
 }
 
-# --- Remove walkthrough-derived state that should not persist across reruns ---
+# Remove walkthrough state that must not persist across runs.
 scrub_volatile_state() {
     rm -rf "$FORGE_TEST_REPO/.forge/artifacts"
     rm -rf "$FORGE_TEST_REPO/.forge/search-index"
     rm -rf "$FORGE_TEST_REPO/.forge-home/logs"
 }
 
-# --- Handle --reset ---
+# Reset an existing walkthrough repository.
 if [ "${1:-}" = "--reset" ]; then
     if [ -d "$FORGE_TEST_REPO" ] && [ -f "$MARKER_FILE" ]; then
-        # Marker exists: fast reset via git
         if [ ! -f "$FORGE_TEST_REPO/src/main.py" ] || [ ! -f "$FORGE_TEST_REPO/CLAUDE.md" ]; then
             echo "ERROR: Expected structure not found (src/main.py, CLAUDE.md)." >&2
             echo "This does not look like a forge-walkthrough repo. Refusing --reset." >&2
@@ -83,18 +80,16 @@ if [ "${1:-}" = "--reset" ]; then
         echo "Reset complete." >&2
         exit 0
     elif [ -d "$FORGE_TEST_REPO" ]; then
-        # No marker but dir exists: nuke and fall through to fresh init
+        # check_safe_path rejected unsafe targets before this recursive deletion.
         echo "No marker file found. Removing stale directory and recreating." >&2
         rm -rf "$FORGE_TEST_REPO"
     fi
-    # Fall through to fresh init below
 fi
 
-# --- Idempotent: skip if already exists ---
+# Reuse an existing walkthrough repository.
 if [ -d "$FORGE_TEST_REPO" ] && [ -f "$MARKER_FILE" ]; then
-    # Keep the repo baseline, but scrub walkthrough-derived artifacts so reruns start clean.
+    # Preserve the repository baseline while refreshing derived state and environment paths.
     scrub_volatile_state
-    # Ensure env.sh exists and stays up to date (e.g., if skill path moved).
     generate_env
     echo "Test repo already exists: $FORGE_TEST_REPO" >&2
     echo "Scrubbed volatile walkthrough state (.forge/artifacts, .forge/search-index, .forge-home/logs)." >&2
@@ -103,7 +98,7 @@ if [ -d "$FORGE_TEST_REPO" ] && [ -f "$MARKER_FILE" ]; then
     exit 0
 fi
 
-# --- Refuse to init into an existing directory without a marker ---
+# Do not initialize a directory that this script did not create.
 if [ -d "$FORGE_TEST_REPO" ] && [ ! -f "$MARKER_FILE" ]; then
     echo "ERROR: Directory exists but has no marker: $FORGE_TEST_REPO" >&2
     echo "This was not created by setup-test-repo.sh. Refusing to initialize." >&2
@@ -111,22 +106,19 @@ if [ -d "$FORGE_TEST_REPO" ] && [ ! -f "$MARKER_FILE" ]; then
     exit 1
 fi
 
-# --- Fresh init ---
+# Initialize a new walkthrough repository.
 echo "Creating test repo: $FORGE_TEST_REPO" >&2
 
 mkdir -p "$FORGE_TEST_REPO"
 cd "$FORGE_TEST_REPO"
 
-# Isolated Forge state and user-scoped Claude extension settings (HOME stays real)
 mkdir -p .forge-home .claude-user .codex-user
 
-# State/reports namespace
 mkdir -p .forge/walkthrough
 
-# Source tree
 mkdir -p src tests .claude
 
-# --- Write fixture files ---
+# Write fixture files.
 
 cat > src/main.py << 'PYEOF'
 def hello():
@@ -179,7 +171,7 @@ __pycache__/
 *.pyc
 GITEOF
 
-# --- Git init ---
+# Initialize the fixture repository.
 git init -q
 git config user.email "forge-test@localhost"
 git config user.name "Forge Test"
@@ -192,10 +184,9 @@ for f in .claude/ CLAUDE.local.md; do
 done
 git commit -q -m "Initial test repo for forge walkthrough"
 
-# --- Write marker (after commit so it's untracked = survives git checkout) ---
+# Write the marker after the commit so git checkout preserves it.
 echo "forge-walkthrough-marker" > "$MARKER_FILE"
 
-# --- Generate env.sh ---
 generate_env
 
 echo "Test repo created: $FORGE_TEST_REPO" >&2

@@ -81,8 +81,7 @@ class TestParseRolloutFilename:
         assert parsed == DiscoveredRollout(thread_id=_TID, path=path)
 
     def test_opaque_non_uuid_id_still_parses(self, tmp_path: Path) -> None:
-        # Phase 2 treats the id opaquely; the parser keeps that stance (strict on
-        # the timestamp prefix, loose on the id).
+        # Treat IDs as opaque: require the timestamp prefix but accept any remaining identifier.
         path = tmp_path / "rollout-2026-06-10T03-36-19-other-thread-id.jsonl"
         parsed = parse_rollout_filename(path)
         assert parsed is not None

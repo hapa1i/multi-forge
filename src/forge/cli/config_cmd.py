@@ -306,7 +306,6 @@ def edit_cmd() -> None:
     config_path = ensure_config()
     editor_argv = resolve_editor_argv()
 
-    # Copy to temp file for safe editing
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
         tmp.write(config_path.read_text())
         tmp_path = Path(tmp.name)

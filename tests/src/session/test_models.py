@@ -36,8 +36,7 @@ from forge.session.models import (
     create_session_state,
 )
 
-# NOTE: Comprehensive timestamp tests are in tests/src/core/state/test_timestamps.py
-# These tests use now_iso/parse_iso from core.state to verify integration with session models.
+# Timestamp edge cases live in tests/src/core/state/test_timestamps.py; these tests cover session-model integration.
 
 
 class TestWorktree:
@@ -216,7 +215,7 @@ class TestLaunchIntent:
 
 
 class TestCodexConfirmed:
-    """CodexConfirmed dataclass + additive manifest compatibility (codex_frontend Phase 2)."""
+    """CodexConfirmed preserves additive manifest compatibility."""
 
     def test_confirmed_codex_defaults_none(self) -> None:
         assert SessionConfirmed().codex is None
@@ -265,7 +264,7 @@ def _sample_adoption() -> AdoptionConfirmed:
 
 
 class TestAdoptionConfirmed:
-    """Adoption provenance schema (native_session_adoption Slice 1)."""
+    """Tests for the adoption provenance schema."""
 
     def test_confirmed_adoption_defaults_none(self) -> None:
         assert SessionConfirmed().adoption is None
@@ -843,7 +842,7 @@ class TestConstants:
 
 
 class TestConsumerLanes:
-    """LaneRecord DTO + consumer_lanes manifest sections (epic consumer_lanes, T1b)."""
+    """Tests for LaneRecord and the consumer_lanes manifest sections."""
 
     def test_lanerecord_stores_unknown_ids_without_catalog_validation(self) -> None:
         """LaneRecord is an inert DTO: it must NOT validate against the live catalogs.
@@ -871,7 +870,7 @@ class TestConsumerLanes:
     def test_lanerecord_rejects_non_string_fields(self, bad_value: object) -> None:
         """A LaneRecord field must be a real str (matches the annotation), not just truthy.
 
-        Slice 2 setters build LaneRecord directly, bypassing dacite's type check.
+        Direct LaneRecord construction bypasses dacite's type check.
         """
         with pytest.raises(ValueError, match="runtime_id"):
             LaneRecord(bad_value, "chatgpt", "gpt-5-codex")  # type: ignore[arg-type]  # runtime-validation test

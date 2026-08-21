@@ -177,7 +177,6 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
     """
     policy_id = "semantic.supervisor"
 
-    # Aligned = allow
     if verdict.verdict == "aligned":
         return PolicyDecision(
             decision="allow",

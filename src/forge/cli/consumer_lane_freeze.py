@@ -1,4 +1,4 @@
-"""Best-effort dispatch-time freeze of a consumer's bound lane (epic consumer_lanes T6a).
+"""Best-effort dispatch-time freeze of a consumer's bound lane.
 
 The non-supervisor consumers -- memory-writer, shadow-curation, team-supervisor -- dispatch
 on the lane ``read_bound_lane`` resolves, then pin that exact lane into ``confirmed`` so a
@@ -7,20 +7,20 @@ later re-declaration is rejected and observability sees one stable lane for the 
 This mirrors the supervisor freeze (``cli/hooks/policy.py``) rather than re-reading the
 manifest:
 
-- The caller resolves the lane ONCE (the same read ``backend_id`` came from) and threads it
+- The caller resolves the lane once (the same read ``backend_id`` came from) and threads it
   in as ``dispatched_lane``, so the frozen lane cannot diverge from the billed lane.
 - The freeze runs from each consumer's ``on_dispatch`` hook -- at the actual runtime dispatch
-  (the ``run_claude_session`` call, or ``codex exec`` on shadow-curation's codex lane, T6b) --
+  (the ``run_claude_session`` call or ``codex exec`` on a codex lane) --
   so a skipped/throttled/cached run never freezes a lane it never used.
 - Under the lock it re-checks ``read_bound_lane(m) == dispatched_lane`` (the supervisor's
   equality guard): a concurrent ``forge session lane set/clear`` between dispatch and this
   write drops the stale freeze instead of recording a lane the run did not bill.
 
-The *timing* differs from the supervisor by design, even though the guard mechanism is shared.
+The timing differs from the supervisor by design, even though the guard mechanism is shared.
 The supervisor is a registered, session-scoped entity (``resume_id``) and freezes eagerly at
-the first policy check, because registration is its commitment point (T1b). These consumers are
-per-hook invocations with no registration -- a skip means no work ran -- so their only honest
-commitment point is the dispatch itself. Same guard, different trigger.
+the first policy check, because registration is its commitment point. These consumers are
+per-hook invocations with no registration. A skip means no work ran, so dispatch is their
+commitment point. The guard is the same, but the trigger differs.
 
 Per the boundary framework (coding_standards.md §5), the persist is the outermost caller's
 call to make non-blocking: a lock/IO failure degrades to "retry on the next dispatch" -- the

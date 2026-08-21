@@ -1,4 +1,4 @@
-"""Tests for ``forge session resume --review`` (D4 from runtime abstraction Phase 1).
+"""Tests for ``forge session resume --review``.
 
 Verifies the --review flag opens the per-child transfer file in $EDITOR before
 launching Claude, and that the flag rejects incompatible combinations.

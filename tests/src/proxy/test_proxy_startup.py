@@ -79,7 +79,7 @@ def test_validate_proxy_startup_allows_matching_registered_proxy(
 
 
 class TestSidecarModeActive:
-    """Sidecar mode gates whether host-registry startup validation runs (Slice 2e)."""
+    """Sidecar mode gates host-registry startup validation."""
 
     def test_false_without_env(self, monkeypatch) -> None:
         from forge.proxy import server

@@ -353,7 +353,6 @@ def _run_verification_check(
             click.echo(f"Warning: Verification incomplete - {check_error}", err=True)
             return (True, None)
 
-        # on_incomplete == "block" - check escape hatches before blocking
         current_iterations = 0
         started_at: str | None = None
         if manifest.confirmed.verification:

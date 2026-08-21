@@ -1,9 +1,9 @@
-"""Tests for the native-Codex auth/runtime preflight (Phase 5a).
+"""Tests for the native-Codex auth and runtime preflight.
 
 Hermetic: the subprocess/filesystem probe seams on ``codex_preflight`` are
-monkeypatched, so no real ``codex`` runs and nothing is spawned. Each case encodes
-a Stage-A empirical finding (string-boolean details, doctor-parsed-on-nonzero-exit,
-overallStatus-never-gates-ready, hook-seam-never-active) as a regression guard.
+monkeypatched, so no real ``codex`` runs and nothing is spawned. The cases cover
+string booleans, doctor output on nonzero exit, readiness independent of
+``overallStatus``, and the inactive hook seam.
 """
 
 from __future__ import annotations
@@ -351,9 +351,9 @@ class TestHookSeamNeverActive:
         assert preflight_codex().hook_seam == "unknown"
 
     def test_enabled_is_enrollment_gated_never_active(self, monkeypatch) -> None:
-        # Enabled + version-OK: the normal case is "enrollment_gated" -- hooks can fire,
-        # but enrollment state is unchecked BY DECISION (codex_frontend Phase 1: the
-        # trusted_hash is not black-box computable and a path-keyed [hooks.state] read
+        # Enabled + version-OK normally means "enrollment_gated": hooks can fire,
+        # but enrollment state is intentionally unchecked. The trusted_hash is not black-box computable, and a
+        # path-keyed [hooks.state] read
         # false-negatives in worktrees, so no per-hook read exists). Even a (fabricated)
         # doctor trust hint never yields "active" here.
         doctor = _doctor(chatgpt="true", extra_details={"project trusted": "true"})

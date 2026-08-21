@@ -1,4 +1,4 @@
-"""Tests for usage-ledger emission helpers (Phase 4c).
+"""Tests for usage-ledger emission helpers.
 
 ``emit_usage_for_session_result`` (claude -p verbs) attributes from the
 SessionResult and the track_verb_cost holder, with null source_refs. An

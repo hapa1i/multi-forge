@@ -38,9 +38,7 @@ def _isolate_forge_logger():
     forge_logger.propagate = original_propagate
 
 
-# ---------------------------------------------------------------------------
 # Basic forge logs display
-# ---------------------------------------------------------------------------
 
 
 def test_logs_bare_group_shows_help(tmp_path, monkeypatch):
@@ -173,9 +171,7 @@ def test_logs_shows_total_summary(tmp_path, monkeypatch):
     assert "2 files" in result.output
 
 
-# ---------------------------------------------------------------------------
 # forge logs clean
-# ---------------------------------------------------------------------------
 
 
 def test_logs_clean_no_logs(tmp_path, monkeypatch):
@@ -237,9 +233,7 @@ def test_logs_clean_reports_active_files(tmp_path, monkeypatch):
     assert not (logs_dir / "proxy.99999999.log").exists()
 
 
-# ---------------------------------------------------------------------------
 # forge logs clean --older-than
-# ---------------------------------------------------------------------------
 
 
 def test_old_bare_clean_flag_is_clean_break(tmp_path, monkeypatch):
@@ -337,9 +331,7 @@ def test_clean_older_than_no_matches(tmp_path, monkeypatch):
     assert "No log files older than 7 days" in result.output
 
 
-# ---------------------------------------------------------------------------
 # Helper functions (unit tests)
-# ---------------------------------------------------------------------------
 
 
 class TestExtractPid:
@@ -506,7 +498,7 @@ class TestRemoveFiles:
         assert skipped == 0
 
     def test_skips_active_process_files(self, tmp_path):
-        """P1 fix: files belonging to a running process are not deleted."""
+        """Files belonging to a running process are not deleted."""
         subdir = tmp_path / "proxy"
         subdir.mkdir()
 
@@ -544,7 +536,7 @@ class TestRemoveFiles:
         assert dead_file.exists()
 
     def test_skips_active_rotated_log(self, tmp_path):
-        """P1 fix: rotated logs (.log.1) for active processes are also skipped."""
+        """Rotated logs for active processes are also skipped."""
         subdir = tmp_path / "proxy"
         subdir.mkdir()
 
@@ -558,7 +550,7 @@ class TestRemoveFiles:
         assert rotated.exists()
 
     def test_preserves_non_log_files(self, tmp_path):
-        """Review fix: non-log files in log subdirectories are not deleted."""
+        """Non-log files in log subdirectories are not deleted."""
         subdir = tmp_path / "tool_events"
         subdir.mkdir()
         (subdir / "20260327_proxy.99999999.jsonl").write_text("log data")
@@ -571,9 +563,7 @@ class TestRemoveFiles:
         assert (subdir / "notes.txt").exists()
 
 
-# ---------------------------------------------------------------------------
 # Auto-cleanup
-# ---------------------------------------------------------------------------
 
 
 def test_auto_clean_skips_when_disabled(tmp_path, monkeypatch):
@@ -617,7 +607,7 @@ def test_auto_clean_removes_old_files(tmp_path, monkeypatch):
 
 
 def test_auto_clean_preserves_active_proxy_logs(tmp_path, monkeypatch):
-    """P1 fix: auto-cleanup skips logs belonging to running processes."""
+    """Auto-cleanup skips logs that belong to running processes."""
     from forge.core.paths import get_forge_home
     from forge.runtime_config import reset_runtime_config
 

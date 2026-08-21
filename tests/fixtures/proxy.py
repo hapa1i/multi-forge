@@ -85,14 +85,13 @@ def kill_process(pid: int) -> None:
     try:
         os.kill(pid, signal.SIGTERM)
         time.sleep(0.5)
-        # Check if still running
         try:
-            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            os.kill(pid, 0)  # Signal 0 checks existence without sending a signal.
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
-            pass  # Already dead
+            pass
     except ProcessLookupError:
-        pass  # Process doesn't exist
+        pass
 
 
 @contextmanager
@@ -127,11 +126,9 @@ def proxy_context(
     actual_port = port if port is not None else allocate_ephemeral_port()
     actual_cwd = cwd if cwd is not None else forge_home
 
-    # Build environment
     actual_env = env if env is not None else os.environ.copy()
     actual_env["FORGE_HOME"] = str(forge_home)
 
-    # Start proxy subprocess
     proc = subprocess.Popen(
         [
             "uv",
@@ -151,7 +148,6 @@ def proxy_context(
     )
 
     try:
-        # Wait for proxy to be ready
         if not wait_for_port(actual_port, timeout=wait_timeout):
             proc.kill()
             stderr = proc.stderr.read().decode() if proc.stderr else ""
@@ -166,5 +162,4 @@ def proxy_context(
         )
 
     finally:
-        # Always cleanup
         kill_process(proc.pid)

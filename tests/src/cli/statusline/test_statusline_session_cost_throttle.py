@@ -1,15 +1,14 @@
-"""Tests for the time-only per-session cost throttle (Phase 5d).
+"""Tests for the time-only per-session cost throttle.
 
 ``read_or_compute_session_cost`` backs the ``forge_cost`` status-line segment. It
-differs from ``read_or_compute`` (the cache-hit-rate throttle) in three ways the
-card requires:
+differs from ``read_or_compute`` (the cache-hit-rate throttle) in three ways:
 
 - **Time-only** (no transcript mtime): headless cost accrues via ledger writes
   that never touch the transcript, so an mtime "unchanged" shortcut would freeze
-  ``forge +$Y`` for the whole session (card R4).
-- **Caches a legitimate ``0``** (#5): a no-cost session must not re-scan the
+  ``forge +$Y`` for the whole session.
+- **Caches a legitimate ``0``**: a no-cost session must not re-scan the
   PID-sharded ledger on every poll.
-- **Keyed on FORGE session identity** (#6), not the Claude stdin ``session_id``
+- **Keyed on FORGE session identity**, not the Claude stdin ``session_id``
   (which rolls on every ``/compact`` and would fragment the cache).
 
 A compute failure is fail-open and uncached.
@@ -126,9 +125,6 @@ def test_wrong_typed_cache_value_is_ignored() -> None:
 def test_uses_fcost_namespace() -> None:
     # Distinct filename namespace from the cache-hit throttle entries.
     assert _session_cost_cache_path("k").name.startswith("fcost-")
-
-
-# --- Supervisor-health throttle (sibling of the cost throttle) ----------------
 
 
 def _health_counter(health: SupervisorHealth):

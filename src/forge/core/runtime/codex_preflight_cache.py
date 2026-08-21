@@ -1,4 +1,4 @@
-"""Disk cache for the native-Codex headless preflight (epic consumer_lanes, T4).
+"""Disk cache for the native-Codex headless preflight.
 
 The supervisor's codex lane runs per Write/Edit hook, where the ~20s ``codex doctor``
 probe is far too slow -- but ``preflight_codex(run_doctor=False)`` falls back to env-only

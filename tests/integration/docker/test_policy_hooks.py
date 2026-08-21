@@ -218,7 +218,6 @@ class TestPolicyCheckDocker:
 
         assert exit_code == 0, f"Expected allow (exit 0), got {exit_code}. stderr: {stderr}"
 
-        # Verify manifest was updated (policy_states uses generic dict keyed by policy_id)
         manifest = read_manifest(policy_workspace)
         assert manifest["confirmed"]["policy"] is not None, "Policy state should be set"
         policy_states = manifest["confirmed"]["policy"].get("policy_states", {})
@@ -361,11 +360,6 @@ class TestPolicyCheckDocker:
         assert "max_cache_entries" in stderr
         assert "must be int, got bool" in stderr
         assert "Traceback" not in stderr
-
-
-# =============================================================================
-# Stop Verification Tests
-# =============================================================================
 
 
 class TestStopVerificationDocker:
@@ -716,11 +710,6 @@ class TestCodexSessionStartDocker:
         assert result.stdout.strip() == "", f"Fail-open should produce no stdout, got: {result.stdout}"
 
 
-# =============================================================================
-# PreCompact Tests
-# =============================================================================
-
-
 class TestPreCompactDocker:
     """Pre-compact transcript capture tests with Docker isolation.
 
@@ -731,7 +720,6 @@ class TestPreCompactDocker:
 
     def test_captures_transcript_and_updates_manifest(self, precompact_workspace: ContainerLike) -> None:
         """pre-compact should copy transcript to artifacts, update confirmed.compaction, and exit 0."""
-        # Create a transcript file for the hook to capture
         precompact_workspace.exec("echo '{\"test\": true}' > /tmp/test-transcript.jsonl")
 
         exit_code, stdout, stderr = invoke_precompact(
@@ -743,13 +731,11 @@ class TestPreCompactDocker:
 
         assert exit_code == 0, f"pre-compact should always exit 0, got {exit_code}. stderr: {stderr}"
 
-        # Verify transcript was copied to artifacts
         find_result = precompact_workspace.exec(
             "find /workspace/.forge/artifacts/precompact-test/transcripts -name '*pre-compact*' -type f"
         )
         assert find_result.stdout.strip(), "Expected pre-compact transcript snapshot in artifacts"
 
-        # Verify confirmed.compaction was updated in the manifest
         manifest_result = precompact_workspace.exec("cat /workspace/.forge/sessions/precompact-test/forge.session.json")
         manifest = json.loads(manifest_result.stdout)
         compaction = manifest.get("confirmed", {}).get("compaction")
@@ -809,7 +795,6 @@ class TestPolicyPipeline:
         )
         assert exit_code1 == 0, f"Step 1 failed: test write should allow, got {exit_code1}. stderr: {stderr1}"
 
-        # Verify intermediate state (policy_states uses generic dict keyed by policy_id)
         manifest1 = read_manifest(policy_workspace)
         assert manifest1["confirmed"]["policy"] is not None, "Step 1: policy state should exist"
         policy_states1 = manifest1["confirmed"]["policy"].get("policy_states", {})
@@ -828,7 +813,6 @@ class TestPolicyPipeline:
             exit_code2 == 0
         ), f"Step 2 failed: impl write should allow after test, got {exit_code2}. stderr: {stderr2}"
 
-        # Verify final state - tests_touched should still have the test file
         manifest2 = read_manifest(policy_workspace)
         policy_states2 = manifest2["confirmed"]["policy"].get("policy_states", {})
         tdd_state2 = policy_states2.get("tdd.tests-before-impl", {})

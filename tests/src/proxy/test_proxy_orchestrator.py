@@ -35,9 +35,7 @@ class _Proc:
         return None
 
 
-# ---------------------------------------------------------------------------
 # Template loading
-# ---------------------------------------------------------------------------
 
 
 def test_load_template_for_proxy_wraps_malformed_template(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,9 +76,7 @@ def test_find_available_port_wrapper_preserves_contract(orchestrator, monkeypatc
         orchestrator._find_available_port(start_port=8100, max_attempts=3)
 
 
-# ---------------------------------------------------------------------------
 # Reuse / adopt / spawn basics
-# ---------------------------------------------------------------------------
 
 
 def test_start_reuses_healthy_updates_last_seen(
@@ -355,9 +351,7 @@ def test_start_timeout_terminates_process(tmp_path, orch_registry, orch_health, 
     assert terminated["called"] is True
 
 
-# ---------------------------------------------------------------------------
 # Subprocess env var passing
-# ---------------------------------------------------------------------------
 
 
 class TestSpawnPassesProxyIdCliArg:
@@ -438,9 +432,7 @@ class TestSpawnPassesProxyIdCliArg:
         assert captured_env["HOME"] == "/home/user"
 
 
-# ---------------------------------------------------------------------------
 # Proxy ID generation timing
-# ---------------------------------------------------------------------------
 
 
 class TestStartGeneratesProxyIdBeforeSpawn:
@@ -479,9 +471,7 @@ class TestStartGeneratesProxyIdBeforeSpawn:
         assert spawned_proxy_id == "proxy_pregenerated"
 
 
-# ---------------------------------------------------------------------------
 # Explicit proxy_id
-# ---------------------------------------------------------------------------
 
 
 class TestStartWithExplicitProxyId:
@@ -561,9 +551,7 @@ class TestStartWithExplicitProxyId:
         assert result.proxy.proxy_id == "my-proxy"
 
 
-# ---------------------------------------------------------------------------
 # Explicit port
-# ---------------------------------------------------------------------------
 
 
 class TestStartWithExplicitPort:
@@ -634,9 +622,7 @@ class TestStartWithExplicitPort:
         assert result.proxy.base_url == "http://localhost:9999"
 
 
-# ---------------------------------------------------------------------------
 # Both proxy_id and port
-# ---------------------------------------------------------------------------
 
 
 class TestStartWithBothProxyIdAndPort:
@@ -671,9 +657,7 @@ class TestStartWithBothProxyIdAndPort:
         assert result.proxy.base_url == "http://localhost:9999"
 
 
-# ---------------------------------------------------------------------------
 # skip_proxy_file
-# ---------------------------------------------------------------------------
 
 
 class TestSkipProxyFile:
@@ -898,9 +882,7 @@ class TestSkipProxyFile:
         assert orch_registry.read().proxies[prior.proxy_id] == concurrent
 
 
-# ---------------------------------------------------------------------------
 # Dependency checking
-# ---------------------------------------------------------------------------
 
 
 def test_check_proxy_dependencies_raises_on_missing(monkeypatch: pytest.MonkeyPatch, orchestrator) -> None:
@@ -925,9 +907,7 @@ def test_check_proxy_dependencies_raises_on_missing(monkeypatch: pytest.MonkeyPa
     assert "--no-start" in error_msg
 
 
-# ---------------------------------------------------------------------------
 # Credential preflight
-# ---------------------------------------------------------------------------
 
 
 class TestTemplateCredentialPreflight:
@@ -989,9 +969,7 @@ class TestTemplateCredentialPreflight:
         assert result.proxy.proxy_id == "proxy_remote"
 
 
-# ---------------------------------------------------------------------------
 # Backend config staleness
-# ---------------------------------------------------------------------------
 
 
 class TestBackendConfigStaleness:
@@ -1045,13 +1023,11 @@ class TestBackendConfigStaleness:
         assert is_backend_config_outdated("litellm") is False
 
 
-# ---------------------------------------------------------------------------
-# Adoption under lock (TOCTOU fix)
-# ---------------------------------------------------------------------------
+# Atomic adoption under lock
 
 
 class TestAdoptionUnderLock:
-    """Tests for atomic adopt-under-lock behavior (M21 TOCTOU fix)."""
+    """Tests for atomic adopt-under-lock behavior."""
 
     def test_adopt_under_lock_prevents_duplicate(
         self, orch_stubs, orch_registry, orch_health, orchestrator, monkeypatch
@@ -1144,9 +1120,7 @@ class TestAdoptionUnderLock:
         assert len(registry.proxies) == 1
 
 
-# ---------------------------------------------------------------------------
 # smoke_test_proxy
-# ---------------------------------------------------------------------------
 
 
 class TestSmokeTestProxy:
@@ -1313,9 +1287,7 @@ class TestSmokeTestProxy:
         assert "timed out" in detail.lower()
 
 
-# ---------------------------------------------------------------------------
 # ensure_proxy: resolve-or-autostart-from-template
-# ---------------------------------------------------------------------------
 
 _ORCH = "forge.proxy.proxy_orchestrator"
 
@@ -1494,9 +1466,7 @@ class TestEnsureProxy:
         assert started is True
 
 
-# ---------------------------------------------------------------------------
-# assert_proxy_responses_capable (Phase 4 `forge codex start --proxy` gate)
-# ---------------------------------------------------------------------------
+# assert_proxy_responses_capable (`forge codex start --proxy` gate)
 
 
 def _capable_root_body(**overrides):

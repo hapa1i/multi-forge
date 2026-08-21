@@ -47,11 +47,9 @@ class TestBackendCLI:
         assert result.exit_code == 0
         assert "Created" in result.output
 
-        # Verify config was created
         config_path = isolated_forge_home / "backends" / "litellm" / "config.yaml"
         assert config_path.exists()
 
-        # Verify content looks like LiteLLM config
         content = config_path.read_text()
         assert "model_list:" in content
 
@@ -59,11 +57,9 @@ class TestBackendCLI:
         """Verify backend create errors on duplicate with a recovery tip."""
         runner = CliRunner()
 
-        # First create
         result1 = runner.invoke(main, ["model", "backend", "create", "litellm"])
         assert result1.exit_code == 0
 
-        # Second create - should error with tip to start instead
         result2 = runner.invoke(main, ["model", "backend", "create", "litellm"])
         assert result2.exit_code == 1
         assert "already exists" in result2.output
@@ -73,12 +69,10 @@ class TestBackendCLI:
         """Verify backend delete removes config directory."""
         runner = CliRunner()
 
-        # Create first
         runner.invoke(main, ["model", "backend", "create", "litellm"])
         config_dir = isolated_forge_home / "backends" / "litellm"
         assert config_dir.exists()
 
-        # Delete with --yes to skip confirmation
         result = runner.invoke(main, ["model", "backend", "delete", "litellm", "--yes"])
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -114,7 +108,7 @@ class TestBackendRegistry:
             ManagedBackendProcess,
         )
 
-        # Manually add a backend to registry (simulating a running backend)
+        # Seed a running backend without starting an external process.
         store = BackendRegistryStore()
         instance = ManagedBackendProcess(
             process_id="litellm-4000",
@@ -130,7 +124,6 @@ class TestBackendRegistry:
 
         store.update(timeout_s=5.0, mutate=add_backend)
 
-        # Now list should show the backend
         runner = CliRunner()
         result = runner.invoke(main, ["model", "backend", "list"])
 
@@ -157,7 +150,6 @@ class TestBackendRegistry:
         registry = BackendRegistry(processes={"litellm-4000": instance})
         store.write(registry)
 
-        # Read raw JSON
         registry_path = isolated_forge_home / "backends" / "index.json"
         data = json.loads(registry_path.read_text())
 

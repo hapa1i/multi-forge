@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 4 provider-trace command-core ops."""
+"""Unit tests for provider-trace command-core operations."""
 
 from __future__ import annotations
 

@@ -448,7 +448,7 @@ class TestRunSidecarSession:
 
 
 class TestRunSidecarSessionProxyAudit:
-    """Tests for the proxy-id audit plumbing (Slice 2e)."""
+    """Tests for proxy-ID audit plumbing."""
 
     def _capture_cmd(self, *, proxy_id: str | None, make_proxy_yaml: bool) -> str:
         """Run the session with subprocess mocked; return the docker cmd as a string."""

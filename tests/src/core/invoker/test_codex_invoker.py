@@ -1,4 +1,4 @@
-"""Tests for CodexHeadlessInvoker + prepare_codex_request (Phase 5b, B3/B4).
+"""Tests for CodexHeadlessInvoker and prepare_codex_request.
 
 The shared lifecycle (process groups, ordered fan-out, cancellation races) is proven
 in ``test_claude_invoker.py``; these tests cover the Codex hooks: JSONL-stream result
@@ -122,11 +122,11 @@ class TestCodexResultBuilding:
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_operation_none_suppresses_upstream_keeps_usage(self, mock_popen):
-        """T5/WS1: the codex supervisor passes operation=None -- the downstream usage event
-        still fires but the upstream-outcome row is suppressed, so the engine's policy.evaluate
-        is the only upstream row (no double-count). The gate must not over-reach to usage. Driven
-        on a runtime-error run so the suppressed row would otherwise be recorded (the volume
-        policy drops successful rows regardless)."""
+        """operation=None keeps the downstream usage event but suppresses the upstream outcome.
+
+        The Codex supervisor uses this mode, so the engine's policy.evaluate row is the only upstream row.
+        The gate must not suppress usage. A runtime-error run ensures that volume policy would not hide the row.
+        """
         from forge.core.telemetry.upstream import read_upstream_outcomes
         from forge.core.usage.ledger import read_usage_events
 
@@ -141,7 +141,7 @@ class TestCodexResultBuilding:
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_operation_label_threads_to_upstream_row(self, mock_popen):
-        """T5/WS1: a non-default Attribution.operation becomes the codex upstream-outcome label.
+        """A non-default Attribution.operation becomes the Codex upstream-outcome label.
         Guards against re-hardcoding `operation="workflow.worker"` (the default == the old literal,
         so only a non-default value distinguishes threading from a hardcode). Driven on a runtime
         error so the upstream row is actually recorded (success rows are volume-dropped)."""

@@ -1,18 +1,18 @@
-"""Manifest <-> lane binding bridge (epic consumer_lanes, ticket T1b).
+"""Bridge manifest lane records to validated consumer lanes.
 
 The seam between the catalog-free manifest DTOs (``session.models.LaneRecord`` and
 the ``consumer_lanes`` sections) and the validating pure resolver
 (``core.lanes``). It deliberately lives in neither: ``session.models`` stays
-catalog-free (it must not import ``core.lanes``, card D1), and ``core.lanes``
+catalog-free because it must not import ``core.lanes``. The ``core.lanes`` module
 stays pure/IO-free (no session-model mutation, its purity test forbids it).
 
-Two operations, both keyed by ``consumer.id`` so T6 extends them by adding a
-named field per consumer to ``ConsumerLane{Intent,Confirmed}`` -- no edit here:
+Two operations key by ``consumer.id``. Adding a consumer requires a named field
+in ``ConsumerLane{Intent,Confirmed}``, without changes to this module:
 
 - ``read_bound_lane`` -- the lane to dispatch on (frozen binding first, then the
   pre-freeze intent override, then the consumer default).
 - ``ensure_consumer_lane_binding`` -- freeze that lane into ``confirmed``
-  write-if-absent, the single immutability seam (card D2).
+  write-if-absent at the single immutability seam.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def read_bound_lane(state: SessionState, consumer: Consumer) -> LaneRecord | Non
     "resolved once and frozen" contract), so a written binding is followed even if
     ``intent`` later drifts. Before the freeze, the ``intent`` override is the
     source. None means no placement is recorded -- the caller resolves the
-    consumer's default lane (the byte-identical pre-T1b path).
+    consumer's default lane.
     """
     binding = _confirmed_binding(state, consumer)
     if binding is not None:

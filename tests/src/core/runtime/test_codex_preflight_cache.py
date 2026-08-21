@@ -1,4 +1,4 @@
-"""Tests for the Codex headless preflight disk cache (epic consumer_lanes, T4).
+"""Tests for the Codex headless-preflight disk cache.
 
 The cache lets the per-Write/Edit supervisor hook read codex readiness without the ~20s
 ``codex doctor`` probe. These assert the round-trip and every invalidation path; the
@@ -129,8 +129,8 @@ class TestCodexPreflightCacheInvalidation:
         assert cpc.read_fresh_codex_preflight() is None
 
     def test_credentials_change_invalidates(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # M4: _resolve_codex_auth reads CODEX_API_KEY from ~/.forge/credentials.yaml *before* the
-        # codex store, so editing that file changes readiness. Its mtime is a stat-able key.
+        # Credential resolution checks ~/.forge/credentials.yaml before the Codex store.
+        # Its mtime must therefore participate in cache invalidation.
         monkeypatch.setattr(cpc, "_codex_binary_signature", lambda runtime: ("/usr/bin/codex", 1000.0))
         monkeypatch.setattr(cpc, "_auth_store_mtime", lambda: 2000.0)
         monkeypatch.setattr(cpc, "_now", lambda: 5000.0)

@@ -2946,7 +2946,7 @@ class TestEnableCodexHooks:
         assert "Next steps (Codex hooks):" not in result.output
 
     def test_rerun_enable_without_codex_keeps_tracking(self) -> None:
-        """CLI-level pin of the preserve fix: enable -> re-enable codex-less."""
+        """Re-enabling without Codex preserves the existing Codex installation."""
         import json
 
         from click.testing import CliRunner

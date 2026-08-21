@@ -141,24 +141,22 @@ def _supervisor_action_content(context: ActionContext) -> str:
     return _bounded_excerpt(context.new_content or "", _SUPERVISOR_CONTENT_CHARS)
 
 
-# The supervisor as a consumer-lane binding (epic consumer_lanes). It reads repo
-# files (a `tool_agent` capability floor), and `runtime_id` selects the dispatch arm
-# in `_dispatch_supervisor`: `claude_code` or `codex`. `backend_id`/`model` remain
-# nominal placement metadata for dispatch: the Claude arm derives transport
+# The supervisor reads repository files, so it requires a `tool_agent` lane.
+# `runtime_id` selects the `claude_code` or `codex` arm in `_dispatch_supervisor`.
+# `backend_id` and `model` are placement metadata. The Claude arm derives transport
 # (`base_url`) and its `opus` pin dynamically, while Codex chooses its own model.
-# `backend_id` is nevertheless load-bearing for billing (for example `claude-max`).
+# `backend_id` still determines billing (for example `claude-max`).
 # `anthropic-direct` is a real catalog source; no single backend is "correct" for a
 # proxied Claude supervisor, which routes through whichever proxy was resolved.
 SUPERVISOR_CONSUMER = Consumer(
     id="supervisor",
     capability_floor="tool_agent",
     default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
-    # T4: the codex-exec lane on the ChatGPT subscription (chatgpt.reachable_via=("codex",), T2). An
-    # override must be a declared candidate -- resolve_lane(override=...) rejects anything outside
-    # valid_lanes. backend_id/model are nominal (only runtime_id drives dispatch in T4; codex picks
-    # its own model unless `-m` is passed). T1b generalizes this to a uniform consumer-lane binding.
-    # T0 (claude subscription): the keyless claude_code lane on the Claude Max subscription
-    # (claude-max.reachable_via=("claude_code",)). backend_id is load-bearing for billing only --
+    # The codex-exec lane uses the ChatGPT subscription (chatgpt.reachable_via=("codex",)).
+    # resolve_lane rejects an override that is not a declared candidate.
+    # Only runtime_id drives dispatch. Codex picks its own model unless `-m` is passed.
+    # The keyless claude_code lane uses the Claude Max subscription
+    # (claude-max.reachable_via=("claude_code",)). backend_id determines billing only;
     # resolve_billing_mode reads its subscription posture; the claude_code dispatch arm is unchanged.
     allowed_lanes=(
         Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
@@ -234,9 +232,9 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
 
     def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
         self._config = config
-        # Injected consumer-lane binding (epic consumer_lanes, T1b): the policy-check hook
-        # resolves it from the manifest and passes it here, so this module never reads the store.
-        # None => the default lane (byte-identical pre-T1b dispatch).
+        # The policy-check hook passes the manifest's consumer-lane binding here,
+        # so this module never reads the store.
+        # None selects the default lane.
         self._lane_record = lane_record
         ttl = config.throttle_seconds if config else 30
         self._cache = ThrottleCache(ttl_seconds=ttl)
@@ -272,7 +270,6 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         if self._config.suspended:
             return PolicyDecision(decision="allow", policy_id=self.policy_id)
 
-        # Check cache
         cache_key = action_fingerprint(context)
         if self._config.plan_override_path:
             cache_key = (
@@ -544,9 +541,9 @@ def _dispatch_supervisor(
             usage_command=usage_command,
             backend_id=lane.backend_id,
         )
-    # T4 wired the codex arm (raises _SupervisorRoutingError(codex_unavailable) on an unready
-    # preflight). A runtime with no adapter (a future T1b lane reaching here unmapped) also
-    # raises _SupervisorRoutingError -- failure_type="configuration_error" -- so the dispatch
+    # The codex arm raises _SupervisorRoutingError(codex_unavailable) when preflight is not ready.
+    # A runtime with no adapter raises _SupervisorRoutingError with
+    # failure_type="configuration_error", so the dispatch
     # try/except in run_supervisor_check catches it and fails open. It must NOT raise LaneError
     # here: that except clause catches only _SupervisorRoutingError, so a LaneError would escape
     # uncaught -> engine policy_error -> DENY under fail_mode="closed" (the supervisor's contract
@@ -651,7 +648,7 @@ def _dispatch_codex_supervisor(
     context: ActionContext,
     usage_command: str,
 ) -> SessionResult:
-    """Run the supervisor on the codex-exec lane (T4, epic consumer_lanes).
+    """Run the supervisor on the codex-exec lane.
 
     Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
     be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
@@ -662,8 +659,8 @@ def _dispatch_codex_supervisor(
     auto-emits the SOLE usage event (``emit_codex_usage`` via the request's ``Attribution``);
     this arm must NOT call ``emit_usage_for_session_result`` -- that would double-count.
 
-    Preflight is **cached, never probed in the hook** (T4 review fix). ``codex doctor`` is
-    ~20s and ``run_doctor=False`` cannot see ``codex_store`` (ChatGPT-login) auth -- the very
+    Preflight is **cached, never probed in the hook**. ``codex doctor`` is
+    about 20 seconds and ``run_doctor=False`` cannot see ``codex_store`` (ChatGPT-login) auth -- the very
     backend this lane declares -- so the arm reads the ``run_doctor=True`` preflight that
     ``forge runtime preflight codex`` cached. A cold/stale/unready cache fails open
     (``codex_unavailable``) with a refresh hint. **All** setup failures (cache read, request
@@ -672,7 +669,7 @@ def _dispatch_codex_supervisor(
     ``policy_error`` -- a DENY under ``fail_mode="closed"`` -- or crash the shadow-auditor
     path that calls ``run_supervisor_check`` directly).
 
-    Upstream-row parity (T5/WS1): the codex arm passes ``operation=None`` in its ``Attribution``
+    The codex arm passes ``operation=None`` in its ``Attribution``
     so the shared invoker emits the usage event but skips its ``record_upstream_operation`` row.
     Both arms therefore persist exactly one upstream outcome -- the engine's ``policy.evaluate`` --
     instead of the codex arm double-counting with an extra mis-categorized ``workflow.worker`` row.
@@ -694,7 +691,7 @@ def _dispatch_codex_supervisor(
             # operation=None suppresses the invoker's upstream-outcome row (the usage event
             # still fires); the engine's policy.evaluate is this arm's only upstream row.
             attribution=Attribution(command=usage_command, session=context.session_name, operation=None),
-            model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
+            model=None,  # codex picks its own model; backend_id/model on the lane are nominal
             # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
             # worktree, needed only because `claude --resume` is CWD-scoped to find the
             # transcript -- a Claude-arm constraint codex (no --resume) doesn't share. Codex
@@ -784,8 +781,8 @@ def run_supervisor_check(
     must NOT emit again -- this is the sole emitter), so the shadow path records
     ``supervisor-shadow`` rather than double-counting as ``supervisor``.
 
-    ``lane_record`` is the injected consumer-lane binding (epic consumer_lanes, T1b):
-    the policy-check hook resolves it from the manifest and passes it, so this function
+    ``lane_record`` is the injected consumer-lane binding.
+    The policy-check hook resolves it from the manifest and passes it, so this function
     never reads the store. None selects the consumer's default lane.
     """
     from forge.core.reactive.env import should_spawn_subprocesses
@@ -830,9 +827,9 @@ def run_supervisor_check(
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
-    # Resolve the supervisor's lane (T1a) under a fail-open guard, then dispatch on its
-    # runtime. The lane comes from the injected consumer-lane binding (T1b): converting the
-    # stored LaneRecord -> Lane revalidates it against today's catalogs, so a drifted binding
+    # Resolve the supervisor lane under a fail-open guard, then dispatch on its runtime.
+    # Converting the injected consumer-lane binding from LaneRecord to Lane
+    # revalidates the runtime and backend catalogs, so a drifted binding
     # (renamed backend) raises LaneError here and fails open as a no-call -- it never silently
     # runs the default lane. resolve_lane also rejects any override outside SUPERVISOR_CONSUMER's
     # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
@@ -883,14 +880,14 @@ def run_supervisor_check(
         # The provider reason rides `stderr` on a codex runtime failure (codex.py surfaces
         # it there); `_headless_to_session_result` folds it into `error` only on the exit-0
         # path, so a realistic non-zero failed turn has `error=None`. Read `error or stderr`
-        # for the warning, the fail-open decision text, AND the T7 classification -- falling
+        # for the warning, fail-open decision text, and exhaustion classification. Fall
         # back to `exit N` only when neither field carries a reason (so the quota message is
         # not hidden behind a bare "exit 1").
         reason = result.error or result.stderr or ""
         _log.warning("Supervisor invocation failed: %s", reason or f"exit {result.returncode}")
-        # T7: a codex turn that reports an in-stream quota wall (runtime_is_error) is
+        # A codex turn that reports an in-stream quota wall (runtime_is_error) is
         # classified as `subscription_exhausted` -- ahead of the generic `subprocess_error`/
-        # `exit_N` -- so Phase 2 can degrade the spent codex lane. Gated on the codex runtime
+        # `exit_N` -- so callers can degrade the spent codex lane. This check is limited to codex
         # so a claude-lane/subprocess failure is never read as exhaustion.
         if result.timed_out:
             failure_type = "timeout"
@@ -1343,7 +1340,6 @@ def resolve_supervisor_reload_plan_path(
                     fork_state = SessionStore(current_fr, name).read()
                 except Exception:
                     continue
-                # Check parent relationship
                 parent = None
                 if fork_state.confirmed.derivation:
                     parent = fork_state.confirmed.derivation.parent_session
@@ -1351,7 +1347,6 @@ def resolve_supervisor_reload_plan_path(
                     parent = fork_state.parent_session
                 if parent != target_name:
                     continue
-                # Check for approved plan snapshots
                 plans = fork_state.confirmed.artifacts.get("plans", [])
                 if not isinstance(plans, list):
                     continue

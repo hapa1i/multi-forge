@@ -160,13 +160,11 @@ def temp_source_dir(tmp_path: Path) -> Path:
     src = tmp_path / "src"
     src.mkdir()
 
-    # Create commands
     commands = src / "commands"
     commands.mkdir()
     (commands / "test-cmd.md").write_text("# Test Command\n")
     (commands / "another.md").write_text("# Another Command\n")
 
-    # Create agents
     agents = src / "agents"
     agents.mkdir()
     (agents / "test-agent.md").write_text("# Test Agent\n")

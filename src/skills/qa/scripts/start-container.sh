@@ -18,18 +18,17 @@ PROVIDER_PROFILE="openrouter"
 RESET=false
 ACTION="start"
 
-# --- Resolve repo root and image tag ---
+# Resolve the repository root and image tag.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd -P)"
 
-# Detect Claude Code version from installed binary
 if command -v claude &>/dev/null; then
     CLAUDE_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
 fi
 CLAUDE_VERSION="${CLAUDE_VERSION:-latest}"
 IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}"
 
-# --- Helper functions ---
+# Helpers
 error() { echo "ERROR: $*" >&2; }
 info()  { echo "INFO: $*" >&2; }
 
@@ -235,12 +234,12 @@ docker_env_args() {
     printf '%s\n' "${args[@]}"
 }
 
-# --- Host state dir (mounted into container) ---
+# Mount the host QA state in the container.
 HOST_STATE_DIR_RAW="${FORGE_HOME:-$HOME/.forge}/manual-testing/qa"
 HOST_STATE_DIR="$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(os.path.expandvars(sys.argv[1]))))' "$HOST_STATE_DIR_RAW")"
 mkdir -p "$HOST_STATE_DIR"
 
-# --- Docker availability check ---
+# Require a running Docker daemon.
 if ! command -v docker &> /dev/null; then
     error "Docker command not found. Install Docker: https://docs.docker.com/get-docker/"
     exit 1
@@ -251,7 +250,7 @@ if ! docker info &> /dev/null; then
     exit 1
 fi
 
-# --- Handle --stop ---
+# Stop and remove the container.
 if [[ "$ACTION" == "stop" ]]; then
     if docker ps -q -f "name=^${CONTAINER_NAME}$" | grep -q .; then
         info "Stopping and removing container: $CONTAINER_NAME"
@@ -265,7 +264,7 @@ if [[ "$ACTION" == "stop" ]]; then
     exit 0
 fi
 
-# --- Handle --status ---
+# Report container status.
 if [[ "$ACTION" == "status" ]]; then
     if docker ps -q -f "name=^${CONTAINER_NAME}$" | grep -q .; then
         info "Container $CONTAINER_NAME is running."
@@ -283,16 +282,13 @@ if [[ "$ACTION" == "status" ]]; then
     fi
 fi
 
-# --- Resolve repo revision (used by the reuse staleness guard and the build) ---
+# Use the repository revision to detect stale containers and images.
 FORGE_REV="$(get_forge_rev)"
 
-# --- Reuse if already running ---
+# Reuse a current running container.
 if [[ "$RESET" != "true" ]] && docker ps -q -f "name=^${CONTAINER_NAME}$" | grep -q .; then
-    # Staleness guard (must run before the reuse fast-path's `exit 0` below): a
-    # container whose baked image revision predates the current checkout would
-    # make QA silently validate stale code. Refuse to reuse it and point at
-    # --reset. The earlier bug exited 0 here without any revision check, so a
-    # running container built before a fix was reused indefinitely.
+    # Reject a container whose image revision differs from the checkout.
+    # Reusing it would make QA validate stale code.
     running_rev="$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$CONTAINER_NAME" 2>/dev/null || true)"
     if [[ -z "$running_rev" || "$running_rev" != "$FORGE_REV" ]]; then
         error "Running container '$CONTAINER_NAME' is stale (image=${running_rev:-<missing>}, repo=${FORGE_REV})."
@@ -323,7 +319,7 @@ fi
 
 validate_provider_profile
 
-# --- Handle --reset (kill container + remove image, then fall through to rebuild) ---
+# Reset by removing the container and image before rebuilding.
 if [[ "$RESET" == "true" ]]; then
     info "Rebuild: removing container and image..."
     docker stop "$CONTAINER_NAME" > /dev/null 2>&1 || true
@@ -332,7 +328,7 @@ if [[ "$RESET" == "true" ]]; then
     info "Cleaned up. Rebuilding from scratch..."
 fi
 
-# --- Remove stopped container with same name ---
+# Remove a stopped container that uses the target name.
 if docker ps -aq -f "name=^${CONTAINER_NAME}$" | grep -q .; then
     info "Removing stopped container: $CONTAINER_NAME"
     docker rm "$CONTAINER_NAME" > /dev/null 2>&1 || true
@@ -340,9 +336,8 @@ fi
 
 DOCKERFILE="$REPO_ROOT/docker/Dockerfile.forge"
 
-# --- Image staleness detection (reuse pattern from scripts/test-integration.sh) ---
-# FORGE_REV is computed before the reuse fast-path (so stale *running* containers
-# are rejected there too); here it gates rebuilds for stopped/missing images.
+# Rebuild stopped or missing images when their revision differs from the checkout.
+# Running containers were rejected above.
 needs_build=false
 if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
     needs_build=true
@@ -386,7 +381,7 @@ if [[ "$needs_build" == "true" ]]; then
     fi
 fi
 
-# --- Start container ---
+# Start the container.
 info "Starting container: $CONTAINER_NAME"
 DOCKER_ENV=()
 while IFS= read -r docker_env_arg; do
@@ -403,13 +398,11 @@ if ! docker run -d \
     exit 3
 fi
 
-# --- Remove leaked .env before any forge imports ---
-# load_dotenv() in cli/main.py:16 fires at import time. If /forge/.env survived
-# from a stale image (built before .dockerignore excluded it), it contaminates
-# all forge commands. Remove before the "Forge importable" preflight check.
+# Remove leaked .env files before importing Forge. A stale image can contain files
+# excluded by current .dockerignore rules, and load_dotenv() would import their values.
 docker exec "$CONTAINER_NAME" bash -c 'rm -f /forge/.env /forge/.env.*'
 
-# --- Preflight inside container ---
+# Run the container preflight.
 info "Running preflight checks..."
 
 # Install checklist/runtime process-inspection dependencies.
@@ -461,10 +454,9 @@ docker exec "$CONTAINER_NAME" bash -lc 'test -x /forge/.venv/bin/forge' || {
     exit 3
 }
 
-# Configure Claude Code auth for container environment.
-# ANTHROPIC_API_KEY from the env profile (set above) is the sole auth mechanism.
-# hasCompletedOnboarding skips the first-run screen.
-# settings.json starts empty; `forge extension enable` (section 2) merges hooks into it.
+# Use ANTHROPIC_API_KEY as the only Claude Code authentication mechanism.
+# Mark onboarding complete to bypass the first-run screen. Section 2 runs
+# `forge extension enable`, which adds hooks to the initially empty settings.json.
 # See: github.com/anthropics/claude-code/issues/9699
 docker exec "$CONTAINER_NAME" bash -c 'mkdir -p /root/.claude'
 
@@ -476,13 +468,12 @@ docker exec -i "$CONTAINER_NAME" bash -c 'cat > /root/.claude.json && chmod 600 
 {"hasCompletedOnboarding":true}
 ONBOARDEOF
 
-# Verify Forge is importable
 docker exec "$CONTAINER_NAME" bash -lc 'cd /forge && uv run python -c "import forge.cli.main"' || {
     error "Forge is not importable in container."
     exit 3
 }
 
-# --- Initialize workspace ---
+# Initialize the workspace.
 docker exec "$CONTAINER_NAME" bash -c '
     mkdir -p /workspace/src /workspace/tests /workspace/.claude /workspace/.forge/qa /workspace/.forge/qa/logs
     cd /workspace

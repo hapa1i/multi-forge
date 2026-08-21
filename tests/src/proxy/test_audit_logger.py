@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 2 audit logger (logging, hashing, drift, and redaction)."""
+"""Unit tests for audit logging, hashing, drift detection, and redaction."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _downstream_path():
 
 
 class TestAuditStatePath:
-    """Drift-state file location (Slice 2e: read-only config mount forces a redirect)."""
+    """A read-only config mount redirects the drift-state file."""
 
     def test_host_mode_writes_beside_proxy_yaml(self, monkeypatch):
         from forge.core.paths import get_forge_home

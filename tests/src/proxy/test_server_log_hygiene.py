@@ -1,7 +1,7 @@
-"""Slice 1 (proxy_log_hygiene): successful, fast poll completions log at DEBUG, not INFO.
+"""Successful, fast poll completions log at DEBUG rather than INFO.
 
 The status line polls GET / frequently; an INFO line per poll turned the proxy log into an
-access-log stream. The middleware now demotes a successful, fast non-verbose completion to
+access-log stream. The middleware demotes a successful, fast non-verbose completion to
 DEBUG and keeps INFO only for failures (status >= 400) or slow responses (> _SLOW_POLL_LOG_S).
 
 The middleware is exercised directly with a stub ``call_next``; the fast/slow boundary is

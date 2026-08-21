@@ -40,7 +40,6 @@ class TestSessionList:
 
     def test_list_shows_sessions(self, mock_claude_workspace: ContainerLike) -> None:
         """Should list existing sessions."""
-        # Create a session first
         mock_claude_workspace.exec("cd /workspace && forge session start test-session")
 
         result = mock_claude_workspace.exec("cd /workspace && forge session list")
@@ -81,7 +80,6 @@ class TestSessionInspect:
 
         assert result.returncode == 0
         assert "inspect-test" in result.stdout
-        # Check for session info markers
         assert "UUID" in result.stdout or "Basic Info" in result.stdout
 
     def test_inspect_nonexistent_fails(self, mock_claude_workspace: ContainerLike) -> None:
@@ -107,7 +105,6 @@ class TestSessionStart:
         """Should create per-session manifest."""
         mock_claude_workspace.exec("cd /workspace && forge session start manifest-test")
 
-        # Check manifest file exists and contains session name
         result = mock_claude_workspace.exec("cat /workspace/.forge/sessions/manifest-test/forge.session.json")
 
         assert result.returncode == 0
@@ -128,7 +125,6 @@ class TestSessionStart:
         """Should invoke claude binary (UUID is launch-owned, no --session-id)."""
         mock_claude_workspace.exec("cd /workspace && forge session start invoke-test")
 
-        # Check that mock claude was invoked
         result = mock_claude_workspace.exec("cat /tmp/claude_invocations.log")
 
         assert result.returncode == 0
@@ -185,14 +181,11 @@ class TestSessionDelete:
         """Should remove manifest file."""
         mock_claude_workspace.exec("cd /workspace && forge session start remove-test")
 
-        # Verify manifest exists
         check_before = mock_claude_workspace.exec("test -f /workspace/.forge/sessions/remove-test/forge.session.json")
         assert check_before.returncode == 0
 
-        # Delete session
         mock_claude_workspace.exec("cd /workspace && forge session delete remove-test --yes")
 
-        # Verify manifest is gone
         check_after = mock_claude_workspace.exec("test -f /workspace/.forge/sessions/remove-test/forge.session.json")
         assert check_after.returncode != 0
 
@@ -294,17 +287,13 @@ class TestSessionResume:
         """With --fresh, should invoke claude as NEW session with context file (not --resume)."""
         mock_claude_workspace.exec("cd /workspace && forge session start resume-invoke-test")
 
-        # Clear previous invocations
         mock_claude_workspace.exec("> /tmp/claude_invocations.log")
 
         mock_claude_workspace.exec("cd /workspace && forge session resume resume-invoke-test --fresh")
 
-        # --fresh creates a derived session with context assembled from parent
         result = mock_claude_workspace.exec("cat /tmp/claude_invocations.log")
 
-        # Should NOT have --resume flag (it's a new session with context file)
         assert "--resume" not in result.stdout
-        # Should have been invoked (just checking claude was called)
         assert "claude" in result.stdout
         # Per-child path: <parent>/children/<auto-named-child>.md
         assert (
@@ -749,7 +738,6 @@ class TestSessionSetOverride:
         mock_claude_workspace.exec("cd /workspace && forge session start persist-test")
         mock_claude_workspace.exec("cd /workspace && forge session set --session persist-test agent custom-agent")
 
-        # Check manifest contains override (per-session directory layout)
         result = mock_claude_workspace.exec("find /workspace/.forge/sessions -name forge.session.json -exec cat {} \\;")
 
         assert "custom-agent" in result.stdout or "agent" in result.stdout
@@ -888,7 +876,6 @@ class TestInspectShowsOverrides:
         result = mock_claude_workspace.exec("cd /workspace && forge session show inspect-override")
 
         assert result.returncode == 0
-        # Should show the override value
         assert "closed" in result.stdout or "override" in result.stdout.lower()
 
 
@@ -899,7 +886,6 @@ class TestTransactionalBehavior:
         """Manifest file should be unchanged when set fails key validation."""
         mock_claude_workspace.exec("cd /workspace && forge session start transactional-test")
 
-        # Read manifest before
         before = mock_claude_workspace.exec("cat /workspace/.forge/sessions/transactional-test/forge.session.json")
         content_before = before.stdout
 

@@ -173,7 +173,7 @@ def _render_enrollment(console: Console, result: CodexEnrollmentVerification) ->
 
 
 def _write_direct_preflight_cache(result: CodexPreflight) -> None:
-    """Persist the DIRECT preflight the supervisor's codex lane reads (epic consumer_lanes, T4).
+    """Persist the direct preflight that the supervisor's codex lane reads.
 
     Only the no-proxy preflight answers "is direct ``codex exec`` ready?" -- the question the
     per-Write/Edit supervisor hook asks. A ``--proxy`` run is a different (proxied) question and
@@ -261,7 +261,7 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
     result = preflight_codex(proxy_id=proxy_id)
 
     # Persist the DIRECT preflight so the supervisor's codex lane (a per-Write/Edit hook) can read
-    # readiness without re-running the ~20s doctor probe (epic consumer_lanes, T4).
+    # readiness without re-running the ~20-second doctor probe.
     if proxy_id is None:
         _write_direct_preflight_cache(result)
 

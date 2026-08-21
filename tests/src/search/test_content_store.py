@@ -30,11 +30,6 @@ def store(store_path: Path) -> ContentStore:
     return ContentStore(store_path=store_path)
 
 
-# ---------------------------------------------------------------------------
-# Read
-# ---------------------------------------------------------------------------
-
-
 class TestContentStoreRead:
     def test_missing_file_returns_empty(self, store: ContentStore) -> None:
         assert store.read_all() == {}
@@ -74,11 +69,6 @@ class TestContentStoreRead:
             store.read_all()
 
 
-# ---------------------------------------------------------------------------
-# Write
-# ---------------------------------------------------------------------------
-
-
 class TestContentStoreWrite:
     def test_creates_parent_directories(self, store: ContentStore) -> None:
         store.write({})
@@ -93,11 +83,6 @@ class TestContentStoreWrite:
         store.write({"doc1": "content"})
         data = json.loads(store.store_path.read_text())
         assert "updated_at" in data
-
-
-# ---------------------------------------------------------------------------
-# Read keys (lazy loading)
-# ---------------------------------------------------------------------------
 
 
 class TestContentStoreReadKeys:
@@ -117,11 +102,6 @@ class TestContentStoreReadKeys:
 
     def test_missing_file_returns_empty(self, store: ContentStore) -> None:
         assert store.read_keys(["a"]) == {}
-
-
-# ---------------------------------------------------------------------------
-# Add (idempotent upsert)
-# ---------------------------------------------------------------------------
 
 
 class TestContentStoreAdd:
@@ -147,11 +127,6 @@ class TestContentStoreAdd:
         assert len(content) == 1
 
 
-# ---------------------------------------------------------------------------
-# Remove
-# ---------------------------------------------------------------------------
-
-
 class TestContentStoreRemove:
     def test_remove_existing(self, store: ContentStore) -> None:
         store.add("doc1", "content")
@@ -165,11 +140,6 @@ class TestContentStoreRemove:
 
     def test_remove_from_empty(self, store: ContentStore) -> None:
         assert store.remove("anything") is False
-
-
-# ---------------------------------------------------------------------------
-# Prune
-# ---------------------------------------------------------------------------
 
 
 class TestContentStorePrune:

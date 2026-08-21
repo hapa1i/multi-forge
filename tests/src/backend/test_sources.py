@@ -377,9 +377,6 @@ def test_model_source_lookup_misses_raise_domain_error_without_keyerror_quotes()
     assert str(template_exc.value) == "Unknown model source or alias: unknown-template"
 
 
-# --- Runtime-native subscription sources (epic consumer_lanes, T2) ---
-
-
 def test_chatgpt_subscription_source_is_runtime_native() -> None:
     """The chatgpt source: openai provider, runtime_native endpoint (no URL/credential), subscription billing."""
 

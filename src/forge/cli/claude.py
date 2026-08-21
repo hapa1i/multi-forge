@@ -170,7 +170,6 @@ def start_cmd(
 
     from forge.session.claude.invoke import invoke_claude
 
-    # Resolve proxy to template + base_url
     template: str | None = None
     base_url: str | None = None
     context_limit: int | None = None

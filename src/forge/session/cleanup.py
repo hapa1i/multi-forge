@@ -154,7 +154,6 @@ def clean_old_sessions(
         return result
 
     for name, entry in all_sessions:
-        # Check age
         try:
             dt = parse_iso(entry.last_accessed_at)
             age_days = (datetime.now(UTC) - dt).total_seconds() / 86400

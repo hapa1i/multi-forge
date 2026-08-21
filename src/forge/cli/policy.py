@@ -456,9 +456,8 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
             swp = ts.confirmed.started_with_proxy
             if swp and swp.template:
                 data["source_model"] = swp.template
-    # The full resolved lane (runtime, backend, model) the supervisor runs on -- the chosen
-    # consumer-lane binding (epic consumer_lanes, T1b): confirmed binding if frozen, else intent,
-    # else default. The per-call usage event carries no backend id, so this is where it shows.
+    # Show the confirmed binding if frozen, then the intent, then the default lane.
+    # The per-call usage event carries no backend id, so this is where it appears.
     try:
         lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         data["lane"] = {
@@ -469,7 +468,7 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
     except Exception as exc:  # drifted/removed catalog entry -> show null, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         data["lane"] = None
-    # T7: a sticky degrade routes dispatch to the default claude lane while the bound codex lane
+    # A sticky degrade routes dispatch to the default claude lane while the bound codex lane
     # above stays frozen -- surface it so the operator sees the lane was routed around this session.
     marker = read_supervisor_degrade(manifest)
     data["degraded"] = (
@@ -1087,8 +1086,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         if swp and swp.template:
             console.print(f"  Source model: {swp.template}")
 
-    # The full resolved lane (runtime, backend, model) -- the chosen consumer-lane binding
-    # (epic consumer_lanes, T1b): confirmed binding if frozen, else intent override, else default.
+    # Show the confirmed binding if frozen, then the intent override, then the default lane.
     try:
         lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         console.print(f"  Lane: runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}")
@@ -1096,7 +1094,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         console.print("  Lane: [yellow]not executable[/yellow] (binding no longer valid)")
 
-    # T7 sticky degrade: the bound lane above is frozen but dispatch routes to the default claude
+    # The bound lane remains frozen, but a sticky degrade routes dispatch to the default claude
     # lane this session (the codex subscription is spent). Surface it so `Lane: ...codex...` is not
     # read as "still running on codex".
     marker = read_supervisor_degrade(manifest)

@@ -173,7 +173,6 @@ def login(credential: str | None, profile: str | None) -> None:
     """
     profile_name = resolve_profile(profile)
 
-    # Validate credential name
     if credential is not None:
         if credential in RETIRED_NAMES:
             click.secho(RETIRED_NAMES[credential], fg="yellow", err=True)
@@ -419,7 +418,6 @@ def status(profile: str | None, as_json: bool) -> None:
         state = _credential_state(cred, file_secrets, ignore_env, profile_name)
         summary = _capability_summary(cred)
         if state.startswith("configured"):
-            # Find primary source for display
             primary_source = state.split("(", 1)[1].rstrip(")") if "(" in state else ""
             configured.append(f"  * {cred.name:<18} {summary}  ({primary_source})")
         else:

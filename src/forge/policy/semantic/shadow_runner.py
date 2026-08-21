@@ -111,10 +111,10 @@ def reconstruct_config(candidate: dict[str, Any], directory: Path) -> Supervisor
 
 
 def reconstruct_lane(candidate: dict[str, Any]) -> LaneRecord | None:
-    """Rebuild the replay lane from the frozen candidate (epic consumer_lanes, T1b).
+    """Rebuild the replay lane from the frozen candidate.
 
-    The candidate stores the resolved consumer-lane binding as a ``lane`` dict (v3). None =>
-    the claude default. An older record (no ``lane``) or a malformed one degrades to None ->
+    The candidate stores the resolved consumer-lane binding as a ``lane`` dict (v3). None selects
+    the claude default. An older record (no ``lane``) or a malformed one degrades to None, which uses
     default replay -- shadow candidates are runtime-only state, discard-and-default per
     coding_standards section 5.
     """

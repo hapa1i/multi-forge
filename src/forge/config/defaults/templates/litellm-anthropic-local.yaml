@@ -9,8 +9,8 @@
 # Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Use --model to select
 # an alternative (claude-fable-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6).
 #
-# Note: If you added ANTHROPIC_API_KEY after the backend started,
-# restart with: forge model backend stop litellm-4000
+# After adding ANTHROPIC_API_KEY, stop the backend so Forge restarts it with the new environment:
+# forge model backend stop litellm-4000
 
 proxy:
   family: anthropic

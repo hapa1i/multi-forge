@@ -1,5 +1,5 @@
 # Template: litellm-gemini-flash-local
-# Gemini 3 Flash via local LiteLLM (beats Pro on SWE benchmarks!)
+# Gemini 3 Flash via local LiteLLM
 #
 # Requires:
 #   - GEMINI_API_KEY in .env
@@ -7,8 +7,8 @@
 # Backend (LiteLLM on port 4000) starts automatically.
 # All tiers use Flash, differentiated by reasoning_effort.
 #
-# Note: If you added GEMINI_API_KEY after the backend started,
-# restart with: forge model backend stop litellm-4000
+# After adding GEMINI_API_KEY, stop the backend so Forge restarts it with the new environment:
+# forge model backend stop litellm-4000
 
 proxy:
   family: gemini
@@ -21,7 +21,7 @@ proxy:
       haiku: gemini/gemini-3-flash-preview
       sonnet: gemini/gemini-3-flash-preview
       opus: gemini/gemini-3-flash-preview
-    # Per-tier overrides: all tiers use same model, differentiate by reasoning
+    # All tiers use the same model with different reasoning levels.
     tier_overrides:
       haiku:
         reasoning_effort: low

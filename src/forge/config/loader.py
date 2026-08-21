@@ -630,8 +630,7 @@ def _apply_template_backend(template: str, template_data: dict[str, Any]) -> Non
     source = _resolve_template_backend(template, proxy_block)
     # A runtime_native source (e.g. a ChatGPT subscription) is reached through its
     # runtime, which owns the connection and auth; a key-authenticated proxy cannot
-    # carry it. Reject here so a template can never mint a proxy for an undialable
-    # backend (T2 non-goal: no key-auth proxy support for subscriptions).
+    # carry it. Reject such templates because a proxy cannot connect to runtime-owned sources.
     if source.endpoint.kind == "runtime_native":
         raise ValueError(
             f"Template '{template}' references runtime-native source '{source.id}', which a proxy cannot back: "
@@ -708,7 +707,6 @@ def _load_template_config(template: str) -> "ForgeConfig":
     secrets = env_to_dict()
     config_dict = deep_merge(template_data, secrets)
 
-    # Set active_template so proxy knows which template is in use
     config_dict.setdefault("proxy", {})["active_template"] = template
 
     try:

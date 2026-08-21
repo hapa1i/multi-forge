@@ -1,4 +1,4 @@
-"""Tests for conservative billing-mode inference (Phase 4c).
+"""Tests for conservative billing-mode inference.
 
 ``infer_billing_mode`` asserts ``api`` only when a call is provably direct +
 key-authenticated; everything ambiguous is ``unknown`` (never guessed).
@@ -20,9 +20,6 @@ def test_direct_without_key_is_unknown() -> None:
 def test_proxied_is_unknown_even_with_key() -> None:
     # A proxied call's upstream billing is opaque from the callsite -- never guess.
     assert infer_billing_mode(direct=False, has_api_key=True) == "unknown"
-
-
-# --- resolve_billing_mode: the subscription-lane upgrade (epic consumer_lanes, T0) ---
 
 
 def test_keyless_direct_on_subscription_backend_is_subscription_quota() -> None:

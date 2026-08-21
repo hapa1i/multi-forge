@@ -318,8 +318,8 @@ def handle_session_start(
                     new_uuid[:8],
                 )
 
-            # T7: a fresh process re-entry (startup/resume) is the natural retry boundary for the
-            # codex subscription degrade -- the weekly quota may have refilled since it exhausted,
+            # A fresh process re-entry is the retry boundary for a degraded codex subscription.
+            # The weekly quota may have refilled since it exhausted,
             # so clear the sticky marker and let the next supervisor check re-probe codex. Preserve
             # it on compact/clear: those fire mid-sitting, where the quota is unchanged and re-arming
             # codex would just exhaust and re-degrade (flap).

@@ -272,9 +272,6 @@ class TestOpenRouterCredentials:
             assert creds["base_url"] == "https://config.example.com/v1"
 
 
-# --- Phase 3: File-based credential chain tests ---
-
-
 def _write_creds(path: Path, profiles: dict[str, dict[str, str]]) -> None:
     """Write a credentials.yaml for testing."""
     path.parent.mkdir(parents=True, exist_ok=True)

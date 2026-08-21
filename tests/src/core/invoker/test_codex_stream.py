@@ -1,4 +1,4 @@
-"""Unit tests for ``parse_codex_jsonl_stream`` (Phase 5b, B1).
+"""Unit tests for ``parse_codex_jsonl_stream``.
 
 Driven by the recorded ``tests/fixtures/codex/`` streams (codex-cli 0.137.0). The
 fixture is authoritative: ``final_text`` must equal the ``-o`` oracle, and the token
@@ -199,7 +199,7 @@ _NOT_EXHAUSTED_MESSAGES = [
 
 
 class TestSubscriptionExhaustionClassifier:
-    """T7 ``is_subscription_exhausted`` truth table (codex JSONL ``message`` signal)."""
+    """Truth table for subscription-exhaustion signals in Codex JSONL messages."""
 
     @pytest.mark.parametrize("message", _EXHAUSTED_MESSAGES)
     def test_exhaustion_messages_classified_true(self, message: str) -> None:

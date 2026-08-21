@@ -244,7 +244,7 @@ def search_from_index(
     if not query_tokens:
         return []
 
-    # Validate invariant: every indexed doc must have metadata
+    # Every indexed document must have metadata.
     missing_meta = [k for k in doc_keys if k not in doc_metadata]
     if missing_meta:
         raise BM25IndexCorruptedError(
@@ -276,7 +276,7 @@ def search_from_index(
     top_keys = [key for _, key in top_k]
     content_map = content_loader(top_keys)
 
-    # Validate content availability
+    # Every top-K result must have stored content.
     missing_content = [k for k in top_keys if k not in content_map]
     if missing_content:
         raise ContentStoreCorruptedError(
