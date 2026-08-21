@@ -12,6 +12,7 @@ proxy:
   default_port: 8100
 
   openrouter:
+    allow_non_zdr: false
     tiers:
       haiku: deepseek/deepseek-v4-flash
       sonnet: deepseek/deepseek-v4-pro

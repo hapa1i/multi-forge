@@ -30,7 +30,7 @@ _log = logging.getLogger(__name__)
 
 DEFAULT_PLAN_CHECK_PROVIDER: ProviderType = "openrouter"
 DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER: dict[ProviderType, str] = {
-    "openrouter": "google/gemini-3.6-flash",
+    "openrouter": "google/gemini-3.7-flash",
     "litellm_local": "gemini/gemini-3.6-flash",
     "litellm_remote": "gemini/gemini-3.6-flash",
 }

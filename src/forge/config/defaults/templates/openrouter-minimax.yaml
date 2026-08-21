@@ -13,6 +13,7 @@ proxy:
   default_port: 8104
 
   openrouter:
+    allow_non_zdr: false
     tiers:
       haiku: google/gemma-4-31b-it
       sonnet: minimax/minimax-m3

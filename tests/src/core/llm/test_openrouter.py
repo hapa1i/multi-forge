@@ -38,6 +38,13 @@ class TestOpenRouterClientInit:
         assert result["extra_body"] == {"reasoning": {"effort": "high"}}
         assert result["temperature"] == 0.7
 
+    def test_translates_provider_max_reasoning_effort(self):
+        result = OpenRouterClient._translate_params(
+            {"model": "z-ai/glm-5.3", "messages": [], "reasoning_effort": "max"}
+        )
+
+        assert result["extra_body"] == {"reasoning": {"effort": "max"}}
+
     def test_translates_verbosity_to_extra_body(self):
         kwargs = {"model": "test", "messages": [], "verbosity": "medium"}
         result = OpenRouterClient._translate_params(kwargs)
@@ -64,10 +71,14 @@ class TestOpenRouterClientInit:
             "model": "test",
             "messages": [],
             "reasoning_effort": "medium",
-            "extra_body": {"transforms": ["middle-out"]},
+            "extra_body": {
+                "provider": {"zdr": True},
+                "transforms": ["middle-out"],
+            },
         }
         result = OpenRouterClient._translate_params(kwargs)
         assert result["extra_body"]["reasoning"] == {"effort": "medium"}
+        assert result["extra_body"]["provider"] == {"zdr": True}
         assert result["extra_body"]["transforms"] == ["middle-out"]
 
     def test_translate_params_keeps_user_top_level(self):

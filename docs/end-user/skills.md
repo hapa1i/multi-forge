@@ -285,14 +285,18 @@ entry point selects the interpreter and `$smoke-test`/`/forge:smoke-test` do not
 For Claude, the dynamic detection path is:
 
 ```
-Session -> proxy template -> tier model name -> vendor prefix -> family
+Session -> proxy instance/template -> declared family
+
+Legacy metadata without a family -> tier model name -> vendor prefix -> family
 ```
 
-| Family      | Templates using it          | Resource suffix |
-| ----------- | --------------------------- | --------------- |
-| `openai`    | `openrouter-openai`         | `-openai.md`    |
-| `gemini`    | `openrouter-gemini`         | `-gemini.md`    |
-| `anthropic` | `litellm-anthropic`, direct | (default)       |
+| Family                        | Templates using it                             | Resource suffix |
+| ----------------------------- | ---------------------------------------------- | --------------- |
+| `openai`                      | `openrouter-openai`                            | `-openai.md`    |
+| `gemini`                      | `openrouter-gemini`, `openrouter-gemini-flash` | `-gemini.md`    |
+| `anthropic`                   | `litellm-anthropic`, direct                    | (default)       |
+| `qwen`, `glm`                 | `openrouter-qwen`, `openrouter-glm`            | (default)       |
+| `deepseek`, `kimi`, `minimax` | Corresponding OpenRouter family template       | (default)       |
 
 The Claude detection chain uses `forge session show --field model_family`, which resolves managed sessions from the
 Forge-managed session's launch environment and otherwise falls back to local environment metadata such as

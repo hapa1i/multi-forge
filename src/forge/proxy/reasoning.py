@@ -25,6 +25,7 @@ EFFORT_RANK: dict[str | None, int] = {
     "medium": 3,
     "high": 4,
     "xhigh": 5,
+    "max": 6,
 }
 
 # Budget thresholds for ceil-to-tier mapping (never downgrade).

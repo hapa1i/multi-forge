@@ -1016,6 +1016,17 @@ def proxy_server_openrouter_qwen(module_forge_home: Path, tmp_path_factory) -> G
 
 
 @pytest.fixture(scope="module")
+def proxy_server_openrouter_glm(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    yield from _openrouter_family_proxy(
+        "openrouter-glm",
+        module_forge_home,
+        tmp_path_factory,
+        "OpenRouter GLM proxy unreachable",
+        preflight=False,
+    )
+
+
+@pytest.fixture(scope="module")
 def proxy_server_openrouter_gemini_flash(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
     yield from _openrouter_family_proxy(
         "openrouter-gemini-flash", module_forge_home, tmp_path_factory, "OpenRouter Gemini Flash proxy unreachable"

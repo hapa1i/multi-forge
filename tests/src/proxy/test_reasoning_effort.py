@@ -118,6 +118,8 @@ class TestMaxEffort:
             ("medium", "medium", "medium"),
             ("xhigh", "high", "xhigh"),
             ("high", "xhigh", "xhigh"),
+            ("max", "xhigh", "max"),
+            ("high", "max", "max"),
             ("minimal", "low", "low"),
             ("none", "minimal", "minimal"),
             ("disable", "minimal", "minimal"),  # disable aliases none (rank 0)
@@ -181,6 +183,7 @@ class TestClampEffortToSupported:
             # default could be the model's highest level).
             ("none", ("low", "high"), "low"),
             ("disable", ("minimal", "low", "medium", "high"), "minimal"),
+            ("xhigh", ("low", "high", "max"), "high"),
         ],
     )
     def test_clamps_unsupported_levels(self, effort: str, supported: tuple[str, ...], expected: str):
@@ -246,6 +249,15 @@ class TestResolveReasoningEffort:
             request_id="req-1",
         )
         assert result == "high"
+
+    def test_glm_53_max_tier_floor_uses_provider_max_label(self):
+        result = resolve_reasoning_effort(
+            self._request(thinking={"budget_tokens": 30_000}),
+            tier_override=TierOverride(reasoning_effort="max"),
+            model_id="z-ai/glm-5.3",
+            request_id="req-1",
+        )
+        assert result == "max"
 
     def test_derived_for_uncataloged_model_not_clamped(self):
         result = resolve_reasoning_effort(

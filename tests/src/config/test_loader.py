@@ -268,6 +268,19 @@ class TestLoadConfig:
             },
         }
 
+    def test_openrouter_gemini_templates_use_37_flash(self):
+        from forge.config.schema import TierModels
+
+        family = load_config(template="openrouter-gemini")
+        flash = load_config(template="openrouter-gemini-flash")
+
+        assert family.proxy.openrouter.tiers.haiku == "google/gemini-3.7-flash"
+        assert flash.proxy.openrouter.tiers == TierModels(
+            haiku="google/gemini-3.7-flash",
+            sonnet="google/gemini-3.7-flash",
+            opus="google/gemini-3.7-flash",
+        )
+
     def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter templates intentionally allow the catalog endpoint override."""
         monkeypatch.setenv("OPENROUTER_BASE_URL", "https://openrouter.internal.example.com/api/v1")
@@ -653,6 +666,51 @@ class TestProxyFileIO:
         assert loaded.port == 8085
         assert loaded.tiers.haiku == "gemini/gemini-3-flash-preview"
         assert loaded.default_tier == "opus"
+
+    def test_litellm_proxy_writer_omits_openrouter_zdr_fields(self, tmp_path, monkeypatch):
+        """LiteLLM proxy files do not advertise an unsupported ZDR surface."""
+        from forge.config.loader import write_proxy_instance_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="litellm-gemini",
+            template_digest="sha256:test",
+            provider="litellm",
+            proxy_endpoint="http://localhost:8085",
+            port=8085,
+            upstream_base_url="https://litellm.example.com",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+        )
+
+        data = yaml.safe_load(write_proxy_instance_config("litellm-no-zdr", config).read_text())
+
+        assert "allow_non_zdr" not in data
+        assert "zdr_fallbacks" not in data
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("allow_non_zdr", False), ("zdr_fallbacks", {})],
+    )
+    def test_litellm_proxy_loader_rejects_openrouter_zdr_fields(self, field, value):
+        """Even default-looking ZDR keys are invalid on a LiteLLM proxy."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "proxy_format": 1,
+            "template": "litellm-gemini",
+            "template_digest": "sha256:test",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8085",
+            "port": 8085,
+            "upstream_base_url": "https://litellm.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+            field: value,
+        }
+
+        with pytest.raises(ValueError, match="supported only for provider: openrouter"):
+            load_proxy_instance_config_from_dict(data)
 
     def test_proxy_instance_config_writes_backend_not_source(self, tmp_path, monkeypatch):
         """proxy.yaml uses the canonical backend key."""
@@ -1078,16 +1136,22 @@ class TestTemplateResolution:
     def test_openrouter_templates_in_template_list(self, user_templates_dir: Path) -> None:
         """OpenRouter family templates appear in shipped template list."""
         names = list_template_names()
-        assert "openrouter-anthropic" in names
-        assert "openrouter-openai" in names
-        assert "openrouter-gemini" in names
-        assert "openrouter-openai-codex" in names
-        assert "openrouter-gemini-flash" in names
-        assert "openrouter-deepseek" in names
-        assert "openrouter-kimi" in names
-        assert "openrouter-qwen" in names
-        assert "openrouter-glm" in names
-        assert "openrouter-minimax" in names
+        expected = {
+            "openrouter-anthropic",
+            "openrouter-openai",
+            "openrouter-gemini",
+            "openrouter-openai-codex",
+            "openrouter-gemini-flash",
+            "openrouter-deepseek",
+            "openrouter-kimi",
+            "openrouter-qwen",
+            "openrouter-glm",
+            "openrouter-minimax",
+        }
+        assert expected <= set(names)
+
+        for template in expected:
+            assert load_config(template=template).proxy.openrouter.allow_non_zdr is False
 
     def test_openrouter_open_model_templates_load(self, user_templates_dir: Path) -> None:
         """OpenRouter open-model family templates load with expected tiers."""
@@ -1097,29 +1161,53 @@ class TestTemplateResolution:
                 "deepseek/deepseek-v4-pro",
                 "deepseek/deepseek-v4-pro",
             ),
-            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.7-plus", "qwen/qwen3.7-max"),
+            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.8-27b", "qwen/qwen3.8-max"),
             "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k3", "moonshotai/kimi-k3"),
-            "openrouter-glm": ("z-ai/glm-4.7-flash", "z-ai/glm-5.2", "z-ai/glm-5.2"),
+            "openrouter-glm": ("z-ai/glm-4.7-flash", "z-ai/glm-5.3", "z-ai/glm-5.3"),
             "openrouter-minimax": ("google/gemma-4-31b-it", "minimax/minimax-m3", "minimax/minimax-m3"),
         }
 
         for template, (haiku, sonnet, opus) in cases.items():
             config = load_config(template=template)
             assert config.proxy.preferred_provider == "openrouter"
+            assert config.proxy.openrouter.allow_non_zdr is False
             assert config.proxy.openrouter.tiers.haiku == haiku
             assert config.proxy.openrouter.tiers.sonnet == sonnet
             assert config.proxy.openrouter.tiers.opus == opus
 
         qwen = load_config(template="openrouter-qwen")
         assert qwen.proxy.openrouter.model_alternatives == {
-            "sonnet": {"qwen3.6-plus": "qwen/qwen3.6-plus", "qwen3-coder": "qwen/qwen3-coder"},
-            "opus": {"qwen3.6-max-preview": "qwen/qwen3.6-max-preview", "qwen3-coder": "qwen/qwen3-coder"},
+            "sonnet": {
+                "qwen3.7-plus": "qwen/qwen3.7-plus",
+                "qwen3.6-plus": "qwen/qwen3.6-plus",
+                "qwen3-coder": "qwen/qwen3-coder",
+            },
+            "opus": {
+                "qwen3.7-max": "qwen/qwen3.7-max",
+                "qwen3.6-max-preview": "qwen/qwen3.6-max-preview",
+                "qwen3-coder": "qwen/qwen3-coder",
+            },
+        }
+        assert qwen.proxy.openrouter.zdr_fallbacks == {
+            "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
         }
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {
-            "sonnet": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
-            "opus": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
+            "sonnet": {
+                "kimi-k2.7-code": "moonshotai/kimi-k2.7-code",
+                "kimi-k2.6": "moonshotai/kimi-k2.6",
+                "kimi-k2.5": "moonshotai/kimi-k2.5",
+            },
+            "opus": {
+                "kimi-k2.7-code": "moonshotai/kimi-k2.7-code",
+                "kimi-k2.6": "moonshotai/kimi-k2.6",
+                "kimi-k2.5": "moonshotai/kimi-k2.5",
+            },
         }
+        assert kimi.proxy.openrouter.tier_overrides.sonnet is not None
+        assert kimi.proxy.openrouter.tier_overrides.sonnet.reasoning_effort == "high"
+        assert kimi.proxy.openrouter.tier_overrides.opus is not None
+        assert kimi.proxy.openrouter.tier_overrides.opus.reasoning_effort == "high"
         minimax = load_config(template="openrouter-minimax")
         assert minimax.proxy.openrouter.model_alternatives == {
             "sonnet": {

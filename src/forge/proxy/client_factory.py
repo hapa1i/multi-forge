@@ -18,7 +18,7 @@ from forge.config import config
 from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
 from forge.core.llm.types import (
     ModelHyperparameters,
-    ReasoningEffort,
+    ModelReasoningEffort,
     ThinkingConfig,
     Verbosity,
 )
@@ -375,9 +375,11 @@ class TierClientFactory:
         catalog_strict = provider != ModelProvider.OPENROUTER
         max_tokens_override = _enforce_max_output_tokens_cap(model_name, None, strict=catalog_strict)
 
-        tier_reasoning: ReasoningEffort | None
+        tier_reasoning: ModelReasoningEffort | None
         if tier_override and tier_override.reasoning_effort is not None:
-            tier_reasoning = cast(ReasoningEffort, tier_override.reasoning_effort)  # validated by ModelHyperparameters
+            tier_reasoning = cast(
+                ModelReasoningEffort, tier_override.reasoning_effort
+            )  # validated by ModelHyperparameters
         else:
             tier_reasoning = None
 
@@ -395,11 +397,19 @@ class TierClientFactory:
                     budget_tokens=tier_override.thinking_budget_tokens,
                 )
 
+        provider_extra: dict[str, dict[str, Any]] = {}
+        if provider == ModelProvider.OPENROUTER and not getattr(provider_cfg, "allow_non_zdr", False):
+            # Request-level enforcement is authoritative even when the catalog's
+            # endpoint snapshot is stale. OpenRouter treats this as an OR with
+            # account/guardrail ZDR, so it can require but never weaken policy.
+            provider_extra = {"openai": {"extra_body": {"provider": {"zdr": True}}}}
+
         default_hyperparams = ModelHyperparameters(
             max_tokens=max_tokens_override,
             reasoning_effort=tier_reasoning,
             verbosity=tier_verbosity,
             thinking=thinking_config,
+            extra=provider_extra,
         )
 
         # temperature: tier_override only

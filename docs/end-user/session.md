@@ -756,10 +756,10 @@ lane to the child, which re-freezes on its own first check. See [policy.md](poli
 ```bash
 # Fork with the tier-1 plan check (cascade) and a specific checker model/provider
 forge session fork planner --worktree --supervise \
-  --cascade --checker-model google/gemini-3.6-flash --checker-provider openrouter
+  --cascade --checker-model google/gemini-3.7-flash --checker-provider openrouter
 
 # Same knobs on session start
-forge session start executor --supervise planner --cascade --checker-model google/gemini-3.6-flash
+forge session start executor --supervise planner --cascade --checker-model google/gemini-3.7-flash
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the

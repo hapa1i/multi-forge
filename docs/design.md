@@ -646,8 +646,8 @@ To avoid writer conflicts:
 
 #### 3.6.2 Field ownership invariants (normative)
 
-- **Proxy-owned**: tier→model mappings, provider/base_url, and default hyperparams (`reasoning_effort`, `temperature`,
-  `verbosity`, `thinking_budget_tokens`).
+- **Proxy-owned**: tier→model mappings, provider/base_url, default hyperparams (`reasoning_effort`, `temperature`,
+  `verbosity`, `thinking_budget_tokens`), and direct OpenRouter ZDR policy; LiteLLM has no ZDR surface.
 - **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
   metadata.
 - **Consumer-lane binding** (epic consumer_lanes/T1b, T6a): `intent.consumer_lanes.<consumer>` is the *requested* lane
@@ -829,9 +829,7 @@ The proxy exposes runtime truth via `GET /`:
 
 **Key points:**
 
-- The proxy does **not** know about sessions (see §3.6.2)
-- Session info comes from the session file, not the proxy
-- Status line tools read both sources independently
+- Proxy and session state remain independent; status tools read both (see §3.6.2).
 - Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
   `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
   identity fields available; the nested `downstream_retention` object carries the recovery detail.

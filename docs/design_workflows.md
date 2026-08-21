@@ -146,7 +146,7 @@ ambiguities.
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set <target> --cascade` or
 `forge policy supervisor cascade on` routes checks through a cheap tier before the frontier. The direct toggle is
 `%policy supervisor cascade on`. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
-OpenRouter model `google/gemini-3.6-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
+OpenRouter model `google/gemini-3.7-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
 configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
 the action against the **approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the
 `--reload` machinery). The persistent `set ... --cascade` and `cascade on` commands fail with an actionable error when

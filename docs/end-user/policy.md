@@ -322,7 +322,7 @@ forge policy supervisor cascade off       # disable (supervisor checks every act
 
 # Optional: pick the tier-1 route
 forge policy supervisor cascade on --checker-provider litellm-local
-forge policy supervisor cascade on --checker-model google/gemini-3.6-flash
+forge policy supervisor cascade on --checker-model google/gemini-3.7-flash
 
 # Advanced: tune the persisted checker prompt budget
 forge session set policy.supervisor.checker_budget_tokens 64000
@@ -333,7 +333,7 @@ How it behaves:
 - The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
   needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search
   `forge policy supervisor reload` uses) and fails with instructions when none exists.
-- The default checker route is OpenRouter `google/gemini-3.6-flash` with an approximate 32K-token total budget for the
+- The default checker route is OpenRouter `google/gemini-3.7-flash` with an approximate 32K-token total budget for the
   tier-1 checker prompt. Use `--checker-provider litellm-local` to use the local LiteLLM default
   (`gemini/gemini-3.6-flash`) when OpenRouter is unavailable. Local LiteLLM backend configs are one-time copies:
   backends generated before that model was added need their materialized `litellm` config updated or deleted/recreated,

@@ -186,7 +186,7 @@ class TierOverride:
     Values here override model catalog defaults. None means "use catalog default".
     """
 
-    reasoning_effort: str | None = None  # none, low, medium, high, xhigh (model-dependent)
+    reasoning_effort: str | None = None  # none/minimal/low/medium/high/xhigh/max (model-dependent)
     verbosity: str | None = None  # low, medium, high
     temperature: float | None = None  # Override temperature for this tier
     thinking_budget_tokens: int | None = None  # For models with thinking budgets
@@ -235,9 +235,25 @@ def _validate_model_alternatives(value: Any) -> None:
             raise ValueError("Invalid model_alternatives: aliases and backend models must be strings")
 
 
+def _validate_zdr_fallbacks(value: Any) -> None:
+    """Validate primary-to-fallback model routing for required-ZDR mode."""
+    if not isinstance(value, dict):
+        raise ValueError("Invalid zdr_fallbacks: must be a mapping of model IDs")
+    for primary, fallback in value.items():
+        if not isinstance(primary, str) or not primary.strip():
+            raise ValueError("Invalid zdr_fallbacks: primary model IDs must be non-empty strings")
+        if not isinstance(fallback, str) or not fallback.strip():
+            raise ValueError("Invalid zdr_fallbacks: fallback model IDs must be non-empty strings")
+        if primary == fallback:
+            raise ValueError(f"Invalid zdr_fallbacks: {primary!r} cannot fall back to itself")
+
+
 def _validate_provider_direct_fields(config: Any) -> None:
     """Validate provider fields copied unchanged into proxy instances."""
     _validate_model_alternatives(config.model_alternatives)
+    if not isinstance(config.allow_non_zdr, bool):
+        raise ValueError("Invalid allow_non_zdr: must be a bool")
+    _validate_zdr_fallbacks(config.zdr_fallbacks)
     if not isinstance(config.prompt_caching, str) or config.prompt_caching not in _VALID_PROMPT_CACHING_MODES:
         allowed = ", ".join(sorted(_VALID_PROMPT_CACHING_MODES))
         raise ValueError(f"Invalid prompt_caching: {config.prompt_caching!r} (must be one of: {allowed})")
@@ -252,6 +268,10 @@ class ProviderConfig:
     tiers: TierModels = field(default_factory=TierModels)
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)
+    # OpenRouter privacy defaults. When false, Forge sends provider.zdr=true on
+    # every request and applies any known non-ZDR model fallback before dispatch.
+    allow_non_zdr: bool = False
+    zdr_fallbacks: dict[str, str] = field(default_factory=dict)
     base_url: str = ""
     cache_ttl: float = 3600.0
     top_p: float | None = None
@@ -764,9 +784,11 @@ PROXY_SHARED_NON_BLOCK_FIELDS: frozenset[str] = frozenset(
 # and ``tier_overrides`` are deliberately excluded: creation rebuilds tiers and
 # merges CLI overrides, so their transformed transport remains explicit.
 PROXY_PROVIDER_DIRECT_FIELDS: tuple[str, ...] = (
+    "allow_non_zdr",
     "model_alternatives",
     "prompt_caching",
     "auto_cache_min_tokens",
+    "zdr_fallbacks",
 )
 PROXY_PROVIDER_TRANSFORMED_FIELDS: frozenset[str] = frozenset({"tier_overrides", "tiers"})
 
@@ -890,6 +912,8 @@ class ProxyInstanceConfig:
     family: str = ""  # model family (e.g., "openai", "anthropic", "gemini")
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)
+    allow_non_zdr: bool = False
+    zdr_fallbacks: dict[str, str] = field(default_factory=dict)
     default_tier: str = "sonnet"
     tool_prefixes_to_ignore: list[str] = field(default_factory=list)
 
@@ -921,6 +945,8 @@ class ProxyInstanceConfig:
                 "Gemini and OpenAI backends are served through a LiteLLM proxy, not as standalone "
                 "providers. Recreate this proxy from a template, e.g. 'forge proxy create litellm-gemini'."
             )
+        if self.provider != "openrouter" and (self.allow_non_zdr or self.zdr_fallbacks):
+            raise ValueError("allow_non_zdr and zdr_fallbacks are supported only for provider: openrouter")
 
         if not self.proxy_endpoint:
             raise ValueError("proxy_endpoint is required (e.g., 'http://localhost:8085')")

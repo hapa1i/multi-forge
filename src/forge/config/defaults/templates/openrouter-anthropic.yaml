@@ -14,6 +14,7 @@ proxy:
   default_port: 8095
 
   openrouter:
+    allow_non_zdr: false
     tiers:
       haiku: anthropic/claude-haiku-4.5
       sonnet: anthropic/claude-sonnet-5

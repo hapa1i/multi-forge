@@ -66,6 +66,25 @@ class TestModelToFamily:
     def test_vertex_ai_beta_prefixed(self):
         assert _model_to_family("vertex_ai_beta/gemini-3.1-pro") == "gemini"
 
+    def test_qwen_prefixed(self):
+        assert _model_to_family("qwen/qwen3.8-max") == "qwen"
+
+    def test_z_ai_prefixed(self):
+        assert _model_to_family("z-ai/glm-5.3") == "glm"
+
+    @pytest.mark.parametrize(
+        ("model", "family"),
+        [
+            ("qwen3.8-max", "qwen"),
+            ("glm-5.3", "glm"),
+            ("deepseek-v4-pro", "deepseek"),
+            ("minimax-m3", "minimax"),
+            ("kimi-k3", "kimi"),
+        ],
+    )
+    def test_bare_open_model_names(self, model: str, family: str):
+        assert _model_to_family(model) == family
+
     def test_anthropic_prefixed(self):
         assert _model_to_family("anthropic/claude-opus-4-6") == "anthropic"
 
@@ -103,6 +122,27 @@ class TestDetectModelFamily:
     def test_litellm_anthropic_template(self):
         result = detect_model_family("litellm-anthropic")
         assert result == "anthropic"
+
+    @pytest.mark.parametrize(
+        ("template", "family"),
+        [
+            ("openrouter-qwen", "qwen"),
+            ("openrouter-glm", "glm"),
+            ("openrouter-deepseek", "deepseek"),
+            ("openrouter-kimi", "kimi"),
+            ("openrouter-minimax", "minimax"),
+        ],
+    )
+    def test_openrouter_template_declared_family_is_authoritative(self, template: str, family: str):
+        assert detect_model_family(template) == family
+
+    def test_legacy_template_without_declared_family_falls_back_to_opus_model(self, monkeypatch: pytest.MonkeyPatch):
+        cfg = MagicMock()
+        cfg.proxy.family = ""
+        cfg.proxy.get_provider.return_value.tiers.opus = "qwen/qwen3.8-max"
+        monkeypatch.setattr("forge.config.loader.load_config", lambda **_kwargs: cfg)
+
+        assert detect_model_family("legacy-qwen") == "qwen"
 
     def test_unknown_template_returns_anthropic(self):
         result = detect_model_family("nonexistent-template-xyz")
@@ -436,6 +476,42 @@ class TestGetSessionContext:
             "sonnet": "vertex_ai/gemini-3.1-pro",
             "opus": "vertex_ai/gemini-3.1-pro",
         }
+
+    def test_prefers_proxy_instance_family_over_model_name_inference(self, tmp_path: Path):
+        worktree = tmp_path / "repo"
+        worktree.mkdir()
+
+        proxy_config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="openrouter-qwen",
+            template_digest="digest",
+            provider="openrouter",
+            proxy_endpoint="http://localhost:9999",
+            port=9999,
+            upstream_base_url="https://openrouter.ai/api/v1",
+            tiers=TierModels(
+                haiku="qwen/qwen3.6-flash",
+                sonnet="qwen/qwen3.8-27b",
+                opus="qwen/qwen3.8-max",
+            ),
+            family="qwen",
+        )
+        write_proxy_instance_config("proxy-qwen", proxy_config)
+
+        state = create_session_state(
+            "qwen-session",
+            proxy_template="openrouter-qwen",
+            proxy_base_url="http://localhost:9999",
+            worktree_path=str(worktree),
+        )
+        state.confirmed.started_with_proxy = StartedWithProxy(
+            base_url="http://localhost:9999",
+            proxy_id="proxy-qwen",
+            template="openrouter-qwen",
+        )
+        publish_session(IndexStore(), state, worktree)
+
+        assert get_session_context("qwen-session").model_family == "qwen"
 
     def test_policy_context_uses_effective_overrides(self, tmp_path: Path):
         worktree = tmp_path / "repo"
