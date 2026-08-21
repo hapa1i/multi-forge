@@ -181,14 +181,27 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
         if not manifest_path.is_file():
             continue  # session dir without a manifest: nothing to index
 
-        def record(classification: Classification, detail: str, **kwargs: object) -> None:
+        def record(
+            classification: Classification,
+            detail: str,
+            *,
+            claude_session_id: str | None = None,
+            codex_thread_id: str | None = None,
+            collision_holder: str | None = None,
+            manifest_sha256: str | None = None,
+            identity: RepairIdentity | None = None,
+        ) -> None:
             records.append(
                 OrphanRecord(
                     name=name,
                     manifest_dir=str(manifest_dir),
                     classification=classification,
                     detail=detail,
-                    **kwargs,  # type: ignore[arg-type]
+                    claude_session_id=claude_session_id,
+                    codex_thread_id=codex_thread_id,
+                    collision_holder=collision_holder,
+                    manifest_sha256=manifest_sha256,
+                    identity=identity,
                 )
             )
 
@@ -213,8 +226,6 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
         claude_id = state.confirmed.claude_session_id
         codex = state.confirmed.codex
         thread_id = codex.thread_id if codex else None
-        ids = {"claude_session_id": claude_id, "codex_thread_id": thread_id}
-
         uuid_key = claude_id.lower() if claude_id else None
         thread_key = thread_id.lower() if thread_id else None
         bound_holder: str | None = None
@@ -226,9 +237,10 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
             record(
                 "collision",
                 f"conversation already bound to session {bound_holder}",
+                claude_session_id=claude_id,
+                codex_thread_id=thread_id,
                 collision_holder=bound_holder,
                 manifest_sha256=digest,
-                **ids,
             )
             continue
         if uuid_key:
@@ -238,7 +250,13 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
 
         worktree = state.worktree
         if worktree is None:
-            record("unrepairable", "manifest records no worktree block", manifest_sha256=digest, **ids)
+            record(
+                "unrepairable",
+                "manifest records no worktree block",
+                claude_session_id=claude_id,
+                codex_thread_id=thread_id,
+                manifest_sha256=digest,
+            )
             continue
 
         recorded = Path(worktree.path)
@@ -247,18 +265,20 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
             record(
                 "repairable",
                 "recorded checkout present",
+                claude_session_id=claude_id,
+                codex_thread_id=thread_id,
                 identity=identity,
                 manifest_sha256=digest,
-                **ids,
             )
         elif worktree.is_worktree:
             identity = _derive_missing_worktree_identity(recorded, root, manager)
             record(
                 "missing-worktree",
                 f"recorded worktree is gone: {worktree.path}",
+                claude_session_id=claude_id,
+                codex_thread_id=thread_id,
                 identity=identity,
                 manifest_sha256=digest,
-                **ids,
             )
         else:
             # Ordinary shape: the manifest lives inside its own checkout, so the
@@ -276,9 +296,10 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
             record(
                 "repairable",
                 f"checkout moved; stale recorded path {worktree.path} will be corrected",
+                claude_session_id=claude_id,
+                codex_thread_id=thread_id,
                 identity=identity,
                 manifest_sha256=digest,
-                **ids,
             )
 
     return RepairScanReport(forge_root=root_str, records=tuple(records))

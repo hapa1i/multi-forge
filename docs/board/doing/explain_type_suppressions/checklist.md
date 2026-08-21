@@ -6,19 +6,20 @@ card owns production suppression cleanup and the conformance guard; the Batch 5 
 ## Phase 1 -- Reverification and guard
 
 - [x] Recheck every production `# type: ignore` on the Batch 5 base and confirm 13 lack a reason comment.
-- [ ] Add a fail-first source guard that reports each production suppression without a non-empty same-line reason.
+- [x] Add a fail-first source guard that reports each production suppression without a non-empty same-line reason.
 
 ## Phase 2 -- Suppression cleanup
 
-- [ ] Replace suppressions with explicit narrowing, `cast`, or corrected annotations where the runtime invariant is
+- [x] Replace suppressions with explicit narrowing, `cast`, or corrected annotations where the runtime invariant is
   already expressible to the checker.
-- [ ] Pair every unavoidable production suppression with its concrete runtime invariant without changing behavior.
+- [x] Pair every unavoidable production suppression with its concrete runtime invariant without changing behavior.
 
 ## Phase 3 -- Verification
 
-- [ ] Run the source guard and focused tests for every production module changed by narrowing or annotation cleanup.
-- [ ] Run `make type-check`, then contribute to the integrated unit, regression, pre-commit, board/link, and diff gates.
-- [ ] Record the final suppression disposition and verification evidence without closing the card before merge.
+- [x] Run the source guard and focused tests for every production module changed by narrowing or annotation cleanup.
+- [x] Run the configured mypy and pyright checks directly because this checkout exposes no `make type-check` target.
+- [ ] Contribute to the integrated unit, regression, pre-commit, board/link, and diff gates.
+- [x] Record the final suppression disposition and focused verification evidence without closing the card before merge.
 
 ## Acceptance evidence
 
@@ -27,3 +28,14 @@ card owns production suppression cleanup and the conformance guard; the Batch 5 
 | Source guard         | every Python file under `src/forge`     | each `type: ignore` has a non-empty same-line reason        |
 | Checker-safe cleanup | each of the 13 unexplained suppressions | suppression is removed or its runtime invariant is stated   |
 | Runtime preservation | focused tests for touched modules       | narrowing and annotations do not change observable behavior |
+
+Fail-first evidence: the new conformance guard failed with exactly 13 production paths on `e6064920` before source
+cleanup. The implementation removed all 13 unexplained suppressions through typed casts, explicit value narrowing,
+direct model construction, complete helper signatures, and concrete return/parameter annotations. It also removed the
+adjacent already-explained installer source-path suppression; the 11 remaining production suppressions all retain their
+specific same-line reasons.
+
+Focused evidence: both conformance guards passed; mypy reported no issues across 349 source files; pyright reported zero
+errors or warnings; and 446 focused proxy, policy, status-line, installer, session-repair, usage-summary, and
+conformance tests passed. `make type-check` itself is unavailable because the repository Makefile defines no such
+target.
