@@ -40,9 +40,11 @@ and journal chain inside disposable Docker identities.
   each uses the public session CLI and asserts filesystem plus correlated journal evidence instead of model prose.
 - Recreated only Codex's non-secret hook trust hashes at their original absolute paths; no host config was mutated and
   no `auth.json` was copied.
+- Synchronized the bundled QA image identity, isolated the installer's no-Codex boundary, bounded hung runtime
+  processes, and moved paid credentials from process arguments into atomic owner-only stdin writes.
 
-**Verification**: Three real-model Docker cases; eight existing authority Docker/CLI boundaries; 207 focused authority
-tests; 9,447 unit with 117 deselected; 1,053 regression; full pre-commit, diff, and 1,227-link checks.
+**Verification**: Three real-model Docker cases; 437 non-slow integration tests with 10,615 deselected; 207 focused
+authority tests; 9,447 unit with 117 deselected; 1,056 regression; full pre-commit, diff, and 1,227-link checks.
 
 ## 2026-08-21
 

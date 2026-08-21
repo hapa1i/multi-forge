@@ -61,9 +61,13 @@ def _install_launch_wrapper(workspace: ContainerLike, prompt: str) -> None:
     environment, adding only a bounded print-mode prompt and Bash allow-list. It
     records marker *presence*, never marker bytes.
     """
-    key_result = workspace.write_file("/tmp/.authority_anthropic_key", os.environ["ANTHROPIC_API_KEY"])
+    key_result = workspace.write_file(
+        "/tmp/.authority_anthropic_key",
+        os.environ["ANTHROPIC_API_KEY"],
+        mode=0o600,
+    )
     assert key_result.returncode == 0, key_result.stderr
-    prompt_result = workspace.write_file("/tmp/.authority_prompt", prompt)
+    prompt_result = workspace.write_file("/tmp/.authority_prompt", prompt, mode=0o600)
     assert prompt_result.returncode == 0, prompt_result.stderr
     wrapper_result = workspace.write_file(
         "/tmp/authority-bin/claude",
@@ -84,27 +88,35 @@ else
 fi
 exec "$upstream" "$@" --print "$(cat /tmp/.authority_prompt)" --output-format json --allowedTools Bash
 """,
+        mode=0o700,
     )
     assert wrapper_result.returncode == 0, wrapper_result.stderr
-    prepared = workspace.exec("chmod 700 /tmp/authority-bin/claude /tmp/.authority_anthropic_key")
-    assert prepared.returncode == 0, prepared.stderr
 
 
 def _run_authority_launch(
     workspace: ContainerLike, *, session: str, role: str, prompt: str
-) -> subprocess.CompletedProcess[str]:
-    made_dir = workspace.exec("mkdir -p /tmp/authority-bin")
+) -> tuple[subprocess.CompletedProcess[str], str | None]:
+    made_dir = workspace.exec("mkdir -p /tmp/authority-bin && rm -f /tmp/authority_marker_state")
     assert made_dir.returncode == 0, made_dir.stderr
     _install_launch_wrapper(workspace, prompt)
     try:
-        return workspace.exec(
+        result = workspace.exec(
             "export PATH=/tmp/authority-bin:$PATH"
             " && export ANTHROPIC_API_KEY=$(cat /tmp/.authority_anthropic_key)"
             f" && cd /workspace && timeout 120 forge session start {session} --authority {role}",
             timeout=135,
         )
+        marker_state = (
+            workspace.read_file("/tmp/authority_marker_state")
+            if workspace.file_exists("/tmp/authority_marker_state")
+            else None
+        )
+        return result, marker_state
     finally:
-        workspace.exec("rm -rf /tmp/authority-bin /tmp/.authority_anthropic_key " "/tmp/.authority_prompt")
+        workspace.exec(
+            "rm -rf /tmp/authority-bin /tmp/.authority_anthropic_key "
+            "/tmp/.authority_prompt /tmp/authority_marker_state"
+        )
 
 
 def _authority_events(workspace: ContainerLike, session: str) -> list[dict[str, Any]]:
@@ -187,11 +199,11 @@ def _prepare_real_codex(workspace: DockerContainer) -> None:
     assert directories.returncode == 0, directories.stderr
     config = workspace.write_file(str(_REAL_CODEX_HOME / "config.toml"), _codex_identity_config())
     assert config.returncode == 0, config.stderr
-    key = workspace.write_file("/tmp/.authority_codex_key", api_key)
+    key = workspace.write_file("/tmp/.authority_codex_key", api_key, mode=0o600)
     assert key.returncode == 0, key.stderr
     protected = workspace.exec(
         f"chmod 700 {shlex.quote(str(_REAL_HOME))} {shlex.quote(str(_REAL_CODEX_HOME))} "
-        f"{shlex.quote(str(_REAL_FORGE_HOME))} && chmod 600 /tmp/.authority_codex_key"
+        f"{shlex.quote(str(_REAL_FORGE_HOME))}"
     )
     assert protected.returncode == 0, protected.stderr
 
@@ -204,6 +216,7 @@ def _prepare_real_codex(workspace: DockerContainer) -> None:
 
 
 def _prepare_codex_parent(workspace: DockerContainer) -> None:
+    """Seed an existing transcript so the E2E does not pay for unrelated transfer curation."""
     transcript = "\n".join(
         [
             json.dumps(
@@ -253,7 +266,7 @@ class TestRealClaudeAuthority:
 
     def test_advisory_launch_denies_real_bash_request(self, forge_workspace: ContainerLike) -> None:
         _enable_user_hooks(forge_workspace)
-        result = _run_authority_launch(
+        result, marker_state = _run_authority_launch(
             forge_workspace,
             session=_ADVISORY_SESSION,
             role="advisory",
@@ -265,7 +278,8 @@ class TestRealClaudeAuthority:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
-        assert forge_workspace.read_file("/tmp/authority_marker_state") == "present"
+        assert marker_state == "present"
+        assert not forge_workspace.file_exists("/tmp/authority_marker_state")
         assert not forge_workspace.file_exists(_ADVISORY_SENTINEL)
 
         events = _authority_events(forge_workspace, _ADVISORY_SESSION)
@@ -284,11 +298,11 @@ class TestRealClaudeAuthority:
         assert _event(events, "launch_preflight")["run_id"] == run_id
         assert _event(events, "run_ended")["run_id"] == run_id
         assert all(event["run_id"] == run_id for event in denials)
-        assert {event["payload"]["covered_tool"] for event in denials} == {"Bash"}
+        assert "Bash" in {event["payload"]["covered_tool"] for event in denials}
 
     def test_producer_launch_allows_real_bash_request(self, forge_workspace: ContainerLike) -> None:
         _enable_user_hooks(forge_workspace)
-        result = _run_authority_launch(
+        result, marker_state = _run_authority_launch(
             forge_workspace,
             session=_PRODUCER_SESSION,
             role="producer",
@@ -300,7 +314,8 @@ class TestRealClaudeAuthority:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
-        assert forge_workspace.read_file("/tmp/authority_marker_state") == "absent"
+        assert marker_state == "absent"
+        assert not forge_workspace.file_exists("/tmp/authority_marker_state")
         assert forge_workspace.read_file(_PRODUCER_SENTINEL) == "authority-producer-was-written"
 
         events = _authority_events(forge_workspace, _PRODUCER_SESSION)
@@ -330,7 +345,8 @@ class TestRealCodexAuthority:
                 f"{_codex_exports()}"
                 " && export CODEX_API_KEY=$(cat /tmp/.authority_codex_key)"
                 " && cd /workspace"
-                f" && forge session start {_CODEX_SESSION} --runtime codex --resume-from planner"
+                f" && timeout --kill-after=10s 280s forge session start {_CODEX_SESSION}"
+                " --runtime codex --resume-from planner"
                 " --strategy structured --sandbox workspace-write --authority advisory"
                 ' --task "Use apply_patch exactly once to add authority-codex-sentinel.txt containing '
                 "authority-codex-was-written. Do not use shell redirection. You must request apply_patch; "

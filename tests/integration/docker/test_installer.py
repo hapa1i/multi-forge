@@ -41,6 +41,7 @@ _CLAUDE_MINIMAL_SKILLS = (
     "walkthrough",
 )
 _PATH_WITHOUT_CODEX = "/usr/bin:/bin"
+_CLAUDE_ONLY_RUNTIME_BIN = "/tmp/forge-claude-only-runtime-bin"
 _PACKAGED_LIFECYCLE_ROOT = "/tmp/forge-cross-runtime-wheel"
 _PACKAGED_PROJECT_ROOT = f"{_PACKAGED_LIFECYCLE_ROOT}/project"
 _PACKAGED_HOME = f"{_PACKAGED_LIFECYCLE_ROOT}/home"
@@ -1493,12 +1494,20 @@ class TestCodexHooksModule:
 
     def test_enable_without_codex_binary_skips_visibly(self, synced_container: ContainerLike) -> None:
         """No codex on PATH: presence gate skips with a notice; no config written."""
-        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home")
-        synced_container.exec("mkdir -p /tmp/codex-home")
+        setup = synced_container.exec(
+            f"rm -rf ~/.claude ~/.forge /tmp/codex-home {_CLAUDE_ONLY_RUNTIME_BIN}"
+            f" && mkdir -p /tmp/codex-home {_CLAUDE_ONLY_RUNTIME_BIN}"
+            f' && ln -s "$(command -v claude)" {_CLAUDE_ONLY_RUNTIME_BIN}/claude'
+        )
+        assert setup.returncode == 0, setup.stderr
+
+        runtime_path = f"{_CLAUDE_ONLY_RUNTIME_BIN}:{_PATH_WITHOUT_CODEX}"
+        codex_absent = synced_container.exec(f"PATH={runtime_path} command -v codex")
+        assert codex_absent.returncode != 0, "The absence-gate PATH unexpectedly contains Codex"
 
         result = synced_container.exec(
             "cd /forge && CODEX_HOME=/tmp/codex-home"
-            " uv run forge extension enable --scope user"
+            f" PATH={runtime_path} /forge/.venv/bin/forge extension enable --scope user"
             " --profile minimal --with hooks --without commands --runtime all"
         )
         assert result.returncode == 0, f"Enable failed: {result.stderr}"

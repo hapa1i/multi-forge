@@ -73,7 +73,8 @@ class TestRealClaudeHeadlessCost:
         setup_real_claude(forge_workspace, session_name="headless-cost")
 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        forge_workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
+        key_result = forge_workspace.write_file("/tmp/.anthropic_key", api_key, mode=0o600)
+        assert key_result.returncode == 0, key_result.stderr
         try:
             result = forge_workspace.exec(_PROBE, timeout=120)
         finally:

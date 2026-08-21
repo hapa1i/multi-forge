@@ -48,6 +48,8 @@ runtime hook delivery:
   remain real.
 - A real model may recover conversationally after a denied request, so process success is not the denial oracle. The
   sentinel's absence and a correlated `request_denied` event are the authority assertions.
+- Credential and prompt bytes enter the disposable container over stdin and land through an owner-only atomic write;
+  they must never be interpolated into `docker exec` process arguments.
 - Missing credentials, runtime installation, or Codex enrollment fail loudly under the repository's no-skip policy.
 
 ## Acceptance boundary
@@ -63,6 +65,7 @@ runtime hook delivery:
   denial/lifecycle evidence.
 - [x] Tests are marked `integration`, `slow`, and `docker_in`; no host auth/config bytes are mutated and `auth.json` is
   never copied.
+- [x] Paid credential bytes do not transit process arguments, and temporary key files are created with mode `0600`.
 - [x] Existing hermetic authority tests remain unchanged and passing.
 
 ## Non-goals

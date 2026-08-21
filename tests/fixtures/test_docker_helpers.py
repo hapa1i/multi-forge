@@ -23,7 +23,7 @@ def test_write_and_read_file(clean_workspace: ContainerLike):
 
 
 def test_write_file_with_special_chars(clean_workspace: ContainerLike):
-    """Test heredoc handles special characters without escaping."""
+    """Test stdin transport handles special characters without escaping."""
     content = """Line with 'single quotes'
 Line with "double quotes"
 Line with $variables and ${braces}
@@ -102,6 +102,27 @@ def test_roundtrip_empty_file(clean_workspace: ContainerLike):
     clean_workspace.write_file("/workspace/empty.txt", "")
     result = clean_workspace.read_file("/workspace/empty.txt")
     assert result == ""
+
+
+def test_write_file_honors_explicit_private_mode(clean_workspace: ContainerLike):
+    """Secret-bearing callers can publish exact bytes without a permissive mode window."""
+    result = clean_workspace.write_file("/workspace/private.txt", "private-content", mode=0o600)
+    assert result.returncode == 0, result.stderr
+
+    mode = clean_workspace.exec("stat -c %a /workspace/private.txt")
+    assert mode.returncode == 0, mode.stderr
+    assert mode.stdout.strip() == "600"
+    assert clean_workspace.read_file("/workspace/private.txt") == "private-content"
+
+
+def test_write_file_expands_container_home(clean_workspace: ContainerLike):
+    """Fixture paths retain the documented container-side $HOME expansion."""
+    directory = clean_workspace.mkdir("$HOME/.forge/write-helper", parents=True)
+    assert directory.returncode == 0, directory.stderr
+
+    written = clean_workspace.write_file("$HOME/.forge/write-helper/value.txt", "expanded-home")
+    assert written.returncode == 0, written.stderr
+    assert clean_workspace.read_file("$HOME/.forge/write-helper/value.txt") == "expanded-home"
 
 
 def test_roundtrip_multiline_json(clean_workspace: ContainerLike):

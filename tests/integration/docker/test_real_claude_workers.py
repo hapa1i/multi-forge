@@ -71,7 +71,8 @@ class TestRealClaudeWorkers:
         forge_workspace.exec("rm -rf ~/.forge/usage")
 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        forge_workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
+        key_result = forge_workspace.write_file("/tmp/.anthropic_key", api_key, mode=0o600)
+        assert key_result.returncode == 0, key_result.stderr
         try:
             result = forge_workspace.exec(
                 "export ANTHROPIC_API_KEY=$(cat /tmp/.anthropic_key) && "
@@ -140,7 +141,8 @@ class TestRealClaudeWorkers:
         _install_passthrough_logging_wrapper(forge_workspace)
 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        forge_workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
+        key_result = forge_workspace.write_file("/tmp/.anthropic_key", api_key, mode=0o600)
+        assert key_result.returncode == 0, key_result.stderr
         try:
             result = forge_workspace.exec(
                 "export ANTHROPIC_API_KEY=$(cat /tmp/.anthropic_key) && "

@@ -35,7 +35,7 @@ def _require_anthropic_api_key() -> None:
 
 def _write_api_key_file(workspace: ContainerLike) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    result = workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
+    result = workspace.write_file("/tmp/.anthropic_key", api_key, mode=0o600)
     if result.returncode != 0:
         pytest.fail(f"Failed to write API key: {result.stderr}")
 

@@ -204,6 +204,8 @@ integration, session lifecycle, authority enforcement, and supervisor flows that
   and environment and execs the real binary.
 - Cross-runtime enforcement tests must assert filesystem and journal evidence, not model prose; never construct the
   authority marker or invoke its hook directly in an E2E.
+- Stream paid credentials through `ContainerLike.write_file(..., mode=0o600)`; never interpolate credential bytes into a
+  shell command or `docker exec` argument.
 - Keep prompts minimal to reduce cost and execution time (~30-60s per test)
 - These are for **release validation**, not CI gating
 

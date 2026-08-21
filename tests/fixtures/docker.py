@@ -35,6 +35,21 @@ from _pytest.nodes import Item
 
 _active_container_id: str | None = None
 
+_WRITE_FILE_SCRIPT = r"""set -euo pipefail
+target="$1"
+target="${target//\$\{HOME\}/$HOME}"
+target="${target//\$HOME/$HOME}"
+parent="$(dirname -- "$target")"
+base="$(basename -- "$target")"
+umask 077
+tmp="$(mktemp "$parent/.${base}.tmp.XXXXXX")"
+trap 'rm -f -- "$tmp"' EXIT
+cat > "$tmp"
+chmod "$2" "$tmp"
+mv -f -- "$tmp" "$target"
+trap - EXIT
+"""
+
 
 def _detect_claude_code_version() -> str:
     """Detect installed Claude Code version via `claude --version`."""
@@ -88,8 +103,15 @@ class ContainerLike(Protocol):
         """Execute a command and return the result."""
         ...
 
-    def write_file(self, path: str, content: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
-        """Write content to file using heredoc (no quote escaping needed)."""
+    def write_file(
+        self,
+        path: str,
+        content: str,
+        timeout: int = 30,
+        *,
+        mode: int = 0o644,
+    ) -> subprocess.CompletedProcess[str]:
+        """Write exact content from stdin with the requested file mode."""
         ...
 
     def write_json(self, path: str, data: dict, timeout: int = 30) -> subprocess.CompletedProcess[str]:
@@ -129,21 +151,33 @@ class DockerContainer:
             timeout=timeout,
         )
 
-    def write_file(self, path: str, content: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
-        """Write content to file using heredoc (no quote escaping needed).
-
-        Note: Heredoc adds a trailing newline, so we strip it with head -c -1.
-        Special case: empty content writes empty file (not a newline).
-        """
-        if not content:
-            return self.exec(f'> "{path}"', timeout=timeout)
-
-        cmd = f"""cat > "{path}" << 'FORGE_EOF'
-{content}
-FORGE_EOF
-head -c -1 "{path}" > "{path}.tmp" && mv "{path}.tmp" "{path}"
-"""
-        return self.exec(cmd, timeout=timeout)
+    def write_file(
+        self,
+        path: str,
+        content: str,
+        timeout: int = 30,
+        *,
+        mode: int = 0o644,
+    ) -> subprocess.CompletedProcess[str]:
+        """Write exact content over stdin so bytes never enter the host process arguments."""
+        return subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self.container_id,
+                "bash",
+                "-c",
+                _WRITE_FILE_SCRIPT,
+                "forge-write-file",
+                path,
+                f"{mode:04o}",
+            ],
+            input=content,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
 
     def write_json(self, path: str, data: dict, timeout: int = 30) -> subprocess.CompletedProcess[str]:
         """Write JSON data to file (handles serialization + escaping)."""
@@ -190,21 +224,22 @@ class LocalExecution:
             timeout=timeout,
         )
 
-    def write_file(self, path: str, content: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
-        """Write content to file using heredoc (no quote escaping needed).
-
-        Note: Heredoc adds a trailing newline, so we strip it with head -c -1.
-        Special case: empty content writes empty file (not a newline).
-        """
-        if not content:
-            return self.exec(f'> "{path}"', timeout=timeout)
-
-        cmd = f"""cat > "{path}" << 'FORGE_EOF'
-{content}
-FORGE_EOF
-head -c -1 "{path}" > "{path}.tmp" && mv "{path}.tmp" "{path}"
-"""
-        return self.exec(cmd, timeout=timeout)
+    def write_file(
+        self,
+        path: str,
+        content: str,
+        timeout: int = 30,
+        *,
+        mode: int = 0o644,
+    ) -> subprocess.CompletedProcess[str]:
+        """Write exact content over stdin when tests already run inside the container."""
+        return subprocess.run(
+            ["bash", "-c", _WRITE_FILE_SCRIPT, "forge-write-file", path, f"{mode:04o}"],
+            input=content,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
 
     def write_json(self, path: str, data: dict, timeout: int = 30) -> subprocess.CompletedProcess[str]:
         """Write JSON data to file (handles serialization + escaping)."""

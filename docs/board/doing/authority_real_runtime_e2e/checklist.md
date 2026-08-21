@@ -52,9 +52,25 @@ the launch journal recorded the same-run denial and terminal event.
 - [x] Run the new real-Codex Docker case through `./scripts/test-integration.sh` (1 passed); record any external
   prerequisite failure exactly and do not substitute a mocked pass.
 - [x] Run the existing authority Docker/lifecycle cases (8 passed), focused authority unit suites (207 passed),
-  `make test-unit` (9,447 passed, 117 deselected), and `make test-regression` (1,053 passed).
+  `make test-unit` (9,447 passed, 117 deselected), and `make test-regression` (1,056 passed after review repairs).
 - [x] Run `make pre-commit`, `git diff --check`, and a relative Markdown-link sweep (1,227 links across 453 files).
 - [x] Add a compact completed-work entry to `docs/board/change_log.md`; design and end-user docs remain unchanged
   because this card adds validation only.
 - [x] Commit, push the separate branch, and open a PR with real-model cost/prerequisite disclosure and exact evidence.
 - [ ] After merge, move this card `doing/ -> done/` and repoint inbound board links.
+
+## Review repair
+
+- [x] Keep the bundled QA runner on the same Claude/Codex-versioned image identity and build arguments as the canonical
+  integration runner; pin the three surfaces with regression coverage.
+- [x] Make the installer absence test establish a Claude-present/Codex-absent PATH instead of depending on base-image
+  contents.
+- [x] Accept additional correctly denied Claude retries, clear the marker probe around each launch, and bound the real
+  Codex command with an in-container timeout.
+- [x] Stream fixture file content over `docker exec -i`, publish through an atomic same-directory temporary file, and
+  use mode `0600` for all real-runtime credentials and prompts.
+
+Evidence (2026-08-22): 3 real-model authority cases passed in 46.73 s; 13 Docker file-helper cases passed; the 32-case
+proxy/Claude/installer regression cluster passed; the complete non-slow integration target passed with 437 tests and
+10,615 deselections in 10m17s; 9,447 unit tests passed with 117 deselections; 1,056 regression tests passed; full
+pre-commit and diff checks passed.

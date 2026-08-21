@@ -100,7 +100,8 @@ RUN CI=1 claude --version \
 FROM ${INSTALL_METHOD}-toolchain AS forge-install
 
 # Real-runtime integration tests exercise Codex in the same disposable image.
-# Keep this before Forge source copies so routine code changes reuse the toolchain layer.
+# The native Claude toolchain has no Node.js; on the default npm toolchain the
+# package install is redundant. Keep this cached layer before Forge source copies.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs \
     npm \
