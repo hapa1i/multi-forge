@@ -824,7 +824,7 @@ The linked cards retain acceptance, verification, and closeout detail; this tabl
 | [CLI/proxy/runtime](done/epic_cli_proxy_runtime_correctness/card.md), [diagnostic hygiene](done/epic_proxy_diagnostic_data_hygiene/card.md), and [conversion failure](done/epic_proxy_conversion_failure_handling/card.md) | Closed; Wave 5 shipped.                                                                              |
 | [Wave 6 correctness](done/epic_wave6_correctness_maintenance/card.md)                                                                                                                                                      | Closed at 36 verified findings across 13 members; D033/O020 rejected.                                |
 | [Wave 7 refactor/deletion](done/epic_wave7_refactor_and_deletion/card.md)                                                                                                                                                  | Closed at 32 findings across 35 members; bounded post-merge corrections did not change those counts. |
-| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--14 shipped; Batch 4 orders 15--17 are active; orders 18--19 remain parked.                 |
+| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--14 shipped; Batch 4 is locally verified; orders 18--19 remain parked.                      |
 
 ## Strengths (preserve these)
 

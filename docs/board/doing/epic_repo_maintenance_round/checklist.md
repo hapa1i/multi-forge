@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 Batch 4 orders 15--17 are active on `agent/wave8-batch-4` from pushed closeout `0048e60e`; orders
-18--19 remain parked.
+Current focus: Wave 8 Batch 4 orders 15--17 are locally verified on `agent/wave8-batch-4`; publish their shared draft
+review while orders 18--19 remain parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -403,3 +403,5 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Merge Wave 8 Batch 3 in PR #227 (`f3353042`) and close all three cards together before activating Batch 4.
 - [x] Activate Wave 8 Batch 4 from pushed closeout `0048e60e` with separate O076/O081/O085 checklists and card-level
   commit boundaries.
+- [x] Complete the three Batch 4 implementation commits and combined focused, Docker, full unit/regression, pre-commit,
+  documentation, board-link, and diff gates without closing cards before merge.

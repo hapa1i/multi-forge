@@ -5,11 +5,11 @@
 **Lane**: `doing/` -- orders 1--14 shipped in PRs #216--#227; Batch 4 orders 15--17 are active on `agent/wave8-batch-4`;
 orders 18--19 remain parked. The corrective and external follow-ups retain their recorded PRs.
 
-**Current execution**: Batch 4 is active from pushed Batch 3 closeout `0048e60e`. Review cards:
-[`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md),
+**Current execution**: Batch 4 is locally verified on `agent/wave8-batch-4` from pushed Batch 3 closeout `0048e60e`.
+Review cards: [`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md),
 [`log_forge_info_probe_degradation`](../log_forge_info_probe_degradation/card.md), and
-[`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md). They retain separate implementation
-commits and close together only after the shared review merges.
+[`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md). Their implementation commits are
+`51f3b60a`, `a7cea967`, and `cff6adc6`; they close together only after the shared review merges.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

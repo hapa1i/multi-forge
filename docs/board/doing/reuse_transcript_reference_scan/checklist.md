@@ -1,7 +1,6 @@
 # Reuse transcript-reference scans checklist
 
-Current focus: implementation and focused verification are complete; aggregate and Docker gates remain for the shared
-Batch 4 head.
+Current focus: implementation commit `cff6adc6` and all local gates are complete; publish the shared Batch 4 review.
 
 ## Phase 1 -- Pin the scan and ownership matrix
 
@@ -20,8 +19,8 @@ Batch 4 head.
 
 - [x] Run focused session delete, fork/native-relocate, shared-transcript, and O085 regression tests.
 - [x] Commit O085 as its own implementation boundary after O081.
-- [ ] Run targeted native-relocate/session-lifecycle Docker coverage on the integrated Batch 4 head.
-- [ ] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
+- [x] Run targeted native-relocate/session-lifecycle Docker coverage on the integrated Batch 4 head.
+- [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
 - [ ] Publish all three cards in one draft PR; close them together only after merge.
 
 ## Acceptance tests
@@ -45,3 +44,5 @@ Batch 4 head.
 - The first file-scoped static run found one `str | None` narrowing error at the reused cleanup root; an explicit
   invariant assertion corrected it, and repository-pinned Ruff, isort, Black, mypy, Pyright, secret, and hygiene hooks
   then passed.
+- Integrated: real-Claude native relocation/resume and containerized worktree deletion each passed; the 165-test
+  combined slice, 9,331 unit tests, 1,035 regressions, and full pre-commit gate passed.

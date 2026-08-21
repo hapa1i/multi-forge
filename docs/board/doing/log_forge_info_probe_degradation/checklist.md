@@ -1,6 +1,6 @@
 # Log `forge info` probe degradation checklist
 
-Current focus: implementation and focused verification are complete; aggregate gates remain for the shared Batch 4 head.
+Current focus: implementation commit `a7cea967` and all local gates are complete; publish the shared Batch 4 review.
 
 ## Phase 1 -- Pin degradation evidence
 
@@ -19,7 +19,7 @@ Current focus: implementation and focused verification are complete; aggregate g
 
 - [x] Run focused info, output-stream, and O081 regression tests.
 - [x] Commit O081 as its own implementation boundary after O076 and before O085.
-- [ ] Run full unit, regression, pre-commit, documentation, board/link, and diff gates on the combined head.
+- [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates on the combined head.
 - [ ] Publish all three cards in one draft PR; close them together only after merge.
 
 ## Acceptance tests
@@ -40,3 +40,5 @@ Current focus: implementation and focused verification are complete; aggregate g
 - Debug evidence names only the probe plus exception type or exit code; the sentinel exception/stderr secret is absent
   from logs and ordinary stderr.
 - Repository-pinned Ruff, isort, Black, mypy, Pyright, secret, and hygiene hooks passed for both changed Python files.
+- Integrated: the 165-test combined slice, 9,331 unit tests, 1,035 regressions, and full pre-commit gate passed without
+  changing normal `forge info` streams or schemas.

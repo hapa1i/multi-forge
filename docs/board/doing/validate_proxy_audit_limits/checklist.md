@@ -1,7 +1,6 @@
 # Validate proxy-audit limits checklist
 
-Current focus: implementation and focused verification are complete; aggregate and Docker gates remain for the shared
-Batch 4 head.
+Current focus: implementation commit `51f3b60a` and all local gates are complete; publish the shared Batch 4 review.
 
 ## Phase 1 -- Pin invalid and control limits
 
@@ -19,8 +18,8 @@ Batch 4 head.
 
 - [x] Run focused proxy-audit, output-stream, and O076 regression tests.
 - [x] Commit O076 as its own implementation boundary before starting O081.
-- [ ] Run the targeted audit/telemetry Docker boundary on the integrated Batch 4 head.
-- [ ] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
+- [x] Run the targeted audit/telemetry Docker boundary on the integrated Batch 4 head.
+- [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
 - [ ] Publish all three cards in one draft PR; close them together only after merge.
 
 ## Acceptance tests
@@ -38,3 +37,5 @@ Batch 4 head.
   callbacks and attempted period-bound reads; all eight positive/default controls passed (`4 failed, 8 passed`).
 - Final: the proxy-audit, O076 regression, and output-stream slice passed (`65 passed`).
 - Repository-pinned Ruff, isort, Black, mypy, Pyright, secret, and hygiene hooks passed for both changed Python files.
+- Integrated: the real sidecar wrote audit telemetry and the host `proxy audit show` read it back; the 165-test combined
+  slice, 9,331 unit tests, 1,035 regressions, and full pre-commit gate passed.

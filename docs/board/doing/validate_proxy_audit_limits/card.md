@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active in Batch 4 on `agent/wave8-batch-4` from pushed Batch 3 closeout `0048e60e`.
+**Lane**: `doing/` -- implementation commit `51f3b60a` and integrated verification are complete on
+`agent/wave8-batch-4`; await the shared Batch 4 review and merge.
 
 **Finding**: O076 (LOW correctness).
 
