@@ -39,5 +39,5 @@ Current focus: remove the implementation and pin the stale-manifest compatibilit
 - [x] Run the targeted Docker policy-hook integration test through `./scripts/test-integration.sh` (1 passed).
 - [x] Run `make pre-commit`, `git diff --check`, board-link validation (424 documents, 1,028 local links, none broken),
   and design-document size checks (`design.md` 29,928; appendix 29,903; workflows 17,929 tokens).
-- [ ] Commit and push the reviewable changes, then open a draft PR against `main` with exact verification evidence.
+- [x] Commit and push the reviewable changes, then open draft PR #233 against `main` with exact verification evidence.
 - [ ] After merge, add the completed-work change-log entry and move this card to `done/` with final PR/check evidence.
