@@ -280,7 +280,8 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
     discoverable bundle when its only caller is tests; leave `BUNDLES` discovery + `policy enable --bundle`
     (`tdd`/`coding_standards`) untouched.
   - **Keep** the pipeline, registry path, and `build_divergence_config()` intact (no deletion).
-  - File a follow-on `proposed/graduate_workflow_policy_cli/` card for the real `--workflow <preset>` UX + wiring
+  - File a follow-on `retired/graduate_workflow_policy_cli/` card for the real `--workflow <preset>` UX + wiring
+    (later invalidated and replaced by removal)
     `build_divergence_config` (product/docs/tests -- deliberately out of this cleanup card).
   - **Assertion**: `policy.md` names it experimental/manifest-only; `get_all_bundles` no longer advertises `workflow` to
     any non-test path; `policy list` / `policy enable --bundle` unchanged; the pipeline + `build_divergence_config`
@@ -290,7 +291,8 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
     `test_workflow_in_all_bundles` removes the only place `workflow` was advertised as discoverable. Relabeled the
     `policy.md` header experimental/manifest-only and hardened the note ("no CLI surface... not in
     `forge policy list`"). Pipeline, `get_bundle_policies`, `get_bundle_for_policy`, `build_divergence_config`
-    untouched; `proposed/graduate_workflow_policy_cli/card.md` filed. 578 policy tests + mypy green. **Review
+    untouched; the now-retired `retired/graduate_workflow_policy_cli/card.md` was filed. 578 policy tests + mypy green.
+    **Review
     follow-up**: the `registry.py` module docstring still listed `workflow` as a flat "Available bundle"; reworded to
     split CLI-discoverable `BUNDLES` (tdd/coding_standards) from the dynamic manifest-only `workflow` path.
 
