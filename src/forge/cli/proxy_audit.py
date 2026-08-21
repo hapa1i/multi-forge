@@ -16,6 +16,7 @@ from rich.table import Table
 from forge.core.state import local_period_bounds, try_parse_iso
 
 console = Console(width=200)
+_POSITIVE_LIMIT = click.IntRange(min=1)
 
 
 def _short_hash(value: str | None) -> str:
@@ -40,7 +41,7 @@ def audit_cmd() -> None:
     default="today",
     help="Time period to show (default: today)",
 )
-@click.option("--limit", type=int, default=20, help="Max records to show (default: 20)")
+@click.option("--limit", type=_POSITIVE_LIMIT, default=20, help="Max records to show (default: 20)")
 @click.option("--json", "as_json", is_flag=True, help="Output raw records as JSON")
 def audit_show_cmd(proxy_id: str | None, period: str, limit: int, as_json: bool) -> None:
     """Show recent audit metadata (system-prompt/tool hashes, drift, mode).
@@ -172,7 +173,7 @@ def _mutation_rows(record: dict) -> list[tuple[str, str]]:
     default="week",
     help="Time period to show (default: week)",
 )
-@click.option("--limit", type=int, default=30, help="Max changes to show (default: 30)")
+@click.option("--limit", type=_POSITIVE_LIMIT, default=30, help="Max changes to show (default: 30)")
 @click.option("--json", "as_json", is_flag=True, help="Output raw records as JSON")
 def audit_diff_cmd(proxy_id: str | None, period: str, limit: int, as_json: bool) -> None:
     """Show what changed on the wire over time: drift + override mutations.
