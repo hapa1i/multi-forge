@@ -171,10 +171,10 @@ remains available, `session repair --yes` can restore a missing index row withou
 `forge clean` reports but does not remove the valid degraded session.
 
 Authority intent is a human control-plane setting. Authority-bearing creation, `authority set`, and `authority clear`
-refuse inside a managed agent process; set/clear also require an inactive target. Advisory authority inherits across
-`resume --fresh` and forks, while producer authority does not. An explicitly supplied child role wins. Adoption is
-deliberately excluded: stop the native client, adopt it unmarked, then set authority before its first managed resume.
-In-place resume accepts no authority flags.
+refuse inside a managed agent process; set/clear also require a target that is neither launching nor active. Advisory
+authority inherits across `resume --fresh` and forks, while producer authority does not. An explicitly supplied child
+role wins. Adoption is deliberately excluded: stop the native client, adopt it unmarked, then set authority before its
+first managed resume. In-place resume accepts no authority flags.
 
 `shell_closed` (the advisory default) denies every delivered tool except Claude's printed inspection and
 conversation/control allowlists; Codex has no shell-backed inspection allowlist. `named_tools` denies only direct

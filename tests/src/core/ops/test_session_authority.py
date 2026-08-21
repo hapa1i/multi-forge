@@ -9,6 +9,7 @@ import pytest
 
 import forge.core.ops.session_authority as ops
 from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
@@ -76,6 +77,28 @@ def test_required_mutation_append_failure_rolls_manifest_back(temp_env: Path, mo
         ops,
         "append_authority_event",
         lambda *_args: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    with pytest.raises(ops.ForgeOpError, match="manifest was rolled back"):
+        ops.set_session_authority(
+            ctx=ExecutionContext.from_cwd(),
+            session_name="planner",
+            role="producer",
+            tier=None,
+        )
+
+    assert store.manifest_path.read_bytes() == original
+
+
+def test_required_mutation_event_construction_failure_rolls_manifest_back(
+    temp_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _seed(temp_env, journal_config=False)
+    original = store.manifest_path.read_bytes()
+    monkeypatch.setattr(
+        ops,
+        "new_authority_event",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("invalid event")),
     )
 
     with pytest.raises(ops.ForgeOpError, match="manifest was rolled back"):
@@ -223,3 +246,22 @@ def test_malformed_history_is_a_read_error(temp_env: Path) -> None:
             ctx=ExecutionContext.from_cwd(),
             session_name="planner",
         )
+
+
+def test_authority_mutation_wraps_lock_open_failure_as_command_error(
+    temp_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _seed(temp_env)
+
+    class UnopenableLock:
+        def __enter__(self) -> None:
+            raise OSError("permission denied")
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(ops, "authority_session_lock", lambda *_args, **_kwargs: UnopenableLock())
+
+    with pytest.raises(ForgeOpError, match="could not change authority.*authority lock.*permission denied"):
+        with ops._authority_mutation_lock(store, operation="set"):
+            pytest.fail("authority mutation continued without its authority lock")

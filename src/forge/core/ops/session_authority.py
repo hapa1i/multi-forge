@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import os
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 from forge.core.reactive.env import get_run_identity
+from forge.core.state import FileLockTimeoutError
 from forge.session.active import ActiveSessionStore
 from forge.session.authority import (
     append_authority_event,
@@ -34,6 +36,7 @@ AUTHORITY_LIMITATIONS = (
     "The local journal is append-only by convention and is not tamper-proof.",
     "Authority does not attest authorship, semantic independence, admission, merge, or provider compliance.",
 )
+AUTHORITY_MUTATION_LOCK_TIMEOUT_S = 0.25
 
 
 @dataclass(frozen=True)
@@ -78,7 +81,7 @@ def set_session_authority(
     resolved = resolve_session(ctx=ctx, session_name=session_name)
     _enforce_compatible(resolved.store)
 
-    with authority_session_lock(resolved.store.session_dir):
+    with _authority_mutation_lock(resolved.store, operation="set"):
         fresh = resolved.store.read()
         _refuse_if_in_agent_or_active(resolved.store, fresh, operation="set")
         previous = deepcopy(fresh.intent.authority)
@@ -87,15 +90,15 @@ def set_session_authority(
             state.intent.authority = deepcopy(requested)
 
         updated = resolved.store.update(timeout_s=5.0, mutate=apply)
-        event = new_authority_event(
-            updated,
-            event_type="authority_configured",
-            run_id=None,
-            origin_surface="external_cli",
-            operation="set",
-            outcome="success",
-        )
         try:
+            event = new_authority_event(
+                updated,
+                event_type="authority_configured",
+                run_id=None,
+                origin_surface="external_cli",
+                operation="set",
+                outcome="success",
+            )
             append_authority_event(str(resolved.store.forge_root), event)
         except Exception as exc:
             _rollback_authority(resolved.store, previous, exc)
@@ -108,7 +111,7 @@ def clear_session_authority(*, ctx: ExecutionContext, session_name: str) -> Auth
     resolved = resolve_session(ctx=ctx, session_name=session_name)
     _enforce_compatible(resolved.store)
 
-    with authority_session_lock(resolved.store.session_dir):
+    with _authority_mutation_lock(resolved.store, operation="clear"):
         fresh = resolved.store.read()
         _refuse_if_in_agent_or_active(resolved.store, fresh, operation="clear")
         previous = deepcopy(fresh.intent.authority)
@@ -117,16 +120,16 @@ def clear_session_authority(*, ctx: ExecutionContext, session_name: str) -> Auth
             state.intent.authority = None
 
         updated = resolved.store.update(timeout_s=5.0, mutate=apply)
-        event = new_authority_event(
-            updated,
-            event_type="authority_cleared",
-            run_id=None,
-            origin_surface="external_cli",
-            operation="clear",
-            outcome="success",
-            authority=None,
-        )
         try:
+            event = new_authority_event(
+                updated,
+                event_type="authority_cleared",
+                run_id=None,
+                origin_surface="external_cli",
+                operation="clear",
+                outcome="success",
+                authority=None,
+            )
             append_authority_event(str(resolved.store.forge_root), event)
         except Exception as exc:
             _rollback_authority(resolved.store, previous, exc)
@@ -183,7 +186,7 @@ def get_session_authority_report(*, ctx: ExecutionContext, session_name: str | N
         else:
             launch_support = "verified" if _active_preflight_matches(state, events, active_entry) else "unverified"
 
-    denial_events = [event for event in events if event.event_type == "request_denied"]
+    denial_events = [event for event in events if event.event_type == "request_denied" and event.outcome == "denied"]
     limitations: list[str] = list(AUTHORITY_LIMITATIONS)
     if authority is not None and authority.role == "advisory" and authority.tier == "named_tools":
         limitations.append(
@@ -238,6 +241,52 @@ def _refuse_if_in_agent_or_active(store: SessionStore, state: SessionState, *, o
     raise ForgeOpError(f"session '{state.name}' is active; stop it before changing authority")
 
 
+@contextmanager
+def _authority_mutation_lock(store: SessionStore, *, operation: str) -> Iterator[None]:
+    """Acquire the control lock quickly or record a live-launch refusal."""
+
+    stack = ExitStack()
+    try:
+        stack.enter_context(
+            authority_session_lock(
+                store.session_dir,
+                timeout_s=AUTHORITY_MUTATION_LOCK_TIMEOUT_S,
+            )
+        )
+    except FileLockTimeoutError as exc:
+        in_agent = bool(os.environ.get("FORGE_SESSION"))
+        reason_code = "in_agent_authority_mutation" if in_agent else "active_session_authority_mutation"
+        try:
+            state = store.read()
+            event = new_authority_event(
+                state,
+                event_type="mutation_refused",
+                run_id=_current_root_run_id(),
+                origin_surface="external_cli",
+                operation=operation,
+                outcome="refused",
+                reason_code=reason_code,
+            )
+            append_authority_event(str(store.forge_root), event)
+        except Exception as journal_error:
+            raise ForgeOpError(
+                "authority mutation was refused while the session was launching or active, "
+                f"but its required journal write failed: {journal_error}"
+            ) from exc
+        if in_agent:
+            raise ForgeOpError("authority can only be changed by a human outside a managed Forge session") from exc
+        raise ForgeOpError(
+            f"session '{store.session_name}' is launching or active; stop it before changing authority"
+        ) from exc
+    except OSError as exc:
+        raise ForgeOpError(
+            f"could not change authority for session '{store.session_name}': "
+            f"the authority lock could not be opened ({exc})"
+        ) from exc
+    with stack:
+        yield
+
+
 def _rollback_authority(store: SessionStore, previous: AuthorityIntent | None, cause: Exception) -> None:
     try:
         store.update(
@@ -260,7 +309,7 @@ def _configuration_history(
     epoch: dict[str, Any] | None = None
     saw_history_event = False
     for event in events:
-        if event.event_type in {"authority_configured", "authority_inherited"}:
+        if event.event_type in {"authority_configured", "authority_inherited"} and event.outcome == "success":
             saw_history_event = True
             historical = (
                 event.payload["role"],
@@ -271,7 +320,7 @@ def _configuration_history(
                 "started_at": event.timestamp,
                 "ended_at": None,
             }
-        elif event.event_type == "authority_cleared":
+        elif event.event_type == "authority_cleared" and event.outcome == "success":
             saw_history_event = True
             if historical is not None and epoch is not None:
                 epoch["ended_at"] = event.timestamp

@@ -494,7 +494,6 @@ def launch_claude_session(
         launch_mode=launch_mode,
         worktree_path=worktree_path,
         claude_session_id=session_id,
-        state_hint=manifest,
     ) as authority_attempt:
         env_vars.pop(AUTHORITY_MARKER_ENV, None)
         if authority_attempt is not None and authority_attempt.marker is not None:

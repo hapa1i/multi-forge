@@ -296,7 +296,6 @@ def start_interactive_codex_session(
         launch_mode=LAUNCH_MODE_HOST,
         worktree_path=Path(cwd),
         codex_preflight=preflight,
-        state_hint=state,
     ) as authority_attempt:
 
         def runner() -> int:
@@ -463,7 +462,6 @@ def reattach_codex_session(
         launch_mode=LAUNCH_MODE_HOST,
         worktree_path=Path(cwd),
         codex_preflight=preflight,
-        state_hint=state,
     ) as authority_attempt:
 
         def runner() -> int:

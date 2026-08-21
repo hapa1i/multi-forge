@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from forge.core.reactive.env import RunIdentity
+from forge.core.reactive.env import FORGE_AUTHORITY_MARKER_VAR, RunIdentity
 
 
 def invoke_claude(
@@ -201,8 +201,8 @@ def _build_environment(
     merged = {**(extra_vars or {}), **root.as_env()}
     env = build_claude_env(extra_vars=merged, derive_run_identity=False, interactive=True)
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a root has no parent; scrub any inherited
-    if not extra_vars or "FORGE_AUTHORITY_MARKER" not in extra_vars:
-        env.pop("FORGE_AUTHORITY_MARKER", None)
+    if not extra_vars or FORGE_AUTHORITY_MARKER_VAR not in extra_vars:
+        env.pop(FORGE_AUTHORITY_MARKER_VAR, None)
     for key in unset_vars or ():
         env.pop(key, None)
     apply_attribution_header_policy(env)

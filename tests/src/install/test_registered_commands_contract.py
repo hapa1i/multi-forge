@@ -66,8 +66,11 @@ def test_claude_hook_entries_are_pinned_by_event_matcher_command_and_timeout() -
     ]
 
 
-def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
-    host_rows = _rendered_hook_entries()
+def test_sidecar_hook_entries_omit_unsupported_authority_and_use_bare_commands() -> None:
+    # Advisory sidecars are refused before spawn, and the bare CLI command has
+    # no dispatcher fast path. Staging the catch-all there would add latency to
+    # every tool request without providing an enforceable posture.
+    host_rows = [row for row in _rendered_hook_entries() if not row[2].endswith(" authority-check")]
     sidecar_rows: list[tuple[str, Any, str, int | None]] = []
     settings = get_sidecar_hook_settings()
 
@@ -91,6 +94,7 @@ def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
         f"forge hook {command.rsplit(' ', 1)[-1]}" for _event, _matcher, command, _timeout in host_rows
     ]
     assert all("forge-hook" not in command for _event, _matcher, command, _timeout in sidecar_rows)
+    assert all(not command.endswith(" authority-check") for _event, _matcher, command, _timeout in sidecar_rows)
 
 
 def test_statusline_command_is_pinned() -> None:

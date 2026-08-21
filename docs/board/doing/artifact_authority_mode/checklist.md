@@ -2,7 +2,7 @@
 
 **Card**: [card.md](card.md) -- the normative contract. **Epic**:
 [Session Authority and Provenance](../epic_session_authority_provenance/card.md). **Branch**:
-`feat/artifact-authority-mode` (from `main` at `80d23f39`).
+`feat/artifact-authority-mode` (rebased onto `main` at `9ea043a4`).
 
 ## Current focus
 
@@ -68,16 +68,17 @@ Ratified decisions:
   the producer/unmarked fast no-op, but forwards any present marker -- including malformed data -- to the handler for a
   fail-closed decision. Full schema, manifest, digest, and run-id validation stays in Forge code.
 - [x] **D3 -- Runtime preflight posture.** For host Claude, require the exact catch-all registration and a current,
-  executable dispatcher. For advisory Codex, call the existing empirical enrollment verifier for each launch attempt; do
-  not convert static `hook_seam="enrollment_gated"` or a stale cache into `verified`. Treat advisory Claude sidecar as
-  `unsupported` in v1 unless implementation can establish an equivalent pre-spawn hook/handler proof for the selected
-  image; producer and unmarked sidecars retain current behavior and record a null installed-registration digest when no
-  seam is required or observed. This is the narrow honest reading of “unverified refuses” and avoids claiming that
-  staged settings prove the image can execute the handler. The chosen strictness spends one real, cheap `codex exec`
-  probe whenever Codex is ready and registered: a 20-turn headless advisory workflow can therefore pay about 20
-  additional turns of latency and quota. The existing readiness cache observes the binary, auth/credential mtimes, and a
-  TTL, not a proven trust-revocation source; any future enrollment cache needs separate probe evidence locating Codex
-  trust state and demonstrating sound invalidation.
+  executable dispatcher. For advisory Codex, require exactly one user-scope no-matcher `codex-policy-check` row with the
+  installed command bytes and timeout, then call the existing empirical SessionStart enrollment verifier for each launch
+  attempt; do not convert either static `hook_seam="enrollment_gated"` or a stale cache into `verified`. Treat advisory
+  Claude sidecar as `unsupported` in v1 unless implementation can establish an equivalent pre-spawn hook/handler proof
+  for the selected image; producer and unmarked sidecars retain current behavior and record a null
+  installed-registration digest when no seam is required or observed. This is the narrow honest reading of “unverified
+  refuses” and avoids claiming that staged settings prove the image can execute the handler. The chosen strictness
+  spends one real, cheap `codex exec` probe whenever Codex is ready and registered: a 20-turn headless advisory workflow
+  can therefore pay about 20 additional turns of latency and quota. The existing readiness cache observes the binary,
+  auth/credential mtimes, and a TTL, not a proven trust-revocation source; any future enrollment cache needs separate
+  probe evidence locating Codex trust state and demonstrating sound invalidation.
 - [x] **D4 -- Configuration/lifecycle transaction boundary.** Serialize authority mutation against launch preflight for
   the same session. A successful set/clear/derivation must leave intent and its journal event consistent; on required
   append failure, roll back a newly created session or the prior authority subtree before returning an error. Register
@@ -87,7 +88,10 @@ Ratified decisions:
   to invoke, not that a child was observed alive: a spawn exception produces
   `run_ended(outcome=error, reason_code=child_never_spawned)`, while a spawned child that returns nonzero uses
   `run_ended(outcome=error, reason_code=child_exited_nonzero)`. Reads must not present the former as an observed child
-  run.
+  run. The review refinement applies the same lock to an unmarked launch decision and retains it for the legacy child's
+  lifetime. Its active registration stays best-effort, so ordinary start gains no new global-registry dependency;
+  concurrent set/clear fails quickly with a journaled launching-or-active diagnostic instead of creating a marked
+  manifest behind an unmarked child.
 - [x] **D5 -- `launch_support` derivation.** Report `unsupported` for a statically incapable seam, `unverified` when a
   capable seam lacks required empirical/current-run evidence, `verified` only for a matching successful preflight of a
   live run, and `not_running` when the seam is capable but no run is active. `configuration_history` remains an
@@ -114,9 +118,12 @@ Ratified decisions:
 - [x] Implement a strict ordered reader.
   - Assertion: missing file is represented to the domain reader as absence, while unreadable files, truncated/non-object
     lines, unknown fields, invalid enums/nullability/timestamps/ids, and newer schema versions raise a record/line
-    diagnostic; no bad line is skipped.
+    diagnostic; non-UTF-8 bytes are a typed read error and no bad line is skipped.
 - [x] Pin the authority payload schema: role, nullable tier, effective-config SHA-256, nullable hook-registration
   SHA-256, and nullable covered tool; reject prompt/tool payload/patch/source fields and unknown payload keys.
+- [x] Validate event-specific authority envelope semantics in addition to the shared fields and payload: run-id
+  nullability, origin, operation, outcome/reason pairing, runtime-hook correspondence, and required advisory hook
+  evidence must match the event type before append or report derivation.
 - [x] Add neutral tests in `tests/src/session/test_session_events.py`; name the helper contract in the epic checklist so
   M2 must consume rather than fork it.
 - [x] Sync the shared event ownership, paths, lock/failure behavior, local-tamper caveat, and C4 absence vocabulary into
@@ -193,8 +200,9 @@ Ratified decisions:
     `child_exited_nonzero`, and reads distinguish both from a preflight/commit abort, which has no `run_started` event.
   - Assertion: the launch orchestration exposes M2's future “authority then routing projection” insertion point and can
     append same-run compensating aborts, but M1 adds no routing event or projection.
-- [x] Serialize launch activation with authority mutation per D4, while retaining existing active-session cleanup after
-  child exit; marker/config mismatch during a live run can only tighten to denial.
+- [x] Serialize every managed launch decision with authority mutation per D4. Marked launch activation remains required
+  and releases the lock before child execution; unmarked execution keeps the lock for the child lifetime while retaining
+  best-effort legacy active registration. Marker/config mismatch during a live marked run can only tighten to denial.
 - [x] Pin journal tree lifetime through normal delete, clean with either transcript flag, failed launch, and incognito
   cleanup.
   - Assertion: delete/clean never selectively removes `authority/`; `--keep-transcripts` has no effect, and the journal
@@ -215,9 +223,9 @@ Ratified decisions:
     outside/`.forge`/unnormalizable targets remain denied by tool name.
   - Assertion: valid advisory guard exceptions, unreadable state, and marker mismatch deny; request-journal failure
     emits a diagnostic but never changes the deny.
-- [x] Add one Claude PreToolUse registration with omitted matcher for `authority-check`; keep both existing
-  `policy-check` Write/Edit rows intact and update host/sidecar inventories plus pinned event/matcher/command/timeout
-  contracts.
+- [x] Add one host Claude PreToolUse registration with omitted matcher for `authority-check`; keep both existing
+  `policy-check` Write/Edit rows intact. Omit the row from sidecar staging while advisory sidecar is unsupported, and
+  pin both host and sidecar event/matcher/command/timeout contracts.
 - [x] Move the rendered dispatcher's handler parse and advisory-marker presence gate ahead of `_should_dispatch`, dev
   override resolution, runtime metadata reads, Forge launcher resolution, import, and exec.
   - Assertion: absent marker for producer/unmarked `authority-check` exits 0 structurally without resolving/importing/
@@ -282,35 +290,36 @@ Ratified decisions:
 
 ## Acceptance tests (fixture-grounded)
 
-| Test                               | Fixture                                                                                                      | Assertion                                                                                                  | Test File                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Additive intent round trip         | legacy manifest; advisory; producer                                                                          | legacy loads unmarked; valid roles round-trip strictly; schema stays compatible                            | `tests/src/session/test_models.py`, `test_store.py`                                                  |
-| Role/tier validation               | advisory with omitted/named tier; producer with tier; unknown values                                         | default is `shell_closed`; invalid combinations fail before write                                          | `tests/src/session/test_authority.py`                                                                |
-| Shared envelope validation         | valid authority event plus bad id/time/enum/nullability/newer-version variants                               | valid record round-trips; every malformed variant names record/field                                       | `tests/src/session/test_session_events.py`                                                           |
-| Containment and domain isolation   | traversal/absolute/symlinked session targets; authority domain                                               | every escape rejects with no file; only authority path is created                                          | `tests/src/session/test_session_events.py`                                                           |
-| Concurrent complete appends        | multiple processes append distinct events to one journal                                                     | exact record count, unique ids, parseable newline-complete JSON, no lost/interleaved records               | `tests/src/session/test_session_events.py`                                                           |
-| Required append failure            | lock/open/write/fsync faults                                                                                 | typed error propagates; command/launch reports failure and D4 rollback invariant holds                     | `tests/src/session/test_session_events.py`, `tests/src/core/ops/test_session_authority.py`           |
-| Control-plane mutations            | inactive target outside agent; active target; `FORGE_SESSION` set; unresolved target                         | only external inactive mutation succeeds; scoped refusals journal; unresolved input creates no journal     | `tests/src/cli/test_session_authority.py`                                                            |
-| Adoption exclusion                 | adopted Claude and Codex sessions; set before managed resume                                                 | adoption has no authority flags and creates unmarked state; only later external inactive set designates it | `tests/src/cli/test_session_adopt.py`, `tests/src/core/ops/test_codex_adopt.py`                      |
-| Generic override rejection         | `set authority...`, `reset authority...`, and `reset --all`                                                  | keyed authority attempts reject+journal; clear-all cannot mutate intent                                    | `tests/src/cli/test_session_overrides.py`                                                            |
-| Derivation matrix                  | advisory/producer parents across fresh resume, fork, relaunch, and Codex child creation                      | advisory+tier inherit; producer becomes unmarked; explicit child role wins and event origin/type is exact  | `tests/src/session/test_authority_inheritance.py`                                                    |
-| One root id per attempt            | Claude host, supported sidecar or refusal, Codex headless/TUI, aborted preflight                             | preflight/start/end/marker use one root id; no remint; abort has no run-start/usage claim                  | `tests/src/core/ops/test_session_authority_launch.py`                                                |
-| Spawn-boundary lifecycle           | launcher spawn exception; spawned child exits nonzero                                                        | both terminate as error, with `child_never_spawned` distinct from `child_exited_nonzero`                   | `tests/src/core/ops/test_session_authority_launch.py`                                                |
-| Claude seam preflight              | exact catch-all/current dispatcher; absent/wrong matcher/stale/missing dispatcher                            | only exact current seam launches advisory; failures name recovery                                          | `tests/src/core/ops/test_session_authority_launch.py`                                                |
-| Codex empirical preflight          | ready+enrolled, registered-only, unenrolled, verifier error; consecutive headless resumes                    | only positive empirical result launches advisory; each attempt probes; readiness cache never implies trust | `tests/src/core/ops/test_session_authority_launch.py`                                                |
-| Marker immutability/mismatch       | validated advisory marker, later manifest drift, malformed marker, wrong run/digest                          | marker is fixed; every inconsistency denies rather than consulting ordinary fail mode                      | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Named-tools raw denial             | Write/Edit/NotebookEdit/apply_patch add/update/delete/rename; malformed/path variants                        | every covered raw request denies without path carve-outs; Bash/unknown reported uncovered                  | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Shell-closed classification        | exact Claude allowlists, Bash, unknown/delegation/skill/MCP; Codex Bash/apply_patch/unknown                  | allowlisted tools receive no authority grant; every other delivered tool denies                            | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Authority-before-policy            | advisory request with policy absent/disabled/open, no bundles, malformed adapter input                       | authority denial occurs before each existing early exit/adapter                                            | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Guard error and denial-log failure | manifest read/digest/classifier error; journal append error                                                  | valid runtime deny remains; diagnostic is secret/source-free                                               | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Producer/unmarked compatibility    | existing TDD/supervisor allow+deny fixtures under no advisory marker                                         | ordinary Claude Write/Edit and Codex apply_patch results remain unchanged                                  | `tests/src/cli/hooks/test_authority_check.py`, `test_codex_policy_check.py`                          |
-| Registration byte contracts        | Claude preset/sidecar rows and existing Codex managed block                                                  | Claude adds one no-matcher authority row; Write/Edit rows stay; Codex bytes/row count stay exact           | `tests/src/install/test_registered_commands_contract.py`, `test_codex_hooks.py`                      |
-| Dispatcher early no-op             | authority handler, absent marker, managed env, populated registry, broken resolver/dev target                | exits 0 without gate/resolver/import/exec; marker-present path still forwards                              | `tests/src/install/test_hook_dispatcher.py`                                                          |
-| Journal content hygiene            | config, preflight, abort, lifecycle, denial, and refusal fixtures seeded with secret/source strings          | envelope/payload exact; no prompt, raw payload, patch, command, source bytes, or candidate path appears    | `tests/src/session/test_authority.py`                                                                |
-| Posture absence matrix             | unmarked/no journal; marked/missing or inconsistent; malformed; inactive capable; unsupported; live verified | exact history/support states; malformed is error; JSON fields never disappear                              | `tests/src/core/ops/test_session_authority.py`, `tests/src/cli/test_session_authority.py`            |
-| Read-only show                     | valid report with stale active entry and journal                                                             | stdout/JSON correct; manifest/journal/index/active files and mtimes remain unchanged                       | `tests/src/cli/test_session_authority.py`                                                            |
-| Artifact tree lifetime             | delete/clean; both transcript settings; retained/external vs containing owning worktree; incognito; failure  | no selective purge; journal survives with its Forge root and disappears only with its containing checkout  | `tests/src/session/test_authority_retention.py`, `tests/integration/docker/test_project_identity.py` |
-| Human-courier producer flow        | planner advisory plus independent producer `--worktree`, no parent flags                                     | distinct checkout/conversation; no derivation/transfer artifact or automatic context                       | `tests/integration/cli/test_session_commands_integration.py`                                         |
+| Test                               | Fixture                                                                                                      | Assertion                                                                                                   | Test File                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Additive intent round trip         | legacy manifest; advisory; producer                                                                          | legacy loads unmarked; valid roles round-trip strictly; schema stays compatible                             | `tests/src/session/test_models.py`, `test_store.py`                                                  |
+| Role/tier validation               | advisory with omitted/named tier; producer with tier; unknown values                                         | default is `shell_closed`; invalid combinations fail before write                                           | `tests/src/session/test_authority.py`                                                                |
+| Shared envelope validation         | valid authority event plus bad id/time/enum/nullability/UTF-8/semantic/newer-version variants                | valid record round-trips; every malformed shared or event-specific variant names record/field               | `tests/src/session/test_session_events.py`, `tests/src/session/test_authority.py`                    |
+| Containment and domain isolation   | traversal/absolute/symlinked session targets; authority domain                                               | every escape rejects with no file; only authority path is created                                           | `tests/src/session/test_session_events.py`                                                           |
+| Concurrent complete appends        | multiple processes append distinct events to one journal                                                     | exact record count, unique ids, parseable newline-complete JSON, no lost/interleaved records                | `tests/src/session/test_session_events.py`                                                           |
+| Required append failure            | lock/open/write/fsync faults                                                                                 | typed error propagates; command/launch reports failure and D4 rollback invariant holds                      | `tests/src/session/test_session_events.py`, `tests/src/core/ops/test_session_authority.py`           |
+| Control-plane mutations            | inactive target outside agent; active target; `FORGE_SESSION` set; unresolved target                         | only external inactive mutation succeeds; scoped refusals journal; unresolved input creates no journal      | `tests/src/cli/test_session_authority.py`                                                            |
+| Adoption exclusion                 | adopted Claude and Codex sessions; set before managed resume                                                 | adoption has no authority flags and creates unmarked state; only later external inactive set designates it  | `tests/src/cli/test_session_adopt.py`, `tests/src/core/ops/test_codex_adopt.py`                      |
+| Generic override rejection         | `set authority...`, `reset authority...`, and `reset --all`                                                  | keyed authority attempts reject+journal; clear-all cannot mutate intent                                     | `tests/src/cli/test_session_overrides.py`                                                            |
+| Derivation matrix                  | advisory/producer parents across fresh resume, fork, relaunch, and Codex child creation                      | advisory+tier inherit; producer becomes unmarked; explicit child role wins and event origin/type is exact   | `tests/src/session/test_authority_inheritance.py`                                                    |
+| One root id per attempt            | Claude host, supported sidecar or refusal, Codex headless/TUI, aborted preflight                             | preflight/start/end/marker use one root id; no remint; abort has no run-start/usage claim                   | `tests/src/core/ops/test_session_authority_launch.py`                                                |
+| Unmarked launch serialization      | unmarked child plus concurrent set/second launch; unavailable active registry                                | child keeps legacy path; mutation cannot race behind it; contention is actionable without registry reliance | `tests/src/core/ops/test_session_authority_launch.py`                                                |
+| Spawn-boundary lifecycle           | launcher spawn exception; spawned child exits nonzero                                                        | both terminate as error, with `child_never_spawned` distinct from `child_exited_nonzero`                    | `tests/src/core/ops/test_session_authority_launch.py`                                                |
+| Claude seam preflight              | exact catch-all/current dispatcher; absent/wrong matcher/stale/missing dispatcher                            | only exact current seam launches advisory; failures name recovery                                           | `tests/src/core/ops/test_session_authority_launch.py`                                                |
+| Codex seam preflight               | exact/missing/drifted/duplicate policy row; ready+enrolled and negative enrollment; consecutive resumes      | exact static policy row and positive empirical probe are both required; every attempt probes                | `tests/src/install/test_codex_hooks.py`, `tests/src/core/ops/test_session_authority_launch.py`       |
+| Marker immutability/mismatch       | validated advisory marker, later manifest drift, malformed marker, wrong run/digest                          | marker is fixed; every inconsistency denies rather than consulting ordinary fail mode                       | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Named-tools raw denial             | Write/Edit/NotebookEdit/apply_patch add/update/delete/rename; malformed/path variants                        | every covered raw request denies without path carve-outs; Bash/unknown reported uncovered                   | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Shell-closed classification        | exact Claude allowlists, Bash, unknown/delegation/skill/MCP; Codex Bash/apply_patch/unknown                  | allowlisted tools receive no authority grant; every other delivered tool denies                             | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Authority-before-policy            | advisory request with policy absent/disabled/open, no bundles, malformed adapter input                       | authority denial occurs before each existing early exit/adapter                                             | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Guard error and denial-log failure | manifest read/digest/classifier error; journal append error                                                  | valid runtime deny remains; diagnostic is secret/source-free                                                | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Producer/unmarked compatibility    | existing TDD/supervisor allow+deny fixtures under no advisory marker                                         | ordinary Claude Write/Edit and Codex apply_patch results remain unchanged                                   | `tests/src/cli/hooks/test_authority_check.py`                                                        |
+| Registration byte contracts        | host Claude, authority-excluding sidecar rows, and existing Codex managed block                              | host adds one no-matcher authority row; sidecar omits it; Codex bytes/row count stay exact                  | `tests/src/install/test_registered_commands_contract.py`, `tests/src/install/test_codex_hooks.py`    |
+| Dispatcher early no-op             | authority handler, absent marker, managed env, populated registry, broken resolver/dev target                | exits 0 without gate/resolver/import/exec; marker-present path still forwards                               | `tests/src/install/test_hook_dispatcher.py`                                                          |
+| Journal content hygiene            | config, preflight, abort, lifecycle, denial, and refusal fixtures seeded with secret/source strings          | envelope/payload exact; no prompt, raw payload, patch, command, source bytes, or candidate path appears     | `tests/src/session/test_authority.py`                                                                |
+| Posture absence matrix             | unmarked/no journal; marked/missing or inconsistent; malformed; inactive capable; unsupported; live verified | exact history/support states; malformed is error; JSON fields never disappear                               | `tests/src/core/ops/test_session_authority.py`, `tests/src/cli/test_session_authority.py`            |
+| Read-only show                     | valid report with stale active entry and journal                                                             | stdout/JSON correct; manifest/journal/index/active files and mtimes remain unchanged                        | `tests/src/cli/test_session_authority.py`                                                            |
+| Artifact tree lifetime             | delete/clean; both transcript settings; retained/external vs containing owning worktree; incognito; failure  | no selective purge; journal survives with its Forge root and disappears only with its containing checkout   | `tests/src/session/test_authority_retention.py`, `tests/integration/docker/test_project_identity.py` |
+| Human-courier producer flow        | planner advisory plus independent producer `--worktree`, no parent flags                                     | distinct checkout/conversation; no derivation/transfer artifact or automatic context                        | `tests/integration/cli/test_session_commands_integration.py`                                         |
 
 ## Phase 7 -- Verification and closeout
 
@@ -318,14 +327,15 @@ Ratified decisions:
   CLI subgroup/flags/output streams, both hook handlers, preset/Codex registrations, dispatcher, cleanup, and
   status-line non-regression; record exact results here. The broad focused pass completed 357 tests, and the final
   journal/history/creation-lock review pass completed 108 tests after its edge-case fixes.
-- [x] Run `make test-unit` and `make test-regression`; fix failures rather than skipping them. Final results: 9,528
-  passed with 124 deselected, and 1,064 passed, respectively.
+- [x] Run `make test-unit` and `make test-regression`; fix failures rather than skipping them. Final repaired-head
+  results are recorded in Phase 8.
 - [x] Run the risk-required targeted integration set through `./scripts/test-integration.sh`: authority additions in
   `tests/integration/docker/test_policy_hooks.py`, `test_installer.py`, `test_session_lifecycle.py`,
   `tests/integration/cli/test_session_commands_integration.py`, the relevant Codex session smoke, and sidecar hook tests
-  if D3 support is added. The final targeted run passed seven cases, including both runtime deny wires, producer policy
-  preservation, installed registrations, the complete advisory Claude launch lifecycle, and the independent producer
-  worktree flow. Advisory sidecar remains unsupported by D3, so no sidecar-launch success case applies.
+  if D3 support is added. The repaired targeted run passed eight cases, including both runtime deny wires, producer
+  policy preservation, installed registrations, the complete advisory Claude launch lifecycle, the independent producer
+  worktree flow, and omission of the unsupported sidecar authority row. Advisory sidecar remains unsupported by D3, so
+  no sidecar-launch success case applies.
 - [x] Run the live runtime checks appropriate to configured credentials: `forge extension doctor --json`,
   `forge extension sync`, `forge runtime preflight codex --verify-enrollment`, one advisory Claude deny, one advisory
   Codex deny, producer ordinary-policy behavior, and `authority show --json` before/during/after a run. Record any
@@ -342,9 +352,8 @@ Ratified decisions:
   0.9.4 wheel/sdist built; an isolated wheel install completed idempotent user-scope enable/sync, exposed both authority
   command groups, installed an executable dispatcher, and produced exactly one catch-all `PreToolUse` row at 60 s.
 - [x] Run `make pre-commit`, `git diff --check`, a relative Markdown-link sweep, and
-  `./scripts/count-tokens.py docs/board/doing/artifact_authority_mode/checklist.md`; record results. All hooks passed on
-  the fully staged tree, both diff checks passed, all relative targets in the ten changed Markdown files resolved, and
-  the checklist remained below 8k tokens.
+  `./scripts/count-tokens.py docs/board/doing/artifact_authority_mode/checklist.md`; record results. Final repaired-head
+  results are recorded in Phase 8.
 - [x] Review the final diff against every card acceptance item 01-12 and epic C1-C5; explicitly confirm M2/non-goal
   exclusions and no unrelated user changes. The review found and fixed strict UTC/JSON coercion, record-context,
   inconsistent-history, pre-active marker, typed preflight-error, and creation/publication-lock edge cases. M2, route
@@ -354,6 +363,26 @@ Ratified decisions:
 - [x] Update the epic checklist with M1 evidence and shared-helper ownership; leave M2 proposed until separately
   accepted.
 - [ ] After merge, move M1 `doing/ -> done/` and repoint every inbound board link.
+
+## Phase 8 -- Multi-model review repairs
+
+- [x] Rebase onto current `main` and preserve the merged WorkflowPolicy removal instead of resurrecting its deleted
+  design text while resolving conflicts.
+- [x] Require an exact static Codex `codex-policy-check` row before the existing per-attempt empirical SessionStart
+  probe; keep the trust-sensitive managed-block bytes unchanged.
+- [x] Close the unmarked launch/set race with the refined D4 lock boundary, without making an ordinary launch depend on
+  successful global active registration; add short actionable contention errors and deterministic concurrency tests.
+- [x] Remove the unenforceable sidecar authority catch-all and pin the intentional host/sidecar inventory difference.
+- [x] Centralize launch-marker scrubbing and cover bare proxy Codex, wrap non-UTF-8 journal reads, enforce
+  event-specific envelope semantics, include event construction in mutation rollback, replace prose-derived preflight
+  reasons with typed codes, distinguish post-child launcher exceptions, and remove unused legacy active-helper
+  parameters.
+- [x] Re-run focused, full unit, regression, integration, pre-commit, diff, link, and token checks on the repaired
+  rebased head; update the PR review interface. The consolidated authority contract pass ran 212 tests; the full unit
+  and regression suites passed 9,447 tests with 117 deselected and 1,053 tests, respectively; eight targeted Docker/CLI
+  integration cases passed; and `make pre-commit`, `git diff --check`, and the relative-link sweep passed. The checklist
+  measured 8,572 tokens. The intentionally bypassed design-size gate measured 31,415 tokens for `design.md` and 31,273
+  for `design_appendix.md`; compaction remains a separate follow-up as directed.
 
 ## Deferred and out of scope
 

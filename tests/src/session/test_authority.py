@@ -17,7 +17,10 @@ from forge.session.authority import (
     classify_authority_tool,
     new_authority_event,
     parse_authority_marker,
+    validate_authority_event,
+    validate_authority_payload,
 )
+from forge.session.events import SessionEventValidationError, validate_session_event
 from forge.session.models import (
     AuthorityIntent,
     create_session_state,
@@ -186,6 +189,77 @@ def test_authority_event_payload_is_exact_and_source_free() -> None:
     serialized = json.dumps(asdict(event))
     assert "tool_input" not in serialized
     assert "file_path" not in serialized
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("run_id", "run_0123456789ab"),
+        ("origin_surface", "codex_policy_hook"),
+        ("operation", "tool_request"),
+        ("outcome", "error"),
+    ],
+)
+def test_authority_event_rejects_semantically_invalid_configuration_envelope(field: str, value: object) -> None:
+    state = create_session_state("planner", authority=AuthorityIntent("advisory"))
+    valid = new_authority_event(
+        state,
+        event_type="authority_configured",
+        run_id=None,
+        origin_surface="external_cli",
+        operation="set",
+        outcome="success",
+    )
+    raw = asdict(valid)
+    raw[field] = value
+    if field == "outcome":
+        raw["reason_code"] = "invalid_configuration"
+
+    with pytest.raises(SessionEventValidationError):
+        validate_session_event(
+            raw,
+            payload_validator=validate_authority_payload,
+            event_validator=validate_authority_event,
+        )
+
+
+def test_authority_event_rejects_denial_with_wrong_runtime_origin() -> None:
+    state = create_session_state("planner", runtime="codex", authority=AuthorityIntent("advisory"))
+
+    with pytest.raises(SessionEventValidationError, match="origin_surface"):
+        new_authority_event(
+            state,
+            event_type="request_denied",
+            run_id="run_0123456789ab",
+            origin_surface="claude_authority_hook",
+            operation="tool_request",
+            outcome="denied",
+            reason_code="advisory_shell_closed_denied",
+            hook_registration_sha256="b" * 64,
+            covered_tool="apply_patch",
+        )
+
+
+def test_authority_event_wraps_invalid_digest_as_typed_record_error() -> None:
+    state = create_session_state("planner", authority=AuthorityIntent("advisory"))
+    valid = new_authority_event(
+        state,
+        event_type="authority_configured",
+        run_id=None,
+        origin_surface="external_cli",
+        operation="set",
+        outcome="success",
+    )
+    raw = asdict(valid)
+    raw["payload"]["effective_config_sha256"] = "not-a-digest"
+
+    with pytest.raises(SessionEventValidationError, match="record 7 field 'payload'.*SHA-256"):
+        validate_session_event(
+            raw,
+            payload_validator=validate_authority_payload,
+            event_validator=validate_authority_event,
+            record_number=7,
+        )
 
 
 def test_report_coverage_is_explicit() -> None:

@@ -12,6 +12,7 @@ import pytest
 
 from forge.session.events import (
     SessionEventPathError,
+    SessionEventReadError,
     SessionEventValidationError,
     SessionEventWriteError,
     append_session_event,
@@ -143,6 +144,15 @@ def test_strict_reader_never_skips_a_bad_line(tmp_path: Path) -> None:
         stream.write("not json\n")
 
     with pytest.raises(SessionEventValidationError, match="record 2.*invalid JSON"):
+        read_session_events(tmp_path, "planner", "authority")
+
+
+def test_non_utf8_journal_is_a_typed_read_error(tmp_path: Path) -> None:
+    (tmp_path / ".forge" / "artifacts" / "planner" / "authority").mkdir(parents=True)
+    journal = tmp_path / ".forge" / "artifacts" / "planner" / "authority" / "events.jsonl"
+    journal.write_bytes(b"\xff\n")
+
+    with pytest.raises(SessionEventReadError, match="cannot read session-event journal"):
         read_session_events(tmp_path, "planner", "authority")
 
 

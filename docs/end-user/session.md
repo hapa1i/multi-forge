@@ -385,10 +385,11 @@ forge runtime preflight codex --verify-enrollment
 ```
 
 Claude advisory launch requires the current executable Forge dispatcher and exactly one catch-all `authority-check`
-registration. Codex advisory launch empirically verifies hook enrollment on **every launch attempt**; each headless
-resume turn therefore spends an additional Codex turn of latency and quota. Static registration is not enough because an
-unenrolled Codex home silently omits hooks. Advisory sidecar launch is unsupported in v1. Producer and unmarked sidecars
-retain their existing behavior.
+registration. Codex advisory launch requires exactly one user-scope no-matcher `codex-policy-check` row with the
+installed command bytes and timeout, then empirically verifies SessionStart enrollment on **every launch attempt**; each
+headless resume turn therefore spends an additional Codex turn of latency and quota. Static registration is necessary
+but not enough because an unenrolled Codex home silently omits hooks. Advisory sidecar launch is unsupported in v1.
+Producer and unmarked sidecars retain their existing behavior.
 
 ### Assign, inherit, and inspect authority
 
@@ -404,8 +405,10 @@ forge session authority show existing --json
 ```
 
 These are human control-plane operations. Authority-bearing creation, set, and clear refuse from inside any managed
-session; set/clear also refuse an active target. Stop the session, change it from another terminal, then resume. Generic
-`session set` and keyed `session reset` cannot mutate authority intent.
+session; set/clear also refuse a target that is launching or active. Unmarked launches keep their legacy best-effort
+active registration, while the per-session authority lock prevents a concurrent designation during the child lifetime.
+Stop the session, change it from another terminal, then resume. Generic `session set` and keyed `session reset` cannot
+mutate authority intent.
 
 Fresh resumes and forks inherit advisory authority and its tier. Producer authority is deliberately not inherited: a
 derived child is unmarked unless the human gives it an explicit role, and an explicit child role wins before launch.

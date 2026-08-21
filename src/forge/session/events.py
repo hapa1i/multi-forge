@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from forge.core.run_id import is_valid_run_id
+from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
 from forge.core.state import file_lock_for_target, parse_iso, utc_timestamp_z
 
 from .exceptions import ForgeSessionError, InvalidSessionNameError
@@ -68,8 +69,6 @@ _ENVELOPE_FIELDS = frozenset(
     }
 )
 
-SessionEventPayloadValidator = Callable[[str, dict[str, Any]], None]
-
 
 class SessionEventError(ForgeSessionError):
     """Base error for strict session-event state."""
@@ -118,6 +117,10 @@ class SessionEvent:
     payload: dict[str, Any]
 
 
+SessionEventPayloadValidator = Callable[[str, dict[str, Any]], None]
+SessionEventValidator = Callable[[SessionEvent], None]
+
+
 def mint_session_event_id() -> str:
     """Mint an opaque id shared by all session-journal domains."""
     return f"sevt_{uuid.uuid4().hex}"
@@ -135,6 +138,7 @@ def new_session_event(
     reason_code: str | None,
     payload: dict[str, Any],
     payload_validator: SessionEventPayloadValidator | None = None,
+    event_validator: SessionEventValidator | None = None,
 ) -> SessionEvent:
     """Construct and validate one event using current id and UTC time."""
     event = SessionEvent(
@@ -151,7 +155,12 @@ def new_session_event(
         reason_code=reason_code,
         payload=payload,
     )
-    return validate_session_event(asdict(event), expected_session=session, payload_validator=payload_validator)
+    return validate_session_event(
+        asdict(event),
+        expected_session=session,
+        payload_validator=payload_validator,
+        event_validator=event_validator,
+    )
 
 
 def validate_session_event(
@@ -159,6 +168,7 @@ def validate_session_event(
     *,
     expected_session: str | None = None,
     payload_validator: SessionEventPayloadValidator | None = None,
+    event_validator: SessionEventValidator | None = None,
     record_number: int | None = None,
 ) -> SessionEvent:
     """Validate one shared envelope and its optional domain payload contract."""
@@ -207,8 +217,12 @@ def validate_session_event(
         )
 
     runtime = _require_string(record, "runtime", record_number)
-    if runtime not in {"claude_code", "codex"}:
-        raise SessionEventValidationError("must be 'claude_code' or 'codex'", record=record_number, field="runtime")
+    if runtime not in AGENT_RUNTIME_IDS:
+        raise SessionEventValidationError(
+            f"must be one of: {', '.join(AGENT_RUNTIME_IDS)}",
+            record=record_number,
+            field="runtime",
+        )
 
     event_type = _require_token(record, "event_type", record_number)
     run_id = record["run_id"]
@@ -273,7 +287,7 @@ def validate_session_event(
         except (TypeError, ValueError) as exc:
             raise SessionEventValidationError(str(exc), record=record_number, field="payload") from exc
 
-    return SessionEvent(
+    validated = SessionEvent(
         schema_version=schema_version,
         event_id=record["event_id"],
         timestamp=timestamp,
@@ -287,6 +301,20 @@ def validate_session_event(
         reason_code=reason_code,
         payload=dict(payload),
     )
+    if event_validator is not None:
+        try:
+            event_validator(validated)
+        except SessionEventValidationError as exc:
+            if record_number is None or exc.record is not None:
+                raise
+            raise SessionEventValidationError(
+                exc.reason,
+                record=record_number,
+                field=exc.field,
+            ) from exc
+        except (TypeError, ValueError) as exc:
+            raise SessionEventValidationError(str(exc), record=record_number) from exc
+    return validated
 
 
 def get_session_event_journal_path(forge_root: str | Path, session: str, domain: str) -> Path:
@@ -319,6 +347,7 @@ def append_session_event(
     event: SessionEvent | dict[str, Any],
     *,
     payload_validator: SessionEventPayloadValidator | None = None,
+    event_validator: SessionEventValidator | None = None,
     timeout_s: float = SESSION_EVENT_LOCK_TIMEOUT_S,
 ) -> Path:
     """Durably append one complete validated event under a dedicated lock."""
@@ -326,7 +355,12 @@ def append_session_event(
     session_value = raw.get("session") if isinstance(raw, dict) else None
     if not isinstance(session_value, str):
         raise SessionEventValidationError("must be a string", field="session")
-    validated = validate_session_event(raw, expected_session=session_value, payload_validator=payload_validator)
+    validated = validate_session_event(
+        raw,
+        expected_session=session_value,
+        payload_validator=payload_validator,
+        event_validator=event_validator,
+    )
     journal = get_session_event_journal_path(forge_root, validated.session, domain)
 
     try:
@@ -366,6 +400,7 @@ def read_session_events(
     domain: str,
     *,
     payload_validator: SessionEventPayloadValidator | None = None,
+    event_validator: SessionEventValidator | None = None,
 ) -> list[SessionEvent]:
     """Read and strictly validate every journal record in append order."""
     journal = get_session_event_journal_path(forge_root, session, domain)
@@ -386,7 +421,7 @@ def read_session_events(
         finally:
             if fd >= 0:
                 os.close(fd)
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise SessionEventReadError(f"cannot read session-event journal '{journal}': {exc}") from exc
 
     if lines and not lines[-1].endswith("\n"):
@@ -407,6 +442,7 @@ def read_session_events(
             raw,
             expected_session=session,
             payload_validator=payload_validator,
+            event_validator=event_validator,
             record_number=line_number,
         )
         if event.event_id in event_ids:

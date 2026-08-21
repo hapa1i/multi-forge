@@ -70,6 +70,32 @@ def _configure_mock_fork_manager(mock_manager: Any, parent: Any, project_root: P
     mock_manager.index_store = _publish_fork_parent(parent, project_root)
     mock_manager.get_session.return_value = parent
 
+    def publish_mocked_fork(*_args: Any, **_kwargs: Any) -> Any:
+        result = mock_manager.fork_session.return_value
+        if not isinstance(result, tuple) or len(result) != 2:
+            return result
+        _parent, child = result
+        worktree_root = Path(child.worktree.path) if child.worktree is not None else project_root
+        forge_root = Path(child.forge_root) if child.forge_root else worktree_root
+        forge_root.mkdir(parents=True, exist_ok=True)
+        store = SessionStore(str(forge_root), child.name)
+        if not store.exists():
+            try:
+                relative_path = str(forge_root.relative_to(worktree_root)) or "."
+            except ValueError:
+                relative_path = "."
+            publish_session(
+                mock_manager.index_store,
+                child,
+                project_root,
+                checkout_root=worktree_root,
+                forge_root=forge_root,
+                relative_path=relative_path,
+            )
+        return result
+
+    mock_manager.fork_session.side_effect = publish_mocked_fork
+
 
 def _iso_days_ago(days: int) -> str:
     return (datetime.now(UTC) - timedelta(days=days)).isoformat()

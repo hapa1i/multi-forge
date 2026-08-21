@@ -198,8 +198,9 @@ Verified seam changes required by v1:
   trust. V1 therefore extends that command instead of adding another registration or changing its dispatcher command.
   The command currently exits unless the tool is `apply_patch`; `CodexHookAdapter` then skips malformed and delete-only
   patches. Authority mode evaluates raw `apply_patch`, `Bash`, and unknown tool envelopes before the tool filter,
-  `policy.enabled`, and adapter gates. An advisory Codex launch requires empirically verified hook enrollment; static
-  registration alone is insufficient.
+  `policy.enabled`, and adapter gates. An advisory Codex launch requires exactly one static no-matcher
+  `codex-policy-check` row with the installed command bytes and timeout plus empirically verified SessionStart hook
+  enrollment; either signal alone is insufficient.
 
 ## Authority journal and posture read
 
@@ -278,8 +279,9 @@ authority:
 
 The JSON shape is stable and contains the same fields for advisory, producer, and unmarked sessions, using `null` or an
 empty list where a field does not apply. Missing sessions, invalid state, unreadable manifests, and malformed journals
-are command errors. A valid session with an unavailable hook seam is a successful read with
-`launch_support: unsupported`; attempting to launch that session as advisory is an error.
+are command errors. A valid session whose recorded launch mode has a statically incapable hook seam is a successful read
+with `launch_support: unsupported`; attempting to launch that session as advisory is an error. A capable host seam with
+missing registration is checked at launch and does not turn an inactive report into `unsupported`.
 
 `configuration_history: supported` means only that Forge's recorded authority configuration is continuous between its
 journaled events. It does not mean that Forge observed every filesystem mutation or every process during that interval.

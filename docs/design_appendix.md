@@ -1060,8 +1060,9 @@ User enable/sync consolidates exact released direct hooks in both user settings 
 candidates. Discovery is read-only: no candidate checkout, tracking row, `projects.json`, or ambient dispatcher state is
 touched.
 
-**Sidecar exception.** Sidecars stage canonical hooks plus `apiKeyHelper` in `.forge/sidecar-home` without an install
-row. They mount project skills, not host-user or Codex skill targets.
+**Sidecar exception.** Sidecars stage the sidecar-compatible canonical hooks plus `apiKeyHelper` in
+`.forge/sidecar-home` without an install row. The host-only authority catch-all is omitted while advisory sidecar is
+unsupported. They mount project skills, not host-user or Codex skill targets.
 
 ### C.3 Settings merge rules
 
@@ -1861,11 +1862,13 @@ operator-facing guards backstop version churn and the unverifiable trust ceremon
   `UNVERIFIED`, not "not enrolled". Tests **user** scope only (path-stable, one-ceremony-covers-all); project-scope
   hooks need a turn inside the project.
 
-Artifact-authority launch deliberately invokes this empirical verifier for **every advisory Codex launch attempt**,
-including each `session resume --task` turn. A 20-turn headless advisory workflow therefore pays roughly 20 additional
-probe turns of latency and quota. The existing readiness cache observes binary and auth/credential mtimes plus a TTL; it
-is not proven to observe trust revocation. Any future enrollment cache requires separate probe evidence locating the
-trust state and demonstrating sound invalidation.
+Artifact-authority launch first requires exactly one user-scope, no-matcher `codex-policy-check` row with the installed
+dispatcher command bytes and timeout. That proves the policy handler is statically present; it does not prove Codex
+trust. Launch therefore also invokes the empirical `codex-session-start` verifier for **every advisory Codex launch
+attempt**, including each `session resume --task` turn. A 20-turn headless advisory workflow therefore pays roughly 20
+additional probe turns of latency and quota. The existing readiness cache observes binary and auth/credential mtimes
+plus a TTL; it is not proven to observe trust revocation. Any future enrollment cache requires separate probe evidence
+locating the trust state and demonstrating sound invalidation.
 
 ### I.4 Artifact-authority runtime seam
 
@@ -1886,11 +1889,14 @@ Claude host preflight requires exactly one current executable catch-all `authori
 dispatcher parses enough argv to recognize that handler and checks only whether the marker is absent before project
 registry lookup, contributor override resolution, imports, or exec. Any present value, including malformed JSON, is
 forwarded to Forge so marker/schema/session/digest mismatches deny in the handler. Advisory Claude sidecar remains
-`unsupported`: staged settings do not prove that the selected image can execute the handler before spawn.
+`unsupported`: staged settings do not prove that the selected image can execute the handler before spawn. The
+sidecar-owned hook inventory omits this host-only catch-all because its bare `forge hook authority-check` form has no
+dispatcher fast gate and could never enforce an advisory launch in v1.
 
-Codex uses the same launch identity and marker for headless start/resume and interactive TUI start/reattach. Its
-combined handler evaluates authority before `apply_patch` filtering or adapter normalization and emits the probe-pinned
-strict deny JSON. Handler-internal resolution/classification failures deny when the runtime can receive a response.
+Codex uses the same launch identity and marker for headless start/resume and interactive TUI start/reattach. Preflight
+requires both the exact installed policy row and a positive empirical SessionStart enrollment probe. Its combined
+handler evaluates authority before `apply_patch` filtering or adapter normalization and emits the probe-pinned strict
+deny JSON. Handler-internal resolution/classification failures deny when the runtime can receive a response.
 Non-delivery, command timeout, dispatcher failure, and runtime rejection of malformed output remain outside this handler
 boundary and are disclosed as fail-open seams.
 
@@ -1918,8 +1924,10 @@ provenance card; M1 does not create its path.
 ```
 
 Unknown or missing envelope fields, invalid ids/timestamps/enums/nullability, non-JSON values, duplicate event ids,
-blank/truncated/non-object lines, and newer schema versions are errors. A domain supplies an exact payload validator;
-the shared layer never serializes arbitrary objects with `default=str`.
+blank/truncated/non-object lines, non-UTF-8 bytes, and newer schema versions are errors. A domain supplies exact payload
+and full-event validators; authority uses the latter to enforce each event type's run-id, origin, operation, outcome,
+reason-code nullability, and runtime-hook correspondence. The shared layer never serializes arbitrary objects with
+`default=str`.
 
 The authority payload has exactly `role`, `tier`, `effective_config_sha256`, `hook_registration_sha256`, and
 `covered_tool`. It stores no prompt, raw tool payload, candidate patch, source bytes, command text, or candidate path.

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -12,6 +14,7 @@ from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import RunIdentity, new_root_run_identity
+from forge.install.codex_hooks import get_builtin_codex_entries, render_codex_block
 from forge.install.hooks import ForgeHookRegistration
 from forge.session.active import ActiveSessionStore
 from forge.session.authority import (
@@ -22,14 +25,14 @@ from forge.session.models import AuthorityIntent, create_session_state
 from forge.session.store import SessionStore
 
 
-def _store(tmp_path: Path, *, role: str = "producer", runtime: str = "claude_code") -> SessionStore:
+def _store(tmp_path: Path, *, role: str | None = "producer", runtime: str = "claude_code") -> SessionStore:
     store = SessionStore(str(tmp_path), "planner")
     store.write(
         create_session_state(
             "planner",
             worktree_path=str(tmp_path),
             runtime=runtime,
-            authority=AuthorityIntent(role),
+            authority=AuthorityIntent(role) if role is not None else None,
         )
     )
     return store
@@ -115,6 +118,26 @@ def test_spawn_failure_is_distinct_from_nonzero_exit(tmp_path: Path) -> None:
         attempt.complete(7)
     nonzero_end = read_authority_events(str(nonzero_root), "planner")[-1]
     assert nonzero_end.reason_code == "child_exited_nonzero"
+
+
+def test_post_child_oserror_is_not_reported_as_never_spawned(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+
+    with pytest.raises(OSError, match="post-child"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=_active_store(tmp_path),
+        ) as attempt:
+            assert attempt is not None
+            attempt.complete(0)
+            raise OSError("post-child bookkeeping")
+
+    ended = read_authority_events(str(tmp_path), "planner")[-1]
+    assert ended.reason_code == "launcher_exception_after_child"
 
 
 def test_advisory_sidecar_refuses_without_started_claim(tmp_path: Path) -> None:
@@ -239,6 +262,10 @@ def test_claude_advisory_requires_exact_registration_and_current_executable_disp
 
 def test_codex_advisory_verifies_enrollment_on_every_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     store = _store(tmp_path, role="advisory", runtime="codex")
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(render_codex_block(get_builtin_codex_entries()), encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
     calls = 0
 
     def verified(**_kwargs):
@@ -274,6 +301,131 @@ def test_codex_advisory_verifies_enrollment_on_every_attempt(tmp_path: Path, mon
 
     assert calls == 2
     assert markers[0] != markers[1]
+
+
+def test_codex_advisory_rejects_missing_policy_row_before_empirical_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    session_start = tuple(entry for entry in get_builtin_codex_entries() if entry.event == "SessionStart")
+    (codex_home / "config.toml").write_text(render_codex_block(session_start), encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setattr(
+        "forge.core.ops.codex_enrollment.verify_codex_enrollment",
+        lambda **_kwargs: pytest.fail("the empirical probe must not run when the policy row is absent"),
+    )
+
+    with pytest.raises(launch.AuthoritySeamPreflightError, match="codex-policy-check") as error:
+        launch._preflight_authority_seam(
+            AuthorityIntent("advisory"),
+            runtime="codex",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            codex_preflight=None,
+        )
+
+    assert error.value.reason_code == "codex_policy_registration_invalid"
+
+
+def test_unmarked_launch_holds_authority_lock_without_using_active_registry(
+    tmp_path: Path,
+) -> None:
+    import forge.core.ops.session_authority as control
+
+    store = _store(tmp_path, role=None)
+    errors: list[Exception] = []
+
+    with launch.authority_launch_transaction(
+        store=store,
+        root=new_root_run_identity(),
+        operation="start",
+        launch_mode="host",
+        worktree_path=tmp_path,
+        active_store=cast(
+            ActiveSessionStore,
+            SimpleNamespace(
+                get_session=lambda *_args, **_kwargs: pytest.fail("unmarked preflight must not require active state"),
+                upsert_session=lambda *_args, **_kwargs: pytest.fail(
+                    "unmarked preflight must not register active state"
+                ),
+            ),
+        ),
+    ) as attempt:
+        assert attempt is None
+
+        def mutate() -> None:
+            try:
+                with control._authority_mutation_lock(store, operation="set"):
+                    pytest.fail("a concurrent authority mutation acquired the launch lock")
+            except Exception as exc:  # capture the worker outcome for the main test thread
+                errors.append(exc)
+
+        worker = threading.Thread(target=mutate)
+        worker.start()
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+
+    assert len(errors) == 1
+    assert isinstance(errors[0], ForgeOpError)
+    assert "launching or active" in str(errors[0])
+    assert store.read().intent.authority is None
+    refused = read_authority_events(str(tmp_path), "planner")
+    assert len(refused) == 1
+    assert refused[0].event_type == "mutation_refused"
+    assert refused[0].reason_code == "active_session_authority_mutation"
+
+
+def test_concurrent_unmarked_launch_has_actionable_lock_contention_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path, role=None)
+    active = _active_store(tmp_path)
+    monkeypatch.setattr(launch, "AUTHORITY_LAUNCH_LOCK_TIMEOUT_S", 0.01)
+
+    with launch.authority_launch_transaction(
+        store=store,
+        root=new_root_run_identity(),
+        operation="start",
+        launch_mode="host",
+        worktree_path=tmp_path,
+        active_store=active,
+    ):
+        with pytest.raises(ForgeOpError, match="another launch or authority change in progress"):
+            with launch.authority_launch_transaction(
+                store=store,
+                root=new_root_run_identity(),
+                operation="resume",
+                launch_mode="host",
+                worktree_path=tmp_path,
+                active_store=active,
+            ):
+                pytest.fail("a concurrent unmarked launch acquired the authority lock")
+
+
+def test_unmarked_launch_wraps_lock_open_failure_as_actionable_command_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path, role=None)
+
+    class UnopenableLock:
+        def __enter__(self) -> None:
+            raise OSError("permission denied")
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(launch, "authority_session_lock", lambda *_args, **_kwargs: UnopenableLock())
+
+    with pytest.raises(ForgeOpError, match="could not coordinate launch.*authority lock.*permission denied"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+        ):
+            pytest.fail("launch continued without its authority lock")
 
 
 def test_claude_launcher_reuses_preflight_root_in_marker_and_invoker(

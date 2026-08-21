@@ -41,6 +41,7 @@ from forge.core.invoker import (
 )
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.reactive.env import (
+    FORGE_AUTHORITY_MARKER_VAR,
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
@@ -369,13 +370,13 @@ def bridge_session_to_codex(
     # The CHILD's forge_root (transfer_root): codex hook subprocesses resolve the
     # session store from FORGE_FORGE_ROOT, and a worktree session's manifest lives
     # under the child root, not the payload cwd's.
-    marker_env = {"FORGE_AUTHORITY_MARKER": authority_marker} if authority_marker is not None else None
+    marker_env = {FORGE_AUTHORITY_MARKER_VAR: authority_marker} if authority_marker is not None else None
     with _temporary_run_env(
         root,
         sess,
         forge_root=str(transfer_root),
         extra_vars=marker_env,
-        unset_vars=("FORGE_AUTHORITY_MARKER",) if marker_env is None else (),
+        unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
     ):
         assembly = assemble_codex_transfer(
             ctx=ctx,

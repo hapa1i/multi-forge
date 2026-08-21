@@ -38,10 +38,13 @@ local evidence, while leaving route provenance, authorship, and admission outsid
   authority-neutral durable event-journal seam reusable by later route provenance.
 - Preflighted and journaled one root launch attempt across Claude and Codex, enforced advisory requests before ordinary
   policy, preserved producer/unmarked behavior, and exposed a read-only posture report plus the human-courier workflow.
+- Closed review-found enforcement gaps with exact Codex policy-row attestation, full-lifetime unmarked launch locking,
+  sidecar authority-row exclusion, marker isolation, and event-specific journal validation.
 
-**Verification**: 357 broad focused acceptance tests plus 108 final edge-focused tests; 9,528 unit with 124 deselected;
-1,064 regression; seven targeted Docker and CLI integration boundaries; full pre-commit; wheel/sdist build plus isolated
-packaged enable/sync; dispatcher p95 26.79 ms across 50 runs with 40 registry entries at depth 5.
+**Verification**: 212 repaired authority-contract tests; 9,447 unit with 117 deselected; 1,053 regression; eight
+targeted Docker and CLI integration boundaries; full pre-commit; wheel/sdist build plus isolated packaged enable/sync;
+dispatcher p95 26.79 ms across 50 runs with 40 registry entries at depth 5. The design-size gate was intentionally
+deferred.
 
 ### Remove the experimental manifest WorkflowPolicy
 
@@ -58,6 +61,7 @@ reviewer had no repository or other normative project authority.
 **Verification**: 574 focused policy/reactive/CLI tests; 9,302 unit with 117 deselected; 1,053 regression; one targeted
 Docker policy-hook boundary; both policy-check content modes; pre-commit/diff, board/link, and design-size gates. PR
 #233 merged as `4f95d88d` with all five GitHub checks passing.
+
 ### Close Wave 8 Batch 5 and the repository maintenance round
 
 **Goal/outcome**: Close the final verified residuals and leave the whole-repository review with terminal dispositions

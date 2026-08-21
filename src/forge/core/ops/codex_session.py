@@ -37,7 +37,7 @@ from forge.core.ops.codex_thread_index import sync_codex_thread_to_index
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import referenced_transfer_context_paths
 from forge.core.ops.session import ForgeOpError
-from forge.core.reactive.env import new_root_run_identity
+from forge.core.reactive.env import FORGE_AUTHORITY_MARKER_VAR, new_root_run_identity
 from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     CodexPreflightError,
@@ -357,7 +357,6 @@ def _run_first_codex_turn(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
-        state_hint=state,
     ) as authority_attempt:
         bridge = bridge_session_to_codex(
             ctx=ctx,
@@ -537,10 +536,9 @@ def continue_codex_session(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
-        state_hint=state,
     ) as authority_attempt:
         marker_env = (
-            {"FORGE_AUTHORITY_MARKER": authority_attempt.marker}
+            {FORGE_AUTHORITY_MARKER_VAR: authority_attempt.marker}
             if authority_attempt is not None and authority_attempt.marker is not None
             else None
         )
@@ -549,7 +547,7 @@ def continue_codex_session(
             name,
             forge_root=entry.forge_root,
             extra_vars=marker_env,
-            unset_vars=("FORGE_AUTHORITY_MARKER",) if marker_env is None else (),
+            unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
         ):
             request = prepare_codex_request(
                 prompt=task,

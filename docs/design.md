@@ -1156,17 +1156,22 @@ UUID `<R>`, not the parent's UUID.
 **Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
 `--proxy <name>` overrides.
 
-**Authority launch transaction:** Every marked launch path mints one root `RunIdentity` before preflight and passes it
-through Claude host, Codex headless/TUI, resume, fork, and incognito invocation; the invoker does not remint it. Under
-the session authority lock, Forge rereads intent, proves the runtime seam, registers the active entry, and durably
-appends `launch_preflight` then `run_started` before invoking the child. It always attempts same-run `run_ended` and
-clears active state. A failed preflight produces `launch_aborted` and no started claim. A spawn exception after the
+**Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
+authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child
+lifetime, preventing a concurrent control-plane command from assigning authority after the launcher committed to an
+unmarked environment; its existing active registration remains best-effort. A marked launch instead proves the runtime
+seam, requires active registration, and durably appends `launch_preflight` then `run_started` under the lock before
+releasing it and invoking the child. Set/clear use the same lock and turn live-launch contention into a short,
+actionable refusal. The invoker does not remint the identity. Forge always attempts same-run `run_ended` and clears
+marked active state. A failed preflight produces `launch_aborted` and no started claim. A spawn exception after the
 commit is `child_never_spawned`; a spawned child returning nonzero is `child_exited_nonzero`, so `run_started` means
 “Forge committed to invoke,” not “the child was observed alive.”
 
-Advisory Claude requires the exact catch-all registration and current executable dispatcher. Advisory Codex performs the
-empirical enrollment check for every attempt. Advisory sidecar is unsupported until its selected image has an equivalent
-pre-spawn proof. Producer launches record config/lifecycle posture without requiring an enforcement seam; unmarked
+Advisory Claude requires the exact catch-all registration and current executable dispatcher. Advisory Codex requires
+exactly one user-scope no-matcher `codex-policy-check` row with the installed command bytes and timeout, then performs
+the empirical `codex-session-start` enrollment check for every attempt. Advisory sidecar is unsupported until its
+selected image has an equivalent pre-spawn proof; Forge therefore does not stage the host-only authority catch-all in
+sidecar settings. Producer launches record config/lifecycle posture without requiring an enforcement seam; unmarked
 launches keep the legacy path and create no authority events. Only a validated advisory attempt receives the internal
 marker, containing session/runtime, the one root run id, and config/hook digests. The transaction exposes the future M2
 insertion point after authority preflight, but M1 writes no routing journal or projection.
@@ -1739,14 +1744,16 @@ multi-forge/
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
 `--host-proxy`. The launch checkout supplies `.claude/`, while the session manifest's Forge root supplies `.forge/`;
 Forge mounts both at their corresponding paths under `/workspace`. It does NOT mount all of `~/.forge` (UID issues,
-undermines port isolation). The launcher stages the canonical Claude runtime-hook inventory at
+undermines port isolation). The launcher stages the canonical sidecar-compatible Claude runtime-hook inventory at
 `<forge_root>/.forge/sidecar-home/settings.json`, mounted as the in-container user scope at
 `/root/.claude/settings.json`. Those entries use the image-resolvable bare form (`forge hook <name>`), because every
-sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The file is replaced on
-every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project `.claude/settings*.json` bytes are
-never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
-host checkout and manifest-owned Forge root separately. Stop therefore probes for pending shadow candidates through the
-mounted `/workspace` Forge root and translates only the resulting marker payload back to host-resolvable paths.
+sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The unsupported advisory
+authority catch-all is host-only and omitted from this inventory because its bare command lacks the dispatcher fast
+gate. The file is replaced on every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project
+`.claude/settings*.json` bytes are never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads,
+while deferred-work markers retain the host checkout and manifest-owned Forge root separately. Stop therefore probes for
+pending shadow candidates through the mounted `/workspace` Forge root and translates only the resulting marker payload
+back to host-resolvable paths.
 
 The host `~/.forge/pending-work/` queue is mounted read-write at `/root/.forge/pending-work/`, so Stop-enqueued
 index/memory/shadow markers survive `--rm` for host-CLI draining. **Narrow exception (§7.x audit path):** a proxy-id

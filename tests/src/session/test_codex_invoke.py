@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.core.reactive.env import (
+    FORGE_AUTHORITY_MARKER_VAR,
     FORGE_DEPTH_VAR,
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
@@ -252,6 +253,7 @@ _BARE_STRIP_VARS = [
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
+    FORGE_AUTHORITY_MARKER_VAR,
     "CODEX_API_KEY",
     "CODEX_ACCESS_TOKEN",
     "ANTHROPIC_API_KEY",

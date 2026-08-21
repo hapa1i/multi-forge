@@ -348,7 +348,9 @@ timeout, dispatcher startup/execution failure, and Claude discarding a malformed
 outside the handler's decision boundary.
 
 Claude sidecars do not have an equivalent pre-spawn proof for the selected image, so advisory sidecar launch is
-unsupported in v1. Producer and unmarked sidecars continue to use their existing hook inventory.
+unsupported in v1. Producer and unmarked sidecars continue to use their existing hook inventory; Forge deliberately does
+not stage the catch-all `authority-check` row in a sidecar, where its bare CLI command would lack the host dispatcher's
+absent-marker fast path.
 
 ### codex-policy-check (Codex PreToolUse, catch-all)
 
@@ -367,9 +369,10 @@ Purpose: run the Codex authority guard first, then apply ordinary policy to supp
   registration verification or the final install record fails, Forge restores the prior config bytes/mode or removes a
   config created by that attempt; a later edit is preserved and named for manual recovery.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
-  prompted) — Codex hooks only fire from trust-enrolled registrations. Advisory launch verifies enrollment empirically
-  on every launch attempt with one cheap Codex turn; this per-attempt latency/quota cost is intentional because static
-  registration cannot prove delivery
+  prompted) — Codex hooks only fire from trust-enrolled registrations. Advisory launch first requires the exact
+  no-matcher `codex-policy-check` row, then verifies SessionStart enrollment empirically on every launch attempt with
+  one cheap Codex turn; this per-attempt latency/quota cost is intentional because static registration cannot prove
+  delivery
 
 The managed Codex registration command bytes do not change for authority mode. This preserves existing trust enrollment;
 the authority guard is an earlier branch inside the same handler. As with Claude, runtime hook non-delivery, timeout,

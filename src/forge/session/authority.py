@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
+from forge.core.reactive.env import FORGE_AUTHORITY_MARKER_VAR
 from forge.core.run_id import is_valid_run_id
 from forge.core.state import file_lock
 
@@ -30,7 +31,7 @@ from .models import (
 from .validation import validate_name
 
 AUTHORITY_JOURNAL_DOMAIN = "authority"
-AUTHORITY_MARKER_ENV = "FORGE_AUTHORITY_MARKER"
+AUTHORITY_MARKER_ENV = FORGE_AUTHORITY_MARKER_VAR
 AUTHORITY_MARKER_SCHEMA_VERSION = 1
 AUTHORITY_COVERAGE_VERSION = 1
 AUTHORITY_HOOK_TIMEOUT_SECONDS = 60
@@ -92,6 +93,8 @@ _MARKER_FIELDS = frozenset(
     }
 )
 _USE_STATE_AUTHORITY = object()
+_AUTHORITY_CREATION_OPERATIONS = frozenset({"start", "resume", "fork", "incognito"})
+_AUTHORITY_LAUNCH_OPERATIONS = _AUTHORITY_CREATION_OPERATIONS
 
 
 class AuthorityError(Exception):
@@ -124,7 +127,11 @@ class AuthorityToolDecision:
 
 
 @contextmanager
-def authority_session_lock(session_dir: Path) -> Iterator[None]:
+def authority_session_lock(
+    session_dir: Path,
+    *,
+    timeout_s: float | None = None,
+) -> Iterator[None]:
     """Serialize authority creation/configuration and launch preflight.
 
     The sibling lock exists before the session directory can be published, so a
@@ -134,7 +141,7 @@ def authority_session_lock(session_dir: Path) -> Iterator[None]:
     validate_name(session_dir.name)
     with file_lock(
         lock_path=session_dir.parent / f".{session_dir.name}.authority.lock",
-        timeout_s=AUTHORITY_CONTROL_LOCK_TIMEOUT_S,
+        timeout_s=AUTHORITY_CONTROL_LOCK_TIMEOUT_S if timeout_s is None else timeout_s,
     ):
         yield
 
@@ -332,6 +339,7 @@ def new_authority_event(
             covered_tool=covered_tool,
         ),
         payload_validator=validate_authority_payload,
+        event_validator=validate_authority_event,
     )
 
 
@@ -342,6 +350,7 @@ def append_authority_event(forge_root: str, event: SessionEvent) -> None:
         AUTHORITY_JOURNAL_DOMAIN,
         event,
         payload_validator=validate_authority_payload,
+        event_validator=validate_authority_event,
     )
 
 
@@ -352,6 +361,7 @@ def read_authority_events(forge_root: str, session: str) -> list[SessionEvent]:
         session,
         AUTHORITY_JOURNAL_DOMAIN,
         payload_validator=validate_authority_payload,
+        event_validator=validate_authority_event,
     )
 
 
@@ -385,7 +395,10 @@ def validate_authority_payload(event_type: str, payload: dict[str, Any]) -> None
     for field_name in ("effective_config_sha256", "hook_registration_sha256"):
         value = payload[field_name]
         if value is not None:
-            _require_sha256(value, field_name)
+            try:
+                _require_sha256(value, field_name)
+            except AuthorityError as exc:
+                raise ValueError(str(exc)) from exc
     covered_tool = payload["covered_tool"]
     if covered_tool is not None and (
         not isinstance(covered_tool, str) or _SAFE_TOOL_RE.fullmatch(covered_tool) is None
@@ -411,6 +424,96 @@ def validate_authority_payload(event_type: str, payload: dict[str, Any]) -> None
         _require_authority_payload(payload, require_hook=True, require_tool=True)
     elif event_type == "mutation_refused" and covered_tool is not None:
         raise ValueError("mutation_refused payload cannot carry a covered tool")
+
+
+def validate_authority_event(event: SessionEvent) -> None:
+    """Validate cross-field semantics for one authority event envelope."""
+
+    event_type = event.event_type
+    if event_type not in AUTHORITY_EVENT_TYPES:
+        raise SessionEventValidationError(f"unknown authority event type {event_type!r}", field="event_type")
+
+    if event_type == "authority_configured":
+        _require_authority_event_value(event, "origin_surface", {"external_cli"})
+        _require_authority_event_value(event, "operation", _AUTHORITY_CREATION_OPERATIONS | {"set"})
+        _require_authority_event_value(event, "outcome", {"success"})
+        _require_authority_run_id(event, required=False)
+    elif event_type == "authority_inherited":
+        _require_authority_event_value(event, "origin_surface", {"session_derivation"})
+        _require_authority_event_value(event, "operation", _AUTHORITY_CREATION_OPERATIONS)
+        _require_authority_event_value(event, "outcome", {"success"})
+        _require_authority_run_id(event, required=False)
+    elif event_type == "authority_cleared":
+        _require_authority_event_value(event, "origin_surface", {"external_cli"})
+        _require_authority_event_value(event, "operation", {"clear"})
+        _require_authority_event_value(event, "outcome", {"success"})
+        _require_authority_run_id(event, required=False)
+    elif event_type in {"launch_preflight", "launch_aborted", "run_started", "run_ended"}:
+        _require_authority_event_value(event, "origin_surface", {"launcher"})
+        _require_authority_event_value(event, "operation", _AUTHORITY_LAUNCH_OPERATIONS)
+        _require_authority_run_id(event, required=True)
+        allowed_outcomes = {
+            "launch_preflight": {"success", "error"},
+            "launch_aborted": {"error"},
+            "run_started": {"success"},
+            "run_ended": {"success", "error", "cancelled"},
+        }
+        _require_authority_event_value(event, "outcome", allowed_outcomes[event_type])
+    elif event_type == "request_denied":
+        expected_origin = "claude_authority_hook" if event.runtime == "claude_code" else "codex_policy_hook"
+        _require_authority_event_value(event, "origin_surface", {expected_origin})
+        _require_authority_event_value(event, "operation", {"tool_request"})
+        _require_authority_event_value(event, "outcome", {"denied"})
+    elif event_type == "mutation_refused":
+        _require_authority_event_value(event, "origin_surface", {"external_cli"})
+        _require_authority_event_value(event, "operation", {"set", "clear"})
+        _require_authority_event_value(event, "outcome", {"refused"})
+
+    if event.outcome == "success":
+        if event.reason_code is not None:
+            raise SessionEventValidationError("must be null for a successful event", field="reason_code")
+    elif event.reason_code is None:
+        raise SessionEventValidationError("is required for a non-success event", field="reason_code")
+
+    role = event.payload["role"]
+    hook_digest = event.payload["hook_registration_sha256"]
+    if role != "advisory" and hook_digest is not None:
+        raise SessionEventValidationError(
+            "must be null unless role is advisory",
+            field="payload.hook_registration_sha256",
+        )
+    if event_type in {"authority_configured", "authority_inherited", "authority_cleared", "mutation_refused"}:
+        if hook_digest is not None:
+            raise SessionEventValidationError(
+                "must be null for configuration and mutation events",
+                field="payload.hook_registration_sha256",
+            )
+    if event_type in {"run_started", "run_ended", "request_denied"} and role == "advisory" and hook_digest is None:
+        raise SessionEventValidationError(
+            "is required for an advisory runtime event",
+            field="payload.hook_registration_sha256",
+        )
+    if event_type == "launch_preflight" and event.outcome == "success" and role == "advisory" and hook_digest is None:
+        raise SessionEventValidationError(
+            "is required for a successful advisory preflight",
+            field="payload.hook_registration_sha256",
+        )
+
+
+def _require_authority_event_value(event: SessionEvent, field: str, allowed: set[str] | frozenset[str]) -> None:
+    value = getattr(event, field)
+    if value not in allowed:
+        raise SessionEventValidationError(
+            f"must be one of: {', '.join(sorted(allowed))}",
+            field=field,
+        )
+
+
+def _require_authority_run_id(event: SessionEvent, *, required: bool) -> None:
+    if required and event.run_id is None:
+        raise SessionEventValidationError("is required for this event type", field="run_id")
+    if not required and event.run_id is not None:
+        raise SessionEventValidationError("must be null for this event type", field="run_id")
 
 
 def _require_authority_payload(
