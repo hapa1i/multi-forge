@@ -1,6 +1,7 @@
 # Reuse transcript-reference scans checklist
 
-Current focus: implementation commit `cff6adc6` and all local gates are complete; publish the shared Batch 4 review.
+Current focus: implementation commit `cff6adc6` and all local gates are complete in draft PR #228; keep this card in
+`doing/` until the shared Batch 4 merge.
 
 ## Phase 1 -- Pin the scan and ownership matrix
 
@@ -21,7 +22,7 @@ Current focus: implementation commit `cff6adc6` and all local gates are complete
 - [x] Commit O085 as its own implementation boundary after O081.
 - [x] Run targeted native-relocate/session-lifecycle Docker coverage on the integrated Batch 4 head.
 - [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
-- [ ] Publish all three cards in one draft PR; close them together only after merge.
+- [x] Publish all three cards in draft PR #228; close them together only after merge.
 
 ## Acceptance tests
 

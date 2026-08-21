@@ -1,6 +1,7 @@
 # Validate proxy-audit limits checklist
 
-Current focus: implementation commit `51f3b60a` and all local gates are complete; publish the shared Batch 4 review.
+Current focus: implementation commit `51f3b60a` and all local gates are complete in draft PR #228; keep this card in
+`doing/` until the shared Batch 4 merge.
 
 ## Phase 1 -- Pin invalid and control limits
 
@@ -20,7 +21,7 @@ Current focus: implementation commit `51f3b60a` and all local gates are complete
 - [x] Commit O076 as its own implementation boundary before starting O081.
 - [x] Run the targeted audit/telemetry Docker boundary on the integrated Batch 4 head.
 - [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
-- [ ] Publish all three cards in one draft PR; close them together only after merge.
+- [x] Publish all three cards in draft PR #228; close them together only after merge.
 
 ## Acceptance tests
 

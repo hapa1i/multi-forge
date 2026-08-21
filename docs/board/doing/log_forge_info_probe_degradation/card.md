@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation commit `a7cea967` and integrated verification are complete on
-`agent/wave8-batch-4`; await the shared Batch 4 review and merge.
+**Lane**: `doing/` -- implementation commit `a7cea967` and integrated verification are under review in draft PR #228;
+close with the shared Batch 4 merge.
 
 **Finding**: O081 (LOW conformance/diagnostics).
 
