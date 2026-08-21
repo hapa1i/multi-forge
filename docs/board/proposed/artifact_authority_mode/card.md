@@ -6,6 +6,11 @@ seams, and an honest posture read. It does not add delegation, cross-runtime con
 textual-overlap analysis, or an admission gate. Forge adds no courier; the supported advisory-to-producer flow is
 human-only.
 
+**Epic**: M1 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
+owns the shared journal envelope, run identity, absence-state vocabulary, and presentation boundary with
+[Session Route Provenance and Marking](../session_route_provenance/card.md). The cards remain independently shippable;
+authority mode does not require route history, model selection, or marking metadata.
+
 **References**: [design.md §3.9](../../../design.md#39-session-resume-context-management) (Codex session lifecycle),
 [design.md §3.10](../../../design.md#310-hook-handlers) (managed hook dispatch),
 [design_workflows.md §1](../../../design_workflows.md#1-policy-enforcement) (policy boundaries),
@@ -164,7 +169,7 @@ Authority uses runtime-specific PreToolUse entry points. Claude adds a dedicated
 the raw authority guard at the top of its existing no-matcher `codex-policy-check` command:
 
 1. The launcher validates the authority role and tier, verifies the required hook seam, and stamps a run-owned authority
-   marker and configuration digest into the managed runtime environment.
+   marker containing the existing root `run_id` and configuration digest into the managed runtime environment.
 2. Claude's standalone dispatcher recognizes the `authority-check` hook name and tests the launch-owned advisory marker
    before Forge launcher resolution, imports, or CLI execution. Unmarked and producer runs return from that
    authority-only row; their existing `Write`/`Edit` `policy-check` rows still enforce ordinary policy.
@@ -203,21 +208,33 @@ Authority mode adds one durable record path:
 .forge/artifacts/<session>/authority/events.jsonl
 ```
 
-Forge appends `authority_configured`, `authority_cleared`, `authority_inherited`, `launch_preflight`, `run_started`,
-`run_ended`, `request_denied`, and `mutation_refused` events. `mutation_refused` covers syntactically valid,
-target-resolved attempts through in-agent, active-target, and generic override surfaces; malformed or unresolved
-invocations remain diagnostics rather than an unbounded journal-spam surface.
+The journal is Forge artifact state and follows epic C3 retention: session deletion and cleanup preserve it with the
+containing `.forge/artifacts/<session>` tree regardless of `--keep-transcripts`.
 
-Each event contains a schema version, timestamp, session, runtime, event type, role, tier, `origin_surface`, outcome,
-optional reason code, effective-config SHA-256, hook-registration SHA-256, and the covered tool name when applicable.
-Outcome is one of `success`, `denied`, `refused`, `cancelled`, or `error`; the reason code is `null` when it does not
-apply. `origin_surface` is a code-defined enum such as `external_cli`, `session_derivation`, `launcher`,
-`claude_authority_hook`, or `codex_policy_hook`; it identifies the Forge surface that observed the event, not an
-authenticated human identity. The journal stores no tool payload, candidate patch, prompt, or source bytes.
+Forge appends `authority_configured`, `authority_cleared`, `authority_inherited`, `launch_preflight`, `launch_aborted`,
+`run_started`, `run_ended`, `request_denied`, and `mutation_refused` events. `launch_aborted` is a compensating event
+when the later routing journal or route projection fails after authority preflight was recorded; it never means the
+child ran. `mutation_refused` covers syntactically valid, target-resolved attempts through in-agent, active-target, and
+generic override surfaces; malformed or unresolved invocations remain diagnostics rather than an unbounded journal-spam
+surface.
 
-Appends are serialized under a dedicated journal lock and write one complete JSONL record per acquisition.
-Configuration, inheritance, or launch-preflight append failures are command or launch errors. Failure to journal a
-denied tool request never changes the deny decision and is reported as a diagnostic.
+Each event uses the epic-owned envelope: schema version, event id, timestamp, session, runtime, event type, nullable
+`run_id`, `origin_surface`, nullable operation, outcome, and optional reason code. The authority payload adds role,
+tier, effective-config SHA-256, hook-registration SHA-256, and the covered tool name when applicable. Launch preflight,
+run-start, and run-end events require the same launcher-minted `run_id`. `authority_configured`, `authority_cleared`,
+and `authority_inherited` use `null`. `request_denied` uses the valid marker-provided `run_id`; it is `null` only on
+marker-invalid error paths where no valid id can be recovered. `mutation_refused` uses the active managed process or
+marker `run_id` when the refusal occurs in-process and `null` for an external control-plane refusal. Outcome is one of
+`success`, `denied`, `refused`, `cancelled`, or `error`; the reason code is `null` when it does not apply.
+`origin_surface` follows the epic enum (`external_cli`, `session_derivation`, `launcher`, `claude_authority_hook`, or
+`codex_policy_hook`) and identifies the Forge surface that observed the event, not an authenticated human identity. The
+journal stores no tool payload, candidate patch, prompt, or source bytes.
+
+Appends use the epic-owned containment, validation, id, and lock helper and write one complete JSONL record per
+acquisition. Configuration, inheritance, or launch-preflight append failures are command or launch errors. When the
+required routing journal or route projection fails after authority preflight was recorded, the launcher best-effort
+appends `launch_aborted` with the same `run_id`; the child is not invoked. Failure to journal a denied tool request
+never changes the deny decision and is reported as a diagnostic.
 
 The file is append-only by Forge convention. `shell_closed` protects it from the advisory model; `named_tools` lists
 shell mutation of operational state as uncovered. It is not a tamper-proof log and makes no claim against a human or
@@ -321,9 +338,10 @@ switch is required.
 07. Role assignment or mutation through authority commands, creation flags, active-session targets, in-agent processes,
     and generic overrides follows the human control-plane rules. Every well-formed, target-resolved refusal appends
     `mutation_refused` with its `origin_surface`.
-08. The authority journal serializes one complete record per configuration, inheritance, launch-preflight,
-    run-lifecycle, denial, and scoped-refusal event, including origin surface and outcome but no prompts, payloads,
-    patches, or source bytes.
+08. The authority journal serializes one complete record per configuration, inheritance, launch-preflight, launch-abort,
+    run-lifecycle, denial, and scoped-refusal event. Every record uses the epic-owned envelope, including event id,
+    nullable run id, origin surface, operation, outcome, and reason code, but no prompts, payloads, patches, or source
+    bytes.
 09. `configuration_history` is derived from the journal; missing or manifest-inconsistent history for a currently marked
     session yields `unproven`, an unmarked session with no journal uses `null` without making a history claim, and
     malformed or unreadable journal state is a command error.
@@ -363,7 +381,7 @@ switch is required.
 - **Human carryover.** A human can paste advisory output into the producer conversation or an artifact. Authority mode
   neither detects nor prevents that.
 
-## Resolved during proposal review (2026-08-13)
+## Resolved during proposal review (2026-08-13; updated 2026-08-20)
 
 | Question            | Decision                                                                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -375,8 +393,7 @@ switch is required.
 | Shell posture       | `shell_closed` is the default and denies all shell use; `named_tools` is explicitly weaker                         |
 | Role inheritance    | Advisory inherits; producer never inherits                                                                         |
 | Provider posture    | Provider-neutral roles; v1 coverage is reported separately for each managed runtime                                |
+| Status line         | `authority show` is sufficient for v1; no authority segment, and no combined authority/marking badge               |
 
-## Open question
-
-Should the authority role and tier appear in the status line during an active managed session, or is
-`forge session authority show` sufficient for v1?
+The epic keeps any later authority segment distinct from provider-declared marking so presentation cannot imply that a
+model's marking posture grants or removes mutation authority.
