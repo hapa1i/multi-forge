@@ -44,7 +44,7 @@ local evidence, while leaving route provenance, authorship, and admission outsid
 **Verification**: 212 repaired authority-contract tests; 9,447 unit with 117 deselected; 1,053 regression; eight
 targeted Docker and CLI integration boundaries; full pre-commit; wheel/sdist build plus isolated packaged enable/sync;
 dispatcher p95 26.79 ms across 50 runs with 40 registry entries at depth 5. The design-size gate was intentionally
-deferred.
+deferred. PR #234 merged as `a1c54a05` with all five GitHub checks passing; M1 closed to `done/` on 2026-08-22.
 
 ### Remove the experimental manifest WorkflowPolicy
 

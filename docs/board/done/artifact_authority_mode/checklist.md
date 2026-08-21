@@ -1,14 +1,16 @@
 # M1 execution checklist: Artifact Authority Mode
 
+Closeout: shipped in [PR #234](https://github.com/hapa1i/multi-forge/pull/234) (merge `a1c54a05`) and moved to `done/`
+on 2026-08-22.
+
 **Card**: [card.md](card.md) -- the normative contract. **Epic**:
-[Session Authority and Provenance](../epic_session_authority_provenance/card.md). **Branch**:
+[Session Authority and Provenance](../../doing/epic_session_authority_provenance/card.md). **Branch**:
 `feat/artifact-authority-mode` (rebased onto `main` at `9ea043a4`).
 
 ## Current focus
 
-Implementation and local verification completed on 2026-08-21; the branch is being prepared for review. M1 remains in
-`doing/` until merge and post-merge lane/link closeout. M2 remains proposed; this branch adds no route history, marking
-metadata, model selection, or status-line segment.
+M1 shipped via PR #234 and closed on 2026-08-22; this checklist retains its execution evidence. M2 remains proposed; the
+shipped member adds no route history, marking metadata, model selection, or status-line segment.
 
 ## Verified pre-implementation baseline
 
@@ -352,7 +354,7 @@ Ratified decisions:
   0.9.4 wheel/sdist built; an isolated wheel install completed idempotent user-scope enable/sync, exposed both authority
   command groups, installed an executable dispatcher, and produced exactly one catch-all `PreToolUse` row at 60 s.
 - [x] Run `make pre-commit`, `git diff --check`, a relative Markdown-link sweep, and
-  `./scripts/count-tokens.py docs/board/doing/artifact_authority_mode/checklist.md`; record results. Final repaired-head
+  `./scripts/count-tokens.py docs/board/done/artifact_authority_mode/checklist.md`; record results. Final repaired-head
   results are recorded in Phase 8.
 - [x] Review the final diff against every card acceptance item 01-12 and epic C1-C5; explicitly confirm M2/non-goal
   exclusions and no unrelated user changes. The review found and fixed strict UTC/JSON coercion, record-context,
@@ -362,7 +364,8 @@ Ratified decisions:
   lessons for `docs/board/impl_notes.md`.
 - [x] Update the epic checklist with M1 evidence and shared-helper ownership; leave M2 proposed until separately
   accepted.
-- [ ] After merge, move M1 `doing/ -> done/` and repoint every inbound board link.
+- [x] After merge, move M1 `doing/ -> done/` and repoint every inbound board link. PR #234 merged as `a1c54a05`; M1
+  moved to `done/` and all inbound board links were repointed on 2026-08-22.
 
 ## Phase 8 -- Multi-model review repairs
 

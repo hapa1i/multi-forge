@@ -2,15 +2,16 @@
 
 **Epic** -- coordinating card for the independently shippable members below. Lane: `doing/` (activated 2026-08-21);
 shared contracts C1-C5 are accepted and frozen for execution. M1
-[Artifact Authority Mode](../artifact_authority_mode/card.md) is the first active member on branch
-`feat/artifact-authority-mode`; M2 remains proposed. Coordination is tracked in [checklist.md](checklist.md).
+[Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 and is the epic's first done
+member; M2 remains proposed. Coordination is tracked in [checklist.md](checklist.md), with M2 reassessment as the next
+decision and no epic batch authorized.
 
 **Purpose**: keep artifact authority and session route provenance semantically separate while preventing their journal,
 run-correlation, and presentation infrastructure from drifting.
 
 ## Problem
 
-[Artifact Authority Mode](../artifact_authority_mode/card.md) and
+[Artifact Authority Mode](../../done/artifact_authority_mode/card.md) and
 [Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md) answer different questions:
 
 - authority: which managed session is permitted to mutate project artifacts, and what enforcement posture supported a
@@ -30,7 +31,7 @@ behavior-changing proposal; it may emit richer routing facts when present but is
 
 | Id  | Card                                                                        | Delivers                                                        | Depends on |
 | --- | --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| M1  | [artifact_authority_mode](../artifact_authority_mode/card.md)               | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
+| M1  | [artifact_authority_mode](../../done/artifact_authority_mode/card.md)       | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
 | M2  | [session_route_provenance](../../proposed/session_route_provenance/card.md) | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
 
 The members remain independently shippable. M1 does not require model selection, marking metadata, or M2's read
