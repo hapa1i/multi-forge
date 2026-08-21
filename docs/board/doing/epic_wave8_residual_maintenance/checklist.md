@@ -152,6 +152,7 @@ Batch 5 pre-publication evidence (2026-08-21): order 18's focused slice passed 4
 349 source files, and pyright reported zero errors or warnings; order 19's focused CLI/documentation slice passed 203
 tests. The combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, and three targeted
 integration boundaries for cross-runtime install/disable/sync, session repair, and fake-upstream OpenAI routing.
-`make pre-commit` passed every hook. `design.md` measured 29,997 Opus tokens and `cli_reference.md` measured 9,551; all
-1,022 local paths across 422 board documents and all 1,209 local paths across 447 documentation files resolved. No
-selected-card `todo/` link remained, and `git diff --check` passed.
+`make pre-commit` passed every hook. After PR review clarified the proxy-id mount condition and the immediate
+`ModelHyperparameters` validation boundary, `design.md` measured 29,993 Opus tokens and `cli_reference.md` measured
+9,551; all 1,022 local paths across 422 board documents and all 1,209 local paths across 447 documentation files
+resolved. No selected-card `todo/` link remained, and `git diff --check` passed.

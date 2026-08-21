@@ -377,13 +377,13 @@ class TierClientFactory:
 
         tier_reasoning: ReasoningEffort | None
         if tier_override and tier_override.reasoning_effort is not None:
-            tier_reasoning = cast(ReasoningEffort, tier_override.reasoning_effort)
+            tier_reasoning = cast(ReasoningEffort, tier_override.reasoning_effort)  # validated by ModelHyperparameters
         else:
             tier_reasoning = None
 
         tier_verbosity: Verbosity | None
         if tier_override and tier_override.verbosity is not None:
-            tier_verbosity = cast(Verbosity, tier_override.verbosity)
+            tier_verbosity = cast(Verbosity, tier_override.verbosity)  # validated by ModelHyperparameters
         else:
             tier_verbosity = None
 

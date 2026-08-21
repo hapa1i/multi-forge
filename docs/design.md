@@ -1676,13 +1676,13 @@ host checkout and manifest-owned Forge root separately. Stop therefore probes fo
 mounted `/workspace` Forge root and translates only the resulting marker payload back to host-resolvable paths.
 
 The host `~/.forge/pending-work/` queue is mounted read-write at `/root/.forge/pending-work/`, so Stop-enqueued
-index/memory/shadow markers survive `--rm` for host-CLI draining. When present, host `~/.forge/config.yaml` is mounted
-read-only at `/root/.forge/config.yaml` so the in-container proxy reads global runtime settings. **Narrow exception
-(§7.x audit path):** a proxy-id session also mounts its `~/.forge/proxies/<id>/` read-only for intercept/audit config,
-plus `~/.forge/audit/`, `~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write so legacy audit/cost
-files, downstream/upstream telemetry, cap state, and the usage-attribution ledger survive container removal. That ledger
-is the only record of in-container supervisor/verb activity and feeds `forge telemetry activity` and the session-end
-summary for sidecar sessions. These are the only global `~/.forge` subdirectories mounted, preserving the port-isolation
+index/memory/shadow markers survive `--rm` for host-CLI draining. **Narrow exception (§7.x audit path):** a proxy-id
+session also mounts its `~/.forge/proxies/<id>/` read-only for intercept/audit config and, when the host file exists,
+`~/.forge/config.yaml` read-only at `/root/.forge/config.yaml` for global runtime settings. It mounts `~/.forge/audit/`,
+`~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write so legacy audit/cost files,
+downstream/upstream telemetry, cap state, and the usage-attribution ledger survive container removal. That ledger is the
+only record of in-container supervisor/verb activity and feeds `forge telemetry activity` and the session-end summary
+for sidecar sessions. These are the only global `~/.forge` subdirectories mounted, preserving the port-isolation
 rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins
 `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the
 `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox, **not** a

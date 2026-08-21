@@ -43,3 +43,7 @@ target.
 Integrated evidence: the combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, and three
 targeted integration boundaries covering cross-runtime install/disable/sync, containerized session repair, and
 subprocess OpenAI routing with reasoning/verbosity forwarding. `make pre-commit` passed every hook.
+
+PR review evidence: `TierOverride` does not itself narrow the two string fields, but the immediately constructed
+`ModelHyperparameters` validates both core literals. A direct invalid-value probe confirmed rejection for reasoning and
+verbosity, 60 focused type/hyperparameter tests passed, and the casts now name that boundary without changing behavior.

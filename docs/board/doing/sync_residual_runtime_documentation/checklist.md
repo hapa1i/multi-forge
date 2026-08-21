@@ -43,3 +43,7 @@ across 447 files. `design.md` is 29,997 Opus tokens and `cli_reference.md` is 9,
 Integrated evidence: the combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, three
 targeted integration tests, and every `make pre-commit` hook. The final scan resolved 1,209 local paths across 447
 documentation files.
+
+PR review evidence: design §7 now places the conditional runtime-config file inside the proxy-id exception, matching the
+template-only sidecar boundary. The focused hooks passed and `design.md` remains below its ceiling at 29,993 Opus
+tokens.
