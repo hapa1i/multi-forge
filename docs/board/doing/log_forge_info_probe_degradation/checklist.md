@@ -1,24 +1,24 @@
 # Log `forge info` probe degradation checklist
 
-Current focus: pin O081's silent best-effort fallbacks and the direct Python-version control before implementation.
+Current focus: implementation and focused verification are complete; aggregate gates remain for the shared Batch 4 head.
 
 ## Phase 1 -- Pin degradation evidence
 
-- [ ] Add fail-first caplog coverage for package-version, `uv`, proxy-registry, and session-list probe failures.
-- [ ] Require each debug record to name its probe without leaking exception text into normal stdout or stderr.
-- [ ] Pin the actionable tracking-store early return and successful human/JSON shapes as unchanged controls.
-- [ ] Characterize direct `sys.version_info` access so no impossible fallback branch remains.
+- [x] Add fail-first caplog coverage for package-version, `uv`, proxy-registry, and session-list probe failures.
+- [x] Require each debug record to name its probe without leaking exception text into normal stdout or stderr.
+- [x] Pin the actionable tracking-store early return and successful human/JSON shapes as unchanged controls.
+- [x] Characterize direct `sys.version_info` access so no impossible fallback branch remains.
 
 ## Phase 2 -- Implement
 
-- [ ] Add one module logger and debug evidence at every recoverable optional-probe boundary.
-- [ ] Remove only the impossible standard-library exception scaffold around Python version construction.
-- [ ] Preserve best-effort continuation, tracking-store failure semantics, output schemas, and secret safety.
+- [x] Add one module logger and debug evidence at every recoverable optional-probe boundary.
+- [x] Remove only the impossible standard-library exception scaffold around Python version construction.
+- [x] Preserve best-effort continuation, tracking-store failure semantics, output schemas, and secret safety.
 
 ## Phase 3 -- Verify and publish
 
-- [ ] Run focused info, output-stream, and O081 regression tests.
-- [ ] Commit O081 as its own implementation boundary after O076 and before O085.
+- [x] Run focused info, output-stream, and O081 regression tests.
+- [x] Commit O081 as its own implementation boundary after O076 and before O085.
 - [ ] Run full unit, regression, pre-commit, documentation, board/link, and diff gates on the combined head.
 - [ ] Publish all three cards in one draft PR; close them together only after merge.
 
@@ -31,3 +31,12 @@ Current focus: pin O081's silent best-effort fallbacks and the direct Python-ver
 | Proxy registry    | registry construction/read fails | empty proxies plus named debug record                    | CLI regression |
 | Session inventory | manager construction/list fails  | empty sessions plus named debug record                   | CLI regression |
 | Tracking store    | manifest read fails              | existing actionable result and early return are retained | existing unit  |
+
+## Focused evidence (2026-08-21)
+
+- Fail first: the O081 regression produced five intended failures: four exception fallbacks emitted no debug evidence,
+  and a non-zero `uv --version` result omitted the fallback field (`5 failed, 1 passed`).
+- Final: the info, output-stream, stale-tracking, and O081 regression slice passed (`66 passed`).
+- Debug evidence names only the probe plus exception type or exit code; the sentinel exception/stderr secret is absent
+  from logs and ordinary stderr.
+- Repository-pinned Ruff, isort, Black, mypy, Pyright, secret, and hygiene hooks passed for both changed Python files.

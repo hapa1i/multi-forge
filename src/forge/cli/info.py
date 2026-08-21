@@ -5,6 +5,8 @@ Top-level read-only diagnostics spanning install, proxy, and session state.
 
 from __future__ import annotations
 
+import logging
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -13,6 +15,7 @@ from forge.core.paths import display_path
 from forge.install.tracking import TrackingStore
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @click.command("info")
@@ -53,12 +56,14 @@ def _gather_info_data(max_sessions: int) -> dict:
 
     data: dict = {}
 
+    # Optional dashboard probes stay best-effort, but their safe fallbacks must remain observable in debug logs.
     # Forge info
     try:
         from importlib.metadata import version
 
         data["forge_version"] = version("multi-forge")
-    except Exception:
+    except Exception as exc:
+        logger.debug("forge info package-version probe failed (%s); using unknown", type(exc).__name__)
         data["forge_version"] = "unknown"
 
     from forge.core.paths import get_forge_home
@@ -73,12 +78,9 @@ def _gather_info_data(max_sessions: int) -> dict:
     }
 
     # Python/uv versions
-    try:
-        import sys
+    import sys
 
-        data["python_version"] = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    except Exception:
-        data["python_version"] = "unknown"
+    data["python_version"] = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
     try:
         result = subprocess.run(["uv", "--version"], capture_output=True, text=True, timeout=5)
@@ -88,7 +90,11 @@ def _gather_info_data(max_sessions: int) -> dict:
             if " (" in uv_ver:
                 uv_ver = uv_ver.split(" (")[0]
             data["uv_version"] = uv_ver
-    except Exception:
+        else:
+            logger.debug("forge info uv-version probe returned exit %s; using unknown", result.returncode)
+            data["uv_version"] = "unknown"
+    except Exception as exc:
+        logger.debug("forge info uv-version probe failed (%s); using unknown", type(exc).__name__)
         data["uv_version"] = "unknown"
 
     # Installations
@@ -133,8 +139,8 @@ def _gather_info_data(max_sessions: int) -> dict:
                     "template": proxy_entry.template,
                 }
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("forge info proxy-registry probe failed (%s); using empty result", type(exc).__name__)
 
     # Recent sessions
     data["sessions"] = []
@@ -151,8 +157,8 @@ def _gather_info_data(max_sessions: int) -> dict:
                     "last_accessed": entry.last_accessed_at,
                 }
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("forge info session-list probe failed (%s); using empty result", type(exc).__name__)
 
     return data
 
