@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active as Wave 8 Batch 5 order 19 on `agent/wave8-batch-5`, based on pushed `main` at `1e0e664c`.
+**Lane**: `doing/` -- under shared review in draft PR #230 as Wave 8 Batch 5 order 19.
 
 **Findings**: D042, narrowed D044, and O082 (LOW documentation/comment drift).
 

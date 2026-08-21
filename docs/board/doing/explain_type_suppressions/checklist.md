@@ -1,7 +1,7 @@
 # Explain or remove type suppressions checklist
 
-Current focus: active as Wave 8 Batch 5 order 18 on `agent/wave8-batch-5`, based on pushed `main` at `1e0e664c`. This
-card owns production suppression cleanup and the conformance guard; the Batch 5 integrator owns shared board evidence.
+Current focus: under shared review in draft PR #230 as Wave 8 Batch 5 order 18. This card owns production suppression
+cleanup and the conformance guard; keep it in `doing/` until the batch merges.
 
 ## Phase 1 -- Reverification and guard
 

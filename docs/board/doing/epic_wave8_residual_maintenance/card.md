@@ -2,14 +2,13 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; Batch 5 orders 18--19 are active. The corrective and
-external follow-ups retain their recorded PRs.
+**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; Batch 5 orders 18--19 are under review in draft PR #230.
+The corrective and external follow-ups retain their recorded PRs.
 
-**Current execution**: Batch 5 is active on `agent/wave8-batch-5` from pushed correction closeout `1e0e664c` with fixed
-membership and order: order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md), then order 19
-[`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md). Their production/test and
-documentation/comment scopes are disjoint and may proceed in parallel. The shared branch integrator owns board evidence,
-combined verification, and PR publication; each card retains its own checklist and commit boundary.
+**Current execution**: Batch 5 is under review in draft PR #230 from `agent/wave8-batch-5`, based on pushed correction
+closeout `1e0e664c`. Its fixed order is order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md),
+then order 19 [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md); each retains its
+own checklist and commit boundary. Combined verification and publication evidence are recorded in the epic checklist.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
