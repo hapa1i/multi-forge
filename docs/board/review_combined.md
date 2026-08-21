@@ -802,9 +802,9 @@ direct single-boundary controls named on their cards. No Forge workflow or exter
 | 12    | O086           | [`stabilize_proxy_metrics_json`](done/stabilize_proxy_metrics_json/card.md)                       |
 | 13    | O080           | [`align_supervisor_missing_config_exits`](done/align_supervisor_missing_config_exits/card.md)     |
 | 14    | O077           | [`reject_ambiguous_policy_check_input`](done/reject_ambiguous_policy_check_input/card.md)         |
-| 15    | O076           | [`validate_proxy_audit_limits`](todo/validate_proxy_audit_limits/card.md)                         |
-| 16    | O081           | [`log_forge_info_probe_degradation`](todo/log_forge_info_probe_degradation/card.md)               |
-| 17    | O085           | [`reuse_transcript_reference_scan`](todo/reuse_transcript_reference_scan/card.md)                 |
+| 15    | O076           | [`validate_proxy_audit_limits`](doing/validate_proxy_audit_limits/card.md)                        |
+| 16    | O081           | [`log_forge_info_probe_degradation`](doing/log_forge_info_probe_degradation/card.md)              |
+| 17    | O085           | [`reuse_transcript_reference_scan`](doing/reuse_transcript_reference_scan/card.md)                |
 | 18    | O100           | [`explain_type_suppressions`](todo/explain_type_suppressions/card.md)                             |
 | 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](todo/sync_residual_runtime_documentation/card.md)         |
 
@@ -824,7 +824,7 @@ The linked cards retain acceptance, verification, and closeout detail; this tabl
 | [CLI/proxy/runtime](done/epic_cli_proxy_runtime_correctness/card.md), [diagnostic hygiene](done/epic_proxy_diagnostic_data_hygiene/card.md), and [conversion failure](done/epic_proxy_conversion_failure_handling/card.md) | Closed; Wave 5 shipped.                                                                              |
 | [Wave 6 correctness](done/epic_wave6_correctness_maintenance/card.md)                                                                                                                                                      | Closed at 36 verified findings across 13 members; D033/O020 rejected.                                |
 | [Wave 7 refactor/deletion](done/epic_wave7_refactor_and_deletion/card.md)                                                                                                                                                  | Closed at 32 findings across 35 members; bounded post-merge corrections did not change those counts. |
-| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--14 shipped; Batch 4 orders 15--17 are next; orders 18--19 remain parked.                   |
+| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--14 shipped; Batch 4 is in draft PR #228; orders 18--19 remain parked.                      |
 
 ## Strengths (preserve these)
 

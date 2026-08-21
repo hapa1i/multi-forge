@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 16; parked.
+**Lane**: `doing/` -- implementation commit `a7cea967` and integrated verification are under review in draft PR #228;
+close with the shared Batch 4 merge.
 
 **Finding**: O081 (LOW conformance/diagnostics).
 

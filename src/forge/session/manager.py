@@ -2005,30 +2005,49 @@ class SessionManager:
             if cleanup_result.errors:
                 raise ForgeSessionError(cleanup_result.errors[0])
 
+        _deriv = state.confirmed.derivation if delete_transcripts and state is not None else None
+        _relocated_parent_session_id = (
+            _deriv.relocated_parent_session_id
+            if _deriv is not None and _deriv.resume_mode == "native-relocate"
+            else None
+        )
+        _artifact_ids: list[str] = []
+        _cleanup_ids: list[str] = []
         if delete_transcripts and _claude_session_id:
             if state:
                 _artifact_ids = _tracked_transcript_session_ids(state)
             else:
-                _artifact_ids = []
                 raw_confirmed = (_raw_data or {}).get("confirmed")
                 if isinstance(raw_confirmed, dict):
                     _artifact_ids = _tracked_transcript_session_ids_from_artifacts(raw_confirmed.get("artifacts"))
 
-            _cleanup_ids: list[str] = []
             for _session_id in [_claude_session_id, *_artifact_ids]:
                 _append_unique_string(_cleanup_ids, _session_id)
 
+        _transcript_project_root: str | None = None
+        _shared_transcript_ids: dict[str, list[str]] = {}
+        if delete_transcripts and (_cleanup_ids or _relocated_parent_session_id):
             _transcript_project_root = _transcript_cleanup_project_root(
                 state,
                 entry.forge_root or entry.worktree_path,
                 _raw_data,
             )
-            shared_ids = self._find_shared_transcript_sessions(
+            _reference_scan_ids = list(_cleanup_ids)
+            _append_unique_string(_reference_scan_ids, _relocated_parent_session_id)
+            _shared_transcript_ids = self._find_shared_transcript_sessions(
                 _transcript_project_root,
-                _cleanup_ids,
+                _reference_scan_ids,
                 exclude_name=name,
                 exclude_forge_root=entry_forge_root,
             )
+
+        if delete_transcripts and _claude_session_id:
+            assert _transcript_project_root is not None
+            shared_ids = {
+                session_id: _shared_transcript_ids[session_id]
+                for session_id in _cleanup_ids
+                if session_id in _shared_transcript_ids
+            }
 
             # An adopted session's native transcript is user-owned, so it is
             # protected the same way a transcript shared with another session is.
@@ -2068,14 +2087,9 @@ class SessionManager:
         # Remove that copy independently of the child's own UUID (which may be unset on a
         # failed/partial launch) -- but never when another session still needs it.
         if delete_transcripts and state is not None:
-            _deriv = state.confirmed.derivation
-            if _deriv is not None and _deriv.resume_mode == "native-relocate" and _deriv.relocated_parent_session_id:
-                _reloc_root = _transcript_cleanup_project_root(
-                    state,
-                    entry.forge_root or entry.worktree_path,
-                    _raw_data,
-                )
-                _reloc_path = get_transcript_path(_reloc_root, _deriv.relocated_parent_session_id)
+            if _relocated_parent_session_id:
+                assert _transcript_project_root is not None
+                _reloc_path = get_transcript_path(_transcript_project_root, _relocated_parent_session_id)
                 # The relocated UUID IS the parent's claude_session_id, so the shared-transcript
                 # scan (path-resolved, not encoded-dir-guessed) protects two cases at once:
                 #   (1) the parent's ORIGINAL -- the parent references the same UUID, and in a dir
@@ -2086,11 +2100,10 @@ class SessionManager:
                 # Replaces an earlier guard that compared index identity (parent_forge_root/
                 # project_root) instead of the parent's resolved Claude CWD, and so missed
                 # root-level-worktree parents and had no sibling awareness.
-                _reloc_shared = self._find_shared_transcript_sessions(
-                    _reloc_root,
-                    [_deriv.relocated_parent_session_id],
-                    exclude_name=name,
-                    exclude_forge_root=entry_forge_root,
+                _reloc_shared = (
+                    {_relocated_parent_session_id: _shared_transcript_ids[_relocated_parent_session_id]}
+                    if _relocated_parent_session_id in _shared_transcript_ids
+                    else {}
                 )
                 if _reloc_shared:
                     logger.info(

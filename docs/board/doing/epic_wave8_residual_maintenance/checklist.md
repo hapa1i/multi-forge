@@ -1,7 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 3 shipped in PR #227 (`f3353042`) with all five GitHub checks passing; Batch 4 remains parked until
-activation from the pushed closeout.
+Current focus: Batch 4 is under review in draft PR #228; keep all three cards in `doing/` until merge.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -94,6 +93,12 @@ activation from the pushed closeout.
 - [x] Publish one Batch 3 review branch in draft PR #227; close all three cards together only after the batch merges.
 - [x] Merge Batch 3 as `f3353042`, confirm all five GitHub checks, add the shared change-log record, repoint inbound
   links, and move all three cards to `done/` before activating Batch 4.
+- [x] Create `agent/wave8-batch-4` from pushed closeout `0048e60e`; move only orders 15--17 to `doing/`, create separate
+  O076/O081/O085 checklists, and reverify all three source claims before implementation.
+- [x] Complete and commit each Batch 4 card within its own implementation boundary (`51f3b60a`, `a7cea967`, and
+  `cff6adc6`).
+- [x] Run combined unit, regression, targeted audit/native-relocate Docker, pre-commit, board/link, and diff gates.
+- [x] Publish one Batch 4 review branch in draft PR #228; close all three cards together only after merge.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review
@@ -115,3 +120,14 @@ Batch 3 pre-publication evidence (2026-08-21): direct container-boundary coverag
 paths/fragments across the 13 changed Markdown documents resolved, no selected-card `todo/` link remained, and
 `git diff --check` passed. `docs/cli_reference.md` measured 9,415 tokens, the combined design and appendix measured
 59,988 tokens, and the review ledger remained below its ceiling at 29,988 tokens.
+
+Batch 4 pre-publication evidence (2026-08-21): the combined focused CLI/session/regression slice passed 165 tests;
+`make test-unit` passed 9,331 tests with 124 deselected; `make test-regression` passed 1,035 tests; and
+`make pre-commit` passed every hook. The sidecar audit readback, real-Claude native relocation/resume, and containerized
+session deletion boundaries each passed. The first combined Docker invocation produced two passes and one setup error
+because the isolated worktree did not expose `ANTHROPIC_API_KEY`; the native gate passed when rerun through the
+repository's direnv environment. No normative or end-user document described the corrected audit limit, debug-log, or
+internal scan contract, so no behavior prose changed. All 995 local links across 415 tracked board documents resolved,
+the one changed local fragment resolved, no selected-card `todo/` link remained, and `git diff --check` passed. The CLI
+reference measured 9,415 tokens, design plus appendix measured 59,988, and the review ledger remained below its ceiling
+at 29,981.

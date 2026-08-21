@@ -752,14 +752,14 @@ class TestDeleteCreateCoordination:
             SessionStore(str(project), "victim").delete()
             return _Result()
 
-        def _publish_during_transcript_phase(*args: object, **kwargs: object) -> list[str]:
+        def _publish_during_transcript_phase(*args: object, **kwargs: object) -> dict[str, list[str]]:
             # Stands in for the slow transcript work that keeps the window open.
             if "uuid" not in published:
                 replacement = manager.start_session(
                     "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
                 )
                 published["uuid"] = replacement.confirmed.claude_session_id or ""
-            return []
+            return {}
 
         monkeypatch.setattr("forge.session.worktree.cleanup_worktree", _cleanup_takes_the_manifest)
         monkeypatch.setattr(SessionManager, "_find_shared_transcript_sessions", _publish_during_transcript_phase)
