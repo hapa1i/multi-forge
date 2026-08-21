@@ -671,7 +671,7 @@ def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str =
     OpenRouter routing, provider-user grouping, parse-as-JSON, and usage metadata.
     """
     # Lazy import to avoid circular dependencies and startup cost
-    from forge.core.llm import Message
+    from forge.core.llm import Message, with_openrouter_zdr
     from forge.core.llm.types import ModelHyperparameters
     from forge.core.reactive.llm_call import complete_llm_call
     from forge.core.reactive.structured_output import extract_json_from_response
@@ -684,13 +684,14 @@ def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str =
         Message(role="system", content=AI_CURATION_SYSTEM_PROMPT),
         Message(role="user", content=user_prompt),
     ]
-    hp = ModelHyperparameters(
-        max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
-        temperature=AI_CURATION_TEMPERATURE,
+    hp = with_openrouter_zdr(
+        ModelHyperparameters(
+            max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
+            temperature=AI_CURATION_TEMPERATURE,
+        )
     )
-    # Curation always routes through OpenRouter (AI_CURATION_PROVIDER), so the only gate
-    # is the global toggle (resolved inside). Groups this spend account-side with the
-    # rest of the run's OpenRouter calls under one opaque `user` id.
+    # Forge-owned transcript curation always requires ZDR. Provider-user grouping
+    # remains separately gated by the global observability toggle.
     provider_user = resolve_direct_provider_user(provider_user_role)
     if provider_user:
         hp = with_openrouter_user(hp, provider_user)

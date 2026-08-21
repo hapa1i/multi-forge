@@ -214,12 +214,12 @@ for one role and the wrong pick for another:
 # Planner/supervisor source on the proxy default (Opus 5)
 forge session start planner --proxy openrouter-anthropic
 
-# Executor pinned to the top-tier Fable 5, checked against the planner by a read-only supervisor
-forge session start exec --proxy openrouter-anthropic --model claude-fable-5 --supervise planner
+# Executor pinned to a ZDR-compatible alternative, checked against the planner by a read-only supervisor
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 
 See [model_selection.md](model_selection.md) for per-role recommendations, the structural reasons context fidelity
-varies across model versions, cost optimization order, and a release-validation checklist.
+varies across model versions, cost optimization order, the Fable 5 ZDR caveat, and a release-validation checklist.
 
 ### Hooks -- Lifecycle & Artifacts
 

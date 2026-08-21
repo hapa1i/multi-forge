@@ -107,9 +107,13 @@ not need separate proxies just to compare Claude versions:
 # Planner/supervisor source on the proxy's default opus tier (Opus 5)
 forge session start planner --proxy openrouter-anthropic
 
-# Executor pinned to an alternative exposed by the same proxy (e.g. Fable 5 or Opus 4.6)
-forge session start exec --proxy openrouter-anthropic --model claude-fable-5 --supervise planner
+# Executor pinned to a ZDR-compatible alternative exposed by the same proxy
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
+
+Fable 5 is also exposed as an alternative, but OpenRouter's 2026-08-21 endpoint catalog had no ZDR route for it. The
+default required-ZDR policy therefore dispatches Opus 5; using Fable itself requires the explicit non-ZDR opt-out
+described in [proxy.md](proxy.md#openrouter-zero-data-retention-zdr).
 
 The executor's `--model` pin changes routing for that session's main Claude process. Proxied supervisor calls clear
 inherited Claude model-pin environment variables and pass `--model opus`, so the proxy resolves the supervisor through

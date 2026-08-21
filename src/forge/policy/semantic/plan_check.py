@@ -387,7 +387,7 @@ def run_plan_check(
     Must NOT be called from inside an event loop (SyncAdapter constraint).
     """
     try:
-        from forge.core.llm import Message, ModelHyperparameters
+        from forge.core.llm import Message, ModelHyperparameters, with_openrouter_zdr
         from forge.core.llm.types import ReasoningEffort
         from forge.core.reactive.llm_call import complete_llm_call
         from forge.core.usage import (
@@ -407,18 +407,18 @@ def run_plan_check(
             action_text=packed_action.text,
         )
 
-        # OpenRouter `user` grouping: opt-in (global toggle, resolved inside) and
-        # OpenRouter-only -- the field is an OpenRouter feature, so gate on the route.
-        provider_user = (
-            resolve_direct_provider_user("plan-check") if _effective_provider(model, provider) == "openrouter" else None
-        )
+        effective_provider = _effective_provider(model, provider)
+        # OpenRouter `user` grouping is opt-in (global toggle, resolved inside).
+        provider_user = resolve_direct_provider_user("plan-check") if effective_provider == "openrouter" else None
         # Compose hyperparams by chaining the additive wrappers: each deep-copies and
-        # adds only its own key, preserving siblings. Stays None when nothing applies,
-        # preserving the prior "no hyperparams" behavior.
+        # adds only its own key, preserving siblings. Forge-owned direct OpenRouter
+        # plan checks always require ZDR; the per-proxy opt-out does not govern them.
         # reasoning_effort is validated upstream (CLI Choice + SupervisorConfig.__post_init__).
         hp: ModelHyperparameters | None = (
             ModelHyperparameters(reasoning_effort=cast(ReasoningEffort, reasoning_effort)) if reasoning_effort else None
         )
+        if effective_provider == "openrouter":
+            hp = with_openrouter_zdr(hp)
         if provider_user:
             hp = with_openrouter_user(hp, provider_user)
 

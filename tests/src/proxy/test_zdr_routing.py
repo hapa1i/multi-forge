@@ -43,6 +43,7 @@ def test_openrouter_explicit_non_zdr_opt_in_omits_request_requirement(monkeypatc
     )
 
     assert hyperparams.extra == {}
+    assert "extra" not in hyperparams.model_dump(exclude_unset=True)
 
 
 def test_litellm_has_no_zdr_transport_behavior(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,6 +56,7 @@ def test_litellm_has_no_zdr_transport_behavior(monkeypatch: pytest.MonkeyPatch) 
     )
 
     assert hyperparams.extra == {}
+    assert "extra" not in hyperparams.model_dump(exclude_unset=True)
 
 
 def test_zdr_survives_call_metadata_and_reasoning_translation(monkeypatch: pytest.MonkeyPatch) -> None:

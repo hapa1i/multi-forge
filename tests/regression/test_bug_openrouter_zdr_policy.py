@@ -1,9 +1,8 @@
-"""Regression coverage for Qwen Max under OpenRouter ZDR policy.
+"""Regression coverage for bundled models without OpenRouter ZDR endpoints.
 
-OpenRouter has no ZDR endpoint for ``qwen/qwen3.8-max``. Without request-level
-enforcement and a pre-dispatch replacement, an account policy could either
-reject the request late or permit a non-ZDR route without Forge making that
-privacy choice explicit.
+Without request-level enforcement and pre-dispatch replacements, old proxy
+snapshots can either fail late or route without Forge making the privacy choice
+explicit.
 """
 
 from __future__ import annotations
@@ -60,3 +59,20 @@ def test_qwen_max_requires_explicit_non_zdr_opt_in(monkeypatch: pytest.MonkeyPat
         model_name="qwen/qwen3.8-max",
     )
     assert hyperparams.extra == {}
+
+
+def test_old_qwen_flash_default_resolves_to_a_zdr_capable_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    import forge.proxy.server as server
+
+    loaded = load_config(template="openrouter-qwen")
+    loaded.proxy.openrouter.tiers.haiku = "qwen/qwen3.6-flash"
+    loaded.proxy.openrouter.zdr_fallbacks = {}
+    monkeypatch.setattr(server, "config", loaded)
+
+    request = MessagesRequest(
+        model="claude-haiku-4-5-20251001",
+        messages=[],
+        max_tokens=1,
+    )
+
+    assert server._resolve_model_with_alternatives(request).model == "qwen/qwen3.8-27b"

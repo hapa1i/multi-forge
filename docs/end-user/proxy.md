@@ -161,7 +161,7 @@ New proxies created from the current built-in templates use these defaults:
 | `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                                               |
 | `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)                               |
 | `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                              |
-| `openrouter-qwen`                                   | haiku -> Qwen3.6 Flash, sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max  |
+| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max                    |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                              |
 | `openrouter-gemini-flash`                           | all tiers -> Gemini 3.7 Flash                                       |
 | `openrouter-gemini`                                 | haiku -> Gemini 3.7 Flash                                           |
@@ -172,7 +172,8 @@ LiteLLM checker default remains Gemini 3.6 Flash because the bundled local adapt
 Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
 model alternative.
 
-Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
+Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
+endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
 `qwen/qwen3.8-2.4t-a95b`: OpenRouter's ZDR endpoint catalog had no compatible Max endpoint in the 2026-08-21 audit. See
 [OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
 
@@ -275,18 +276,29 @@ key is absent), Forge sends `provider.zdr: true` on every request. OpenRouter th
 currently marks ZDR-compatible. This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only
 replaces models already known to lack a compatible endpoint before dispatch.
 
-The built-in Qwen rule is:
+Forge audited all 34 model slugs in the bundled OpenRouter defaults and alternatives against OpenRouter's
+[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21. Twenty-seven had at least one ZDR
+endpoint. The seven exceptions and their required-ZDR fallbacks are:
 
 ```yaml
 allow_non_zdr: false
 zdr_fallbacks:
+  anthropic/claude-fable-5: anthropic/claude-opus-5
+  qwen/qwen3.6-flash: qwen/qwen3.8-27b
+  qwen/qwen3.6-plus: qwen/qwen3.8-27b
+  qwen/qwen3.6-max-preview: qwen/qwen3.8-2.4t-a95b
+  qwen/qwen3.7-plus: qwen/qwen3.8-27b
+  qwen/qwen3.7-max: qwen/qwen3.8-2.4t-a95b
   qwen/qwen3.8-max: qwen/qwen3.8-2.4t-a95b
 ```
 
-It also applies to older Qwen proxy snapshots that predate the key. `GET /` reports the user-owned selection under
-`runtime.configured_tier_mappings`, the model Forge will actually dispatch under `runtime.tier_mappings`, and the active
-rule under `runtime.data_policy`. Unknown models are not guessed: Forge still sends `provider.zdr: true`, so OpenRouter
-rejects the request if it has no eligible endpoint.
+These built-in rules also protect older proxy snapshots that predate the keys; values in a proxy's own `zdr_fallbacks`
+replace them. `GET /` reports the user-owned selection under `runtime.configured_tier_mappings`, the model Forge will
+actually dispatch under `runtime.tier_mappings`, and the active rule under `runtime.data_policy`. Unknown models are not
+guessed: Forge still sends `provider.zdr: true`, so OpenRouter rejects the request if it has no eligible endpoint.
+
+Fallback values are exact OpenRouter backend slugs. Forge strips Claude Code's `[1m]` lookup hint from the configured
+source before matching and never appends that client-side hint to the fallback target.
 
 The 2.4T A95B fallback preserves the flagship text/code posture but is text-only. If Opus must accept images, replace
 the mapping target with the ZDR-compatible multimodal `qwen/qwen3.8-27b`; that trades capability for modality and lower
@@ -306,9 +318,11 @@ too if you intend to use a non-ZDR-only model. See OpenRouter's
 [ZDR guide](https://openrouter.ai/docs/guides/features/zdr) and
 [provider-routing reference](https://openrouter.ai/docs/guides/routing/provider-selection).
 
-This contract is intentionally limited to direct OpenRouter proxies. Forge neither discovers nor claims ZDR support for
-LiteLLM routes, does not send OpenRouter ZDR routing fields through LiteLLM, and rejects `allow_non_zdr` or
-`zdr_fallbacks` keys in a LiteLLM `proxy.yaml`.
+The per-proxy opt-out and fallback contract applies only to direct OpenRouter proxies. Separately, Forge-owned direct
+OpenRouter plan checks and transfer/rewind transcript curation always send `provider.zdr: true`; a proxy's
+`allow_non_zdr` setting cannot weaken those calls. Forge neither discovers nor claims ZDR support for LiteLLM routes,
+does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr` or `zdr_fallbacks` keys in a LiteLLM
+`proxy.yaml`.
 
 ---
 
@@ -330,7 +344,8 @@ forge session start my-session --proxy openrouter-anthropic --model claude-fable
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
 `model_alternatives[tier][model]` and routes to the configured backend model. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected.
+(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5 currently
+resolves to Opus 5 because the dated endpoint audit found no Fable-compatible ZDR route.
 
 `--model` is currently a Claude model pin. Other proxy templates may define `model_alternatives` for explicit proxy API
 requests that already send the matching model name, but those alternatives are not selected by `forge session --model`.

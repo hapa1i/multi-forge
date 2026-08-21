@@ -426,9 +426,10 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k3)
 - [ ] `openrouter-kimi` exposes `kimi-k2.7-code` as a sonnet/opus model alternative
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
-- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku=qwen3.6-flash, sonnet=qwen3.8-27b, opus=qwen3.8-max)
+- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku/sonnet=qwen3.8-27b, opus=qwen3.8-max)
 - [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields
-- [ ] `openrouter-qwen` maps required-ZDR Qwen3.8 Max to `qwen/qwen3.8-2.4t-a95b`
+- [ ] The dated ZDR audit fallbacks cover Fable 5 and all six bundled non-ZDR Qwen slugs; Qwen3.8 Max maps to
+  `qwen/qwen3.8-2.4t-a95b`
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.6-sol, opus=gpt-5.6-sol)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-5.6-sol)
@@ -487,6 +488,8 @@ forge proxy delete openrouter-zdr-test --yes
 - [ ] LiteLLM template output contains neither ZDR field
 - [ ] Qwen configured Opus is `qwen/qwen3.8-max`, effective Opus is `qwen/qwen3.8-2.4t-a95b`, and
   `runtime.data_policy.zdr` is `required`
+- [ ] Forge-owned direct OpenRouter plan checks and transfer/rewind curation remain required-ZDR regardless of this
+  proxy's `allow_non_zdr` setting
 - [ ] The disposable Qwen proxy stops and deletes cleanly
 
 ### 4.19 Model Alternatives

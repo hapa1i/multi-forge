@@ -449,6 +449,8 @@ class TestRunPlanCheck:
         resolve_model.assert_not_called()
         forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]
         assert forwarded["X-Request-ID"].startswith("req_")
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -545,6 +547,8 @@ class TestRunPlanCheckProviderUser:
 
         user = self._user_in(mock_adapter)
         assert user is not None and user.startswith("forge_sess_") and user.endswith("_plan_check")
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -566,6 +570,8 @@ class TestRunPlanCheckProviderUser:
         )
 
         assert self._user_in(mock_adapter) is None
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")

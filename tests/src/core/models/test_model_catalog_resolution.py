@@ -430,7 +430,7 @@ class TestQwen38:
         assert "qwen3.8-2.4t-a95b" in catalog.models
         assert "qwen3.8-max" in catalog.models
         assert catalog.defaults["qwen"] == {
-            "haiku": "qwen3.6-flash",
+            "haiku": "qwen3.8-27b",
             "sonnet": "qwen3.8-27b",
             "opus": "qwen3.8-max",
         }

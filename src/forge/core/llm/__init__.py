@@ -36,6 +36,7 @@ from .errors import (
     ProviderError,
     UnsupportedParamError,
 )
+from .openrouter_policy import with_openrouter_zdr
 from .protocols import LLMClient
 from .types import (
     CompletionResponse,
@@ -67,6 +68,8 @@ __all__ = [
     "PromptCachingConfig",
     "PromptCachingPolicy",
     "InjectionPoint",
+    # OpenRouter request policy
+    "with_openrouter_zdr",
     # Protocol
     "LLMClient",
     # Errors

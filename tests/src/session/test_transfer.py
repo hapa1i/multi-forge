@@ -1694,6 +1694,7 @@ class TestCurationUsageEmission:
         assert call.request_id is None
         hyperparams = mock_adapter.complete.call_args.kwargs["hyperparams"]
         assert "extra_headers" not in hyperparams.extra.get("openai", {})
+        assert hyperparams.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     def test_proxy_call_threads_request_id_to_usage(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from unittest.mock import MagicMock, patch

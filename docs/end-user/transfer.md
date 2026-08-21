@@ -60,7 +60,9 @@ forge session transfer diff <parent> --child <c>           # how the cache has d
 
 **Strategies** (`--strategy`): `minimal` | `structured` (default) | `full` | `ai-curated`. Only `ai-curated` calls a
 model — it distils the transcript into the full schema; the others are deterministic. `ai-curated` needs
-`OPENROUTER_API_KEY` (see [authentication.md](authentication.md)); without it, curation falls back to `structured`.
+`OPENROUTER_API_KEY` (see [authentication.md](authentication.md)) and always restricts its direct OpenRouter request to
+ZDR endpoints. Without usable authentication or a compatible endpoint, curation falls back to `structured`; proxy-level
+non-ZDR opt-outs do not apply to this Forge-owned call.
 
 `rewind` is a resume/fork launch strategy, not a `forge session transfer regenerate` strategy. Use
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` to resume a fresh child from a truncated native

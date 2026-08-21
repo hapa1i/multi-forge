@@ -57,7 +57,7 @@ defaults:
     sonnet: minimax-m3
     opus: minimax-m3
   qwen:
-    haiku: qwen3.6-flash
+    haiku: qwen3.8-27b
     sonnet: qwen3.8-27b
     opus: qwen3.8-max
   glm:

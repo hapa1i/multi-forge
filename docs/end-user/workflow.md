@@ -57,7 +57,9 @@ compatible proxy found in the registry will work.
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
 (most capable). Additional OSS models include `deepseek-v4-pro`, `minimax-m3`, `qwen3.8-max`, `kimi-k3`, and `glm-5.3`.
-Use `--proxy` to route all workers through a specific proxy:
+Under the default OpenRouter policy, `qwen3.8-max` dispatches the text-only Qwen3.8 2.4T A95B fallback; see
+[OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr) before reviewing image-bearing targets. Use `--proxy` to
+route all workers through a specific proxy:
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)

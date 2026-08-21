@@ -651,9 +651,16 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
 
 
 _BUILTIN_OPENROUTER_ZDR_FALLBACKS = {
-    # Audited against OpenRouter's ZDR endpoint catalog on 2026-08-21. The
-    # request-level provider.zdr requirement remains authoritative if this
+    # Full bundled-default/alternative audit against OpenRouter's ZDR endpoint
+    # catalog on 2026-08-21. These were the seven slugs without an eligible
+    # endpoint. Request-level provider.zdr remains authoritative if this dated
     # snapshot becomes stale in either direction.
+    "anthropic/claude-fable-5": "anthropic/claude-opus-5",
+    "qwen/qwen3.6-flash": "qwen/qwen3.8-27b",
+    "qwen/qwen3.6-plus": "qwen/qwen3.8-27b",
+    "qwen/qwen3.6-max-preview": "qwen/qwen3.8-2.4t-a95b",
+    "qwen/qwen3.7-plus": "qwen/qwen3.8-27b",
+    "qwen/qwen3.7-max": "qwen/qwen3.8-2.4t-a95b",
     "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
 }
 

@@ -647,7 +647,9 @@ To avoid writer conflicts:
 #### 3.6.2 Field ownership invariants (normative)
 
 - **Proxy-owned**: tier→model mappings, provider/base_url, default hyperparams (`reasoning_effort`, `temperature`,
-  `verbosity`, `thinking_budget_tokens`), and direct OpenRouter ZDR policy; LiteLLM has no ZDR surface.
+  `verbosity`, `thinking_budget_tokens`), and direct-OpenRouter-proxy ZDR settings; LiteLLM has no ZDR surface.
+- **Forge-owned direct OpenRouter calls**: plan checking and transfer/rewind curation always require ZDR; proxy opt-outs
+  do not apply.
 - **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
   metadata.
 - **Consumer-lane binding** (epic consumer_lanes/T1b, T6a): `intent.consumer_lanes.<consumer>` is the *requested* lane
@@ -806,10 +808,7 @@ exact model.
 
 ### 3.7 Proxy runtime truth
 
-When the proxy base URL is reachable, **live proxy introspection is authoritative** for tier→model mappings and context
-windows. File caches are allowed but non-authoritative.
-
-The proxy exposes runtime truth via `GET /`:
+When reachable, live proxy `GET /` is authoritative for tier→model mappings and context windows; caches are not:
 
 ```json
 {
@@ -818,11 +817,16 @@ The proxy exposes runtime truth via `GET /`:
   "proxy": { "template": "litellm-openai", "base_url": "http://localhost:8085" },
   "wire_shape": "openai_translated",
   "intercept_mode": "passthrough",
-  "intercept": { "mode": "passthrough", "thinking_blocks_preserved": false, "can_inspect": { "...": "..." } },
+  "intercept": { "mode": "passthrough", "can_inspect": { "...": "..." } },
   "tiers": {
     "haiku": { "model": "gpt-4o-mini", "context_window": 128000 },
     "sonnet": { "model": "gpt-4o", "context_window": 128000 },
     "opus": { "model": "o3", "context_window": 200000 }
+  },
+  "runtime": {
+    "configured_tier_mappings": { "...": "..." },
+    "tier_mappings": { "...": "..." },
+    "data_policy": { "zdr": "not_applicable", "zdr_fallbacks": {} }
   }
 }
 ```
@@ -1401,15 +1405,10 @@ ambient run identity, so a plain `forge session resume --strategy ai-curated` st
 mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and
 `forge telemetry activity` shows both sides of the hop.
 
-**Provider lifecycle evidence.** Backend-capability-gated fields on downstream attempts answer whether a request left
-Forge, which provider/generation handled it, and whether streaming reached content/final usage
-([§A.14](design_appendix.md#a14-provider-lifecycle-fields-in-downstream-telemetry-314)). Correlation headers are
-allowlisted; prompts, auth, and cookies are absent. The generation id is captured on the first stream event, while
-`timeout_seen=false` reflects that the proxy sees client disconnects, not the parent's subprocess timeout. Trace reads
-are local-only (`forge telemetry trace list|show|explain`); aborted streams are not assumed remotely retrievable, and
-`explain` uses a bounded request-id cost join. Global opt-in `provider_trace.inject_provider_user` sends the same hashed
-session/run grouping in OpenRouter's `user` field from proxied and direct `core.llm` paths; it changes observability,
-not routing.
+**Provider lifecycle evidence.** Backend-gated fields record dispatch, provider, and stream progress
+([§A.14](design_appendix.md#a14-provider-lifecycle-fields-in-downstream-telemetry-314)); trace reads are local and
+exclude prompts/secrets. Global `provider_trace.inject_provider_user` hashes run grouping across proxy/direct paths and
+affects observability only.
 
 Each proxy may define:
 

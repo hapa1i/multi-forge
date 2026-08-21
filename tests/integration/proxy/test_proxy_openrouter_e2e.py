@@ -135,7 +135,7 @@ class TestCurrentDefaultsWithOpenRouter:
         """Runtime truth distinguishes configured Qwen Max from its ZDR-safe fallback."""
         with httpx.Client() as client:
             health = client.get(f"{proxy_server_openrouter_qwen}/").json()
-        assert health["runtime"]["tier_mappings"]["haiku"] == "qwen/qwen3.6-flash"
+        assert health["runtime"]["tier_mappings"]["haiku"] == "qwen/qwen3.8-27b"
         assert health["runtime"]["tier_mappings"]["sonnet"] == "qwen/qwen3.8-27b"
         assert health["runtime"]["tier_mappings"]["opus"] == "qwen/qwen3.8-2.4t-a95b"
         assert health["runtime"]["configured_tier_mappings"]["opus"] == "qwen/qwen3.8-max"
@@ -143,6 +143,10 @@ class TestCurrentDefaultsWithOpenRouter:
             "zdr": "required",
             "zdr_fallbacks": {"qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b"},
         }
+
+    def test_qwen_haiku_resolves_to_38_27b(self, proxy_server_openrouter_qwen: str) -> None:
+        """Qwen 27B is the least-expensive multimodal Qwen with an audited ZDR endpoint."""
+        _assert_tier_completion(proxy_server_openrouter_qwen, "claude-haiku-4-5-20251001", "haiku", "qwen/qwen3.8-27b")
 
     def test_qwen_sonnet_resolves_to_38_27b(self, proxy_server_openrouter_qwen: str) -> None:
         """Qwen 27B has a ZDR endpoint and remains the effective Sonnet route."""
