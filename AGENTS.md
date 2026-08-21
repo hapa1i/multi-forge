@@ -10,13 +10,15 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 
 ## Documentation Guide
 
-Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
-and `CLAUDE.md` for agent context. `docs/developer/coding_standards.md`, `testing_guidelines.md`,
-`documentation_guidelines.md`, `cli_style_guidelines.md`, and `board_contract.md` define code style, test policy, doc
-writing, CLI command shape, and board workflow rules. `docs/board/README.md` is a board directory guide with examples,
-not the authority. Update `docs/design.md` and `docs/design_appendix.md` when architecture or file ownership changes.
-When changing config ownership, auth resolution, installer behavior, proxy/session semantics, or workflow prerequisites,
-also update the relevant `docs/end-user/*` guide so wheel-installed users get the right Day 1 path.
+Use the repo docs as the source of truth for their domains: `README.md` for the overview and `docs/developer/` for
+setup. This `AGENTS.md` is the primary repository-wide agent context. `CLAUDE.md` is a thin Claude Code entry point that
+imports this file; keep shared instructions here and only Claude-specific routing there.
+`docs/developer/coding_standards.md`, `testing_guidelines.md`, `documentation_guidelines.md`, `cli_style_guidelines.md`,
+and `board_contract.md` define code style, test policy, doc writing, CLI command shape, and board workflow rules.
+`docs/board/README.md` is a board directory guide with examples, not the authority. Update `docs/design.md` and
+`docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
+installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide
+so wheel-installed users get the right Day 1 path.
 
 Board quick semantics: `todo/` means accepted but parked; starting a todo card means create or switch to the execution
 branch, move the card directory to `doing/`, and create/update its `checklist.md`. `doing/` is active work; `paused/` is
@@ -24,12 +26,19 @@ partially-done work on hold and moves back to `doing/` when resumed; `done/` mea
 synced, and closeout recorded. `retired/` is terminal work that did not ship independently; it is excluded from live and
 done counts, and reconsideration starts a new `proposed/` card.
 
+Per-card branches and PRs remain the default. A shared two- or three-card batch is allowed only when an active epic
+records fixed membership and order, the branch base, parallel or sequential boundaries, and integration ownership. Each
+card still needs its own checklist, commit series, evidence, and closeout; run the applicable aggregate unit,
+regression, pre-commit, and board/link checks on the integrated head before closing the batch together.
+
 ## Build, Test, and Development Commands
 
 Use `uv` for dependencies and `make` for the standard workflow:
 
 - `uv sync` installs runtime and dev dependencies.
 - `./scripts/setup.sh --local` performs the editable local install used for development.
+- `FORGE_DEV="$PWD" uv run forge session start dev-hooks` launches a managed session whose host hooks use this checkout;
+  `FORGE_DEV` must be an absolute root, and the session must be relaunched after changing or unsetting it.
 - `make deps` syncs dev dependencies and is the prerequisite behind the standard targets.
 - `uv run forge --help` checks the CLI entry point.
 - `make test-unit` runs tests.
@@ -46,6 +55,10 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make pre-commit-md` runs the Markdown-only hook subset for docs-only changes.
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
+
+The configured global pre-commit hook normalizes staged text, including replacing emoji with ASCII. Use `\U` escapes for
+emoji that must survive in source strings. If a hook reformats a staged file, review and restage it before retrying the
+commit.
 
 ## Release & UX Verification
 
@@ -89,21 +102,30 @@ readiness with `forge runtime preflight codex`, then exercise `forge workflow pa
 that include one must use blind context (`--context blind`). The default worker set remains Claude-backed. `--proxy`
 does not reroute direct Claude or Codex workers, and `--effort` applies only to Claude workers.
 
+For policy CLI or hook changes, exercise `forge policy check --bundle coding_standards --file <path>` and
+`git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown workflow
+keys or invalid field types must fail atomic engine construction with an entry/field diagnostic. Claude and Codex hooks
+report that build error and allow the action before the configured fail mode applies.
+
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status
-surfaces, and send recovery output through `forge.cli.output` helpers. Extend `tests/src/cli/test_output_streams.py`
-when a new read leaf could split result and diagnostic streams.
+surfaces, and send recovery output through `forge.cli.output` helpers. Conflict-bearing dry-run previews remain on
+stdout even when they exit non-zero; only the terminating failure diagnostic goes to stderr. Keep error messages
+accurate and offer only recovery commands that apply to the current install and runtime. Extend
+`tests/src/cli/test_output_streams.py` when a new read leaf could split result and diagnostic streams.
 
 For backend-source, telemetry, provider-trace, and cost-accounting changes, verify the operator read paths:
 `forge model backend list|show <source-or-backend-id>|test-auth <source-id>`,
 `forge telemetry trace list|show <request_id>|explain <request_id>`, and
-`forge telemetry costs show --by-model|--by-verb`. Use `forge telemetry costs reset --dry-run` before destructive
-telemetry resets; `reset` wipes legacy costs, downstream/upstream telemetry, cap state, audit sidecar state, usage
-events, and derived status-line caches, while running proxies keep in-memory cost/cap counters until restarted. For
-backend lifecycle or remote-reconcile changes, also verify `forge model backend start <source-or-adapter>`,
-`forge model backend stop <runtime-id>...|--all`, `forge model backend delete <adapter>`, and
-`forge model backend reconcile <source-id> --request-id|--remote-id`; `stop` targets runtime instance ids from `list`,
-not source ids or adapter names.
+`forge telemetry costs show --by-model|--by-verb`, plus `forge proxy metrics [proxy_id] --json`. Cost breakdown flags
+are mutually exclusive; JSON retains both summaries, and verb runs count unique Forge run IDs separately from requests.
+Bare metrics JSON is always a proxy-ID-to-metrics/null map, while a selected proxy returns its raw metrics object. Use
+`forge telemetry costs reset --dry-run` before destructive telemetry resets; `reset` wipes legacy costs,
+downstream/upstream telemetry, cap state, audit sidecar state, usage events, and derived status-line caches, while
+running proxies keep in-memory cost/cap counters until restarted. For backend lifecycle or remote-reconcile changes,
+also verify `forge model backend start <source-or-adapter>`, `forge model backend stop <runtime-id>...|--all`,
+`forge model backend delete <adapter>`, and `forge model backend reconcile <source-id> --request-id|--remote-id`; `stop`
+targets runtime instance ids from `list`, not source ids or adapter names.
 
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
 `forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
@@ -148,6 +170,14 @@ and variables, `CamelCase` for classes, and `UPPER_CASE` for constants. Follow t
 methods before private ones, type hints on public functions, and comments that explain why. Quality checks center on
 `make pre-commit`, which runs ruff, black, isort, mypy, pyright, mdformat, and gitleaks.
 
+## Design and Review Discipline
+
+Treat user-defined domain concepts as first-class architecture unless the user explicitly narrows them. Do not collapse
+a named abstraction into an implementation detail; ask for clarification when its scope is genuinely ambiguous.
+
+For code or document review requests, complete one full pass and report all findings together unless the user explicitly
+asks for an iterative review.
+
 ## Testing Guidelines
 
 Use `pytest`, not `unittest`. Mirror source paths in `tests/src/` (for example, `src/forge/session/store.py` maps to
@@ -158,6 +188,11 @@ tests should be fixed or removed rather than skipped. Docker is expected to be r
 touching hooks, sessions (including Codex runtime/frontend), the memory writer, proxy runtime, backend source catalog,
 consumer-lane bindings, telemetry/cost/provider-trace paths, rewind resume/fork behavior, workflow-worker/headless
 invoker fan-out, or the installer — don't defer them to closeout.
+
+Indexed-session tests must publish and delete coherent state through `tests.fixtures.session_state`: use
+`publish_session`, `publish_session_from_fields`, and `delete_published_session`. Reserve `seed_row_only_session` and
+`remove_index_row_only` for deliberately incomplete states and explain the violated invariant at the call site; do not
+restore the retired `IndexStore.add_session`, `add_from_state`, or `remove_session` shortcuts.
 
 ## GitHub CLI Auth
 
@@ -174,6 +209,9 @@ direnv exec . gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes.md> 
 Do not print token values while debugging. To diagnose safely, compare presence/length or make a status-only API probe
 through `direnv exec .`; `gh` gives `GH_TOKEN` precedence over stored credentials, and unsetting `GH_TOKEN` may make
 `gh` appear logged out even though SSH-based `git push` still works.
+
+This clone has both `origin` and a parent upstream remote. For PR creation, pin the GitHub repository and branch
+coordinates explicitly: `direnv exec . gh pr create --repo <owner>/<repo> --base main --head <branch>`.
 
 In a network-restricted Codex sandbox, `gh auth status` can misleadingly label a valid token as invalid when the real
 failure is inability to reach `api.github.com`. Do not ask the user to rotate the token from that message alone. First
