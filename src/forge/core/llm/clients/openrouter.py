@@ -8,7 +8,7 @@ OpenRouter-specific headers and translates parameters to OpenRouter's format.
 import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable
 
 from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
@@ -115,12 +115,15 @@ class OpenRouterClient:
         messages: list[Message],
         tools: list[dict[str, Any]] | None,
         merged_params: ModelHyperparameters,
+        on_provider_dispatch: Callable[[], None] | None,
     ) -> CompletionResponse:
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
         kwargs = self._translate_params(kwargs)
         # with_raw_response keeps the HTTP headers (probe-confirmed x-request-id / gen-id carriers)
         # alongside the parsed body so the direct path populates provider_meta.headers, matching the
         # LiteLLM path. Plain .create() discards headers, which is the gap review #R3 flagged.
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = openai_response_to_completion(raw.parse(), self._provider)
         return merge_provider_headers(completion, raw.headers, self._provider)
@@ -131,12 +134,19 @@ class OpenRouterClient:
         *,
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> CompletionResponse:
         merged_params = merge_hyperparams(self._default_hyperparams, hyperparams)
         client = await self._get_client()
 
         try:
-            return await self._make_completion_request(client, messages, tools, merged_params)
+            return await self._make_completion_request(
+                client,
+                messages,
+                tools,
+                merged_params,
+                on_provider_dispatch,
+            )
         except (ProviderError, AuthenticationError):
             raise
         except Exception as e:
@@ -167,6 +177,7 @@ class OpenRouterClient:
         *,
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         merged_params = merge_hyperparams(self._default_hyperparams, hyperparams)
         client = await self._get_client()
@@ -189,6 +200,8 @@ class OpenRouterClient:
             kwargs["stream"] = True
             kwargs["stream_options"] = {"include_usage": True}
 
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             stream_resp = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream_resp:

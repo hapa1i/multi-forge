@@ -293,9 +293,12 @@ class CoreLLMClientAdapter:
 
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
-        if on_provider_dispatch is not None:
-            on_provider_dispatch()
-        response = await self._client.complete(messages, tools=tools, hyperparams=hyperparams)
+        response = await self._client.complete(
+            messages,
+            tools=tools,
+            hyperparams=hyperparams,
+            on_provider_dispatch=on_provider_dispatch,
+        )
 
         if response.usage:
             cache_info = _extract_cache_info(response.usage)
@@ -377,9 +380,12 @@ class CoreLLMClientAdapter:
         final_usage: dict[str, int] = {}
         provider_meta_carried = False  # emit the trace-meta carrier chunk at most once
 
-        if on_provider_dispatch is not None:
-            on_provider_dispatch()
-        async for event in self._client.stream(messages, tools=tools, hyperparams=hyperparams):
+        async for event in self._client.stream(
+            messages,
+            tools=tools,
+            hyperparams=hyperparams,
+            on_provider_dispatch=on_provider_dispatch,
+        ):
             # Emit the provider-trace metadata as its own internal-only chunk the instant it
             # first appears (Phase 2). The core client publishes it on the FIRST content/tool
             # event, so the Phase 3 SSE seam stashes the generation id BEFORE any cancellation --
