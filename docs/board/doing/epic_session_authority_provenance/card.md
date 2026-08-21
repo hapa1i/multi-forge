@@ -1,7 +1,9 @@
 # Epic: Session Authority and Provenance
 
-**Epic** -- coordinating card for the independently shippable members below. Lane: `proposed/`; shared contracts are not
-yet accepted for execution.
+**Epic** -- coordinating card for the independently shippable members below. Lane: `doing/` (activated 2026-08-21);
+shared contracts C1-C5 are accepted and frozen for execution. M1
+[Artifact Authority Mode](../artifact_authority_mode/card.md) is the first active member on branch
+`feat/artifact-authority-mode`; M2 remains proposed. Coordination is tracked in [checklist.md](checklist.md).
 
 **Purpose**: keep artifact authority and session route provenance semantically separate while preventing their journal,
 run-correlation, and presentation infrastructure from drifting.
@@ -9,7 +11,7 @@ run-correlation, and presentation infrastructure from drifting.
 ## Problem
 
 [Artifact Authority Mode](../artifact_authority_mode/card.md) and
-[Session Route Provenance and Marking](../session_route_provenance/card.md) answer different questions:
+[Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md) answer different questions:
 
 - authority: which managed session is permitted to mutate project artifacts, and what enforcement posture supported a
   run;
@@ -21,15 +23,15 @@ entry points, JSONL mechanics, origin/outcome vocabulary, local-evidence caveats
 Implementing those seams independently would create two subtly incompatible evidence systems.
 
 Generic model selection is not part of this epic.
-[Model-First Interactive Session Routing](../model_first_session_routing/card.md) is an adjacent behavior-changing
-proposal; it may emit richer routing facts when present but is not required by either member.
+[Model-First Interactive Session Routing](../../proposed/model_first_session_routing/card.md) is an adjacent
+behavior-changing proposal; it may emit richer routing facts when present but is not required by either member.
 
 ## Members
 
-| Id  | Card                                                            | Delivers                                                        | Depends on |
-| --- | --------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| M1  | [artifact_authority_mode](../artifact_authority_mode/card.md)   | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
-| M2  | [session_route_provenance](../session_route_provenance/card.md) | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
+| Id  | Card                                                                        | Delivers                                                        | Depends on |
+| --- | --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
+| M1  | [artifact_authority_mode](../artifact_authority_mode/card.md)               | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
+| M2  | [session_route_provenance](../../proposed/session_route_provenance/card.md) | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
 
 The members remain independently shippable. M1 does not require model selection, marking metadata, or M2's read
 surfaces. M2 does not require authority roles or enforcement.

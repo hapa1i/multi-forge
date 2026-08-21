@@ -1,15 +1,16 @@
 # Artifact Authority Mode
 
-**Status**: Proposed (2026-08-13; narrowed after design review). This card covers per-session artifact authority,
-handler-level fail-closed decisions on declared runtime-tool surfaces, launch preflight, disclosed runtime fail-open
-seams, and an honest posture read. It does not add delegation, cross-runtime context transfer, Git-range attestation,
-textual-overlap analysis, or an admission gate. Forge adds no courier; the supported advisory-to-producer flow is
-human-only.
+**Status**: Active (2026-08-21; proposed 2026-08-13 and narrowed after design review). This is M1 and the first active
+member of its epic; execution is sequenced in [checklist.md](checklist.md). The card covers per-session artifact
+authority, handler-level fail-closed decisions on declared runtime-tool surfaces, launch preflight, disclosed runtime
+fail-open seams, and an honest posture read. It does not add delegation, cross-runtime context transfer, Git-range
+attestation, textual-overlap analysis, or an admission gate. Forge adds no courier; the supported advisory-to-producer
+flow is human-only.
 
 **Epic**: M1 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
 owns the shared journal envelope, run identity, absence-state vocabulary, and presentation boundary with
-[Session Route Provenance and Marking](../session_route_provenance/card.md). The cards remain independently shippable;
-authority mode does not require route history, model selection, or marking metadata.
+[Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md). The cards remain independently
+shippable; authority mode does not require route history, model selection, or marking metadata.
 
 **References**: [design.md §3.9](../../../design.md#39-session-resume-context-management) (Codex session lifecycle),
 [design.md §3.10](../../../design.md#310-hook-handlers) (managed hook dispatch),
