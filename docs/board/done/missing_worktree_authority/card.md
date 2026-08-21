@@ -1,6 +1,6 @@
 # Decide authority for sessions with a missing worktree
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG2; D009).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md) (DG2; D009).
 
 **Lane**: `done/` -- approved on 2026-08-04; implementation shipped in PR #137 (`cce6e8c6`) through
 [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md).

@@ -1,6 +1,6 @@
 # Epic: Proxy conversion failure handling
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- D053 shipped in PR #161 (`8088ceae`) and O007 shipped in PR #162 (`31a0832f`); both retained
 regression boundaries are verified.

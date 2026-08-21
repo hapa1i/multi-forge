@@ -1,6 +1,6 @@
 # Epic: Stop and artifact correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all three Wave 2 members shipped in PRs #130–#132 and the coordinated outcome closed on 2026-08-06.
 

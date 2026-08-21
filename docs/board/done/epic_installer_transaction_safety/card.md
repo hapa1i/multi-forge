@@ -1,6 +1,6 @@
 # Epic: Installer transaction safety
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all three members shipped independently in PRs #144--#146; the coordinated outcome closed on
 2026-08-08.

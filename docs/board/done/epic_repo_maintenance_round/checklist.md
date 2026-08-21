@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 Batch 5 orders 18--19 are under review in draft PR #230 from `agent/wave8-batch-5`; keep both
-cards open through their shared review.
+Current focus: closed after Wave 8 Batch 5 merged in PR #230 (`7e5ea8c4`); D040 remains separately proposed.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -375,7 +374,7 @@ cards open through their shared review.
 - [x] Ship Wave 7 order 35 independently in PR #214 (`4c9dee34`) and close its member.
 - [x] Close the bounded Wave 7 epic after synchronizing all 35 members, the review ledger, and terminal verification.
 
-The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
+The decision gates closed before the later execution waves; this checklist retains their historical sequencing record.
 
 - [x] Activate only the bounded `correct_wave8_merged_regressions` follow-up from pushed order-6 closeout `113b5670`.
 - [x] Ship and close the corrective follow-up in PR #222 (`02e0ced9`) before advancing Wave 8 sequencing.
@@ -415,3 +414,4 @@ The epic remains in `doing/` after the decision cards close; later execution wav
   checklists.
 - [x] Complete and publish the two-card Batch 5 review with distinct implementation commits and integrated evidence in
   draft PR #230.
+- [x] Merge PR #230 with all five checks passing; close both Batch 5 cards, the Wave 8 epic, and this parent epic.

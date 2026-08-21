@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-21
 
+### Close Wave 8 Batch 5 and the repository maintenance round
+
+**Goal/outcome**: Close the final verified residuals and leave the whole-repository review with terminal dispositions
+without treating the separately proposed D040 design choice as accepted work.
+
+**Key changes**:
+
+- Removed every unexplained production type suppression, retained concrete reasons on the unavoidable remainder, and
+  added a source guard against recurrence.
+- Synchronized the conditional sidecar runtime-config mount, auth/workflow CLI inventory, and consensus precedence
+  comment, then closed Wave 8 at 23 findings across 19 members and the parent maintenance round.
+
+**Verification**: 446 focused suppression/touched-module tests; 203 focused auth/workflow documentation tests; 60 PR
+review follow-up tests; 9,332 unit with 124 deselected; 1,059 regression; three targeted integration boundaries;
+pre-commit/diff, board/link, and document-size gates. PR #230 merged as `7e5ea8c4` with all five GitHub checks passing.
+
 ### Close daily-review regressions
 
 **Goal/outcome**: Keep provider traces, workflow integer controls, and Stop failure diagnostics aligned with their

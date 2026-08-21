@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- under shared review in draft PR #230 as Wave 8 Batch 5 order 18.
+**Lane**: `done/` -- shipped in Wave 8 Batch 5 PR #230 (`7e5ea8c4`).
 
 **Finding**: narrowed O100 (LOW conformance).
 
@@ -30,3 +30,8 @@ Authority: [`coding_standards.md` Comments](../../../developer/coding_standards.
 
 Run the suppression guard, focused touched tests, the configured mypy and pyright commands, full unit/regression suites,
 and `make pre-commit`.
+
+## Closeout
+
+All 13 unexplained production suppressions were removed, the remaining 11 retain concrete same-line reasons, and the
+source guard prevents recurrence. PR #230 merged with all five GitHub checks passing.

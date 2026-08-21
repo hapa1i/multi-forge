@@ -1,6 +1,6 @@
 # Fix cost-breakdown selectors and run counts
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `done/` -- shipped with the metrics card in Batch 2 PR #226 (`5f02bb0f`) on 2026-08-20.
 

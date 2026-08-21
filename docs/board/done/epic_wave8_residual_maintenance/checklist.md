@@ -1,7 +1,6 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 5 orders 18--19 are under review in draft PR #230 from `agent/wave8-batch-5`; keep both cards in
-`doing/` until their shared review merges.
+Current focus: closed at 23/23 findings across 19/19 members after Batch 5 merged in PR #230 (`7e5ea8c4`).
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -115,6 +114,7 @@ Current focus: Batch 5 orders 18--19 are under review in draft PR #230 from `age
 - [x] Run combined type-check, unit, regression, targeted integration, pre-commit, documentation-size, board/link, and
   diff gates.
 - [x] Publish one Batch 5 review branch in draft PR #230; close both cards and this epic together only after merge.
+- [x] Confirm all five GitHub checks, merge Batch 5 as `7e5ea8c4`, and close both members plus this epic together.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review

@@ -1,6 +1,6 @@
 # Reuse transcript-reference scans
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in Batch 4 PR #228 (`559a3453`).
 

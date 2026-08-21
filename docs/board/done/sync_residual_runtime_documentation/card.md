@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- under shared review in draft PR #230 as Wave 8 Batch 5 order 19.
+**Lane**: `done/` -- shipped in Wave 8 Batch 5 PR #230 (`7e5ea8c4`).
 
 **Findings**: D042, narrowed D044, and O082 (LOW documentation/comment drift).
 
@@ -29,3 +29,8 @@ Make the sidecar mount model, CLI reference, and workflow precedence comment des
 ## Verification
 
 Run `make pre-commit-md`, documentation token checks, board/doc link checks, and `git diff --check`.
+
+## Closeout
+
+The normative sidecar mount condition, CLI inventory, and workflow precedence comment now match shipped behavior. PR
+#230 merged with all five GitHub checks passing.

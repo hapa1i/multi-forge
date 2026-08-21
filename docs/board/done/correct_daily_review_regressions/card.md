@@ -1,6 +1,6 @@
 # Correct daily-review regressions
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #229 (`da34bcb3`) on 2026-08-21 with all five GitHub checks passing.
 

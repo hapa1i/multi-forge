@@ -1,6 +1,6 @@
 # Stabilize search-index snapshot fingerprints
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- corrected directly on `main` as `2bd556e9` after PR #206 closed and before Wave 7 order 28.
 

@@ -1,6 +1,6 @@
 # Decide the Stop verification contract
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG1; D006 and U002–U003).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md) (DG1; D006 and U002–U003).
 
 **Lane**: `done/` -- approved on 2026-08-04; implementation is complete in
 [`align_stop_verification_contract`](../align_stop_verification_contract/card.md).

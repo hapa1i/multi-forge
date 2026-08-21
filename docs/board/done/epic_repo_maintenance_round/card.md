@@ -1,7 +1,7 @@
 # Epic: Repository maintenance round
 
-**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
+**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `done/` -- Waves
+1--5 and the bounded Wave 6 correctness-maintenance admission are closed. Wave 5 contains 13 shipped findings; its
 closeout audit rejected stale claims D033/O020 and handed 34 still-live correctness rows to Wave 6. Follow-up
 verification added D054/D055, and all 36 findings shipped across 13 members in PRs #164--#168 and #170--#177. PR #169
 added bounded O012 and retention-status hardening without changing that finding count. Wave 7 is closed at 32 verified
@@ -21,8 +21,8 @@ and the bounded [`correct_wave8_merged_regressions`](../../done/correct_wave8_me
 shipped in PR #222. Wave 8 order 8
 [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224;
 orders 9--10 and the external Batch 1 Stop follow-up shipped in PR #225; Batch 2 orders 11--12 shipped in PR #226; Batch
-3 orders 13--14 and its external vocabulary follow-up shipped in PR #227; Batch 4 orders 15--17 shipped in PR #228.
-Batch 5 orders 18--19 are under review in draft PR #230 from `agent/wave8-batch-5`.
+3 orders 13--14 and its external vocabulary follow-up shipped in PR #227; Batch 4 orders 15--17 shipped in PR #228;
+Batch 5 orders 18--19 shipped in PR #230. Wave 8 and this maintenance round are closed.
 
 ## Goal
 
@@ -96,7 +96,7 @@ in PRs #157--#159. The next bounded MEDIUM set closed under
 O007 shipped independently in PRs #161--#162. The Wave 5 closeout screen on `246aaff1` rejected D033/O020 and accepted
 34 live rows into [`epic_wave6_correctness_maintenance`](../../done/epic_wave6_correctness_maintenance/card.md).
 Follow-up verification expanded that bounded admission with D054/D055, and all 36 findings shipped across 13 independent
-members in PRs #164--#168 and #170--#177. D056 is active in Wave 8 order 5 after its separate execution gate.
+members in PRs #164--#168 and #170--#177. D056 later shipped in Wave 8 order 5 after its separate execution gate.
 
 A post-Wave 6 screen on merged `main` at `5777192a` admitted the verified refactor/deletion set under
 [`epic_wave7_refactor_and_deletion`](../../done/epic_wave7_refactor_and_deletion/card.md). The child epic split the old
@@ -192,6 +192,6 @@ execution phase.
 
 ## Closeout
 
-Move the epic to `done/` only when every live member is done, all accepted findings have a recorded disposition, the
-combined review points to the shipped/retired outcomes, verification is recorded, and normative docs are synchronized. A
-retired member does not count as shipped; record its rationale and successor on both the member and epic.
+This epic closed after every live member shipped, every accepted finding received a disposition, the combined review
+pointed to shipped or retired outcomes, verification was recorded, and normative docs were synchronized. D040 remains a
+separate unaccepted proposal; retired members do not count as shipped work.

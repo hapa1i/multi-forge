@@ -1,6 +1,6 @@
 # Decide retention ownership for unified downstream telemetry
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG3; D015).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md) (DG3; D015).
 
 **Lane**: `done/` -- approved on 2026-08-04; implementation shipped in PR #148 under
 [`unify_downstream_retention`](../unify_downstream_retention/card.md).

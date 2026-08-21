@@ -1,6 +1,6 @@
 # Correct post-merge review findings
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- shipped in PR #185 (`8ccbf387`) before Wave 7 order 8.
 

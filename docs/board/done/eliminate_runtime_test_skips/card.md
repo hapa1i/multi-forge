@@ -1,6 +1,6 @@
 # Eliminate runtime test skips
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
 **Origin**: Verification review of
 [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md).

@@ -1,7 +1,6 @@
 # Explain or remove type suppressions checklist
 
-Current focus: under shared review in draft PR #230 as Wave 8 Batch 5 order 18. This card owns production suppression
-cleanup and the conformance guard; keep it in `doing/` until the batch merges.
+Current focus: closed in Wave 8 Batch 5 PR #230 (`7e5ea8c4`).
 
 ## Phase 1 -- Reverification and guard
 
@@ -47,3 +46,8 @@ subprocess OpenAI routing with reasoning/verbosity forwarding. `make pre-commit`
 PR review evidence: `TierOverride` does not itself narrow the two string fields, but the immediately constructed
 `ModelHyperparameters` validates both core literals. A direct invalid-value probe confirmed rejection for reasoning and
 verbosity, 60 focused type/hyperparameter tests passed, and the casts now name that boundary without changing behavior.
+
+## Phase 4 -- Closeout
+
+- [x] Confirm PR #230 merged as `7e5ea8c4` with all five GitHub checks passing.
+- [x] Move the card to `done/` with its epic and review-ledger links synchronized.

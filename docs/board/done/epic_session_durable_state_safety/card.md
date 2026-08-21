@@ -1,6 +1,6 @@
 # Epic: Session and durable-state safety
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all eight Wave 3 members shipped independently in PRs #134--#138 and #140--#142; the coordinated
 outcome closed on 2026-08-07.

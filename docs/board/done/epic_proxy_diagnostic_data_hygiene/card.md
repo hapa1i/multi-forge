@@ -1,6 +1,6 @@
 # Epic: Proxy diagnostic data hygiene
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all three members shipped independently in PRs #157--#159; the coordinated outcome closed on
 2026-08-10.

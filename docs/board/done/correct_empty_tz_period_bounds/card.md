@@ -1,6 +1,6 @@
 # Honor explicitly empty process timezone
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- shipped in PR #189 (`f0afc0c4`) from `459887fa`.
 

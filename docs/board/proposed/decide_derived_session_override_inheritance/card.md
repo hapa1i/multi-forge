@@ -4,7 +4,7 @@
 
 **Lane**: `proposed/` -- design decision required; not accepted for implementation.
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../done/epic_repo_maintenance_round/card.md) (completed provenance).
 
 ## Question
 

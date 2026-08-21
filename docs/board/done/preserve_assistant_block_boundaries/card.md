@@ -1,6 +1,6 @@
 # Preserve assistant block boundaries
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
 **Lane**: `done/` -- shipped in PR #224 (`4727deaa`) on 2026-08-20.
 

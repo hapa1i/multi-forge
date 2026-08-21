@@ -2,13 +2,13 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; Batch 5 orders 18--19 are under review in draft PR #230.
-The corrective and external follow-ups retain their recorded PRs.
+**Lane**: `done/` -- all 23 verified findings shipped across 19 members. Batch 5 closed the bounded admission in PR #230
+(`7e5ea8c4`); corrective and external follow-ups retain their recorded PRs.
 
-**Current execution**: Batch 5 is under review in draft PR #230 from `agent/wave8-batch-5`, based on pushed correction
-closeout `1e0e664c`. Its fixed order is order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md),
-then order 19 [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md); each retains its
-own checklist and commit boundary. Combined verification and publication evidence are recorded in the epic checklist.
+**Final execution**: Batch 5 shipped order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md), then
+order 19 [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md), from correction
+closeout `1e0e664c`. Each retained its own checklist and commit boundary; combined verification and publication evidence
+are recorded in the epic checklist.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -47,9 +47,9 @@ external model call was used.
 
 ## Members and Sequence
 
-The member order remains the finding-provenance sequence. Remaining execution uses the epic-authorized batches below,
-with only one batch active at a time. Every card remains a separate implementation unit with its own checklist, commit
-boundary, acceptance evidence, and closeout record.
+The member order follows the finding-provenance sequence. Execution used the epic-authorized batches below, with only
+one batch active at a time. Every card retained a separate checklist, commit boundary, acceptance evidence, and closeout
+record.
 
 | Order | Findings       | Member                                                                                                  | Review boundary                         |
 | ----- | -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -75,7 +75,7 @@ boundary, acceptance evidence, and closeout record.
 
 ## Batch Execution Plan
 
-Execute these batches in order on one branch and PR per batch:
+Execution used these batches in order, with one branch and PR per batch:
 
 1. **Batch 1 -- independent correctness**: order 9
    [`report_active_registry_cleanup_failures`](../../done/report_active_registry_cleanup_failures/card.md), order 10
@@ -147,3 +147,9 @@ credit and do not change this epic's 23 findings or 19-member accounting.
   failures remain visible in the result or logs.
 - Do not collapse implementation ownership within a batch: retain each card's checklist, commit boundary, acceptance
   evidence, and closeout record. Close one complete batch before activating the next.
+
+## Closeout
+
+All 19 live members and 23 admitted findings shipped through PRs #216--#230, with each corrective or external batch
+member recorded separately from finding credit. The combined review, parent epic, normative docs, and board links are
+synchronized. D040 remains an independent unaccepted proposal and does not block this bounded admission.

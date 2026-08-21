@@ -1,6 +1,6 @@
 # Decide compatibility requirements for cleanup deletions
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG4).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md) (DG4).
 
 **Lane**: `done/` -- approved on 2026-08-04; the post-Wave 6 screen split admitted work under the parked
 [`epic_wave7_refactor_and_deletion`](../epic_wave7_refactor_and_deletion/card.md).

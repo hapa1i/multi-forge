@@ -1,6 +1,6 @@
 # Epic: CLI, proxy, and runtime correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all seven bounded HIGH members shipped independently in PRs #148--#154; the coordinated outcome
 closed on 2026-08-09.

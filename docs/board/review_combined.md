@@ -33,12 +33,12 @@ as safe to remove until its compatibility role and tests have been characterized
 according to `docs/developer/board_contract.md`; keep independently shippable fixes as member cards when a shared
 contract requires an epic.
 
-**Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). It owns sequencing
-and disposition; this report remains the evidence ledger. Waves 1--7 are closed, with their finding counts, corrections,
-and PR ranges retained in the admission records below and in the linked done cards. The residual gate on `bad273ef`
-parked 23 verified rows as 19 members under
-[`epic_wave8_residual_maintenance`](doing/epic_wave8_residual_maintenance/card.md); the admission activated no
-implementation, and order 1 later started from pushed closeout `7a2ad4c1`.
+**Coordination epic:** [`epic_repo_maintenance_round`](done/epic_repo_maintenance_round/card.md). It closed after owning
+sequencing and disposition; this report remains the evidence ledger. Waves 1--8 are closed, with their finding counts,
+corrections, and PR ranges retained in the admission records below and in the linked done cards. The residual gate on
+`bad273ef` admitted 23 verified rows as 19 members under
+[`epic_wave8_residual_maintenance`](done/epic_wave8_residual_maintenance/card.md); all later shipped, while D040 remains
+a separate unaccepted proposal.
 
 ### Finding fields
 
@@ -764,8 +764,8 @@ directly on `main` after PR #206 and before order 28.
 The correctness/security/performance/test-policy/output/documentation residue excluded from Wave 7 was rechecked on
 merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6`. The screen covered D040, D042--D052, D056, O045--O046,
 O072, O074--O091, O097, and the omitted conformance row O100. It admitted 23 finding rows as 19 parked members under
-[`epic_wave8_residual_maintenance`](doing/epic_wave8_residual_maintenance/card.md); no implementation branch or member
-was activated by the admission itself. Order 1 later activated from `7a2ad4c1`.
+[`epic_wave8_residual_maintenance`](done/epic_wave8_residual_maintenance/card.md); no implementation branch or member
+was activated by the admission itself. All 19 later shipped through PRs #216--#230.
 
 The gate corrected stale and overbroad claims before admission:
 
@@ -805,8 +805,8 @@ direct single-boundary controls named on their cards. No Forge workflow or exter
 | 15    | O076           | [`validate_proxy_audit_limits`](done/validate_proxy_audit_limits/card.md)                         |
 | 16    | O081           | [`log_forge_info_probe_degradation`](done/log_forge_info_probe_degradation/card.md)               |
 | 17    | O085           | [`reuse_transcript_reference_scan`](done/reuse_transcript_reference_scan/card.md)                 |
-| 18    | O100           | [`explain_type_suppressions`](doing/explain_type_suppressions/card.md)                            |
-| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](doing/sync_residual_runtime_documentation/card.md)        |
+| 18    | O100           | [`explain_type_suppressions`](done/explain_type_suppressions/card.md)                             |
+| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](done/sync_residual_runtime_documentation/card.md)         |
 
 The policy-check vocabulary follow-up joins Batch 3 without finding credit; the Stop-excerpt follow-up shipped in Batch
 1 without credit. Members retain separate implementation, acceptance, and closeout boundaries within a shared review.
@@ -824,7 +824,7 @@ The linked cards retain acceptance, verification, and closeout detail; this tabl
 | [CLI/proxy/runtime](done/epic_cli_proxy_runtime_correctness/card.md), [diagnostic hygiene](done/epic_proxy_diagnostic_data_hygiene/card.md), and [conversion failure](done/epic_proxy_conversion_failure_handling/card.md) | Closed; Wave 5 shipped.                                                                              |
 | [Wave 6 correctness](done/epic_wave6_correctness_maintenance/card.md)                                                                                                                                                      | Closed at 36 verified findings across 13 members; D033/O020 rejected.                                |
 | [Wave 7 refactor/deletion](done/epic_wave7_refactor_and_deletion/card.md)                                                                                                                                                  | Closed at 32 findings across 35 members; bounded post-merge corrections did not change those counts. |
-| [Wave 8 residual maintenance](doing/epic_wave8_residual_maintenance/card.md)                                                                                                                                               | Orders 1--17 shipped; Batch 5 orders 18--19 are active.                                              |
+| [Wave 8 residual maintenance](done/epic_wave8_residual_maintenance/card.md)                                                                                                                                                | Closed at 23 findings across 19 members after Batch 5 shipped in PR #230.                            |
 
 ## Strengths (preserve these)
 

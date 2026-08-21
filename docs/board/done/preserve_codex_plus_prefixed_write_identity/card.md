@@ -1,6 +1,6 @@
 # Preserve Codex plus-prefixed Write identity
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Finding**: corrective follow-up to D005 (HIGH) in
 [`review_combined.md`](../../review_combined.md#design-conformance-findings).

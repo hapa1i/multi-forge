@@ -1,6 +1,6 @@
 # Epic: Wave 6 correctness maintenance
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all 36 findings across 13 members shipped in PRs #164--#168 and #170--#177. O036 closed the bounded
 admission in PR #177 (`3026b14a`). PR #169 (`ece999d4`) hardened O012 escalation and retention-status error sanitization

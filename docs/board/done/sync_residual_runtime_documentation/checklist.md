@@ -1,7 +1,6 @@
 # Sync residual runtime documentation checklist
 
-Current focus: under shared review in draft PR #230 as Wave 8 Batch 5 order 19. This card owns the residual design,
-CLI-reference, and workflow-comment edits; keep it in `doing/` until the batch merges.
+Current focus: closed in Wave 8 Batch 5 PR #230 (`7e5ea8c4`).
 
 ## Phase 1 -- Reverification
 
@@ -47,3 +46,8 @@ documentation files.
 PR review evidence: design §7 now places the conditional runtime-config file inside the proxy-id exception, matching the
 template-only sidecar boundary. The focused hooks passed and `design.md` remains below its ceiling at 29,993 Opus
 tokens.
+
+## Phase 4 -- Closeout
+
+- [x] Confirm PR #230 merged as `7e5ea8c4` with all five GitHub checks passing.
+- [x] Move the card to `done/` with its epic and review-ledger links synchronized.

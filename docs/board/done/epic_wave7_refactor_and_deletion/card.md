@@ -1,6 +1,6 @@
 # Epic: Wave 7 refactor and deletion
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- all 32 verified findings across 35 members shipped independently in PRs #178--#184, #186--#188, and
 #190--#214. Order 35 closed the bounded admission in PR #214 (`4c9dee34`). The bounded
@@ -121,8 +121,7 @@ runs last so it lands on the smallest stable surface.
 
 - D040, D042--D052, D056, O045--O046, O072, O074--O091, and O097 were correctness, security, performance, test-policy,
   output, or documentation work under separate entry gates; they were not prerequisites Wave 7 could absorb silently.
-  Their later disposition lives in
-  [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+  Their later disposition lives in [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 - O092's converter `system_prompt`/Gemini candidates and approximately 20 unnamed symbols remain unverified and
   excluded.
 - O095's repeated Click option blocks remain local; O099's transcript-selector subset already shipped with D007/D024.

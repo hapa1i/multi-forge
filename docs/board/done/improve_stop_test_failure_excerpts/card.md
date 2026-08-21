@@ -3,8 +3,8 @@
 **Origin**: Post-implementation review of
 [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md).
 
-**Batch coordinator**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md)
-(execution/review association only; not Wave 8 finding credit).
+**Batch coordinator**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md) (execution/review
+association only; not Wave 8 finding credit).
 
 **Lane**: `done/` -- shipped in Batch 1 PR #225 (`fd548c8e`) on 2026-08-20.
 

@@ -1,6 +1,6 @@
 # Correct fork transfer snapshot rollback
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Lane**: `done/` -- shipped in PR #215 (`7736d0d0`) before Wave 8 order 1.
 
