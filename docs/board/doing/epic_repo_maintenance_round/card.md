@@ -22,7 +22,7 @@ shipped in PR #222. Wave 8 order 8
 [`preserve_assistant_block_boundaries`](../../done/preserve_assistant_block_boundaries/card.md) shipped in PR #224;
 orders 9--10 and the external Batch 1 Stop follow-up shipped in PR #225; Batch 2 orders 11--12 shipped in PR #226; Batch
 3 orders 13--14 and its external vocabulary follow-up shipped in PR #227; Batch 4 orders 15--17 shipped in PR #228.
-Orders 18--19 are next.
+Batch 5 orders 18--19 are active on `agent/wave8-batch-5` from pushed closeout `1e0e664c`.
 
 ## Goal
 

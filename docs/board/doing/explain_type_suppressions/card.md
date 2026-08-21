@@ -1,8 +1,8 @@
 # Explain or remove type suppressions
 
-**Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
+**Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `todo/` -- accepted Wave 8 order 18; parked.
+**Lane**: `doing/` -- active as Wave 8 Batch 5 order 18 on `agent/wave8-batch-5`, based on pushed `main` at `1e0e664c`.
 
 **Finding**: narrowed O100 (LOW conformance).
 

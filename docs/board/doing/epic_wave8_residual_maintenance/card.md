@@ -2,12 +2,14 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; orders 18--19 remain parked. The corrective and external
-follow-ups retain their recorded PRs.
+**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; Batch 5 orders 18--19 are active. The corrective and
+external follow-ups retain their recorded PRs.
 
-**Current execution**: the independent
-[`correct_daily_review_regressions`](../../done/correct_daily_review_regressions/card.md) follow-up shipped in PR #229
-(`da34bcb3`) and is closed. Batch 5 orders 18--19 remain parked until activation from the pushed closeout.
+**Current execution**: Batch 5 is active on `agent/wave8-batch-5` from pushed correction closeout `1e0e664c` with fixed
+membership and order: order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md), then order 19
+[`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md). Their production/test and
+documentation/comment scopes are disjoint and may proceed in parallel. The shared branch integrator owns board evidence,
+combined verification, and PR publication; each card retains its own checklist and commit boundary.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -69,8 +71,8 @@ boundary, acceptance evidence, and closeout record.
 | 15    | O076           | [`validate_proxy_audit_limits`](../../done/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
 | 16    | O081           | [`log_forge_info_probe_degradation`](../../done/log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
 | 17    | O085           | [`reuse_transcript_reference_scan`](../../done/reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
-| 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                             | typed suppression rationale             |
-| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
+| 18    | O100           | [`explain_type_suppressions`](../explain_type_suppressions/card.md)                                     | typed suppression rationale             |
+| 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md)                 | shipped docs and source commentary      |
 
 ## Batch Execution Plan
 
@@ -99,9 +101,8 @@ Execute these batches in order on one branch and PR per batch:
    [`log_forge_info_probe_degradation`](../../done/log_forge_info_probe_degradation/card.md), and order 17
    [`reuse_transcript_reference_scan`](../../done/reuse_transcript_reference_scan/card.md). These can be implemented in
    parallel across proxy audit, global info, and session-manager seams.
-5. **Batch 5 -- final conformance**: order 18
-   [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md) and order 19
-   [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md). These can be
+5. **Batch 5 -- final conformance**: order 18 [`explain_type_suppressions`](../explain_type_suppressions/card.md) and
+   order 19 [`sync_residual_runtime_documentation`](../sync_residual_runtime_documentation/card.md). These can be
    implemented in parallel only after Batches 1--4 close, so the suppression sweep sees final production code and the
    documentation pass sees final CLI behavior.
 
