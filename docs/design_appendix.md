@@ -1463,7 +1463,9 @@ citations required for a blocking architectural-divergence verdict.
 The policy registry now rejects unknown bundle names and unknown `bundle_config` owners before registering any policy.
 For existing sessions, `workflow` in `policy.bundles` or `policy.bundle_config.workflow` produces an actionable removal
 diagnostic. The Claude and Codex policy hooks report that construction failure and allow the action before engine-owned
-`fail_mode` semantics apply. Re-running `forge policy enable` with supported bundles replaces both stale fields.
+`fail_mode` semantics apply. Because session overrides take precedence over intent, recovery starts with
+`forge session reset policy`; the user then runs terminal `forge policy enable` with supported bundles or
+`forge policy disable`.
 
 ---
 

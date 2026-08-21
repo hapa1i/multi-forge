@@ -321,6 +321,7 @@ class TestPolicyCheckDocker:
         assert "policy bundle 'workflow' was removed" in stderr
         assert "policy.bundles" in stderr
         assert "policy.bundle_config.workflow" in stderr
+        assert "forge session reset policy" in stderr
         assert "Traceback" not in stderr
 
 

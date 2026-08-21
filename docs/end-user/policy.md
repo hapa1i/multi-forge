@@ -92,15 +92,25 @@ The former manifest-only `workflow` bundle was removed. Existing sessions that s
 `policy.bundles` or retain `policy.bundle_config.workflow` fail policy-engine construction with a recovery diagnostic;
 the hook allows the action rather than silently running a partial policy set.
 
-Replace stale policy intent by enabling the supported bundle or bundles you want, which rewrites both fields:
+The old activation instructions allowed `forge session set`, which stores overrides that win over policy intent. Clear
+all policy overrides first:
+
+```bash
+forge session reset policy
+```
+
+Then choose the policy intent you want:
 
 ```bash
 forge policy enable --bundle tdd
 forge policy enable --bundle tdd --bundle coding_standards
+# Or turn enforcement off:
+forge policy disable
 ```
 
-If you do not want policy enforcement, `forge policy disable` stops it. A later `forge policy enable` invocation
-replaces the stale bundle and configuration.
+The reset returns policy settings to intent. A following terminal `forge policy enable` replaces stale intent bundle and
+configuration fields; `forge policy disable` turns enforcement off. Setting `policy.bundles` or `policy.bundle_config`
+to `null` is not a recovery path because those fields are non-nullable.
 
 ---
 

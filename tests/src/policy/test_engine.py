@@ -489,6 +489,7 @@ class TestBuildEngine:
         assert "policy bundle 'workflow' was removed" in message
         assert "policy.bundles" in message
         assert "policy.bundle_config.workflow" in message
+        assert "forge session reset policy" in message
         assert registered == []
 
     def test_build_tdd_with_bundle_config_permissive(self) -> None:

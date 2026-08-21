@@ -63,6 +63,7 @@ class TestGetBundlePoliciesConfig:
         assert "policy bundle 'workflow' was removed" in message
         assert "policy.bundles" in message
         assert "policy.bundle_config.workflow" in message
+        assert "forge session reset policy" in message
 
     def test_permissive_preserves_no_skip_tests(self) -> None:
         """Permissive config only affects TDDEnforcementPolicy, not NoSkipTestsPolicy."""

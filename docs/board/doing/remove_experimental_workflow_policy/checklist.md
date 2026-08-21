@@ -22,6 +22,10 @@ Current focus: remove the implementation and pin the stale-manifest compatibilit
   fail-open behavior and traceback-free recovery output.
 - [x] Remove live WorkflowPolicy activation, cost, telemetry, and runner claims from design/end-user docs; update shared
   reactive comments without deleting those primitives.
+- [x] Remove the now-caller-less reverse policy-to-bundle lookup; record `tag_action` as an intentional library API and
+  defer the zero-caller `compute_cache_key` decision to a reactive-library audit.
+- [x] Make stale-state recovery override-aware in the hook diagnostic, end-user guide, design appendix, and repository
+  policy-change instructions.
 
 ## Acceptance controls
 
@@ -34,10 +38,12 @@ Current focus: remove the implementation and pin the stale-manifest compatibilit
 
 ## Verification and closeout
 
-- [x] Run the focused policy/reactive/CLI slice (573 passed) and exact-term documentation/source inventory.
-- [x] Run `make test-unit` (9,301 passed, 117 deselected) and `make test-regression` (1,053 passed).
+- [x] Run the focused policy/reactive/CLI slice (574 passed) and exact-term documentation/source inventory.
+- [x] Run `make test-unit` (9,302 passed, 117 deselected) and `make test-regression` (1,053 passed).
 - [x] Run the targeted Docker policy-hook integration test through `./scripts/test-integration.sh` (1 passed).
 - [x] Run `make pre-commit`, `git diff --check`, board-link validation (424 documents, 1,028 local links, none broken),
-  and design-document size checks (`design.md` 29,928; appendix 29,903; workflows 17,929 tokens).
+  and design-document size checks (`design.md` 29,928; appendix 29,926; workflows 17,929 tokens).
 - [x] Commit and push the reviewable changes, then open draft PR #233 against `main` with exact verification evidence.
-- [ ] After merge, add the completed-work change-log entry and move this card to `done/` with final PR/check evidence.
+- [ ] After merge, add the completed-work change-log entry, move this card to `done/`, and repoint the retired
+  graduation card plus the accidental-complexity checklist from `../../doing/remove_experimental_workflow_policy/` to
+  `../../done/remove_experimental_workflow_policy/`.

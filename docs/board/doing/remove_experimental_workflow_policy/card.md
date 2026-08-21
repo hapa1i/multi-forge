@@ -45,6 +45,14 @@ declared stable Python API, but the documented manifest shape is user-authored s
 deleted; the registry continues to recognize the removed bundle name only to reject it with reset guidance. Arbitrary
 unknown bundle names also fail engine construction rather than disappearing into an empty policy set.
 
+## Deliberate keeps and follow-up boundary
+
+`tag_action` remains an intentional shared-library primitive: `design_workflows.md` presents the tagger protocol and
+helper as the supported Python composition seam even though no production policy currently calls it. `compute_cache_key`
+also has no production caller after this removal, but this card retains it under the explicit shared-reactive exclusion;
+a future reactive-library audit should decide whether that API has earned its keep. The caller-less `POLICY_TO_BUNDLE`
+map and `get_bundle_for_policy()` helper are not reactive primitives and are removed here.
+
 ## Acceptance criteria
 
 - No production, test, package, or normative-document reference treats WorkflowPolicy as available behavior.

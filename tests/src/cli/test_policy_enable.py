@@ -12,6 +12,7 @@ from forge.cli.main import main
 from forge.core.ops import policy as policy_ops
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.effective import compute_effective_intent
 from forge.session.models import PolicyIntent, SupervisorConfig
 from tests.fixtures.session_state import publish_session
 
@@ -177,6 +178,44 @@ class TestPolicyEnable:
         assert policy.bundle_config == {"tdd": {"strict": False}}
         assert policy.supervisor == supervisor
         assert policy.team_supervisor == team_supervisor
+
+    def test_reset_policy_then_terminal_policy_commands_recover_override_held_workflow_state(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, store = self._seed_target(tmp_path, monkeypatch)
+        state = store.read()
+        state.intent.policy = PolicyIntent(
+            enabled=True,
+            bundles=["workflow"],
+            bundle_config={"workflow": {"workflows": []}},
+        )
+        state.overrides["policy"] = {
+            "enabled": True,
+            "bundles": ["workflow"],
+            "bundle_config": {"workflow": {"workflows": []}},
+        }
+        store.write(state)
+
+        reset = runner.invoke(main, ["session", "reset", "--session", "worker", "policy"])
+        disabled = runner.invoke(main, ["policy", "disable", "--session", "worker"])
+
+        assert reset.exit_code == 0, reset.output
+        assert disabled.exit_code == 0, disabled.output
+        recovered = store.read()
+        assert "policy" not in recovered.overrides
+        effective_policy = compute_effective_intent(recovered).policy
+        assert effective_policy is not None
+        assert effective_policy.enabled is False
+
+        enabled = runner.invoke(main, ["policy", "enable", "--bundle", "tdd", "--session", "worker"])
+
+        assert enabled.exit_code == 0, enabled.output
+        recovered = store.read()
+        effective_policy = compute_effective_intent(recovered).policy
+        assert effective_policy is not None
+        assert effective_policy.enabled is True
+        assert effective_policy.bundles == ["tdd"]
+        assert effective_policy.bundle_config == {}
 
     def test_enable_creates_policy_intent_when_absent(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch

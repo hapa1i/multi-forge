@@ -33,18 +33,10 @@ BUNDLES: dict[str, list[type]] = {
     ],
 }
 
-# Map policy_id to bundle for reverse lookup
-POLICY_TO_BUNDLE: dict[str, str] = {
-    "tdd.tests-before-impl": "tdd",
-    "tdd.no-skip-tests": "tdd",
-    "coding_standards.no-type-checking": "coding_standards",
-    "coding_standards.no-backward-compat": "coding_standards",
-    "coding_standards.no-emoji": "coding_standards",
-}
-
 _REMOVED_WORKFLOW_BUNDLE_ERROR = (
-    "policy bundle 'workflow' was removed; remove 'workflow' from policy.bundles "
-    "and delete policy.bundle_config.workflow"
+    "policy bundle 'workflow' was removed; stale state may be in policy.bundles or "
+    "policy.bundle_config.workflow; run 'forge session reset policy' to clear policy overrides, then run "
+    "'forge policy enable --bundle tdd' (or another supported bundle) or 'forge policy disable'"
 )
 
 
@@ -93,18 +85,6 @@ def get_bundle_policies(bundle: str, *, config: dict[str, Any] | None = None) ->
         else:
             policies.append(cls())
     return policies
-
-
-def get_bundle_for_policy(policy_id: str) -> str | None:
-    """Get the bundle name for a policy ID.
-
-    Args:
-        policy_id: Policy identifier (e.g., "tdd.tests-before-impl")
-
-    Returns:
-        Bundle name or None if not found.
-    """
-    return POLICY_TO_BUNDLE.get(policy_id)
 
 
 def get_policy_ids_for_bundle(bundle: str) -> list[str]:
