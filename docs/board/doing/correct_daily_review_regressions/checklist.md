@@ -40,6 +40,8 @@ Batch 5 parked until merge and closeout.
 | Workflow integer controls | each integer field receives YAML boolean values                         | atomic construction failure names entry and field            | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py`   |
 | Reviewer bypass           | matching filtered/reviewed branch with `max_content_length: false`      | config is rejected before evaluation                         | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py`   |
 | Colored pytest output     | real forced-color failure summary plus warning-only stderr              | bounded diagnostic retains node id without terminal controls | `tests/regression/test_bug_d006_stop_test_suite_contract.py`       |
+| Truncated control string  | one-line OSC/DCS intro followed by failure lines and a later ST         | later failure lines remain available for selection           | `tests/regression/test_bug_d006_stop_test_suite_contract.py`       |
+| Decoded C1 controls       | UTF-8 bytes for the full U+0080--U+009F control range                   | no C1 control survives diagnostic sanitization               | `tests/regression/test_bug_d006_stop_test_suite_contract.py`       |
 
 Provider evidence: the 10-test fail-first slice failed at every new forwarding/setup assertion on `5246473e`; after the
 dispatch seam moved, the adjacent adapter/core-client/provider-trace slice passed 130 tests.
@@ -48,11 +50,14 @@ Workflow evidence: all six boolean-control cases failed first because policy con
 invariant was added, the adjacent workflow config/policy/stage and O083 regression slice passed 91 tests.
 
 Stop evidence: the real `PY_COLORS=1` regression failed first by persisting warning-only stderr; terminal sanitization
-before redaction restored the colored node id, and the adjacent Stop-verification slice passed 25 tests.
+before redaction restored the colored node id. Review follow-up reproductions confirmed that multiline OSC/DCS matches
+could swallow later failures and decoded C1 controls survived; bounding control strings to one line and removing the
+full C1 range preserved both failure lines, and the adjacent Stop-verification slice passed 28 tests.
 
-Final verification: the combined focused slice passed 246 tests; the manifest/Stop hook and local LiteLLM
-non-streaming/streaming Docker boundaries passed four tests; `make test-unit` passed 9,331 tests with 124 deselected;
-and the clean `make test-regression` rerun passed 1,056 tests. `make pre-commit`, `git diff --check`, the 420-document/
-1,028-local-link board check, and the design-size checks passed (`design.md` 30,000 Opus tokens, `design_appendix.md`
-29,988, `design_workflows.md` 18,052). The existing attempt-boundary, strict workflow-type, and bounded Stop-diagnostic
-wording remains accurate, so no normative design edit is required.
+Final verification: the combined focused slice passed 249 tests; the manifest/Stop hook and local LiteLLM
+non-streaming/streaming Docker boundaries passed four tests, and the review follow-up Stop Docker boundary passed;
+`make test-unit` passed 9,331 tests with 124 deselected; and the clean `make test-regression` rerun passed 1,059 tests.
+`make pre-commit`, `git diff --check`, the 420-document and 1,028-local-link board check, and the design-size checks
+passed (`design.md` 30,000 Opus tokens, `design_appendix.md` 29,988, `design_workflows.md` 18,052). The existing
+attempt-boundary, strict workflow-type, and bounded Stop-diagnostic wording remains accurate, so no normative design
+edit is required.

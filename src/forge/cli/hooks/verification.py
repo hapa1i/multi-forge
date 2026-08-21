@@ -32,12 +32,12 @@ _FORGE_OVERHEAD_WARNING_SECONDS = 0.1
 _SECRET_ASSIGNMENT_RE = re.compile(r"(?im)\b(api[_-]?key|token|secret|password|authorization)\b(\s*[:=]\s*)([^\r\n]*)")
 _TOKEN_PREFIX_RE = re.compile(r"\b(?:sk|gh[pousr])-[A-Za-z0-9_-]{8,}\b|\bgh[pousr]_[A-Za-z0-9_]{8,}\b")
 _TERMINAL_CONTROL_SEQUENCE_RE = re.compile(
-    r"(?:\x1b\](?:[^\x07\x1b]|\x1b(?!\\))*(?:\x07|\x1b\\))"  # OSC: title, hyperlink, clipboard controls
-    r"|(?:\x1b[P^_].*?\x1b\\)"  # DCS, PM, and APC strings terminated by ST
+    r"(?:\x1b\](?:[^\x07\x1b\r\n]|\x1b(?!\\))*(?:\x07|\x1b\\))"  # one-line OSC controls
+    r"|(?:\x1b[P^_][^\r\n]*?\x1b\\)"  # one-line DCS, PM, and APC strings terminated by ST
     r"|(?:(?:\x1b\[)|\x9b)[0-?]*[ -/]*[@-~]"  # CSI, including pytest SGR color sequences
     r"|(?:\x1b[()][0-2A-Z])"  # character-set selection
-    r"|(?:\x1b[@-_])",  # remaining two-byte escape sequences
-    re.DOTALL,
+    r"|(?:\x1b[@-_])"  # remaining two-byte escape sequences
+    r"|[\x80-\x9f]"  # decoded C1 controls, including DCS, CSI, ST, and OSC
 )
 _PYTEST_FAILURE_SUMMARY_RE = re.compile(r"^\s*(?P<kind>FAILED|ERROR)\s+\S")
 _PYTEST_SHORT_SUMMARY_MARKER_RE = re.compile(r"^\s*=+\s+short test summary info\s+=+\s*$", re.IGNORECASE)
@@ -74,7 +74,7 @@ def _redacted_diagnostic(value: str | bytes | None) -> str:
     if value is None:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
-    text = _TERMINAL_CONTROL_SEQUENCE_RE.sub("", text).replace("\x1b", "").replace("\x9b", "")
+    text = _TERMINAL_CONTROL_SEQUENCE_RE.sub("", text).replace("\x1b", "")
     for credential in CREDENTIALS.values():
         for env_var in credential.env_vars:
             secret = os.environ.get(env_var.name) if env_var.secret else None

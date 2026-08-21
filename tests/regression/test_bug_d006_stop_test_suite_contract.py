@@ -154,6 +154,32 @@ def test_terminal_hyperlink_controls_preserve_visible_diagnostic_text() -> None:
     assert verification._redacted_diagnostic(linked_failure) == "FAILED test_widget.py::test_failure"
 
 
+@pytest.mark.parametrize(
+    "unterminated_control",
+    ["\x1b]0;truncated-title", "\x1bPtruncated-device-control"],
+    ids=["osc", "dcs"],
+)
+def test_unterminated_terminal_control_does_not_consume_later_failure_lines(unterminated_control: str) -> None:
+    output = (
+        f"{unterminated_control}\n"
+        "FAILED test_widget.py::test_one - AssertionError\n"
+        "FAILED test_widget.py::test_two - AssertionError\n"
+        "\x1b\\tail"
+    )
+
+    sanitized = verification._redacted_diagnostic(output)
+
+    assert "FAILED test_widget.py::test_one" in sanitized
+    assert "FAILED test_widget.py::test_two" in sanitized
+    assert sanitized.endswith("tail")
+
+
+def test_utf8_decoded_c1_controls_are_removed() -> None:
+    c1_controls = "".join(chr(codepoint) for codepoint in range(0x80, 0xA0)).encode()
+
+    assert verification._redacted_diagnostic(b"before" + c1_controls + b"after") == "beforeafter"
+
+
 def test_failed_test_diagnostic_prefers_late_stdout_summary_after_redaction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
