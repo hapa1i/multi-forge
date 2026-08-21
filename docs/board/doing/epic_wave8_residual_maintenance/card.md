@@ -2,16 +2,11 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--12 shipped in PRs #216--#226; the corrective follow-up shipped in PR #222; the external
-Batch 1 Stop follow-up shipped in PR #225; Batch 3 orders 13--14 and its external vocabulary follow-up are in draft PR
-#227, and orders 15--19 remain parked.
+**Lane**: `doing/` -- orders 1--14 shipped in PRs #216--#227; the corrective follow-up shipped in PR #222; the external
+Batch 1 Stop and Batch 3 vocabulary follow-ups shipped in PRs #225 and #227. Orders 15--19 remain parked.
 
-**Current execution**: Batch 3 is locally verified in draft PR #227 from `agent/wave8-batch-3`, based on pushed Batch 2
-closeout `34cbb601`. Review cards:
-[`align_supervisor_missing_config_exits`](../align_supervisor_missing_config_exits/card.md),
-[`reject_ambiguous_policy_check_input`](../reject_ambiguous_policy_check_input/card.md), and external follow-up
-[`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md). They remain in `doing/` and
-close together only after merge.
+**Current execution**: Batch 3 shipped in PR #227 (`f3353042`) and its three cards are closed. Batch 4 orders 15--17
+remain parked until activation from the pushed Batch 3 closeout.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -68,8 +63,8 @@ boundary, acceptance evidence, and closeout record.
 | 10    | O091           | [`serialize_llm_client_initialization`](../../done/serialize_llm_client_initialization/card.md)         | one lazy async client per adapter       |
 | 11    | O084           | [`fix_cost_breakdown_selectors`](../../done/fix_cost_breakdown_selectors/card.md)                       | CLI selector and unique-run accounting  |
 | 12    | O086           | [`stabilize_proxy_metrics_json`](../../done/stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
-| 13    | O080           | [`align_supervisor_missing_config_exits`](../align_supervisor_missing_config_exits/card.md)             | required-state failure semantics        |
-| 14    | O077           | [`reject_ambiguous_policy_check_input`](../reject_ambiguous_policy_check_input/card.md)                 | mutually exclusive input selectors      |
+| 13    | O080           | [`align_supervisor_missing_config_exits`](../../done/align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
+| 14    | O077           | [`reject_ambiguous_policy_check_input`](../../done/reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
 | 15    | O076           | [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
 | 16    | O081           | [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
 | 17    | O085           | [`reuse_transcript_reference_scan`](../../todo/reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
@@ -92,11 +87,12 @@ Execute these batches in order on one branch and PR per batch:
    are parallel; the batch integrator owns shared `docs/cli_reference.md` and `docs/end-user/proxy.md` edits plus final
    CLI reconciliation.
 3. **Batch 3 -- policy CLI**: order 13
-   [`align_supervisor_missing_config_exits`](../align_supervisor_missing_config_exits/card.md), order 14
-   [`reject_ambiguous_policy_check_input`](../reject_ambiguous_policy_check_input/card.md), and the external accepted
-   follow-up [`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md). Review these
-   together, but use one owner and implement them sequentially: the first two touch `src/forge/cli/policy.py`, while the
-   last shares the terminal `policy check` declaration and also corrects direct parsing.
+   [`align_supervisor_missing_config_exits`](../../done/align_supervisor_missing_config_exits/card.md), order 14
+   [`reject_ambiguous_policy_check_input`](../../done/reject_ambiguous_policy_check_input/card.md), and the external
+   accepted follow-up [`align_policy_check_bundle_vocabulary`](../../done/align_policy_check_bundle_vocabulary/card.md).
+   Review these together, but use one owner and implement them sequentially: the first two touch
+   `src/forge/cli/policy.py`, while the last shares the terminal `policy check` declaration and also corrects direct
+   parsing.
 4. **Batch 4 -- isolated runtime fixes**: order 15
    [`validate_proxy_audit_limits`](../../todo/validate_proxy_audit_limits/card.md), order 16
    [`log_forge_info_probe_degradation`](../../todo/log_forge_info_probe_degradation/card.md), and order 17
@@ -130,9 +126,9 @@ credit and do not change this epic's 23 findings or 19-member accounting.
 
 ## External Batch Members and Gated Work
 
-- [`align_policy_check_bundle_vocabulary`](../align_policy_check_bundle_vocabulary/card.md) retains its bounded shared-
-  vocabulary residue as a standalone accepted follow-up. It joins Batch 3 without becoming review-row credit for this
-  epic.
+- [`align_policy_check_bundle_vocabulary`](../../done/align_policy_check_bundle_vocabulary/card.md) retains its bounded
+  shared vocabulary residue as a standalone accepted follow-up. It joins Batch 3 without becoming review-row credit for
+  this epic.
 - [`improve_stop_test_failure_excerpts`](../../done/improve_stop_test_failure_excerpts/card.md) joined Batch 1 as an
   unrelated accepted follow-up without becoming Wave 8 finding credit.
 - D040 remains proposed, and the rejected/resolved rows above are not executable members.

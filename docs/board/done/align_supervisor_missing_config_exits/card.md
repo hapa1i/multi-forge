@@ -2,7 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- implemented and locally verified in draft PR #227; await the shared Batch 3 merge before closeout.
+**Lane**: `done/` -- shipped in Batch 3 PR #227 (`f3353042`).
 
 **Finding**: narrowed O080 (LOW correctness).
 

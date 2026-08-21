@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-21
+
+### Close Wave 8 Batch 3 policy CLI contracts
+
+**Goal/outcome**: Make missing supervisor prerequisites and ambiguous policy-check inputs fail explicitly while sharing
+one policy-bundle vocabulary across terminal and direct-command parsing.
+
+**Key changes**:
+
+- Returned non-zero stderr diagnostics for enabling supervisor actions without configured state while preserving
+  idempotent teardown commands.
+- Rejected simultaneous policy-check file and diff sources before either read, and replaced three residual bundle
+  literals with the shared registries without changing unknown-token behavior.
+
+**Verification**: 370 focused card tests; three direct container-boundary policy checks; 9,331 unit with 124 deselected;
+1,015 regression; pre-commit/diff and board/link gates. PR #227 merged as `f3353042` with all five GitHub checks
+passing.
+
 ## 2026-08-20
 
 ### Close Wave 8 Batch 2 telemetry reads

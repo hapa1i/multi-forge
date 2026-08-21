@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: Batch 3 is locally verified in draft PR #227 from `agent/wave8-batch-3`; keep all three cards in `doing/`
-until the shared merge.
+Current focus: Batch 3 shipped in PR #227 (`f3353042`) with all five GitHub checks passing; Batch 4 remains parked until
+activation from the pushed closeout.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -92,6 +92,8 @@ until the shared merge.
 - [x] Run combined unit, regression, targeted policy integration, pre-commit, board/link, and diff gates on the
   integrated branch head.
 - [x] Publish one Batch 3 review branch in draft PR #227; close all three cards together only after the batch merges.
+- [x] Merge Batch 3 as `f3353042`, confirm all five GitHub checks, add the shared change-log record, repoint inbound
+  links, and move all three cards to `done/` before activating Batch 4.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review

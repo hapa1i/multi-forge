@@ -2,8 +2,7 @@
 
 **Origin**: Post-implementation review of Wave 7 O044 on `refactor/share-policy-activation-rules` (`d9f0e2c2`).
 
-**Lane**: `doing/` -- implemented and locally verified in draft PR #227; await the shared Batch 3 merge before closeout.
-It remains separate from Wave 8 finding credit.
+**Lane**: `done/` -- shipped in Batch 3 PR #227 (`f3353042`). It remains separate from Wave 8 finding credit.
 
 ## Goal
 

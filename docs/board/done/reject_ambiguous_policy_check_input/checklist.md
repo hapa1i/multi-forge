@@ -1,7 +1,6 @@
 # Reject ambiguous policy-check input checklist
 
-Current focus: implementation commit `71c2ed11` and integrated verification are in draft PR #227; await the shared Batch
-3 merge before closeout.
+Current focus: complete -- implementation commit `71c2ed11` shipped in Batch 3 PR #227 (`f3353042`).
 
 ## Phase 1 -- Pin ambiguous input
 
@@ -24,6 +23,7 @@ Current focus: implementation commit `71c2ed11` and integrated verification are 
 - [x] Run the combined unit, regression, pre-commit, documentation, board/link, and diff gates on the integrated Batch 3
   head.
 - [x] Publish all three cards in draft PR #227; close them together only after merge.
+- [x] Confirm all five GitHub checks, merge Batch 3 as `f3353042`, and close all three cards together.
 
 ## Acceptance tests
 
