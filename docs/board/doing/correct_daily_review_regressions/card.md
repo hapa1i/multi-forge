@@ -2,12 +2,14 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- active on `agent/correct-daily-review-regressions` from pushed `main` at `5246473e`.
+**Lane**: `doing/` -- under review in draft PR #229 from `agent/correct-daily-review-regressions`; activated from pushed
+`main` at `5246473e`.
 
 **Related shipped work**:
 
 - [`correct_wave8_merged_regressions`](../../done/correct_wave8_merged_regressions/card.md) (provider dispatch seam)
-- [`reject_unknown_workflow_policy_keys`](../../done/reject_unknown_workflow_policy_keys/card.md) (workflow config types)
+- [`reject_unknown_workflow_policy_keys`](../../done/reject_unknown_workflow_policy_keys/card.md) (workflow config
+  types)
 - [`improve_stop_test_failure_excerpts`](../../done/improve_stop_test_failure_excerpts/card.md) (pytest diagnostics)
 
 These are post-merge edge cases in PRs #222, #223, and #225. They do not reopen or change the finding credit of the
@@ -20,11 +22,11 @@ booleans in manifest integer controls, and retain colored pytest failure identif
 
 ## Verified failures
 
-| Boundary | Reproduction | Incorrect result |
-| --- | --- | --- |
-| Provider dispatch | real lazy LiteLLM/OpenRouter client with deterministic missing credentials | one incomplete provider trace despite no SDK client or request |
-| Workflow config | `filter.max_content_length: false` on a matching reviewed branch | config builds and the write is allowed without a reviewer call |
-| Stop diagnostic | real failing pytest run with `PY_COLORS=1` and warning-only stderr | selector returns unrelated stderr instead of the colored `FAILED` node id |
+| Boundary          | Reproduction                                                               | Incorrect result                                                          |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Provider dispatch | real lazy LiteLLM/OpenRouter client with deterministic missing credentials | one incomplete provider trace despite no SDK client or request            |
+| Workflow config   | `filter.max_content_length: false` on a matching reviewed branch           | config builds and the write is allowed without a reviewer call            |
+| Stop diagnostic   | real failing pytest run with `PY_COLORS=1` and warning-only stderr         | selector returns unrelated stderr instead of the colored `FAILED` node id |
 
 ## Scope
 

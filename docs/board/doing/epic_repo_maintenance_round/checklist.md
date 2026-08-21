@@ -409,4 +409,5 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Merge Wave 8 Batch 4 in PR #228 (`559a3453`) and close all three cards together before activating Batch 5.
 - [x] Activate only `correct_daily_review_regressions` from pushed `main` at `5246473e` after reproducing three
   post-merge edge cases; keep Wave 8 Batch 5 parked.
-- [ ] Publish and close the independent correction before deciding whether to activate Wave 8 Batch 5.
+- [x] Publish the independent correction in draft PR #229 while keeping its card in `doing/` and Batch 5 parked.
+- [ ] Merge and close the independent correction before deciding whether to activate Wave 8 Batch 5.

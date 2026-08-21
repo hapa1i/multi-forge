@@ -6,7 +6,8 @@
 follow-ups retain their recorded PRs.
 
 **Current execution**: the independent [`correct_daily_review_regressions`](../correct_daily_review_regressions/card.md)
-follow-up is active from pushed `main` at `5246473e`. Batch 5 orders 18--19 remain parked until this correction closes.
+follow-up is under review in draft PR #229 from pushed `main` at `5246473e`. Batch 5 orders 18--19 remain parked until
+this correction closes.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 

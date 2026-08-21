@@ -1,7 +1,7 @@
 # Correct daily-review regressions checklist
 
-Current focus: active on `agent/correct-daily-review-regressions`; implementation follows the three reproduced ownership
-seams while Wave 8 Batch 5 remains parked.
+Current focus: draft PR #229 is open from `agent/correct-daily-review-regressions`; keep the card in `doing/` and Wave 8
+Batch 5 parked until merge and closeout.
 
 ## Phase 1 -- Provider dispatch boundary
 
@@ -29,17 +29,17 @@ seams while Wave 8 Batch 5 remains parked.
 - [x] Run required targeted proxy and policy-hook Docker integration tests.
 - [x] Run full unit and regression suites plus `make pre-commit`, board/link, and diff gates.
 - [x] Verify the normative design contracts remain accurate; update them only if the implementation changes a contract.
-- [ ] Review and commit only confirmed paths, push the branch, and open a draft PR without activating Wave 8 Batch 5.
+- [x] Review and commit only confirmed paths, push the branch, and open draft PR #229 without activating Wave 8 Batch 5.
 
 ## Acceptance tests
 
-| Boundary | Fixture | Assertion | Test file |
-| --- | --- | --- | --- |
-| Lazy provider setup | real LiteLLM/OpenRouter client; missing credential or constructor error | no provider trace in either request mode | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
-| Failed dispatch | callback-aware provider fake that fails after signaling | exactly one joined incomplete trace | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
-| Workflow integer controls | each integer field receives YAML boolean values | atomic construction failure names entry and field | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py` |
-| Reviewer bypass | matching filtered/reviewed branch with `max_content_length: false` | config is rejected before evaluation | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py` |
-| Colored pytest output | real forced-color failure summary plus warning-only stderr | bounded diagnostic retains node id without terminal controls | `tests/regression/test_bug_d006_stop_test_suite_contract.py` |
+| Boundary                  | Fixture                                                                 | Assertion                                                    | Test file                                                          |
+| ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Lazy provider setup       | real LiteLLM/OpenRouter client; missing credential or constructor error | no provider trace in either request mode                     | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
+| Failed dispatch           | callback-aware provider fake that fails after signaling                 | exactly one joined incomplete trace                          | `tests/regression/test_bug_o045_failed_provider_attempt_traces.py` |
+| Workflow integer controls | each integer field receives YAML boolean values                         | atomic construction failure names entry and field            | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py`   |
+| Reviewer bypass           | matching filtered/reviewed branch with `max_content_length: false`      | config is rejected before evaluation                         | `tests/regression/test_bug_o083_unknown_workflow_policy_keys.py`   |
+| Colored pytest output     | real forced-color failure summary plus warning-only stderr              | bounded diagnostic retains node id without terminal controls | `tests/regression/test_bug_d006_stop_test_suite_contract.py`       |
 
 Provider evidence: the 10-test fail-first slice failed at every new forwarding/setup assertion on `5246473e`; after the
 dispatch seam moved, the adjacent adapter/core-client/provider-trace slice passed 130 tests.
@@ -53,6 +53,6 @@ before redaction restored the colored node id, and the adjacent Stop-verificatio
 Final verification: the combined focused slice passed 246 tests; the manifest/Stop hook and local LiteLLM
 non-streaming/streaming Docker boundaries passed four tests; `make test-unit` passed 9,331 tests with 124 deselected;
 and the clean `make test-regression` rerun passed 1,056 tests. `make pre-commit`, `git diff --check`, the 420-document/
-1,028-local-link board check, and the design-size checks passed (`design.md` 30,000 Opus tokens,
-`design_appendix.md` 29,988, `design_workflows.md` 18,052). The existing attempt-boundary, strict workflow-type, and
-bounded Stop-diagnostic wording remains accurate, so no normative design edit is required.
+1,028-local-link board check, and the design-size checks passed (`design.md` 30,000 Opus tokens, `design_appendix.md`
+29,988, `design_workflows.md` 18,052). The existing attempt-boundary, strict workflow-type, and bounded Stop-diagnostic
+wording remains accurate, so no normative design edit is required.
