@@ -245,9 +245,8 @@ context or the Codex lane's in-band approved snapshot keeps the plan authority i
 
 Several components react to hook events, directly or through deferred markers: semantic supervisor
 (`policy/semantic/supervisor.py`), the memory writer (`session/memory_writer.py`), deterministic policies
-(`policy/deterministic/`), and the experimental, manifest-only WorkflowPolicy. The shared pattern is to take event or
-marker context, classify/evaluate, and return a decision or side effect. Three node types cover current and planned use
-cases:
+(`policy/deterministic/`), and team policies (`policy/team/`). The shared pattern is to take event or marker context,
+classify/evaluate, and return a decision or side effect. Three node types cover current and planned use cases:
 
 | Node type      | Execution                              | Examples                                  | Cost / billing         |
 | -------------- | -------------------------------------- | ----------------------------------------- | ---------------------- |
@@ -265,20 +264,11 @@ adding a new policy imports these utilities and writes a class.
 
 > Shared library API table and example policy code in [§2](#2-policy-internals).
 
-**WorkflowPolicy (tagger → branch → checker → reviewer)**: Plugs into PolicyEngine via existing
-`Policy + StatefulPolicy` protocols (zero changes to the engine). Composes library utilities into a branching pipeline:
-a shared tagger classifies the action, branches match by tags (first match wins), each branch has optional filter →
-checker → reviewer stages. The tagger is called once per event and its tags route to all matching downstream checks —
-avoiding redundant classification.
-
-The manifest-backed workflow registry strictly deserializes each `WorkflowConfig` and its nested dataclasses. Unknown
-keys and invalid field types fail engine construction with the workflow entry and offending field instead of silently
-selecting a default.
-
-Hook engine construction is atomic: Forge does not evaluate a partial bundle set. If any bundle cannot be built, the
-Claude and Codex policy hooks emit a diagnostic and allow the action before a `PolicyEngine` exists, regardless of the
-configured `fail_mode`. That pre-existing posture is distinct from evaluation errors, where the constructed engine owns
-the configured fail mode.
+The manifest-backed registry accepts only the deterministic bundle names in `BUNDLES`. Unknown bundle names and
+configuration owned by an unknown bundle fail construction before Forge creates a `PolicyEngine`; the removed
+manifest-only `workflow` bundle receives a diagnostic naming both stale manifest fields. Hook engine construction stays
+atomic: the Claude and Codex policy hooks report the build error and allow the action before the configured `fail_mode`
+applies. That posture is distinct from evaluation errors, where the constructed engine owns the fail mode.
 
 **Team extension**: The same library works for team hooks (`TeammateIdle`, `TaskCompleted`) by subscribing to different
 events. Its block bar is deliberately narrower than the semantic supervisor's: a parsed divergent verdict blocks only
@@ -673,12 +663,12 @@ differently by different entry points.
 
 **Four fundamental runners (conservative set):**
 
-| Runner         | Loop pattern                                 | Status            | Current implementation                 |
-| -------------- | -------------------------------------------- | ----------------- | -------------------------------------- |
-| Linear         | A → B → C (sequential)                       | Exists            | WorkflowPolicy pipeline, Stop pipeline |
-| Fan-out/Fan-in | N workers parallel → collect → synthesize    | Exists, enhancing | `run_multi_review()`                   |
-| Adversarial    | N workers with stances, blinded → synthesize | Exists            | `run_adversarial()`                    |
-| Actor/Critic   | Generate → critique → iterate                | Pattern exists    | Ralph-wiggum verification loop         |
+| Runner         | Loop pattern                                 | Status            | Current implementation         |
+| -------------- | -------------------------------------------- | ----------------- | ------------------------------ |
+| Linear         | A → B → C (sequential)                       | Pattern exists    | Stop verification pipeline     |
+| Fan-out/Fan-in | N workers parallel → collect → synthesize    | Exists, enhancing | `run_multi_review()`           |
+| Adversarial    | N workers with stances, blinded → synthesize | Exists            | `run_adversarial()`            |
+| Actor/Critic   | Generate → critique → iterate                | Pattern exists    | Ralph-wiggum verification loop |
 
 **Design principles:**
 

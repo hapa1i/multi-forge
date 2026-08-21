@@ -103,9 +103,11 @@ that include one must use blind context (`--context blind`). The default worker 
 does not reroute direct Claude or Codex workers, and `--effort` applies only to Claude workers.
 
 For policy CLI or hook changes, exercise `forge policy check --bundle coding_standards --file <path>` and
-`git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown workflow
-keys or invalid field types must fail atomic engine construction with an entry/field diagnostic. Claude and Codex hooks
-report that build error and allow the action before the configured fail mode applies.
+`git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown policy
+bundle names, unknown `bundle_config` owners, and invalid supported-bundle field types must fail atomic engine
+construction. The removed `workflow` bundle diagnostic must name both `policy.bundles` and
+`policy.bundle_config.workflow`. Claude and Codex hooks report that build error and allow the action before the
+configured fail mode applies.
 
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status

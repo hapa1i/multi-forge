@@ -1,5 +1,7 @@
 """Tests for policy/engine.py."""
 
+import pytest
+
 from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.policy.engine import PolicyEngine, build_engine
 from forge.policy.types import ActionContext, PolicyDecision, Violation
@@ -464,9 +466,31 @@ class TestBuildEngine:
         assert len(engine.policies) == 5
 
     def test_build_unknown_bundle(self) -> None:
-        """Unknown bundle is ignored (returns no policies)."""
-        engine = build_engine(["unknown"])
-        assert len(engine.policies) == 0
+        """Unknown bundles fail before an apparently valid empty engine is returned."""
+        with pytest.raises(ValueError, match="unknown policy bundle 'unknown'"):
+            build_engine(["unknown"])
+
+    def test_build_rejects_unknown_bundle_config_owner(self) -> None:
+        with pytest.raises(ValueError, match="unknown policy bundle 'typo'"):
+            build_engine(["tdd"], bundle_config={"typo": {}})
+
+    def test_build_rejects_removed_workflow_config_before_registration(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        registered: list[str] = []
+
+        def record_registration(_engine: PolicyEngine, policy: object) -> None:
+            registered.append(str(getattr(policy, "policy_id")))
+
+        monkeypatch.setattr(PolicyEngine, "register", record_registration)
+
+        with pytest.raises(ValueError) as caught:
+            build_engine(["tdd"], bundle_config={"workflow": {"workflows": []}})
+
+        message = str(caught.value)
+        assert "policy bundle 'workflow' was removed" in message
+        assert "policy.bundles" in message
+        assert "policy.bundle_config.workflow" in message
+        assert "forge session reset policy" in message
+        assert registered == []
 
     def test_build_tdd_with_bundle_config_permissive(self) -> None:
         """bundle_config passes per-bundle config to get_bundle_policies."""

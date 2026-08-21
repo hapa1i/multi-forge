@@ -86,24 +86,31 @@ forge policy enable --bundle tdd --permissive
 | `coding_standards.no-type-checking`   | Blocks `if TYPE_CHECKING:` imports                  |
 | `coding_standards.no-backward-compat` | Blocks backward-compatibility wrappers and adapters |
 
-### `workflow` — LLM-based review pipelines (experimental, manifest-only)
+### Removed experimental `workflow` bundle
 
-Config-driven pipelines that classify code changes via a cheap LLM tagger, then route through filter → checker →
-reviewer stages. Only actions flagged as "architectural" or "migration" reach the expensive reviewer.
+The former manifest-only `workflow` bundle was removed. Existing sessions that still contain `workflow` in
+`policy.bundles` or retain `policy.bundle_config.workflow` fail policy-engine construction with a recovery diagnostic;
+the hook allows the action rather than silently running a partial policy set.
 
-> **Note:** The `workflow` bundle is **experimental** and has **no CLI surface** — it is not offered by
-> `forge policy enable` and does not appear in `forge policy list`. The only way to activate it is to set
-> `policy.bundles: ["workflow"]` plus `policy.bundle_config.workflow` in the session manifest (e.g., via
-> `forge session set`). See [`design_workflows.md` §1.2](../design_workflows.md#12-semantic-policy-the-supervisor) for
-> the pipeline architecture.
+The old activation instructions allowed `forge session set`, which stores overrides that win over policy intent. Clear
+all policy overrides first:
 
-Workflow entries and their nested branch, filter, checker, and reviewer objects reject unknown keys or invalid field
-types when Forge builds the policy engine. The diagnostic names the workflow entry and offending field rather than
-silently applying a default.
+```bash
+forge session reset policy
+```
 
-Engine construction is atomic. An invalid workflow entry also prevents other configured bundles from running for that
-hook invocation; the Claude and Codex hooks report the build error and allow the action before the configured fail mode
-applies. Correct the manifest entry before relying on policy enforcement again.
+Then choose the policy intent you want:
+
+```bash
+forge policy enable --bundle tdd
+forge policy enable --bundle tdd --bundle coding_standards
+# Or turn enforcement off:
+forge policy disable
+```
+
+The reset returns policy settings to intent. A following terminal `forge policy enable` replaces stale intent bundle and
+configuration fields; `forge policy disable` turns enforcement off. Setting `policy.bundles` or `policy.bundle_config`
+to `null` is not a recovery path because those fields are non-nullable.
 
 ---
 

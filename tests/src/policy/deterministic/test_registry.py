@@ -50,10 +50,20 @@ class TestGetBundlePoliciesConfig:
         assert "coding_standards.no-backward-compat" in ids
         assert "coding_standards.no-emoji" in ids
 
-    def test_unknown_bundle_returns_empty(self) -> None:
-        """Unknown bundle name returns empty list."""
-        policies = get_bundle_policies("nonexistent", config={"strict": True})
-        assert policies == []
+    def test_unknown_bundle_raises(self) -> None:
+        """Unknown bundle names must not silently produce an empty policy set."""
+        with pytest.raises(ValueError, match="unknown policy bundle 'nonexistent'"):
+            get_bundle_policies("nonexistent", config={"strict": True})
+
+    def test_removed_workflow_bundle_names_stale_manifest_fields(self) -> None:
+        with pytest.raises(ValueError) as caught:
+            get_bundle_policies("workflow", config={"workflows": []})
+
+        message = str(caught.value)
+        assert "policy bundle 'workflow' was removed" in message
+        assert "policy.bundles" in message
+        assert "policy.bundle_config.workflow" in message
+        assert "forge session reset policy" in message
 
     def test_permissive_preserves_no_skip_tests(self) -> None:
         """Permissive config only affects TDDEnforcementPolicy, not NoSkipTestsPolicy."""

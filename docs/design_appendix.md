@@ -845,7 +845,6 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 | Rewind code-delta curation (`emit_direct_llm_usage`, `rewind-code-delta`) | Yes             | `session=$FORGE_SESSION`; rewind dropped-window curation; `route=core_llm`/`runtime=forge_cli` |
 | Plan check (`emit_direct_llm_usage`, `plan-check`)                        | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                               |
 | Action tagger (`emit_direct_llm_usage` + upstream outcome)                | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial         |
-| WorkflowPolicy checker/reviewer (`policy-checker`/`policy-reviewer`)      | Yes             | `session=context.session_name`; success + parse-fail/exception (`status="error"`)              |
 | Team event tagger (`emit_direct_llm_usage`, `team-tagger`)                | Partially       | `session=$FORGE_SESSION` best-effort, else ambient (the handler carries no Forge session)      |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
@@ -1455,14 +1454,18 @@ reject provider-unsupported parameters until client wiring lands.
 
 ---
 
-## F. WorkflowPolicy Cost Model
+## F. Removed Experimental WorkflowPolicy Bundle
 
-Migrated from the former archived Appendix C. Contextualizes why the tagger->checker->reviewer pipeline
-(design_workflows.md §1.2) uses a branching architecture.
+The experimental, manifest-only `workflow` policy bundle and its tagger -> checker -> reviewer implementation were
+removed. The preset lacked a normative project-pattern corpus, so its stateless reviewer could not substantiate the
+citations required for a blocking architectural-divergence verdict.
 
-Cost model for a divergence-from-mean workflow: tagger ($0.001/call) filters 80% of changes as non-architectural. Of the
-20% that reach a checker ($0.001), ~80% short-circuit as aligned. Only ~4% reach the reviewer ($0.05). Total: ~$0.32/100
-changes vs $5.00 reviewing everything.
+The policy registry now rejects unknown bundle names and unknown `bundle_config` owners before registering any policy.
+For existing sessions, `workflow` in `policy.bundles` or `policy.bundle_config.workflow` produces an actionable removal
+diagnostic. The Claude and Codex policy hooks report that construction failure and allow the action before engine-owned
+`fail_mode` semantics apply. Because session overrides take precedence over intent, recovery starts with
+`forge session reset policy`; the user then runs terminal `forge policy enable` with supported bundles or
+`forge policy disable`.
 
 ---
 
@@ -1562,9 +1565,8 @@ record, T1b), else the `intent` override or the default claude lane. `runtime_id
 **never rewrites** the manifest, so a frozen lane whose catalog entry was later removed prints `Lane: not executable`
 rather than crashing or silently falling back to the default. `forge telemetry activity` shows the per-call
 `runtime`/`billing_mode` each command ran on (`mixed` when a command's events disagree); the usage ledger carries no
-catalog backend id, so the full lane shows only on supervisor status. T5 also closed the three M3 no-emission gaps --
-the WorkflowPolicy checker/reviewer and the team event tagger now emit `policy-checker`/`policy-reviewer`/ `team-tagger`
-usage events (`.complete()` captures the tokens `.ask()` discarded).
+catalog backend id, so the full lane shows only on supervisor status. The team event tagger emits `team-tagger` usage
+events through `.complete()`, which retains the token counts that `.ask()` discarded.
 
 **Subscription-exhaustion degrade (T7).** A supervisor check that exhausts its bound codex subscription
 (`failure_type="subscription_exhausted"`, classified in `run_supervisor_check` from the codex JSONL message -- no
