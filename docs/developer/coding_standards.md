@@ -187,11 +187,14 @@ above.
 
 ## 7. Code Comments
 
-AI-assisted coding often produces oververbose comments. Every comment must earn its place.
+Every comment must earn its place. Judge comments by their accuracy and usefulness, not by whether they appear to have
+been written by a person or an AI; prose style cannot establish authorship reliably.
 
-### The Rule: Comment the Why, Not the What
+### The Rule: Add Information the Code Does Not
 
-Code shows **how**. Comments explain **why**. Restating code is noise.
+Code usually shows **how**, so comments should explain **why**: the constraint, tradeoff, invariant, or surprising
+failure mode. A concise explanation of **what** is appropriate when the code is intrinsically difficult to decode, such
+as a regular expression, bit manipulation, or a specialized algorithm. Restating straightforward code is noise.
 
 ```python
 # Bad — duplicates the code
@@ -209,6 +212,17 @@ def get_session_by_name(name: str) -> Session:
     """
 ```
 
+A useful comment is:
+
+- **Accurate**: Describes the current code and identifiers
+- **Additive**: Provides information that names, types, and control flow do not make obvious
+- **Specific**: Names the actual constraint, consequence, invariant, or special case
+- **Durable**: Describes a stable contract or rationale, not an incidental implementation step
+- **Local**: Uses established project terminology and sits next to the relevant code
+
+If a comment conflicts with the code and tests, specifications, issues, or history do not establish the intended
+behavior, leave it unchanged and request human context. Do not invent intent.
+
 ### When to Comment
 
 - **Non-obvious "why"**: Rules, constraints, performance
@@ -218,14 +232,27 @@ def get_session_by_name(name: str) -> Session:
 - **Invariants and assumptions**: Non-obvious constraints (caller holds lock, sorted, max 100 entries)
 - **Lint/type suppressions**: Any `# noqa` or `# type: ignore` must include a reason.
   `# type: ignore[arg-type]  # Pydantic coerces str→Path at runtime`
-- **TODO markers**: `# TODO(#issue): ...` with context (not bare `# TODO`)
+- **TODO markers**: Use `# TODO(#issue): ...` with concrete remaining work. Never invent an issue reference, owner, or
+  deadline. Treat an existing untraceable TODO as needing human context.
+
+### Preserve Comments with External Meaning
+
+Do not remove or casually rewrite:
+
+- Copyright, license, attribution, provenance, and generated-file notices
+- Shebangs, encoding declarations, compiler directives, pragmas, and documentation-tool syntax
+- Linter, formatter, type-checker, coverage, security-scanner, and test-runner instructions
+- Security, safety, compatibility, concurrency, and data-loss warnings
+- Standards references, algorithm citations, and links that establish provenance
+- Traceable TODO/FIXME comments that record unfinished work
 
 ### When NOT to Comment
 
 - **Obvious operations**: `i += 1`, `return result`, `self.name = name`
 - **What the function signature already says**: Type hints + clear name > restating docstring
-- **Commenting out dead code**: Delete it (git remembers). Includes debugging leftovers (`# print(...)`,
-  `# import pdb`).
+- **Commenting out dead code**: Delete it when version control preserves the history. This includes debugging leftovers
+  (`# print(...)`, `# import pdb`). If code appears deliberately retained as reference material or a fallback, document
+  its purpose or request human context before deleting it.
 - **Apologetic comments**: `# This is a hack` / `# Sorry, this is ugly` — fix the code
 - **Section separators**: `# ===== HELPERS =====` — use module structure, not ASCII art
 - **Closing bracket labels**: `# end if` / `# end for` — if you need these, the block is too long; extract a function
@@ -237,6 +264,8 @@ def get_session_by_name(name: str) -> Session:
 - **Private methods**: Optional. Skip if the name is self-explanatory. Add if the logic is non-trivial.
 - **Modules**: Optional. Use if the module's purpose isn't obvious from name + contents.
 - **Format**: Use imperative mood ("Return the session" not "Returns the session").
+- **Observable behavior**: Docstrings can feed doctests, CLIs, schemas, and generated documentation. Verify those
+  consumers before rewriting a docstring.
 
 ```python
 # Good — tells you something the signature doesn't
@@ -257,9 +286,22 @@ def resolve_model(tier: str, family: str) -> str:
     """
 ```
 
-### AI-Generated Comment Hygiene
+### Comment Prose
 
-When AI generates code, watch for these comment anti-patterns:
+For explanatory comments and docstrings, use an ASD-STE100-inspired readability profile:
+
+- Keep one idea per sentence.
+- Use short, direct sentences.
+- Use active voice when the agent is known; do not invent an agent to avoid passive voice.
+- Use one consistent term for each concept.
+- Prefer explicit nouns over ambiguous pronouns.
+
+This is not formal ASD-STE100 compliance. Technical accuracy, code identifiers, project terminology, and local style
+take precedence. Do not apply this profile to licenses, directives, suppressions, quoted text, or intentional fragments.
+
+### Comment Hygiene
+
+Watch for these anti-patterns regardless of authorship:
 
 - **Play-by-play narration**: Comment on every line explaining Python syntax
 - **Redundant section headers**: `# Initialize variables` above three obvious assignments
@@ -269,4 +311,4 @@ When AI generates code, watch for these comment anti-patterns:
 - **Over-qualifying with "Note:"**: `# Note: returns None if not found` — just say `# Returns None if not found`
 - **Invented rationales**: `# for performance` / `# for safety` without evidence — delete unless verified
 
-Strip these during review. Don't add comments to untouched code.
+Strip these during review. Do not add comments outside the change's scope.
