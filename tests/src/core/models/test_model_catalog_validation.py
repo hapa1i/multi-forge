@@ -24,7 +24,6 @@ def _minimal_model_data() -> dict:
         "supports_images": False,
         "temperature_constraint": "range",
         "temperature": {"min": 0.0, "default": 1.0, "max": 2.0},
-        "intelligence_score": 50,
         "tags": [],
     }
 
@@ -32,7 +31,7 @@ def _minimal_model_data() -> dict:
 def _minimal_catalog_data() -> dict:
     """Return minimal valid catalog data for testing."""
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "models": {"test-model": _minimal_model_data()},
         "aliases": {},
     }
@@ -63,14 +62,6 @@ class TestModelFieldValidation:
         data["max_output_tokens"] = -1
 
         with pytest.raises((ModelCatalogError, ValueError), match="max_output_tokens must be > 0"):
-            _parse_model_spec("test", data)
-
-    def test_rejects_invalid_intelligence_score(self):
-        """intelligence_score outside 0-100 raises error."""
-        data = _minimal_model_data()
-        data["intelligence_score"] = 150
-
-        with pytest.raises((ModelCatalogError, ValueError), match="intelligence_score must be 0-100"):
             _parse_model_spec("test", data)
 
 
@@ -274,7 +265,6 @@ class TestTypeValidation:
         with pytest.raises(ValueError, match="context_window_tokens must be > 0"):
             ModelSpec(
                 friendly_name="Test",
-                intelligence_score=50,
                 context_window_tokens=0,
                 max_output_tokens=1000,
                 supports_thinking=False,

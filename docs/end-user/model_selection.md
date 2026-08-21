@@ -251,7 +251,8 @@ strengths matter.
 | Memory writer               | Stop enqueues; a later CLI drain launches it        | `src/forge/session/memory_writer.py`                         |
 
 Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
-need runtime readiness for workflow workers, including the cached preflight state of the opt-in `codex` worker.
+need runtime readiness for workflow workers, including the cached preflight state of the opt-in `codex` worker. The
+catalog reports intrinsic capabilities and explicit defaults; Forge does not assign comparative intelligence scores.
 
 For the panel and debate model specs, see `src/forge/review/models.py`. To add a new model alternative or change the
 default tier mapping, edit the proxy template under `src/forge/config/defaults/templates/` and reset proxies that use it

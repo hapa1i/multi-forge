@@ -39,6 +39,7 @@ def test_model_catalog_human_output() -> None:
     assert "Forge Model Catalog" in result.output
     assert "Provider Defaults" in result.output
     assert "gpt-5.5" in result.output
+    assert "SCORE" not in result.output
 
 
 def test_model_catalog_json_shape() -> None:
@@ -46,8 +47,9 @@ def test_model_catalog_json_shape() -> None:
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert "gpt-5.5" in payload["models"]
+    assert "intelligence_score" not in payload["models"]["gpt-5.5"]
     assert "aliases" in payload
     assert "openai" in payload["defaults"]
 

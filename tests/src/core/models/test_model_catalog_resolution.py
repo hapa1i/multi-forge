@@ -86,14 +86,14 @@ class TestGPT56Family:
         assert resolve_model_id(alias) == canonical
 
     @pytest.mark.parametrize(
-        ("model_id", "friendly_name", "intelligence_score"),
+        ("model_id", "friendly_name"),
         [
-            ("gpt-5.6-sol", "GPT-5.6 Sol", 100),
-            ("gpt-5.6-terra", "GPT-5.6 Terra", 98),
-            ("gpt-5.6-luna", "GPT-5.6 Luna", 90),
+            ("gpt-5.6-sol", "GPT-5.6 Sol"),
+            ("gpt-5.6-terra", "GPT-5.6 Terra"),
+            ("gpt-5.6-luna", "GPT-5.6 Luna"),
         ],
     )
-    def test_shared_capabilities(self, model_id, friendly_name, intelligence_score):
+    def test_shared_capabilities(self, model_id, friendly_name):
         spec = get_model_spec(model_id)
 
         assert spec.friendly_name == friendly_name
@@ -117,15 +117,7 @@ class TestGPT56Family:
         )
         assert spec.default_reasoning_effort == "medium"
         assert spec.use_responses_api is True
-        assert spec.intelligence_score == intelligence_score
         assert spec.system_prompt_addendum == "system_prompt_addendums/openai.md"
-
-    def test_intelligence_scores_use_intentional_peer_tiers(self):
-        score = lambda model: get_model_spec(model).intelligence_score  # noqa: E731
-
-        assert score("gpt-5.6-sol") == score("claude-fable-5") == score("gpt-5.5-pro")
-        assert score("gpt-5.6-sol") > score("gpt-5.5")
-        assert score("gpt-5.6-terra") == score("claude-sonnet-5") == score("claude-opus-4-7")
 
 
 class TestClaudeFable5:
@@ -163,15 +155,6 @@ class TestClaudeFable5:
 
         for provider in ("anthropic", "openrouter"):
             assert catalog.defaults[provider]["opus"] == "claude-opus-5"
-
-    def test_fable_outranks_opus_and_peers_gpt55_pro(self):
-        """Fable tops the ladder with gpt-5.5-pro; Opus 5 / gpt-5.5 / Gemini 3.1 are one tier below."""
-        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
-
-        assert score("claude-fable-5") == score("gpt-5.5-pro")
-        assert score("claude-fable-5") > score("claude-opus-5")
-        assert score("gpt-5.5") == score("claude-opus-5") == score("gemini-3.1-pro-preview")
-        assert score("claude-opus-5") > score("claude-opus-4-8")
 
 
 class TestClaudeOpus5:
@@ -319,13 +302,6 @@ class TestGemini36Flash:
         assert spec.default_reasoning_effort == "medium"
         assert spec.system_prompt_addendum == "system_prompt_addendums/gemini.md"
 
-    def test_gemini_36_flash_scores_with_35(self):
-        """Efficiency release: same measured intelligence bucket as 3.5 Flash."""
-        assert (
-            get_model_spec("gemini-3.6-flash").intelligence_score
-            == get_model_spec("gemini-3.5-flash").intelligence_score
-        )
-
 
 class TestGemini37Flash:
     """Tests for the Gemini 3.7 Flash catalog entry and family default."""
@@ -356,12 +332,6 @@ class TestGemini37Flash:
         assert spec.default_thinking_level == "medium"
         assert spec.litellm_reasoning_efforts == ("low", "medium", "high")
         assert spec.default_reasoning_effort == "medium"
-
-    def test_gemini_37_flash_scores_above_36(self):
-        assert (
-            get_model_spec("gemini-3.7-flash").intelligence_score
-            > get_model_spec("gemini-3.6-flash").intelligence_score
-        )
 
 
 class TestKimiModels:
@@ -414,14 +384,6 @@ class TestKimiModels:
         assert spec.litellm_reasoning_efforts == ("low", "high", "max")
         assert spec.default_reasoning_effort == "max"
 
-    def test_kimi_k3_score_ordering(self):
-        """K3 sits with the Claude 98 bucket, above every other open-weight model."""
-        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
-
-        assert score("kimi-k3") == score("claude-opus-4-8") == score("claude-sonnet-5")
-        assert score("kimi-k3") > score("kimi-k2.7-code") > score("kimi-k2.6")
-        assert score("kimi-k3") > score("glm-5.2")
-
 
 class TestQwen37:
     """Tests for the displaced-but-selectable qwen3.7 catalog entries."""
@@ -456,15 +418,6 @@ class TestQwen37:
             assert spec.litellm_reasoning_efforts is None
         assert plus.supports_images is True
         assert maxx.supports_images is False
-
-    def test_qwen_37_score_ordering(self):
-        """Max (GA flagship) tops the qwen family; Plus sits above the 3.6 Plus it replaces."""
-        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
-
-        assert score("qwen3.7-max") > score("qwen3.6-max-preview")
-        assert score("qwen3.7-max") > score("glm-5.2")
-        assert score("qwen3.7-plus") > score("qwen3.6-plus")
-        assert score("qwen3.7-max") > score("qwen3.7-plus")
 
 
 class TestQwen38:
@@ -514,11 +467,6 @@ class TestQwen38:
         assert open_weight.supports_images is False
         assert open_weight.litellm_reasoning_efforts is None
         assert flagship.litellm_reasoning_efforts == ("minimal", "low", "medium", "high", "xhigh")
-
-    def test_qwen_38_score_ordering(self):
-        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
-
-        assert score("qwen3.8-max") > score("qwen3.8-2.4t-a95b") > score("qwen3.8-27b") > score("qwen3.7-max")
 
 
 class TestOpenRouterSlugAliases:
