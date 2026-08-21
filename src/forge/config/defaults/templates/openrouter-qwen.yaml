@@ -1,10 +1,12 @@
 # Template: openrouter-qwen
 # Qwen models via OpenRouter (direct, no LiteLLM)
 #
-# Haiku uses Qwen3.6 Flash for fast multimodal work. Sonnet uses Qwen3.7 Plus.
-# Opus uses Qwen3.7 Max (GA flagship) for the strongest current Qwen tier.
-# The Qwen3.6 predecessors and qwen3-coder are available as
-# model_alternatives for explicit proxy requests.
+# Qwen3.8 27B serves Haiku and Sonnet as the least-expensive multimodal Qwen
+# with a ZDR endpoint in the 2026-08-21 audit. Opus is configured as Qwen3.8
+# Max but resolves to the same-price open-weight 2.4T A95B under required ZDR.
+# That fallback is text-only; use 27B as the mapping target when vision is
+# required. Displaced Qwen3.7/3.6 alternatives also resolve to audited 3.8
+# replacements unless non-ZDR routing is explicitly enabled.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 
 proxy:
@@ -14,15 +16,25 @@ proxy:
   default_port: 8101
 
   openrouter:
+    allow_non_zdr: false
     tiers:
-      haiku: qwen/qwen3.6-flash
-      sonnet: qwen/qwen3.7-plus
-      opus: qwen/qwen3.7-max
+      haiku: qwen/qwen3.8-27b
+      sonnet: qwen/qwen3.8-27b
+      opus: qwen/qwen3.8-max
+    zdr_fallbacks:
+      qwen/qwen3.6-flash: qwen/qwen3.8-27b
+      qwen/qwen3.6-plus: qwen/qwen3.8-27b
+      qwen/qwen3.6-max-preview: qwen/qwen3.8-2.4t-a95b
+      qwen/qwen3.7-plus: qwen/qwen3.8-27b
+      qwen/qwen3.7-max: qwen/qwen3.8-2.4t-a95b
+      qwen/qwen3.8-max: qwen/qwen3.8-2.4t-a95b
     model_alternatives:
       sonnet:
+        qwen3.7-plus: qwen/qwen3.7-plus
         qwen3.6-plus: qwen/qwen3.6-plus
         qwen3-coder: qwen/qwen3-coder
       opus:
+        qwen3.7-max: qwen/qwen3.7-max
         qwen3.6-max-preview: qwen/qwen3.6-max-preview
         qwen3-coder: qwen/qwen3-coder
     error_hints: true

@@ -102,9 +102,10 @@ class TestModelHyperparameters:
         assert params.strict is False
         assert params.extra == {}
 
-    def test_with_reasoning_effort(self):
-        params = ModelHyperparameters(reasoning_effort="high")
-        assert params.reasoning_effort == "high"
+    @pytest.mark.parametrize("effort", ["none", "disable", "minimal", "low", "medium", "high", "xhigh", "max"])
+    def test_with_provider_reasoning_effort(self, effort: str):
+        params = ModelHyperparameters(reasoning_effort=effort)  # type: ignore[arg-type]
+        assert params.reasoning_effort == effort
 
     def test_invalid_reasoning_effort_rejected(self):
         with pytest.raises(ValidationError):

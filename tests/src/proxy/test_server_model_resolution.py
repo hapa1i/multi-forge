@@ -83,6 +83,8 @@ class _ProviderCfg:
         sonnet="openai/gpt-sonnet-test",
         opus="openai/gpt-opus-test",
     )
+    allow_non_zdr = False
+    zdr_fallbacks: dict[str, str] = {}
     model_alternatives = {"opus": {"claude-fable": "anthropic/claude-opus-special"}}
 
 

@@ -1,5 +1,5 @@
 # Template: openrouter-gemini-flash
-# Gemini 3.6 Flash via OpenRouter (cheap, all tiers use Flash)
+# Gemini 3.7 Flash via OpenRouter (cheap, all tiers use Flash)
 #
 # Requires OPENROUTER_API_KEY in .env (or environment).
 #
@@ -12,10 +12,11 @@ proxy:
   default_port: 8099
 
   openrouter:
+    allow_non_zdr: false
     tiers:
-      haiku: google/gemini-3.6-flash
-      sonnet: google/gemini-3.6-flash
-      opus: google/gemini-3.6-flash
+      haiku: google/gemini-3.7-flash
+      sonnet: google/gemini-3.7-flash
+      opus: google/gemini-3.7-flash
     tier_overrides:
       haiku:
         reasoning_effort: low

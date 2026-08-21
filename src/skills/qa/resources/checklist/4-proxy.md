@@ -422,16 +422,20 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
   opus=claude-opus-5)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
-- [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.2)
+- [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.3)
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k3)
+- [ ] `openrouter-kimi` exposes `kimi-k2.7-code` as a sonnet/opus model alternative
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
-- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku=qwen3.6-flash, sonnet=qwen3.7-plus, opus=qwen3.7-max)
+- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku/sonnet=qwen3.8-27b, opus=qwen3.8-max)
+- [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields
+- [ ] The dated ZDR audit fallbacks cover Fable 5 and all six bundled non-ZDR Qwen slugs; Qwen3.8 Max maps to
+  `qwen/qwen3.8-2.4t-a95b`
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.6-sol, opus=gpt-5.6-sol)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-5.6-sol)
-- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.6-flash, sonnet=gemini-3.1-pro-preview,
+- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.7-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
-- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.6-flash with tier_overrides for reasoning_effort
+- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.7-flash with tier_overrides for reasoning_effort
   (low/medium/high)
 - [ ] Each OpenRouter template has a distinct default_port (8095-8104)
 
@@ -457,6 +461,36 @@ forge proxy show openrouter-test --raw
 - [ ] `forge proxy show` or `forge proxy validate` displays `Provider: openrouter`
 - [ ] Raw YAML shows `provider: openrouter` and tier mappings with `anthropic/` prefixed model IDs
 - [ ] Proxy uses port 8095 (openrouter-anthropic default)
+
+### 4.18.1 OpenRouter ZDR Boundary
+
+<!-- prereq: 4.18 -->
+
+<!-- auto -->
+
+```bash
+# Direct OpenRouter advertises and defaults to required ZDR.
+forge proxy show openrouter-test --raw | rg 'allow_non_zdr: false'
+
+# LiteLLM does not expose the OpenRouter-only controls.
+! forge proxy template show litellm-openai --raw | rg 'allow_non_zdr|zdr_fallbacks'
+
+# Create the Qwen route and inspect configured versus effective runtime truth.
+forge proxy delete openrouter-zdr-test --yes 2>/dev/null || true
+forge proxy create openrouter-qwen --name openrouter-zdr-test
+curl -fsS "$(forge proxy list --json | jq -r '.[] | select(.proxy_id == "openrouter-zdr-test") | .base_url')/" \
+  | jq '.runtime | {configured_tier_mappings, tier_mappings, data_policy}'
+forge proxy stop openrouter-zdr-test
+forge proxy delete openrouter-zdr-test --yes
+```
+
+- [ ] Direct OpenRouter raw config shows `allow_non_zdr: false`
+- [ ] LiteLLM template output contains neither ZDR field
+- [ ] Qwen configured Opus is `qwen/qwen3.8-max`, effective Opus is `qwen/qwen3.8-2.4t-a95b`, and
+  `runtime.data_policy.zdr` is `required`
+- [ ] Forge-owned direct OpenRouter plan checks and transfer/rewind curation remain required-ZDR regardless of this
+  proxy's `allow_non_zdr` setting
+- [ ] The disposable Qwen proxy stops and deletes cleanly
 
 ### 4.19 Model Alternatives
 

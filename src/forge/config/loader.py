@@ -449,11 +449,18 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         if "source" in data_map:
             raise ValueError(_PROXY_SOURCE_CLEAN_BREAK_TIP)
 
+        provider = data_map.get("provider", "")
+        zdr_fields = sorted({"allow_non_zdr", "zdr_fallbacks"}.intersection(data_map))
+        if provider != "openrouter" and zdr_fields:
+            fields = ", ".join(zdr_fields)
+            verb = "is" if len(zdr_fields) == 1 else "are"
+            raise ValueError(f"{fields} {verb} supported only for provider: openrouter")
+
         return ProxyInstanceConfig(
             proxy_format=data_map.get("proxy_format", 1),
             template=data_map.get("template", ""),
             template_digest=data_map.get("template_digest", ""),
-            provider=data_map.get("provider", ""),
+            provider=provider,
             proxy_endpoint=data_map.get("proxy_endpoint", ""),
             port=data_map.get("port", 0),
             upstream_base_url=data_map.get("upstream_base_url", ""),
@@ -503,6 +510,12 @@ def write_proxy_instance_config(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = asdict(config)
+
+    # These controls describe OpenRouter's first-party routing contract. Do not
+    # imply ZDR support for arbitrary LiteLLM backends by serializing inert keys.
+    if config.provider != "openrouter":
+        data.pop("allow_non_zdr", None)
+        data.pop("zdr_fallbacks", None)
 
     # Read old proxy files during the compatibility window, but never author
     # their inert provider settings into a newly serialized proxy.yaml.

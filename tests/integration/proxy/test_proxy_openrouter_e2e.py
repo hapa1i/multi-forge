@@ -37,6 +37,11 @@ class TestProxyWithOpenRouter:
         assert data["template"] == "openrouter-anthropic"
         assert data["provider"] == "openrouter"
         assert data["runtime"]["tier_mappings"]["haiku"] == "anthropic/claude-haiku-4.5"
+        assert data["runtime"]["configured_tier_mappings"] == data["runtime"]["tier_mappings"]
+        assert data["runtime"]["data_policy"] == {"zdr": "required", "zdr_fallbacks": {}}
+        assert data["runtime"]["llm_defaults_by_tier"]["haiku"]["extra"] == {
+            "openai": {"extra_body": {"provider": {"zdr": True}}}
+        }
 
     def test_simple_completion_preserves_system_prompt(self, proxy_server_openrouter: str) -> None:
         """POST /v1/messages routes through OpenRouter and preserves system prompts."""
@@ -97,8 +102,8 @@ def _assert_tier_completion(
     assert data.get("usage", {}).get("input_tokens", 0) > 0
 
 
-class TestJuly2026DefaultsWithOpenRouter:
-    """Each July 2026 template default resolves to its exact live OpenRouter slug.
+class TestCurrentDefaultsWithOpenRouter:
+    """Each current template default resolves to its exact live OpenRouter slug.
 
     Request models are Claude names that are neither tier defaults nor
     model_alternatives entries for these templates, so resolution falls
@@ -118,38 +123,68 @@ class TestJuly2026DefaultsWithOpenRouter:
             proxy_server_openrouter_kimi, "claude-sonnet-4-5-20250929", "sonnet", "moonshotai/kimi-k3"
         )
 
-    def test_qwen_tier_mappings(self, proxy_server_openrouter_qwen: str) -> None:
-        """Routing metadata for the qwen defaults; runs even on policy-blocked accounts."""
-        with httpx.Client() as client:
-            health = client.get(f"{proxy_server_openrouter_qwen}/").json()
-        assert health["runtime"]["tier_mappings"]["haiku"] == "qwen/qwen3.6-flash"
-        assert health["runtime"]["tier_mappings"]["sonnet"] == "qwen/qwen3.7-plus"
-        assert health["runtime"]["tier_mappings"]["opus"] == "qwen/qwen3.7-max"
-
-    def test_qwen_sonnet_resolves_to_37_plus(self, proxy_server_openrouter_qwen: str) -> None:
-        """Requires an OpenRouter account whose data policy allows qwen's providers."""
+    def test_kimi_27_code_alternative_completion(self, proxy_server_openrouter_kimi: str) -> None:
         _assert_tier_completion(
-            proxy_server_openrouter_qwen, "claude-sonnet-4-5-20250929", "sonnet", "qwen/qwen3.7-plus"
+            proxy_server_openrouter_kimi,
+            "kimi-k2.7-code",
+            "sonnet",
+            "moonshotai/kimi-k2.7-code",
         )
 
-    def test_qwen_opus_resolves_to_37_max(self, proxy_server_openrouter_qwen: str) -> None:
-        """Requires an OpenRouter account whose data policy allows qwen's providers."""
-        _assert_tier_completion(proxy_server_openrouter_qwen, "claude-opus-4-5-20251101", "opus", "qwen/qwen3.7-max")
+    def test_qwen_tier_mappings(self, proxy_server_openrouter_qwen: str) -> None:
+        """Runtime truth distinguishes configured Qwen Max from its ZDR-safe fallback."""
+        with httpx.Client() as client:
+            health = client.get(f"{proxy_server_openrouter_qwen}/").json()
+        assert health["runtime"]["tier_mappings"]["haiku"] == "qwen/qwen3.8-27b"
+        assert health["runtime"]["tier_mappings"]["sonnet"] == "qwen/qwen3.8-27b"
+        assert health["runtime"]["tier_mappings"]["opus"] == "qwen/qwen3.8-2.4t-a95b"
+        assert health["runtime"]["configured_tier_mappings"]["opus"] == "qwen/qwen3.8-max"
+        assert health["runtime"]["data_policy"] == {
+            "zdr": "required",
+            "zdr_fallbacks": {"qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b"},
+        }
+
+    def test_qwen_haiku_resolves_to_38_27b(self, proxy_server_openrouter_qwen: str) -> None:
+        """Qwen 27B is the least-expensive multimodal Qwen with an audited ZDR endpoint."""
+        _assert_tier_completion(proxy_server_openrouter_qwen, "claude-haiku-4-5-20251001", "haiku", "qwen/qwen3.8-27b")
+
+    def test_qwen_sonnet_resolves_to_38_27b(self, proxy_server_openrouter_qwen: str) -> None:
+        """Qwen 27B has a ZDR endpoint and remains the effective Sonnet route."""
+        _assert_tier_completion(
+            proxy_server_openrouter_qwen, "claude-sonnet-4-5-20250929", "sonnet", "qwen/qwen3.8-27b"
+        )
+
+    def test_qwen_opus_resolves_to_zdr_fallback(self, proxy_server_openrouter_qwen: str) -> None:
+        """Qwen Max is replaced before dispatch while required-ZDR mode is active."""
+        _assert_tier_completion(
+            proxy_server_openrouter_qwen,
+            "claude-opus-4-5-20251101",
+            "opus",
+            "qwen/qwen3.8-2.4t-a95b",
+        )
+
+    def test_glm_tiers_and_opus_completion(self, proxy_server_openrouter_glm: str) -> None:
+        with httpx.Client() as client:
+            health = client.get(f"{proxy_server_openrouter_glm}/").json()
+        assert health["runtime"]["tier_mappings"]["sonnet"] == "z-ai/glm-5.3"
+        assert health["runtime"]["tier_mappings"]["opus"] == "z-ai/glm-5.3"
+
+        _assert_tier_completion(proxy_server_openrouter_glm, "claude-opus-4-5-20251101", "opus", "z-ai/glm-5.3")
 
     def test_gemini_flash_tiers_and_haiku_completion(self, proxy_server_openrouter_gemini_flash: str) -> None:
         with httpx.Client() as client:
             health = client.get(f"{proxy_server_openrouter_gemini_flash}/").json()
         assert health["runtime"]["tier_mappings"] == {
-            "haiku": "google/gemini-3.6-flash",
-            "sonnet": "google/gemini-3.6-flash",
-            "opus": "google/gemini-3.6-flash",
+            "haiku": "google/gemini-3.7-flash",
+            "sonnet": "google/gemini-3.7-flash",
+            "opus": "google/gemini-3.7-flash",
         }
 
         _assert_tier_completion(
             proxy_server_openrouter_gemini_flash,
             "claude-3-5-haiku-20241022",
             "haiku",
-            "google/gemini-3.6-flash",
+            "google/gemini-3.7-flash",
         )
 
 

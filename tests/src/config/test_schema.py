@@ -362,6 +362,36 @@ class TestProxyInstanceConfig:
 
         assert config.provider_settings["openai_api_mode"] == "responses"
 
+    def test_provider_zdr_defaults_fail_closed(self):
+        from forge.config.schema import ProviderConfig
+
+        config = ProviderConfig()
+
+        assert config.allow_non_zdr is False
+        assert config.zdr_fallbacks == {}
+
+    @pytest.mark.parametrize("value", [1, "false", None])
+    def test_provider_rejects_non_boolean_allow_non_zdr(self, value):
+        from forge.config.schema import ProviderConfig
+
+        with pytest.raises(ValueError, match="allow_non_zdr: must be a bool"):
+            ProviderConfig(allow_non_zdr=value)
+
+    @pytest.mark.parametrize(
+        ("fallbacks", "message"),
+        [
+            ([], "must be a mapping"),
+            ({"": "qwen/fallback"}, "primary model IDs must be non-empty strings"),
+            ({"qwen/primary": ""}, "fallback model IDs must be non-empty strings"),
+            ({"qwen/same": "qwen/same"}, "cannot fall back to itself"),
+        ],
+    )
+    def test_provider_rejects_invalid_zdr_fallbacks(self, fallbacks, message):
+        from forge.config.schema import ProviderConfig
+
+        with pytest.raises(ValueError, match=message):
+            ProviderConfig(zdr_fallbacks=fallbacks)
+
     def test_cost_caps_coerce_numeric_strings(self):
         """CostCaps accepts CLI/YAML numeric strings."""
         from forge.config.schema import CostCaps
@@ -787,6 +817,59 @@ class TestProxyInstanceConfigValidation:
         assert config.tier_overrides.sonnet.reasoning_effort == "high"
         assert config.tier_overrides.opus is not None
         assert config.tier_overrides.opus.reasoning_effort == "xhigh"
+
+    def test_glm_53_accepts_low_high_and_max_reasoning_effort(self):
+        """GLM 5.3 uses OpenRouter's low/high/max effort vocabulary."""
+        from forge.config.schema import (
+            ProxyInstanceConfig,
+            TierModels,
+            TierOverride,
+            TierOverrides,
+        )
+
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="test",
+            template_digest="sha256:test",
+            provider="openrouter",
+            proxy_endpoint="http://localhost:8103",
+            port=8103,
+            upstream_base_url="https://openrouter.ai/api/v1",
+            tiers=TierModels(haiku="h", sonnet="z-ai/glm-5.3", opus="z-ai/glm-5.3"),
+            tier_overrides=TierOverrides(
+                haiku=TierOverride(reasoning_effort="low"),
+                sonnet=TierOverride(reasoning_effort="high"),
+                opus=TierOverride(reasoning_effort="max"),
+            ),
+        )
+
+        assert config.tier_overrides.haiku is not None
+        assert config.tier_overrides.haiku.reasoning_effort == "low"
+        assert config.tier_overrides.sonnet is not None
+        assert config.tier_overrides.sonnet.reasoning_effort == "high"
+        assert config.tier_overrides.opus is not None
+        assert config.tier_overrides.opus.reasoning_effort == "max"
+
+    def test_glm_53_rejects_xhigh_reasoning_effort(self):
+        from forge.config.schema import (
+            ProxyInstanceConfig,
+            TierModels,
+            TierOverride,
+            TierOverrides,
+        )
+
+        with pytest.raises(ValueError, match="reasoning_effort='xhigh' is not supported"):
+            ProxyInstanceConfig(
+                proxy_format=1,
+                template="test",
+                template_digest="sha256:test",
+                provider="openrouter",
+                proxy_endpoint="http://localhost:8103",
+                port=8103,
+                upstream_base_url="https://openrouter.ai/api/v1",
+                tiers=TierModels(haiku="h", sonnet="z-ai/glm-5.3", opus="z-ai/glm-5.3"),
+                tier_overrides=TierOverrides(opus=TierOverride(reasoning_effort="xhigh")),
+            )
 
     def test_glm_51_rejects_unsupported_xhigh_reasoning_effort(self):
         """GLM 5.1 advertises low/medium/high only, so an xhigh override is rejected at load.

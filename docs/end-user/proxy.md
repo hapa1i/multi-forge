@@ -152,20 +152,30 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
-### Picking up the July 2026 model defaults after an upgrade
+### Picking up the August 2026 model defaults after an upgrade
 
 New proxies created from the current built-in templates use these defaults:
 
-| Template                                            | New default tiers                           |
-| --------------------------------------------------- | ------------------------------------------- |
-| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                       |
-| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)       |
-| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                      |
-| `openrouter-qwen`                                   | sonnet -> Qwen3.7 Plus, opus -> Qwen3.7 Max |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.6 Flash               |
-| `openrouter-gemini`, `litellm-gemini`               | haiku -> Gemini 3.6 Flash                   |
+| Template                                            | New default tiers                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                                               |
+| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)                               |
+| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                              |
+| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max                    |
+| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                              |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.7 Flash                                       |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.7 Flash                                           |
+| `litellm-gemini`                                    | haiku -> Gemini 3.6 Flash (unchanged; local LiteLLM route retained) |
 
-The tier-1 cascade checker default also moves to Gemini 3.6 Flash (see [policy.md](policy.md)).
+The OpenRouter tier-1 cascade checker default also moves to Gemini 3.7 Flash (see [policy.md](policy.md)). The local
+LiteLLM checker default remains Gemini 3.6 Flash because the bundled local adapter does not yet expose a 3.7 route. The
+Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
+model alternative.
+
+Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
+endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
+`qwen/qwen3.8-2.4t-a95b`: OpenRouter's ZDR endpoint catalog had no compatible Max endpoint in the 2026-08-21 audit. See
+[OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
 
 Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
 rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
@@ -251,13 +261,68 @@ Default tiers use Anthropic Claude models on OpenRouter. Edit the proxy to use a
 ```bash
 forge proxy edit <proxy_id>
 # Change tiers to e.g.:
-#   haiku: google/gemini-3.6-flash
+#   haiku: google/gemini-3.7-flash
 #   sonnet: anthropic/claude-sonnet-4.6
 #   opus: openai/gpt-5.5
 ```
 
 Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the proxy uses safe defaults for
 `max_output_tokens` and `context_window` when catalog data is unavailable.
+
+### OpenRouter zero data retention (ZDR)
+
+Direct OpenRouter proxies require ZDR by default. With `allow_non_zdr: false` (also the compatibility default when the
+key is absent), Forge sends `provider.zdr: true` on every request. OpenRouter then restricts routing to endpoints it
+currently marks ZDR-compatible. This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only
+replaces models already known to lack a compatible endpoint before dispatch.
+
+Forge audited all 34 model slugs in the bundled OpenRouter defaults and alternatives against OpenRouter's
+[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21. Twenty-seven had at least one ZDR
+endpoint. The seven exceptions and their required-ZDR fallbacks are:
+
+```yaml
+allow_non_zdr: false
+zdr_fallbacks:
+  anthropic/claude-fable-5: anthropic/claude-opus-5
+  qwen/qwen3.6-flash: qwen/qwen3.8-27b
+  qwen/qwen3.6-plus: qwen/qwen3.8-27b
+  qwen/qwen3.6-max-preview: qwen/qwen3.8-2.4t-a95b
+  qwen/qwen3.7-plus: qwen/qwen3.8-27b
+  qwen/qwen3.7-max: qwen/qwen3.8-2.4t-a95b
+  qwen/qwen3.8-max: qwen/qwen3.8-2.4t-a95b
+```
+
+These built-in rules also protect older proxy snapshots that predate the keys; values in a proxy's own `zdr_fallbacks`
+replace them. `GET /` reports the user-owned selection under `runtime.configured_tier_mappings`, the model Forge will
+actually dispatch under `runtime.tier_mappings`, and the active rule under `runtime.data_policy`. Unknown models are not
+guessed: Forge still sends `provider.zdr: true`, so OpenRouter rejects the request if it has no eligible endpoint.
+
+Fallback values are exact OpenRouter backend slugs. Forge strips Claude Code's `[1m]` lookup hint from the configured
+source before matching and never appends that client-side hint to the fallback target.
+
+The 2.4T A95B fallback preserves the flagship text/code posture but is text-only. If Opus must accept images, replace
+the mapping target with the ZDR-compatible multimodal `qwen/qwen3.8-27b`; that trades capability for modality and lower
+cost.
+
+To make a direct OpenRouter proxy eligible for non-ZDR endpoints, opt in explicitly and restart it:
+
+```bash
+forge proxy set <proxy_id> allow_non_zdr=true
+forge proxy stop <proxy_id>
+forge proxy start <proxy_id> --smoke-test
+```
+
+This removes Forge's request-level ZDR requirement and bypasses its ZDR fallback. It cannot weaken ZDR enabled in your
+OpenRouter account or guardrail: OpenRouter combines those policies, so you must disable the account-side requirement
+too if you intend to use a non-ZDR-only model. See OpenRouter's
+[ZDR guide](https://openrouter.ai/docs/guides/features/zdr) and
+[provider-routing reference](https://openrouter.ai/docs/guides/routing/provider-selection).
+
+The per-proxy opt-out and fallback contract applies only to direct OpenRouter proxies. Separately, Forge-owned direct
+OpenRouter plan checks and transfer/rewind transcript curation always send `provider.zdr: true`; a proxy's
+`allow_non_zdr` setting cannot weaken those calls. Forge neither discovers nor claims ZDR support for LiteLLM routes,
+does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr` or `zdr_fallbacks` keys in a LiteLLM
+`proxy.yaml`.
 
 ---
 
@@ -279,7 +344,8 @@ forge session start my-session --proxy openrouter-anthropic --model claude-fable
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
 `model_alternatives[tier][model]` and routes to the configured backend model. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected.
+(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5 currently
+resolves to Opus 5 because the dated endpoint audit found no Fable-compatible ZDR route.
 
 `--model` is currently a Claude model pin. Other proxy templates may define `model_alternatives` for explicit proxy API
 requests that already send the matching model name, but those alternatives are not selected by `forge session --model`.
@@ -481,6 +547,8 @@ backend: openrouter
 proxy_endpoint: http://localhost:8096
 port: 8096
 upstream_base_url: https://openrouter.ai/api/v1
+allow_non_zdr: false
+zdr_fallbacks: {}
 
 tiers:
   haiku: openai/gpt-5.4-mini
@@ -515,9 +583,10 @@ unless you know what you're doing — those are set from the template/backend ca
 
 Custom templates may also set `tool_prefixes_to_ignore`, `prompt_caching`, and `auto_cache_min_tokens`. Forge copies
 those values into each new proxy; existing `proxy.yaml` files remain user-owned snapshots and keep compatibility
-defaults when the keys are absent. Tool-ignore entries must be strings, `model_alternatives` must contain
-string-to-string tier mappings, `prompt_caching` is `passthrough` or `auto_inject`, and `auto_cache_min_tokens` is an
-integer. Forge rejects malformed values when loading either a template or a proxy instance.
+defaults when the keys are absent. `allow_non_zdr` and `zdr_fallbacks` are direct-OpenRouter-only fields. Tool-ignore
+entries must be strings, `model_alternatives` and `zdr_fallbacks` must contain string-to-string mappings,
+`prompt_caching` is `passthrough` or `auto_inject`, and `auto_cache_min_tokens` is an integer. Forge rejects malformed
+values when loading either a template or a proxy instance.
 
 Configuration authored by Forge 0.9.4 or earlier remains readable for one release window. Explicit occurrences of its
 three inert fields warn once per process; omission is silent, and new templates or proxy files omit them. Remove

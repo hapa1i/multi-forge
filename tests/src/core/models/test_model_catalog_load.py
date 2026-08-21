@@ -82,7 +82,7 @@ class TestSchemaVersionValidation:
     def test_accepts_supported_schema_version(self):
         """Supported schema_version is accepted."""
         raw = {
-            "schema_version": 1,
+            "schema_version": 2,
             "models": {
                 "test-model": {
                     "friendly_name": "Test Model",
@@ -93,7 +93,6 @@ class TestSchemaVersionValidation:
                     "supports_images": False,
                     "temperature_constraint": "range",
                     "temperature": {"min": 0.0, "default": 1.0, "max": 2.0},
-                    "intelligence_score": 50,
                     "tags": [],
                 }
             },
@@ -101,7 +100,7 @@ class TestSchemaVersionValidation:
         }
 
         catalog = _validate_and_build_catalog(raw)
-        assert catalog.schema_version == 1
+        assert catalog.schema_version == 2
 
 
 class TestCatalogStructure:
@@ -116,7 +115,6 @@ class TestCatalogStructure:
             assert spec.context_window_tokens > 0, f"{model_id} has invalid context_window_tokens"
             assert spec.max_output_tokens > 0, f"{model_id} has invalid max_output_tokens"
             assert spec.temperature is not None, f"{model_id} missing temperature"
-            assert 0 <= spec.intelligence_score <= 100, f"{model_id} has invalid intelligence_score"
 
     def test_aliases_are_strings(self):
         """All aliases map to string canonical IDs."""
@@ -189,7 +187,7 @@ class TestCatalogDefaults:
 
     def test_validation_rejects_unknown_model_in_defaults(self):
         raw = {
-            "schema_version": 1,
+            "schema_version": 2,
             "models": {
                 "real-model": {
                     "friendly_name": "Real",
@@ -200,7 +198,6 @@ class TestCatalogDefaults:
                     "supports_images": False,
                     "temperature_constraint": "range",
                     "temperature": {"min": 0.0, "default": 1.0, "max": 2.0},
-                    "intelligence_score": 50,
                     "tags": [],
                 }
             },
@@ -218,7 +215,7 @@ class TestCatalogDefaults:
 
     def test_validation_rejects_missing_tier(self):
         raw = {
-            "schema_version": 1,
+            "schema_version": 2,
             "models": {
                 "real-model": {
                     "friendly_name": "Real",
@@ -229,7 +226,6 @@ class TestCatalogDefaults:
                     "supports_images": False,
                     "temperature_constraint": "range",
                     "temperature": {"min": 0.0, "default": 1.0, "max": 2.0},
-                    "intelligence_score": 50,
                     "tags": [],
                 }
             },

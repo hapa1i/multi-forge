@@ -918,19 +918,17 @@ Semantics and invariants:
     `plan-check`, gated on the resolved route being OpenRouter) and transfer curation (role `transfer-curate`, always
     OpenRouter). The tagger is excluded by design — it routes via local LiteLLM, which is not a provider-user-grouping
     sink.
+  - **Direct-call ZDR.** `core/llm/openrouter_policy.py::with_openrouter_zdr` sets
+    `extra["openai"]["extra_body"]["provider"]["zdr"]=true` without clobbering siblings. OpenRouter plan checks and
+    transfer/rewind curation always apply it; proxy `allow_non_zdr` does not govern these calls.
   - **Migration.** The pre-Phase-4 per-proxy `proxy.yaml` key is deprecated: it loads with a one-time relocation warning
     and is ignored (warn-and-degrade, user-owned config is a system boundary). The sidecar mounts `~/.forge/config.yaml`
     read-only so in-container proxied forks read the same toggle.
-- **Remote reconciliation (single-id MVP).** `forge model backend reconcile <backend>` joins one local downstream trace
-  to one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A backend is
-  remote-reconcile capable iff it has a registered adapter there — NOT a `ModelSourceCapabilities` flag (a flag could
-  drift; registry presence is the single source of truth and keeps an account-side read concern out of the
-  proxy-write-path capability struct). OpenRouter is the first adapter (`GET /api/v1/generation`, metadata-only, never
-  `/generation/content`). The op (`core/ops/backend_reconcile.py`) buckets are **comparative** —
-  `joined`/`remote`/`missing-remote`/`not-queryable` for the single-id paths; remote/network failures are renderable
-  data (`not-queryable`), never raised, and local cost/tokens are never overwritten by remote figures. Windowed
-  activity/analytics (management key, `missing-local`/`local` buckets) is a designed-for follow-on — the adapter
-  protocol already declares the window seam (`RemoteCapability.window_*`, `fetch_activity`).
+- **Remote reconciliation (single-id MVP).** `forge model backend reconcile <backend>` joins one local trace to one
+  account-side record through `forge.backend.remote`; registry presence defines capability. OpenRouter is the first
+  adapter (`GET /api/v1/generation`, metadata-only). Results are `joined`/`remote`/`missing-remote`/`not-queryable`;
+  remote failures become `not-queryable`, and remote figures never overwrite local cost/tokens. Windowed activity is a
+  follow-on exposed by `RemoteCapability.window_*` and `fetch_activity`.
 
 ---
 
@@ -1383,6 +1381,7 @@ src/forge/core/llm/
 ├── credentials.py       # CredentialManager
 ├── detection.py         # Prefix detection
 ├── errors.py            # Client errors
+├── openrouter_policy.py # Shared ZDR request-policy merge
 └── clients/
     ├── base.py          # Shared helpers
     ├── litellm.py       # Remote/local LiteLLM

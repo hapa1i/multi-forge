@@ -39,6 +39,11 @@ _VENDOR_TO_FAMILY: dict[str, str] = {
     "vertex_ai": "gemini",
     "vertex_ai_beta": "gemini",
     "google": "gemini",
+    "deepseek": "deepseek",
+    "minimax": "minimax",
+    "moonshotai": "kimi",
+    "qwen": "qwen",
+    "z-ai": "glm",
 }
 
 
@@ -208,11 +213,12 @@ class SessionContextError(RuntimeError):
 def detect_model_family(template: str | None) -> str:
     """Map a proxy template to a normalized model family name.
 
-    Loads the template config, reads the opus-tier model name,
-    and extracts the vendor prefix.
+    The template's explicit ``proxy.family`` is authoritative. Model-name
+    inference remains the fallback for legacy templates or proxy instances that predate
+    persisted family metadata.
 
     Returns:
-        ``"openai"`` | ``"gemini"`` | ``"anthropic"``
+        The template's normalized model-family identifier.
     """
     if template is None:
         return "anthropic"
@@ -221,14 +227,13 @@ def detect_model_family(template: str | None) -> str:
         from forge.config.loader import load_config
 
         cfg = load_config(template=template)
+        family = cfg.proxy.family.strip().lower()
+        if family:
+            return family
+
         provider = cfg.proxy.get_provider()
-
-        # Get the opus-tier model (most representative)
         opus_model = provider.tiers.opus
-        if not opus_model:
-            return "anthropic"
-
-        return _model_to_family(opus_model)
+        return _model_to_family(opus_model) if opus_model else "anthropic"
     except Exception:
         _log.debug("Failed to detect model family for template %r", template, exc_info=True)
         return "anthropic"
@@ -259,6 +264,16 @@ def _model_to_family(model_name: str) -> str:
         return "anthropic"
     if bare.startswith("gemini-"):
         return "gemini"
+    if bare.startswith("qwen"):
+        return "qwen"
+    if bare.startswith("glm-"):
+        return "glm"
+    if bare.startswith("deepseek-"):
+        return "deepseek"
+    if bare.startswith("minimax-"):
+        return "minimax"
+    if bare.startswith("kimi-"):
+        return "kimi"
 
     return "anthropic"
 
@@ -627,7 +642,7 @@ def _build_model_context(proxy_ctx: ProxyContext, state: SessionState | None) ->
     proxy_config = _load_proxy_instance_for_context(proxy_ctx)
     if proxy_config is not None:
         models = _proxy_instance_tier_models(proxy_config)
-        family = _family_from_models(models)
+        family = (getattr(proxy_config, "family", "") or "").strip().lower() or _family_from_models(models)
         main_model = models.get(getattr(proxy_config, "default_tier", None) or "sonnet")
         return family, models, main_model
 

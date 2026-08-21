@@ -23,7 +23,7 @@
 # NOTE: Only Anthropic caching can be controlled via input (cache_control markers).
 # OpenAI/Deepseek cache automatically - client policies have no effect on them.
 
-schema_version: 1
+schema_version: 2
 
 # =============================================================================
 # DEFAULTS - Per-provider edge picks at each tier
@@ -37,7 +37,7 @@ defaults:
     sonnet: gpt-5.6-sol
     opus: gpt-5.6-sol
   gemini:
-    haiku: gemini-3-flash-preview
+    haiku: gemini-3.7-flash
     sonnet: gemini-3.1-pro-preview
     opus: gemini-3.1-pro-preview
   anthropic:
@@ -57,13 +57,13 @@ defaults:
     sonnet: minimax-m3
     opus: minimax-m3
   qwen:
-    haiku: qwen3.6-flash
-    sonnet: qwen3.7-plus
-    opus: qwen3.7-max
+    haiku: qwen3.8-27b
+    sonnet: qwen3.8-27b
+    opus: qwen3.8-max
   glm:
     haiku: glm-4.7-flash
-    sonnet: glm-5.2
-    opus: glm-5.2
+    sonnet: glm-5.3
+    opus: glm-5.3
   kimi:
     haiku: gemma-4-31b-it
     sonnet: kimi-k3
@@ -97,7 +97,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 100  # Curated top bucket; peers Claude Fable 5 and GPT-5.5 Pro
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -122,7 +121,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 98  # Curated peer bucket with Claude Sonnet 5 and Claude Opus 4.7
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -147,7 +145,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 90
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -172,7 +169,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 99
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -197,7 +193,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 99
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -220,7 +215,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 100
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -245,7 +239,6 @@ models:
     litellm_reasoning_efforts: [medium, high, xhigh]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 100
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -270,7 +263,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 85
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -295,7 +287,6 @@ models:
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: minimal
     use_responses_api: true
-    intelligence_score: 76
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -320,7 +311,6 @@ models:
     # LiteLLM docs: gpt-5.2 supports none, low, medium, high, xhigh (no minimal)
     litellm_reasoning_efforts: [none, low, medium, high, xhigh]
     default_reasoning_effort: medium
-    intelligence_score: 98
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -346,7 +336,6 @@ models:
     litellm_reasoning_efforts: [medium, high, xhigh]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 99
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -370,7 +359,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 95
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -395,7 +383,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 90
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -420,7 +407,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 82
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -445,7 +431,6 @@ models:
     # LiteLLM docs: codex-mini supports low, medium, high only (default: adaptive)
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 77
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -470,7 +455,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 85
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -495,7 +479,6 @@ models:
     # LiteLLM docs: gpt-5.1 series supports none, low, medium, high (no minimal)
     litellm_reasoning_efforts: [none, low, medium, high]
     default_reasoning_effort: none
-    intelligence_score: 76
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -520,7 +503,6 @@ models:
     # LiteLLM docs: gpt-5-mini supports minimal, low, medium, high (no none)
     litellm_reasoning_efforts: [minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 79
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -545,7 +527,6 @@ models:
     # LiteLLM docs: gpt-5 supports minimal, low, medium, high (no none)
     litellm_reasoning_efforts: [minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 88
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -571,7 +552,6 @@ models:
     litellm_reasoning_efforts: [high]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 91
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -596,7 +576,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: medium
     use_responses_api: true
-    intelligence_score: 80
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: [code-gen]
 
@@ -621,7 +600,6 @@ models:
     # OpenAI matrix: gpt-5-nano supports minimal, low, medium, high (no none)
     litellm_reasoning_efforts: [minimal, low, medium, high]
     default_reasoning_effort: minimal
-    intelligence_score: 70
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -647,7 +625,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 76
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -672,7 +649,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 65
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -697,7 +673,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 72
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -719,7 +694,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [none, minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 60
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -741,7 +715,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [none, minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 85
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -764,7 +737,6 @@ models:
     litellm_reasoning_efforts: [none, minimal, low, medium, high]
     default_reasoning_effort: high
     use_responses_api: true
-    intelligence_score: 87
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -786,7 +758,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [none, minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 67
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -808,7 +779,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [none, minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 84
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
@@ -836,7 +806,6 @@ models:
     # minimal/low/none/disable -> low, medium/high -> high
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 99  # Peer of gpt-5.5 / Claude Opus 5
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -860,7 +829,6 @@ models:
     default_thinking_level: high
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 99  # Tracks gemini-3.1-pro-preview
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: [agentic, custom-tools]
 
@@ -884,7 +852,6 @@ models:
     # LiteLLM mapping: reasoning_effort -> thinking_level
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 80
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -911,7 +878,6 @@ models:
     # Note: Cannot disable thinking on 2.5 Pro (none still uses dynamic)
     litellm_reasoning_efforts: [none, disable, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 89
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -938,7 +904,6 @@ models:
     # none=0, disable=0, low=1024, medium=2048, high=4096
     litellm_reasoning_efforts: [none, disable, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 73
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -962,12 +927,11 @@ models:
     # LiteLLM mapping: reasoning_effort -> thinking_level
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 84
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
-  # Gemini 3.6 Flash: efficiency release built on 3.5 Flash (same measured
-  # intelligence, fewer output tokens). Google deprecates temperature/top_p/
+  # Gemini 3.6 Flash: efficiency release built on 3.5 Flash with fewer output
+  # tokens. Google deprecates temperature/top_p/
   # top_k for this model (values are ignored), so sampling overrides are off.
   # Thinking levels minimal/low/medium/high with medium the documented
   # default; derived efforts above high clamp to high at the proxy seam.
@@ -996,7 +960,34 @@ models:
     # 3.5-era aliases, unproven for 3.6 — extend only with LiteLLM test proof.
     litellm_reasoning_efforts: [minimal, low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 84  # Same measured intelligence as 3.5 Flash (efficiency release)
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
+  # Gemini 3.7 Flash: OpenRouter's successor to 3.6 Flash. It keeps the
+  # 1M/64K multimodal envelope, exposes low/medium/high reasoning, and restores
+  # sampling controls on the OpenRouter model surface. Cache accounting has not
+  # been Forge-probed yet, so prompt caching remains conservative.
+  gemini-3.7-flash:
+    friendly_name: Gemini 3.7 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: false
+    native_thinking_param: thinking_level
+    thinking_levels: [low, medium, high]
+    default_thinking_level: medium
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: medium
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -1027,7 +1018,6 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 97
     tags: []
 
   # --- Claude 4.7 Series ---
@@ -1055,7 +1045,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 98
     tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
@@ -1084,7 +1073,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 98  # Displaced by Opus 5; peer of Sonnet 5 / Opus 4.7
     tags: []
 
   # --- Claude Opus 5 ---
@@ -1116,7 +1104,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 99  # Below Fable 5; peer of gpt-5.5 / Gemini 3.1 Pro
     tags: []  # Default opus tier (anthropic + openrouter)
 
   # --- Claude Fable Series ---
@@ -1147,7 +1134,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 100
     tags: [opt-in]
 
   # --- Claude Sonnet 5 ---
@@ -1177,7 +1163,6 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 98  # Peer of Opus 4.8 / Opus 4.7 (all 98); below Opus 5 (99)
     tags: []
 
   claude-sonnet-4-6:
@@ -1202,7 +1187,6 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 92
     tags: []
 
   # 1M context variants (requires anthropic-beta header via LiteLLM extra_headers)
@@ -1228,7 +1212,6 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 97
     tags: []
 
   claude-sonnet-4-6-1m:
@@ -1253,7 +1236,6 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 92
     tags: []
 
   # --- Claude 4.5 Series ---
@@ -1281,7 +1263,6 @@ models:
     # LiteLLM mapping: reasoning_effort -> output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 96
     tags: []
 
   claude-sonnet-4-5-20250929:
@@ -1307,7 +1288,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 90
     tags: []
 
   claude-haiku-4-5-20251001:
@@ -1333,7 +1313,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 81
     tags: []
 
   # ---------------------------------------------------------------------------
@@ -1360,7 +1339,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [high, xhigh]
     default_reasoning_effort: high
-    intelligence_score: 82
     tags: [code-gen]
 
   deepseek-v4-pro:
@@ -1385,7 +1363,6 @@ models:
     # OpenRouter exposes only the upper effort tiers for V4 Pro
     litellm_reasoning_efforts: [high, xhigh]
     default_reasoning_effort: high
-    intelligence_score: 88
     tags: [code-gen]
 
   kimi-k2.5:
@@ -1409,7 +1386,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 86
     tags: [agentic, code-gen, vision]
 
   kimi-k2.6:
@@ -1433,15 +1409,39 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 89
+    tags: [agentic, code-gen, vision]
+
+  # Kimi K2.7 Code: coding-specialized, always-thinking K2 model. OpenRouter
+  # exposes the generic reasoning object but not a model-specific effort enum,
+  # so Forge leaves reasoning effort unset and preserves the provider default.
+  kimi-k2.7-code:
+    friendly_name: Kimi K2.7 Code
+    context_window_tokens: 262144
+    max_output_tokens: 262144
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
     tags: [agentic, code-gen, vision]
 
   # Kimi K3: strongest open-weight model, placed with Opus 4.8 / Sonnet 5.
   # Fixed sampling (unlike the K2.x range surface). Native reasoning_effort
-  # levels are low/high/max with max the provider-side default; Forge's effort
-  # vocabulary has no "max" (reasoning.py EFFORT_RANK tops out at xhigh), so
-  # the catalog advertises [low, high], the bundled template pins high, and
-  # derived efforts above high clamp to high at the proxy seam.
+  # levels are low/high/max with max the provider-side default. The bundled
+  # template deliberately retains high for both tiers to avoid changing its
+  # established cost/latency posture as part of transport support for max.
   # max_output_tokens is the provider DEFAULT cap (raisable to 1,048,576);
   # Forge keeps the default as a deliberate conservative cap.
   # supports_images covers Forge's OpenRouter route (text+image); Moonshot's
@@ -1463,9 +1463,8 @@ models:
       mechanism: auto
       min_tokens: 1024
     native_thinking_param: reasoning_effort
-    litellm_reasoning_efforts: [low, high]
-    default_reasoning_effort: high
-    intelligence_score: 98  # Strongest open-weight; peer of Opus 4.8 / Sonnet 5
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: max
     tags: [agentic, code-gen, vision]
 
   qwen3.6-plus:
@@ -1487,7 +1486,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 88
     tags: [agentic, code-gen, vision]
 
   qwen3.6-flash:
@@ -1509,7 +1507,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 82
     tags: [agentic, code-gen, vision]
 
   qwen3.6-max-preview:
@@ -1531,7 +1528,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 90
     tags: [agentic, code-gen]
 
   # Qwen3.7: successor generation. Plus is the qwen sonnet default (multimodal,
@@ -1558,7 +1554,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 89  # Above Qwen3.6 Plus (88)
     tags: [agentic, code-gen, vision]
 
   qwen3.7-max:
@@ -1582,8 +1577,80 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 92  # GA flagship; above GLM-5.2 / Qwen3.6 Max Preview (both 90)
     tags: [agentic, code-gen]
+
+  # Qwen3.8: 27B is the balanced multimodal tier; Max is the proprietary
+  # flagship. The 2.4T A95B open-weight Max variant is the ZDR fallback.
+  qwen3.8-27b:
+    friendly_name: Qwen3.8 27B
+    context_window_tokens: 1000000
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, medium, xhigh]
+    default_reasoning_effort: xhigh
+    tags: [agentic, code-gen, vision, open-weights]
+
+  qwen3.8-2.4t-a95b:
+    friendly_name: Qwen3.8 2.4T A95B
+    context_window_tokens: 1048576
+    max_output_tokens: 262144
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenRouter advertises reasoning_effort support but does not publish a
+    # stable effort enum for this model; preserve the provider default.
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    tags: [agentic, code-gen, open-weights]
+
+  qwen3.8-max:
+    friendly_name: Qwen3.8 Max
+    context_window_tokens: 1000000
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [minimal, low, medium, high, xhigh]
+    default_reasoning_effort: xhigh
+    tags: [agentic, code-gen, vision]
 
   qwen3-coder:
     friendly_name: Qwen3 Coder 480B A35B
@@ -1604,7 +1671,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 84
     tags: [code-gen]
 
   minimax-m2.5:
@@ -1626,7 +1692,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: medium
-    intelligence_score: 84
     tags: [agentic]
 
   minimax-m2.7:
@@ -1648,7 +1713,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 86
     tags: [agentic]
 
   minimax-m3:
@@ -1673,10 +1737,8 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    # Vendor benchmarks (SWE-Bench Pro 59%, Terminal-Bench 2.1 66%) claim
-    # parity with the proprietary frontier but are unverified, so scored just
-    # above qwen3.6-max (90), below Qwen3.7 Max (92) and Kimi K3 (98).
-    intelligence_score: 91
+    # Vendor benchmarks (SWE-Bench Pro 59%, Terminal-Bench 2.1 66%) are
+    # unverified release context; they do not define catalog routing or defaults.
     tags: [agentic, code-gen]
 
   glm-4.7-flash:
@@ -1700,7 +1762,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 78
     tags: [agentic]
 
   glm-5.1:
@@ -1724,7 +1785,6 @@ models:
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 87
     tags: [agentic, code-gen]
 
   glm-5.2:
@@ -1749,7 +1809,31 @@ models:
     # OpenRouter z-ai/glm-5.2 advertises only high and xhigh (xhigh is the highest effort it exposes); no low/medium.
     litellm_reasoning_efforts: [high, xhigh]
     default_reasoning_effort: high
-    intelligence_score: 90
+    tags: [agentic, code-gen]
+
+  glm-5.3:
+    friendly_name: GLM 5.3
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenRouter advertises low/high/max; max is provider reasoning effort,
+    # distinct from the core.llm checker vocabulary.
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: max
     tags: [agentic, code-gen]
 
   gemma-4-31b-it:
@@ -1771,7 +1855,6 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    intelligence_score: 78
     tags: [open-weights, vision]
 
 
@@ -1821,6 +1904,7 @@ aliases:
   vertex_ai/gemini-2.5-flash: gemini-2.5-flash
   vertex_ai/gemini-3.5-flash: gemini-3.5-flash
   vertex_ai/gemini-3.6-flash: gemini-3.6-flash
+  vertex_ai/gemini-3.7-flash: gemini-3.7-flash
 
   # Google AI Studio provider prefix (LiteLLM style)
   gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1830,6 +1914,7 @@ aliases:
   gemini/gemini-2.5-flash: gemini-2.5-flash
   gemini/gemini-3.5-flash: gemini-3.5-flash
   gemini/gemini-3.6-flash: gemini-3.6-flash
+  gemini/gemini-3.7-flash: gemini-3.7-flash
 
   # Google provider prefix (OpenRouter style)
   google/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1838,6 +1923,7 @@ aliases:
   google/gemini-2.5-flash: gemini-2.5-flash
   google/gemini-3.5-flash: gemini-3.5-flash
   google/gemini-3.6-flash: gemini-3.6-flash
+  google/gemini-3.7-flash: gemini-3.7-flash
 
   # Anthropic provider prefix + friendly aliases
   # Opus 4.6
@@ -1920,9 +2006,11 @@ aliases:
   # Kimi / MoonshotAI (via OpenRouter)
   moonshotai/kimi-k2.5: kimi-k2.5
   moonshotai/kimi-k2.6: kimi-k2.6
+  moonshotai/kimi-k2.7-code: kimi-k2.7-code
   moonshotai/kimi-k3: kimi-k3
   kimi-k2-5: kimi-k2.5
   kimi-k2-6: kimi-k2.6
+  kimi-k2-7-code: kimi-k2.7-code
 
   # Qwen (via OpenRouter)
   qwen/qwen3.6-flash: qwen3.6-flash
@@ -1930,6 +2018,9 @@ aliases:
   qwen/qwen3.6-max-preview: qwen3.6-max-preview
   qwen/qwen3.7-plus: qwen3.7-plus
   qwen/qwen3.7-max: qwen3.7-max
+  qwen/qwen3.8-27b: qwen3.8-27b
+  qwen/qwen3.8-2.4t-a95b: qwen3.8-2.4t-a95b
+  qwen/qwen3.8-max: qwen3.8-max
   qwen/qwen3-coder: qwen3-coder
   qwen3-6-flash: qwen3.6-flash
   qwen3-6-plus: qwen3.6-plus
@@ -1937,6 +2028,9 @@ aliases:
   qwen3-6-max: qwen3.6-max-preview
   qwen3-7-plus: qwen3.7-plus
   qwen3-7-max: qwen3.7-max
+  qwen3-8-27b: qwen3.8-27b
+  qwen3-8-2-4t-a95b: qwen3.8-2.4t-a95b
+  qwen3-8-max: qwen3.8-max
   qwen-coder: qwen3-coder
 
   # MiniMax / Z.ai / Google / Mistral (via OpenRouter)
@@ -1948,8 +2042,10 @@ aliases:
   z-ai/glm-4.7-flash: glm-4.7-flash
   z-ai/glm-5.1: glm-5.1
   z-ai/glm-5.2: glm-5.2
+  z-ai/glm-5.3: glm-5.3
   glm-4-7-flash: glm-4.7-flash
   glm-5-1: glm-5.1
   glm-5-2: glm-5.2
+  glm-5-3: glm-5.3
   google/gemma-4-31b-it: gemma-4-31b-it
   gemma-4-31b: gemma-4-31b-it

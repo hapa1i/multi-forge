@@ -36,7 +36,6 @@ class ModelSpec:
 
     # Basic identity
     friendly_name: str
-    intelligence_score: int
 
     # Token limits
     context_window_tokens: int
@@ -94,8 +93,6 @@ class ModelSpec:
             raise ValueError(f"max_output_tokens must be > 0, got {self.max_output_tokens}")
         if self.max_thinking_tokens is not None and self.max_thinking_tokens <= 0:
             raise ValueError(f"max_thinking_tokens must be > 0 or null, got {self.max_thinking_tokens}")
-        if not (0 <= self.intelligence_score <= 100):
-            raise ValueError(f"intelligence_score must be 0-100, got {self.intelligence_score}")
         if self.token_estimate_multiplier <= 0:
             raise ValueError(f"token_estimate_multiplier must be > 0, got {self.token_estimate_multiplier}")
         if self.temperature_constraint == "fixed":

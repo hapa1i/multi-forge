@@ -54,7 +54,6 @@ def _print_catalog(catalog: ModelCatalog, console: Console) -> None:
     table = Table(title="Forge Model Catalog")
     table.add_column("MODEL", style="cyan")
     table.add_column("NAME")
-    table.add_column("SCORE", justify="right")
     table.add_column("CONTEXT", justify="right")
     table.add_column("OUTPUT", justify="right")
     table.add_column("CAPABILITIES")
@@ -63,7 +62,6 @@ def _print_catalog(catalog: ModelCatalog, console: Console) -> None:
         table.add_row(
             record["model_id"],
             record["friendly_name"],
-            str(record["intelligence_score"]),
             str(record["context_window_tokens"]),
             str(record["max_output_tokens"]),
             _capabilities(catalog.models[record["model_id"]]),

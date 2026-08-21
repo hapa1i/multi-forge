@@ -16,9 +16,10 @@ from urllib.parse import urlparse
 
 from forge.config import config
 from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
+from forge.core.llm.openrouter_policy import with_openrouter_zdr
 from forge.core.llm.types import (
     ModelHyperparameters,
-    ReasoningEffort,
+    ModelReasoningEffort,
     ThinkingConfig,
     Verbosity,
 )
@@ -375,9 +376,11 @@ class TierClientFactory:
         catalog_strict = provider != ModelProvider.OPENROUTER
         max_tokens_override = _enforce_max_output_tokens_cap(model_name, None, strict=catalog_strict)
 
-        tier_reasoning: ReasoningEffort | None
+        tier_reasoning: ModelReasoningEffort | None
         if tier_override and tier_override.reasoning_effort is not None:
-            tier_reasoning = cast(ReasoningEffort, tier_override.reasoning_effort)  # validated by ModelHyperparameters
+            tier_reasoning = cast(
+                ModelReasoningEffort, tier_override.reasoning_effort
+            )  # validated by ModelHyperparameters
         else:
             tier_reasoning = None
 
@@ -401,6 +404,11 @@ class TierClientFactory:
             verbosity=tier_verbosity,
             thinking=thinking_config,
         )
+        if provider == ModelProvider.OPENROUTER and not getattr(provider_cfg, "allow_non_zdr", False):
+            # Request-level enforcement is authoritative even when the endpoint
+            # audit is stale. Account/guardrail policy can strengthen this, never
+            # weaken it; the proxy-owned opt-out is handled by the gate above.
+            default_hyperparams = with_openrouter_zdr(default_hyperparams)
 
         # temperature: tier_override only
         if tier_override and tier_override.temperature is not None:

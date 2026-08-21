@@ -21,7 +21,7 @@ from forge.core.models.types import (
 logger = logging.getLogger(__name__)
 
 # Supported schema versions (reject unknown)
-SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2})
 
 # Module-level singleton (lazy-loaded)
 _catalog: ModelCatalog | None = None
@@ -127,7 +127,6 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
         "supports_images",
         "temperature_constraint",
         "temperature",
-        "intelligence_score",
     }
 
     missing = required_fields - set(data.keys())
@@ -179,7 +178,6 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
         return ModelSpec(
             friendly_name=str(data["friendly_name"]),
             short_name=short_name,
-            intelligence_score=int(data["intelligence_score"]),
             context_window_tokens=int(data["context_window_tokens"]),
             max_output_tokens=int(data["max_output_tokens"]),
             max_thinking_tokens=int(data["max_thinking_tokens"]) if data.get("max_thinking_tokens") else None,

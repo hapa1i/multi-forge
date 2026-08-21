@@ -267,6 +267,7 @@ def test_bug_codeql_32_retention_failure_no_exception_detail(
     provider = SimpleNamespace(tiers=SimpleNamespace(haiku="m1", sonnet="m2", opus="m3"))
     proxy = SimpleNamespace(
         get_provider=lambda _name=None: provider,
+        preferred_provider="litellm",
         default_tier="sonnet",
         wire_shape="openai_translated",
         intercept=None,

@@ -650,6 +650,50 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
     return fallback_model
 
 
+_BUILTIN_OPENROUTER_ZDR_FALLBACKS = {
+    # Full bundled-default/alternative audit against OpenRouter's ZDR endpoint
+    # catalog on 2026-08-21. These were the seven slugs without an eligible
+    # endpoint. Request-level provider.zdr remains authoritative if this dated
+    # snapshot becomes stale in either direction.
+    "anthropic/claude-fable-5": "anthropic/claude-opus-5",
+    "qwen/qwen3.6-flash": "qwen/qwen3.8-27b",
+    "qwen/qwen3.6-plus": "qwen/qwen3.8-27b",
+    "qwen/qwen3.6-max-preview": "qwen/qwen3.8-2.4t-a95b",
+    "qwen/qwen3.7-plus": "qwen/qwen3.8-27b",
+    "qwen/qwen3.7-max": "qwen/qwen3.8-2.4t-a95b",
+    "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
+}
+
+
+def _openrouter_zdr_fallbacks(provider_cfg: object) -> dict[str, str]:
+    """Return built-in ZDR fallbacks plus user-owned replacements."""
+    fallbacks = dict(_BUILTIN_OPENROUTER_ZDR_FALLBACKS)
+    fallbacks.update(getattr(provider_cfg, "zdr_fallbacks", {}))
+    return fallbacks
+
+
+def _model_for_zdr_policy(model_name: str) -> str:
+    """Apply a configured safe fallback when OpenRouter ZDR is required.
+
+    The request path still sends ``provider.zdr=true`` for every model. This
+    local mapping avoids dispatching models already known to have no ZDR
+    endpoint; unknown or stale cases remain fail-closed at OpenRouter.
+    """
+    if config.proxy.preferred_provider != "openrouter":
+        return model_name
+
+    provider_cfg = config.proxy.get_provider("openrouter")
+    if getattr(provider_cfg, "allow_non_zdr", False):
+        return model_name
+
+    lookup = model_name.removesuffix("[1m]")
+    fallback = _openrouter_zdr_fallbacks(provider_cfg).get(lookup)
+    if fallback:
+        logger.info("Required-ZDR routing replaced model %r with %r", model_name, fallback)
+        return fallback
+    return model_name
+
+
 def _resolve_model_with_alternatives(
     request_data: MessagesRequest | TokenCountRequest,
 ) -> _ResolvedModelRoute:
@@ -678,6 +722,7 @@ def _resolve_model_with_alternatives(
     else:
         tier_default = config.proxy.get_model_for_tier(resolved_tier)
         actual_model_id = _model_alternative_or_default(resolved_tier, original_model_name, tier_default)
+    actual_model_id = _model_for_zdr_policy(actual_model_id)
 
     return _ResolvedModelRoute(
         tier=resolved_tier,
@@ -1724,11 +1769,20 @@ async def root(request: Request):
     # Tier mappings exposed via GET / for status line and session context
     tiers = {}
     provider_config = config.proxy.get_provider(preferred_provider)
-    tier_models = {
+    configured_tier_models = {
         "haiku": provider_config.tiers.haiku,
         "sonnet": provider_config.tiers.sonnet,
         "opus": provider_config.tiers.opus,
     }
+    tier_models = {tier: _model_for_zdr_policy(model) for tier, model in configured_tier_models.items()}
+    relevant_zdr_fallbacks: dict[str, str] = {}
+    if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False):
+        configured_models = {model.removesuffix("[1m]") for model in configured_tier_models.values()}
+        relevant_zdr_fallbacks = {
+            primary: fallback
+            for primary, fallback in _openrouter_zdr_fallbacks(provider_config).items()
+            if primary in configured_models
+        }
 
     for tier, model in tier_models.items():
         tiers[tier] = {
@@ -1776,9 +1830,18 @@ async def root(request: Request):
         "template": active_template,
         "provider": preferred_provider,
         "tier_mappings": tier_models,
+        "configured_tier_mappings": configured_tier_models,
         "context_windows": {tier: get_context_window(model) for tier, model in tier_models.items()},
         "active_tier": default_tier,
         "active_context_window": get_context_window(runtime_active_model) if runtime_active_model else None,
+        "data_policy": {
+            "zdr": (
+                "required"
+                if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False)
+                else "allow_non_zdr" if preferred_provider == "openrouter" else "not_applicable"
+            ),
+            "zdr_fallbacks": relevant_zdr_fallbacks,
+        },
         # Proxy-owned hyperparameter defaults actually used by proxy clients (post-merge)
         "llm_defaults_by_tier": llm_defaults_by_tier,
     }

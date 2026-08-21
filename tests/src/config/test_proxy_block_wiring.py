@@ -61,9 +61,11 @@ _SHARED_NON_BLOCK_MARKERS: dict[str, object] = {
 }
 
 _PROVIDER_DIRECT_MARKERS: dict[str, object] = {
+    "allow_non_zdr": True,
     "model_alternatives": {"opus": {"claude-opus-4-8": "anthropic/claude-opus-4-8"}},
     "prompt_caching": "auto_inject",
     "auto_cache_min_tokens": 4096,
+    "zdr_fallbacks": {"qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b"},
 }
 
 

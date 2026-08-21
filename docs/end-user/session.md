@@ -692,8 +692,9 @@ auto-switches the fork (with an info line), and `--resume-mode transfer` opts in
 fork generates the transfer file and starts a *fresh* child Claude session — the same file-based transfer that
 `--worktree` and `--into` forks always use. `--resume-mode native-relocate` remains worktree/`--into`-only.
 
-`ai-curated` uses OpenRouter directly and requires `OPENROUTER_API_KEY`. If OpenRouter auth is unavailable, Forge warns
-and falls back to the deterministic `structured` strategy.
+`ai-curated` uses OpenRouter directly, always requires a ZDR endpoint, and requires `OPENROUTER_API_KEY`. Proxy-level
+non-ZDR opt-outs do not apply. If OpenRouter auth or a ZDR route is unavailable, Forge warns and falls back to the
+deterministic `structured` strategy.
 
 **Use case: Plan -> Execute -> Review workflow:**
 
@@ -756,10 +757,10 @@ lane to the child, which re-freezes on its own first check. See [policy.md](poli
 ```bash
 # Fork with the tier-1 plan check (cascade) and a specific checker model/provider
 forge session fork planner --worktree --supervise \
-  --cascade --checker-model google/gemini-3.6-flash --checker-provider openrouter
+  --cascade --checker-model google/gemini-3.7-flash --checker-provider openrouter
 
 # Same knobs on session start
-forge session start executor --supervise planner --cascade --checker-model google/gemini-3.6-flash
+forge session start executor --supervise planner --cascade --checker-model google/gemini-3.7-flash
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the

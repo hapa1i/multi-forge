@@ -7,8 +7,9 @@ Two distinct effort vocabularies exist and must not be conflated:
   ``claude -p`` subprocess: the supervisor frontier, the memory writer, shadow
   curation, the team supervisor, and the workflow fan-out.
 - core.llm ``ReasoningEffort`` (``none/low/medium/high/xhigh``; ``none`` is
-  API-only) -- used for the tier-1 plan checker, which is a ``core.llm`` call,
-  not a ``claude -p`` subprocess.
+  API-only) -- the user-facing tier-1 plan-checker vocabulary. Provider
+  transports use a separate catalog-aware union that can also include labels
+  such as ``minimal``, ``disable``, or ``max``.
 
 This module is a dependency-light leaf (typing only) so the foundational
 ``forge.session.models`` dataclasses can validate Claude-effort fields without
@@ -23,8 +24,9 @@ from __future__ import annotations
 from typing import Literal, get_args
 
 # The claude CLI's --effort levels (confirmed from `claude --help`). `max` has no
-# core.llm ReasoningEffort equivalent; `none` (a ReasoningEffort value) is NOT a
-# valid `claude --effort` level.
+# tier-1 checker ReasoningEffort equivalent; `none` (a ReasoningEffort value) is
+# NOT a valid `claude --effort` level. Provider transports may independently
+# support either label through their model-specific catalogs.
 ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 
 CLAUDE_EFFORT_LEVELS: tuple[str, ...] = get_args(ClaudeEffort)

@@ -24,7 +24,6 @@ def _minimal_model_data() -> dict:
         "supports_images": False,
         "temperature_constraint": "range",
         "temperature": {"min": 0.0, "default": 1.0, "max": 2.0},
-        "intelligence_score": 50,
         "tags": [],
     }
 
@@ -32,7 +31,7 @@ def _minimal_model_data() -> dict:
 def _minimal_catalog_data() -> dict:
     """Return minimal valid catalog data for testing."""
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "models": {"test-model": _minimal_model_data()},
         "aliases": {},
     }
@@ -63,14 +62,6 @@ class TestModelFieldValidation:
         data["max_output_tokens"] = -1
 
         with pytest.raises((ModelCatalogError, ValueError), match="max_output_tokens must be > 0"):
-            _parse_model_spec("test", data)
-
-    def test_rejects_invalid_intelligence_score(self):
-        """intelligence_score outside 0-100 raises error."""
-        data = _minimal_model_data()
-        data["intelligence_score"] = 150
-
-        with pytest.raises((ModelCatalogError, ValueError), match="intelligence_score must be 0-100"):
             _parse_model_spec("test", data)
 
 
@@ -274,7 +265,6 @@ class TestTypeValidation:
         with pytest.raises(ValueError, match="context_window_tokens must be > 0"):
             ModelSpec(
                 friendly_name="Test",
-                intelligence_score=50,
                 context_window_tokens=0,
                 max_output_tokens=1000,
                 supports_thinking=False,
@@ -389,12 +379,16 @@ class TestOpenRouterOpenModelsCatalog:
             "deepseek/deepseek-v4-pro": ("deepseek-v4-pro", 1048576, 384000),
             "moonshotai/kimi-k2.5": ("kimi-k2.5", 262144, 262144),
             "moonshotai/kimi-k2.6": ("kimi-k2.6", 32768, 32768),
+            "moonshotai/kimi-k2.7-code": ("kimi-k2.7-code", 262144, 262144),
             "moonshotai/kimi-k3": ("kimi-k3", 1048576, 131072),
             "qwen/qwen3.6-flash": ("qwen3.6-flash", 1000000, 65536),
             "qwen/qwen3.6-plus": ("qwen3.6-plus", 1000000, 65536),
             "qwen/qwen3.6-max-preview": ("qwen3.6-max-preview", 262144, 65536),
             "qwen/qwen3.7-plus": ("qwen3.7-plus", 1000000, 65536),
             "qwen/qwen3.7-max": ("qwen3.7-max", 1000000, 65536),
+            "qwen/qwen3.8-27b": ("qwen3.8-27b", 1000000, 131072),
+            "qwen/qwen3.8-2.4t-a95b": ("qwen3.8-2.4t-a95b", 1048576, 262144),
+            "qwen/qwen3.8-max": ("qwen3.8-max", 1000000, 131072),
             "qwen/qwen3-coder": ("qwen3-coder", 262144, 65536),
             "minimax/minimax-m2.5": ("minimax-m2.5", 196608, 196608),
             "minimax/minimax-m2.7": ("minimax-m2.7", 196608, 131072),
@@ -402,6 +396,7 @@ class TestOpenRouterOpenModelsCatalog:
             "z-ai/glm-4.7-flash": ("glm-4.7-flash", 202752, 16384),
             "z-ai/glm-5.1": ("glm-5.1", 202752, 202752),
             "z-ai/glm-5.2": ("glm-5.2", 1048576, 131072),
+            "z-ai/glm-5.3": ("glm-5.3", 1048576, 131072),
             "google/gemma-4-31b-it": ("gemma-4-31b-it", 262144, 16384),
         }
 
@@ -417,16 +412,20 @@ class TestOpenRouterOpenModelsCatalog:
         for model_id in (
             "kimi-k2.5",
             "kimi-k2.6",
+            "kimi-k2.7-code",
             "kimi-k3",
             "qwen3.6-flash",
             "qwen3.6-plus",
             "qwen3.7-plus",
+            "qwen3.8-27b",
+            "qwen3.8-max",
             "gemma-4-31b-it",
         ):
             assert catalog.get(model_id).supports_images is True
 
         assert catalog.get("qwen3.6-max-preview").supports_images is False
         assert catalog.get("qwen3.7-max").supports_images is False
+        assert catalog.get("qwen3.8-2.4t-a95b").supports_images is False
         assert catalog.get("qwen3-coder").supports_thinking is False
 
     def test_glm_52_reasoning_effort_list_is_high_xhigh_only(self):
@@ -442,6 +441,14 @@ class TestOpenRouterOpenModelsCatalog:
         spec = catalog.get("glm-5.2")
         assert spec.litellm_reasoning_efforts == ("high", "xhigh")
         assert spec.default_reasoning_effort == "high"
+
+    def test_glm_53_reasoning_effort_list_matches_openrouter(self):
+        """GLM 5.3 replaces xhigh with the provider's max effort label."""
+        catalog = load_model_catalog(force_reload=True)
+
+        spec = catalog.get("glm-5.3")
+        assert spec.litellm_reasoning_efforts == ("low", "high", "max")
+        assert spec.default_reasoning_effort == "max"
 
 
 class TestSystemPromptAddendumValidation:

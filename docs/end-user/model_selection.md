@@ -107,9 +107,13 @@ not need separate proxies just to compare Claude versions:
 # Planner/supervisor source on the proxy's default opus tier (Opus 5)
 forge session start planner --proxy openrouter-anthropic
 
-# Executor pinned to an alternative exposed by the same proxy (e.g. Fable 5 or Opus 4.6)
-forge session start exec --proxy openrouter-anthropic --model claude-fable-5 --supervise planner
+# Executor pinned to a ZDR-compatible alternative exposed by the same proxy
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
+
+Fable 5 is also exposed as an alternative, but OpenRouter's 2026-08-21 endpoint catalog had no ZDR route for it. The
+default required-ZDR policy therefore dispatches Opus 5; using Fable itself requires the explicit non-ZDR opt-out
+described in [proxy.md](proxy.md#openrouter-zero-data-retention-zdr).
 
 The executor's `--model` pin changes routing for that session's main Claude process. Proxied supervisor calls clear
 inherited Claude model-pin environment variables and pass `--model opus`, so the proxy resolves the supervisor through
@@ -251,7 +255,8 @@ strengths matter.
 | Memory writer               | Stop enqueues; a later CLI drain launches it        | `src/forge/session/memory_writer.py`                         |
 
 Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
-need runtime readiness for workflow workers, including the cached preflight state of the opt-in `codex` worker.
+need runtime readiness for workflow workers, including the cached preflight state of the opt-in `codex` worker. The
+catalog reports intrinsic capabilities and explicit defaults; Forge does not assign comparative intelligence scores.
 
 For the panel and debate model specs, see `src/forge/review/models.py`. To add a new model alternative or change the
 default tier mapping, edit the proxy template under `src/forge/config/defaults/templates/` and reset proxies that use it

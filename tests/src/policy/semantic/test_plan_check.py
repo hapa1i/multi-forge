@@ -302,7 +302,7 @@ class TestRunPlanCheck:
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
-    def test_default_route_uses_openrouter_gemini_35(
+    def test_default_route_uses_openrouter_gemini_37(
         self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
     ) -> None:
         mock_adapter = MagicMock()
@@ -312,6 +312,7 @@ class TestRunPlanCheck:
         policy = PlanCheckPolicy(config=_make_config(plan_override_path=None))
         route = resolve_plan_check_route(policy._config)
         assert route.model == DEFAULT_PLAN_CHECK_MODEL
+        assert route.model == "google/gemini-3.7-flash"
         assert route.provider == "openrouter"
         assert DEFAULT_PLAN_CHECK_BUDGET_TOKENS == 32_000
 
@@ -448,6 +449,8 @@ class TestRunPlanCheck:
         resolve_model.assert_not_called()
         forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]
         assert forwarded["X-Request-ID"].startswith("req_")
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -544,6 +547,8 @@ class TestRunPlanCheckProviderUser:
 
         user = self._user_in(mock_adapter)
         assert user is not None and user.startswith("forge_sess_") and user.endswith("_plan_check")
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -565,6 +570,8 @@ class TestRunPlanCheckProviderUser:
         )
 
         assert self._user_in(mock_adapter) is None
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp.extra["openai"]["extra_body"]["provider"] == {"zdr": True}
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")

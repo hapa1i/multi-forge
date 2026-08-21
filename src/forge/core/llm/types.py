@@ -8,7 +8,15 @@ from typing import Any, Literal, Self, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
+# User-facing tier-1 checker vocabulary. Keep this narrower than the transport
+# vocabulary so checker CLI validation does not silently acquire provider-only
+# labels when a new model is cataloged.
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
+
+# Union of reasoning labels accepted by cataloged model providers. This is the
+# wire-facing type used by ModelHyperparameters; individual model constraints
+# are enforced from model_catalog.yaml at the proxy boundary.
+ModelReasoningEffort = Literal["none", "disable", "minimal", "low", "medium", "high", "xhigh", "max"]
 Verbosity = Literal["low", "medium", "high", "xhigh", "max"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 StreamEventType = Literal["text_delta", "tool_call_delta", "response_end", "usage", "error"]
@@ -92,7 +100,7 @@ class ModelHyperparameters(BaseModel):
     max_tokens: int = 4096
     temperature: float | None = None
     top_p: float | None = None
-    reasoning_effort: ReasoningEffort | None = None
+    reasoning_effort: ModelReasoningEffort | None = None
     thinking: ThinkingConfig | None = None
     verbosity: Verbosity | None = None
     timeout: int | None = None  # Request timeout in seconds (None = use model default)

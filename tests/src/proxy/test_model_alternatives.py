@@ -15,17 +15,22 @@ def _ensure_runtime(monkeypatch):
     monkeypatch.setattr(server, "reload", lambda: None)
 
     class ProviderCfg:
-        tiers = type("T", (), {"haiku": "h-model", "sonnet": "s-model", "opus": "o-model"})()
-        model_alternatives = {
-            "opus": {
-                "claude-opus-4-8": "anthropic/claude-opus-4.8",
-            },
-        }
+        def __init__(self):
+            self.tiers = SimpleNamespace(haiku="h-model", sonnet="s-model", opus="o-model")
+            self.allow_non_zdr = False
+            self.zdr_fallbacks = {}
+            self.model_alternatives = {
+                "opus": {
+                    "claude-opus-4-8": "anthropic/claude-opus-4.8",
+                },
+            }
 
     class ProxyCfg:
         default_tier = "sonnet"
         preferred_provider = "openrouter"
-        _provider = ProviderCfg()
+
+        def __init__(self):
+            self._provider = ProviderCfg()
 
         def get_model_for_tier(self, tier: str) -> str:
             return getattr(self._provider.tiers, tier, "s-model")
@@ -70,11 +75,69 @@ class TestResolveModelWithAlternatives:
         result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8[1m]"))
         assert result.model == "anthropic/claude-opus-4.8"
 
+    def test_required_zdr_routes_known_non_zdr_model_to_safe_fallback(self):
+        proxy_cfg = server.config.proxy
+        proxy_cfg._provider.tiers.opus = "qwen/qwen3.8-max"
+        proxy_cfg._provider.zdr_fallbacks = {
+            "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
+        }
+
+        result = server._resolve_model_with_alternatives(self._request("claude-opus"))
+
+        assert result.model == "qwen/qwen3.8-2.4t-a95b"
+
+    @pytest.mark.parametrize(
+        ("source", "fallback"),
+        [
+            ("anthropic/claude-fable-5", "anthropic/claude-opus-5"),
+            ("qwen/qwen3.6-flash", "qwen/qwen3.8-27b"),
+            ("qwen/qwen3.6-plus", "qwen/qwen3.8-27b"),
+            ("qwen/qwen3.6-max-preview", "qwen/qwen3.8-2.4t-a95b"),
+            ("qwen/qwen3.7-plus", "qwen/qwen3.8-27b"),
+            ("qwen/qwen3.7-max", "qwen/qwen3.8-2.4t-a95b"),
+            ("qwen/qwen3.8-max", "qwen/qwen3.8-2.4t-a95b"),
+        ],
+    )
+    def test_builtin_fallbacks_cover_audited_non_zdr_routes(self, source, fallback):
+        assert server._model_for_zdr_policy(source) == fallback
+
+    def test_zdr_fallback_target_is_exact_and_drops_client_lookup_suffix(self):
+        assert server._model_for_zdr_policy("anthropic/claude-fable-5[1m]") == "anthropic/claude-opus-5"
+
+    def test_allow_non_zdr_keeps_primary_model(self):
+        proxy_cfg = server.config.proxy
+        proxy_cfg._provider.tiers.opus = "qwen/qwen3.8-max"
+        proxy_cfg._provider.zdr_fallbacks = {
+            "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
+        }
+        proxy_cfg._provider.allow_non_zdr = True
+
+        result = server._resolve_model_with_alternatives(self._request("claude-opus"))
+
+        assert result.model == "qwen/qwen3.8-max"
+
+    def test_configured_zdr_fallback_replaces_builtin_target(self):
+        proxy_cfg = server.config.proxy
+        proxy_cfg._provider.tiers.opus = "qwen/qwen3.8-max"
+        proxy_cfg._provider.zdr_fallbacks = {
+            "qwen/qwen3.8-max": "qwen/qwen3.8-27b",
+        }
+
+        result = server._resolve_model_with_alternatives(self._request("claude-opus"))
+
+        assert result.model == "qwen/qwen3.8-27b"
+
+    def test_required_zdr_keeps_unknown_model_for_provider_enforcement(self):
+        result = server._resolve_model_with_alternatives(self._request("qwen/unknown-zdr-status"))
+
+        assert result.model == "qwen/unknown-zdr-status"
+
     def test_provider_error_degrades_to_fallback(self, monkeypatch):
         def _broken_provider(name=None):
             raise RuntimeError("config unavailable")
 
         proxy_cfg = server.config.proxy
+        proxy_cfg.preferred_provider = "litellm"
         monkeypatch.setattr(proxy_cfg, "get_provider", _broken_provider)
         monkeypatch.setattr(server, "map_model_name", lambda _: "o-model")
         result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8"))

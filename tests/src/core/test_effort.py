@@ -56,7 +56,7 @@ class TestValidateReasoningEffort:
     def test_accepts_each_level(self, level):
         validate_reasoning_effort(level)
 
-    def test_rejects_claude_only_max(self):
+    def test_rejects_non_checker_max(self):
         with pytest.raises(ValueError, match="reasoning_effort must be one of"):
             validate_reasoning_effort("max")
 

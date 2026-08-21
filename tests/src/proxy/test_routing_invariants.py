@@ -206,14 +206,25 @@ async def _capture_openrouter_request(
 
     monkeypatch.setattr(server.client_factory, "get_client", _fake_get_client)
 
+    class ProviderCfg:
+        model_alternatives: dict[str, dict[str, str]] = {}
+        allow_non_zdr = False
+        zdr_fallbacks: dict[str, str] = {}
+
     class ProxyCfg:
         default_tier = "haiku"
         preferred_provider = "openrouter"
         backend = ""
 
+        def __init__(self) -> None:
+            self._provider = ProviderCfg()
+
         @staticmethod
         def get_model_for_tier(_tier: str) -> str:
             return "openai/gpt-5.5"
+
+        def get_provider(self, _name: str | None = None) -> ProviderCfg:
+            return self._provider
 
     class SessionCfg:
         default_tier = "opus"

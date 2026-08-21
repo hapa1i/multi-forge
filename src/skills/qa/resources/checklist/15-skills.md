@@ -21,7 +21,7 @@ forge session show test-session-1 --field model_family
 ```
 
 - [ ] Returns valid JSON with session_name, proxy, model_family, models, policy
-- [ ] `--field model_family` returns a raw string (openai, gemini, or anthropic)
+- [ ] `--field model_family` returns the raw declared family (for example, anthropic, openai, gemini, qwen, or glm)
 - [ ] Direct (no-proxy) session returns `model_family: "anthropic"`
 
 ### 15.2 `forge session show` with UUID
