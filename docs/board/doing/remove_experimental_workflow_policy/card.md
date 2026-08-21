@@ -3,10 +3,9 @@
 **Lane**: `doing/` -- accepted and activated on `refactor/remove-workflow-policy` from `main` at `edb5ada6` on
 2026-08-21.
 
-**Replaces**: retired
-[`graduate_workflow_policy_cli`](../../retired/graduate_workflow_policy_cli/card.md). Reconsideration of an automatic
-semantic architecture guard requires a new proposal with an explicit authority corpus; it must not reactivate the
-retired CLI-wiring card.
+**Replaces**: retired [`graduate_workflow_policy_cli`](../../retired/graduate_workflow_policy_cli/card.md).
+Reconsideration of an automatic semantic architecture guard requires a new proposal with an explicit authority corpus;
+it must not reactivate the retired CLI-wiring card.
 
 ## Goal
 
@@ -25,14 +24,13 @@ surfaces rather than internal-only code.
 The concrete divergence preset asks stateless checker/reviewer calls to judge established project patterns from a
 truncated action alone. It supplies no repository, approved plan, design document, or other normative authority, yet a
 high-confidence response with any non-empty citation can deny. Graduation would therefore expose a checker that cannot
-substantiate its own blocking contract. The current workflow design instead specifies shared Python primitives,
-explicit policy classes, and deliberate `forge workflow ... --check` gates -- library, not a declarative workflow
-framework.
+substantiate its own blocking contract. The current workflow design instead specifies shared Python primitives, explicit
+policy classes, and deliberate `forge workflow ... --check` gates -- library, not a declarative workflow framework.
 
 ## Scope
 
-- Remove `src/forge/policy/workflow/`, its registry special case, dynamic policy lookup, and tests that characterize only
-  the removed behavior.
+- Remove `src/forge/policy/workflow/`, its registry special case, dynamic policy lookup, and tests that characterize
+  only the removed behavior.
 - Reject unknown bundle names before policy registration. Preserve a specific recovery diagnostic for the removed
   `workflow` bundle, including when only `bundle_config.workflow` remains beside another active bundle.
 - Keep `core/reactive` utilities and their tests. Update only stale comments that present WorkflowPolicy as a live

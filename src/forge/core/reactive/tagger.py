@@ -1,7 +1,6 @@
 """Cheap LLM classification via core.llm.SyncAdapter.
 
-Classifies actions into tags using a cheap model for routing
-decisions in WorkflowPolicy branches.
+Classifies actions into tags using a cheap model for reactive branch selection.
 """
 
 from __future__ import annotations

@@ -288,20 +288,19 @@ class TestPolicyCheckDocker:
             output = json.loads(result.stdout)
             assert output.get("action") == "skip" or output.get("reason") == "no_session"
 
-    def test_reports_unknown_workflow_key_at_engine_boundary(self, policy_workspace: ContainerLike) -> None:
+    def test_reports_removed_workflow_bundle_at_engine_boundary(self, policy_workspace: ContainerLike) -> None:
         manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
         manifest = read_manifest(policy_workspace)
         manifest["intent"]["policy"] = {
             "enabled": True,
-            "bundles": ["workflow"],
-            "fail_mode": "open",
+            "bundles": ["tdd", "workflow"],
+            "fail_mode": "closed",
             "bundle_config": {
                 "workflow": {
                     "workflows": [
                         {
                             "name": "guardrails",
                             "description": "Review guarded changes",
-                            "tagger_promt": "Classify this change",
                         }
                     ]
                 }
@@ -319,46 +318,9 @@ class TestPolicyCheckDocker:
         assert exit_code == 0
         assert stdout.strip() == ""
         assert "Policy check: cannot build engine" in stderr
-        assert "bundle_config.workflow.workflows[0]" in stderr
-        assert "guardrails" in stderr
-        assert "tagger_promt" in stderr
-        assert "Traceback" not in stderr
-
-    def test_reports_boolean_workflow_integer_at_engine_boundary(self, policy_workspace: ContainerLike) -> None:
-        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
-        manifest = read_manifest(policy_workspace)
-        manifest["intent"]["policy"] = {
-            "enabled": True,
-            "bundles": ["workflow"],
-            "fail_mode": "open",
-            "bundle_config": {
-                "workflow": {
-                    "workflows": [
-                        {
-                            "name": "guardrails",
-                            "description": "Review guarded changes",
-                            "max_cache_entries": False,
-                        }
-                    ]
-                }
-            },
-        }
-        policy_workspace.write_json(manifest_path, manifest)
-
-        exit_code, stdout, stderr = invoke_policy_check(
-            policy_workspace,
-            tool_name="Write",
-            file_path="src/foo.py",
-            content="print('hello')",
-        )
-
-        assert exit_code == 0
-        assert stdout.strip() == ""
-        assert "Policy check: cannot build engine" in stderr
-        assert "bundle_config.workflow.workflows[0]" in stderr
-        assert "guardrails" in stderr
-        assert "max_cache_entries" in stderr
-        assert "must be int, got bool" in stderr
+        assert "policy bundle 'workflow' was removed" in stderr
+        assert "policy.bundles" in stderr
+        assert "policy.bundle_config.workflow" in stderr
         assert "Traceback" not in stderr
 
 

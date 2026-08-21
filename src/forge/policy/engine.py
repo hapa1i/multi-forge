@@ -352,13 +352,21 @@ def build_engine(
     Returns:
         Configured PolicyEngine
     """
-    from forge.policy.deterministic.registry import get_bundle_policies
+    from forge.policy.deterministic.registry import (
+        get_bundle_policies,
+        validate_bundle_name,
+    )
 
-    engine = PolicyEngine(fail_mode=fail_mode)
+    for configured_bundle in bundle_config or {}:
+        validate_bundle_name(configured_bundle)
 
+    policies: list[Policy] = []
     for bundle in bundles:
         config = bundle_config.get(bundle) if bundle_config else None
-        for policy in get_bundle_policies(bundle, config=config):
-            engine.register(policy)
+        policies.extend(get_bundle_policies(bundle, config=config))
+
+    engine = PolicyEngine(fail_mode=fail_mode)
+    for policy in policies:
+        engine.register(policy)
 
     return engine

@@ -86,24 +86,21 @@ forge policy enable --bundle tdd --permissive
 | `coding_standards.no-type-checking`   | Blocks `if TYPE_CHECKING:` imports                  |
 | `coding_standards.no-backward-compat` | Blocks backward-compatibility wrappers and adapters |
 
-### `workflow` — LLM-based review pipelines (experimental, manifest-only)
+### Removed experimental `workflow` bundle
 
-Config-driven pipelines that classify code changes via a cheap LLM tagger, then route through filter → checker →
-reviewer stages. Only actions flagged as "architectural" or "migration" reach the expensive reviewer.
+The former manifest-only `workflow` bundle was removed. Existing sessions that still contain `workflow` in
+`policy.bundles` or retain `policy.bundle_config.workflow` fail policy-engine construction with a recovery diagnostic;
+the hook allows the action rather than silently running a partial policy set.
 
-> **Note:** The `workflow` bundle is **experimental** and has **no CLI surface** — it is not offered by
-> `forge policy enable` and does not appear in `forge policy list`. The only way to activate it is to set
-> `policy.bundles: ["workflow"]` plus `policy.bundle_config.workflow` in the session manifest (e.g., via
-> `forge session set`). See [`design_workflows.md` §1.2](../design_workflows.md#12-semantic-policy-the-supervisor) for
-> the pipeline architecture.
+Replace stale policy intent by enabling the supported bundle or bundles you want, which rewrites both fields:
 
-Workflow entries and their nested branch, filter, checker, and reviewer objects reject unknown keys or invalid field
-types when Forge builds the policy engine. The diagnostic names the workflow entry and offending field rather than
-silently applying a default.
+```bash
+forge policy enable --bundle tdd
+forge policy enable --bundle tdd --bundle coding_standards
+```
 
-Engine construction is atomic. An invalid workflow entry also prevents other configured bundles from running for that
-hook invocation; the Claude and Codex hooks report the build error and allow the action before the configured fail mode
-applies. Correct the manifest entry before relying on policy enforcement again.
+If you do not want policy enforcement, `forge policy disable` stops it. A later `forge policy enable` invocation
+replaces the stale bundle and configuration.
 
 ---
 

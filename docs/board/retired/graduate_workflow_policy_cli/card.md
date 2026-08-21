@@ -11,8 +11,8 @@
 **Lane**: `retired/`. The graduation premise was invalidated after the supervisor cascade and explicit
 `forge workflow ... --check` gate became the supported semantic-review paths. Reinspection also found that the concrete
 divergence preset could deny from unverified model-generated citations without receiving any repository or normative
-project context. The replacement removes the experimental manifest surface and makes stale configuration fail
-actionably instead of silently becoming a no-op.
+project context. The replacement removes the experimental manifest surface and makes stale configuration fail actionably
+instead of silently becoming a no-op.
 
 ## Historical proposal
 
@@ -65,7 +65,6 @@ and unusable without reading the source.
 
 ## Historical references
 
-- Demote decision + rationale:
-  [`accidental_complexity_cleanup`](../../done/accidental_complexity_cleanup/checklist.md) (Phase C,
-  "WorkflowPolicy: DEMOTE").
+- Demote decision + rationale: [`accidental_complexity_cleanup`](../../done/accidental_complexity_cleanup/checklist.md)
+  (Phase C, "WorkflowPolicy: DEMOTE").
 - The original `design.md` §4.1.2 schema reference was already stale when this card retired.

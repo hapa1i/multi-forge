@@ -186,7 +186,7 @@ def _classify_event(
             task_subject=task_subject or "",
         )
         # Exact-cost join only when the client provably targets a Forge proxy (same gate as
-        # the action tagger / WorkflowPolicy stages); else no header and no cost_request_id.
+        # other direct core.llm emitters); else no header and no cost_request_id.
         response, latency_ms, request_id = complete_llm_call(
             model=model,
             messages=[Message(role="user", content=prompt)],

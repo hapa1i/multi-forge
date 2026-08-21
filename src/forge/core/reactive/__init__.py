@@ -1,8 +1,8 @@
 """Shared reactive library for Forge hook handlers and policies.
 
 Provides utilities for subprocess management, caching, structured output
-extraction, and LLM-based classification. These are the building blocks
-for the semantic supervisor, memory writer, and WorkflowPolicy.
+extraction, and LLM-based classification. These are building blocks for
+semantic policies, memory handling, team policies, and workflow runners.
 
 Note: ``proxy.py`` is intentionally NOT re-exported here because it
 lazy-imports ``forge.proxy.proxies`` (a top-level component). Consumers
