@@ -62,6 +62,7 @@ __pypackages__/
 .claude/*
 !.claude/commands/
 .claude/commands/*
+!.claude/commands/comment-cleanup.md
 !.claude/commands/gather-context.md
 !.claude/commands/refactor_audit.md
 !.claude/commands/simplicity_audit.md
@@ -70,6 +71,8 @@ __pypackages__/
 .agents/*
 !.agents/skills/
 .agents/skills/*
+!.agents/skills/comment-cleanup/
+!.agents/skills/comment-cleanup/SKILL.md
 !.agents/skills/gather-context/
 !.agents/skills/gather-context/SKILL.md
 !.agents/skills/refactor-audit/
