@@ -6,7 +6,7 @@
 
 **Retired**: 2026-08-21
 
-**Replacement**: [`remove_experimental_workflow_policy`](../../doing/remove_experimental_workflow_policy/card.md).
+**Replacement**: [`remove_experimental_workflow_policy`](../../done/remove_experimental_workflow_policy/card.md).
 
 **Lane**: `retired/`. The graduation premise was invalidated after the supervisor cascade and explicit
 `forge workflow ... --check` gate became the supported semantic-review paths. Reinspection also found that the concrete

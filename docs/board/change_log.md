@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-21
 
+### Remove the experimental manifest WorkflowPolicy
+
+**Goal/outcome**: Retire the stale CLI-graduation proposal and remove a hidden semantic-policy pipeline whose blocking
+reviewer had no repository or other normative project authority.
+
+**Key changes**:
+
+- Deleted the manifest-only workflow package and behavior tests, then made unknown bundles and configuration owners fail
+  atomic engine construction with override-aware recovery for stale `workflow` state.
+- Preserved the documented shared reactive library, removed the caller-less reverse bundle lookup, and synchronized the
+  policy design, end-user, and repository-agent contracts.
+
+**Verification**: 574 focused policy/reactive/CLI tests; 9,302 unit with 117 deselected; 1,053 regression; one targeted
+Docker policy-hook boundary; both policy-check content modes; pre-commit/diff, board/link, and design-size gates. PR
+#233 merged as `4f95d88d` with all five GitHub checks passing.
+
 ### Close Wave 8 Batch 5 and the repository maintenance round
 
 **Goal/outcome**: Close the final verified residuals and leave the whole-repository review with terminal dispositions

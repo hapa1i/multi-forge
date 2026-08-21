@@ -1,7 +1,8 @@
 # Remove the experimental manifest WorkflowPolicy
 
-**Lane**: `doing/` -- accepted and activated on `refactor/remove-workflow-policy` from `main` at `edb5ada6` on
-2026-08-21.
+**Lane**: `done/` -- shipped in PR #233 (`4f95d88d`) on 2026-08-21.
+
+**Execution**: `refactor/remove-workflow-policy` from `main` at `edb5ada6` on 2026-08-21.
 
 **Replaces**: retired [`graduate_workflow_policy_cli`](../../retired/graduate_workflow_policy_cli/card.md).
 Reconsideration of an automatic semantic architecture guard requires a new proposal with an explicit authority corpus;

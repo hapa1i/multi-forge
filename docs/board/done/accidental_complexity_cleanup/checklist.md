@@ -283,7 +283,7 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
   - File the follow-on [`graduate_workflow_policy_cli`](../../retired/graduate_workflow_policy_cli/card.md) card for the
     real `--workflow <preset>` UX and `build_divergence_config` wiring (product/docs/tests -- deliberately out of this
     cleanup card). That proposal was later invalidated and replaced by
-    [`remove_experimental_workflow_policy`](../../doing/remove_experimental_workflow_policy/card.md).
+    [`remove_experimental_workflow_policy`](../../done/remove_experimental_workflow_policy/card.md).
   - **Assertion**: `policy.md` names it experimental/manifest-only; `get_all_bundles` no longer advertises `workflow` to
     any non-test path; `policy list` / `policy enable --bundle` unchanged; the pipeline + `build_divergence_config`
     still import and run; the follow-on card exists in `proposed/`.

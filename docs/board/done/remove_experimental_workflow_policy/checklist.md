@@ -1,7 +1,6 @@
 # Remove the experimental manifest WorkflowPolicy checklist
 
-Current focus: remove the implementation and pin the stale-manifest compatibility boundary on
-`refactor/remove-workflow-policy`.
+Closeout: shipped in PR #233 (`4f95d88d`) on 2026-08-21.
 
 ## Activation and evidence
 
@@ -44,6 +43,6 @@ Current focus: remove the implementation and pin the stale-manifest compatibilit
 - [x] Run `make pre-commit`, `git diff --check`, board-link validation (424 documents, 1,028 local links, none broken),
   and design-document size checks (`design.md` 29,928; appendix 29,926; workflows 17,929 tokens).
 - [x] Commit and push the reviewable changes, then open draft PR #233 against `main` with exact verification evidence.
-- [ ] After merge, add the completed-work change-log entry, move this card to `done/`, and repoint the retired
-  graduation card plus the accidental-complexity checklist from `../../doing/remove_experimental_workflow_policy/` to
-  `../../done/remove_experimental_workflow_policy/`.
+- [x] Merge PR #233 as `4f95d88d`, add the completed-work change-log entry, move this card to `done/`, and repoint the
+  retired graduation card plus the accidental-complexity checklist from
+  `../../doing/remove_experimental_workflow_policy/` to `../../done/remove_experimental_workflow_policy/`.
