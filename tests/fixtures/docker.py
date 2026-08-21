@@ -48,7 +48,19 @@ def _detect_claude_code_version() -> str:
     return "latest"
 
 
+def _detect_codex_cli_version() -> str:
+    """Detect installed Codex CLI version via ``codex --version``."""
+    try:
+        result = subprocess.run(["codex", "--version"], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().split()[-1]
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return "latest"
+
+
 CLAUDE_CODE_VERSION = _detect_claude_code_version()
+CODEX_CLI_VERSION = _detect_codex_cli_version()
 
 
 class ContainerLike(Protocol):
@@ -396,7 +408,7 @@ def local_claude_available() -> bool:
 
 @pytest.fixture(scope="session")
 def forge_test_image(docker_available: bool, local_claude_available: bool) -> str | None:
-    """Build or use existing forge-claude-test image.
+    """Build or use the version-keyed Forge runtime test image.
 
     Returns None if running in local mode (inside container).
 
@@ -414,7 +426,7 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     repo_root = _find_repo_root()
     forge_revision = _get_forge_revision(repo_root)
 
-    image_name = f"forge-claude-test:{CLAUDE_CODE_VERSION}"
+    image_name = f"forge-claude-test:{CLAUDE_CODE_VERSION}-codex-{CODEX_CLI_VERSION}"
 
     needs_build = not _image_exists(image_name)
     if not needs_build:
@@ -437,7 +449,10 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     if not dockerfile.exists():
         pytest.fail(f"Dockerfile not found at {dockerfile}. Run from repo root or check docker/ directory.")
 
-    print(f"\nBuilding Docker image {image_name} (Claude Code {CLAUDE_CODE_VERSION})...")
+    print(
+        f"\nBuilding Docker image {image_name} "
+        f"(Claude Code {CLAUDE_CODE_VERSION}, Codex CLI {CODEX_CLI_VERSION})..."
+    )
     result = subprocess.run(
         [
             "docker",
@@ -446,6 +461,8 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
             str(dockerfile),
             "--build-arg",
             f"CLAUDE_VERSION={CLAUDE_CODE_VERSION}",
+            "--build-arg",
+            f"CODEX_VERSION={CODEX_CLI_VERSION}",
             "--build-arg",
             f"FORGE_REV={forge_revision}",
             "-t",

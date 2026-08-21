@@ -168,10 +168,10 @@ uv run pytest tests/src/session/test_store.py -v
 uv run pytest -k test_proxy
 ```
 
-### Real-Claude E2E Tests (`@pytest.mark.slow`)
+### Real-runtime E2E Tests (`@pytest.mark.slow`)
 
-A separate tier of tests that use **real Claude Code** with **real LLM calls** in Docker. These verify hook integration,
-session lifecycle, and supervisor flows that can't be tested with mock Claude.
+A separate tier of tests uses **real Claude Code or Codex CLI** with **real LLM calls** in Docker. These verify hook
+integration, session lifecycle, authority enforcement, and supervisor flows that cannot be tested with runtime mocks.
 
 ```bash
 # Run all real-Claude tests (requires ANTHROPIC_API_KEY + Docker)
@@ -179,19 +179,31 @@ session lifecycle, and supervisor flows that can't be tested with mock Claude.
 
 # Run a specific real-Claude test
 ./scripts/test-integration.sh -k test_plan_fork_wire_supervisor_check -v
+
+# Run real Claude + Codex authority enforcement
+./scripts/test-integration.sh tests/integration/docker/test_real_authority.py -v
 ```
 
 **Requirements:**
 
 - `ANTHROPIC_API_KEY` environment variable (or in `.env`). Tests fail loudly if missing (never skip).
-- Docker with the `forge-claude-test` image (`make test-integration` builds it).
+- Codex authority tests require `CODEX_API_KEY` or `OPENAI_API_KEY`, plus enrolled user SessionStart and PreToolUse hook
+  hashes in the operator's `CODEX_HOME`. The test copies only those non-secret hashes into the disposable container at
+  the same absolute paths; it never copies `auth.json` or mutates the host config.
+- Docker with the `forge-claude-test` image (`make test-integration` builds it). Its tag and toolchain are keyed to both
+  the host-selected Claude Code and Codex CLI versions.
 - Real Claude Code binary in the container (the test restores it from backup after `forge_workspace` mocks it).
+- Real Codex CLI binary in the container.
 
 **Design rules:**
 
 - Mark with `@pytest.mark.slow` + `@pytest.mark.integration` + `@pytest.mark.docker_in`
 - Use **narrow assertions** — assert on field presence and exit codes, not LLM output content
-- Use shared helpers `setup_real_claude()` and `run_claude_print()` from `tests/integration/docker/conftest.py`
+- Use shared helpers `setup_real_claude()` and `run_claude_print()` from `tests/integration/docker/conftest.py` when a
+  test invokes Claude directly. A managed-launch test may instead use a narrow PATH wrapper that preserves Forge's argv
+  and environment and execs the real binary.
+- Cross-runtime enforcement tests must assert filesystem and journal evidence, not model prose; never construct the
+  authority marker or invoke its hook directly in an E2E.
 - Keep prompts minimal to reduce cost and execution time (~30-60s per test)
 - These are for **release validation**, not CI gating
 
@@ -209,6 +221,7 @@ use the existing `slow` marker; do not add a separate paid marker.
 | `test_real_claude_memory.py`     | Memory handoff review-only and shadow curation smoke flows                 |
 | `test_supervisor_e2e.py`         | Full plan -> fork -> wire supervisor -> on-demand check flow               |
 | `test_adopt_binding_contract.py` | A plain `--resume` reports the original `session_id` in every Stop payload |
+| `test_real_authority.py`         | Real Claude/Codex authority denial plus the Claude producer control        |
 
 ### Requirements
 
