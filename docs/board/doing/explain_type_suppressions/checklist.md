@@ -18,7 +18,7 @@ card owns production suppression cleanup and the conformance guard; the Batch 5 
 
 - [x] Run the source guard and focused tests for every production module changed by narrowing or annotation cleanup.
 - [x] Run the configured mypy and pyright checks directly because this checkout exposes no `make type-check` target.
-- [ ] Contribute to the integrated unit, regression, pre-commit, board/link, and diff gates.
+- [x] Contribute to the integrated unit, regression, pre-commit, board/link, and diff gates.
 - [x] Record the final suppression disposition and focused verification evidence without closing the card before merge.
 
 ## Acceptance evidence
@@ -39,3 +39,7 @@ Focused evidence: both conformance guards passed; mypy reported no issues across
 errors or warnings; and 446 focused proxy, policy, status-line, installer, session-repair, usage-summary, and
 conformance tests passed. `make type-check` itself is unavailable because the repository Makefile defines no such
 target.
+
+Integrated evidence: the combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, and three
+targeted integration boundaries covering cross-runtime install/disable/sync, containerized session repair, and
+subprocess OpenAI routing with reasoning/verbosity forwarding. `make pre-commit` passed every hook.

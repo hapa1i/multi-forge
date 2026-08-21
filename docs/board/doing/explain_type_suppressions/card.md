@@ -28,4 +28,5 @@ Authority: [`coding_standards.md` Comments](../../../developer/coding_standards.
 
 ## Verification
 
-Run the suppression guard, focused touched tests, `make type-check`, full unit/regression suites, and `make pre-commit`.
+Run the suppression guard, focused touched tests, the configured mypy and pyright commands, full unit/regression suites,
+and `make pre-commit`.

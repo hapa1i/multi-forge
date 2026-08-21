@@ -40,3 +40,7 @@ readiness-only `workflow list-models --available` filter. The consensus source c
 Verification evidence: 203 auth, workflow, and workflow-documentation tests passed; `make pre-commit-md`, the configured
 Python hooks for the touched comment, and `git diff --check` passed. The documentation scan resolved 1,207 local links
 across 447 files. `design.md` is 29,997 Opus tokens and `cli_reference.md` is 9,551.
+
+Integrated evidence: the combined head passed 9,332 unit tests with 124 deselected, 1,059 regression tests, three
+targeted integration tests, and every `make pre-commit` hook. The final scan resolved 1,209 local paths across 447
+documentation files.
