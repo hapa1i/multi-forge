@@ -3,7 +3,7 @@ name: understand
 description: Explain code, documentation, or technical concepts. Auto-detects code vs docs mode.
 runtimes: [claude_code, codex]
 capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
-allow_implicit_invocation: true
+allow_implicit_invocation: false
 claude_frontmatter:
   argument-hint: '[target: path or question or instruction] [--output path] [--mode code|docs] [--depth quick|detailed|deep]'
   allowed-tools: Read, Grep, Glob, Bash, Agent

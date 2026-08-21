@@ -996,6 +996,65 @@ def test_neutral_source_rejects_raw_claude_invocation_policy() -> None:
     assert any(item.rule == "source.invocation-policy-authority" for item in exc_info.value.diagnostics)
 
 
+@pytest.mark.parametrize("runtime", list(SkillRuntime))
+def test_install_time_invocation_override_supersedes_source_default(runtime: SkillRuntime) -> None:
+    source = _neutral_source(
+        required=frozenset({SkillCapability.INVOCATION_POLICY}),
+        allow_implicit_invocation=False,
+    )
+
+    package = compile_skill_for_runtime(source, runtime, invocation_policy_override=True)
+
+    if runtime == SkillRuntime.CLAUDE_CODE:
+        assert _frontmatter(package.file("SKILL.md").content)["disable-model-invocation"] is False
+    else:
+        openai = yaml.safe_load(package.file("agents/openai.yaml").content)
+        assert openai["policy"] == {"allow_implicit_invocation": True}
+
+
+@pytest.mark.parametrize("runtime", list(SkillRuntime))
+def test_install_time_explicit_default_applies_without_source_policy(runtime: SkillRuntime) -> None:
+    package = compile_skill_for_runtime(
+        _neutral_source(),
+        runtime,
+        invocation_policy_override=False,
+    )
+
+    if runtime == SkillRuntime.CLAUDE_CODE:
+        assert _frontmatter(package.file("SKILL.md").content)["disable-model-invocation"] is True
+    else:
+        openai = yaml.safe_load(package.file("agents/openai.yaml").content)
+        assert openai["policy"] == {"allow_implicit_invocation": False}
+
+
+def test_install_time_override_rewrites_legacy_claude_policy_only_when_needed() -> None:
+    source = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "qa")
+    assert source.source_format == SkillSourceFormat.CLAUDE_BRIDGE
+
+    explicit = compile_skill_for_runtime(
+        source,
+        SkillRuntime.CLAUDE_CODE,
+        invocation_policy_override=False,
+    )
+    model = compile_skill_for_runtime(
+        source,
+        SkillRuntime.CLAUDE_CODE,
+        invocation_policy_override=True,
+    )
+
+    assert explicit.file("SKILL.md").content == source.claude_document
+    assert _frontmatter(model.file("SKILL.md").content)["disable-model-invocation"] is False
+
+
+def test_install_time_invocation_override_rejects_non_boolean_values() -> None:
+    with pytest.raises(ValueError, match="invocation_policy_override must be a bool"):
+        compile_skill_for_runtime(
+            _neutral_source(),
+            SkillRuntime.CLAUDE_CODE,
+            invocation_policy_override="model",  # type: ignore[arg-type]
+        )
+
+
 def test_codex_bridge_rejects_raw_claude_tokens_after_explicit_opt_in() -> None:
     bridge = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "qa")
     assert bridge.source_format == SkillSourceFormat.CLAUDE_BRIDGE

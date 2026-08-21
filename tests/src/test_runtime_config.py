@@ -22,6 +22,7 @@ from forge.runtime_config import (
     RuntimeConfig,
     RuntimeDownstreamRetentionConfig,
     RuntimeProviderTraceConfig,
+    RuntimeSkillsConfig,
     RuntimeTelemetryConfig,
     StatusLineConfig,
     get_default_config_content,
@@ -77,6 +78,11 @@ class TestRuntimeConfigDefaults:
     def test_downstream_retention_defaults(self):
         rc = RuntimeConfig()
         assert rc.telemetry.downstream == RuntimeDownstreamRetentionConfig(retention_days=14, max_total_mb=512)
+
+    def test_skill_invocation_defaults_to_explicit_only(self):
+        rc = RuntimeConfig()
+        assert rc.skills.invocation == {}
+        assert rc.skills.allows_model_invocation("review") is False
 
 
 class TestRuntimeConfigValidation:
@@ -433,6 +439,8 @@ class TestGetDefaultConfigContent:
             "memory_writer_timeout",
             "log_tool_failures",
             "auth_ignore_env",
+            "skills",
+            "invocation",
             "telemetry",
             "retention_days",
             "max_total_mb",
@@ -453,6 +461,7 @@ class TestRenderRuntimeConfigYaml:
         content = render_runtime_config_yaml(RuntimeConfig())
         data = yaml.safe_load(content)
         assert data["proxy_mode"] == "host"
+        assert data["skills"]["invocation"] == {}
         assert data["statusline"]["cost_mode"] == "auto"
         assert data["provider_trace"]["inject_provider_user"] is False
         assert data["telemetry"]["downstream"] == {
@@ -506,6 +515,12 @@ class TestConfigCommentCoverage:
 
         missing = [f.name for f in fields(StatusLineConfig) if f.name not in _STATUSLINE_FIELD_COMMENTS]
         assert not missing, f"StatusLineConfig fields missing a comment: {missing}"
+
+    def test_every_skills_field_has_a_comment(self):
+        from forge.runtime_config import _SKILLS_FIELD_COMMENTS
+
+        missing = [f.name for f in fields(RuntimeSkillsConfig) if f.name not in _SKILLS_FIELD_COMMENTS]
+        assert not missing, f"RuntimeSkillsConfig fields missing a comment: {missing}"
 
     def test_every_provider_trace_field_has_a_comment(self):
         from dataclasses import fields
@@ -613,6 +628,55 @@ class TestEnvVarOverrides:
             assert field_name in valid_fields, (
                 f"_ENV_OVERRIDES[{env_var!r}] targets {field_name!r} " f"which is not a RuntimeConfig field"
             )
+
+
+class TestSkillsConfig:
+    def test_dict_coercion_and_per_skill_resolution(self):
+        rc = RuntimeConfig(skills={"invocation": {"review": "model", "analyze": "explicit"}})  # type: ignore[arg-type]
+
+        assert isinstance(rc.skills, RuntimeSkillsConfig)
+        assert rc.skills.allows_model_invocation("review") is True
+        assert rc.skills.allows_model_invocation("analyze") is False
+        assert rc.skills.allows_model_invocation("unlisted") is False
+
+    @pytest.mark.parametrize("mode", ["implicit", "human", True, None])
+    def test_invalid_invocation_mode_rejected(self, mode: object):
+        with pytest.raises(ValueError, match=r"Invalid skills\.invocation\.review"):
+            RuntimeSkillsConfig(invocation={"review": mode})  # type: ignore[dict-item]
+
+    @pytest.mark.parametrize("skill_name", ["", "Review", "review_docs", "-review", "review-"])
+    def test_invalid_skill_name_rejected(self, skill_name: str):
+        with pytest.raises(ValueError, match="skills.invocation keys"):
+            RuntimeSkillsConfig(invocation={skill_name: "model"})
+
+    def test_invocation_must_be_mapping(self):
+        with pytest.raises(ValueError, match="skills.invocation must be a mapping"):
+            RuntimeSkillsConfig(invocation=["review"])  # type: ignore[arg-type]
+
+    def test_unknown_skills_subkey_is_dropped_for_forward_compatibility(self):
+        rc = RuntimeConfig(skills={"invocation": {"review": "model"}, "future_key": 1})  # type: ignore[arg-type]
+
+        assert rc.skills.invocation == {"review": "model"}
+        assert not hasattr(rc.skills, "future_key")
+
+    def test_load_round_trips_invocation_modes(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("skills:\n  invocation:\n    review: model\n    analyze: explicit\n")
+
+        rc = load_runtime_config(cfg)
+
+        assert rc.skills.invocation == {"review": "model", "analyze": "explicit"}
+
+    def test_bad_skills_subtree_fails_open_to_explicit_only(self, tmp_path: Path, caplog):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("status_timeout: 0.5\nskills:\n  invocation:\n    review: automatic\n")
+
+        with caplog.at_level(logging.WARNING):
+            rc = load_runtime_config(cfg)
+
+        assert rc.status_timeout == 0.5
+        assert rc.skills == RuntimeSkillsConfig()
+        assert any("explicit-only skill defaults" in record.message for record in caplog.records)
 
 
 class TestStatusLineConfigDefaults:

@@ -475,7 +475,7 @@ result still exits zero, and `query --scope all` keeps its skip-and-continue par
 | `forge clean`                    | Preview/remove orphaned state (`--scope`, `--yes`, `--json`)                                                    |
 | `forge config`                   | Manage global runtime preferences                                                                               |
 | `forge config show`              | Show effective config plus downstream-retention status (`--raw`, `--json`)                                      |
-| `forge config set`               | Set a top-level or dotted runtime key                                                                           |
+| `forge config set`               | Set a top-level or dotted runtime key; skill modes are `explicit` or `model`                                    |
 | `forge config edit`              | Validate and replace the user-owned runtime config                                                              |
 | `forge config reset`             | Reset one top-level key or the whole runtime config                                                             |
 | `forge config migrate-retention` | Preview/apply legacy proxy-retention migration (`--yes`, `--json`)                                              |

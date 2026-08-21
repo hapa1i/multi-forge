@@ -545,11 +545,11 @@ runtime-specific skill packages (how to use them). The system teaches the agent 
 
 Portable sources have three layers:
 
-| Layer           | Ownership                                                         | Representation                                    |
-| --------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
-| Neutral content | Runtime-free behavior and shared templated/model-family resources | `forge-skill.yaml`, `content.md`, auxiliary files |
-| Runtime adapter | Names, frontmatter, invocation policy, and capability bindings    | Typed Claude/Codex adapter data                   |
-| Build/install   | Complete validated runtime package and target ownership           | Compiled `SKILL.md` tree + `installed.json` v2    |
+| Layer           | Ownership                                                          | Representation                                    |
+| --------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| Neutral content | Runtime-free behavior and shared templated/model-family resources  | `forge-skill.yaml`, `content.md`, auxiliary files |
+| Runtime adapter | Names, frontmatter, invocation policy, and capability bindings     | Typed Claude/Codex adapter data                   |
+| Build/install   | Effective invocation mode, validated package, and target ownership | Runtime config + compiled tree + `installed.json` |
 
 Neutral Markdown uses `{{forge:<capability>}}`; resource and executable paths use
 `{{forge:<capability>:<package-relative-path>}}`. The vocabulary covers task arguments, resource loading,
@@ -558,9 +558,12 @@ Forge CLI. Packaged scripts are first-class rather than a resource-loading speci
 owner-readable/executable and compile to direct package-absolute execution from any working directory. Text scripts use
 their shebang; native executables use their OS entry point. Adapters must not assume every executable is Bash.
 
-Portable invocation policy has one typed authority: declaring the `invocation_policy` capability requires
-`allow_implicit_invocation`, from which adapters derive Claude's `disable-model-invocation` and Codex policy metadata. A
-neutral source cannot set the Claude field directly.
+Portable sources declare invocation policy once: the `invocation_policy` capability requires
+`allow_implicit_invocation`, from which adapters can derive Claude's `disable-model-invocation` and Codex policy
+metadata. Forge-shipped sources set that portable default to false, and a neutral source cannot set the Claude field
+directly. At installation, `~/.forge/config.yaml` is the user authority: `skills.invocation.<name>` is `explicit` when
+absent and may be set to `model`. The installer passes that effective policy to the same adapters for every selected
+runtime, so enable and sync cannot diverge between Claude and Codex. Invalid config fails safe to explicit-only.
 
 Model-family selection is also host-runtime-owned. Claude may resolve its active Forge session dynamically; Codex binds
 the family to `openai` and leaves the exact model unspecified. It must not query an unrelated tracked Forge session,

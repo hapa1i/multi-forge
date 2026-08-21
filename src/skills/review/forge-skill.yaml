@@ -3,7 +3,7 @@ name: review
 description: Review code for conformance, correctness, and architecture alignment.
 runtimes: [claude_code, codex]
 capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
-allow_implicit_invocation: true
+allow_implicit_invocation: false
 claude_frontmatter:
   argument-hint: '[target: path or instruction] [--output path]'
   allowed-tools: Read, Grep, Glob, Bash, Agent

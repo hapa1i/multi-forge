@@ -2,17 +2,17 @@
 
 Configuration is split by ownership. Each type of setting has a single authoritative location:
 
-| What you want to change                            | Where                              | Command                                |
-| -------------------------------------------------- | ---------------------------------- | -------------------------------------- |
-| Proxy mode, timeouts, logging, telemetry retention | `~/.forge/config.yaml`             | `forge config set/edit`                |
-| Model routing, reasoning effort, temperature       | `~/.forge/proxies/<id>/proxy.yaml` | `forge proxy set/edit`                 |
-| Claude Code hooks, status line, permissions, env   | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
-| Policy, memory, verification settings              | Session manifest                   | `forge session set`                    |
-| Multi-model review and analysis                    | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
-| Automatic doc updates after sessions               | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
-| Project Forge compatibility                        | `<forge_root>/.forge/project.toml` | edit file                              |
-| Trusted project enrollment                         | `~/.forge/projects.json`           | extension `enable` / `cleanup-project` |
-| API keys and credentials                           | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
+| What you want to change                          | Where                              | Command                                |
+| ------------------------------------------------ | ---------------------------------- | -------------------------------------- |
+| Runtime, telemetry, and skill invocation         | `~/.forge/config.yaml`             | `forge config set/edit`                |
+| Model routing, reasoning effort, temperature     | `~/.forge/proxies/<id>/proxy.yaml` | `forge proxy set/edit`                 |
+| Claude Code hooks, status line, permissions, env | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
+| Policy, memory, verification settings            | Session manifest                   | `forge session set`                    |
+| Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
+| Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
+| Project Forge compatibility                      | `<forge_root>/.forge/project.toml` | edit file                              |
+| Trusted project enrollment                       | `~/.forge/projects.json`           | extension `enable` / `cleanup-project` |
+| API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
 ---
 
@@ -33,6 +33,7 @@ forge config show --raw     # Commented YAML only, no headings or syntax highlig
 # Set a value
 forge config set proxy_mode=sidecar
 forge config set status_timeout=1.0
+forge config set skills.invocation.review=model
 forge config set telemetry.downstream.retention_days=30
 
 # Edit in $EDITOR
@@ -70,6 +71,7 @@ Available settings:
 | `log_tool_failures`                   | `false`                | Log tool failures to `~/.forge/logs/tool_failures/` (proxy; includes tool inputs/errors)                                                                                                                                      |
 | `auth_ignore_env`                     | `false`                | Ignore env vars for credential resolution; use credential file only. See [authentication.md](authentication.md#ignoring-environment-variables-auth_ignore_env)                                                                |
 | `interactive_anthropic_api_key`       | `inherit`              | `omit` strips `ANTHROPIC_API_KEY` from interactive `claude` launches only (headless subprocesses keep it). See [authentication.md](authentication.md#keeping-a-key-out-of-interactive-sessions-interactive_anthropic_api_key) |
+| `skills.invocation.<name>`            | `explicit`             | Per-skill `explicit` (human invocation only) or `model` (the runtime model may select it automatically); applied by extension enable/sync                                                                                     |
 | `telemetry.downstream.retention_days` | `14`                   | Delete non-current-month downstream shards older than N days (`0` disables the age bound)                                                                                                                                     |
 | `telemetry.downstream.max_total_mb`   | `512`                  | Prune non-current-month downstream shards oldest-first over N MB (`0` disables the size bound)                                                                                                                                |
 
@@ -89,6 +91,36 @@ retention or `log_tool_failures`.
 
 **In-session access (read-only):** Type `%config` in the Claude prompt to see effective config. See
 [hook.md](hook.md#in-session-commands--commands) for all `%` commands.
+
+---
+
+## Skill invocation
+
+Every Forge skill defaults to human/explicit invocation. Claude Code therefore receives
+`disable-model-invocation: true`, and Codex receives `allow_implicit_invocation: false`. Explicit selectors such as
+`/forge:review` and `$review` continue to work.
+
+Opt individual skills into model invocation through the shared runtime config:
+
+```bash
+# Let either runtime's model select review automatically when its description matches
+forge config set skills.invocation.review=model
+
+# Keep another skill human/explicit-only (also the default when no entry exists)
+forge config set skills.invocation.analyze=explicit
+
+# Materialize the new native metadata in an existing installation
+forge extension sync
+```
+
+The mapping is global and applies by skill name to both Claude Code and Codex outputs. `forge extension enable` reads it
+for a new or re-enabled installation; `forge extension sync` refreshes already installed packages. The setting permits
+automatic selection but does not force the model to use the skill. Use `forge config reset skills` to clear every
+override, or set one entry back to `explicit`.
+
+Skill invocation does not belong in `~/.forge/claude.preset.json`: that preset can only merge Claude Code settings,
+whereas this policy must compile consistently for both runtimes. There is intentionally no invocation flag on
+`forge extension enable`.
 
 ---
 
@@ -153,6 +185,9 @@ Forge merges only four setting families from the preset: `hooks`, `statusLine`, 
 then places runtime `hooks` at user scope and `statusLine` at project/local scope. A pre-user-scope project hook is
 migration state, not a supported customization target; use `forge extension cleanup-project` rather than deleting
 tracking or registry files by hand.
+
+Per-skill invocation modes are cross-runtime Forge configuration, not Claude preset content. Configure them under
+`skills.invocation` in `~/.forge/config.yaml`.
 
 Use the preset when you want Forge to keep applying your preferred Claude Code settings on enable/re-enable, for
 example:

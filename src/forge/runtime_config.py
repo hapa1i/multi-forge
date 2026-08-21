@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from io import StringIO
@@ -44,6 +45,8 @@ _VALID_COST_MODES = ("auto", "api", "subscription")
 _VALID_PALETTES = ("default", "earthy")
 _VALID_GLYPHS = ("ascii", "unicode")
 _VALID_CACHE_HIT = ("auto", "off")
+_VALID_SKILL_INVOCATION_MODES = ("explicit", "model")
+_SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 DEFAULT_DOWNSTREAM_RETENTION_DAYS = 14
 DEFAULT_DOWNSTREAM_MAX_TOTAL_MB = 512
@@ -100,6 +103,10 @@ _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
         "ANTHROPIC_API_KEY policy for interactive forge session / forge claude launches.",
         "inherit keeps normal credential resolution; omit strips the key from the interactive child only.",
     ),
+    "skills": (
+        "Skill invocation preferences shared by Claude Code and Codex.",
+        "Set one skill with: forge config set skills.invocation.<name>=explicit|model",
+    ),
     "statusline": (
         "Status-line display preferences.",
         "Set nested values with: forge config set statusline.<key>=<value>",
@@ -111,6 +118,13 @@ _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
     "telemetry": (
         "Global telemetry lifecycle preferences.",
         "Set downstream retention with: forge config set telemetry.downstream.<key>=<value>",
+    ),
+}
+
+_SKILLS_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "invocation": (
+        "Per-skill invocation mode. Unlisted skills default to explicit.",
+        "model permits automatic model selection; explicit reserves selection for human invocation.",
     ),
 }
 
@@ -337,6 +351,58 @@ def _coerce_telemetry_config(value: Any) -> RuntimeTelemetryConfig:
 
 
 @dataclass
+class RuntimeSkillsConfig:
+    """Cross-runtime skill preferences (``skills:`` in config.yaml).
+
+    ``invocation`` stores only per-skill overrides. An absent skill is always
+    explicit-only, which keeps installation fail-safe when the config file is
+    missing or its subtree cannot be loaded.
+    """
+
+    invocation: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.invocation, dict):
+            raise ValueError("skills.invocation must be a mapping")
+
+        normalized: dict[str, str] = {}
+        for skill_name, mode in self.invocation.items():
+            if (
+                not isinstance(skill_name, str)
+                or not (1 <= len(skill_name) <= 64)
+                or _SKILL_NAME_RE.fullmatch(skill_name) is None
+            ):
+                raise ValueError(
+                    "skills.invocation keys must be 1-64 lowercase letters/numbers/hyphens "
+                    "without edge or consecutive hyphens"
+                )
+            if mode not in _VALID_SKILL_INVOCATION_MODES:
+                raise ValueError(
+                    f"Invalid skills.invocation.{skill_name}: {mode!r} "
+                    f"(must be one of: {', '.join(_VALID_SKILL_INVOCATION_MODES)})"
+                )
+            normalized[skill_name] = mode
+        self.invocation = normalized
+
+    def allows_model_invocation(self, skill_name: str) -> bool:
+        """Return whether ``skill_name`` may be selected automatically by a model."""
+
+        return self.invocation.get(skill_name, "explicit") == "model"
+
+
+def _coerce_skills_config(value: Any) -> RuntimeSkillsConfig:
+    if value is None:
+        return RuntimeSkillsConfig()
+    if isinstance(value, RuntimeSkillsConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("skills must be a mapping")
+    known = {f.name for f in fields(RuntimeSkillsConfig)}
+    kwargs = {k: v for k, v in value.items() if k in known}
+    return RuntimeSkillsConfig(**kwargs)
+
+
+@dataclass
 class RuntimeConfig:
     """Global Forge runtime preferences — always reflects effective values.
 
@@ -413,6 +479,9 @@ class RuntimeConfig:
     # are unaffected and always keep normal credential resolution.
     interactive_anthropic_api_key: str = "inherit"
 
+    # Per-skill invocation preferences shared by every supported agent runtime.
+    skills: RuntimeSkillsConfig = field(default_factory=RuntimeSkillsConfig)
+
     # Nested status-line display preferences (statusline: section in config.yaml).
     statusline: StatusLineConfig = field(default_factory=StatusLineConfig)
 
@@ -427,6 +496,7 @@ class RuntimeConfig:
         # Coerce a raw dict (from YAML or `forge config set`/`edit`) into the
         # nested dataclass. This is the single convergence point for the load,
         # set, and edit paths (see _coerce_statusline_config).
+        self.skills = _coerce_skills_config(self.skills)
         self.statusline = _coerce_statusline_config(self.statusline)
         self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
         self.telemetry = _coerce_telemetry_config(self.telemetry)
@@ -634,6 +704,19 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
             )
             kwargs["statusline"] = StatusLineConfig()
 
+    # Skill invocation is permission-like: malformed state must degrade to the
+    # explicit-only default without discarding unrelated valid preferences.
+    if "skills" in kwargs:
+        try:
+            _coerce_skills_config(kwargs["skills"])
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Invalid skills config in %s: %s — using explicit-only skill defaults",
+                source,
+                e,
+            )
+            kwargs["skills"] = RuntimeSkillsConfig()
+
     # Same subtree fail-open for provider_trace: a bad block resets only this
     # section, never the whole config (set/edit keep the strict raise).
     if "provider_trace" in kwargs:
@@ -733,6 +816,13 @@ def _commented_runtime_config_map(data: Mapping[str, Any]) -> Any:
                 value,
                 field_owner=StatusLineConfig,
                 comments=_STATUSLINE_FIELD_COMMENTS,
+                indent=2,
+            )
+        elif key == "skills" and isinstance(value, Mapping):
+            value = _commented_section_map(
+                value,
+                field_owner=RuntimeSkillsConfig,
+                comments=_SKILLS_FIELD_COMMENTS,
                 indent=2,
             )
         elif key == "provider_trace" and isinstance(value, Mapping):
@@ -911,6 +1001,14 @@ proxy_mode: host
 #                     subscription/OAuth session isn't billed against a key meant
 #                     for other tools. Headless subprocesses keep their key.
 # interactive_anthropic_api_key: inherit
+
+# Skill invocation is explicit-only by default in both Claude Code and Codex.
+# Opt one Forge skill into automatic model selection with:
+#   forge config set skills.invocation.review=model
+# Set it back to human/explicit-only invocation with:
+#   forge config set skills.invocation.review=explicit
+# skills:
+#   invocation: {}
 
 # Status line display (nested section). Choose which segments show, the cost
 # model, palette, and glyphs. Set values with: forge config set statusline.<key>=<value>

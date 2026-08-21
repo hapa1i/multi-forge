@@ -207,4 +207,46 @@ forge claude preset edit
 
 - [ ] Opens `${FORGE_HOME:-$HOME/.forge}/claude.preset.json` in `$EDITOR`
 
+### 11.9 Per-Skill Invocation Mode
+
+<!-- auto -->
+
+```bash
+forge config set skills.invocation.review=model
+forge extension sync
+
+python3 - <<'PY'
+import os
+from pathlib import Path
+
+import yaml
+
+claude_home = Path(os.environ.get("CLAUDE_HOME", str(Path.home() / ".claude")))
+document = (claude_home / "skills" / "review" / "SKILL.md").read_text()
+frontmatter = yaml.safe_load(document.split("---", 2)[1])
+assert frontmatter["disable-model-invocation"] is False
+print("REVIEW_MODEL_INVOCATION=true")
+PY
+
+forge config reset skills
+forge extension sync
+
+python3 - <<'PY'
+import os
+from pathlib import Path
+
+import yaml
+
+claude_home = Path(os.environ.get("CLAUDE_HOME", str(Path.home() / ".claude")))
+document = (claude_home / "skills" / "review" / "SKILL.md").read_text()
+frontmatter = yaml.safe_load(document.split("---", 2)[1])
+assert frontmatter["disable-model-invocation"] is True
+print("REVIEW_EXPLICIT_INVOCATION=true")
+PY
+```
+
+- [ ] Config can opt one skill into model invocation without an extension-enable flag
+- [ ] Sync materializes the changed policy in the installed package
+- [ ] Removing the override restores human/explicit-only invocation
+
 ---

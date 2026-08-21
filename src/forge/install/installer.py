@@ -23,6 +23,7 @@ from typing import Any, NoReturn, cast
 from forge.core.paths import find_git_root
 from forge.core.runtime import installed_runtimes
 from forge.core.state import StateError, now_iso
+from forge.runtime_config import load_runtime_config
 
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
@@ -977,6 +978,7 @@ class Installer:
             raise ForgeInstallError(f"Failed to load skill sources: {e}") from e
 
         source_by_name = {source.manifest.name: source for source in sources}
+        skills_config = load_runtime_config().skills
         candidates = tuple(
             SkillCandidate(
                 name=source.manifest.name,
@@ -1104,7 +1106,11 @@ class Installer:
 
             source = source_by_name[decision.skill]
             try:
-                compiled = compile_skill_for_runtime(source, SkillRuntime(decision.runtime))
+                compiled = compile_skill_for_runtime(
+                    source,
+                    SkillRuntime(decision.runtime),
+                    invocation_policy_override=skills_config.allows_model_invocation(decision.skill),
+                )
             except (OSError, ValueError) as e:
                 raise ForgeInstallError(
                     f"Failed to compile skill '{decision.skill}' for runtime '{decision.runtime}': {e}"

@@ -87,6 +87,25 @@ row does not manage the requested runtime, disable exits successfully with a no-
 
 ---
 
+## Invocation control
+
+All Forge skills install as human/explicit-only by default. Models cannot select them automatically, while explicit
+selectors such as `/forge:review` and `$review` continue to work.
+
+Opt in one skill by name, then enable or sync the runtime packages:
+
+```bash
+forge config set skills.invocation.review=model
+forge extension sync
+```
+
+`model` permits Claude Code or Codex to select that skill from its description; it does not force selection. Restore the
+secure default with `forge config set skills.invocation.review=explicit`. The global mapping applies to both runtimes
+and is compiled into each runtime's native metadata. It is intentionally not an `extension enable` option or a
+Claude-only preset field. See [config.md](config.md#skill-invocation).
+
+---
+
 ## `/forge:review`
 
 Review code for conformance, correctness, and architecture alignment.
@@ -252,9 +271,9 @@ The skill defaults to skepticism: it assumes the claim may be wrong and tries to
 conclusion if the skeptical case fails. Returns a verdict: validated, partially validated, not supported, or
 insufficient evidence.
 
-**Model-invocable in Claude:** Claude can trigger this automatically when you say "are you sure?", "push back on this",
-or "what am I missing?". In either runtime, an explicit invocation without arguments infers the claim from the preceding
-conversation.
+An explicit invocation without arguments infers the claim from the preceding conversation. To let either runtime select
+`challenge` automatically for prompts such as "are you sure?" or "what am I missing?", run
+`forge config set skills.invocation.challenge=model` and sync the extension packages.
 
 ---
 

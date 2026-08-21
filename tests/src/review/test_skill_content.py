@@ -364,10 +364,9 @@ class TestChallengeSkill:
         content = _compiled_skill("challenge")
         assert "name: forge:challenge" in content
 
-    def test_is_model_invocable(self):
-        """Challenge must be auto-invocable (no disable-model-invocation)."""
+    def test_defaults_to_explicit_invocation(self):
         content = _compiled_skill("challenge")
-        assert "disable-model-invocation" not in content
+        assert "disable-model-invocation: true" in content
 
     def test_has_read_only_tools(self):
         """Challenge is evaluative -- no Write or Edit access."""

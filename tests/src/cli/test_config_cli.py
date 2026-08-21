@@ -155,6 +155,8 @@ class TestConfigShowJson:
         # Nested dataclasses must serialize as plain mappings (json can't dump a
         # dataclass instance; show_cmd asdict()s them).
         assert isinstance(cfg["statusline"], dict)
+        assert isinstance(cfg["skills"], dict)
+        assert cfg["skills"]["invocation"] == {}
         assert isinstance(cfg["provider_trace"], dict)
         assert isinstance(cfg["telemetry"], dict)
 
@@ -263,6 +265,7 @@ class TestConfigSet:
         result = CliRunner().invoke(config, ["set", "--help"])
 
         assert result.exit_code == 0
+        assert "skills.invocation.review=model" in result.output
         assert "statusline.cost_mode=actual" in result.output
         assert "provider_trace.inject_provider_user=true" in result.output
 
@@ -388,6 +391,73 @@ class TestConfigReset:
         result = runner.invoke(config, ["reset", "proxy_mode"])
         assert result.exit_code == 0
         assert not (home / "config.yaml").exists()
+
+
+class TestConfigSetSkills:
+    """Tests for per-skill ``skills.invocation.<name>`` overrides."""
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def test_set_model_invocation_round_trips(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "skills.invocation.review=model"])
+
+        assert result.exit_code == 0, result.output
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["skills"]["invocation"] == {"review": "model"}
+        assert get_runtime_config().skills.allows_model_invocation("review") is True
+
+    def test_set_preserves_sibling_skill_modes(self):
+        runner = CliRunner()
+        assert runner.invoke(config, ["set", "skills.invocation.review=model"]).exit_code == 0
+        assert runner.invoke(config, ["set", "skills.invocation.analyze=explicit"]).exit_code == 0
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["skills"]["invocation"] == {"review": "model", "analyze": "explicit"}
+
+    def test_set_invalid_mode_is_rejected_without_writing(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "skills.invocation.review=automatic"])
+
+        assert result.exit_code == 1
+        assert "Invalid skills.invocation.review" in result.stderr
+        assert not (get_forge_home() / "config.yaml").exists()
+
+    def test_set_invalid_skill_name_is_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "skills.invocation.Review=model"])
+
+        assert result.exit_code == 1
+        assert "Unknown Forge skill" in result.stderr
+
+    def test_set_unknown_forge_skill_is_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "skills.invocation.not-a-forge-skill=model"])
+
+        assert result.exit_code == 1
+        assert "Unknown Forge skill" in result.stderr
+        assert "review" in result.stderr
+
+    def test_set_requires_skill_name(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "skills.invocation.=model"])
+
+        assert result.exit_code == 1
+        assert "skills.invocation.<skill>" in result.stderr
+
+    def test_show_renders_skill_invocation_block(self):
+        runner = CliRunner()
+        assert runner.invoke(config, ["set", "skills.invocation.review=model"]).exit_code == 0
+
+        result = runner.invoke(config, ["show", "--raw"])
+
+        assert result.exit_code == 0
+        assert "skills:" in result.output
+        assert "review: model" in result.output
 
 
 class TestConfigSetStatusline:
@@ -693,6 +763,36 @@ class TestConfigEdit:
         assert "segment" in result.stderr.lower()
         assert "bogus" in result.stderr
         assert "Your changes are saved at" in result.stderr
+
+    def test_edit_accepts_valid_skill_invocation_modes(self, monkeypatch):
+        result = self._run_edit_with(
+            "skills:\n  invocation:\n    review: model\n    challenge: explicit\n",
+            monkeypatch,
+        )
+
+        assert result.exit_code == 0
+        assert get_runtime_config().skills.invocation == {"review": "model", "challenge": "explicit"}
+
+    def test_edit_rejects_invalid_skill_invocation_mode(self, monkeypatch):
+        result = self._run_edit_with("skills:\n  invocation:\n    review: automatic\n", monkeypatch)
+
+        assert result.exit_code == 1
+        assert "Invalid skills.invocation.review" in result.stderr
+
+    def test_edit_rejects_unknown_skills_subkey(self, monkeypatch):
+        result = self._run_edit_with("skills:\n  invocations: {}\n", monkeypatch)
+
+        assert result.exit_code == 1
+        assert "Unknown skills key" in result.stderr
+
+    def test_edit_rejects_unknown_forge_skill(self, monkeypatch):
+        result = self._run_edit_with(
+            "skills:\n  invocation:\n    not-a-forge-skill: model\n",
+            monkeypatch,
+        )
+
+        assert result.exit_code == 1
+        assert "Unknown Forge skill" in result.stderr
 
     def test_edit_rejects_invalid_enum(self, monkeypatch):
         result = self._run_edit_with("statusline:\n  cost_mode: wat\n", monkeypatch)
