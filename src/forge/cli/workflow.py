@@ -1637,7 +1637,7 @@ def consensus(
         ctx.exit(2)
         return
 
-    # Resolve raw subject once (positional > -p > stdin) to avoid double-read
+    # Resolve raw subject once (-p > positional > stdin) to avoid double-read
     raw_subject = prompt_text or (" ".join(subject) if subject else None)
     if not raw_subject and not sys.stdin.isatty():
         raw_subject = sys.stdin.read().strip() or None

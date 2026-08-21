@@ -419,13 +419,13 @@ runners.
 
 ### Workflow
 
-| Command                              | Purpose                                    |
-| ------------------------------------ | ------------------------------------------ |
-| `forge workflow panel [targets]`     | Fan out review to multiple models          |
-| `forge workflow analyze [topic]`     | Deep single-model analysis                 |
-| `forge workflow debate [subject]`    | Adversarial evaluation with stance workers |
-| `forge workflow consensus [subject]` | Two-round multi-model convergence          |
-| `forge workflow list-models`         | Show available workflow models             |
+| Command                              | Purpose                                                                           |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| `forge workflow panel [targets]`     | Fan out review to multiple models                                                 |
+| `forge workflow analyze [topic]`     | Deep single-model analysis                                                        |
+| `forge workflow debate [subject]`    | Adversarial evaluation with stance workers                                        |
+| `forge workflow consensus [subject]` | Two-round multi-model convergence                                                 |
+| `forge workflow list-models`         | Show workflow worker readiness (`--json`; `--available` keeps only ready workers) |
 
 Workflow model specs declare a worker runtime and support proxy-backed Claude workers, explicit direct Claude workers,
 and the opt-in runtime-native `codex` worker. The default set is unchanged and remains Claude-backed. Codex selects its
@@ -435,9 +435,9 @@ any Codex worker fails closed and names `--context blind` as the recovery.
 All four execution commands accept `--proxy <proxy_id>`. It overrides preferred-proxy and route-scan selection for
 proxy-backed workers; direct Claude and Codex workers warn and ignore it. `--effort <level>`
 (`low/medium/high/xhigh/max`) applies only to Claude worker argv. Mixed runs share one five-child concurrency and
-cancellation domain. `forge workflow list-models [--json]` reports readiness and runtime. In execution JSON,
-`resolved_models` includes `runtime`; the unpinned Codex entry reports `resolved_model: null` and
-`model_selection: "runtime_default"`.
+cancellation domain. `forge workflow list-models [--json] [--available]` reports readiness and runtime; `--available`
+keeps only workers whose runtime prerequisites and routing are usable. In execution JSON, `resolved_models` includes
+`runtime`; the unpinned Codex entry reports `resolved_model: null` and `model_selection: "runtime_default"`.
 
 ### Search
 
@@ -467,11 +467,17 @@ result still exits zero, and `query --scope all` keeps its skip-and-continue par
 | `forge config migrate-retention` | Preview/apply legacy proxy-retention migration (`--yes`, `--json`)                                              |
 | `forge auth login`               | Store credentials for LLM providers                                                                             |
 | `forge auth status`              | Show credential status per provider                                                                             |
+| `forge auth logout`              | Remove one stored profile (`--profile <name>`; `--yes` skips confirmation)                                      |
+| `forge auth profiles`            | List stored profile names, key counts, and the active profile (`--json`)                                        |
 | `forge logs show`                | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
 | `forge logs clean`               | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
 
 `forge clean --yes --json` still emits its result object on stdout and exits 1 when either `failed` or
 `skipped_project_compatibility` is non-empty.
+
+`forge auth logout` defaults to the active/default stored profile and removes only that entry from
+`~/.forge/credentials.yaml`; environment variables are unaffected. `forge auth profiles --json` exposes the same saved
+profile inventory as structured output.
 
 The `unmanaged_skill_packages` category contains only untracked runtime package directories whose Forge sentinel, exact
 tree, payload bytes/modes (or bounded cache-reset dangling links), path shape, absent ownership, and cleanup scope were

@@ -15,15 +15,15 @@ evidence.
 
 ## Phase 2 -- Documentation and comment sync
 
-- [ ] Add the runtime-config file to the narrow sidecar mount description without implying all of `~/.forge` is mounted.
-- [ ] Document only the three missing CLI surfaces and their current behavior/options.
-- [ ] Correct the consensus precedence comment to `-p > positional > stdin` without changing parsing.
+- [x] Add the runtime-config file to the narrow sidecar mount description without implying all of `~/.forge` is mounted.
+- [x] Document only the three missing CLI surfaces and their current behavior/options.
+- [x] Correct the consensus precedence comment to `-p > positional > stdin` without changing parsing.
 
 ## Phase 3 -- Verification
 
-- [ ] Run focused CLI help/behavior tests for the documented surfaces and confirm the source diff is comment-only.
-- [ ] Run `make pre-commit-md`, design/CLI-reference token checks, board/doc link checks, and `git diff --check`.
-- [ ] Record final documentation evidence without closing the card before merge.
+- [x] Run focused CLI help/behavior tests for the documented surfaces and confirm the source diff is comment-only.
+- [x] Run `make pre-commit-md`, design/CLI-reference token checks, board/doc link checks, and `git diff --check`.
+- [x] Record final documentation evidence without closing the card before merge.
 
 ## Acceptance evidence
 
@@ -32,3 +32,11 @@ evidence.
 | Sidecar mounts  | `sidecar/container.py`                     | design lists the existing read-only runtime-config mount precisely |
 | CLI inventory   | registered auth/workflow commands and help | all three missing surfaces are documented with current options     |
 | Consensus input | `cli/workflow.py` evaluation order         | the comment states `-p > positional > stdin` and code is unchanged |
+
+Implementation evidence: design section 7 now names the conditional read-only `~/.forge/config.yaml` mount while
+retaining the narrow global-directory boundary. The CLI reference documents auth profile deletion/listing and the
+readiness-only `workflow list-models --available` filter. The consensus source change is comment-only.
+
+Verification evidence: 203 auth, workflow, and workflow-documentation tests passed; `make pre-commit-md`, the configured
+Python hooks for the touched comment, and `git diff --check` passed. The documentation scan resolved 1,207 local links
+across 447 files. `design.md` is 29,997 Opus tokens and `cli_reference.md` is 9,551.
