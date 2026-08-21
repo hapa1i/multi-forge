@@ -1100,7 +1100,7 @@ def _handle_policy_check(argv: list[str]) -> None:
         arg = argv[i]
         if arg in ("--bundle", "-b") and i + 1 < len(argv):
             bundle = argv[i + 1]
-            if bundle in ("tdd", "coding_standards"):
+            if bundle in policy_ops.POLICY_BUNDLE_NAMES:
                 bundles.append(bundle)
             i += 2
         elif arg == "--staged":
@@ -1108,7 +1108,7 @@ def _handle_policy_check(argv: list[str]) -> None:
             i += 1
         else:
             # Positional bundle names
-            if arg in ("tdd", "coding_standards"):
+            if arg in policy_ops.POLICY_BUNDLE_NAMES:
                 bundles.append(arg)
             i += 1
 

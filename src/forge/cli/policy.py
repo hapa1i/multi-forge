@@ -640,7 +640,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
     "bundles",
     multiple=True,
     required=True,
-    type=click.Choice(["tdd", "coding_standards"]),
+    type=_POLICY_BUNDLE_CHOICES,
     help="Policy bundles to evaluate (can be repeated)",
 )
 @click.option(
@@ -686,6 +686,9 @@ def check(
         forge policy check --bundle tdd --bundle coding_standards -f src/foo.py --json
         git diff | forge policy check --bundle coding_standards --diff
     """
+    if file_path and use_diff:
+        raise click.UsageError("Options --file and --diff cannot be used together.")
+
     from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, extract_added_lines
@@ -1345,8 +1348,11 @@ def supervisor_on(session_name: str | None) -> None:
     try:
         policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=5.0)
     except policy_ops.SupervisorNotConfiguredError:
-        console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
-        return
+        print_error(
+            "No supervisor configured. Use 'forge policy supervisor set <target>' to set one.",
+            console=err_console,
+        )
+        sys.exit(1)
 
     console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")
 
@@ -1457,8 +1463,12 @@ def supervisor_cascade(
             lock_timeout_s=5.0,
         )
     except policy_ops.SupervisorNotConfiguredError:
-        console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
-        return
+        message = "No supervisor configured. Use 'forge policy supervisor set <target>' to set one."
+        if state == "off":
+            console.print(message)
+            return
+        print_error(message, console=err_console)
+        sys.exit(1)
     except policy_ops.SupervisorInputError as exc:
         print_error(str(exc))
         if exc.tip:

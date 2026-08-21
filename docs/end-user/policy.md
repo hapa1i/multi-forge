@@ -153,6 +153,9 @@ git diff | forge policy check --bundle coding_standards --diff
 - `--fail-mode` — `closed` (default) or `open`
 - `--json` — structured JSON output
 
+Choose exactly one content source: `--file` / `-f` or `--diff`. Passing both is a usage error; Forge does not choose one
+and ignore the other.
+
 Exit codes: 0 (passed or warnings only), 1 (policy violation), 2 (usage error or engine failure).
 
 ### `forge policy supervisor evaluate`
