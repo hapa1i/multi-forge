@@ -65,7 +65,6 @@ class ExecutionContext:
         except (GitNotFoundError, GitWorktreeError):
             project_root = worktree_root
 
-        # Find Forge project root (.forge/ directory)
         forge_root = find_forge_root(cwd)
 
         return cls(cwd=cwd, worktree_root=worktree_root, project_root=project_root, forge_root=forge_root)

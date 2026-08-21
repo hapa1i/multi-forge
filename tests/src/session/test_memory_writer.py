@@ -49,9 +49,7 @@ def _resolve_docs(docs: list[DesignatedDoc]) -> list[ResolvedDocSpec]:
     return [resolve_doc_spec(doc, None) for doc in docs]
 
 
-# ---------------------------------------------------------------------------
 # Transcript fixtures
-# ---------------------------------------------------------------------------
 
 
 def _write_transcript(path: Path, entries: list[dict]) -> Path:
@@ -80,9 +78,7 @@ def _make_older_entry(entry_type: str, text: str = "hello") -> dict:
     return {"type": entry_type, "text": text}
 
 
-# ---------------------------------------------------------------------------
 # count_conversation_turns
-# ---------------------------------------------------------------------------
 
 
 class TestCountConversationTurns:
@@ -151,9 +147,7 @@ class TestCountConversationTurns:
         assert count_conversation_turns(path) == 0
 
 
-# ---------------------------------------------------------------------------
 # DOC_STRATEGIES
-# ---------------------------------------------------------------------------
 
 
 class TestDocStrategies:
@@ -187,9 +181,7 @@ class TestDocStrategies:
             assert "delete" not in lower, f"{name} contains 'delete'"
 
 
-# ---------------------------------------------------------------------------
 # build_multi_doc_prompt
-# ---------------------------------------------------------------------------
 
 
 class TestBuildMultiDocPrompt:
@@ -396,9 +388,7 @@ class TestBuildMultiDocPrompt:
         assert "Propose additions as `- [ ]` checkboxes" not in prompt
 
 
-# ---------------------------------------------------------------------------
 # resolve_writer_base_url
-# ---------------------------------------------------------------------------
 
 
 def _unresolved_result():
@@ -574,9 +564,7 @@ class TestResolveHandoffBaseUrl:
         )
 
 
-# ---------------------------------------------------------------------------
 # run_memory_writer
-# ---------------------------------------------------------------------------
 
 
 class TestRunHandoffAgent:
@@ -756,7 +744,7 @@ class TestRunHandoffAgent:
         assert events[0].billing_mode == "subscription_quota"
 
     def test_stamps_provider_trace_identity_env(self, workspace: Path) -> None:
-        """Phase 1: the writer tags its spawn with the session name + memory_writer role."""
+        """The writer tags its spawn with the session name and memory_writer role."""
         from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 
         with patch("forge.session.memory_writer.run_claude_session") as mock_run:
@@ -959,9 +947,7 @@ class TestRunHandoffAgent:
         assert not memory_report_dir(workspace, "my-sess").exists()
 
 
-# ---------------------------------------------------------------------------
 # _validate_designated_docs
-# ---------------------------------------------------------------------------
 
 
 class TestValidateDesignatedDocs:
@@ -1114,9 +1100,7 @@ class TestValidateDesignatedDocs:
         assert len(result) == 0
 
 
-# ---------------------------------------------------------------------------
-# Permission-denied detection (QA-038)
-# ---------------------------------------------------------------------------
+# Permission-denied detection
 
 
 class TestPermissionDeniedDetection:
@@ -1205,9 +1189,7 @@ class TestPermissionDeniedDetection:
         assert result is True
 
 
-# ---------------------------------------------------------------------------
 # run_memory_writer with designated_docs
-# ---------------------------------------------------------------------------
 
 
 class TestRunHandoffAgentMultiDoc:
@@ -1402,9 +1384,7 @@ class TestRunHandoffAgentMultiDoc:
             assert "proposes changes to" in prompt
 
 
-# ---------------------------------------------------------------------------
 # Passport ownership-split integration tests
-# ---------------------------------------------------------------------------
 
 
 def _write_passport_to_doc(path: Path, **update_kwargs: object) -> None:
@@ -1723,9 +1703,7 @@ class TestPassportLessDocsWork:
             assert "changelog.md" in prompt
 
 
-# ---------------------------------------------------------------------------
 # Per-caller reasoning effort
-# ---------------------------------------------------------------------------
 
 
 class TestMemoryWriterEffort:
@@ -1780,9 +1758,7 @@ class TestMemoryWriterEffort:
         assert kwargs["reasoning_effort"] == "high"
 
 
-# ---------------------------------------------------------------------------
-# Codex dispatch arm (epic consumer_lanes T6c)
-# ---------------------------------------------------------------------------
+# Codex dispatch arm
 
 _CODEX_LANE = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
 _CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-lane manifest DTO
@@ -1801,7 +1777,7 @@ def test_memory_writer_consumer_allows_codex_lane() -> None:
 
 
 class TestCodexMemoryWriter:
-    """The memory writer's codex-exec dispatch arm (epic consumer_lanes T6c)."""
+    """Tests for the memory writer's Codex-exec dispatch arm."""
 
     TRANSCRIPT_REL = ".forge/artifacts/test/transcripts/uuid-123.jsonl"
 
@@ -1818,10 +1794,9 @@ class TestCodexMemoryWriter:
         return tmp_path
 
     def _run_codex(self, workspace: Path, *, mode: str = "review-only", **kwargs: Any) -> bool:
-        """Run the memory writer bound to codex, with claude UNAVAILABLE.
+        """Run the Codex-bound memory writer while Claude is unavailable.
 
-        Patching is_claude_available=False proves the codex arm never requires claude (T6c
-        Finding 2) -- every codex test rides this, so the gate fix is exercised throughout.
+        Every Codex test uses this helper, so each one verifies that the Codex arm does not require Claude.
         """
         with patch("forge.session.memory_writer.is_claude_available", return_value=False):
             return run_memory_writer(
@@ -1846,8 +1821,10 @@ class TestCodexMemoryWriter:
         mock_claude: MagicMock,
         workspace: Path,
     ) -> None:
-        """review-only on codex: read-only request, invoker runs once, stdout persisted, claude
-        untouched -- and it works with is_claude_available() False (T6c Finding 2)."""
+        """Codex review-only uses a read-only request and persists the invoker output.
+
+        It runs without Claude availability.
+        """
         mock_read.return_value = _READY_PREFLIGHT
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="## Promote\n- From codex")
 
@@ -1860,8 +1837,7 @@ class TestCodexMemoryWriter:
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
         assert mock_prepare.call_args.kwargs["model"] is None
         assert mock_prepare.call_args.kwargs["cwd"] == str(workspace)
-        # Spawned success -> the invoker records the upstream outcome; the arm records nothing
-        # manually (T6c Finding 1: no double row). The invoker is mocked, so 0 manual rows here.
+        # The invoker owns the upstream outcome after a successful spawn; the arm must not add a duplicate row.
         assert read_upstream_outcomes(session="test", command="memory-writer") == []
 
     @patch("forge.core.usage.emit_usage_for_session_result")
@@ -1894,8 +1870,10 @@ class TestCodexMemoryWriter:
     def test_cold_preflight_degrades_no_spawn_no_freeze(
         self, mock_read: MagicMock, mock_invoker_cls: MagicMock, workspace: Path
     ) -> None:
-        """A cold cache degrades (return False + a no-spawn outcome), never spawns codex, never
-        freezes -- and records the outcome manually (the invoker never ran; T6c Finding 1)."""
+        """A cold cache degrades without spawning or freezing.
+
+        The arm records the outcome because the invoker never ran.
+        """
         freeze = MagicMock()
 
         result = self._run_codex(workspace, on_dispatch=freeze)
@@ -1917,9 +1895,10 @@ class TestCodexMemoryWriter:
         mock_invoker_cls: MagicMock,
         workspace: Path,
     ) -> None:
-        """A non-zero codex turn degrades (return False) but still freezes -- past the preflight gate
-        it genuinely dispatched. It records NO manual outcome row (rely on the invoker's; T6c
-        Finding 1: the double-record the review flagged)."""
+        """A non-zero Codex turn degrades but still freezes after dispatch.
+
+        The invoker owns the outcome, so the arm does not add another row.
+        """
         mock_read.return_value = _READY_PREFLIGHT
         mock_invoker_cls.return_value.run.return_value = _codex_result(returncode=1, stderr="boom")
         freeze = MagicMock()
@@ -1977,9 +1956,10 @@ class TestCodexMemoryWriter:
         mock_invoker_cls: MagicMock,
         workspace: Path,
     ) -> None:
-        """augment on codex edits the docs in place -> workspace-write sandbox (T6c Phase 0 GO: codex
-        auto-approves in-project writes). It spawns, freezes, and records no manual row -- the invoker
-        owns the outcome (Finding 1). review-only stays read-only (the sibling test)."""
+        """Codex augment uses workspace-write so it can edit documents in place.
+
+        It spawns and freezes, while the invoker owns the outcome. Review-only remains read-only.
+        """
         mock_read.return_value = _READY_PREFLIGHT
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="Updated docs/state.md")
         freeze = MagicMock()

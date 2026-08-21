@@ -673,7 +673,7 @@ class LiteLLMClient:
             stream = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream:
-                # Handle usage from final chunk
+                # The final chunk carries aggregate usage.
                 if chunk.usage:
                     usage_data = {
                         "prompt_tokens": chunk.usage.prompt_tokens,

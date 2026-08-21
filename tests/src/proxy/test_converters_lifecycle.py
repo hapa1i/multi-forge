@@ -1,4 +1,4 @@
-"""Phase 3: provider-trace lifecycle flags + _provider_meta carrier handling at the SSE seam.
+"""Tests for provider-trace lifecycle flags and _provider_meta handling at the SSE seam.
 
 The converter packs observed lifecycle into ``final_usage["_provider_trace"]`` for
 ``_on_stream_complete``; the internal ``_provider_meta`` carrier chunk is consumed (never

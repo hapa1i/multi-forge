@@ -36,10 +36,6 @@ from forge.session.transfer import (
     resolve_transfer_transcript_source,
 )
 
-# -----------------------------------------------------------------------------
-# Test fixtures
-# -----------------------------------------------------------------------------
-
 
 def _fake_completion(text: str, *, usage: dict[str, int] | None = None) -> Any:
     """Stand-in for the ``CompletionResponse`` returned by ``SyncAdapter.complete``.
@@ -156,11 +152,6 @@ def malformed_transcript(tmp_path: Path) -> Path:
     return transcript
 
 
-# -----------------------------------------------------------------------------
-# Test truncate
-# -----------------------------------------------------------------------------
-
-
 class TestTruncate:
     """Tests for truncate helper (forge.core.transcript)."""
 
@@ -184,14 +175,8 @@ class TestTruncate:
 
     def test_unicode_preserved(self) -> None:
         """Unicode characters should be preserved (string slice, not bytes)."""
-        # 5 chars including unicode
         result = truncate("héllo wörld", 5)
         assert result == "héllo..."
-
-
-# -----------------------------------------------------------------------------
-# Test estimate_transcript_tokens
-# -----------------------------------------------------------------------------
 
 
 class TestEstimateTranscriptTokens:
@@ -214,11 +199,6 @@ class TestEstimateTranscriptTokens:
         assert estimate_transcript_tokens(empty_transcript) == 0
 
 
-# -----------------------------------------------------------------------------
-# Test parse_jsonl_transcript
-# -----------------------------------------------------------------------------
-
-
 class TestParseTranscript:
     """Tests for parse_jsonl_transcript (forge.core.transcript)."""
 
@@ -230,7 +210,6 @@ class TestParseTranscript:
     def test_skips_malformed_json(self, malformed_transcript: Path) -> None:
         """Should skip malformed JSON lines without failing."""
         entries = parse_jsonl_transcript(malformed_transcript)
-        # Only the valid entry with message should be parsed
         assert len(entries) == 1
 
     def test_sorts_by_timestamp(self, sample_transcript: Path) -> None:
@@ -244,11 +223,6 @@ class TestParseTranscript:
         nonexistent = tmp_path / "nonexistent.jsonl"
         entries = parse_jsonl_transcript(nonexistent)
         assert entries == []
-
-
-# -----------------------------------------------------------------------------
-# Test resolve_lineage
-# -----------------------------------------------------------------------------
 
 
 def _mock_session(parent: str | None) -> Any:
@@ -274,7 +248,6 @@ class TestResolveLineage:
 
     def test_multiple_ancestors(self) -> None:
         """Should traverse ancestry chain up to depth."""
-        # Mock session states with parent chain
         sessions: dict[str, Any] = {
             "child": _mock_session("parent"),
             "parent": _mock_session("grandparent"),
@@ -427,11 +400,6 @@ class TestResolveTransferTranscriptSource:
         assert artifact_path is None
 
 
-# -----------------------------------------------------------------------------
-# Test _generate_minimal_context
-# -----------------------------------------------------------------------------
-
-
 class TestGenerateMinimalContext:
     """Tests for _generate_minimal_context."""
 
@@ -475,11 +443,6 @@ class TestGenerateMinimalContext:
             proxy_template="litellm-gemini",
         )
         assert "litellm-gemini" in content
-
-
-# -----------------------------------------------------------------------------
-# Test _generate_structured_context
-# -----------------------------------------------------------------------------
 
 
 class TestGenerateStructuredContext:
@@ -639,11 +602,6 @@ class TestGenerateStructuredContext:
         assert warnings == []
 
 
-# -----------------------------------------------------------------------------
-# Test ResumeStrategy enum
-# -----------------------------------------------------------------------------
-
-
 class TestResumeStrategy:
     """Tests for ResumeStrategy enum."""
 
@@ -667,11 +625,6 @@ class TestResumeStrategy:
         """Invalid values should raise ValueError."""
         with pytest.raises(ValueError):
             ResumeStrategy("invalid")
-
-
-# -----------------------------------------------------------------------------
-# Test with fixture file
-# -----------------------------------------------------------------------------
 
 
 class TestWithFixtureFile:
@@ -704,17 +657,11 @@ class TestWithFixtureFile:
             latest_plan_path=".claude/plans/my-plan.md",
         )
 
-        # Check key elements
         assert "# Session Context: fixture-test" in content
         assert "litellm-gemini" in content
         assert "## Conversation Summary" in content
         assert "## Artifacts" in content
         assert ".claude/plans/my-plan.md" in content
-
-
-# -----------------------------------------------------------------------------
-# Test _format_transcript_for_llm
-# -----------------------------------------------------------------------------
 
 
 class TestFormatTranscriptForLLM:
@@ -732,7 +679,6 @@ class TestFormatTranscriptForLLM:
 
     def test_respects_max_chars_limit(self, tmp_path: Path) -> None:
         """Should truncate transcript at MAX_TRANSCRIPT_CHARS."""
-        # Create large transcript that exceeds limit
         large_transcript = tmp_path / "large.jsonl"
         entries = [
             json.dumps(
@@ -752,7 +698,6 @@ class TestFormatTranscriptForLLM:
         parsed = parse_jsonl_transcript(large_transcript)
         formatted, was_truncated, _ = _format_transcript_for_llm(parsed)
 
-        # Should be truncated and include marker
         assert was_truncated is True
         assert "...(transcript truncated for length)" in formatted
         assert len(formatted) <= MAX_TRANSCRIPT_CHARS + 100  # +100 for marker
@@ -763,11 +708,6 @@ class TestFormatTranscriptForLLM:
         assert formatted == ""
         assert was_truncated is False
         assert emitted_turns == set()
-
-
-# -----------------------------------------------------------------------------
-# Test _generate_ai_curated_context
-# -----------------------------------------------------------------------------
 
 
 class TestDecisionCitationValidation:
@@ -852,9 +792,10 @@ def test_ai_curated_output_matches_golden_fixture() -> None:
 
 
 class TestTargetRuntimeRelabel:
-    """Slice 5d: ``target_runtime`` threads to frontmatter + Runtime Hints. The claude
-    (default) variant renders byte-identically to pre-5d output -- a relabel, not a
-    schema change."""
+    """``target_runtime`` updates frontmatter and Runtime Hints without changing the schema.
+
+    The default Claude variant remains byte-identical.
+    """
 
     _CURATED = {
         "goal": "Ship the Codex bridge",
@@ -1611,9 +1552,10 @@ class TestTransferFrontmatter:
 
 
 class TestCurationUsageEmission:
-    """Slice 5e: the ai-curated curation ``core.llm`` call is attributed to the usage
-    ledger (closing a prior gap) -- but only under an ambient run identity, so a normal
-    resume outside a Forge run tree stays silent."""
+    """AI curation writes usage only when an ambient run identity exists.
+
+    A normal resume outside a Forge run tree stays silent.
+    """
 
     _CURATED = {
         "goal": "g",

@@ -65,19 +65,15 @@ def test_mkdir_parents(clean_workspace: ContainerLike):
 def test_mkdir_no_parents_fails(clean_workspace: ContainerLike):
     """Test mkdir without parents flag fails for nested paths."""
     result = clean_workspace.mkdir("/workspace/nonexistent/nested", parents=False)
-    # Should fail because parent doesn't exist
     assert result.returncode != 0
 
 
 def test_file_exists(clean_workspace: ContainerLike):
     """Test file_exists helper."""
-    # Non-existent file
     assert not clean_workspace.file_exists("/workspace/nonexistent.txt")
 
-    # Create file
     clean_workspace.write_file("/workspace/exists.txt", "content")
 
-    # Now exists
     assert clean_workspace.file_exists("/workspace/exists.txt")
 
 
@@ -97,7 +93,6 @@ def test_read_json_invalid(clean_workspace: ContainerLike):
 
 def test_write_file_creates_intermediate_dirs(clean_workspace: ContainerLike):
     """Test write_file fails if parent directory doesn't exist (expected behavior)."""
-    # This should fail - write_file doesn't create parent dirs
     result = clean_workspace.write_file("/workspace/nonexistent/file.txt", "content")
     assert result.returncode != 0
 
@@ -122,6 +117,5 @@ def test_roundtrip_multiline_json(clean_workspace: ContainerLike):
     result = clean_workspace.read_json("/workspace/complex.json")
 
     assert result == data
-    # Verify types preserved
-    assert result["numbers"][1] == 2.5  # Float preserved
-    assert result["booleans"][2] is None  # None preserved
+    assert result["numbers"][1] == 2.5
+    assert result["booleans"][2] is None

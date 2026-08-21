@@ -31,29 +31,22 @@ class TestStatusLineCommand:
 
     def test_status_line_returns_output(self, mock_claude_workspace: ContainerLike) -> None:
         """forge status-line should return some output without crashing."""
-        # Send empty JSON input (minimal contract)
         result = mock_claude_workspace.exec("echo '{}' | forge status-line")
 
-        # Should complete without error
         assert result.returncode == 0
-        # Should produce some output (status line format)
         assert result.stdout.strip() != ""
 
     def test_status_line_with_cwd_session(self, mock_claude_workspace: ContainerLike) -> None:
         """Status line should show session info when manifest exists in CWD."""
-        # Create a session
         mock_claude_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Run status-line from workspace
         result = mock_claude_workspace.exec("cd /workspace && echo '{}' | forge status-line")
 
         assert result.returncode == 0
-        # Should mention the session name somewhere in output
         assert "test-session" in result.stdout or result.stdout.strip() != ""
 
     def test_status_line_exempt_from_queue_processing(self, mock_claude_workspace: ContainerLike) -> None:
         """forge status-line is exempt from startup queue processing."""
-        # Create a pending-work marker
         mock_claude_workspace.exec("mkdir -p $HOME/.forge/pending-work")
         marker_data = {
             "schema_version": 1,
@@ -68,10 +61,8 @@ class TestStatusLineCommand:
         }
         mock_claude_workspace.write_json("$HOME/.forge/pending-work/test-marker-456.json", marker_data)
 
-        # Run status-line (exempt command)
         mock_claude_workspace.exec("echo '{}' | forge status-line")
 
-        # Marker should still exist (exempt command skips processing)
         check = mock_claude_workspace.exec(
             "test -f $HOME/.forge/pending-work/test-marker-456.json && echo exists || echo missing"
         )
@@ -173,28 +164,22 @@ class TestStatusLineRegistryFallback:
 
         mock_claude_workspace.write_json("/tmp/status-line-input.json", {})
 
-        # Set ANTHROPIC_BASE_URL but don't run a proxy (so it fails)
         result = mock_claude_workspace.exec(
             "env ANTHROPIC_BASE_URL=http://localhost:8085 forge status-line < /tmp/status-line-input.json"
         )
 
         assert result.returncode == 0
-        # Output should show something (fallback provides info)
-        # The exact format depends on implementation
 
     def test_no_registry_match_continues_without_proxy(self, mock_claude_workspace: ContainerLike) -> None:
         """When proxy unreachable and no registry match, continues gracefully."""
-        # Empty registry
         _create_registry(mock_claude_workspace, {})
 
         mock_claude_workspace.write_json("/tmp/status-line-input.json", {})
 
-        # Set ANTHROPIC_BASE_URL but don't run a proxy
         result = mock_claude_workspace.exec(
             "env ANTHROPIC_BASE_URL=http://localhost:8085 forge status-line < /tmp/status-line-input.json"
         )
 
-        # Should still complete without crashing
         assert result.returncode == 0
 
 

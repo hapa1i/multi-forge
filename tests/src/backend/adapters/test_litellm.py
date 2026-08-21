@@ -116,7 +116,6 @@ class TestLiteLLMAdapterStop:
         )
 
         with patch("os.killpg", side_effect=ProcessLookupError):
-            # Should not raise
             adapter.stop(process)
 
     def test_surfaces_permission_error(self) -> None:

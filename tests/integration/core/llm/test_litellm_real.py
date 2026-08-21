@@ -40,23 +40,10 @@ def _is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
 
 
 def _has_local_litellm_access() -> bool:
-    """Check if local LiteLLM access is available.
-
-    Checks:
-    1. Local LiteLLM is running (port 4001 responds - test instance)
-    2. GEMINI_API_KEY is set (local LiteLLM needs it)
-    3. Local LiteLLM base URL is configured via template (litellm-gemini-test)
-
-    Note: These tests call `core.llm` directly, so we load the litellm-gemini-test
-    template to configure the base URL for port 4001.
-
-    Uses port 4001 for test isolation (port 4000 is for local development).
-    """
-    # Check if local LiteLLM is running on test port
+    """Return whether the test LiteLLM port and its API key are available."""
     if not _is_port_open("localhost", 4001):
         return False
 
-    # Check if we have API key for local LiteLLM
     if not os.environ.get("GEMINI_API_KEY"):
         return False
 
@@ -66,11 +53,7 @@ def _has_local_litellm_access() -> bool:
 
 
 def _require_local_litellm() -> None:
-    """Guard: fail if local LiteLLM not available.
-
-    Call at the start of tests that require local LiteLLM.
-    This ensures tests FAIL (not skip) when dependencies are missing.
-    """
+    """Fail instead of skipping when the local LiteLLM prerequisite is missing."""
     if not _has_local_litellm_access():
         pytest.fail(
             "Local LiteLLM not available. Requires:\n"
@@ -108,7 +91,6 @@ class TestLiteLLMRemoteReal:
             if event.type == "text_delta":
                 chunks.append(event.text or "")
             elif event.type == "response_end":
-                # Verify we got the response_end event
                 pass
 
         assert len(chunks) > 0
@@ -134,13 +116,11 @@ class TestLiteLLMRemoteReal:
         """Test multi-turn conversation."""
         client = get_client("openai/gpt-4o-mini")
 
-        # First turn
         response1 = await client.complete(
             [Message(role="user", content="My name is Alice.")],
             hyperparams=ModelHyperparameters(max_tokens=50),
         )
 
-        # Second turn
         response2 = await client.complete(
             [
                 Message(role="user", content="My name is Alice."),
@@ -243,7 +223,6 @@ class TestLiteLLMLocalReal:
         # Override .env dev URL (port 4000) with test URL (port 4001)
         monkeypatch.setenv("LITELLM_LOCAL_BASE_URL", "http://localhost:4001")
 
-        # Initialize config singleton with test template for port 4001
         init_config(template="litellm-gemini-test")
 
     async def test_complete_simple_gemini(self) -> None:
@@ -320,7 +299,6 @@ class TestErrorHandling:
         """Test handling of invalid model name."""
         client = get_client("openai/nonexistent-model-12345")
 
-        # Should raise a ProviderError
         from forge.core.llm.errors import ProviderError
 
         with pytest.raises(ProviderError):

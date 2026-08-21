@@ -576,7 +576,7 @@ class TestBuildClaudeEnvRunIdentity:
 
 
 class TestCorrelationHeaders:
-    """Slice 4g: build_claude_env stamps X-Forge-Run-ID/-Root-Run-ID into
+    """build_claude_env stamps X-Forge-Run-ID and X-Forge-Root-Run-ID into
     ANTHROPIC_CUSTOM_HEADERS only for a proxy-routed headless child of a PROVEN Forge
     proxy, treating the two headers as Forge-owned (replace, never duplicate)."""
 
@@ -629,7 +629,7 @@ class TestCorrelationHeaders:
         run_id = env[FORGE_RUN_ID_VAR]
         assert f"{self._RUN_H}: {run_id}" in env[self._H]
 
-    # --- Provider session/command headers ---
+    # Provider session and command headers
 
     def test_session_header_falls_back_to_run_id_without_session_name(self) -> None:
         # No FORGE_SESSION/FORGE_COMMAND -> X-Forge-Session is still emitted via the

@@ -351,7 +351,7 @@ class TestReadCostLogs:
 
 
 class TestForgeRunCorrelation:
-    """Slice 4g: cost records carry the Forge run-tree ids; the root-join sums them."""
+    """Cost records carry Forge run-tree IDs so the root join can sum them."""
 
     def _log(self, dir_: Path, *, root: str | None, run: str | None, cost: int | None) -> None:
         write_request_cost_record(

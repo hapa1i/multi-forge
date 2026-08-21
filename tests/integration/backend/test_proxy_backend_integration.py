@@ -20,7 +20,7 @@ def isolated_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     forge_home = tmp_path / ".forge"
     forge_home.mkdir()
     monkeypatch.setenv("FORGE_HOME", str(forge_home))
-    # Also set GEMINI_API_KEY to avoid env var validation errors
+    # Keep this test focused on backend state instead of credential validation.
     monkeypatch.setenv("GEMINI_API_KEY", "test-key-for-integration-test")
     return forge_home
 
@@ -36,17 +36,13 @@ class TestProxyCreateNoStart:
         """
         runner = CliRunner()
 
-        # Create proxy with --no-start
         result = runner.invoke(main, ["proxy", "create", "litellm-gemini-local", "--no-start"])
 
-        # Proxy config should be created (exit 0)
         assert result.exit_code == 0, f"Failed: {result.output}"
 
-        # But backend config should NOT be created
         backend_config = isolated_forge_home / "backends" / "litellm" / "config.yaml"
         assert not backend_config.exists(), "Backend config should NOT be created with --no-start"
 
-        # And no backend registry entry
         backend_registry = isolated_forge_home / "backends" / "index.json"
         assert not backend_registry.exists(), "Backend registry should NOT be created with --no-start"
 
@@ -58,7 +54,6 @@ class TestProxyCreateNoStart:
 
         assert result.exit_code == 0
 
-        # Proxy registry should exist
         proxy_registry = isolated_forge_home / "proxies" / "index.json"
         assert proxy_registry.exists()
 
@@ -74,7 +69,7 @@ class TestProxyListShowsBackends:
             ManagedBackendProcess,
         )
 
-        # Manually register a backend
+        # Seed backend state without starting an external process.
         store = BackendRegistryStore()
         instance = ManagedBackendProcess(
             process_id="litellm-4000",
@@ -89,11 +84,9 @@ class TestProxyListShowsBackends:
 
         store.update(timeout_s=5.0, mutate=add_backend)
 
-        # Create a proxy to list
         runner = CliRunner()
         runner.invoke(main, ["proxy", "create", "litellm-gemini-local", "--no-start"])
 
-        # List should show backends
         result = runner.invoke(main, ["proxy", "list"])
 
         assert result.exit_code == 0

@@ -29,14 +29,12 @@ def test_compact_copies_previous_transcript_to_project_artifacts(
     temp_worktree: Path,
     tmp_path: Path,
 ) -> None:
-    # Create manifest
     manifest = create_session_state(
         "test-session",
         proxy_template="test-family",
         proxy_base_url="http://localhost:8080",
     )
 
-    # Old session id + transcript
     manifest.confirmed.claude_session_id = "old-uuid"
     old_transcript = temp_worktree / "old.jsonl"
     old_transcript.write_text("{}\n", encoding="utf-8")
@@ -45,14 +43,13 @@ def test_compact_copies_previous_transcript_to_project_artifacts(
     store = SessionStore(str(temp_worktree), "test-session")
     store.write(manifest)
 
-    # New hook input indicates compact
     hook_input = HookInput(
         session_id="new-uuid",
         transcript_path=str(temp_worktree / "new.jsonl"),
         source="compact",
     )
 
-    # Force project_root resolution to our tmp_path (acts as main repo)
+    # Store the captured artifact under the isolated project root.
     with patch("forge.session.artifacts.resolve_forge_root", return_value=tmp_path):
         with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree)

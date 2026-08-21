@@ -62,15 +62,12 @@ class TestWorktreeSemantics:
         """Verify multiple sessions can coexist in same worktree (per-session dirs)."""
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
 
-        # Create first session
         result1 = forge_workspace.exec("cd /workspace && forge session start alpha")
         assert result1.returncode == 0, f"First session failed: {result1.stderr}"
 
-        # Create second session in same worktree — should succeed (D5)
         result2 = forge_workspace.exec("cd /workspace && forge session start beta")
         assert result2.returncode == 0, f"Second session should succeed: {result2.stderr}"
 
-        # Both manifests should exist
         check = forge_workspace.exec(
             "test -f /workspace/.forge/sessions/alpha/forge.session.json && test -f /workspace/.forge/sessions/beta/forge.session.json && echo ok"
         )
@@ -80,15 +77,12 @@ class TestWorktreeSemantics:
         """Verify --worktree creates a new worktree with isolated session."""
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
 
-        # Create first session in main worktree
         result1 = forge_workspace.exec("cd /workspace && forge session start main-session")
         assert result1.returncode == 0, f"Main session failed: {result1.stderr}"
 
-        # Create second session with --worktree flag
         result2 = forge_workspace.exec("cd /workspace && forge session start worktree-session --worktree")
         assert result2.returncode == 0, f"Worktree session failed: {result2.stderr}"
 
-        # Verify both manifests exist in different locations
         check = forge_workspace.exec("""
             cd /forge && uv run python -c "
 from pathlib import Path
@@ -154,7 +148,6 @@ class TestIndexSelfHealing:
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Verify in index
         check1 = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -166,11 +159,9 @@ print('in_index')
         """)
         assert "in_index" in check1.stdout, f"Pre-delete check failed: {check1.stderr}"
 
-        # Delete session
         result = forge_workspace.exec("cd /workspace && forge session delete test-session --yes")
         assert result.returncode == 0, f"Delete failed: {result.stderr}"
 
-        # Verify NOT in index
         check2 = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -187,15 +178,12 @@ print('removed_from_index')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Manually delete manifest (simulating corruption/external deletion)
+        # Remove only the manifest to exercise index pruning.
         forge_workspace.exec("rm /workspace/.forge/sessions/test-session/forge.session.json")
 
-        # Run forge session list (triggers prune)
         result = forge_workspace.exec("cd /workspace && forge session list")
 
-        # Command should succeed (not fail due to orphaned entry)
         assert result.returncode == 0, f"Session list failed: {result.stderr}"
-        # Session should not appear in output (pruned on access)
         assert "test-session" not in result.stdout, f"Orphaned session should be pruned: {result.stdout}"
 
     def test_repair_reindexes_orphaned_manifest(self, forge_workspace: ContainerLike) -> None:
@@ -339,7 +327,6 @@ print('manifest_structure_ok')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Try to set a confirmed field
         result = forge_workspace.exec(
             "cd /workspace && forge session set --session test-session confirmed.claude_session_id 'malicious' 2>&1"
         )
@@ -353,13 +340,11 @@ print('manifest_structure_ok')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Set an override (key is relative to intent, not prefixed with 'intent.')
         result = forge_workspace.exec(
             "cd /workspace && forge session set --session test-session policy.fail_mode closed"
         )
         assert result.returncode == 0, f"Session set failed: {result.stderr}"
 
-        # Verify stored in overrides, not mutating intent
         check = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -391,14 +376,11 @@ print('override_stored_correctly')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start test-session")
 
-        # Corrupt manifest
         forge_workspace.exec("echo 'not json' > /workspace/.forge/sessions/test-session/forge.session.json")
 
-        # Try to show details (corrupt manifest should produce helpful error)
         result = forge_workspace.exec("cd /workspace && forge session show test-session 2>&1")
         assert result.returncode != 0, "Expected non-zero exit for corrupt manifest"
 
-        # Verify helpful error (mentions manifest and JSON issue)
         output_lower = result.stdout.lower()
         assert (
             "manifest" in output_lower or "json" in output_lower or "corrupt" in output_lower
@@ -604,7 +586,6 @@ print(entry['worktree_path'])
         wt_path = wt_path_result.stdout.strip()
         assert wt_path, f"Could not determine worktree path: {wt_path_result.stderr}"
 
-        # Delete with --force --delete-branch
         result = forge_workspace.exec("cd /workspace && forge session delete wt-sess --yes --force --delete-branch")
         assert result.returncode == 0, f"Delete failed: {result.stderr}"
 
@@ -650,7 +631,6 @@ print(entry['worktree_path'])
         wt_path = wt_path_result.stdout.strip()
         assert wt_path, f"Could not determine worktree path: {wt_path_result.stderr}"
 
-        # Delete with --keep-worktree
         result = forge_workspace.exec("cd /workspace && forge session delete wt-keep --yes --keep-worktree")
         assert result.returncode == 0, f"Delete failed: {result.stderr}"
 
@@ -702,7 +682,6 @@ print('keep_ok')
         result = forge_workspace.exec("cd /workspace && forge session start config-sess --worktree")
         assert result.returncode == 0, f"Session start failed: {result.stderr}"
 
-        # Verify .env copied to worktree
         check = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -760,7 +739,6 @@ print('artifacts_ok')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start dirty-sess --worktree")
 
-        # Get worktree path
         wt_path_result = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -775,11 +753,9 @@ print(entry['worktree_path'])
         # Create uncommitted file in worktree (use write_file to avoid shell interpolation)
         forge_workspace.write_file(f"{wt_path}/dirty-file.txt", "uncommitted change\n")
 
-        # Delete without --force should fail (dirty worktree)
         result_no_force = forge_workspace.exec("cd /workspace && forge session delete dirty-sess 2>&1")
         assert result_no_force.returncode != 0, "Delete should fail on dirty worktree without --force"
 
-        # Verify "no damage" — session and worktree intact after failed delete
         no_damage_check = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -807,11 +783,9 @@ print('no_damage_ok')
         """)
         assert "no_damage_ok" in no_damage_check.stdout, f"No-damage check failed: {no_damage_check.stderr}"
 
-        # Delete with --force should succeed
         result_force = forge_workspace.exec("cd /workspace && forge session delete dirty-sess --yes --force")
         assert result_force.returncode == 0, f"Force delete failed: {result_force.stderr}"
 
-        # Session should be gone
         check = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -933,7 +907,6 @@ print('branch_ok')
         result_start = forge_workspace.exec("cd /workspace && forge session start incog-parent --no-launch")
         assert result_start.returncode == 0, f"Session start failed: {result_start.stderr}"
 
-        # Patch manifest to mark as incognito
         forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json
@@ -945,7 +918,6 @@ p.write_text(json.dumps(d))
 "
         """)
 
-        # Fork should be rejected
         result_fork = forge_workspace.exec("cd /workspace && forge session fork incog-parent --name incog-fork 2>&1")
         assert result_fork.returncode != 0, "Fork from incognito should fail"
 
@@ -982,7 +954,6 @@ print('incognito_ok')
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
         forge_workspace.exec("cd /workspace && forge session start inside-sess --worktree")
 
-        # Get worktree path
         wt_path_result = forge_workspace.exec("""
             cd /forge && uv run python -c "
 import json

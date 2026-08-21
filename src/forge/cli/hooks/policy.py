@@ -196,10 +196,10 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
         from forge.session.consumer_lanes import read_bound_lane
 
         sup_cfg = effective.policy.supervisor
-        # Inject the supervisor's consumer-lane binding (epic consumer_lanes, T1b). The hook holds
-        # the manifest; the semantic module never reads the store. None => the default lane.
+        # The hook holds the manifest and injects the consumer-lane binding, so the
+        # semantic module never reads the store. None selects the default lane.
         lane_record = read_bound_lane(manifest, SUPERVISOR_CONSUMER)
-        # T7 sticky degrade: if the bound codex subscription lane exhausted earlier this session,
+        # If the bound codex subscription lane exhausted earlier this session,
         # route around it to the default claude lane. The frozen codex binding is left intact
         # (still observable in `lane show`); only this run's dispatch lane is overridden to None.
         if lane_record is not None and is_supervisor_degraded(manifest):
@@ -236,10 +236,10 @@ def _exhausted_supervisor_decision(entries: list[tuple[Any, str]]) -> Any | None
 
 
 def _emit_lane_degraded(payload: dict[str, Any]) -> None:
-    """Record the single upstream ``policy.lane_degraded`` outcome for a T7 degrade (best-effort).
+    """Record one upstream ``policy.lane_degraded`` outcome, best-effort.
 
-    Fired AFTER the store lock (``store.update`` may retry the mutate; telemetry I/O must not run
-    under the lock). This is an operation-outcome row (read by ``forge telemetry activity``), not a
+    Emit this after releasing the store lock because ``store.update`` can retry the mutation.
+    Telemetry I/O must not run under the lock. This is an operation-outcome row, not a
     ``UsageEvent`` -- the degrade is a routing decision, not a model call.
     """
     from forge.core.telemetry.upstream import record_upstream_operation
@@ -292,8 +292,8 @@ def _persist_policy_decisions(
     from forge.policy.store import build_policy_state_update
     from forge.session.models import PolicyConfirmed
 
-    # Captured under the lock, emitted after it: a T7 degrade fires exactly one upstream outcome,
-    # but telemetry I/O must not run inside store.update (which may retry the mutate). None => no degrade.
+    # Capture under the lock and emit after it. Telemetry I/O must not run inside
+    # store.update because the mutation can retry. None means no degradation occurred.
     degrade_emit: dict[str, Any] | None = None
 
     def _mutate(m: object) -> None:
@@ -333,7 +333,7 @@ def _persist_policy_decisions(
         m.confirmed.confirmed_at = now_iso()
         m.confirmed.confirmed_by = confirmed_by
 
-        # Freeze the supervisor's consumer-lane binding write-if-absent (epic consumer_lanes, T1b):
+        # Freeze the supervisor's consumer-lane binding write-if-absent:
         # at the first policy check for a configured supervisor, record the *explicitly chosen* lane
         # as durable ground truth (the anchor the "already bound" reject checks). Folded into this
         # existing locked post-eval write -- no second lock. ensure_consumer_lane_binding no-ops when
@@ -350,7 +350,7 @@ def _persist_policy_decisions(
         #
         # Timing note: this eager freeze (first check for a *registered* supervisor) is deliberate
         # and differs from the aux consumers, which freeze only on a real dispatch
-        # (cli/consumer_lane_freeze.py, T6a) -- they have no registration commitment point, so a
+        # (cli/consumer_lane_freeze.py). They have no registration commitment point, so a
         # skip must not freeze. Same equality-guard mechanism, different trigger.
         sup = effective.policy.supervisor if effective.policy else None
         if sup and sup.resume_id and not sup.suspended:
@@ -362,7 +362,7 @@ def _persist_policy_decisions(
 
             if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane:
                 ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
-                # T7 sticky degrade: if a check exhausted the codex subscription this eval,
+                # If a check exhausted the codex subscription during this evaluation,
                 # persist the degrade overlay so subsequent checks route to the default claude
                 # lane (the read side injects lane_record=None). Shares the freeze's stale-write
                 # guard and lock -- a concurrent remove/re-pin already changed read_bound_lane(m),

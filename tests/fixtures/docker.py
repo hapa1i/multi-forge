@@ -33,7 +33,6 @@ from typing import Generator, Protocol
 import pytest
 from _pytest.nodes import Item
 
-# Module-level state for log capture hook
 _active_container_id: str | None = None
 
 
@@ -42,7 +41,7 @@ def _detect_claude_code_version() -> str:
     try:
         result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0 and result.stdout.strip():
-            # Output is like "2.1.76 (Claude Code)" — take first token
+            # `claude --version` starts with the version number.
             return result.stdout.strip().split()[0]
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
@@ -125,7 +124,6 @@ class DockerContainer:
         Special case: empty content writes empty file (not a newline).
         """
         if not content:
-            # Empty content - just truncate the file
             return self.exec(f'> "{path}"', timeout=timeout)
 
         cmd = f"""cat > "{path}" << 'FORGE_EOF'
@@ -187,7 +185,6 @@ class LocalExecution:
         Special case: empty content writes empty file (not a newline).
         """
         if not content:
-            # Empty content - just truncate the file
             return self.exec(f'> "{path}"', timeout=timeout)
 
         cmd = f"""cat > "{path}" << 'FORGE_EOF'
@@ -385,11 +382,6 @@ def _get_dirty_worktree_fingerprint(repo_root: Path) -> str | None:
         return None
 
 
-# -----------------------------------------------------------------------------
-# Fixtures
-# -----------------------------------------------------------------------------
-
-
 @pytest.fixture(scope="session")
 def docker_available() -> bool:
     """Session-scoped fixture to check Docker availability once."""
@@ -411,7 +403,6 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     The image tag includes the Claude Code version to ensure cache invalidation
     when the version changes. Version is detected from `claude --version`.
     """
-    # If we're already inside a container with Claude Code, no image needed
     if local_claude_available:
         return None
 
@@ -423,7 +414,6 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     repo_root = _find_repo_root()
     forge_revision = _get_forge_revision(repo_root)
 
-    # Include version in tag for cache invalidation when Claude version changes
     image_name = f"forge-claude-test:{CLAUDE_CODE_VERSION}"
 
     needs_build = not _image_exists(image_name)
@@ -442,7 +432,6 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     if not needs_build:
         return image_name
 
-    # Build the image
     dockerfile = repo_root / "docker" / "Dockerfile.forge"
 
     if not dockerfile.exists():
@@ -492,16 +481,13 @@ def synced_container(
     """
     global _active_container_id
 
-    # Local mode: already inside test container (deps installed at image build)
     if local_claude_available:
         yield LocalExecution()
         return
 
-    # Docker mode: spawn container
     if forge_test_image is None:
         pytest.fail("No test image available and not running locally. Run 'make test-integration' to build images.")
 
-    # Build docker run command with platform-specific options
     cmd = [
         "docker",
         "run",
@@ -511,11 +497,8 @@ def synced_container(
         "/forge",
     ]
 
-    # UID/GID mapping for Linux CI runners
-    # On macOS Docker Desktop, this can cause surprising ownership issues,
-    # so we only apply it on Linux.
+    # Map the host UID/GID on Linux CI. Docker Desktop handles ownership differently.
     if platform.system() == "Linux":
-        # Note: if os.getuid() == 0 (already root), this is a no-op
         cmd.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
 
     cmd.extend(
@@ -537,14 +520,12 @@ def synced_container(
         pytest.fail(f"Failed to start container: {result.stderr}")
 
     container_id = result.stdout.strip()
-    _active_container_id = container_id  # Store for log capture hook
+    _active_container_id = container_id
     container = DockerContainer(container_id=container_id, image=forge_test_image)
 
-    # Brief wait for container init
+    # Let the container initialize before the import probe.
     time.sleep(0.5)
 
-    # Quick verification that Forge can import (validates image build)
-    # Dependencies are already baked into the Docker image (see Dockerfile line 62)
     verify_result = container.exec("uv run python -c 'import forge.cli.main'", timeout=10)
     if verify_result.returncode != 0:
         subprocess.run(["docker", "stop", container_id], capture_output=True, timeout=30)
@@ -554,7 +535,6 @@ def synced_container(
     try:
         yield container
     finally:
-        # Cleanup: stop container (--rm flag handles removal)
         subprocess.run(
             ["docker", "stop", container_id],
             capture_output=True,
@@ -599,8 +579,6 @@ def clean_workspace(base_git_repo: ContainerLike) -> ContainerLike:
     - Git worktrees (except /workspace)
     - Git branches (except main)
     """
-    # Hard reset to initial commit (undo any commits made by tests)
-    # This ensures tests that commit files don't pollute subsequent tests
     base_git_repo.exec("""
         cd /workspace
         INIT_COMMIT=$(git rev-list --max-parents=0 HEAD)
@@ -608,14 +586,11 @@ def clean_workspace(base_git_repo: ContainerLike) -> ContainerLike:
         git reset --hard $INIT_COMMIT
         """)
 
-    # Reset working directory and remove config dirs
     result = base_git_repo.exec("cd /workspace && git clean -fdx && git checkout -- . && rm -rf .claude .forge")
     if result.returncode != 0:
         pytest.fail(f"Failed to reset workspace: {result.stderr}")
 
-    # Remove any worktrees created by previous tests (sibling dirs like /workspace-*)
-    # git worktree list shows: /workspace  abc1234 [main]
-    # We want to remove all worktrees except /workspace
+    # Remove registered worktrees but preserve /workspace.
     base_git_repo.exec("""
         cd /workspace
         for wt in $(git worktree list --porcelain | grep '^worktree ' | cut -d' ' -f2 | grep -v '^/workspace$'); do
@@ -623,13 +598,12 @@ def clean_workspace(base_git_repo: ContainerLike) -> ContainerLike:
         done
         """)
 
-    # Also remove any /workspace-* sibling directories that might have been created
-    # manually (not as proper git worktrees). This catches orphaned directories.
+    # Remove orphaned sibling directories that are not registered worktrees.
     base_git_repo.exec("""
         rm -rf /workspace-* 2>/dev/null || true
         """)
 
-    # Delete any branches except main (cleanup from fork/worktree tests)
+    # Remove branches left by fork and worktree tests.
     base_git_repo.exec("""
         cd /workspace
         for branch in $(git branch --format='%(refname:short)' | grep -v '^main$'); do
@@ -638,11 +612,6 @@ def clean_workspace(base_git_repo: ContainerLike) -> ContainerLike:
         """)
 
     return base_git_repo
-
-
-# -----------------------------------------------------------------------------
-# Log capture on failure (pytest hook)
-# -----------------------------------------------------------------------------
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -659,17 +628,13 @@ def pytest_runtest_makereport(item: Item, call: pytest.CallInfo) -> Generator:
         return
     report = outcome.get_result()
 
-    # Only capture on actual failures in the call phase
     if report.when != "call" or report.outcome != "failed":
         return
 
-    # Only capture if we have an active Docker container
     if _active_container_id is None:
         return
 
-    # Capture container state and logs
     try:
-        # Container state (brief inspect output)
         inspect_result = subprocess.run(
             [
                 "docker",
@@ -683,7 +648,6 @@ def pytest_runtest_makereport(item: Item, call: pytest.CallInfo) -> Generator:
             timeout=5,
         )
 
-        # Last 100 lines of logs
         logs_result = subprocess.run(
             ["docker", "logs", "--tail", "100", _active_container_id],
             capture_output=True,
@@ -691,7 +655,6 @@ def pytest_runtest_makereport(item: Item, call: pytest.CallInfo) -> Generator:
             timeout=10,
         )
 
-        # Append to report
         extra_info = [
             "",
             "=" * 60,
@@ -707,14 +670,12 @@ def pytest_runtest_makereport(item: Item, call: pytest.CallInfo) -> Generator:
             "=" * 60,
         ]
 
-        # Append to longrepr for display
         if report.longrepr is not None:
             if hasattr(report.longrepr, "addsection"):
                 report.longrepr.addsection("Docker Debug", "\n".join(extra_info))
             else:
-                # For string longrepr, append directly
                 report.longrepr = str(report.longrepr) + "\n".join(extra_info)
 
     except Exception as e:
-        # Don't let log capture failure break test reporting
+        # Diagnostics must not replace the original test failure.
         print(f"Warning: Failed to capture Docker logs: {e}", file=sys.stderr)

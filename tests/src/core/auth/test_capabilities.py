@@ -25,9 +25,6 @@ def _shipped_template_names() -> list[str]:
     return sorted(p.stem for p in TEMPLATE_DIR.glob("*.yaml"))
 
 
-# ── Template coverage ─────────────────────────────────────────────
-
-
 class TestTemplateCoverage:
     """Every shipped template must map to credentials."""
 
@@ -83,9 +80,6 @@ class TestTemplateCoverage:
             assert len(names) == len(set(names)), f"Template '{template}' has duplicate credential entries"
 
 
-# ── Reverse lookup ────────────────────────────────────────────────
-
-
 class TestCredentialForEnvVar:
 
     def test_known_env_vars(self):
@@ -104,9 +98,6 @@ class TestCredentialForEnvVar:
         assert credential_for_env_var("UNKNOWN_KEY") is None
 
 
-# ── Retired names ─────────────────────────────────────────────────
-
-
 class TestRetiredNames:
 
     def test_anthropic_retired(self):
@@ -121,9 +112,6 @@ class TestRetiredNames:
         assert "gemini-api" in msg
         assert "openai-api" in msg
         assert "anthropic-api" in msg
-
-
-# ── EnvVar metadata ───────────────────────────────────────────────
 
 
 class TestEnvVarMetadata:
@@ -148,9 +136,6 @@ class TestEnvVarMetadata:
         assert base_url_var.required
         assert not base_url_var.secret
         assert base_url_var.connection_value
-
-
-# ── Credential registry integrity ─────────────────────────────────
 
 
 class TestCredentialRegistry:
@@ -213,9 +198,6 @@ class TestCredentialRegistry:
                 check=False,
             )
             assert result.returncode == 0, result.stderr
-
-
-# ── Error formatting ──────────────────────────────────────────────
 
 
 class TestFormatMissingCredentialError:
@@ -332,9 +314,6 @@ class TestFormatMissingCredentialError:
         cred = CREDENTIALS["anthropic-api"]
         msg = format_missing_credential_error(cred, missing_vars=["ANTHROPIC_API_KEY"])
         assert "Pay-per-token" in msg
-
-
-# ── codex-api credential (Phase 5a) ───────────────────────────────
 
 
 class TestCodexCredential:

@@ -1129,7 +1129,6 @@ def shell(name: str | None) -> None:
         err_console.print("Start a sidecar session with: [cyan]forge session start <name> --sidecar[/cyan]")
         sys.exit(1)
 
-    # Check if container is running (deterministic naming)
     container_name = f"forge-{name}"
     if not is_container_running(container_name):
         print_error(f"Container '{container_name}' is not running")

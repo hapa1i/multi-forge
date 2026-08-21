@@ -1,4 +1,4 @@
-"""Tests for empirical Codex hook-enrollment verification (residual-risk slice).
+"""Tests for empirical Codex hook-enrollment verification.
 
 Hermetic: no real ``codex`` runs. The verdict-logic tests stub the probe turn and the
 registration read; the mechanism tests patch ``CodexHeadlessInvoker.run`` and simulate

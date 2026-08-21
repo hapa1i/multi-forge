@@ -84,7 +84,6 @@ def _scope_filters(ctx: ExecutionContext, scope: str) -> tuple[str | None, str |
             return None, str(ctx.forge_root)
         _log.debug("No forge_root for --scope project, falling back to workspace scope")
         return str(ctx.project_root), None
-    # scope == "all"
     return None, None
 
 

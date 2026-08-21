@@ -331,7 +331,7 @@ class TierClientFactory:
         logger.warning(f"Invalidating cached credentials for {model_name} (tier={tier}) due to auth failure")
 
         async with self._refresh_lock:
-            # Remove from cache - handle both specific tier and all tiers
+            # A missing tier invalidates every cached tier for this model.
             if tier is not None:
                 cache_key = (model_name, tier)
                 if cache_key in self._cache:

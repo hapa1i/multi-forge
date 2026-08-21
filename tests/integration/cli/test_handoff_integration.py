@@ -28,19 +28,10 @@ from tests.fixtures.docker import ContainerLike
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 SESSION_NAME = "handoff-test"
 PROXY_TEMPLATE = "test-template"
 PROXY_URL = "http://localhost:8084"
 TRANSCRIPT_REL = ".forge/artifacts/handoff-test/transcripts/uuid-123.jsonl"
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _passported_content(
@@ -164,11 +155,6 @@ exit "${FORGE_MOCK_CLAUDE_EXIT_CODE:-0}"
     assert result.returncode == 0, result.stderr
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 class TestHandoffRunMultiDoc:
     """E2E: forge memory-writer run with passported docs discovered via scan."""
 
@@ -184,7 +170,6 @@ class TestHandoffRunMultiDoc:
         ``target_files`` values may already contain passport frontmatter
         (use ``_passported_content()`` to prepend it).
         """
-        # Write manifest
         manifest = manifest_dict or _build_manifest()
         workspace.mkdir(f"/workspace/.forge/sessions/{SESSION_NAME}", parents=True)
         workspace.write_json(
@@ -192,12 +177,10 @@ class TestHandoffRunMultiDoc:
             manifest,
         )
 
-        # Write transcript
         transcript_path = f"/workspace/{TRANSCRIPT_REL}"
         workspace.exec(f"mkdir -p $(dirname {transcript_path})")
         workspace.write_file(transcript_path, _build_transcript())
 
-        # Write target doc files (content may include passport frontmatter)
         if target_files:
             for path, content in target_files.items():
                 workspace.exec(f"mkdir -p $(dirname /workspace/{path})")
@@ -234,11 +217,9 @@ class TestHandoffRunMultiDoc:
         exit_code = self._run_handoff(mock_claude_workspace)
         assert exit_code == 0
 
-        # Verify claude -p was invoked
         invocations = claude_invocations()
         assert any("claude -p" in inv for inv in invocations), f"Expected claude -p call, got: {invocations}"
 
-        # Verify the prompt contains all three docs with correct strategies
         prompt = claude_capture_file("/tmp/claude_stdin_*.log")
         assert "docs/checklist.md" in prompt
         assert "docs/changelog.md" in prompt
@@ -252,7 +233,6 @@ class TestHandoffRunMultiDoc:
         claude_invocations: Callable[[], list[str]],
     ) -> None:
         """No passported docs under scan roots -> exit 0, no claude -p call."""
-        # Ensure docs/ exists but has no passported files
         self._setup_session(mock_claude_workspace)
         mock_claude_workspace.exec("mkdir -p /workspace/docs")
 
@@ -271,9 +251,7 @@ class TestHandoffRunMultiDoc:
         self._setup_session(
             mock_claude_workspace,
             target_files={
-                # Passported: discovered by scanner
                 "docs/checklist.md": _passported_content("checklist", "# Checklist\n"),
-                # No passport: invisible to scanner
                 "docs/plain.md": "# Plain doc\nNo frontmatter.\n",
             },
         )
@@ -293,17 +271,14 @@ class TestHandoffRunMultiDoc:
         """Empty docs/ dir and no .forge/memory/ -> no scan results, no claude -p call."""
         self._setup_session(mock_claude_workspace)
 
-        # Create empty docs/ dir (no passported files)
         mock_claude_workspace.exec("mkdir -p /workspace/docs")
 
-        # .forge/memory/ should not exist
         check = mock_claude_workspace.exec("test -d /workspace/.forge/memory && echo yes || echo no")
         assert "no" in check.stdout
 
         exit_code = self._run_handoff(mock_claude_workspace)
         assert exit_code == 0
 
-        # No claude -p call (scanner found nothing)
         invocations = claude_invocations()
         assert not any("claude -p" in inv for inv in invocations)
 
@@ -344,7 +319,6 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace.exec(f"mkdir -p /workspace/$(dirname {transcript_rel})")
         mock_claude_workspace.write_file(f"/workspace/{transcript_rel}", _build_transcript())
 
-        # Author a passport on the doc (sessionless)
         result = mock_claude_workspace.exec(
             "cd /workspace && forge memory track docs/state.md --strategy project-state"
         )
@@ -372,7 +346,6 @@ class TestHandoffRunMultiDoc:
         )
         assert result.returncode == 0, result.stderr
 
-        # Verify the passported doc shows up in the project-level list
         list_result = mock_claude_workspace.exec("cd /workspace && forge memory list --json")
         assert list_result.returncode == 0, list_result.stderr
         docs = json.loads(list_result.stdout)
@@ -473,7 +446,6 @@ class TestHandoffRunDisabled:
         claude_invocations: Callable[[], list[str]],
     ) -> None:
         """Missing session manifest → exit 0, no claude -p call."""
-        # Don't create any manifest — just the transcript
         workspace = mock_claude_workspace
         transcript_path = f"/workspace/{TRANSCRIPT_REL}"
         workspace.exec(f"mkdir -p $(dirname {transcript_path})")

@@ -1,4 +1,4 @@
-"""Phase 4: Forge-unique opt-in segments (supervisor, policy, audit, drift).
+"""Tests for Forge-specific opt-in segments: supervisor, policy, audit, and drift.
 
 These read state nothing else in the status line surfaces — session policy
 posture (from the manifest, *effective* intent+overrides) and proxy audit/routing
@@ -45,8 +45,6 @@ from forge.core.tiers import detect_tier_word
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
-# --- Builders -------------------------------------------------------------
-
 _DATA = {
     "workspace": {"current_dir": "/tmp/demo"},
     "model": {"id": "claude-opus-4-8", "display_name": "Opus"},
@@ -92,9 +90,6 @@ def _seed_supervisor(**kw: object) -> None:
     }
     base.update(kw)
     log_usage_event(UsageEvent(**base))  # type: ignore[arg-type]
-
-
-# --- Pure format helpers --------------------------------------------------
 
 
 class TestFormatHelpers:
@@ -187,9 +182,6 @@ class TestFormatHelpers:
         assert format_launch({"routing_mode": "???", "api_key_source": "???"}) is None
 
 
-# --- Producers via render_segments ---------------------------------------
-
-
 class TestLaunchProducer:
     def test_renders_from_confirmed_launch(self):
         manifest = {
@@ -238,8 +230,7 @@ class TestSupervisorProducer:
         assert _stream(_ctx(manifest=None), ["supervisor"]) == []
 
     def test_disabled_policy_shows_off_not_active(self):
-        # Finding 1: %policy disable sets policy.enabled=False; the hook then exits
-        # before running, so the supervisor is configured but NOT watching.
+        # %policy disable exits the hook before the supervisor runs, so it is configured but not watching.
         manifest = {"intent": {"policy": {"enabled": False, "supervisor": {"suspended": False}}}}
         out = _stream(_ctx(manifest=manifest), ["supervisor"])
         assert any("SUP(off)" in s for s in out)
@@ -323,14 +314,13 @@ class TestPolicyProducer:
         assert any("pol:TDD" in s and "(off)" not in s for s in out)
 
     def test_disabled_policy_marks_bundles_off(self):
-        # Finding 1: a disabled policy must not report its bundles as active.
+        # A disabled policy must not report its bundles as active.
         manifest = {"intent": {"policy": {"enabled": False, "bundles": ["tdd"]}}}
         out = _stream(_ctx(manifest=manifest), ["policy"])
         assert any("pol:TDD(off)" in s for s in out)
 
     def test_override_clears_bundles_does_not_revive_confirmed(self):
-        # Finding 2: an override that empties bundles is authoritative — the stale
-        # confirmed bundles must NOT be revived as the active posture.
+        # An override that empties bundles is authoritative; stale confirmed bundles must not become active.
         manifest = {
             "intent": {"policy": {"enabled": True, "bundles": ["tdd"]}},
             "overrides": {"policy": {"bundles": []}},
@@ -416,7 +406,7 @@ class TestDriftProducer:
         assert _stream(ctx, ["drift"]) == []
 
     def test_explicit_tier_beats_default_no_false_positive(self):
-        # Finding 3: active_tier is the proxy *default* (sonnet here), but routing
+        # active_tier is the proxy default (sonnet here), but routing
         # prefers the explicit tier in the model name (opus). The opus request
         # routes to the opus backend == model.id, so there is NO drift — comparing
         # against the sonnet default would have false-positived.
@@ -606,9 +596,6 @@ class TestForgeCostProducer:
         with patch("forge.core.ops.usage_summary.sum_forge_added_cost", return_value=40_000):
             out = _stream(_ctx(manifest=self._MANIFEST), list(DEFAULT_ORDER))
         assert not any("forge +" in s for s in out)
-
-
-# --- Registry wiring ------------------------------------------------------
 
 
 class TestOptInWiring:

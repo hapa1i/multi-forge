@@ -17,7 +17,7 @@ from forge.core.state.exceptions import StateCorruptedError, StateUnreadableErro
 
 logger = logging.getLogger(__name__)
 
-# Load .env early before any config access
+# Load .env before imported configuration modules resolve credentials.
 load_dotenv()
 
 from forge.cli.info import info_cmd  # noqa: E402
@@ -448,8 +448,7 @@ def main(ctx: click.Context) -> None:
 
         configure_debug_logging(component=ctx.invoked_subcommand or "forge", subdirectory="cli")
 
-    # Process pending-work queue opportunistically on CLI startup
-    # Skip for exempt subcommands (hooks, status-line) to preserve low latency
+    # Exempt commands skip startup mutations.
     if ctx.invoked_subcommand not in _EXEMPT_SUBCOMMANDS:
         _process_pending_work_best_effort()
         _auto_clean_logs_best_effort()

@@ -1,4 +1,4 @@
-"""Tests for the adopt command-core op (native_session_adoption Slice 2).
+"""Tests for the adopt command-core operation.
 
 Adoption is the first operation whose *input* is user-owned state Forge did not
 create, so several tests here assert on what adoption must **not** touch.

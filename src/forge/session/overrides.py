@@ -202,7 +202,7 @@ def validate_key(key: str) -> list[str]:
         _reject_launch_runtime_override(key)
 
     if first_part == "consumer_lanes":
-        # Consumer-lane bindings (epic consumer_lanes, T1b) are set only through resolving commands
+        # Consumer-lane bindings are set only through resolving commands
         # (--supervisor-runtime at start/fork, 'forge policy supervisor set <target> --runtime'), which expand a
         # runtime to a full validated LaneRecord and enforce the already-bound reject. A raw override --
         # partial (can't rehydrate a 3-field LaneRecord) or full-object (bypasses that validation, and
@@ -228,8 +228,7 @@ def validate_key(key: str) -> list[str]:
     if key in valid_paths:
         return parts
 
-    # Check if it's a valid prefix (for nested access)
-    # e.g., "proxy" is valid even though "proxy.template" is what you'd usually set
+    # Accept parent objects such as "proxy" as nested access paths.
     if any(p.startswith(f"{key}.") for p in valid_paths):
         return parts
 

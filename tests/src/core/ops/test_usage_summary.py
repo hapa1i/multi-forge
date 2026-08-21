@@ -327,7 +327,7 @@ class TestActivityPanes:
         assert summary.total_cost_micro_usd == 2_500
 
     def test_lane_row_carries_runtime_and_billing(self, tmp_path: Path) -> None:
-        """T5/WS3: an event-backed model-call row reports the lane its events ran on."""
+        """An event-backed model-call row reports the lane used by its events."""
         log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
         summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
         row = next(r for r in summary.downstream.rows if r.command == "supervisor")
@@ -335,7 +335,7 @@ class TestActivityPanes:
         assert row.billing_mode == "subscription_quota"
 
     def test_lane_mixed_when_command_events_disagree(self, tmp_path: Path) -> None:
-        """T5/WS3 (D4): a command whose events span more than one runtime/billing renders 'mixed'."""
+        """A command spanning multiple runtime and billing pairs renders 'mixed'."""
         log_usage_event(_event(command="panel", runtime="claude_code", billing_mode="api"))
         log_usage_event(
             _event(
@@ -352,7 +352,7 @@ class TestActivityPanes:
         assert row.billing_mode == "mixed"
 
     def test_lane_none_for_downstream_only_row(self, tmp_path: Path) -> None:
-        """T5/WS3 (D4): a downstream-only row with no usage-event source carries no lane (renders '-')."""
+        """A downstream-only row without a usage-event source renders no lane."""
         provider_session_id = derive_provider_session_id("planner", root_run_id="", role="memory_writer")
         write_downstream_record(
             DownstreamRecord(
@@ -722,7 +722,7 @@ class TestRenderLine:
         assert line is not None
         assert "supervisor: 12 checks (2 warn, 0 block, 3 errors)" in line
         assert "~$0.04" in line
-        assert " est" not in line  # the stale ' est' suffix was dropped (Phase 6 label honesty)
+        assert " est" not in line  # The approximate marker is the tilde, not an "est" suffix.
         assert "21k tok" in line
         assert "2 workflows" in line
         assert "1 subagent" in line
@@ -1000,7 +1000,7 @@ def _cost_record(*, root: str, run: str | None = None, cost_micros: int | None, 
 
 
 class TestRootJoin4g:
-    """Slice 4g: proxied ``claude -p`` cost comes from the cost plane (exact, by
+    """Proxied ``claude -p`` cost comes from the cost plane (exact, by
     ``forge_root_run_id``), superseding the concurrency-fragile verb snapshot."""
 
     def test_exact_supersedes_snapshot(self) -> None:
@@ -1211,7 +1211,7 @@ class TestRootJoin4g:
         assert mw.cost_estimated is False  # the exact half stays clean per-command
 
 
-# --- Shadow sampling (Slice 3 read surface) ---------------------------------
+# Shadow-sampling read surface
 
 
 def _shadow_dir(forge_root: Path, session: str = "planner") -> Path:

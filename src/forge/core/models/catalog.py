@@ -250,7 +250,7 @@ def _validate_and_build_catalog(raw: dict[str, Any]) -> ModelCatalog:
             raise ModelCatalogError(f"Alias {alias!r} points to unknown model {target!r}")
         aliases[alias] = target
 
-    # Parse defaults (optional; empty dict if missing for backward compat with tests)
+    # Defaults are optional for compatibility with older catalog fixtures.
     defaults_raw = raw.get("defaults", {})
     if not isinstance(defaults_raw, dict):
         raise ModelCatalogError(f"'defaults' must be a dict, got {type(defaults_raw).__name__}")

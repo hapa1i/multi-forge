@@ -16,7 +16,6 @@
 
 set -e
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -25,12 +24,11 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
-# Configuration
 FORGE_HOME="${FORGE_HOME:-$HOME/.forge}"
 FORGE_BIN="$FORGE_HOME/bin"
 FORGE_PACKAGE="multi-forge"
 FORGE_REPO="https://github.com/hapa1i/multi-forge.git"
-# Derived: raw content URL for curl-pipe-bash install (strips .git suffix)
+# Derive the curl installer URL from the repository setting.
 FORGE_RAW_URL="https://raw.githubusercontent.com/${FORGE_REPO#https://github.com/}"
 FORGE_RAW_URL="${FORGE_RAW_URL%.git}"
 FORGE_SETUP_URL="$FORGE_RAW_URL/main/scripts/setup.sh"
@@ -43,13 +41,11 @@ LOCAL_MODE=false
 FORGE_HOME_STAMP="managed-by-setup-sh"
 MODIFIED_PROFILE=""  # Track which profile was modified (for accurate messaging)
 
-# Block markers for safe profile editing (industry standard pattern)
+# Bounded markers let uninstall remove only Forge's PATH entry.
 BLOCK_START="# >>> multi-forge >>>"
 BLOCK_END="# <<< multi-forge <<<"
 
-# -----------------------------------------------------------------------------
 # Helpers
-# -----------------------------------------------------------------------------
 
 info() {
     echo -e "${BLUE}ℹ${NC} $1"
@@ -143,9 +139,8 @@ looks_like_forge_home() {
     is_forge_repo_dir "$FORGE_HOME/repo"
 }
 
-# Portable pip wrapper: tries python3 -m pip first, falls back to pip3/pip.
-# Needed because python3 may resolve to a venv without pip, while the stale
-# package lives in the system Python reachable via pip3.
+# Try each pip entry point because python3 can resolve to a virtual environment
+# while a stale package remains in the system Python installation.
 _pip() {
     if python3 -m pip "$@" 2>/dev/null; then
         return 0
@@ -158,10 +153,8 @@ _pip() {
     fi
 }
 
-# Uninstall a pip package using whichever pip command can see it.
-# `pip uninstall -y` exits 0 even for missing packages, so _pip would
-# succeed on the first interpreter and never reach the one that has it.
-# This function finds which pip has the package, then uninstalls with that.
+# `pip uninstall -y` succeeds for a missing package. Query each interpreter first
+# so removal reaches the interpreter that owns the package.
 _pip_remove() {
     local pkg="$1"
     if python3 -m pip show "$pkg" &>/dev/null 2>&1; then
@@ -178,9 +171,7 @@ _pip_remove() {
     fi
 }
 
-# -----------------------------------------------------------------------------
 # Prerequisite Checks
-# -----------------------------------------------------------------------------
 
 check_command() {
     command -v "$1" &> /dev/null
@@ -191,7 +182,6 @@ check_prerequisites() {
 
     local missing=()
 
-    # Python 3.11+ (pyproject.toml requires-python = ">=3.11")
     if check_command python3; then
         local py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         local py_major=$(echo $py_version | cut -d. -f1)
@@ -205,7 +195,6 @@ check_prerequisites() {
         missing+=("Python 3.11+")
     fi
 
-    # uv (Python package manager)
     if check_command uv; then
         local uv_version=$(uv --version 2>/dev/null | head -1)
         success "uv ($uv_version)"
@@ -213,14 +202,12 @@ check_prerequisites() {
         missing+=("uv (install: curl -LsSf https://astral.sh/uv/install.sh | sh)")
     fi
 
-    # git
     if check_command git; then
         success "git"
     else
         missing+=("git")
     fi
 
-    # Optional: Docker (for sandboxed execution)
     if check_command docker; then
         if docker info &>/dev/null; then
             success "Docker (optional, for sandboxed execution)"
@@ -241,20 +228,18 @@ check_prerequisites() {
     fi
 }
 
-# -----------------------------------------------------------------------------
 # Installation
-# -----------------------------------------------------------------------------
 
 install_forge() {
     header "Installing Forge"
     validate_forge_home "install Forge"
 
-    # Create directories and stamp as a Forge-managed home
+    # The stamp lets uninstall distinguish Forge-managed state from an arbitrary directory.
     mkdir -p "$FORGE_HOME"
     mkdir -p "$FORGE_BIN"
     echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
 
-    # Remove stale pip/uv-tool installs that would conflict
+    # Remove package installations that can shadow this checkout.
     for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if _pip show "$pkg" &>/dev/null; then
             warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
@@ -268,7 +253,6 @@ install_forge() {
         fi
     done
 
-    # Clone or update repository
     local repo_dir="$FORGE_HOME/repo"
     if [[ -d "$repo_dir/.git" ]]; then
         info "Updating existing installation..."
@@ -286,14 +270,12 @@ install_forge() {
 
     success "Repository ready"
 
-    # Install with uv (proxy dependencies now in core)
     info "Installing Python package..."
     cd "$repo_dir"
     uv sync --quiet
 
     success "Package installed"
 
-    # Create wrapper script
     info "Creating forge command..."
     cat > "$FORGE_BIN/forge" << 'WRAPPER'
 #!/usr/bin/env bash
@@ -310,7 +292,6 @@ install_forge_local() {
     header "Installing Forge (Local/Development Mode)"
     validate_forge_home "install Forge"
 
-    # Verify we're in a Forge repo
     if [[ ! -f "pyproject.toml" ]]; then
         fatal "No pyproject.toml found. Run this from the Forge repository root."
     fi
@@ -321,7 +302,7 @@ install_forge_local() {
     local repo_dir="$(pwd)"
     info "Installing from: $repo_dir"
 
-    # Create ~/.forge for config/state (still needed even in local mode)
+    # Local installs still use FORGE_HOME for configuration and state.
     mkdir -p "$FORGE_HOME"
     echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
 
@@ -347,13 +328,11 @@ install_forge_local() {
         fi
     done
 
-    # Use uv tool install for editable installation
-    # This installs to ~/.local/bin/forge and uses the local source
+    # Install the editable source as a uv tool in ~/.local/bin.
     info "Installing with 'uv tool install -e --force .'..."
     uv tool install -e --force "."
 
-    # FIX: Verify installation using uv tool list (more reliable than command -v)
-    # command -v could find a different 'forge' binary on PATH
+    # Verify the uv installation without consulting PATH.
     if uv tool list 2>/dev/null | grep -q "^$FORGE_PACKAGE"; then
         success "Forge installed via uv tool"
         if [[ -x "$HOME/.local/bin/forge" ]]; then
@@ -363,10 +342,9 @@ install_forge_local() {
         fatal "Installation failed - $FORGE_PACKAGE not found in 'uv tool list'"
     fi
 
-    # Create symlink in ~/.forge/repo for compatibility with other tooling
-    # that expects the repo there (e.g., extension symlink mode)
+    # Extension symlink mode expects the source checkout at FORGE_HOME/repo.
     if [[ ! -L "$FORGE_HOME/repo" ]] || [[ "$(readlink "$FORGE_HOME/repo")" != "$repo_dir" ]]; then
-        # FIX: Check for uncommitted changes before deleting existing repo
+        # Preserve a source checkout that has uncommitted changes.
         if [[ -d "$FORGE_HOME/repo/.git" ]]; then
             local dirty_status
             dirty_status=$(git -C "$FORGE_HOME/repo" status --porcelain 2>/dev/null || true)
@@ -394,7 +372,6 @@ setup_path() {
 
     header "Setting up PATH"
 
-    # Detect shell
     local shell_name=$(basename "$SHELL")
     local profile_file=""
 
@@ -418,21 +395,19 @@ setup_path() {
             ;;
     esac
 
-    # Check if already in PATH
     if echo "$PATH" | grep -q "$FORGE_BIN"; then
         success "PATH already configured"
         MODIFIED_PROFILE="$profile_file"
         return
     fi
 
-    # Check if block markers already exist
     if grep -q "$BLOCK_START" "$profile_file" 2>/dev/null; then
         warn "Forge PATH entry exists in $profile_file (may need update)"
         MODIFIED_PROFILE="$profile_file"
         return
     fi
 
-    # Add to profile using block markers (safe to remove later)
+    # Use bounded markers so uninstall can remove this block without matching unrelated lines.
     {
         echo ""
         echo "$BLOCK_START"
@@ -452,10 +427,8 @@ setup_path() {
 verify_forge() {
     header "Verifying Installation"
 
-    # Add bin to PATH for this session
     export PATH="$FORGE_BIN:$PATH"
 
-    # Verify forge command works
     if forge --version &>/dev/null; then
         success "Forge command available"
     else
@@ -515,20 +488,17 @@ print_success_local() {
     echo ""
 }
 
-# -----------------------------------------------------------------------------
 # Uninstallation
-# -----------------------------------------------------------------------------
 
 uninstall_forge() {
     header "Uninstalling Forge"
 
-    # CRITICAL: Validate FORGE_HOME before any rm -rf operations
+    # Reject unsafe FORGE_HOME values before recursive deletion.
     validate_forge_home "uninstall Forge"
     if ! looks_like_forge_home; then
         fatal "FORGE_HOME ('$FORGE_HOME') doesn't look like a Forge installation. Set FORGE_HOME correctly or remove it manually."
     fi
 
-    # Show what will be removed (if forge is available)
     local forge_cmd=""
     if [[ -x "$FORGE_BIN/forge" ]]; then
         forge_cmd="$FORGE_BIN/forge"
@@ -543,9 +513,8 @@ uninstall_forge() {
         echo ""
     fi
 
-    # 1. Remove tracked Forge extensions (if forge is available)
+    # Disable tracked extensions before deleting their installation records.
     if [[ -n "$forge_cmd" ]]; then
-        # Remove ALL tracked extensions (user + all local/project)
         info "Removing Forge extensions (all scopes)..."
         "$forge_cmd" extension disable --all --yes ||
             fatal "Could not disable every tracked Forge extension. Resolve the reported errors, then retry uninstall."
@@ -555,7 +524,7 @@ uninstall_forge() {
         warn "Forge command not found, skipping extension removal"
     fi
 
-    # 2. Remove all package installations (uv tool + pip, current + legacy names)
+    # Remove current and legacy package names from uv and pip.
     for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if uv tool list 2>/dev/null | grep -q "^$pkg"; then
             info "Removing uv tool installation of '$pkg'..."
@@ -571,10 +540,8 @@ uninstall_forge() {
         fi
     done
 
-    # 3. Remove ~/.forge directory
-    # IMPORTANT: Handle symlinked repo (from --local install) to avoid deleting user's source
+    # Do not follow a local-install repo symlink into the user's source checkout.
     if [[ -d "$FORGE_HOME" ]]; then
-        # First, safely remove repo symlink if it exists (don't follow it!)
         if [[ -L "$FORGE_HOME/repo" ]]; then
             local symlink_target
             symlink_target=$(readlink "$FORGE_HOME/repo")
@@ -588,7 +555,7 @@ uninstall_forge() {
         info "$FORGE_HOME does not exist"
     fi
 
-    # 4. Clean up project-local .forge directories
+    # Purge project-local state only when explicitly requested.
     if [[ "$PURGE" == "true" ]]; then
         info "Scanning for project-local .forge/ directories..."
         local forge_dirs
@@ -630,14 +597,12 @@ uninstall_forge() {
         warn "      find ~ -maxdepth 6 -type d -name '.forge'"
     fi
 
-    # 6. Remove Docker images (current + legacy prefixes, avoiding unrelated images)
+    # Match only current and legacy Forge image prefixes.
     if check_command docker && docker info &>/dev/null; then
         info "Removing Forge Docker images..."
-        # Use specific prefix to avoid deleting unrelated images like "forge-server"
         local images=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^(multi-forge-|claude-forge-)' || true)
         if [[ -n "$images" ]]; then
-            # Note: xargs -r is not portable (BSD/macOS doesn't support it)
-            # Use conditional instead
+            # BSD xargs has no -r, so test the list before invoking docker rmi.
             echo "$images" | while read -r img; do
                 docker rmi -f "$img" 2>/dev/null || true
             done
@@ -645,17 +610,14 @@ uninstall_forge() {
         else
             info "No Forge Docker images found"
         fi
-        # NOTE: Deliberately NOT running `docker image prune -f` here
-        # That command removes ALL dangling images, not just Forge-related ones
+        # Do not run `docker image prune -f`; it removes unrelated dangling images.
     fi
 
-    # 7. Clean up PATH from shell profile (using block markers for safe removal)
+    # Remove the bounded PATH block and preserve a backup of each edited profile.
     info "Cleaning up shell profile..."
     for profile in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.config/fish/config.fish"; do
         if [[ -f "$profile" ]]; then
-            # Check if our block markers exist (safe removal)
             if grep -q "$BLOCK_START" "$profile" 2>/dev/null; then
-                # Create backup before modification
                 cp "$profile" "$profile.forge-uninstall-backup"
 
                 # Remove the block between markers (inclusive)
@@ -674,7 +636,7 @@ uninstall_forge() {
                     rm -f "$profile.tmp"
                     warn "Could not clean $profile (backup preserved)"
                 fi
-            # Fallback: check for legacy "# Forge" comment (from older versions)
+            # Older installers used an unbounded "# Forge" marker.
             elif grep -q "# Forge" "$profile" 2>/dev/null; then
                 cp "$profile" "$profile.forge-uninstall-backup"
                 # Use subshell to prevent set -e from aborting on grep no-match
@@ -690,7 +652,6 @@ uninstall_forge() {
         fi
     done
 
-    # 7. Summary
     echo ""
     echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}${BOLD}║         Forge uninstalled successfully!          ║${NC}"
@@ -715,10 +676,6 @@ uninstall_forge() {
     echo "  Restart your terminal to complete cleanup."
     echo ""
 }
-
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 
 show_help() {
     cat << EOF
@@ -761,7 +718,6 @@ EOF
 }
 
 main() {
-    # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --uninstall)
@@ -810,8 +766,7 @@ main() {
     elif [[ "$LOCAL_MODE" == "true" ]]; then
         check_prerequisites
         install_forge_local
-        # FIX: Add ~/.local/bin to PATH for this session so verify_forge can find 'forge'
-        # (uv tool installs to ~/.local/bin which may not be in PATH on fresh systems)
+        # A fresh shell might not include the uv tool directory on PATH.
         export PATH="$HOME/.local/bin:$PATH"
         verify_forge
         print_success_local

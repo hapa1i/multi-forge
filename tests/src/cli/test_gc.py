@@ -334,8 +334,7 @@ class TestVerbRenames:
     """Verify the renamed commands exist."""
 
     def test_proxy_clean_removed(self) -> None:
-        # Removed in Slice 09 (F14a, fully redundant); stale proxies are auto-pruned
-        # by list/create/start and by `forge clean`.
+        # List, create, start, and `forge clean` already prune stale proxies.
         from forge.cli.proxy import proxy
 
         cmd = proxy.get_command(None, "clean")  # type: ignore[arg-type]

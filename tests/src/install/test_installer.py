@@ -98,7 +98,6 @@ class TestGetForgeSourceRoot:
     def test_returns_path(self) -> None:
         root = get_forge_source_root()
         assert isinstance(root, Path)
-        # Should contain src/ directory
         assert (root / "src").is_dir() or not root.exists()
 
 
@@ -236,7 +235,6 @@ class TestInstallerInit:
 
         claude_home = isolate_claude_home
 
-        # Create source directory with files
         src = tmp_path / "src"
         src.mkdir()
         commands = src / "commands"
@@ -376,11 +374,9 @@ class TestInstallerInit:
             installer.init(profile=InstallProfile.MINIMAL)
             plan2 = installer.init(profile=InstallProfile.MINIMAL)
 
-        # Second run should have "skip" actions for unchanged files
         skip_count = sum(1 for f in plan2.files if f.action == "skip")
         install_count = sum(1 for f in plan2.files if f.action == "install")
 
-        # At least the original file should be skipped (unchanged)
         assert skip_count > 0 or install_count == 0
 
     def test_init_backfills_permissions_into_settings_from_upgraded_preset(
@@ -490,7 +486,7 @@ class TestInstallerInit:
 
 
 class TestInstallerScopeModulePolicy:
-    """Tests for T5's split between user-owned runtime hooks and project settings."""
+    """Tests the ownership split between user runtime hooks and project settings."""
 
     @staticmethod
     def _source_root(tmp_path: Path) -> Path:
@@ -1079,7 +1075,6 @@ class TestFindClaudeRoot:
 
     def test_returns_user_scope_at_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should return USER scope when reaching home directory."""
-        # Create a fake home directory with .claude
         fake_home = tmp_path / "home"
         fake_home.mkdir()
         (fake_home / ".claude").mkdir()
@@ -1094,12 +1089,10 @@ class TestFindClaudeRoot:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Should return USER scope when walking up reaches home without finding .claude."""
-        # Create a fake home directory (no .claude)
         fake_home = tmp_path / "home"
         fake_home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-        # Start from home itself
         scope, project_root = find_claude_root(start=fake_home)
 
         assert scope == InstallScope.USER
@@ -1107,12 +1100,10 @@ class TestFindClaudeRoot:
 
     def test_raises_when_no_claude_and_not_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should raise NoClaudeDirectoryError when no .claude found and not at home."""
-        # Create a fake home that's different from tmp_path
         fake_home = tmp_path / "home"
         fake_home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-        # Create a separate directory tree without .claude
         other_dir = tmp_path / "other" / "deep" / "path"
         other_dir.mkdir(parents=True)
 
@@ -1123,7 +1114,6 @@ class TestFindClaudeRoot:
 
     def test_finds_first_claude_going_up(self, tmp_path: Path) -> None:
         """Should find the nearest .claude, not a higher one."""
-        # Create nested projects, each with .claude
         outer = tmp_path / "outer"
         inner = outer / "inner"
         (outer / ".claude").mkdir(parents=True)
@@ -1133,7 +1123,6 @@ class TestFindClaudeRoot:
 
         scope, project_root = find_claude_root(start=deepest)
 
-        # Should find inner's .claude first
         assert scope == InstallScope.LOCAL
         assert project_root == inner
 
@@ -1150,7 +1139,6 @@ class TestFindForgeInstallation:
         project = tmp_path / "project"
         claude_dir = project / ".claude"
         claude_dir.mkdir(parents=True)
-        # Create evidence of LOCAL installation
         (claude_dir / ".settings.local.json.forge.added.20250101-120000").write_text("{}")
 
         scope, project_root = find_forge_installation(start=project)
@@ -1167,7 +1155,6 @@ class TestFindForgeInstallation:
         project = tmp_path / "project"
         claude_dir = project / ".claude"
         claude_dir.mkdir(parents=True)
-        # Create evidence of LOCAL installation (backup only)
         (claude_dir / ".settings.local.json.forge.backup.20250101-120000").write_text("{}")
 
         scope, project_root = find_forge_installation(start=project)
@@ -1184,7 +1171,6 @@ class TestFindForgeInstallation:
         project = tmp_path / "project"
         claude_dir = project / ".claude"
         claude_dir.mkdir(parents=True)
-        # Create evidence of PROJECT installation
         (claude_dir / ".settings.json.forge.added.20250101-120000").write_text("{}")
 
         scope, project_root = find_forge_installation(start=project)
@@ -1201,7 +1187,6 @@ class TestFindForgeInstallation:
         project = tmp_path / "project"
         claude_dir = project / ".claude"
         claude_dir.mkdir(parents=True)
-        # Both LOCAL and PROJECT have evidence
         (claude_dir / ".settings.local.json.forge.added.20250101-120000").write_text("{}")
         (claude_dir / ".settings.json.forge.added.20250101-120000").write_text("{}")
 
@@ -1216,10 +1201,8 @@ class TestFindForgeInstallation:
         claude_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-        # Create evidence of USER installation
         (claude_home / ".settings.json.forge.added.20250101-120000").write_text("{}")
 
-        # Start from somewhere else (subdir of home)
         start_dir = fake_home / "projects" / "myapp"
         start_dir.mkdir(parents=True)
 
@@ -1239,7 +1222,6 @@ class TestFindForgeInstallation:
         claude_dir.mkdir(parents=True)
         (claude_dir / ".settings.local.json.forge.added.20250101-120000").write_text("{}")
 
-        # Start from deep subdirectory
         deep = project / "src" / "lib" / "utils"
         deep.mkdir(parents=True)
 
@@ -1272,8 +1254,6 @@ class TestFindForgeInstallation:
         claude_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-        # Create .settings.json.forge.added.20250101-120000 at home level
-        # This should be treated as USER, not PROJECT
         (claude_home / ".settings.json.forge.added.20250101-120000").write_text("{}")
 
         scope, project_root = find_forge_installation(start=fake_home)

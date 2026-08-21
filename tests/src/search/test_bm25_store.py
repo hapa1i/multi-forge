@@ -45,11 +45,6 @@ def _term_freq(tokens: list[str]) -> dict[str, int]:
     return tf
 
 
-# ---------------------------------------------------------------------------
-# Read
-# ---------------------------------------------------------------------------
-
-
 class TestBM25IndexStoreRead:
     def test_missing_file_returns_none(self, store: BM25IndexStore) -> None:
         assert store.read() is None
@@ -134,11 +129,6 @@ class TestBM25IndexStoreRead:
             store.read()
 
 
-# ---------------------------------------------------------------------------
-# Write
-# ---------------------------------------------------------------------------
-
-
 class TestBM25IndexStoreWrite:
     def test_creates_parent_directories(self, store: BM25IndexStore) -> None:
         store.write(BM25IndexData())
@@ -158,11 +148,6 @@ class TestBM25IndexStoreWrite:
         store.write(BM25IndexData())
         data = json.loads(store.store_path.read_text())
         assert "updated_at" in data
-
-
-# ---------------------------------------------------------------------------
-# Upsert (idempotency is critical for work queue retries)
-# ---------------------------------------------------------------------------
 
 
 class TestBM25IndexStoreUpsert:
@@ -190,11 +175,9 @@ class TestBM25IndexStoreUpsert:
         """Upserting the same doc twice produces identical state to single upsert."""
         tf = {"hello": 2, "world": 1}
 
-        # First upsert
         store.upsert_document("doc1", tf, 3)
         after_first = store.read()
 
-        # Second upsert (same content)
         store.upsert_document("doc1", tf, 3)
         after_second = store.read()
 
@@ -233,12 +216,11 @@ class TestBM25IndexStoreUpsert:
         tf_a = _term_freq(tokens_a)
         tf_b = _term_freq(tokens_b)
 
-        # Single add each
         store.upsert_document("a", tf_a, len(tokens_a))
         store.upsert_document("b", tf_b, len(tokens_b))
         data_single = store.read()
 
-        # Double-add doc a (simulating retry)
+        # Repeating document "a" simulates a work-queue retry.
         store.upsert_document("a", tf_a, len(tokens_a))
         data_double = store.read()
 
@@ -260,11 +242,6 @@ class TestBM25IndexStoreUpsert:
         scores_single = _scores_by_key(data_single, query)
         scores_double = _scores_by_key(data_double, query)
         assert scores_single == pytest.approx(scores_double)
-
-
-# ---------------------------------------------------------------------------
-# Remove
-# ---------------------------------------------------------------------------
 
 
 class TestBM25IndexStoreRemove:
@@ -303,11 +280,6 @@ class TestBM25IndexStoreRemove:
         assert data.avgdl == 20.0
 
 
-# ---------------------------------------------------------------------------
-# Replace all
-# ---------------------------------------------------------------------------
-
-
 class TestBM25IndexStoreReplaceAll:
     def test_replace_all_overwrites(self, store: BM25IndexStore) -> None:
         store.upsert_document("old", {"a": 1}, 1)
@@ -322,11 +294,6 @@ class TestBM25IndexStoreReplaceAll:
         loaded = store.read()
         assert loaded is not None
         assert loaded.doc_keys == ["new1", "new2"]
-
-
-# ---------------------------------------------------------------------------
-# Incremental vs bulk correctness
-# ---------------------------------------------------------------------------
 
 
 class TestIncrementalCorrectness:

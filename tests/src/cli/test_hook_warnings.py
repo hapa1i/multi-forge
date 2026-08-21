@@ -90,7 +90,6 @@ class TestHookDetectionFromSubdirectory:
         subdir = project / "deep" / "nested" / "dir"
         subdir.mkdir(parents=True)
 
-        # Without the walk-up fix, this would return False (false warn)
         assert has_forge_hooks(subdir) is True
 
     def test_returns_false_when_truly_missing(self, tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-"""Tests for ClaudeHeadlessInvoker (Phase 4d).
+"""Tests for ClaudeHeadlessInvoker.
 
 The invoker owns the ``claude -p`` lifecycle extracted from the review engine:
 ordered fan-out, per-job process groups + SIGTERM cleanup, single-shot parity,
@@ -403,7 +403,7 @@ class TestPerWorkerEmission:
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_operation_label_threads_to_upstream_row(self, mock_popen):
-        """T5/WS1: a non-default Attribution.operation becomes the upstream-outcome label
+        """A non-default Attribution.operation becomes the upstream-outcome label
         (the usage event still fires regardless). Driven on a failing worker because the
         volume policy drops successful upstream rows."""
         mock_popen.return_value = _mock_proc("", returncode=1, stderr="boom")
@@ -422,7 +422,7 @@ class TestPerWorkerEmission:
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_operation_none_suppresses_upstream_keeps_usage(self, mock_popen):
-        """T5/WS1: operation=None keeps the per-worker usage event but suppresses the
+        """operation=None keeps the per-worker usage event but suppresses the
         upstream-outcome row -- the gate must not over-reach to emit_worker_usage. Driven on a
         FAILING worker: a successful upstream row is volume-dropped anyway, so only a failure
         proves the gate (not the volume policy) does the suppressing."""

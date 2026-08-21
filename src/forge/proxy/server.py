@@ -1042,7 +1042,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
 
         # Detect provider BEFORE conversion to enable provider-specific schema handling
         detected_provider = client_factory.detect_provider_for_model(actual_model_id)
-        provider_name = detected_provider.value  # Convert enum to string
+        provider_name = detected_provider.value
 
         logger.debug(
             f"[{request_id}] Processing '/v1/messages': "
@@ -1125,7 +1125,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         if request_data.stop_sequences:
             openai_request_dict["stop"] = request_data.stop_sequences
 
-        # Get unified client for this model (pass tier for tier-specific hyperparameters)
         try:
             client = await client_factory.get_client(actual_model_id, tier=resolved_tier)
             logger.debug(f"[{request_id}] Got client for {actual_model_id} (tier={resolved_tier})")
@@ -1749,7 +1748,7 @@ async def root(request: Request):
     active_template = os.environ.get("ACTIVE_TEMPLATE", "unknown")
     preferred_provider = os.environ.get("PREFERRED_PROVIDER", "unknown")
 
-    # Extract request host/port for proxy identity (accurate even with --auto-port)
+    # Use the request endpoint so identity stays accurate when --auto-port selects the port.
     request_host = request.url.hostname or "localhost"
     request_port = request.url.port
 
@@ -1846,7 +1845,6 @@ async def root(request: Request):
         "llm_defaults_by_tier": llm_defaults_by_tier,
     }
 
-    # Build proxy identity section (B2.1.5)
     proxy_section = {
         "proxy_id": proxy_identity.proxy_id,
         "template": proxy_identity.template,
@@ -2310,7 +2308,7 @@ def main(
             sys.exit(1)
 
     # Track which template is active (for runtime introspection)
-    # Set ACTIVE_PORT to actual_port (not port) to handle --auto-port correctly
+    # Store the selected port so --auto-port reports the bound endpoint.
     os.environ["ACTIVE_TEMPLATE"] = template
     os.environ["ACTIVE_PORT"] = str(actual_port)
     os.environ["PREFERRED_PROVIDER"] = provider

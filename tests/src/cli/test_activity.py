@@ -144,7 +144,7 @@ def test_json_shape(monkeypatch) -> None:
 
 
 def test_json_carries_runtime_and_billing(monkeypatch) -> None:
-    """T5/WS3: --json exposes the per-row runtime/billing_mode lane fields."""
+    """--json exposes each row's runtime and billing-mode fields."""
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
     result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
@@ -155,7 +155,7 @@ def test_json_carries_runtime_and_billing(monkeypatch) -> None:
 
 
 def test_human_render_shows_runtime_billing(monkeypatch) -> None:
-    """T5/WS3: the human table has a Runtime/Billing column showing the resolved lane."""
+    """The human table shows the resolved lane in a Runtime/Billing column."""
     monkeypatch.setenv("COLUMNS", "200")  # widen so Rich does not truncate the lane cell
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))

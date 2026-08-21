@@ -1,4 +1,4 @@
-"""Unit tests for the override-mode mutation pipeline (Phase 2 audit proxy, MUTATE)."""
+"""Unit tests for the override-mode mutation pipeline."""
 
 from __future__ import annotations
 

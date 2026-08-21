@@ -1,4 +1,4 @@
-"""Tests for `forge session lane` (consumer-lane placement CLI, epic consumer_lanes T6a)."""
+"""Tests for the `forge session lane` consumer-lane placement CLI."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def _seed(
 
 
 def _seed_degrade(store: SessionStore) -> None:
-    """Seed a sticky codex degrade marker (the T7 supervisor overlay) into the manifest."""
+    """Seed a sticky Codex degrade marker into the manifest."""
     from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
 
     codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
@@ -186,7 +186,7 @@ def test_set_supervisor_via_general_surface(runner: CliRunner, project: Path) ->
 
 
 def test_set_shadow_curation_via_codex_runtime(runner: CliRunner, project: Path) -> None:
-    """T6b: `--consumer shadow_curation --runtime codex` resolves to the codex lane (was LaneError)."""
+    """The shadow-curation consumer resolves the Codex runtime to its Codex lane."""
     store = _seed(project)
     result = runner.invoke(
         main,
@@ -207,7 +207,7 @@ def test_set_shadow_curation_via_codex_runtime(runner: CliRunner, project: Path)
 
 
 def test_set_memory_writer_via_codex_runtime(runner: CliRunner, project: Path) -> None:
-    """T6c: `--consumer memory_writer --runtime codex` resolves to the codex lane (was LaneError)."""
+    """The memory-writer consumer resolves the Codex runtime to its Codex lane."""
     store = _seed(project)
     result = runner.invoke(
         main,
@@ -337,9 +337,7 @@ def test_show_json_reflects_requested_and_frozen(runner: CliRunner, project: Pat
 
 
 def test_show_json_flags_supervisor_degraded(runner: CliRunner, project: Path) -> None:
-    """T7: `lane show --json` marks the supervisor row degraded (its frozen codex lane is routed to
-    the default this session) while leaving the frozen binding itself untouched; other consumers are
-    never flagged (supervisor-only overlay)."""
+    """JSON marks only the supervisor as degraded without changing its frozen Codex binding."""
     store = _seed(
         project,
         confirmed=ConsumerLaneConfirmed(
@@ -385,7 +383,7 @@ def test_clear_removes_intent_only_preserving_frozen(runner: CliRunner, project:
 
 
 def test_supervisor_set_clears_degrade(runner: CliRunner, project: Path) -> None:
-    """T7 reset map: re-pinning the supervisor lane ('topped up, retry codex') clears the sticky degrade."""
+    """Re-pinning the supervisor lane clears its sticky degrade marker."""
     from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
 
     store = _seed(project)

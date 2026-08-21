@@ -1,4 +1,4 @@
-"""Tests for interactive Codex session ops (codex_frontend Phase 5).
+"""Tests for interactive Codex session operations.
 
 The TUI is an injected ``invoke`` callable (no Popen routing needed); the curation
 LLM and preflight are mocked like ``test_codex_session.py``. Thread identity is

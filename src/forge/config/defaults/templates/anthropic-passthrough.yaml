@@ -1,15 +1,15 @@
 # Template: anthropic-passthrough
-# Direct Anthropic Messages API passthrough (Phase 2 audit proxy).
+# Direct Anthropic Messages API passthrough.
 #
-# Forwards the raw Anthropic request to api.anthropic.com WITHOUT OpenAI
-# translation, so thinking blocks and unknown/future fields survive byte-for-byte
-# (signature-safe). This is the only wire shape that preserves signed reasoning.
+# Forwards raw Anthropic requests to api.anthropic.com without OpenAI translation.
+# Thinking blocks and unknown fields remain byte-for-byte so signatures stay valid.
+# This is the only wire shape that preserves signed reasoning.
 #
-# `provider: litellm` is only a config slot used for credential and upstream
-# resolution — `wire_shape: anthropic_passthrough` is the authoritative wire truth
-# (GET / reports it). Tiers are informational here; the client's model is forwarded
-# unchanged (so --model claude-fable-5 reaches the API as-is; no model_alternatives
-# remap applies on this wire shape). Requires ANTHROPIC_API_KEY in .env (or environment).
+# `provider: litellm` selects credential and upstream resolution.
+# `wire_shape: anthropic_passthrough` defines the wire format reported by GET /.
+# Tiers are informational because the client model is forwarded unchanged.
+# No model_alternatives remap applies to this wire shape.
+# This template requires ANTHROPIC_API_KEY in .env or the environment.
 
 proxy:
   family: anthropic
@@ -18,9 +18,9 @@ proxy:
   default_port: 8096
   wire_shape: anthropic_passthrough
 
-  # Observe by default: 'inspect' hashes + drift-detects outbound system prompts /
-  # tool surfaces (metadata only, no body mutation). Raise to 'override' to apply
-  # body controls (allowed only on this anthropic_passthrough wire shape).
+  # 'inspect' hashes outbound system prompts and tool surfaces to detect drift.
+  # It records metadata without mutating the body. Use 'override' to apply body
+  # controls; only anthropic_passthrough supports that mode.
   intercept:
     mode: inspect
 

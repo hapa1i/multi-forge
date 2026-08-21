@@ -1,4 +1,4 @@
-"""Tests for `forge proxy audit show` CLI (Phase 2 audit proxy)."""
+"""Tests for the `forge proxy audit show` CLI."""
 
 from __future__ import annotations
 

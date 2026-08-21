@@ -1535,7 +1535,7 @@ class TestGuardSupervisorToggle:
         assert updated.intent.policy.supervisor.direct is True
 
     def test_old_supervise_verb_falls_through_to_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Slice 10 clean break: the old `%policy supervise` verb is no longer recognized."""
+        """The old `%policy supervise` verb is no longer recognized."""
         store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()

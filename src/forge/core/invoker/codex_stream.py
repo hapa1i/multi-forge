@@ -147,7 +147,7 @@ def _extract_error_message(event: dict[str, object]) -> str | None:
     return None
 
 
-# Subscription-exhaustion classification (T7). Codex collapses its structured
+# Subscription-exhaustion classification. Codex collapses its structured
 # ``usage_limit_exceeded`` discriminator to human prose at the ``exec`` boundary
 # (``ThreadErrorEvent`` carries only ``message``; no status/``error.type`` survives --
 # see tests/fixtures/codex/README.md), so detection is a conservative string match.
@@ -165,7 +165,7 @@ _EXHAUSTION_MESSAGE_ANCHORS = (
 # Raw-leak path: an untyped provider error reaches ``message`` as a stringified JSON
 # envelope (e.g. the 400 fixture). These nested ``error.type`` values are exhaustion;
 # ``rate_limit_exceeded`` is deliberately absent -- a per-minute RPM throttle is
-# transient and must not trip T7's sticky session-long lane degrade.
+# transient and must not trigger the sticky session-long lane degrade.
 _EXHAUSTION_ERROR_TYPES = frozenset({"usage_limit_reached", "insufficient_quota"})
 
 
@@ -173,7 +173,7 @@ def is_subscription_exhausted(error_message: str) -> bool:
     """Return True iff a codex error string signals subscription-quota exhaustion.
 
     Conservative by design: a transient rate limit, a generic API error, or a network
-    blip returns False, so T7's sticky lane degrade never trips on a recoverable
+    blip returns False, so the sticky lane degrade never triggers on a recoverable
     failure. Matches both shapes the boundary can produce -- the human prose of the
     typed ``UsageLimitReached`` path and the stringified-JSON envelope of the raw-leak
     path (nested ``error.type``). Input is the string ``_extract_error_message``

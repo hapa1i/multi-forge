@@ -117,7 +117,6 @@ def show_proxy(*, ctx: ExecutionContext, proxy_id: str) -> ShowProxyResult:
         # unreadable registry degrades to "no entry" rather than failing `proxy show`.
         _log.debug("Registry unreadable, proceeding without registry info")
 
-    # Load config
     config: ProxyInstanceConfig | None = None
     config_yaml: str | None = None
 
@@ -126,7 +125,6 @@ def show_proxy(*, ctx: ExecutionContext, proxy_id: str) -> ShowProxyResult:
     except Exception as e:
         _log.debug("Failed to load config for proxy %r: %s", proxy_id, e)
 
-    # Load raw YAML for display
     from forge.config.loader import get_proxy_file_path
 
     proxy_path = get_proxy_file_path(proxy_id)

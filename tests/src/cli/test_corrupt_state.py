@@ -156,11 +156,7 @@ def test_session_list_corrupt_index_routes_to_handler() -> None:
     assert "forge clean" in combined
 
 
-# ---------------------------------------------------------------------------
-# User-facing command routing: corruption must reach the uniform reset handler,
-# not surface a raw parse error. Regression for the review finding that
-# session show / session resume / extension status bypassed the top-level handler.
-# ---------------------------------------------------------------------------
+# Corrupt session data must reach the uniform reset handler instead of exposing a parse error.
 
 
 def _seed_corrupt_manifest_session(name: str, tmp_path: Path) -> None:
@@ -219,12 +215,7 @@ def test_session_show_corrupt_manifest_routes_to_handler(tmp_path: Path) -> None
     assert "forge clean" in combined
 
 
-# ---------------------------------------------------------------------------
-# The exception-split ripple: a transient *read failure* (OSError) is a state
-# problem too, so it must propagate to the unreadable handler at the same
-# specific-target resolution sites -- never get swallowed into a misleading
-# "no session found" dead-end (the durable-state policy forbids that).
-# ---------------------------------------------------------------------------
+# An OSError during specific-target lookup must reach the unreadable-state handler.
 
 
 def _seed_valid_session(name: str, tmp_path: Path) -> Path:
@@ -343,14 +334,7 @@ def test_in_chat_session_show_emits_json_block_on_corruption(tmp_path: Path) -> 
     assert "forge clean" in payload["reason"]
 
 
-# ---------------------------------------------------------------------------
-# Comprehensive class fix: the op layer (proxy registry, codex resolve/start,
-# transfer regenerate) and the env-var resolution fallbacks all defer corruption
-# to the top-level handler instead of masking it as ForgeOpError / a generic
-# registry error / "no session found". Regression for the broad-`except`
-# interception class (a corruption error is also a domain error, so the domain
-# catch would otherwise swallow it before the root handler).
-# ---------------------------------------------------------------------------
+# Corruption errors must reach the top-level handler. Broad domain-error catches would otherwise mask them.
 
 
 def test_proxy_registry_corrupt_routes_to_handler() -> None:

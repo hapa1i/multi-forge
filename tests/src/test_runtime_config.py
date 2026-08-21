@@ -32,10 +32,6 @@ from forge.runtime_config import (
     write_runtime_config,
 )
 
-# ---------------------------------------------------------------------------
-# RuntimeConfig dataclass
-# ---------------------------------------------------------------------------
-
 
 class TestRuntimeConfigDefaults:
     def test_default_proxy_mode_is_host(self):
@@ -163,11 +159,6 @@ class TestRuntimeConfigValidation:
         assert rc.memory_writer_timeout == 60
 
 
-# ---------------------------------------------------------------------------
-# load_runtime_config()
-# ---------------------------------------------------------------------------
-
-
 class TestLoadRuntimeConfig:
     def test_missing_file_returns_defaults(self, tmp_path: Path):
         rc = load_runtime_config(tmp_path / "nonexistent.yaml")
@@ -268,11 +259,6 @@ class TestLoadRuntimeConfig:
         assert rc.memory_writer_timeout == 120
 
 
-# ---------------------------------------------------------------------------
-# get_runtime_config() singleton
-# ---------------------------------------------------------------------------
-
-
 class TestGetRuntimeConfig:
     def setup_method(self):
         reset_runtime_config()
@@ -304,11 +290,6 @@ class TestGetRuntimeConfig:
         reset_runtime_config()
         rc = get_runtime_config()
         assert rc.proxy_mode == "sidecar"
-
-
-# ---------------------------------------------------------------------------
-# write_runtime_config()
-# ---------------------------------------------------------------------------
 
 
 class TestWriteRuntimeConfig:
@@ -423,11 +404,6 @@ class TestWriteRuntimeConfig:
         assert rc.status_timeout == 1.5
 
 
-# ---------------------------------------------------------------------------
-# get_default_config_content()
-# ---------------------------------------------------------------------------
-
-
 class TestGetDefaultConfigContent:
     def test_returns_string(self):
         content = get_default_config_content()
@@ -509,7 +485,7 @@ class TestRenderRuntimeConfigYaml:
 
 
 class TestConfigCommentCoverage:
-    """Guard against comment/field drift (review Finding 2).
+    """Guard against comment and field drift.
 
     Every config field must have a doc comment, so `forge config show` never
     renders an undocumented field and a new field can't ship without a comment.
@@ -557,12 +533,6 @@ class TestConfigCommentCoverage:
             if f.name not in _DOWNSTREAM_RETENTION_FIELD_COMMENTS
         ]
         assert not missing, f"RuntimeDownstreamRetentionConfig fields missing a comment: {missing}"
-
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Environment variable overrides
-# ---------------------------------------------------------------------------
 
 
 class TestEnvVarOverrides:
@@ -643,11 +613,6 @@ class TestEnvVarOverrides:
             assert field_name in valid_fields, (
                 f"_ENV_OVERRIDES[{env_var!r}] targets {field_name!r} " f"which is not a RuntimeConfig field"
             )
-
-
-# ---------------------------------------------------------------------------
-# StatusLineConfig (nested statusline: section)
-# ---------------------------------------------------------------------------
 
 
 class TestStatusLineConfigDefaults:
@@ -750,12 +715,7 @@ class TestStatusLineConfigLoad:
         assert rc.statusline.cache_hit_ttl == 30
 
 
-# ---------------------------------------------------------------------------
-# RuntimeProviderTraceConfig (nested provider_trace: section) — the global
-# inject_provider_user toggle that governs both proxied and direct callers.
-# ---------------------------------------------------------------------------
-
-
+# The global inject_provider_user toggle applies to proxied and direct callers.
 class TestProviderTraceConfigDefaults:
     def test_runtime_config_has_provider_trace_default(self):
         rc = RuntimeConfig()
@@ -817,11 +777,6 @@ class TestProviderTraceConfigLoad:
         write_runtime_config({"provider_trace": {"inject_provider_user": True}}, cfg)
         rc = load_runtime_config(cfg)
         assert rc.provider_trace.inject_provider_user is True
-
-
-# ---------------------------------------------------------------------------
-# RuntimeTelemetryConfig (global shared downstream retention)
-# ---------------------------------------------------------------------------
 
 
 class TestDownstreamRetentionConfig:

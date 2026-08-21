@@ -188,7 +188,6 @@ class TestBackendRegistryStore:
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        # Create registry with a managed process that has a "dead" PID
         process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
@@ -199,7 +198,6 @@ class TestBackendRegistryStore:
         registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
-        # Mock is_pid_alive to return False
         monkeypatch.setattr("forge.backend.registry.is_pid_alive", lambda pid: False)
 
         pruned = store.prune_dead_pids()
@@ -283,7 +281,7 @@ class TestIsPidAlive:
 
     def test_nonexistent_pid_returns_false(self) -> None:
         """Verify nonexistent PID returns False."""
-        # Use a very high PID that's unlikely to exist
+        # Use an improbable PID to avoid matching a live process.
         assert is_pid_alive(999999999) is False
 
     def test_current_process_returns_true(self) -> None:

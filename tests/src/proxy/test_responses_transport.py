@@ -31,7 +31,7 @@ def responses_transport(
     return proxy_transport
 
 
-# ── Header builder (g) ──────────────────────────────────────────────────────────────
+# Header construction
 
 
 def test_build_upstream_headers_injects_bearer_and_forwards_openai_beta():
@@ -84,7 +84,7 @@ def test_relay_response_headers_strips_hop_by_hop_keeps_safe():
     assert "set-cookie" not in out
 
 
-# ── Cost USD->micros (d) ────────────────────────────────────────────────────────────
+# Cost conversion from USD to micros
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ def test_reported_cost_micros_rejects_bad_values(headers):
     assert rp.reported_cost_micros_from_headers(headers) is None
 
 
-# ── Usage side-tap (c) ──────────────────────────────────────────────────────────────
+# Usage side-tap
 
 
 def test_responses_usage_accumulator_parses_completed_event():
@@ -149,7 +149,7 @@ def test_extract_usage_from_non_streaming_body():
     assert rp.extract_usage_from_response("not a mapping") == {}
 
 
-# ── forward(): non-streaming POST (a, c, d) ─────────────────────────────────────────
+# Non-streaming POST forwarding
 
 
 @pytest.mark.asyncio
@@ -220,7 +220,7 @@ async def test_forward_non_streaming_without_cost_header_is_unavailable(
     assert seen["cost"] is None
 
 
-# ── forward(): streaming POST (a) ───────────────────────────────────────────────────
+# Streaming POST forwarding
 
 
 @pytest.mark.asyncio
@@ -294,7 +294,7 @@ async def test_forward_streaming_non_200_read_error_closes_contexts_and_reports_
     assert completed == [({}, None, True, "upstream_error")]
 
 
-# ── forward(): bodyless + non-{id} surface (b) ──────────────────────────────────────
+# Bodyless requests and paths without an ID
 
 
 @pytest.mark.asyncio
@@ -366,7 +366,7 @@ async def test_forward_relays_response_headers_with_allowlist(responses_transpor
     assert "transfer-encoding" not in {k.lower() for k in resp.headers}
 
 
-# ── source_bearer_auth_env_var fail-closed (h) ──────────────────────────────────────
+# Fail-closed source bearer authentication
 
 
 def _source_with_credentials(*credentials):
@@ -409,7 +409,7 @@ def test_source_bearer_auth_env_var_fails_closed_on_multiple():
         source_bearer_auth_env_var(_source_with_credentials(two_secrets))
 
 
-# ── Route capability gate -> 501 (e) ────────────────────────────────────────────────
+# Route capability failures return 501
 
 
 class _RawReq:
@@ -543,7 +543,7 @@ async def test_responses_route_bodyless_get_never_reads_json(monkeypatch, proxy_
     assert forwarded["body"] is None  # GET forwards no body
 
 
-# ── GET / truth table (f) ───────────────────────────────────────────────────────────
+# GET route truth table
 
 
 def test_intercept_section_responses_passthrough_is_signature_safe_uninspectable():
@@ -594,7 +594,7 @@ def test_advertise_responses_ingress_matrix(wire_shape, source_id, expected):
     assert ri.advertise_responses_ingress(wire_shape, source_id) is expected
 
 
-# ── Accounting gated to the generation endpoint (Issue 1) ───────────────────────────
+# Accounting applies only to the generation endpoint
 
 
 @pytest.mark.asyncio
@@ -613,8 +613,7 @@ async def test_retrieve_with_usage_is_not_accounted(monkeypatch, proxy_runtime_r
 
     async def _fake_forward(**kwargs):
         captured.update(kwargs)
-        # If the server had (wrongly) wired accounting, invoking on_complete with the
-        # retrieve's echoed usage would double-count. The fix passes on_complete=None.
+        # Invoking on_complete for echoed retrieve usage would double-count it; the callback must be None.
         if kwargs.get("on_complete") is not None:
             kwargs["on_complete"]({"input_tokens": 50, "output_tokens": 20}, None, False, None)
         from fastapi.responses import Response
@@ -667,7 +666,7 @@ async def test_accounting_only_on_generation_endpoint(
     assert (captured["provider_trace_ctx"] is not None) is should_account
 
 
-# ── Terminal application status -> failed (Issue 2) ─────────────────────────────────
+# Terminal application errors map to failed status
 
 
 @pytest.mark.parametrize(
@@ -787,7 +786,7 @@ async def test_non_streaming_status_failed_is_recorded_as_failure(responses_tran
     assert seen["error_type"] == "response_failed"
 
 
-# ── Issue 3: warn-mode spend caps surface X-Spend-Warning on the Responses path ──────
+# Warn-mode spend caps add X-Spend-Warning to Responses requests
 
 
 def _cap_tracker(*, on_cap_hit: str):
@@ -907,7 +906,7 @@ async def test_forward_merges_extra_response_headers_streaming(responses_transpo
     await _drain(resp)  # consume the generator so its teardown runs cleanly
 
 
-# ── Issue 4: malformed upstream usage degrades instead of aborting the relay ─────────
+# Malformed upstream usage does not abort the relay
 
 
 @pytest.mark.parametrize(
@@ -1005,7 +1004,7 @@ async def test_forward_streaming_malformed_usage_does_not_corrupt_stream(
     assert seen["failed"] is False
 
 
-# ── Issue 5: non-streaming generations also write a provider trace ───────────────────
+# Non-streaming generations write a provider trace
 
 
 _TRACE_CTX = {
@@ -1024,7 +1023,7 @@ _TRACE_CTX = {
 @pytest.mark.asyncio
 async def test_forward_non_streaming_records_provider_trace(monkeypatch, responses_transport):
     """Issue 5 regression: a non-streaming generation records a provider trace with
-    request_mode='non_streaming'. Before the fix, only the streaming path traced."""
+    request_mode='non_streaming'; tracing must not depend on streaming mode."""
     traces: list = []
     monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
 
@@ -1117,7 +1116,7 @@ async def test_forward_streaming_still_records_streaming_trace_mode(monkeypatch,
     assert traces[0]["request_mode"] == "streaming"
 
 
-# ── Issue 29 (CWE-209): catalog errors must not leak exception text to the client ────
+# Catalog errors must not leak exception text to the client (CWE-209)
 
 
 @pytest.mark.asyncio

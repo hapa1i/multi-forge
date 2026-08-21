@@ -120,24 +120,19 @@ class TestStartupQueueProcessing:
 
     def test_forge_status_processes_queue(self, mock_claude_workspace: ContainerLike) -> None:
         """forge extension status (non-exempt) triggers pending-work processing and deletes markers."""
-        # Create a marker
         marker_path = _create_stop_marker(mock_claude_workspace)
 
-        # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout
 
-        # Run a non-exempt command: forge extension status
-        # Command may fail (no install state), but startup processing runs first
+        # Startup processing runs before a command can fail for missing install state.
         mock_claude_workspace.exec("forge extension status")
 
-        # Marker should be deleted by startup processing
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "missing" in check.stdout, "Non-exempt command should process and delete pending-work markers"
 
     def test_forge_status_handles_empty_queue(self, mock_claude_workspace: ContainerLike) -> None:
         """A known-success command handles an empty queue without changing its exit."""
-        # Ensure queue directory doesn't exist
         mock_claude_workspace.exec("rm -rf $HOME/.forge/pending-work")
 
         result = mock_claude_workspace.exec("forge model backend list --json")
@@ -152,14 +147,11 @@ class TestExemptSubcommands:
         """forge hook (exempt) does NOT process pending-work queue."""
         marker_path = _create_stop_marker(mock_claude_workspace)
 
-        # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout
 
-        # Run an exempt command: forge hook (send empty JSON to stdin)
         mock_claude_workspace.exec("echo '{}' | forge hook stop")
 
-        # Marker should still exist (exempt command skips processing)
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout, "Exempt command (hook) should NOT process pending-work queue"
 
@@ -167,14 +159,11 @@ class TestExemptSubcommands:
         """forge status-line (exempt) does NOT process pending-work queue."""
         marker_path = _create_stop_marker(mock_claude_workspace)
 
-        # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout
 
-        # Run an exempt command: forge status-line
         mock_claude_workspace.exec("forge status-line")
 
-        # Marker should still exist (exempt command skips processing)
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout, "Exempt command (status-line) should NOT process pending-work queue"
 
@@ -184,7 +173,6 @@ class TestStartupQueueRobustness:
 
     def test_corrupted_marker_does_not_crash_cli(self, mock_claude_workspace: ContainerLike) -> None:
         """Corrupted markers are quarantined without failing the foreground command."""
-        # Create corrupted marker
         mock_claude_workspace.exec("mkdir -p $HOME/.forge/pending-work")
         mock_claude_workspace.exec("echo 'not valid json' > $HOME/.forge/pending-work/corrupted.json")
 
@@ -299,15 +287,12 @@ class TestStartupQueueRobustness:
             marker_path = _create_stop_marker(mock_claude_workspace, session_id=f"multi-{i}")
             markers.append(marker_path)
 
-        # Verify all markers exist
         for marker in markers:
             check = mock_claude_workspace.exec(f"test -f {marker} && echo exists || echo missing")
             assert "exists" in check.stdout
 
-        # Run non-exempt command
         mock_claude_workspace.exec("forge extension status")
 
-        # All markers should be deleted
         for marker in markers:
             check = mock_claude_workspace.exec(f"test -f {marker} && echo exists || echo missing")
             assert "missing" in check.stdout, "All valid markers should be processed"

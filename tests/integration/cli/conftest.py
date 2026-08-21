@@ -134,11 +134,9 @@ def claude_invocations(mock_claude_workspace: ContainerLike) -> Callable[[], lis
     invocations. Use request.getfixturevalue() or call it at end of test.
     """
 
-    # This is a factory fixture - call it to get current invocations
     def get_invocations() -> list[str]:
         result = mock_claude_workspace.exec("cat /tmp/claude_invocations.log 2>/dev/null || true")
         lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
-        # Extract command part (after timestamp)
         return [line.split(" ", 1)[1] if " " in line else line for line in lines if line]
 
     return get_invocations

@@ -343,10 +343,8 @@ class TestTrackingStore:
 
     def test_write_is_atomic(self, tracking_store: TrackingStore, sample_manifest: InstalledManifest) -> None:
         """Test that writes use atomic pattern (temp file + rename)."""
-        # Write content
         tracking_store.write(sample_manifest)
 
-        # Check no temp files left behind
         parent = tracking_store.path.parent
         temp_files = list(parent.glob(".installed.*.tmp"))
         assert len(temp_files) == 0
@@ -483,7 +481,6 @@ class TestTrackingStore:
     ) -> None:
         tracking_store.write(sample_manifest)
 
-        # Use the path from sample_installation
         result = tracking_store.is_forge_managed("/home/user/.claude/commands/test.md", "user")
         assert result is True
 
@@ -494,10 +491,6 @@ class TestTrackingStore:
 
         result = tracking_store.is_forge_managed("/some/other/path", "user")
         assert result is False
-
-    # -------------------------------------------------------------------------
-    # Project path support tests
-    # -------------------------------------------------------------------------
 
     def test_get_installation_with_project_path(
         self, tracking_store: TrackingStore, sample_installation: Installation
@@ -511,12 +504,10 @@ class TestTrackingStore:
         )
         tracking_store.set_installation("local", local_install, project_path="/path/to/project")
 
-        # Get with correct project path
         result = tracking_store.get_installation("local", project_path="/path/to/project")
         assert result is not None
         assert result.project_path == "/path/to/project"
 
-        # Get with different project path returns None
         result2 = tracking_store.get_installation("local", project_path="/other/project")
         assert result2 is None
 
@@ -529,7 +520,6 @@ class TestTrackingStore:
         )
         tracking_store.set_installation("local", install, project_path="/my/project")
 
-        # Verify it was saved with the project_path
         loaded = tracking_store.read()
         key = "local:/my/project"
         assert key in loaded.installations
@@ -541,20 +531,16 @@ class TestTrackingStore:
         tracking_store.set_installation("local", install, project_path="/project/a")
         tracking_store.set_installation("local", install, project_path="/project/b")
 
-        # Remove only one
         result = tracking_store.remove_installation("local", project_path="/project/a")
         assert result is True
 
-        # Verify /project/a is gone but /project/b remains
         assert tracking_store.get_installation("local", project_path="/project/a") is None
         assert tracking_store.get_installation("local", project_path="/project/b") is not None
 
     def test_list_installations(self, tracking_store: TrackingStore, sample_installation: Installation) -> None:
         """Test listing all installations."""
-        # Add user installation
         tracking_store.set_installation("user", sample_installation)
 
-        # Add local installations for different projects
         local1 = Installation(scope="local", mode="copy", profile="standard")
         local2 = Installation(scope="local", mode="symlink", profile="minimal")
         tracking_store.set_installation("local", local1, project_path="/project/a")
@@ -564,7 +550,6 @@ class TestTrackingStore:
         installations = tracking_store.list_installations()
         assert len(installations) == 3
 
-        # Verify we have all three
         scopes_paths = [(scope, path) for scope, path, _ in installations]
         assert ("user", None) in scopes_paths
         assert ("local", "/project/a") in scopes_paths

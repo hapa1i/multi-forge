@@ -65,9 +65,6 @@ def mock_repo(tmp_path: Path) -> Path:
     scripts.mkdir()
     (scripts / "search.py").write_text("#!/usr/bin/env python3\nprint('search')\n")
 
-    # Note: hooks and status-line are settings-only modules
-    # (no files to copy, just settings entries pointing to dispatcher hooks and `forge status-line`)
-
     return repo
 
 
@@ -159,7 +156,6 @@ def installer(
             ),
         ]
 
-    # Create a patched version that keeps the patches active
     class PatchedInstaller:
         """Wrapper that applies patches during all method calls."""
 
@@ -216,36 +212,30 @@ class TestInstallerIntegration:
         """Test that init installs files and merges settings."""
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Verify files installed (only file-based modules)
         assert (mock_claude_home / "commands" / "review.md").exists()
         assert (mock_claude_home / "commands" / "test.md").exists()
         assert (mock_claude_home / "agents" / "reviewer.md").exists()
         assert (mock_claude_home / "skills" / "search" / "SKILL.md").exists()
         assert (mock_claude_home / "skills" / "search" / "scripts" / "search.py").exists()
-        # Note: hooks and status-line are settings-only (no files to install)
         assert not (mock_claude_home / "hooks").exists()
         assert not (mock_claude_home / "status-line").exists()
 
-        # Verify file contents
         assert "Review Command" in (mock_claude_home / "commands" / "review.md").read_text()
 
-        # Verify settings merged
         settings = read_settings(mock_claude_home / "settings.json")
-        assert settings["model"] == "opus"  # Preserved
-        assert "Bash(ls:*)" in settings["permissions"]["allow"]  # Preserved
-        assert "Bash(git:*)" in settings["permissions"]["allow"]  # Added
-        assert "Read" in settings["permissions"]["allow"]  # Added
+        assert settings["model"] == "opus"
+        assert "Bash(ls:*)" in settings["permissions"]["allow"]
+        assert "Bash(git:*)" in settings["permissions"]["allow"]
+        assert "Read" in settings["permissions"]["allow"]
 
-        # Verify hooks merged (existing + new) - now dispatcher hook commands
         pretool_hooks = settings["hooks"]["PreToolUse"]
         matchers = [h.get("matcher") for h in pretool_hooks]
-        assert "Bash" in matchers  # Existing preserved
-        assert "Write" in matchers  # New added
+        assert "Bash" in matchers
+        assert "Write" in matchers
 
         # User-scope installs own runtime hooks, while statusLine remains project-scoped.
         assert "statusLine" not in settings
 
-        # Verify tracking updated
         tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
         installation = tracking.get_installation("user")
         assert installation is not None
@@ -261,22 +251,17 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that running init twice is idempotent."""
-        # First install
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Get tracking after first install
         tracking1 = TrackingStore(tracking_path=mock_forge_home / "installed.json")
         install1 = tracking1.get_installation("user")
         file_count1 = len(install1.files) if install1 else 0
 
-        # Second install (should be no-op)
         plan2 = installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Verify all files were skipped
         for file_plan in plan2.files:
             assert file_plan.action == "skip", f"Expected skip, got {file_plan.action} for {file_plan.target_path}"
 
-        # Verify tracking preserved
         tracking2 = TrackingStore(tracking_path=mock_forge_home / "installed.json")
         install2 = tracking2.get_installation("user")
         assert install2 is not None
@@ -290,21 +275,16 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that update detects and applies source changes."""
-        # Initial install
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Modify source file
         (mock_repo / "src" / "commands" / "review.md").write_text("# Updated Review\nNew content.\n")
 
-        # Update
         plan = installer.update()
 
-        # Verify update detected
         updated_files = [f for f in plan.files if f.action == "update"]
         assert len(updated_files) == 1
         assert "review.md" in updated_files[0].target_path
 
-        # Verify file was updated
         content = (mock_claude_home / "commands" / "review.md").read_text()
         assert "Updated Review" in content
 
@@ -316,13 +296,10 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that update with no changes is a no-op."""
-        # Initial install
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Update with no changes
         plan = installer.update()
 
-        # Verify all skipped
         for file_plan in plan.files:
             assert file_plan.action == "skip"
 
@@ -334,27 +311,20 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that uninstall removes only Forge-managed items."""
-        # Install first
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Verify files exist
         assert (mock_claude_home / "commands" / "review.md").exists()
 
-        # Uninstall
         installer.uninstall()
 
-        # Verify Forge files removed
         assert not (mock_claude_home / "commands" / "review.md").exists()
         assert not (mock_claude_home / "agents" / "reviewer.md").exists()
         assert not (mock_claude_home / "hooks" / "notify.sh").exists()
 
-        # Verify settings reverted (Forge entries removed, user entries preserved)
         settings = read_settings(mock_claude_home / "settings.json")
-        assert settings["model"] == "opus"  # Preserved
-        assert "Bash(ls:*)" in settings["permissions"]["allow"]  # Preserved
-        # Forge-added permissions should be removed (if properly tracked)
+        assert settings["model"] == "opus"
+        assert "Bash(ls:*)" in settings["permissions"]["allow"]
 
-        # Verify tracking cleared
         tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
         installation = tracking.get_installation("user")
         assert installation is None
@@ -369,7 +339,6 @@ class TestInstallerIntegration:
         """Test that symlink mode creates symlinks instead of copies."""
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.SYMLINK)
 
-        # Verify symlinks created
         review_path = mock_claude_home / "commands" / "review.md"
         assert review_path.is_symlink()
         assert review_path.resolve() == (mock_repo / "src" / "commands" / "review.md").resolve()
@@ -382,14 +351,12 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that conflicts are detected for non-Forge-managed files."""
-        # Create a conflicting file
         commands_dir = mock_claude_home / "commands"
         commands_dir.mkdir(exist_ok=True)
         (commands_dir / "review.md").write_text("# User's custom review command\n")
 
         plan = installer.plan(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Verify conflict detected
         assert plan.has_conflicts
         conflict_files = [f for f in plan.files if f.action == "conflict"]
         assert any("review.md" in f.target_path for f in conflict_files)
@@ -402,19 +369,16 @@ class TestInstallerIntegration:
         mock_forge_home: Path,
     ) -> None:
         """Test that --force overrides conflicts."""
-        # Create a conflicting file
         commands_dir = mock_claude_home / "commands"
         commands_dir.mkdir(exist_ok=True)
         (commands_dir / "review.md").write_text("# User's custom review command\n")
 
         plan = installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY, force=True)
 
-        # Verify no conflicts (force overrode them)
         assert not plan.has_conflicts
 
-        # Verify file was overwritten
         content = (mock_claude_home / "commands" / "review.md").read_text()
-        assert "Review Command" in content  # Forge version, not user's
+        assert "Review Command" in content
 
     def test_profile_minimal_only_installs_commands(
         self,
@@ -426,7 +390,6 @@ class TestInstallerIntegration:
         """Test that minimal profile only installs commands."""
         installer.init(profile=InstallProfile.MINIMAL, mode=InstallMode.COPY)
 
-        # Verify only commands installed
         assert (mock_claude_home / "commands" / "review.md").exists()
         assert not (mock_claude_home / "agents").exists()
         assert not (mock_claude_home / "hooks").exists()
@@ -444,7 +407,6 @@ class TestInstallerIntegration:
 
         installer.init(profile=InstallProfile.FULL, mode=InstallMode.COPY)
 
-        # Verify backup created
         tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")
         installation = tracking.get_installation(InstallScope.USER.value)
         assert installation is not None
@@ -452,7 +414,6 @@ class TestInstallerIntegration:
         backup_path = Path(installation.settings_backup_path)
         assert backup_path.exists()
 
-        # Verify backup contains original settings
         backup_settings = read_settings(backup_path)
         assert backup_settings == original_settings
 

@@ -1055,11 +1055,11 @@ def _review_curate(
         scope=scope,
         reasoning_effort=effective_effort,
         backend_id=backend_id,
-        # T6b: pass the raw bound lane; run_shadow_curation validates it (resolve_lane guard) and
+        # Pass the raw bound lane. `run_shadow_curation` validates it and
         # selects the claude/codex arm, failing loud on an invalid/drifted explicit binding.
         lane_record=dispatched_lane,
         # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
-        # keep confirmed consistent with the billed backend (epic consumer_lanes T6a).
+        # keep confirmed consistent with the billed backend.
         on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
     )
 
@@ -1084,8 +1084,8 @@ def _review_curate(
         if result.report_path:
             console.print(f"\n[dim]Report saved: {result.report_path}[/dim]")
     else:
-        # T6b: the codex arm carries an actionable hint (e.g. a cold preflight) in result.error;
-        # the claude arm leaves it None, so the generic headline is preserved unchanged.
+        # The codex arm carries actionable hints such as a cold preflight in result.error.
+        # The claude arm leaves it None, so the generic headline remains unchanged.
         if result.error:
             print_error(result.error, console=err_console)
         else:

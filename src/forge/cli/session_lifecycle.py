@@ -182,7 +182,7 @@ def _has_resumable_transcript(state: SessionState) -> bool:
             resolve_claude_project_root,
         )
 
-        # Check persisted launch root first, then computed root
+        # Prefer the launch root captured at start; derive it only for older state.
         if state.confirmed.claude_project_root:
             if get_transcript_path(state.confirmed.claude_project_root, session_id).is_file():
                 return True

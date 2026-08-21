@@ -1,4 +1,4 @@
-"""Tests for ``forge session memory report`` (memory writer report surface, Slice 02 flattened leaf)."""
+"""Tests for the ``forge session memory report`` read surface."""
 
 from __future__ import annotations
 
@@ -36,12 +36,12 @@ def _seed_session_with_reports(
         relative_path=".",
     )
 
-    # Artifact path retains the ".../handoff/" segment (kept by design; see plan Phase 3).
+    # Report discovery expects the handoff path segment.
     review = forge_root / ".forge" / "artifacts" / session_name / "handoff"
     review.mkdir(parents=True, exist_ok=True)
     reports: list[Path] = []
     for i in range(report_count):
-        # Different timestamps so sorting is well-defined
+        # Unique timestamps make the expected order deterministic.
         f = review / f"review-2026010{i}-120000.md"
         f.write_text(f"# Memory Writer Report\n\nrun {i}\n", encoding="utf-8")
         reports.append(f)
@@ -127,7 +127,7 @@ class TestShowCommand:
 
 
 class TestReportJson:
-    """``--json`` makes this read surface scriptable (Slice 02 read-debt resolved here, not deferred)."""
+    """``--json`` makes this read surface scriptable."""
 
     def _run(self, runner: CliRunner, forge_root: Path, argv: list[str]) -> str:
         from forge.session import SessionManager

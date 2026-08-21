@@ -1,4 +1,4 @@
-"""Unit tests for the manifest<->lane binding bridge (epic consumer_lanes, T1b)."""
+"""Unit tests for the manifest-to-lane binding bridge."""
 
 from __future__ import annotations
 
@@ -24,9 +24,8 @@ from forge.session.models import (
     SessionState,
 )
 
-# The codex lane is the one declared override on SUPERVISOR_CONSUMER (T4); an
-# openrouter claude_code lane constructs as a Lane but is NOT a declared candidate,
-# so resolve_lane rejects it.
+# Codex is a declared supervisor lane. An OpenRouter Claude lane can be constructed
+# but is not a declared candidate, so resolve_lane rejects it.
 _CODEX_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")
 _DEFAULT = SUPERVISOR_CONSUMER.default_lane
 _DEFAULT_RECORD = LaneRecord(_DEFAULT.runtime_id, _DEFAULT.backend_id, _DEFAULT.model)
@@ -39,9 +38,6 @@ def _state(*, intent: LaneRecord | None = None, confirmed: ConsumerLaneBinding |
     if confirmed is not None:
         state.confirmed.consumer_lanes = ConsumerLaneConfirmed(supervisor=confirmed)
     return state
-
-
-# --- read_bound_lane ---
 
 
 class TestReadBoundLane:
@@ -61,9 +57,6 @@ class TestReadBoundLane:
         frozen = ConsumerLaneBinding(lane=_DEFAULT_RECORD, source="intent", resolved_at=now_iso())
         state = _state(intent=_CODEX_RECORD, confirmed=frozen)
         assert read_bound_lane(state, SUPERVISOR_CONSUMER) == _DEFAULT_RECORD
-
-
-# --- ensure_consumer_lane_binding ---
 
 
 class TestEnsureConsumerLaneBinding:
@@ -118,9 +111,6 @@ class TestEnsureConsumerLaneBinding:
         assert state.confirmed.consumer_lanes is None
 
 
-# --- intent_lane (the show-command read companion) ---
-
-
 class TestIntentLane:
     """``intent_lane`` reads the *requested* (pre-freeze) slot only -- the intent-side
     counterpart of ``confirmed_lane`` that ``forge session lane show`` pairs to surface drift."""
@@ -137,9 +127,6 @@ class TestIntentLane:
         assert intent_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) is None
 
 
-# --- lane_record_for_runtime (the resolving-command expansion) ---
-
-
 class TestLaneRecordForRuntime:
     def test_expands_default_runtime_to_full_lane(self) -> None:
         # A runtime id alone is not a lane: expansion recovers the declared (runtime, backend, model).
@@ -152,9 +139,6 @@ class TestLaneRecordForRuntime:
         # A runtime with no declared candidate lane is a setter bug, not a silent default.
         with pytest.raises(LaneError, match="no valid lane on runtime 'bogus'"):
             lane_record_for_runtime(SUPERVISOR_CONSUMER, "bogus")
-
-
-# --- set_intent_lane (the resolving-command intent write) ---
 
 
 class TestSetIntentLane:
@@ -172,9 +156,6 @@ class TestSetIntentLane:
         assert state.intent.consumer_lanes.supervisor == _CODEX_RECORD  # type: ignore[union-attr]
 
 
-# --- confirmed_lane (the already-bound reject's reader) ---
-
-
 class TestConfirmedLane:
     def test_none_when_unbound(self) -> None:
         assert confirmed_lane(_state(intent=_CODEX_RECORD), SUPERVISOR_CONSUMER) is None
@@ -182,9 +163,6 @@ class TestConfirmedLane:
     def test_returns_frozen_lane(self) -> None:
         frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
         assert confirmed_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) == _CODEX_RECORD
-
-
-# --- clear_consumer_lane (binding teardown on supervisor remove) ---
 
 
 class TestClearConsumerLane:
@@ -204,11 +182,8 @@ class TestClearConsumerLane:
         assert read_bound_lane(state, SUPERVISOR_CONSUMER) is None
 
 
-# --- generality / drift guards ---
-
-
 def test_intent_and_confirmed_slots_match() -> None:
-    """Each consumer needs an intent slot and a confirmed slot of the same name (T6 seam guard)."""
+    """Each consumer has matching intent and confirmed slots."""
     from dataclasses import fields
 
     intent_slots = {f.name for f in fields(ConsumerLaneIntent)}
@@ -224,7 +199,7 @@ def test_unwired_consumer_rejected() -> None:
 
 
 def test_t0_sibling_consumers_bind_and_read_claude_max() -> None:
-    """The three T0 consumers have working manifest slots: a claude-max lane binds and reads back."""
+    """All three consumers can bind and read a Claude Max lane."""
     from forge.core.lanes import valid_lanes
     from forge.policy.team.handlers import TEAM_SUPERVISOR_CONSUMER
     from forge.session.memory_writer import MEMORY_WRITER_CONSUMER

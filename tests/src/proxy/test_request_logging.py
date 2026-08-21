@@ -1,4 +1,4 @@
-"""Slice 4 (proxy_log_hygiene): config-driven request JSONL writer.
+"""Tests for the config-driven request JSONL writer.
 
 The per-proxy RequestLogConfig gates whether request diagnostics are written (enabled:
 auto/off/on) and whether bodies are captured (metadata vs redacted). There is no plaintext
@@ -26,9 +26,6 @@ def _reset_rc():
     reset_runtime_config()
 
 
-# --- request_logging_enabled matrix -----------------------------------------------------
-
-
 def test_enabled_off_never_writes(monkeypatch) -> None:
     monkeypatch.setattr(utils, "_should_write_structured_logs", lambda: True)  # debug on
     assert request_logging_enabled(RequestLogConfig(enabled="off")) is False
@@ -51,9 +48,6 @@ def test_none_config_behaves_as_auto(monkeypatch) -> None:
     assert request_logging_enabled(None) is False
     monkeypatch.setattr(utils, "_should_write_structured_logs", lambda: True)
     assert request_logging_enabled(None) is True
-
-
-# --- body capture write behavior --------------------------------------------------------
 
 
 def _written_shard(tmp_path: Path) -> Path:

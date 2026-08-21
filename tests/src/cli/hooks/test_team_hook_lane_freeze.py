@@ -1,8 +1,8 @@
-"""The team-supervisor hooks freeze their lane only on a real dispatch (epic consumer_lanes T6a).
+"""The team-supervisor hooks freeze their lane only on a real dispatch.
 
 The freeze runs from ``_run_supervisor``'s ``on_dispatch`` hook, so a cache/tagger/resume/depth
-skip never freezes (Finding 1), and the threaded lane keeps confirmed consistent with billing
-(Finding 2). The handler is faked to simulate dispatch-vs-skip without a real LLM call; the
+skip never freezes. The threaded lane keeps confirmed state consistent with billing.
+The handler is faked to simulate dispatch and skip paths without a real LLM call; the
 handler's own backend_id path is covered in ``tests/src/policy/team/test_handlers.py``.
 """
 
@@ -85,7 +85,7 @@ def test_freezes_on_real_dispatch(command: str, tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("command", ["teammate-idle", "task-completed"])
 def test_no_freeze_when_handler_skips(command: str, tmp_path: Path) -> None:
-    """A declared lane but a skipped check (no on_dispatch) must not freeze (Finding 1)."""
+    """A skipped check without on_dispatch must not freeze a declared lane."""
     store = _seed(tmp_path, declared=True)
     result = _invoke(command, store, _skipping_handler)
     assert result.exit_code == 0, result.output

@@ -1,8 +1,7 @@
 """Golden no-op guard + segment-registry tests for the status line.
 
 The GOLDEN snapshots freeze the exact stdout of ``status_line()`` for a set of
-representative fixtures, captured BEFORE the Phase 1 registry refactor. The
-refactor must keep these byte-identical: the registry only reorganizes how the
+representative fixtures. Registry organization must not affect the byte-identical output because it only changes how the
 five category lists are produced, not what they contain. Environment-dependent
 inputs (proxy, session, git, terminal width, transcript) are patched so the
 output is a pure function of stdin + the patched returns.
@@ -62,8 +61,6 @@ def _render(fixture, *, proxy=None, session=None, stats=None, api_key=True):
     assert res.exit_code == 0, res.output
     return res.output
 
-
-# --- Fixtures -------------------------------------------------------------
 
 FIXTURE_MINIMAL = {
     "workspace": {"current_dir": "/tmp/demo"},
@@ -229,8 +226,6 @@ def _manifest_with_proxy_cost_baseline(
     )
 
 
-# --- Golden snapshots (layout frozen; cost segment is the Phase 4 auto-hedge) ---
-
 GOLDEN_MINIMAL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;75m[Opus\xa04.6]\x1b[0m\xa0\x1b[38;5;115m--------\xa012%/\x1b[1m200K\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
 
 GOLDEN_FULL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;69m[Sonnet\xa04.6\xa0(1M)]\x1b[0m\xa0\x1b[38;5;179m###-----\xa047%/\x1b[1m1M\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;145m≈$0.42\x1b[0m\xa0\x1b[38;5;145m3m\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;28m+12\x1b[0m\x1b[90m/\x1b[0m\x1b[38;5;124m-3\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[2min:\x1b[0m\x1b[38;5;145m28.0K\x1b[0m\xa0\x1b[2mout:\x1b[0m\x1b[38;5;145m17.5K\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[94mTHINK\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
@@ -250,9 +245,7 @@ class TestGoldenNoOpGuard:
         assert _render(FIXTURE_FULL, stats=TranscriptStats(has_thinking=True)) == GOLDEN_FULL
 
     def test_key_presence_does_not_change_cost_view(self):
-        # Phase 4 honesty: an ANTHROPIC_API_KEY in the env is capability, not payer,
-        # so cost_mode=auto renders identically with or without it. The golden is the
-        # hedged view; both renders equal it byte-for-byte.
+        # An API key proves capability, not payer, so auto mode must render the same hedged view with or without it.
         with_key = _render(FIXTURE_FULL, stats=TranscriptStats(has_thinking=True), api_key=True)
         no_key = _render(FIXTURE_FULL, stats=TranscriptStats(has_thinking=True), api_key=False)
         assert with_key == GOLDEN_FULL

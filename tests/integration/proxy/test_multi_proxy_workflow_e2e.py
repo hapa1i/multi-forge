@@ -103,7 +103,6 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
         forge_home = Path(tmpdir)
 
         # Pick two different families so runtime truth reflects the separation clearly.
-        # Note: these tests still rely on LiteLLM being reachable; we will skip if upstream is unavailable.
         family_a = "litellm-gemini-test"
         family_b = "litellm-openai"
 
@@ -131,7 +130,6 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
         os.environ["FORGE_HOME"] = str(forge_home)
 
         try:
-            # Create proxy A (litellm-gemini-test template)
             write_proxy_instance_config(
                 proxy_id_a,
                 ProxyInstanceConfig(
@@ -155,7 +153,6 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
                 ),
             )
 
-            # Create proxy B (litellm-openai template)
             write_proxy_instance_config(
                 proxy_id_b,
                 ProxyInstanceConfig(
@@ -175,7 +172,6 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
                 ),
             )
         finally:
-            # Restore original FORGE_HOME
             if old_forge_home is not None:
                 os.environ["FORGE_HOME"] = old_forge_home
             else:
@@ -211,8 +207,7 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
         proc_a = _start_proxy(template=family_a, port=port_a, forge_home=forge_home, proxy_id=proxy_id_a)
         proc_b = _start_proxy(template=family_b, port=port_b, forge_home=forge_home, proxy_id=proxy_id_b)
 
-        # If either proxy exits early (startup/config failure), surface stderr.
-        # Note: they may still be starting, so we only treat as failure if already exited.
+        # Report startup errors only after a proxy process has exited.
         for proc, label in ((proc_a, "A"), (proc_b, "B")):
             if proc.poll() is not None:
                 stderr = proc.stderr.read().decode() if proc.stderr else ""
@@ -229,20 +224,17 @@ def test_multi_proxy_two_proxies_distinct_proxy_identity_and_routing_defaults() 
                 resp_a = client.get(f"{base_url_a}/")
                 resp_b = client.get(f"{base_url_b}/")
 
-            # If upstream is unreachable, the proxy might still come up, but POST preflight used by
-            # other integration tests would skip. Here we only depend on GET /.
+            # This test reads local runtime truth and does not probe the upstream.
             assert resp_a.status_code == 200
             assert resp_b.status_code == 200
 
             truth_a = resp_a.json()
             truth_b = resp_b.json()
 
-            # Distinct proxy identities
             assert truth_a["proxy"]["proxy_id"] == proxy_id_a
             assert truth_b["proxy"]["proxy_id"] == proxy_id_b
             assert truth_a["proxy"]["base_url"] != truth_b["proxy"]["base_url"]
 
-            # Distinct families (because we started with different --template)
             assert truth_a["proxy"]["template"] == family_a
             assert truth_b["proxy"]["template"] == family_b
 

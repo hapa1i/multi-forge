@@ -1,11 +1,5 @@
 #!/bin/bash
-# Sidecar container entrypoint for Multi-Forge.
-#
-# This script:
-# 1. Optionally syncs project dependencies
-# 2. Starts the proxy in background (bound to localhost)
-# 3. Waits for proxy health check (FAILS HARD if never healthy)
-# 4. Execs into Claude Code (becomes PID 1)
+# Start the sidecar proxy, wait for health, and replace this process with Claude Code.
 #
 # Required environment variables:
 #   FORGE_TEMPLATE - Proxy template name (e.g., "litellm-openai")
@@ -18,16 +12,13 @@
 
 set -e
 
-# Sync project dependencies if pyproject.toml exists in workspace.
-# Failures are surfaced (not silenced) so users see the actual error
-# instead of confusing "module not found" from subsequent commands.
+# Report dependency-sync failures before later commands can fail with missing modules.
 if [ -f /workspace/pyproject.toml ]; then
     cd /workspace && uv sync --quiet || {
         echo "WARNING: uv sync failed in /workspace (continuing without project deps)" >&2
     }
 fi
 
-# Validate required env vars
 if [ -z "$FORGE_TEMPLATE" ]; then
     echo "ERROR: FORGE_TEMPLATE environment variable is required" >&2
     exit 1
@@ -41,7 +32,7 @@ if [ ! -x "$FORGE_PYTHON" ]; then
     FORGE_PYTHON="python"
 fi
 
-# Start proxy in background (bind to localhost only — minimal blast radius).
+# Bind the sidecar proxy to localhost to limit its network exposure.
 # Pass --proxy-id only when set so the proxy loads the per-proxy intercept/audit
 # overlay (proxy.yaml mounted read-only). Template-only sidecars omit it.
 PROXY_ID_ARGS=()
@@ -58,7 +49,7 @@ fi
 
 PROXY_PID=$!
 
-# Wait for proxy health (FAIL HARD if never healthy)
+# Do not launch Claude unless the proxy becomes healthy.
 PROXY_HEALTHY=false
 echo "Waiting for proxy to become healthy..."
 for i in {1..30}; do
@@ -76,7 +67,6 @@ if [ "$PROXY_HEALTHY" != "true" ]; then
   exit 1
 fi
 
-# Set env for Claude
 export ANTHROPIC_BASE_URL=http://localhost:8085
 # CLAUDE_CODE_ATTRIBUTION_HEADER is passed only when the host launcher decides
 # this proxy route needs the cache workaround. The decision is made by
@@ -84,17 +74,13 @@ export ANTHROPIC_BASE_URL=http://localhost:8085
 # cannot drift on classifier-sensitive routes.
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-200000}"
 
-# interactive_anthropic_api_key=omit: drop ANTHROPIC_API_KEY for Claude only. The
-# proxy already started above with the key (captured for upstream), so this affects
-# only Claude -- its apiKeyHelper falls back to the dummy passthrough and Claude
-# routes through the local proxy without a real Anthropic key. Works for every
-# template, including anthropic-upstream, because the per-process unset happens here.
+# The proxy captures upstream credentials before this process removes the key.
+# Claude then uses the dummy apiKeyHelper value and routes through the local proxy.
 if [ "$FORGE_OMIT_INTERACTIVE_KEY" = "1" ]; then
   unset ANTHROPIC_API_KEY
   echo "interactive_anthropic_api_key=omit: ANTHROPIC_API_KEY withheld from Claude (proxy keeps upstream auth)"
 fi
 
-# Configure Claude Code auth for container environment.
 # Containers have no keychain/console login. apiKeyHelper calls a helper script
 # to resolve the API key, and hasCompletedOnboarding skips the first-run screen.
 # /root/.claude is the host-persisted .forge/sidecar-home mount. The launcher
@@ -147,6 +133,4 @@ cat > /root/.claude.json <<'ONBOARDEOF'
 ONBOARDEOF
 chmod 600 /root/.claude.json
 
-# Exec into Claude (becomes PID 1, replaces shell)
-# Any arguments passed to the container are forwarded to Claude
 exec claude "$@"

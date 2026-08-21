@@ -1,4 +1,4 @@
-"""Tests for the Claude hook adapter + responder seam (Phase 4f).
+"""Tests for the Claude hook adapter and responder seam.
 
 ``ClaudeHookResponder`` owns Claude Code's PreToolUse wire contract: the block
 message (deny / needs_review), the allow ``hookSpecificOutput`` JSON, and the

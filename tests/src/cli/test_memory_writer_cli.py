@@ -84,11 +84,6 @@ def test_handoff_run_prefers_marker_subprocess_proxy_snapshot(tmp_path: Path) ->
     assert mock_resolve.call_args.kwargs["subprocess_proxy"] == "marker-proxy"
 
 
-# ---------------------------------------------------------------------------
-# Project-scoped activation + scan
-# ---------------------------------------------------------------------------
-
-
 def _write_plain_session(root: Path, name: str = "session") -> None:
     SessionStore(str(root), name).write(create_session_state(name))
 
@@ -269,8 +264,7 @@ def test_run_cmd_forwards_codex_lane_record(tmp_path: Path) -> None:
 
 
 def test_run_cmd_no_freeze_when_writer_skips(tmp_path: Path) -> None:
-    """Declared lane, but the writer skips without dispatching (no on_dispatch, e.g.
-    below-min-turns/no-docs): the lane must NOT freeze (Finding 1)."""
+    """A writer skip without on_dispatch must not freeze the declared lane."""
     root = tmp_path.resolve()
     store = _declared_handoff_store(root)
     with (

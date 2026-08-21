@@ -39,7 +39,6 @@ class TestProxyList:
 
     def test_list_shows_entries(self, mock_claude_workspace: ContainerLike) -> None:
         """Should list existing proxies from registry."""
-        # Create registry with a proxy
         mock_claude_workspace.mkdir("$HOME/.forge/proxies", parents=True)
         registry = {
             "version": 1,
@@ -192,7 +191,6 @@ tiers:
 
         assert result.returncode == 0
 
-        # Verify file updated
         check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/set-test/proxy.yaml")
         assert "default_tier: opus" in check.stdout
 
@@ -341,13 +339,11 @@ tiers:
 
         assert result.returncode == 0
 
-        # Verify file removed
         check = mock_claude_workspace.exec(
             "test -f $HOME/.forge/proxies/delete-me/proxy.yaml && echo exists || echo gone"
         )
         assert "gone" in check.stdout
 
-        # Verify registry updated
         check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/index.json")
         registry = json.loads(check.stdout)
         assert "delete-me" not in registry["proxies"]
@@ -597,18 +593,15 @@ class TestProxyCreateAndStart:
         - registry registration
         - server startup validation
         """
-        # Create and start a proxy (default behavior)
         result = mock_claude_workspace.exec("forge proxy create litellm-openai", timeout=30)
 
         assert result.returncode == 0, f"Create failed: {result.stdout}\n{result.stderr}"
         assert "Started" in result.stdout or "Reusing" in result.stdout or "Adopted" in result.stdout
 
-        # List should show the proxy as healthy
         list_result = mock_claude_workspace.exec("forge proxy list")
         assert list_result.returncode == 0, f"List failed: {list_result.stdout}\n{list_result.stderr}"
         assert "healthy" in list_result.stdout.lower(), f"Proxy not healthy!\nList output: {list_result.stdout}"
 
-        # Server should respond to health check
         # Extract port from list output (look for port number after URL)
         import re
 
@@ -624,7 +617,6 @@ class TestProxyCreateAndStart:
 
         Verifies the complete user journey works end-to-end.
         """
-        # Create and start
         create_result = mock_claude_workspace.exec("forge proxy create litellm-openai", timeout=30)
         assert create_result.returncode == 0, f"Create failed: {create_result.stdout}\n{create_result.stderr}"
 
@@ -636,11 +628,9 @@ class TestProxyCreateAndStart:
             # Try extracting from "Started proxy_xxx" pattern
             proxy_id_match = re.search(r"(proxy_\w+)", create_result.stdout)
 
-        # List shows healthy
         list_result = mock_claude_workspace.exec("forge proxy list")
         assert "healthy" in list_result.stdout.lower()
 
-        # Stop the server (find the proxy ID from list)
         if proxy_id_match:
             proxy_id = proxy_id_match.group(1) if "_" in proxy_id_match.group(1) else f"proxy_{proxy_id_match.group(1)}"
             # Handle both formats
@@ -664,7 +654,6 @@ class TestProxyCreateNoStart:
 
         assert result.returncode == 0, f"Create failed: {result.stdout}\n{result.stderr}"
 
-        # Verify file created
         check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/my-proxy/proxy.yaml")
         assert check.returncode == 0
         assert "litellm-openai" in check.stdout
@@ -707,11 +696,9 @@ proxy:
         This is the key end-to-end test that verifies the full user workflow.
         A bug where create didn't register the proxy would be caught here.
         """
-        # Create a proxy
         create_result = mock_claude_workspace.exec("forge proxy create litellm-openai --name workflow-test --no-start")
         assert create_result.returncode == 0, f"Create failed: {create_result.stdout}\n{create_result.stderr}"
 
-        # List should show the proxy
         list_result = mock_claude_workspace.exec("forge proxy list")
         assert list_result.returncode == 0, f"List failed: {list_result.stdout}\n{list_result.stderr}"
         assert (
@@ -721,7 +708,6 @@ proxy:
 
     def test_create_already_exists_error(self, mock_claude_workspace: ContainerLike) -> None:
         """Should error when proxy already exists."""
-        # Create existing proxy
         mock_claude_workspace.mkdir("$HOME/.forge/proxies/existing", parents=True)
         mock_claude_workspace.write_file("$HOME/.forge/proxies/existing/proxy.yaml", "template: something")
 
@@ -745,7 +731,6 @@ proxy:
 
         assert result.returncode == 0, f"Create failed: {result.stdout}\n{result.stderr}"
 
-        # Verify port in file
         check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/custom-port/proxy.yaml")
         assert "9999" in check.stdout
 

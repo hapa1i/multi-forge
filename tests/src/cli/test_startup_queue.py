@@ -82,32 +82,23 @@ class TestStartupQueueProcessing:
 
     def test_forge_status_processes_queue(self, tmp_path: Path) -> None:
         """forge status (non-exempt) triggers pending-work processing and deletes markers."""
-        # Create a marker
         marker = _create_test_marker(tmp_path)
         assert marker.is_file()
 
-        # Run a non-exempt command: forge extension status
         runner = CliRunner()
         runner.invoke(main, ["extension", "status"])
 
-        # Command may fail (no install state), but that's OK -
-        # the important thing is startup processing ran first
-        # Note: we don't assert exit_code because status may fail without install
-
-        # Marker should be deleted by startup processing
+        # Queue processing runs before command-specific validation, so the exit status is irrelevant here.
         assert not marker.is_file(), "Non-exempt command should process and delete pending-work markers"
 
     def test_forge_status_handles_empty_queue(self) -> None:
         """forge status handles empty queue gracefully (fast path)."""
-        # Ensure queue directory doesn't exist
         queue_dir = pending_work_dir()
         assert not queue_dir.exists()
 
         runner = CliRunner()
-        # Should not crash even with empty queue
         result = runner.invoke(main, ["status"])
 
-        # Command completes (may have non-zero exit if no install state, but shouldn't crash)
         assert result.exception is None or isinstance(result.exception, SystemExit)
 
     def test_sidecar_cli_leaves_host_queue_for_host_drain(
@@ -126,29 +117,23 @@ class TestExemptSubcommands:
 
     def test_forge_hook_skips_queue(self, tmp_path: Path) -> None:
         """forge hook (exempt) does NOT process pending-work queue."""
-        # Create a marker
         marker = _create_test_marker(tmp_path)
         assert marker.is_file()
 
-        # Run an exempt command: forge hook (with a simple subcommand)
         runner = CliRunner()
         # Send empty JSON to avoid parse errors
         runner.invoke(main, ["hook", "stop"], input="{}")
 
-        # Marker should still exist (exempt command skips processing)
         assert marker.is_file(), "Exempt command (hook) should NOT process pending-work queue"
 
     def test_forge_status_line_skips_queue(self, tmp_path: Path) -> None:
         """forge status-line (exempt) does NOT process pending-work queue."""
-        # Create a marker
         marker = _create_test_marker(tmp_path)
         assert marker.is_file()
 
-        # Run an exempt command: forge status-line
         runner = CliRunner()
         runner.invoke(main, ["status-line"])
 
-        # Marker should still exist (exempt command skips processing)
         assert marker.is_file(), "Exempt command (status-line) should NOT process pending-work queue"
 
 
@@ -160,18 +145,14 @@ class TestStartupQueueRobustness:
         queue_dir = pending_work_dir()
         queue_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create a corrupted marker
         corrupt_marker = queue_dir / "corrupted.json"
         corrupt_marker.write_text("not valid json")
 
-        # Run non-exempt command (extension status triggers startup processing)
         runner = CliRunner()
         result = runner.invoke(main, ["extension", "status"])
 
-        # Should not crash (best-effort processing)
         assert result.exception is None or isinstance(result.exception, SystemExit)
 
-        # Corrupted marker should be moved to failed/ (not stuck in queue)
         assert not corrupt_marker.is_file()
         assert (queue_dir / "failed" / "corrupted.json").is_file()
 
@@ -184,11 +165,9 @@ class TestStartupQueueRobustness:
 
         assert all(m.is_file() for m in markers)
 
-        # Run non-exempt command
         runner = CliRunner()
         runner.invoke(main, ["extension", "status"])
 
-        # All markers should be deleted
         assert all(not m.is_file() for m in markers), "All valid markers should be processed"
 
     def test_unreadable_marker_warns_on_stderr_and_leaves_json_stdout_clean(
@@ -247,10 +226,8 @@ def _create_index_marker_with_transcript(tmp_path: Path, session_id: str = "test
     The real index handler requires the transcript file to exist on disk.
     Creates a minimal .git dir so resolve_project_root finds the project root.
     """
-    # Create .git so resolve_project_root works
     (tmp_path / ".git").mkdir(exist_ok=True)
 
-    # Create the transcript file the marker payload references
     transcript_rel = f".forge/artifacts/test-session/transcripts/{session_id}.jsonl"
     transcript_abs = tmp_path / transcript_rel
     transcript_abs.parent.mkdir(parents=True, exist_ok=True)
@@ -619,7 +596,7 @@ class TestShadowMarkerCompatibility:
 
 
 class TestMemoryWriterRunIdentity:
-    """The detached memory-writer is re-rooted under the originating session (Phase 4a)."""
+    """The detached memory writer is re-rooted under the originating session."""
 
     def test_env_roots_under_origin(self) -> None:
         from forge.cli.main import _memory_writer_env

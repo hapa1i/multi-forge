@@ -1,4 +1,4 @@
-"""Pure consumer-lane resolution (epic consumer_lanes, ticket T1a).
+"""Pure consumer-lane resolution.
 
 A *lane* is a concrete ``(runtime, backend, model)`` placement for a *consumer*
 -- a unit of Forge LLM-work. This module is the pure, side-effect-free core of
@@ -8,13 +8,11 @@ chosen lane.
 
 Out of scope here, by design:
 
-- **Transport** (direct vs proxy / ``base_url``): I/O-bound (proxy registry +
-  health probes via ``resolve_subprocess_routing``); derived at dispatch (T3).
-- **Persistence** of a consumer's chosen lane: the session-manifest binding (T1b).
-- **Model-catalog membership**: ``model`` is validated as a non-empty id only, so
-  the whole module stays I/O-free; full validation lands when a consumer is wired.
-
-See ``docs/board/doing/epic_consumer_lanes/``.
+- **Transport** (direct vs proxy / ``base_url``): I/O-bound proxy registry and
+  health probes via ``resolve_subprocess_routing``. Transport is derived at dispatch.
+- **Persistence** of a consumer's chosen lane: the session-manifest binding.
+- **Model-catalog membership**: this resolver validates ``model`` only as a
+  non-empty id so the module stays I/O-free.
 """
 
 from __future__ import annotations
@@ -152,8 +150,8 @@ def _satisfies_floor(runtime_id: str, floor: CapabilityFloor) -> bool:
 def _reachable(runtime_id: str, backend_id: str) -> bool:
     # A source may pin the lane runtimes that can reach it: a subscription whose
     # auth is a runtime's native login is reachable only via that runtime
-    # (chatgpt -> codex). Empty reachable_via = any runtime (every endpoint-based
-    # source, preserving T1a behavior). backend_id is already canonical
+    # (chatgpt -> codex). Empty reachable_via means any runtime can use the
+    # endpoint-based source. backend_id is already canonical
     # (Lane.__post_init__), so the lookup resolves; this stays a pure dict read
     # (no proxy/registry/network I/O).
     source = get_model_source(backend_id)

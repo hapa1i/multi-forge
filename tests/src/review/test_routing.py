@@ -19,8 +19,6 @@ from forge.review.routing import (
     resolve_model_flag,
 )
 
-# ── resolve_model_flag ───────────────────────────────────────────
-
 
 class TestResolveModelFlag:
 
@@ -56,9 +54,6 @@ class TestResolveModelFlag:
             model_ref="openai/gpt-5.5",
         )
         assert resolve_model_flag(route) == "openai/gpt-5.5"
-
-
-# ── WorkerRoutingPlan ────────────────────────────────────────────
 
 
 class TestWorkerRoutingPlan:
@@ -122,11 +117,6 @@ class TestWorkerRoutingPlan:
         assert plan.routes[0].source == "explicit"
         assert plan.routes[1].source == "route_scan"
         assert plan.routes[2].source == "direct"
-
-
-# ── derive_model_routes ──────────────────────────────────────────
-
-# Stub ModelSpec with the Phase 3+4 fields (real ModelSpec doesn't have them yet)
 
 
 @dataclass(frozen=True)
@@ -387,9 +377,6 @@ class TestDeriveModelRoutes:
 
         assert cross_route.template_family == "anthropic"
         assert cross_route.model_ref == "openai/gpt-5.5"
-
-
-# ── resolve_invocation_routing ───────────────────────────────────
 
 
 class TestResolveInvocationRouting:

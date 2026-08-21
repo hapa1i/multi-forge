@@ -4,7 +4,7 @@ A *consumer lane* binds a unit of Forge LLM-work -- the semantic supervisor,
 memory writer, shadow curation, or team supervisor -- to a
 ``(runtime, backend, model)`` lane. The choice is recorded in the session
 manifest's ``intent.consumer_lanes`` and frozen into ``confirmed`` at first
-dispatch (epic consumer_lanes). Placement is session-scoped, so the canonical
+dispatch. Placement is session-scoped, so the canonical
 surface lives here under ``forge session``; ``forge policy supervisor set
 --runtime/--backend`` stays as the supervisor-specific convenience (same
 ``intent`` slot, same helpers -- no second storage path).
@@ -211,7 +211,7 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         if current is not None and current != lane_record:
             raise _LaneFrozen(current)
         set_intent_lane(m, consumer, lane_record)
-        # T7: re-pinning the supervisor's lane is the "topped up, retry codex" signal -- clear
+        # Re-pinning the supervisor lane signals that codex can be retried. Clear
         # any sticky degrade so the next check dispatches the requested lane, not the default.
         # (Supervisor-only; other consumers have no degrade overlay.)
         from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
@@ -275,8 +275,8 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
     state = result.state
     registry = _consumer_registry()
 
-    # T7: the supervisor's bound (frozen) codex lane can be degraded to the default this session --
-    # flag it so `frozen: codex` is not read as "still dispatching codex". Supervisor-only overlay.
+    # The frozen codex lane can be degraded to the default for this session.
+    # Flag this state so `frozen: codex` is not read as "still dispatching codex".
     from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
     from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
 

@@ -482,8 +482,8 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         lane_record: LaneRecord | None = None,
     ) -> None:
         self._config = config
-        # The supervisor's consumer-lane binding (epic consumer_lanes, T1b), threaded so a shadow
-        # candidate is captured with the lane production would replay on (None => default claude).
+        # Thread the supervisor's consumer-lane binding into each shadow candidate.
+        # None selects the default claude lane.
         self._lane_record = lane_record
         ttl = config.throttle_seconds if config else 30
         self._cache = ThrottleCache(ttl_seconds=ttl)

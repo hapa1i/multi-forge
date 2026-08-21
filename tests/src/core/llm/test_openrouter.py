@@ -292,7 +292,7 @@ class TestOpenRouterClientStream:
 
     @pytest.mark.asyncio
     async def test_stream_provider_meta_from_first_chunk_id(self, client):
-        """The gen-... id on the FIRST chunk rides on the usage/response_end events (Phase 2)."""
+        """The first chunk's generation ID reaches usage and response_end events."""
         chunk1 = MagicMock()
         chunk1.id = "gen-stream-abc"
         chunk1.usage = None

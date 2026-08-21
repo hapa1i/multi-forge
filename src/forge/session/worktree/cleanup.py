@@ -131,8 +131,7 @@ def remove_worktree(
 
     git = find_git_binary()
 
-    # Get the main repo root to run git worktree remove from there
-    # (git worktree remove needs to be run from the main repo, not from the worktree itself)
+    # git worktree remove must run from the main repository, not from the target worktree.
     if repo_root is None:
         repo_root = get_main_repo_root(worktree_path)
 
@@ -241,8 +240,7 @@ def cleanup_worktree(
     """
     result = CleanupResult()
 
-    # Get main repo root before removing worktree (so we can delete branch later)
-    # Must use get_main_repo_root to get the main repo, not the worktree itself
+    # Resolve the main repository before removing the worktree. Branch deletion must run from a surviving checkout.
     if repo_root is None and worktree_path.exists():
         try:
             repo_root = get_main_repo_root(worktree_path)

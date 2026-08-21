@@ -34,9 +34,6 @@ def _ctx(target_path: str | None = "src/foo.py", new_content: str | None = "x = 
     )
 
 
-# --- FilterStage ---
-
-
 class TestFilterStage:
     def test_empty_config_passes_everything(self):
         stage = FilterStage(FilterConfig())
@@ -70,9 +67,6 @@ class TestFilterStage:
     def test_invalid_regex_raises_at_init(self):
         with pytest.raises(re.error):
             FilterStage(FilterConfig(path_patterns=["[invalid"]))
-
-
-# --- CheckerStage ---
 
 
 class TestCheckerStage:
@@ -125,7 +119,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_emits_session_tagged_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: a checker run emits a session-tagged policy-checker event with exact tokens."""
+        """A checker run emits a session-tagged policy-checker event with exact tokens."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
         mock_adapter = MagicMock()
@@ -149,7 +143,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_parse_failure_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: an unparseable checker response still emits, status=error (the call happened)."""
+        """An unparseable checker response emits an error event because the call occurred."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
         mock_adapter = MagicMock()
@@ -168,7 +162,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_exception_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: a checker LLM exception emits a status=error event and still fails open to None."""
+        """A checker LLM exception emits an error event and fails open to None."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
         mock_adapter = MagicMock()
@@ -187,8 +181,10 @@ class TestCheckerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_system_prompt_prepended_when_set(self, mock_adapter_cls, mock_get_client):
-        """T5/WS2: a configured system prompt becomes a leading role='system' message (the
-        behavior .ask() did implicitly; .complete() takes raw messages, so the caller owns it)."""
+        """A configured system prompt becomes the leading system-role message.
+
+        ``complete()`` takes raw messages, so the caller must add this message.
+        """
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
@@ -203,8 +199,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_no_system_message_when_prompt_unset(self, mock_adapter_cls, mock_get_client):
-        """T5/WS2: with no system prompt (the default), no system message is injected -- exactly
-        mirrors .ask()'s `if system:` guard, so behavior is preserved for system_prompt=None."""
+        """No system message is injected when the system prompt is unset."""
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
@@ -215,9 +210,6 @@ class TestCheckerStage:
         messages = mock_adapter.complete.call_args[0][0]
         assert len(messages) == 1
         assert messages[0].role == "user"
-
-
-# --- ReviewerStage ---
 
 
 class TestReviewerStage:
@@ -298,7 +290,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_emits_session_tagged_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: a reviewer run emits a session-tagged policy-reviewer event with exact tokens."""
+        """A reviewer run emits a session-tagged policy-reviewer event with exact tokens."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
         mock_adapter = MagicMock()
@@ -321,7 +313,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_exception_emits_error_event_and_warns(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: a reviewer LLM exception emits status=error and still fails open to warn."""
+        """A reviewer LLM exception emits an error event and fails open to warn."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
         mock_adapter = MagicMock()
@@ -341,7 +333,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_parse_failure_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """T5/WS2: an unparseable reviewer response still emits one status=error event (card: success + failure)."""
+        """An unparseable reviewer response emits one error event."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
         mock_adapter = MagicMock()
@@ -395,9 +387,6 @@ class TestReviewerStage:
 
         stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
         assert stage.review(_ctx(), tags=[], policy_id="workflow.test").decision == "allow"
-
-
-# --- _map_verdict ---
 
 
 class TestMapVerdict:
@@ -531,9 +520,6 @@ class TestMapVerdict:
         assert _map_verdict(data, "wf.test").decision == "deny"
 
 
-# --- _normalize_severity ---
-
-
 class TestNormalizeSeverity:
     def test_valid_lowercase(self):
         assert _normalize_severity("high") == "high"
@@ -554,9 +540,6 @@ class TestNormalizeSeverity:
         assert _normalize_severity("5") == "medium"
 
 
-# --- FilterStage edge cases ---
-
-
 class TestFilterStageEdgeCases:
     def test_max_content_length_at_boundary(self):
         """Content exactly at max_content_length passes (uses > not >=)."""
@@ -568,9 +551,6 @@ class TestFilterStageEdgeCases:
         """None content has length 0, should pass any max_content_length."""
         stage = FilterStage(FilterConfig(max_content_length=0))
         assert stage.passes(_ctx(new_content=None)) is True
-
-
-# --- CheckerStage edge cases ---
 
 
 class TestCheckerStageEdgeCases:

@@ -260,10 +260,8 @@ def _print_info_human(data: dict) -> None:
         table.add_column("LAST ACCESSED", width=20)
 
         for sess in sessions:
-            # Format timestamp
             last_accessed = sess.get("last_accessed", "")
             if last_accessed:
-                # Truncate to date+time
                 last_accessed = last_accessed[:19].replace("T", " ")
             table.add_row(sess.get("name", ""), last_accessed)
         console.print(table)

@@ -540,7 +540,6 @@ def _process_single_marker(
                 last_error=data.get("last_error"),
             )
 
-            # Check for poison marker (too many failures)
             if marker.attempt_count >= MAX_ATTEMPTS:
                 return _move_to_failed(marker_file, marker)
 

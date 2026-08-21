@@ -62,19 +62,16 @@ class TestSecretsPropagateToContainer:
     ) -> None:
         """Secret from credentials.yaml is resolved by get_secrets_for_template()
         and propagated into a Docker container via --env-file."""
-        # Store a test key in the credential file (not in env)
         test_key = "sk-test-e2e-propagation-12345"
         _write_creds(isolated_forge_home, "default", {"GEMINI_API_KEY": test_key})
         monkeypatch.setenv("FORGE_HOME", str(isolated_forge_home))
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-        # Resolve secrets the way the real sidecar code does
         secrets = get_secrets_for_template("litellm-gemini-local")
         assert secrets == {
             "GEMINI_API_KEY": test_key
         }, "get_secrets_for_template should resolve GEMINI_API_KEY from credential file"
 
-        # Write them to a temp env-file (same pattern as run_sidecar_session)
         fd, env_file = tempfile.mkstemp(prefix=".forge-env-", suffix=".env")
         try:
             with os.fdopen(fd, "w") as f:
@@ -82,7 +79,6 @@ class TestSecretsPropagateToContainer:
                     f.write(f"{k}={v}\n")
             os.chmod(env_file, 0o600)
 
-            # Run container and check the env var is visible inside
             result = subprocess.run(
                 [
                     "docker",
@@ -126,7 +122,6 @@ class TestSecretsPropagateToContainer:
         secrets = get_secrets_for_template("litellm-openai")
         assert secrets["LITELLM_API_KEY"] == env_key, "Env should win over file"
 
-        # Verify in container
         fd, env_file = tempfile.mkstemp(prefix=".forge-env-", suffix=".env")
         try:
             with os.fdopen(fd, "w") as f:

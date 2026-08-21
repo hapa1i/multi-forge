@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Forge smoke test -- read-only installation verification.
-# Runs a fixed whitelist of probes and asserts no filesystem side effects.
+# Verify a Forge installation with read-only probes.
+# Confirm that the probes do not modify the file system.
 #
 # Usage:
 #   FORGE_SKILL_RUNTIME=claude_code bash smoke-test.sh
@@ -41,7 +41,7 @@ PASS=0
 FAIL=0
 RESULTS=()
 
-# --- Snapshot "must not change" paths ---
+# Capture paths that the probes must not modify.
 snapshot_mtime() {
     if [ -e "$1" ]; then
         python3 -c 'import os,sys; print(int(os.path.getmtime(sys.argv[1])))' "$1"
@@ -68,7 +68,7 @@ case "$RUNTIME" in
         ;;
 esac
 
-# --- Probe helpers ---
+# Probe helpers
 check() {
     local name="$1"
     shift
@@ -96,17 +96,17 @@ check_file() {
     fi
 }
 
-# --- Run probes (read-only only -- no forge subcommands that trigger pending-work queue) ---
+# Use only probes that cannot trigger the pending-work queue.
 check "forge on PATH" command -v forge
 check "forge --version" forge --version
 check_file "installed.json" "$FORGE_STATE_HOME/installed.json" "exists"
 
-# Direct file read -- no Forge CLI invocation, no startup side effects
+# Read the file directly to avoid Forge startup side effects.
 if [ -f "$FORGE_STATE_HOME/installed.json" ] && command -v jq >/dev/null 2>&1; then
     check "tracking version" jq -r '.version // "unknown"' "$FORGE_STATE_HOME/installed.json"
 fi
 
-# --- Assert no side effects ---
+# Confirm that the probes had no side effects.
 assert_unchanged() {
     local name="$1"
     local path="$2"
@@ -138,7 +138,6 @@ esac
 assert_unchanged "Forge state intact" "$FORGE_STATE_HOME" "$SNAP_FORGE"
 assert_unchanged "installed.json intact" "$FORGE_STATE_HOME/installed.json" "$SNAP_INSTALLED"
 
-# --- Print results ---
 TOTAL=$((PASS + FAIL))
 echo ""
 echo "Forge Smoke Test ($RUNTIME)"

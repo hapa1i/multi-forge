@@ -1,8 +1,8 @@
-"""Slice 4 (proxy_log_hygiene): strict coercion for the per-proxy logging.requests block.
+"""Strict coercion tests for the per-proxy logging.requests block.
 
 Mirrors the audit/provider_trace pattern: a security/diagnostics capture control must reject
-unknown keys and bad values loudly (a silently-ignored typo would leave the control OFF). The
-block is also wired through the loader at both hops (the provider_trace DOA trap).
+unknown keys and bad values loudly because a silently ignored typo would leave the control off.
+The loader must also preserve the block across both configuration hops.
 """
 
 from __future__ import annotations
@@ -94,8 +94,6 @@ def test_logging_config_rejects_unknown_subkey() -> None:
 def test_logging_config_default_is_request_defaults() -> None:
     assert _coerce_logging_config(None).requests == RequestLogConfig()
 
-
-# --- Loader wiring (both hops -- the provider_trace DOA trap) ---
 
 _VALID_PROXY = {
     "proxy_format": 1,

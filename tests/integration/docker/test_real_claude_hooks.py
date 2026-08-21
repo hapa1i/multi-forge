@@ -119,35 +119,23 @@ PY
         ), f"Migrated Stop hook did not run. Claude output: {stdout[:500]}..."
 
     def test_session_start_hook_sets_session_id(self, forge_workspace: ContainerLike) -> None:
-        """After claude --print, manifest should have claude_session_id set.
-
-        Note: We don't assert the specific value, just that the hook ran.
-        If SessionStart hook fires, it will update confirmed.claude_session_id.
-        """
+        """A SessionStart hook records a Claude session ID."""
         _setup_real_claude(forge_workspace)
 
-        # Read manifest before claude run
         before_result = forge_workspace.exec("cat /workspace/.forge/sessions/real-claude-test/forge.session.json")
         manifest_before = json.loads(before_result.stdout)
         session_id_before = manifest_before.get("confirmed", {}).get("claude_session_id")
 
-        # Run claude --print with minimal prompt
         exit_code, stdout, stderr = _run_claude_print(
             forge_workspace,
             prompt="Say just the word hello",
             timeout=30,
         )
 
-        # We don't assert on claude exit code - it might timeout or have other issues
-        # What matters is whether the hook fired
-
-        # Read manifest after claude run
         after_result = forge_workspace.exec("cat /workspace/.forge/sessions/real-claude-test/forge.session.json")
         manifest_after = json.loads(after_result.stdout)
         session_id_after = manifest_after.get("confirmed", {}).get("claude_session_id")
 
-        # NARROW assertion: session_id should be set (hook ran)
-        # We don't check if it changed - just that it's set
         assert session_id_after is not None, (
             f"SessionStart hook should set claude_session_id. "
             f"Before: {session_id_before}, After: {session_id_after}. "
@@ -155,33 +143,23 @@ PY
         )
 
     def test_stop_hook_records_transcript_path(self, forge_workspace: ContainerLike) -> None:
-        """After claude --print exits, manifest should have transcript_path.
-
-        Note: We don't verify transcript content, just that Stop hook ran.
-        If Stop hook fires, it will update confirmed.transcript_path.
-        """
+        """A Stop hook records the transcript path."""
         _setup_real_claude(forge_workspace)
 
-        # Read manifest before claude run
         before_result = forge_workspace.exec("cat /workspace/.forge/sessions/real-claude-test/forge.session.json")
         manifest_before = json.loads(before_result.stdout)
         transcript_before = manifest_before.get("confirmed", {}).get("transcript_path")
 
-        # Run claude --print with minimal prompt
         exit_code, stdout, stderr = _run_claude_print(
             forge_workspace,
             prompt="Say just the word goodbye",
             timeout=30,
         )
 
-        # Read manifest after claude run
         after_result = forge_workspace.exec("cat /workspace/.forge/sessions/real-claude-test/forge.session.json")
         manifest_after = json.loads(after_result.stdout)
         transcript_after = manifest_after.get("confirmed", {}).get("transcript_path")
 
-        # NARROW assertion: transcript_path should be set (hook ran)
-        # Note: This may fail if Stop hook doesn't fire in --print mode
-        # That's expected - this is a best-effort test
         assert transcript_after is not None, (
             f"Stop hook should set transcript_path. "
             f"Before: {transcript_before}, After: {transcript_after}. "

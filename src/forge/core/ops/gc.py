@@ -152,7 +152,6 @@ def _resolve_tracked_roots(ctx: ExecutionContext, scope: str) -> set[Path]:
         if fr:
             roots.add(Path(fr))
 
-    # Add current forge_root
     if ctx.forge_root is not None:
         roots.add(ctx.forge_root)
 
@@ -1414,8 +1413,7 @@ def _clean_search_docs(report: CleanReport, result: CleanResult) -> int:
     from forge.search.index_state import IndexStateStore
     from forge.search.store import SearchDocumentStore
 
-    # Collect forge_roots from the scope_roots used to generate the report
-    # We re-derive from the search_docs category items (transcript paths)
+    # Derive Forge roots from transcript paths in the search-doc report.
     search_cat = next((c for c in report.categories if c.category == "search_docs"), None)
     if search_cat is None or search_cat.count == 0:
         return 0

@@ -1,4 +1,4 @@
-"""Tests for the Codex-runtime session ops (codex_frontend Phase 2).
+"""Tests for Codex-runtime session operations.
 
 Hermetic: the curation LLM, ``codex exec`` subprocess, and preflight are mocked; the
 SessionManager/IndexStore/SessionStore stack is REAL (these ops exist to write manifest
@@ -483,10 +483,11 @@ class TestStartCodexHookDelivery:
         assert not receipt_path(_session_dir(proj)).exists()
 
     def test_observation_receipt_never_read_as_delivery(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Phase 4 contract regression (introduced by Phase 5): the observation receipt
-        is a separate file; delivery reconciliation must never read it as a delivery
-        receipt -- an observation WITHOUT a delivery receipt still reconciles
-        hook_undelivered, and no observation field leaks into the manifest."""
+        """Delivery reconciliation never treats an observation receipt as delivery.
+
+        An observation without a delivery receipt still reconciles ``hook_undelivered``,
+        and observation fields do not leak into the manifest.
+        """
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
         def _observe_only() -> None:
@@ -681,10 +682,10 @@ def _seed_duplicate_project(tmp_path: Path, name: str = "impl") -> Path:
 
 
 class TestCrossProjectNameScoping:
-    """Review finding (2026-06-10): session names are project-scoped, so every
-    post-creation lookup/delete must be scoped to the child's forge_root -- an
-    unscoped strict resolution raises AmbiguousSessionError when another project
-    already has the name, stranding the just-created session."""
+    """Session names are project-scoped, so post-creation operations use the child's forge_root.
+
+    An unscoped lookup can raise AmbiguousSessionError when another project uses the same name.
+    """
 
     def test_duplicate_name_in_other_project_does_not_break_start(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -855,9 +856,10 @@ class TestContinueCodexSession:
         assert state.confirmed.codex.thread_id == _SUCCESS_TID
 
     def test_resume_refreshes_auth_posture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Review finding (2026-06-10): `session show` renders Auth from confirmed.codex,
-        so a resume under a different Codex auth must refresh the recorded posture
-        (CodexConfirmed is refreshed per run), not keep the first turn's."""
+        """A resume under different Codex auth refreshes the recorded posture.
+
+        `session show` renders Auth from confirmed.codex, which is refreshed for each run.
+        """
         from dataclasses import replace
 
         proj, ctx = _make_project(tmp_path, monkeypatch)

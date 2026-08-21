@@ -17,10 +17,6 @@ from forge.cli.hooks.policy import (
 )
 from forge.policy.types import ActionContext
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_manifest(name: str = "test-session") -> MagicMock:
     m = MagicMock()
@@ -456,7 +452,7 @@ class TestSupervisorLaneBindingFreeze:
         assert registered._lane_record == codex  # injected into the policy
         assert returned == codex  # and returned for the caller to thread into the freeze
 
-    # --- T7 sticky degrade (write + read), folded into the same locked _mutate as the freeze ---
+    # Write and read sticky degrade state in the same locked mutation as the freeze.
 
     @staticmethod
     def _fresh_build_return() -> dict[str, Any]:
@@ -605,10 +601,11 @@ class TestSupervisorLaneBindingFreeze:
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_degrade_emits_one_upstream_lane_degraded_outcome(self, mock_build: MagicMock, tmp_path: Path) -> None:
-        """Phase 3 observability: a degrade records exactly ONE upstream `policy.lane_degraded` outcome
-        (command=supervisor, reason_code=subscription_exhausted, from/to lane in message) -- read by
-        `forge telemetry activity`, NOT a UsageEvent. Uses a REAL store so the post-lock emit fires
-        (the mocked-store `_run_mutate` harness would run the mutate after the emit check)."""
+        """A degrade records one upstream ``policy.lane_degraded`` outcome.
+
+        ``forge telemetry activity`` reads this outcome; it is not a UsageEvent. A real store
+        ensures that the post-lock emit runs before the assertion.
+        """
         from forge.cli.hooks.policy import _persist_policy_decisions
         from forge.core.telemetry.upstream import read_upstream_outcomes
         from forge.policy.supervisor_lane_degrade import is_supervisor_degraded

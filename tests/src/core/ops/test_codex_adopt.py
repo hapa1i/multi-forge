@@ -1,4 +1,4 @@
-"""Tests for the Codex adoption arm (native_session_adoption Slice 4).
+"""Tests for the Codex adoption arm.
 
 The Codex arm's discovery differs from Claude's: the thread id is only a filename
 suffix under `$CODEX_HOME/sessions/YYYY/MM/DD/`, and the launch directory lives

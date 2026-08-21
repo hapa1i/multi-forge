@@ -175,9 +175,6 @@ def _warn_decision(**kwargs) -> PolicyDecision:
     return PolicyDecision(decision="warn", policy_id="semantic.supervisor", **kwargs)
 
 
-# --- Slice 10 clean break: `supervise` removed, one-shot moved under `evaluate` ---
-
-
 class TestSupervisorCleanBreak:
     def test_supervise_verb_removed(self) -> None:
         """`forge policy supervise` no longer exists (Click reports no such command)."""
@@ -623,7 +620,7 @@ class TestEvaluateContext:
         assert "def hello(): pass" in (context.new_content or "")
 
 
-# --- Toggle tests for `forge policy supervisor off/on/remove/reload` ---
+# Toggle tests for `forge policy supervisor off/on/remove/reload`
 
 
 def _make_supervised_project(project: Path, monkeypatch, *, suspended: bool = False) -> SessionStore:
@@ -727,7 +724,7 @@ class TestSupervisorStatus:
         assert sup is not None
         assert sup["resume_id"] == "planner"
         assert set(sup.keys()) == self._SUPERVISOR_JSON_KEYS
-        assert sup["degraded"] is None  # T7: not degraded => null (only set after a codex exhaustion)
+        assert sup["degraded"] is None  # Set only after Codex subscription exhaustion.
 
     def test_status_json_unconfigured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -744,8 +741,9 @@ class TestSupervisorStatus:
     def test_status_json_shows_degraded_when_degraded(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
-        """T7: `supervisor status --json` surfaces the sticky degrade (reason + from/to lane) while the
-        bound `lane` stays codex -- the operator sees dispatch was routed around without editing it.
+        """JSON status shows the sticky degrade while preserving the bound Codex lane.
+
+        The operator can see that dispatch was routed around the binding without changing it.
         """
         from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
         from forge.session.models import (
@@ -758,8 +756,7 @@ class TestSupervisorStatus:
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
         _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
-        # The realistic state: the supervisor is bound to codex AND degraded -- the binding stays,
-        # the overlay routes around it. `lane` reflects the binding; `degraded` reflects the overlay.
+        # The overlay routes around the Codex binding without changing it.
         manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
         set_supervisor_degrade(
             manifest,
@@ -788,7 +785,7 @@ class TestSupervisorStatus:
         }
 
     def test_status_table_shows_degraded_line(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T7: the human table calls out the degrade so `Lane: ...codex...` is not misread as live codex."""
+        """The human table distinguishes a degraded route from the bound Codex lane."""
         from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
         from forge.session.models import LaneRecord, SupervisorConfig
 
@@ -811,7 +808,7 @@ class TestSupervisorStatus:
         assert "subscription spent" in result.output
 
     def test_status_json_carries_default_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T5/WS3: a default (claude) supervisor reports its full lane (claude_code/anthropic-direct/opus)."""
+        """The default Claude supervisor reports its full runtime, backend, and model lane."""
         _make_supervised_project(temp_guard_env, monkeypatch)
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
@@ -823,7 +820,7 @@ class TestSupervisorStatus:
         }
 
     def test_status_json_carries_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T1b: a codex-bound supervisor reports the full codex lane from its consumer-lane binding."""
+        """A Codex-bound supervisor reports its full consumer-lane binding."""
         from forge.session.models import (
             ConsumerLaneIntent,
             LaneRecord,
@@ -847,7 +844,7 @@ class TestSupervisorStatus:
         }
 
     def test_status_displays_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T1b: the human view shows the resolved codex lane line from the consumer-lane binding."""
+        """The human view shows the resolved Codex consumer-lane binding."""
         from forge.session.models import (
             ConsumerLaneIntent,
             LaneRecord,
@@ -868,7 +865,7 @@ class TestSupervisorStatus:
     def test_status_displays_confirmed_lane_over_intent(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
-        """T1b: with both intent and a frozen binding, status shows the *confirmed* lane.
+        """With both intent and a frozen binding, status shows the confirmed lane.
 
         read_bound_lane is confirmed-first, so the displayed lane is the one that actually
         dispatches -- a drifted intent override must not mislead the status view.
@@ -913,7 +910,7 @@ class TestSupervisorStatus:
     def test_status_human_lane_unresolved_on_failure(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
-        """T5/WS3: on resolution failure the human view degrades to '(unresolved)' (with the runtime)."""
+        """On resolution failure, the human view retains the runtime and shows '(unresolved)'."""
         from forge.core.lanes import LaneError
         from forge.session.models import SupervisorConfig
 
@@ -1015,7 +1012,7 @@ class TestSupervisorToggle:
         assert confirmed is None or confirmed.supervisor is None
 
     def test_remove_clears_supervisor_degrade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T7: removing the supervisor orphans the codex binding, so the sticky degrade is dropped too."""
+        """Removing the supervisor also drops the sticky degrade for its removed binding."""
         from forge.policy.supervisor_lane_degrade import (
             is_supervisor_degraded,
             set_supervisor_degrade,
@@ -1395,7 +1392,7 @@ class TestSupervisorSetRuntimeFlag:
         assert after.intent.consumer_lanes.supervisor == self._CODEX  # type: ignore[union-attr]
 
 
-# --- Cascade tests for `forge policy supervisor cascade` and `set --cascade` ---
+# Cascade tests for `forge policy supervisor cascade` and `set --cascade`
 
 
 def _fake_resolved_plan(path: str, source: str = "self", session_name: str = "worker"):

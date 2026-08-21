@@ -1,8 +1,8 @@
-"""Tests for the runtime registry capability matrix (Phase 4e).
+"""Tests for the runtime registry capability matrix.
 
-The registry answers the seven capability questions from the runtime-abstraction
-card (installed / interactive / headless / hooks / usage / native resume / scopes)
-and encodes Codex *limits* as values, never as parity-implying omissions.
+The registry describes seven runtime capabilities: installation, interactive use,
+headless use, hooks, usage reporting, native resume, and installation scopes. It
+encodes Codex *limits* as values, never as parity-implying omissions.
 """
 
 from __future__ import annotations
@@ -51,12 +51,12 @@ class TestClaudeSpec:
 class TestCodexSpec:
     def test_limits_encoded_not_parity(self) -> None:
         s = get_runtime("codex")
-        # Phase 1 probe (2026-06-10): post-enrollment PreToolUse deny + updatedInput
-        # mutation confirmed headless -> "partial", not "full" -- enforcement exists only
+        # A 2026-06-10 probe confirmed post-enrollment PreToolUse deny and updatedInput mutation.
+        # The result is "partial", not "full": enforcement exists only
         # in trust-enrolled homes, malformed hook output fails open, and PermissionRequest
         # is unpinned headless.
         assert s.pretool_policy == "partial"
-        assert s.interactive == "default"  # Forge-managed interactive sessions (codex_frontend Phase 5)
+        assert s.interactive == "default"  # Forge manages interactive sessions.
         # Probes (2026-06-10): trust-enrolled hooks fire headless AND interactively ->
         # "enrollment_gated", not "gated": the version floor is satisfied yet untrusted hooks
         # do not fire -- the gate is trust enrollment, not the version. The floor stays
@@ -68,13 +68,13 @@ class TestCodexSpec:
         assert s.native_resume is True
         assert s.usage_source == "jsonl_events"
         assert s.headless_cmd == ("codex", "exec")
-        # Phase 6: the installer registers Codex hooks in the config the Forge
-        # install scope maps to (user -> $CODEX_HOME, project/local -> .codex/).
+        # The installer registers Codex hooks in the config for each Forge install scope.
+        # User scope maps to $CODEX_HOME; project and local scopes map to .codex/.
         assert s.install_scopes == ("user", "project", "local")
         # Local extension participation does not imply a safe Codex skill target:
         # .agents/skills is committed project state, not personal local state.
         assert s.skill_scopes == ("user", "project")
-        # Note records the default-on reality + the trust-enrollment finding.
+        # The note records default-on behavior and the trust-enrollment requirement.
         assert s.note is not None and "default-on" in s.note and "trust-enrolled" in s.note
 
 

@@ -276,7 +276,6 @@ def run_multi_review(
         for (idx, _invoker, req), outcome in zip(spawnable, outcomes):
             results[idx] = _to_review_result(req, outcome)
 
-    # Return in deterministic input order
     ordered = [results[idx] for idx in range(len(specs)) if idx in results]
     return MultiReviewOutput(prompt=prompt, results=ordered)
 

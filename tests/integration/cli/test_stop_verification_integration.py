@@ -36,22 +36,18 @@ class TestStopHookVerificationPolicy:
         max_minutes: int = 30,
     ) -> None:
         """Create a session with verification policy configured."""
-        # Create session
         workspace.exec(f"cd /workspace && forge session start {session_name}")
 
-        # Find per-session manifest and add verification config
         result = workspace.exec("find /workspace/.forge/sessions -name forge.session.json | head -1")
         manifest_path = result.stdout.strip()
         result = workspace.exec(f"cat {manifest_path}")
         manifest = json.loads(result.stdout)
 
-        # Add verification policy to intent
         manifest["intent"]["verification"] = {
             "max_iterations": max_iterations,
             "max_minutes": max_minutes,
         }
 
-        # Write back
         manifest_json = json.dumps(manifest)
         workspace.exec(f"cat > {manifest_path} << 'EOF'\n{manifest_json}\nEOF")
 
@@ -64,7 +60,6 @@ class TestStopHookVerificationPolicy:
         """Create a transcript file with the given messages."""
         workspace.exec("mkdir -p /tmp/claude")
 
-        # Build JSONL content
         lines = [json.dumps(msg) for msg in messages]
         content = "\\n".join(lines)
 
@@ -95,7 +90,6 @@ class TestStopHookVerificationPolicy:
         """Stop hook should succeed when no verification promise detected."""
         self._create_session_with_verification(mock_claude_workspace)
 
-        # Create transcript without any verification promises
         messages = [
             {
                 "type": "assistant",
@@ -107,14 +101,12 @@ class TestStopHookVerificationPolicy:
         output = self._invoke_stop_hook(mock_claude_workspace)
 
         assert output["success"] is True
-        # Should not have pending verification
         assert output.get("verification_pending") is not True
 
     def test_promise_detected_triggers_verification(self, mock_claude_workspace: ContainerLike) -> None:
         """Stop hook should detect verification promise in assistant message."""
         self._create_session_with_verification(mock_claude_workspace)
 
-        # Create transcript with a completion promise
         messages = [
             {
                 "type": "assistant",
@@ -132,8 +124,7 @@ class TestStopHookVerificationPolicy:
 
         output = self._invoke_stop_hook(mock_claude_workspace)
 
-        # Hook should succeed (always exits 0 for Claude safety)
-        # Verification detection may set pending flag but doesn't block
+        # Stop hooks fail open for Claude even when they detect a promise.
         assert output["success"] is True
 
 
@@ -156,7 +147,6 @@ class TestStopHookBypassModes:
         """Create a session with verification policy and optional iteration count."""
         workspace.exec(f"cd /workspace && forge session start {session_name}")
 
-        # Find per-session manifest
         result = workspace.exec("find /workspace/.forge/sessions -name forge.session.json | head -1")
         manifest_path = result.stdout.strip()
         result = workspace.exec(f"cat {manifest_path}")
@@ -167,7 +157,6 @@ class TestStopHookBypassModes:
             "max_minutes": max_minutes,
         }
 
-        # Add iteration count to confirmed state if needed
         if iteration_count > 0:
             if "confirmed" not in manifest:
                 manifest["confirmed"] = {}
@@ -209,7 +198,6 @@ class TestStopHookBypassModes:
         """force_complete flag should bypass verification."""
         self._create_session_with_verification(mock_claude_workspace)
 
-        # Create transcript with promise
         messages = [
             {
                 "type": "assistant",
@@ -227,7 +215,6 @@ class TestStopHookBypassModes:
 
         output = self._invoke_stop_hook(mock_claude_workspace, force_complete=True)
 
-        # Should succeed even with promise, due to force_complete
         assert output["success"] is True
 
     def test_auto_bypass_after_max_iterations(self, mock_claude_workspace: ContainerLike) -> None:
@@ -238,7 +225,6 @@ class TestStopHookBypassModes:
             iteration_count=4,  # Already exceeded max
         )
 
-        # Create transcript with promise
         messages = [
             {
                 "type": "assistant",
@@ -256,7 +242,6 @@ class TestStopHookBypassModes:
 
         output = self._invoke_stop_hook(mock_claude_workspace)
 
-        # Should succeed due to auto-bypass
         assert output["success"] is True
 
 
@@ -292,8 +277,6 @@ class TestStopHookTranscriptProcessing:
             },
         )
 
-        # Hook may skip gracefully for events without transcripts
-        # This is valid behavior - not all hook events have transcripts
         assert output["success"] is True
         assert output.get("action") == "skip" or output.get("reason") == "wrong_event"
 
@@ -309,14 +292,12 @@ class TestStopHookTranscriptProcessing:
             },
         )
 
-        # Should handle gracefully (may succeed with empty transcript or report error)
         assert "success" in output
 
     def test_empty_transcript_file(self, mock_claude_workspace: ContainerLike) -> None:
         """Should handle empty transcript file."""
         self._setup_session(mock_claude_workspace)
 
-        # Create empty transcript
         mock_claude_workspace.exec("mkdir -p /tmp/claude && touch /tmp/claude/empty.jsonl")
 
         output = self._invoke_stop_hook(
@@ -327,14 +308,12 @@ class TestStopHookTranscriptProcessing:
             },
         )
 
-        # Should succeed (no promises to detect)
         assert output["success"] is True
 
     def test_malformed_transcript_entries(self, mock_claude_workspace: ContainerLike) -> None:
         """Should handle malformed JSON entries gracefully."""
         self._setup_session(mock_claude_workspace)
 
-        # Create transcript with mix of valid and invalid entries
         mock_claude_workspace.exec("""
             mkdir -p /tmp/claude
             cat > /tmp/claude/malformed.jsonl << 'EOF'
@@ -352,7 +331,6 @@ EOF
             },
         )
 
-        # Should handle gracefully
         assert "success" in output
 
 
@@ -397,10 +375,7 @@ class TestStopHookPendingWorkMarker:
 
         assert output["success"] is True
 
-        # Check for pending-work marker
         mock_claude_workspace.exec("ls ~/.forge/pending-work/ 2>/dev/null || echo 'no-markers'")
-        # Note: Marker creation is implementation-dependent
-        # The test verifies the hook completes successfully
 
     def test_marker_contains_session_info(self, mock_claude_workspace: ContainerLike) -> None:
         """Pending-work marker should contain session identification."""
@@ -409,7 +384,6 @@ class TestStopHookPendingWorkMarker:
 
         self._invoke_stop_hook(mock_claude_workspace)
 
-        # Check marker content if it exists
         result = mock_claude_workspace.exec("""
             if ls ~/.forge/pending-work/*.json 2>/dev/null; then
                 cat ~/.forge/pending-work/*.json
@@ -417,5 +391,4 @@ class TestStopHookPendingWorkMarker:
                 echo '{"status": "no-marker"}'
             fi
         """)
-        # Marker content is implementation-dependent
         assert result.returncode == 0

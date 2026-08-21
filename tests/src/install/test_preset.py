@@ -100,7 +100,6 @@ class TestEnsurePreset:
 
     def test_idempotent(self) -> None:
         ensure_preset()
-        # Write custom content
         preset_path = get_preset_path()
         custom = {"env": {"MY_VAR": "1"}}
         preset_path.write_text(json.dumps(custom))

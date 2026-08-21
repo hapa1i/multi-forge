@@ -1,4 +1,4 @@
-"""Tests for the ``forge session transfer`` CLI group (Slice 02 clean-break move)."""
+"""Tests for the ``forge session transfer`` CLI group."""
 
 from __future__ import annotations
 
@@ -333,7 +333,7 @@ class TestTransferDiff:
 
 
 class TestTransferCleanBreak:
-    """The old top-level ``forge transfer`` group is gone (Slice 02 clean break)."""
+    """The old top-level ``forge transfer`` group is absent."""
 
     @pytest.mark.parametrize("sub", ["show", "regenerate", "edit", "diff"])
     def test_old_transfer_path_is_no_such_command(self, runner: CliRunner, sub: str) -> None:

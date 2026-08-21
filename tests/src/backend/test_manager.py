@@ -62,7 +62,6 @@ class TestBackendManager:
         """Verify ensure_backend starts new backend when none exists."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Create config file
         config_dir = tmp_path / "backends" / "mock"
         config_dir.mkdir(parents=True)
         (config_dir / "config.yaml").write_text("test: config")
@@ -79,7 +78,6 @@ class TestBackendManager:
         assert result.process.process_id == "mock-4000"
         assert adapter.start_called
 
-        # Verify registered
         registry = store.read()
         assert "mock-4000" in registry.processes
 
@@ -89,7 +87,6 @@ class TestBackendManager:
 
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
 
-        # Pre-register backend
         existing = ManagedBackendProcess(
             process_id="mock-4000",
             adapter_type="mock",
@@ -109,20 +106,18 @@ class TestBackendManager:
 
         assert result.source == "reuse"
         assert result.process.process_id == "mock-4000"
-        assert not adapter.start_called  # Should NOT have started
+        assert not adapter.start_called
 
     def test_ensure_backend_restarts_dead(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ensure_backend restarts dead backend."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
-        # Create config file
         config_dir = tmp_path / "backends" / "mock"
         config_dir.mkdir(parents=True)
         (config_dir / "config.yaml").write_text("test: config")
 
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
 
-        # Pre-register backend
         existing = ManagedBackendProcess(
             process_id="mock-4000",
             adapter_type="mock",
@@ -135,13 +130,13 @@ class TestBackendManager:
 
         manager = BackendManager(store)
         adapter = MockAdapter()
-        adapter.health_check_result = False  # Backend is dead
+        adapter.health_check_result = False
         manager.register_adapter("mock", adapter)
 
         result = manager.ensure_backend("mock-4000", "mock", 4000)
 
         assert result.source == "start"
-        assert adapter.start_called  # Should have restarted
+        assert adapter.start_called
 
     def test_ensure_backend_raises_for_missing_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ensure_backend raises when config is missing."""

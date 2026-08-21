@@ -356,10 +356,8 @@ class TestMerge:
     ) -> None:
         merge(sample_settings, forge_settings, attributions=SETTINGS_ATTRIBUTIONS)
 
-        # Check hooks were merged
         assert len(sample_settings["hooks"]["PreToolUse"]) == 2  # original + forge
 
-        # Check permissions were merged
         assert "Bash(git:*)" in sample_settings["permissions"]["allow"]
         assert "Read" in sample_settings["permissions"]["allow"]
 

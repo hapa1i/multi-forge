@@ -107,7 +107,6 @@ class LiteLLMAdapter(BackendAdapter):
                 start_new_session=True,  # Detach from parent
             )
 
-        # Wait for health (timeout 10s)
         if not self._wait_for_health(port, timeout=10):
             try:
                 os.killpg(proc.pid, signal.SIGKILL)

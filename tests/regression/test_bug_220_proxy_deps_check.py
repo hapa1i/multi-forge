@@ -35,7 +35,6 @@ def test_missing_proxy_dependencies_raise_helpful_error(
     """Verify that missing proxy dependencies raise helpful error before spawn."""
     import forge.proxy.proxy_orchestrator as orchestrator
 
-    # Mock import to simulate missing uvicorn
     original_import = builtins.__import__
 
     def mock_import(name, *args, **kwargs):
@@ -45,17 +44,13 @@ def test_missing_proxy_dependencies_raise_helpful_error(
 
     monkeypatch.setattr(builtins, "__import__", mock_import)
 
-    # Should raise ProxyStartError with helpful message
     with pytest.raises(ProxyStartError) as exc_info:
         orchestrator._check_proxy_dependencies()
 
     error_msg = str(exc_info.value)
 
-    # Error should mention the missing dependency
     assert "uvicorn" in error_msg
 
-    # Error should provide installation instructions
     assert "uv sync" in error_msg or "proxy dependencies" in error_msg.lower()
 
-    # Error should mention --no-start workaround
     assert "--no-start" in error_msg

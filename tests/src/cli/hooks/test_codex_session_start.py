@@ -195,8 +195,8 @@ class TestSilentNoOps:
 
     def test_nothing_staged_is_the_resume_case(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A resume-turn SessionStart finds no staged file (one-shot consumed at start)
-        and must stay silent -- no late delivery, no DELIVERY receipt. Since Phase 5 an
-        observation receipt IS written (interactive thread capture), still silently."""
+        and must stay silent: no late delivery and no DELIVERY receipt. It writes an
+        observation receipt for interactive thread capture without producing output."""
         store = _make_session(tmp_path, monkeypatch)
         result = _invoke(_payload(cwd=str(tmp_path), source="resume"))
         self._assert_silent(result)
@@ -207,7 +207,7 @@ class TestSilentNoOps:
 
 
 class TestObservationReceipt:
-    """Phase 5: nothing-staged turns in a managed session record an observation."""
+    """Nothing-staged turns in a managed session record an observation."""
 
     def _assert_silent(self, result) -> None:  # type: ignore[no-untyped-def]
         assert result.exit_code == 0

@@ -89,8 +89,6 @@ class TestOpenAIResponseToCompletion:
         assert result.cost_usd is None
         assert result.usage is None
 
-    # --- provider_meta population ---
-
     def test_provider_meta_openrouter_lifts_gen_id_and_upstream(self):
         # OpenRouter's body.id is the gen-... generation id (probe 1); `provider` names
         # the selected upstream.
@@ -139,7 +137,7 @@ class TestOpenAIResponseToCompletion:
 
 
 class TestProviderTraceHeaders:
-    """Only a tiny allowlist of correlation headers enters the trace plane (Phase 2).
+    """Only a small allowlist of correlation headers enters the trace plane.
 
     Shared by the LiteLLM and direct-OpenRouter paths, so it lives in openai_compat.
     """
@@ -173,7 +171,7 @@ class TestProviderTraceHeaders:
 
 
 class TestMergeProviderHeaders:
-    """merge_provider_headers attaches allowlisted headers to provider_meta (Phase 2)."""
+    """merge_provider_headers attaches allowlisted headers to provider_meta."""
 
     def test_populates_headers_on_existing_meta(self):
         completion = CompletionResponse(text="hi", provider_meta=ProviderTraceMeta(provider="openrouter"))

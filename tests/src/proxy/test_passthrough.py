@@ -1,4 +1,4 @@
-"""Unit tests for Anthropic passthrough forwarding (Phase 2 audit proxy)."""
+"""Unit tests for Anthropic passthrough forwarding."""
 
 from __future__ import annotations
 
@@ -537,7 +537,7 @@ async def test_passthrough_inspect_mode_writes_audit_metadata(
     assert recs[0]["counts"]["num_tools"] == 1
 
 
-# --- Usage capture / cost / caps (B2, B3, M7) --------------------------------
+# Usage capture, cost, and caps
 
 # Non-streaming response carrying usage + a secret assistant text block.
 _USAGE_RESPONSE = (
@@ -720,7 +720,7 @@ async def test_passthrough_full_body_captures_redacted_response(
         assert secret not in blob
 
 
-# --- Override mode (2d) ------------------------------------------------------
+# Override mode
 
 
 @pytest.mark.asyncio
@@ -983,9 +983,7 @@ async def test_override_full_body_record_is_self_consistent(
     assert fb[0]["system_prompt_hash"] != audit_logger.hash_system_prompt([{"type": "text", "text": "base"}])
 
 
-# ---------------------------------------------------------------------------
 # Provider-trace mirror (forward-wiring)
-# ---------------------------------------------------------------------------
 
 _SSE_CONTENT_CHUNKS = (
     b'event: message_start\ndata: {"type":"message_start","message":'

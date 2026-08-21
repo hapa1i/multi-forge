@@ -376,7 +376,6 @@ def rebuild_index_cmd() -> None:
 
     project_root_str = str(project_root)
 
-    # Extract all docs
     new_docs = []
     extracted_fingerprints: dict[str, IndexFingerprint] = {}
     errors = 0
@@ -418,7 +417,6 @@ def rebuild_index_cmd() -> None:
         content_map[doc.transcript_path] = content
         all_tokens.append(doc.tokens if doc.tokens is not None else [])
 
-    # Build BM25 from all tokens at once (efficient bulk construction)
     bm25 = BM25(all_tokens)
     precomputed = bm25.to_precomputed()
 

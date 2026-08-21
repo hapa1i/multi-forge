@@ -1,4 +1,4 @@
-"""Tests for emit_codex_usage (Phase 5c).
+"""Tests for emit_codex_usage.
 
 A native ``codex exec`` run is DIRECT to OpenAI: tokens are reported by the JSONL
 stream, but there is no Forge proxy cost record, so the event carries exact tokens

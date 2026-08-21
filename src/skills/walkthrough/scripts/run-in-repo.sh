@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Safety wrapper for Forge walkthrough commands.
-# Resolves and validates the target before sourcing env.sh, verifies isolation through 6 gates,
-# cd's to the test repo, and runs the command.
+# Validate the walkthrough workspace, load its environment, and run a command inside it.
+# Six isolation gates must pass before the command runs.
 #
 # Usage:
 #   bash run-in-repo.sh forge session list           # cd's to test repo automatically
@@ -14,7 +13,7 @@
 
 set -euo pipefail
 
-# --- Parse --no-cd flag (maintainer-only: only for commands with no path arguments) ---
+# The maintainer-only --no-cd flag is safe only for commands without path arguments.
 NO_CD=false
 if [ "${1:-}" = "--no-cd" ]; then
     NO_CD=true
@@ -27,7 +26,7 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-# --- Resolve FORGE_TEST_REPO ---
+# Resolve FORGE_TEST_REPO.
 resolve_path() {
     python3 -c 'import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))' "$1"
 }
@@ -41,7 +40,7 @@ matches_expected_path() {
     esac
 }
 
-# Check for explicitly-set empty value before applying default
+# Reject an explicitly empty value before applying the default.
 if [ "${FORGE_TEST_REPO+set}" = "set" ] && [ -z "$FORGE_TEST_REPO" ]; then
     echo "ERROR: FORGE_TEST_REPO is explicitly set to empty. Refusing to proceed." >&2
     exit 1
@@ -50,7 +49,7 @@ FORGE_TEST_REPO="${FORGE_TEST_REPO:-${FORGE_HOME:-$HOME/.forge}/manual-testing/w
 FORGE_TEST_REPO="$(resolve_path "$FORGE_TEST_REPO")"
 readonly WALKTHROUGH_ROOT="$FORGE_TEST_REPO"
 
-# --- Denylist: refuse obviously dangerous values ---
+# Refuse paths that are unsafe command targets.
 check_safe_path() {
     local resolved="$1"
 
@@ -73,7 +72,7 @@ check_safe_path() {
 
 check_safe_path "$WALKTHROUGH_ROOT"
 
-# --- Gate 1: env.sh exists ---
+# Gate 1: env.sh exists.
 ENV_FILE="$WALKTHROUGH_ROOT/.forge/walkthrough/env.sh"
 if [ ! -f "$ENV_FILE" ]; then
     echo "ERROR: env.sh not found at: $ENV_FILE" >&2
@@ -86,7 +85,7 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# --- Gate 2: marker file exists ---
+# Gate 2: the marker file exists.
 MARKER_FILE="$WALKTHROUGH_ROOT/.forge-walkthrough-marker"
 if [ ! -f "$MARKER_FILE" ]; then
     echo "ERROR: Marker file missing at: $MARKER_FILE" >&2
@@ -95,7 +94,7 @@ if [ ! -f "$MARKER_FILE" ]; then
     exit 1
 fi
 
-# --- Gate 6: structure check ---
+# Gate 6: the repository structure is valid.
 if [ ! -d "$WALKTHROUGH_ROOT/.forge/walkthrough" ]; then
     echo "ERROR: Expected directory missing: $WALKTHROUGH_ROOT/.forge/walkthrough/" >&2
     echo "  The test repo structure is incomplete. Run setup-test-repo.sh." >&2
@@ -128,7 +127,7 @@ if [ "$SOURCED_FORGE_TEST_REPO" != "$WALKTHROUGH_ROOT" ]; then
 fi
 export FORGE_TEST_REPO="$WALKTHROUGH_ROOT"
 
-# --- Gate 3: FORGE_HOME isolation ---
+# Gate 3: FORGE_HOME is isolated.
 EXPECTED_FORGE_HOME="$WALKTHROUGH_ROOT/.forge-home"
 if ! matches_expected_path "${FORGE_HOME:-}" "$EXPECTED_FORGE_HOME"; then
     echo "ERROR: FORGE_HOME is not redirected to the test sandbox." >&2
@@ -138,7 +137,7 @@ if ! matches_expected_path "${FORGE_HOME:-}" "$EXPECTED_FORGE_HOME"; then
     exit 1
 fi
 
-# --- Gate 4: CLAUDE_HOME isolation ---
+# Gate 4: CLAUDE_HOME is isolated.
 EXPECTED_CLAUDE_HOME="$WALKTHROUGH_ROOT/.claude-user"
 if ! matches_expected_path "${CLAUDE_HOME:-}" "$EXPECTED_CLAUDE_HOME"; then
     echo "ERROR: CLAUDE_HOME is not redirected to the test sandbox." >&2
@@ -148,7 +147,7 @@ if ! matches_expected_path "${CLAUDE_HOME:-}" "$EXPECTED_CLAUDE_HOME"; then
     exit 1
 fi
 
-# --- Gate 5: CODEX_HOME isolation ---
+# Gate 5: CODEX_HOME is isolated.
 EXPECTED_CODEX_HOME="$WALKTHROUGH_ROOT/.codex-user"
 if ! matches_expected_path "${CODEX_HOME:-}" "$EXPECTED_CODEX_HOME"; then
     echo "ERROR: CODEX_HOME is not redirected to the test sandbox." >&2
@@ -158,7 +157,7 @@ if ! matches_expected_path "${CODEX_HOME:-}" "$EXPECTED_CODEX_HOME"; then
     exit 1
 fi
 
-# --- cd to test repo (unless --no-cd) ---
+# Enter the walkthrough repository unless --no-cd was set.
 if [ "$NO_CD" = false ]; then
     cd "$WALKTHROUGH_ROOT" || {
         echo "ERROR: Cannot cd to test repo: $WALKTHROUGH_ROOT" >&2
@@ -166,5 +165,4 @@ if [ "$NO_CD" = false ]; then
     }
 fi
 
-# --- Execute the command ---
 exec "$@"

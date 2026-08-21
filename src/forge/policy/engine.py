@@ -185,7 +185,6 @@ class PolicyEngine:
         Appends the resulting decision (if any) to ``decisions``.
         """
         start = time.monotonic()
-        # Check if policy applies
         try:
             if not policy.applies_to(context):
                 _log.debug(
@@ -258,7 +257,6 @@ class PolicyEngine:
                 self._record_policy_outcome(policy, context, decision, start, reason_code="evaluate_error")
             return
 
-        # Collect state from stateful policies
         if isinstance(policy, StatefulPolicy):
             try:
                 self._collected_state[policy.policy_id] = policy.get_state()
