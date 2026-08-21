@@ -122,32 +122,32 @@ def _make_adapter_with_mock_client() -> CoreLLMClientAdapter:
 
 
 @pytest.mark.asyncio
-async def test_create_completion_marks_dispatch_immediately_before_provider_call() -> None:
+async def test_create_completion_forwards_provider_dispatch_callback_to_core_client() -> None:
     adapter = _make_adapter_with_mock_client()
-    dispatches: list[str] = []
-
-    async def _complete(*_args: Any, **_kwargs: Any) -> CompletionResponse:
-        assert dispatches == ["provider"]
-        return CompletionResponse(text="ok")
-
-    adapter._client = MagicMock(complete=AsyncMock(side_effect=_complete))  # type: ignore[assignment]
+    callback = MagicMock()
+    complete = AsyncMock(return_value=CompletionResponse(text="ok"))
+    adapter._client = MagicMock(complete=complete)  # type: ignore[assignment]
 
     await adapter.create_completion(
         {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
         request_id="req-dispatch",
-        on_provider_dispatch=lambda: dispatches.append("provider"),
+        on_provider_dispatch=callback,
     )
 
-    assert dispatches == ["provider"]
+    assert complete.await_args is not None
+    assert complete.await_args.kwargs["on_provider_dispatch"] is callback
+    callback.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_create_streaming_completion_marks_dispatch_immediately_before_provider_call() -> None:
+async def test_create_streaming_completion_forwards_provider_dispatch_callback_to_core_client() -> None:
     adapter = _make_adapter_with_mock_client()
-    dispatches: list[str] = []
+    callback = MagicMock()
+    captured_callback = None
 
-    async def _stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[StreamEvent]:
-        assert dispatches == ["provider"]
+    async def _stream(*_args: Any, **kwargs: Any) -> AsyncIterator[StreamEvent]:
+        nonlocal captured_callback
+        captured_callback = kwargs["on_provider_dispatch"]
         yield StreamEvent(type="response_end")
 
     adapter._client = MagicMock(stream=_stream)  # type: ignore[assignment]
@@ -157,11 +157,12 @@ async def test_create_streaming_completion_marks_dispatch_immediately_before_pro
         async for chunk in adapter.create_streaming_completion(
             {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
             request_id="req-stream-dispatch",
-            on_provider_dispatch=lambda: dispatches.append("provider"),
+            on_provider_dispatch=callback,
         )
     ]
 
-    assert dispatches == ["provider"]
+    assert captured_callback is callback
+    callback.assert_not_called()
 
 
 @pytest.mark.asyncio

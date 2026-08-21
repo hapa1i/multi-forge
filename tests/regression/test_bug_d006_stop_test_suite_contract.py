@@ -9,7 +9,9 @@ leak diagnostics, or block Stop without recording a trustworthy result.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -136,6 +138,48 @@ def test_failed_test_diagnostic_is_bounded_and_redacted(
     assert "[REDACTED]" in displayed
 
 
+def test_terminal_controls_are_removed_before_environment_secret_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "boundary-secret-material-for-redaction"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    split_secret = f"{secret[:12]}\x1b[31m{secret[12:]}\x1b[0m"
+
+    assert verification._redacted_diagnostic(split_secret) == "[REDACTED]"
+
+
+def test_terminal_hyperlink_controls_preserve_visible_diagnostic_text() -> None:
+    linked_failure = "\x1b]8;;https://example.test\x1b\\FAILED test_widget.py::test_failure\x1b]8;;\x1b\\"
+
+    assert verification._redacted_diagnostic(linked_failure) == "FAILED test_widget.py::test_failure"
+
+
+@pytest.mark.parametrize(
+    "unterminated_control",
+    ["\x1b]0;truncated-title", "\x1bPtruncated-device-control"],
+    ids=["osc", "dcs"],
+)
+def test_unterminated_terminal_control_does_not_consume_later_failure_lines(unterminated_control: str) -> None:
+    output = (
+        f"{unterminated_control}\n"
+        "FAILED test_widget.py::test_one - AssertionError\n"
+        "FAILED test_widget.py::test_two - AssertionError\n"
+        "\x1b\\tail"
+    )
+
+    sanitized = verification._redacted_diagnostic(output)
+
+    assert "FAILED test_widget.py::test_one" in sanitized
+    assert "FAILED test_widget.py::test_two" in sanitized
+    assert sanitized.endswith("tail")
+
+
+def test_utf8_decoded_c1_controls_are_removed() -> None:
+    c1_controls = "".join(chr(codepoint) for codepoint in range(0x80, 0xA0)).encode()
+
+    assert verification._redacted_diagnostic(b"before" + c1_controls + b"after") == "beforeafter"
+
+
 def test_failed_test_diagnostic_prefers_late_stdout_summary_after_redaction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -233,6 +277,53 @@ def test_failure_excerpt_keeps_error_only_short_summary() -> None:
     assert verification._select_test_failure_excerpt(stdout, "plugin warning\n") == (
         f"{error_id} - RuntimeError: fixture failed"
     )
+
+
+def test_forced_color_failure_keeps_node_id_and_strips_terminal_controls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, manifest, _ = _configured_store(tmp_path)
+    transcript = _write_transcript(tmp_path / "transcript.jsonl")
+    test_path = tmp_path / "test_ansi_failure.py"
+    test_path.write_text("def test_ansi_failure():\n    assert False\n", encoding="utf-8")
+    env = dict(os.environ)
+    env["PY_COLORS"] = "1"
+    env["PYTEST_ADDOPTS"] = ""
+    env.pop("NO_COLOR", None)
+    colored = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", test_path.name],
+        cwd=tmp_path,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    assert colored.returncode == 1
+    assert "\x1b[" in colored.stdout.decode()
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_kwargs: subprocess.CompletedProcess(
+            cmd,
+            colored.returncode,
+            stdout=colored.stdout,
+            stderr=b"third-party plugin warning: unrelated cache notice\n",
+        ),
+    )
+
+    allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+    assert allow is False and message is not None
+    confirmed = store.read().confirmed.verification
+    assert confirmed is not None
+    persisted = confirmed.last_error
+    assert persisted is not None
+    assert "FAILED test_ansi_failure.py::test_ansi_failure" in persisted
+    assert "third-party plugin warning" not in persisted
+    assert "\x1b" not in persisted
+    assert len(persisted) <= 200
+    assert f"Error: {persisted}\n\n" in message
 
 
 def test_incomplete_result_fails_open_when_state_cannot_be_persisted(

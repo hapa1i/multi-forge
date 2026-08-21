@@ -64,6 +64,48 @@ def test_o083_malformed_workflow_entries_raise_actionable_value_error(workflow: 
     assert expected_detail in str(caught.value)
 
 
+@pytest.mark.parametrize("value", [False, True])
+@pytest.mark.parametrize(
+    ("workflow", "field"),
+    [
+        (_workflow(throttle_seconds=False), "throttle_seconds"),
+        (_workflow(max_cache_entries=False), "max_cache_entries"),
+        (
+            _workflow(
+                branches=[
+                    {
+                        "name": "review",
+                        "match_tags": ["guarded"],
+                        "filter": {"max_content_length": False},
+                        "reviewer": {"prompt_template": "Review {content}"},
+                    }
+                ]
+            ),
+            "max_content_length",
+        ),
+    ],
+)
+def test_o083_boolean_integer_controls_fail_before_policy_evaluation(
+    workflow: dict[str, Any],
+    field: str,
+    value: bool,
+) -> None:
+    """Booleans are not manifest integers; a false content limit must not skip review."""
+    if field == "max_content_length":
+        workflow["branches"][0]["filter"][field] = value
+    else:
+        workflow[field] = value
+
+    with pytest.raises(ValueError) as caught:
+        get_bundle_policies("workflow", config={"workflows": [workflow]})
+
+    message = str(caught.value)
+    assert "bundle_config.workflow.workflows[0]" in message
+    assert "guardrails" in message
+    assert field in message
+    assert "must be int, got bool" in message
+
+
 def test_o083_valid_defaulted_workflows_preserve_order_and_defaults() -> None:
     policies = get_bundle_policies(
         "workflow",

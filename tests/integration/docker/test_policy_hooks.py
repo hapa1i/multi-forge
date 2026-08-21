@@ -325,6 +325,43 @@ class TestPolicyCheckDocker:
         assert "tagger_promt" in stderr
         assert "Traceback" not in stderr
 
+    def test_reports_boolean_workflow_integer_at_engine_boundary(self, policy_workspace: ContainerLike) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["policy"] = {
+            "enabled": True,
+            "bundles": ["workflow"],
+            "fail_mode": "open",
+            "bundle_config": {
+                "workflow": {
+                    "workflows": [
+                        {
+                            "name": "guardrails",
+                            "description": "Review guarded changes",
+                            "max_cache_entries": False,
+                        }
+                    ]
+                }
+            },
+        }
+        policy_workspace.write_json(manifest_path, manifest)
+
+        exit_code, stdout, stderr = invoke_policy_check(
+            policy_workspace,
+            tool_name="Write",
+            file_path="src/foo.py",
+            content="print('hello')",
+        )
+
+        assert exit_code == 0
+        assert stdout.strip() == ""
+        assert "Policy check: cannot build engine" in stderr
+        assert "bundle_config.workflow.workflows[0]" in stderr
+        assert "guardrails" in stderr
+        assert "max_cache_entries" in stderr
+        assert "must be int, got bool" in stderr
+        assert "Traceback" not in stderr
+
 
 # =============================================================================
 # Stop Verification Tests
@@ -402,7 +439,9 @@ class TestStopVerificationDocker:
         confirmed = read_manifest(policy_workspace)["confirmed"]["verification"]
         assert confirmed["last_result"] == "passed"
 
-    def test_fixed_suite_failure_prefers_late_stdout_summary(self, policy_workspace: ContainerLike) -> None:
+    def test_fixed_suite_failure_strips_color_and_prefers_late_stdout_summary(
+        self, policy_workspace: ContainerLike
+    ) -> None:
         manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
         manifest = read_manifest(policy_workspace)
         manifest["intent"]["verification"] = {
@@ -421,9 +460,10 @@ class TestStopVerificationDocker:
             "printf '%080d\\n' 0\n"
             f"printf '%s\\n' '{captured_error}'\n"
             f"printf '%s\\n' '{captured_error}'\n"
-            "printf '%s\\n' '=========================== short test summary info ============================'\n"
-            f"printf '%s\\n' '{failure_id} - AssertionError: expected true'\n"
-            "printf '%s\\n' '1 failed in 0.01s'\n"
+            "printf '\\033[36m%s\\033[0m\\n' "
+            "'=========================== short test summary info ============================'\n"
+            f"printf '\\033[31m%s\\033[0m\\n' '{failure_id} - AssertionError: expected true'\n"
+            "printf '\\033[31m%s\\033[0m\\n' '1 failed in 0.01s'\n"
             "printf '%s\\n' 'third-party plugin warning: unrelated cache notice' >&2\n"
             "exit 1\n",
         )
@@ -442,6 +482,7 @@ class TestStopVerificationDocker:
         assert failure_id in persisted
         assert "captured error noise" not in persisted
         assert "third-party plugin warning" not in persisted
+        assert "\x1b" not in persisted
         assert len(persisted) <= 200
         assert f"Error: {persisted}\n\n" in stderr
 

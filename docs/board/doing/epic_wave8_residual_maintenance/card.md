@@ -5,8 +5,9 @@
 **Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; orders 18--19 remain parked. The corrective and external
 follow-ups retain their recorded PRs.
 
-**Current execution**: Batch 4 shipped in PR #228 (`559a3453`) and its three cards are closed. Batch 5 orders 18--19
-remain parked until activation from the pushed Batch 4 closeout.
+**Current execution**: the independent [`correct_daily_review_regressions`](../correct_daily_review_regressions/card.md)
+follow-up is under review in draft PR #229 from pushed `main` at `5246473e`. Batch 5 orders 18--19 remain parked until
+this correction closes.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -131,6 +132,8 @@ credit and do not change this epic's 23 findings or 19-member accounting.
   this epic.
 - [`improve_stop_test_failure_excerpts`](../../done/improve_stop_test_failure_excerpts/card.md) joined Batch 1 as an
   unrelated accepted follow-up without becoming Wave 8 finding credit.
+- [`correct_daily_review_regressions`](../correct_daily_review_regressions/card.md) is an independent post-Batch-4
+  correction for three reproduced merged edge cases; it is not a Batch 5 member and adds no Wave 8 finding credit.
 - D040 remains proposed, and the rejected/resolved rows above are not executable members.
 - This epic does not reopen Wave 7 deletion candidates, release-gated deprecations, or the unverified O092 tail.
 

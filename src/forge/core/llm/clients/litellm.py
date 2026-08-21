@@ -15,7 +15,7 @@ import json
 import logging
 import ssl
 import time
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable
 
 import httpx
 from openai import AsyncOpenAI
@@ -418,6 +418,7 @@ class LiteLLMClient:
         messages: list[Message],
         hyperparams: ModelHyperparameters,
         tools: list[dict[str, Any]] | None = None,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> CompletionResponse:
         """Complete using GPT-5 Responses API.
 
@@ -463,6 +464,8 @@ class LiteLLMClient:
             f"verbosity={hyperparams.verbosity}, reasoning={hyperparams.reasoning_effort}{tools_log}"
         )
 
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         raw = await client.responses.with_raw_response.create(**request_params)
         completion = self._parse_responses_output(raw.parse(), self._model)
         return self._merge_response_metadata(completion, raw.headers)
@@ -479,6 +482,7 @@ class LiteLLMClient:
         messages: list[Message],
         tools: list[dict[str, Any]] | None,
         merged_params: ModelHyperparameters,
+        on_provider_dispatch: Callable[[], None] | None,
     ) -> CompletionResponse:
         """Make the completion request with retry logic.
 
@@ -487,11 +491,19 @@ class LiteLLMClient:
         are wrapped into ProviderError/AuthenticationError.
         """
         if self._should_use_responses_api(tools, merged_params):
-            return await self._complete_with_responses_api(client, messages, merged_params, tools=tools)
+            return await self._complete_with_responses_api(
+                client,
+                messages,
+                merged_params,
+                tools=tools,
+                on_provider_dispatch=on_provider_dispatch,
+            )
 
         kwargs = self._build_request_kwargs(messages, tools, merged_params)
         # with_raw_response exposes the x-litellm-response-cost header the typed
         # .create() drops; .parse() returns the same ChatCompletion model.
+        if on_provider_dispatch is not None:
+            on_provider_dispatch()
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
         return self._merge_response_metadata(completion, raw.headers)
@@ -502,6 +514,7 @@ class LiteLLMClient:
         *,
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> CompletionResponse:
         """Non-streaming completion.
 
@@ -511,6 +524,7 @@ class LiteLLMClient:
             messages: List of messages in the conversation.
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
+            on_provider_dispatch: Optional callback fired immediately before provider I/O.
 
         Returns:
             CompletionResponse with text, optional tool_calls, and usage.
@@ -523,7 +537,13 @@ class LiteLLMClient:
         client = await self._get_client()
 
         try:
-            return await self._make_completion_request(client, messages, tools, merged_params)
+            return await self._make_completion_request(
+                client,
+                messages,
+                tools,
+                merged_params,
+                on_provider_dispatch,
+            )
         except (ProviderError, AuthenticationError):
             # Already wrapped, re-raise as-is
             raise
@@ -556,6 +576,7 @@ class LiteLLMClient:
         *,
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
+        on_provider_dispatch: Callable[[], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Streaming completion.
 
@@ -569,6 +590,7 @@ class LiteLLMClient:
             messages: List of messages in the conversation.
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
+            on_provider_dispatch: Optional callback fired immediately before provider I/O.
 
         Yields:
             StreamEvent objects (text_delta, tool_call_delta, response_end, usage, error).
@@ -584,7 +606,13 @@ class LiteLLMClient:
                     f"GPT-5 Responses API (streaming fallback): model={self._model}, "
                     f"verbosity={merged_params.verbosity}"
                 )
-                response = await self._complete_with_responses_api(client, messages, merged_params, tools=tools)
+                response = await self._complete_with_responses_api(
+                    client,
+                    messages,
+                    merged_params,
+                    tools=tools,
+                    on_provider_dispatch=on_provider_dispatch,
+                )
 
                 # Carry the provider_meta computed by _complete_with_responses_api onto the
                 # synthetic events (it was previously dropped on this fallback path).
@@ -640,6 +668,8 @@ class LiteLLMClient:
             kwargs["stream"] = True
             kwargs["stream_options"] = {"include_usage": True}
 
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             stream = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream:

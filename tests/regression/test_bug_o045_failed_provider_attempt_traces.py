@@ -16,6 +16,11 @@ import pytest
 from fastapi import HTTPException
 
 import forge.proxy.responses_passthrough as responses_passthrough
+from forge.core.llm.clients import litellm as litellm_client_module
+from forge.core.llm.clients import openrouter as openrouter_client_module
+from forge.core.llm.clients.litellm import LiteLLMClient
+from forge.core.llm.clients.openrouter import OpenRouterClient
+from forge.core.llm.errors import NoApiKeyError
 from forge.core.ops import explain_provider_trace, render_explanation_lines
 from forge.core.ops.context import ExecutionContext
 from forge.proxy.client_adapter import CoreLLMClientAdapter
@@ -158,6 +163,123 @@ def _assert_incomplete_trace(
     assert trace["client_disconnected"] is False
     assert trace["reported_cost_micros"] == reported_cost_micros
     assert trace["downstream_event_id"] == downstream_event_id
+
+
+def _real_core_adapter(
+    client_type: type[LiteLLMClient] | type[OpenRouterClient],
+    provider: str,
+    credentials: MagicMock,
+) -> tuple[CoreLLMClientAdapter, LiteLLMClient | OpenRouterClient]:
+    inner = client_type(
+        model="openai/gpt-5.5",
+        provider=provider,  # type: ignore[arg-type]  # parametrized with each client's exact provider literal
+        credentials=credentials,
+    )
+    adapter = CoreLLMClientAdapter.__new__(CoreLLMClientAdapter)
+    adapter.model_name = "openai/gpt-5.5"
+    adapter.max_tokens_override = None
+    adapter._client = inner
+    return adapter, inner
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True], ids=["non_streaming", "streaming"])
+@pytest.mark.parametrize(
+    ("client_type", "client_module", "provider"),
+    [
+        (LiteLLMClient, litellm_client_module, "litellm_remote"),
+        (OpenRouterClient, openrouter_client_module, "openrouter"),
+    ],
+    ids=["litellm", "openrouter"],
+)
+@pytest.mark.parametrize("failure_stage", ["credentials", "client_construction"])
+async def test_messages_lazy_local_client_setup_failure_remains_trace_free(
+    monkeypatch: pytest.MonkeyPatch,
+    stream: bool,
+    client_type: type[LiteLLMClient] | type[OpenRouterClient],
+    client_module: Any,
+    provider: str,
+    failure_stage: str,
+) -> None:
+    """Credential resolution and SDK construction are local setup, not provider dispatch."""
+    import forge.proxy.server as server
+
+    credentials = MagicMock()
+    constructor = MagicMock(side_effect=RuntimeError("local SDK construction failed"))
+    if failure_stage == "credentials":
+        credentials.get_credentials = AsyncMock(
+            side_effect=NoApiKeyError(provider, "TEST_API_KEY", detail="local credential resolution failed")
+        )
+    else:
+        credentials.get_credentials = AsyncMock(
+            return_value={"api_key": "test-key", "base_url": "https://provider.invalid/v1"}
+        )
+        monkeypatch.setattr(client_module, "AsyncOpenAI", constructor)
+
+    adapter, inner = _real_core_adapter(client_type, provider, credentials)
+    traces, costs, _get_client, _completion = _install_message_stubs(monkeypatch, client=adapter)
+
+    if stream:
+        response = await server.create_message(_message_request(stream=True), cast(Any, _RawRequest()))
+        _ = [chunk async for chunk in response.body_iterator]
+        assert response.status_code == 200
+    else:
+        with pytest.raises(HTTPException) as raised:
+            await server.create_message(_message_request(), cast(Any, _RawRequest()))
+        assert raised.value.status_code == 500
+
+    assert len(costs) == 1
+    assert traces == []
+    assert inner._client is None
+    if failure_stage == "client_construction":
+        constructor.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True], ids=["non_streaming", "streaming"])
+@pytest.mark.parametrize(
+    ("client_type", "provider"),
+    [(LiteLLMClient, "litellm_remote"), (OpenRouterClient, "openrouter")],
+    ids=["litellm", "openrouter"],
+)
+async def test_messages_real_core_sdk_dispatch_failure_records_one_trace(
+    monkeypatch: pytest.MonkeyPatch,
+    stream: bool,
+    client_type: type[LiteLLMClient] | type[OpenRouterClient],
+    provider: str,
+) -> None:
+    """The real core-client callback still marks calls that reach an SDK generation method."""
+    import forge.proxy.server as server
+
+    adapter, inner = _real_core_adapter(client_type, provider, MagicMock())
+    sdk_client = MagicMock()
+    dispatch_error = RuntimeError("provider request failed")
+    if client_type is LiteLLMClient:
+        sdk_client.responses.with_raw_response.create = AsyncMock(side_effect=dispatch_error)
+    elif stream:
+        sdk_client.chat.completions.create = AsyncMock(side_effect=dispatch_error)
+    else:
+        sdk_client.chat.completions.with_raw_response.create = AsyncMock(side_effect=dispatch_error)
+    inner._client = sdk_client
+    traces, costs, _get_client, _completion = _install_message_stubs(monkeypatch, client=adapter)
+
+    if stream:
+        response = await server.create_message(_message_request(stream=True), cast(Any, _RawRequest()))
+        _ = [chunk async for chunk in response.body_iterator]
+        assert response.status_code == 200
+    else:
+        with pytest.raises(HTTPException) as raised:
+            await server.create_message(_message_request(), cast(Any, _RawRequest()))
+        assert raised.value.status_code == 500
+
+    assert len(costs) == 1
+    assert len(traces) == 1
+    _assert_incomplete_trace(
+        traces[0],
+        request_mode="streaming" if stream else "non_streaming",
+        downstream_event_id="ds_o045_messages",
+        stream_started=stream,
+    )
 
 
 @pytest.mark.asyncio
