@@ -2,8 +2,7 @@
 
 **Epic**: [`epic_wave8_residual_maintenance`](../../doing/epic_wave8_residual_maintenance/card.md).
 
-**Lane**: `doing/` -- implementation commit `cff6adc6` and integrated verification are under review in draft PR #228;
-close with the shared Batch 4 merge.
+**Lane**: `done/` -- shipped in Batch 4 PR #228 (`559a3453`).
 
 **Finding**: narrowed O085 (LOW efficiency).
 

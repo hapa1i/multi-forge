@@ -1,7 +1,6 @@
 # Validate proxy-audit limits checklist
 
-Current focus: implementation commit `51f3b60a` and all local gates are complete in draft PR #228; keep this card in
-`doing/` until the shared Batch 4 merge.
+Current focus: complete -- implementation commit `51f3b60a` shipped in Batch 4 PR #228 (`559a3453`).
 
 ## Phase 1 -- Pin invalid and control limits
 
@@ -22,6 +21,7 @@ Current focus: implementation commit `51f3b60a` and all local gates are complete
 - [x] Run the targeted audit/telemetry Docker boundary on the integrated Batch 4 head.
 - [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates.
 - [x] Publish all three cards in draft PR #228; close them together only after merge.
+- [x] Confirm all five GitHub checks, merge Batch 4 as `559a3453`, and close all three cards together.
 
 ## Acceptance tests
 

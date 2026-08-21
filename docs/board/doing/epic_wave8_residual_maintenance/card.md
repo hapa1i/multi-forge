@@ -2,14 +2,11 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- orders 1--14 shipped in PRs #216--#227; Batch 4 orders 15--17 are under review in draft PR #228;
-orders 18--19 remain parked. The corrective and external follow-ups retain their recorded PRs.
+**Lane**: `doing/` -- orders 1--17 shipped in PRs #216--#228; orders 18--19 remain parked. The corrective and external
+follow-ups retain their recorded PRs.
 
-**Current execution**: Batch 4 is locally verified and published from `agent/wave8-batch-4` in draft PR #228. Review
-cards: [`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md),
-[`log_forge_info_probe_degradation`](../log_forge_info_probe_degradation/card.md), and
-[`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md). Their implementation commits are
-`51f3b60a`, `a7cea967`, and `cff6adc6`; they close together only after the shared review merges.
+**Current execution**: Batch 4 shipped in PR #228 (`559a3453`) and its three cards are closed. Batch 5 orders 18--19
+remain parked until activation from the pushed Batch 4 closeout.
 
 **Admission baseline**: merged `main` at `bad273ef0d1485d50f0fdb2db1842f6b9830c0e6` on 2026-08-19.
 
@@ -68,9 +65,9 @@ boundary, acceptance evidence, and closeout record.
 | 12    | O086           | [`stabilize_proxy_metrics_json`](../../done/stabilize_proxy_metrics_json/card.md)                       | byte-safe stable JSON                   |
 | 13    | O080           | [`align_supervisor_missing_config_exits`](../../done/align_supervisor_missing_config_exits/card.md)     | required-state failure semantics        |
 | 14    | O077           | [`reject_ambiguous_policy_check_input`](../../done/reject_ambiguous_policy_check_input/card.md)         | mutually exclusive input selectors      |
-| 15    | O076           | [`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md)                                 | positive bounded list limits            |
-| 16    | O081           | [`log_forge_info_probe_degradation`](../log_forge_info_probe_degradation/card.md)                       | observable best-effort fallback         |
-| 17    | O085           | [`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md)                         | native-relocate delete scan reuse       |
+| 15    | O076           | [`validate_proxy_audit_limits`](../../done/validate_proxy_audit_limits/card.md)                         | positive bounded list limits            |
+| 16    | O081           | [`log_forge_info_probe_degradation`](../../done/log_forge_info_probe_degradation/card.md)               | observable best-effort fallback         |
+| 17    | O085           | [`reuse_transcript_reference_scan`](../../done/reuse_transcript_reference_scan/card.md)                 | native-relocate delete scan reuse       |
 | 18    | O100           | [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md)                             | typed suppression rationale             |
 | 19    | D042/D044/O082 | [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md)         | shipped docs and source commentary      |
 
@@ -97,10 +94,10 @@ Execute these batches in order on one branch and PR per batch:
    `src/forge/cli/policy.py`, while the last shares the terminal `policy check` declaration and also corrects direct
    parsing.
 4. **Batch 4 -- isolated runtime fixes**: order 15
-   [`validate_proxy_audit_limits`](../validate_proxy_audit_limits/card.md), order 16
-   [`log_forge_info_probe_degradation`](../log_forge_info_probe_degradation/card.md), and order 17
-   [`reuse_transcript_reference_scan`](../reuse_transcript_reference_scan/card.md). These can be implemented in parallel
-   across proxy audit, global info, and session-manager seams.
+   [`validate_proxy_audit_limits`](../../done/validate_proxy_audit_limits/card.md), order 16
+   [`log_forge_info_probe_degradation`](../../done/log_forge_info_probe_degradation/card.md), and order 17
+   [`reuse_transcript_reference_scan`](../../done/reuse_transcript_reference_scan/card.md). These can be implemented in
+   parallel across proxy audit, global info, and session-manager seams.
 5. **Batch 5 -- final conformance**: order 18
    [`explain_type_suppressions`](../../todo/explain_type_suppressions/card.md) and order 19
    [`sync_residual_runtime_documentation`](../../todo/sync_residual_runtime_documentation/card.md). These can be

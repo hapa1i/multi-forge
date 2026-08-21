@@ -1,7 +1,6 @@
 # Log `forge info` probe degradation checklist
 
-Current focus: implementation commit `a7cea967` and all local gates are complete in draft PR #228; keep this card in
-`doing/` until the shared Batch 4 merge.
+Current focus: complete -- implementation commit `a7cea967` shipped in Batch 4 PR #228 (`559a3453`).
 
 ## Phase 1 -- Pin degradation evidence
 
@@ -22,6 +21,7 @@ Current focus: implementation commit `a7cea967` and all local gates are complete
 - [x] Commit O081 as its own implementation boundary after O076 and before O085.
 - [x] Run full unit, regression, pre-commit, documentation, board/link, and diff gates on the combined head.
 - [x] Publish all three cards in draft PR #228; close them together only after merge.
+- [x] Confirm all five GitHub checks, merge Batch 4 as `559a3453`, and close all three cards together.
 
 ## Acceptance tests
 

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-21
 
+### Close Wave 8 Batch 4 isolated runtime fixes
+
+**Goal/outcome**: Reject invalid proxy-audit limits, expose best-effort info-probe degradation, and avoid repeated
+transcript-reference scans during native-relocate cleanup.
+
+**Key changes**:
+
+- Rejected zero and negative audit limits before shard or period reads while preserving positive/default ordering.
+- Added secret-safe debug evidence and uniform `uv_version` fallback for failed info probes, and resolved ordinary,
+  artifact, and relocated-parent transcript ownership in one shared scan.
+
+**Verification**: 165 focused card tests; three targeted Docker boundaries; 9,331 unit with 124 deselected; 1,035
+regression; pre-commit/diff and board/link gates. PR #228 merged as `559a3453` with all five GitHub checks passing.
+
 ### Close Wave 8 Batch 3 policy CLI contracts
 
 **Goal/outcome**: Make missing supervisor prerequisites and ambiguous policy-check inputs fail explicitly while sharing
