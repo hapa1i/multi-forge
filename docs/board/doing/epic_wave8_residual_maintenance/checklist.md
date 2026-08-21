@@ -1,7 +1,7 @@
 # Wave 8 verified residual maintenance checklist
 
-Current focus: the independent `correct_daily_review_regressions` follow-up is under review in draft PR #229 from pushed
-`main` at `5246473e`; Batch 5 remains parked until the correction closes.
+Current focus: the independent `correct_daily_review_regressions` follow-up shipped in PR #229 (`da34bcb3`) with all
+five GitHub checks passing; Batch 5 remains parked until activation from the pushed closeout.
 
 - [x] Commit and push the bounded Wave 8 admission on `main` (`0d8eb81a`) without activating implementation.
 - [x] Close the fork transfer-snapshot correction on pushed `main` (`7a2ad4c1`) before Wave 8.
@@ -106,6 +106,8 @@ Current focus: the independent `correct_daily_review_regressions` follow-up is u
   `5246473e`; activate only `correct_daily_review_regressions` without moving Batch 5 cards.
 - [x] Publish the independent correction in draft PR #229 after focused, required Docker, full-suite, pre-commit, board,
   and diff verification; keep Batch 5 parked until merge and closeout.
+- [x] Merge and close the independent correction as `da34bcb3`, add its change-log record, and repoint inbound links
+  before activating Batch 5.
 
 Batch 1 review evidence (2026-08-20): the strengthened Stop Docker method passed once; `make test-unit` passed 9,331
 tests with 124 deselected; `make test-regression` passed 992 tests; and `make pre-commit` passed every hook. PR review

@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 8 Batch 4 shipped in PR #228 (`559a3453`) with all five GitHub checks passing; Batch 5 orders 18--19
-are next.
+Current focus: the independent post-Batch-4 correction shipped in PR #229 (`da34bcb3`) with all five GitHub checks
+passing; Wave 8 Batch 5 orders 18--19 are next after the pushed closeout.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -410,4 +410,5 @@ The epic remains in `doing/` after the decision cards close; later execution wav
 - [x] Activate only `correct_daily_review_regressions` from pushed `main` at `5246473e` after reproducing three
   post-merge edge cases; keep Wave 8 Batch 5 parked.
 - [x] Publish the independent correction in draft PR #229 while keeping its card in `doing/` and Batch 5 parked.
-- [ ] Merge and close the independent correction before deciding whether to activate Wave 8 Batch 5.
+- [x] Merge and close the independent correction as `da34bcb3` before activating Wave 8 Batch 5.
+- [ ] Activate Wave 8 Batch 5 from the pushed correction closeout with separate O100 and D042/D044/O082 checklists.

@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-21
 
+### Close daily-review regressions
+
+**Goal/outcome**: Keep provider traces, workflow integer controls, and Stop failure diagnostics aligned with their
+shipped contracts at local setup and terminal-control edge cases.
+
+**Key changes**:
+
+- Moved provider-attempt signaling after local credential/client setup and rejected booleans in all manifest integer
+  controls before workflow evaluation.
+- Sanitized terminal controls before pytest-summary selection, including line-bounded OSC/DCS strings and decoded C1
+  controls.
+
+**Verification**: 249 focused tests; targeted proxy, policy-hook, and Stop Docker boundaries; 9,331 unit with 124
+deselected; 1,059 regression; pre-commit/diff, board/link, and design-size gates. PR #229 merged as `da34bcb3` with all
+five GitHub checks passing.
+
 ### Close Wave 8 Batch 4 isolated runtime fixes
 
 **Goal/outcome**: Reject invalid proxy-audit limits, expose best-effort info-probe degradation, and avoid repeated

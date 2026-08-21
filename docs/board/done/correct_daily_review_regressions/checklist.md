@@ -1,7 +1,7 @@
 # Correct daily-review regressions checklist
 
-Current focus: draft PR #229 is open from `agent/correct-daily-review-regressions`; keep the card in `doing/` and Wave 8
-Batch 5 parked until merge and closeout.
+Current focus: shipped in PR #229 (`da34bcb3`) with all five GitHub checks passing; the card is closed before Wave 8
+Batch 5 activation.
 
 ## Phase 1 -- Provider dispatch boundary
 
@@ -30,6 +30,7 @@ Batch 5 parked until merge and closeout.
 - [x] Run full unit and regression suites plus `make pre-commit`, board/link, and diff gates.
 - [x] Verify the normative design contracts remain accurate; update them only if the implementation changes a contract.
 - [x] Review and commit only confirmed paths, push the branch, and open draft PR #229 without activating Wave 8 Batch 5.
+- [x] Confirm merge `da34bcb3`, record the shared evidence, repoint inbound links, and move the card to `done/`.
 
 ## Acceptance tests
 
