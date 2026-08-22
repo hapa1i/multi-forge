@@ -5,27 +5,35 @@ not replace either member's execution checklist. The normative contract is [card
 
 ## Current focus
 
-The epic was activated on 2026-08-21 with C1-C5 accepted and frozen. M1
-[Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 (merge `a1c54a05`) and closed
-to `done/` on 2026-08-22; its [execution checklist](../../done/artifact_authority_mode/checklist.md) retains the member
-evidence. M2 [Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md) remains proposed
-and is the epic's next reassessment decision. No epic batch is authorized.
+The epic was activated on 2026-08-21 with C1-C5 accepted and frozen for M1. M2 proposes one evidence-conditional C3
+clarification at its human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped
+via PR #234 (merge `a1c54a05`) and closed to `done/` on 2026-08-22; its
+[execution checklist](../../done/artifact_authority_mode/checklist.md) retains the member evidence. M2
+[Session Route Provenance and Marking](../session_route_provenance/card.md) entered `doing/` on
+`feat/session-route-provenance` on 2026-08-22. Its contract and
+[execution checklist](../session_route_provenance/checklist.md) await human review before implementation. No epic batch
+is authorized.
 
 ## Activation bookkeeping
 
 - [x] C1-C5 accepted as the shared contract before member execution; the epic card records the active lane and member.
 - [x] Per-card branch `feat/artifact-authority-mode` created from `main` at `80d23f39`; no unrelated feature branch was
   reused.
-- [x] Epic and M1 moved `proposed/ -> doing/` with `git mv`; M2 remains in `proposed/`.
+- [x] At initial epic activation, epic and M1 moved `proposed/ -> doing/` with `git mv`; M2 remained in `proposed/`.
 - [x] Epic forward links, M1/M2 back links, and the adjacent model-first proposal link were repointed for the lane move.
 - [x] M1 received its own fixture-grounded execution checklist; implementation and commits remained paused through
   checklist review.
 - [x] User ratified M1 decisions D1-D5 on 2026-08-21; the checklist records the adopt exclusion, empirical Codex probe
   cost, spawn-boundary reason codes, and artifact containing-tree matrix.
 - [x] No implementation or commit began during ratification; execution remains at the user-requested review boundary.
+- [x] After M1 closeout, M2 was accepted for detailed planning on its own branch, moved to `doing/`, and received a
+  decision-grounded checklist; implementation remains paused for human review.
 
 Activation and ratification verification (2026-08-21): all affected local Markdown links resolve, `git diff --check`
 passes, and `make pre-commit-md` passes.
+
+M2 planning activation verification (2026-08-22): all affected local Markdown links resolve, `git diff --check` passes,
+and `make pre-commit-md` passes. No source implementation or test suite was run before the M2 review gate.
 
 ## Shared-contract drift watch
 
@@ -42,6 +50,9 @@ These close only with member evidence; M1 must implement the neutral seam withou
 - [x] **C5 -- presentation:** M1 ships only `session authority show`; it adds no status-line segment and no combined
   authority/marking badge.
 - [x] M1 tests leave an explicit neutral-helper contract for M2, including enum and schema drift guards.
+- [ ] **M2 composition -- C3 clarification and abort presentation:** ratify that a landed authority abort supersedes
+  same-run start evidence in the M1 reader even when active clear fails; simultaneous abort/clear failure retains the
+  epic's explicit evidence limitation.
 
 M1 evidence (2026-08-21): `forge.session.events` owns the neutral schema/path/lock/read/write seam; all authority events
 reuse it while creating only `authority/events.jsonl`. One launch transaction supplies the root run identity and an
@@ -53,18 +64,19 @@ merged as `a1c54a05`, and the member's lane/link closeout completed on 2026-08-2
 
 - [x] **M1 -- Artifact Authority Mode (done):** checklist reviewed, implemented, verified, docs synchronized, merged via
   PR #234, and closed from `doing/` to `done/` with inbound links repointed.
-- [ ] Reassess M2 only after M1 closeout. If accepted, create a separate member branch/checklist and require reuse of
-  M1's shared journal/run-correlation tests; do not fork the helper or vocabulary.
-- [ ] If M2 is not accepted, keep the epic active only while a concrete coordination task remains; otherwise move it to
-  the appropriate terminal lane with the member outcome recorded.
+- [x] **M2 -- Session Route Provenance and Marking (doing):** accepted for detailed planning after M1 closeout; separate
+  branch/checklist created with mandatory reuse of M1's journal/run-correlation seam.
+- [ ] Review and ratify M2 D1-D8 before source implementation.
+- [ ] Implement, verify, document, and close M2 independently; do not fork the shared helper or vocabulary.
 
 ## Aggregate acceptance (deferred until both members ship)
 
 - [ ] One launch with both members active reuses one root run id across both journals and the route projection.
 - [ ] Each member still works alone; authority never depends on route/marking availability and routing never authorizes
   mutation.
-- [ ] Later-journal or projection failure produces same-run compensating abort events in journals already touched and
-  never reads as a started run.
+- [ ] Later-journal or projection failure attempts same-run compensation in every touched journal; a landed authority
+  abort reports `launch_support=aborted` even when active clear fails, while simultaneous abort/clear failure is
+  diagnosed and never permits child invocation.
 - [ ] Malformed journal handling, forced-child advisory inheritance, and separate absence/live-state rendering pass the
   epic acceptance matrix.
 - [ ] Session deletion and cleanup make no selective journal purge regardless of `--keep-transcripts`: both directories
@@ -74,8 +86,8 @@ merged as `a1c54a05`, and the member's lane/link closeout completed on 2026-08-2
 ## Closeout
 
 - [ ] Every live member is `done/` or has an explicit terminal outcome; no proposed member is counted as shipped.
-- [ ] `docs/design.md`, `docs/design_workflows.md`, relevant workflow/CLI docs, and end-user guides describe only
-  shipped behavior and preserve the no-attestation boundary.
+- [ ] `docs/design.md`, the relevant session/runtime/telemetry design docs, `docs/cli_reference.md`, and end-user guides
+  describe only shipped behavior and preserve the no-attestation boundary.
 - [ ] Aggregate unit, regression, integration, pre-commit, and relative-link checks pass on the final integrated head.
 - [ ] Add the epic closeout to `docs/board/change_log.md`; promote only human-approved durable lessons to
   `docs/board/impl_notes.md`.

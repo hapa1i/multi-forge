@@ -1,10 +1,11 @@
 # Epic: Session Authority and Provenance
 
 **Epic** -- coordinating card for the independently shippable members below. Lane: `doing/` (activated 2026-08-21);
-shared contracts C1-C5 are accepted and frozen for execution. M1
-[Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 and is the epic's first done
-member; M2 remains proposed. Coordination is tracked in [checklist.md](checklist.md), with M2 reassessment as the next
-decision and no epic batch authorized.
+shared contracts C1-C5 were accepted and frozen for M1. M2 proposes one evidence-conditional clarification to C3 at its
+human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 and is
+the epic's first done member. M2 [Session Route Provenance and Marking](../session_route_provenance/card.md) entered
+`doing/` on its separate member branch on 2026-08-22; its contract/checklist await human review before implementation.
+Coordination is tracked in [checklist.md](checklist.md), and no epic batch is authorized.
 
 **Purpose**: keep artifact authority and session route provenance semantically separate while preventing their journal,
 run-correlation, and presentation infrastructure from drifting.
@@ -12,7 +13,7 @@ run-correlation, and presentation infrastructure from drifting.
 ## Problem
 
 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) and
-[Session Route Provenance and Marking](../../proposed/session_route_provenance/card.md) answer different questions:
+[Session Route Provenance and Marking](../session_route_provenance/card.md) answer different questions:
 
 - authority: which managed session is permitted to mutate project artifacts, and what enforcement posture supported a
   run;
@@ -29,10 +30,10 @@ behavior-changing proposal; it may emit richer routing facts when present but is
 
 ## Members
 
-| Id  | Card                                                                        | Delivers                                                        | Depends on |
-| --- | --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| M1  | [artifact_authority_mode](../../done/artifact_authority_mode/card.md)       | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
-| M2  | [session_route_provenance](../../proposed/session_route_provenance/card.md) | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
+| Id  | Card                                                                  | Delivers                                                        | Depends on |
+| --- | --------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
+| M1  | [artifact_authority_mode](../../done/artifact_authority_mode/card.md) | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
+| M2  | [session_route_provenance](../session_route_provenance/card.md)       | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
 
 The members remain independently shippable. M1 does not require model selection, marking metadata, or M2's read
 surfaces. M2 does not require authority roles or enforcement.
@@ -104,7 +105,12 @@ must treat both journal directories identically and document a separate retentio
 Required authority-preflight and routing-commit appends occur before child invocation, in that order when both apply.
 Either append failing aborts the launch. Because two files cannot be committed atomically, a successfully appended event
 may remain when the later append fails. The launcher best-effort appends a same-`run_id` `launch_aborted` event to every
-journal it already touched. Readers present that attempt as aborted; they never infer that the child ran.
+journal it already touched.
+
+M2 proposes this evidence-conditional clarification to C3, subject to its human review gate: when that compensating
+event lands, the domain reader presents the attempt as aborted and does not infer that the child ran. If a domain's
+compensation append also fails, that domain has no durable abort signal; the launcher reports the secondary failure and
+the member contract must disclose the resulting evidence limitation without permitting child invocation.
 
 When M2 applies, the launcher writes `confirmed.route_commit` as the latest-state projection after every required append
 succeeds. A projection failure also aborts the launch and triggers compensating events in every journal already touched.
@@ -177,7 +183,9 @@ is kept authority-neutral. The second member must run the first member's journal
 2. One shared implementation seam owns envelope validation, ids, locks, and complete-record appends.
 3. A managed launch attempt has one existing root `run_id` across every member journal it touches; when M2 applies,
    `confirmed.route_commit` points to its exact routing event with both event and run ids.
-4. Cross-journal partial preflight is visible as aborted and never presented as a started run.
+4. Subject to the M2 C3 clarification, cross-journal partial preflight with landed compensation is visible as aborted
+   and never presented as a started run; simultaneous compensation/evidence-state failure is diagnosed and explicitly
+   limited rather than called proven.
 5. Authority enforcement never depends on routing/marking availability, and routing reads never authorize mutation.
 6. The JSON reads distinguish local-history support from live-runtime availability.
 7. Status-line presentation remains domain-separated and default-off where added.

@@ -9,8 +9,9 @@ on 2026-08-22.
 
 ## Current focus
 
-M1 shipped via PR #234 and closed on 2026-08-22; this checklist retains its execution evidence. M2 remains proposed; the
-shipped member adds no route history, marking metadata, model selection, or status-line segment.
+M1 shipped via PR #234 and closed on 2026-08-22; this checklist retains its execution evidence. M2 later entered
+`doing/`, but the shipped M1 member still adds no route history, marking metadata, model selection, or status-line
+segment.
 
 ## Verified pre-implementation baseline
 
@@ -389,7 +390,8 @@ Ratified decisions:
 
 ## Deferred and out of scope
 
-- M2 routing journal/projection, provider-declared marking, and any marking status-line segment remain proposed.
+- M2 routing journal/projection, provider-declared marking, and any marking status-line segment remained unshipped at M1
+  closeout; current work is tracked by the [M2 card](../../doing/session_route_provenance/card.md).
 - `os_readonly`, OS/filesystem immutability, raw-runtime/editor/human enforcement, and protection against runtime hook
   timeout/non-delivery are not implemented; the residual fail-open seam is reported.
 - Delegation, automated handoff/return, a producer consumer lane, cross-runtime transfer, and prompt/model routing are
