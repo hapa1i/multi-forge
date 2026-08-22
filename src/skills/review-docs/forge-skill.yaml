@@ -3,7 +3,7 @@ name: review-docs
 description: Review design documents, specs, and technical writing for completeness and consistency.
 runtimes: [claude_code, codex]
 capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
-allow_implicit_invocation: true
+allow_implicit_invocation: false
 claude_frontmatter:
   argument-hint: '[target: path or instruction] [--output path]'
   allowed-tools: Read, Grep, Glob, Bash, Agent

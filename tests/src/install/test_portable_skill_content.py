@@ -10,6 +10,7 @@ import yaml
 from forge.install.skill_compiler import (
     FORGE_PACKAGE_SENTINEL,
     CompiledSkillPackage,
+    SkillCapability,
     SkillRuntime,
     SkillSource,
     SkillSourceFormat,
@@ -34,13 +35,14 @@ SMOKE_SCRIPT = SKILLS_ROOT / "smoke-test" / "scripts" / "smoke-test.sh"
 
 EXPECTED_CLAUDE_EXTRAS: dict[str, dict[str, object]] = {
     "analyze": {
-        "disable-model-invocation": False,
+        "disable-model-invocation": True,
         "argument-hint": "[topic: path or question or instruction] [--output path] [--models model]",
         "context": "fork",
         "effort": "high",
         "allowed-tools": "Bash, Read",
     },
     "challenge": {
+        "disable-model-invocation": True,
         "argument-hint": "[claim or objection]",
         "effort": "high",
         "allowed-tools": "Read, Grep, Glob, Bash, Agent",
@@ -79,17 +81,17 @@ EXPECTED_CLAUDE_EXTRAS: dict[str, dict[str, object]] = {
         "allowed-tools": "Bash, Read",
     },
     "review": {
-        "disable-model-invocation": False,
+        "disable-model-invocation": True,
         "argument-hint": "[target: path or instruction] [--output path]",
         "allowed-tools": "Read, Grep, Glob, Bash, Agent",
     },
     "review-docs": {
-        "disable-model-invocation": False,
+        "disable-model-invocation": True,
         "argument-hint": "[target: path or instruction] [--output path]",
         "allowed-tools": "Read, Grep, Glob, Bash, Agent",
     },
     "understand": {
-        "disable-model-invocation": False,
+        "disable-model-invocation": True,
         "argument-hint": (
             "[target: path or question or instruction] [--output path] "
             "[--mode code|docs] [--depth quick|detailed|deep]"
@@ -105,7 +107,10 @@ EXPECTED_PACKAGE_PATHS: dict[tuple[str, SkillRuntime], set[PurePosixPath]] = {
         PurePosixPath("agents/openai.yaml"),
     },
     ("challenge", SkillRuntime.CLAUDE_CODE): {PurePosixPath("SKILL.md")},
-    ("challenge", SkillRuntime.CODEX): {PurePosixPath("SKILL.md")},
+    ("challenge", SkillRuntime.CODEX): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("agents/openai.yaml"),
+    },
     ("smoke-test", SkillRuntime.CLAUDE_CODE): {
         PurePosixPath("SKILL.md"),
         PurePosixPath("scripts/smoke-test.sh"),
@@ -239,6 +244,8 @@ def test_all_portable_skills_use_neutral_mixed_source_contract(
     for name, source in portable_sources.items():
         assert source.source_format == SkillSourceFormat.NEUTRAL, name
         assert source.manifest.runtime_eligibility == ALL_RUNTIMES, name
+        assert SkillCapability.INVOCATION_POLICY in source.manifest.required_capabilities, name
+        assert source.manifest.allow_implicit_invocation is False, name
         assert not source.manifest.token_allowances, name
         assert (SKILLS_ROOT / name / "forge-skill.yaml").is_file()
         assert (SKILLS_ROOT / name / "content.md").is_file()
@@ -304,17 +311,16 @@ def test_codex_frontmatter_policy_and_whole_tree_are_native(
                 package_file.path,
             )
 
-    challenge_paths = {package_file.path for package_file in compiled_packages[("challenge", SkillRuntime.CODEX)].files}
-    assert PurePosixPath("agents/openai.yaml") not in challenge_paths
     expected_policy = {
-        "analyze": True,
+        "analyze": False,
+        "challenge": False,
         "consensus": False,
         "debate": False,
         "panel": False,
         "smoke-test": False,
-        "review": True,
-        "review-docs": True,
-        "understand": True,
+        "review": False,
+        "review-docs": False,
+        "understand": False,
     }
     for name, allow_implicit in expected_policy.items():
         package = compiled_packages[(name, SkillRuntime.CODEX)]

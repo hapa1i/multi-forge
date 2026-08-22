@@ -763,8 +763,21 @@ def load_skill_sources(
     )
 
 
-def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPackage:
-    """Compile and validate one runtime package without installer I/O."""
+def compile_skill(
+    source: SkillSource,
+    adapter: SkillAdapter,
+    *,
+    invocation_policy_override: bool | None = None,
+) -> CompiledSkillPackage:
+    """Compile and validate one runtime package without installer I/O.
+
+    ``invocation_policy_override`` is an install-time user preference. When it
+    is absent, the portable source remains authoritative; when present, the
+    compiler emits that effective policy in each runtime's native metadata.
+    """
+
+    if invocation_policy_override is not None and not isinstance(invocation_policy_override, bool):
+        raise ValueError("invocation_policy_override must be a bool when present")
 
     diagnostics = _validate_source(source, adapter)
     if diagnostics:
@@ -773,14 +786,28 @@ def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPa
     rendered_body = source.body
     if source.source_format == SkillSourceFormat.NEUTRAL:
         rendered_body = _render_template(source.body, source, adapter, PurePosixPath("SKILL.md"))
-    if (
+    effective_allow_implicit_invocation = (
+        source.manifest.allow_implicit_invocation if invocation_policy_override is None else invocation_policy_override
+    )
+    preserve_claude_bridge_document = (
         adapter.runtime == SkillRuntime.CLAUDE_CODE
         and source.source_format == SkillSourceFormat.CLAUDE_BRIDGE
         and source.claude_document is not None
-    ):
+        and (
+            invocation_policy_override is None
+            or source.manifest.claude_frontmatter.get("disable-model-invocation")
+            == (not effective_allow_implicit_invocation)
+        )
+    )
+    if preserve_claude_bridge_document:
+        assert source.claude_document is not None  # narrowed by the preservation predicate above
         skill_document = source.claude_document
     else:
-        frontmatter = _frontmatter_for(source.manifest, adapter.runtime)
+        frontmatter = _frontmatter_for(
+            source.manifest,
+            adapter.runtime,
+            allow_implicit_invocation=effective_allow_implicit_invocation,
+        )
         skill_document = _render_skill_document(frontmatter, rendered_body, source, adapter)
 
     compiled_files = [
@@ -790,7 +817,14 @@ def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPa
             mode=source.skill_mode,
         )
     ]
-    openai_yaml = _render_openai_yaml(source.manifest) if adapter.runtime == SkillRuntime.CODEX else None
+    openai_yaml = (
+        _render_openai_yaml(
+            source.manifest,
+            allow_implicit_invocation=effective_allow_implicit_invocation,
+        )
+        if adapter.runtime == SkillRuntime.CODEX
+        else None
+    )
     if openai_yaml is not None:
         compiled_files.append(
             CompiledSkillFile(
@@ -834,10 +868,19 @@ def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPa
     return package
 
 
-def compile_skill_for_runtime(source: SkillSource, runtime: SkillRuntime) -> CompiledSkillPackage:
+def compile_skill_for_runtime(
+    source: SkillSource,
+    runtime: SkillRuntime,
+    *,
+    invocation_policy_override: bool | None = None,
+) -> CompiledSkillPackage:
     """Compile with Forge's default adapter for ``runtime``."""
 
-    return compile_skill(source, adapter_for_runtime(runtime))
+    return compile_skill(
+        source,
+        adapter_for_runtime(runtime),
+        invocation_policy_override=invocation_policy_override,
+    )
 
 
 def _render_forge_package_sentinel(
@@ -1377,17 +1420,22 @@ def _render_template(
     return _PLACEHOLDER_RE.sub(replace, text).encode("utf-8")
 
 
-def _frontmatter_for(manifest: SkillManifest, runtime: SkillRuntime) -> dict[str, Any]:
+def _frontmatter_for(
+    manifest: SkillManifest,
+    runtime: SkillRuntime,
+    *,
+    allow_implicit_invocation: bool | None = None,
+) -> dict[str, Any]:
     if runtime == SkillRuntime.CLAUDE_CODE:
         frontmatter: dict[str, Any] = {
             "name": f"forge:{manifest.name}",
             "description": manifest.description,
         }
-        if manifest.allow_implicit_invocation is not None:
-            frontmatter["disable-model-invocation"] = not manifest.allow_implicit_invocation
+        if allow_implicit_invocation is not None:
+            frontmatter["disable-model-invocation"] = not allow_implicit_invocation
         for key, value in manifest.claude_frontmatter.items():
             if key not in {"name", "description"} and not (
-                key == "disable-model-invocation" and manifest.allow_implicit_invocation is not None
+                key == "disable-model-invocation" and allow_implicit_invocation is not None
             ):
                 frontmatter[key] = value
         if manifest.license is not None:
@@ -1415,7 +1463,11 @@ def _frontmatter_for(manifest: SkillManifest, runtime: SkillRuntime) -> dict[str
     return frontmatter
 
 
-def _render_openai_yaml(manifest: SkillManifest) -> bytes | None:
+def _render_openai_yaml(
+    manifest: SkillManifest,
+    *,
+    allow_implicit_invocation: bool | None = None,
+) -> bytes | None:
     value: dict[str, Any] = {}
     interface = manifest.codex_interface
     if interface is not None:
@@ -1433,8 +1485,8 @@ def _render_openai_yaml(manifest: SkillManifest) -> bytes | None:
         }
         if interface_value:
             value["interface"] = interface_value
-    if manifest.allow_implicit_invocation is not None:
-        value["policy"] = {"allow_implicit_invocation": manifest.allow_implicit_invocation}
+    if allow_implicit_invocation is not None:
+        value["policy"] = {"allow_implicit_invocation": allow_implicit_invocation}
     if not value:
         return None
     return yaml.safe_dump(
@@ -1758,6 +1810,7 @@ __all__ = [
     "adapter_for_runtime",
     "compile_skill",
     "compile_skill_for_runtime",
+    "discover_skill_source_names",
     "load_claude_skill_source",
     "load_claude_skill_sources",
     "load_neutral_skill_source",

@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.fixtures.docker import ContainerLike
 
@@ -531,6 +532,56 @@ chmod +x /tmp/forge-codex-skills-bin/codex
 
         after_disable = synced_container.read_json(_get_tracking_path(synced_container))
         assert "user" not in after_disable["installations"]
+
+    def test_skill_invocation_config_materializes_on_enable_and_sync(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        setup = synced_container.exec("""
+rm -rf ~/.agents ~/.claude ~/.forge /tmp/forge-invocation-bin
+mkdir -p /tmp/forge-invocation-bin
+printf '#!/bin/sh\nprintf "2.1.99 (Claude Code)\\n"\n' > /tmp/forge-invocation-bin/claude
+printf '#!/bin/sh\nprintf "codex-cli 0.144.0\\n"\n' > /tmp/forge-invocation-bin/codex
+chmod +x /tmp/forge-invocation-bin/claude /tmp/forge-invocation-bin/codex
+""")
+        assert setup.returncode == 0, setup.stderr
+
+        configured = synced_container.exec(
+            "set -eu\n"
+            "cd /forge\n"
+            "/forge/.venv/bin/forge config set skills.invocation.review=model\n"
+            "PATH=/tmp/forge-invocation-bin:$PATH "
+            "/forge/.venv/bin/forge extension enable --scope user "
+            "--profile minimal --with skills --without commands --runtime all"
+        )
+        assert configured.returncode == 0, configured.stderr
+
+        def claude_allows_model(skill: str) -> bool:
+            document = synced_container.read_file(f"$HOME/.claude/skills/{skill}/SKILL.md")
+            frontmatter = yaml.safe_load(document.split("---", 2)[1])
+            return not frontmatter["disable-model-invocation"]
+
+        def codex_allows_model(skill: str) -> bool:
+            metadata = synced_container.read_file(f"$HOME/.agents/skills/{skill}/agents/openai.yaml")
+            return yaml.safe_load(metadata)["policy"]["allow_implicit_invocation"]
+
+        assert claude_allows_model("review") is True
+        assert codex_allows_model("review") is True
+        assert claude_allows_model("challenge") is False
+        assert codex_allows_model("challenge") is False
+
+        synced = synced_container.exec(
+            "set -eu\n"
+            "cd /forge\n"
+            "/forge/.venv/bin/forge config set skills.invocation.review=explicit\n"
+            "/forge/.venv/bin/forge config set skills.invocation.challenge=model\n"
+            "/forge/.venv/bin/forge extension sync --scope user"
+        )
+        assert synced.returncode == 0, synced.stderr
+        assert claude_allows_model("review") is False
+        assert codex_allows_model("review") is False
+        assert claude_allows_model("challenge") is True
+        assert codex_allows_model("challenge") is True
 
     def test_runtime_disable_then_sync_does_not_resurrect_codex(
         self,

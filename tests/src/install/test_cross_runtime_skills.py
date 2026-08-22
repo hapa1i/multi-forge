@@ -11,6 +11,7 @@ from typing import TypedDict
 from unittest.mock import patch
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from forge.cli.extensions import _parse_skill_runtimes, extensions
@@ -49,6 +50,8 @@ from forge.install.skill_planning import (
     select_skill_runtimes,
 )
 from forge.install.tracking import TrackingStore, compute_checksum
+from forge.runtime_config import write_runtime_config
+from forge.session.claude.paths import get_claude_home
 
 _PORTABLE = SkillCandidate(
     name="portable",
@@ -570,6 +573,50 @@ def use_isolated_install_environment(tmp_path: Path, monkeypatch: pytest.MonkeyP
         lambda: tmp_path / "extensions",
     )
     monkeypatch.setattr("forge.install.installer.installed_runtimes", lambda: [])
+
+
+def test_configured_invocation_mode_compiles_and_syncs_both_runtime_packages(tmp_path: Path) -> None:
+    _write_portable_source(tmp_path)
+    write_runtime_config({"skills": {"invocation": {"portable": "model"}}})
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs: _InstallerSkillKwargs = {
+        "profile": InstallProfile.MINIMAL,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+
+    with (
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
+        ),
+        patch("forge.install.installer._ensure_hook_dispatcher"),
+    ):
+        installed = installer.init(**kwargs)
+
+    claude_document = get_claude_home() / "skills" / "portable" / "SKILL.md"
+    codex_metadata = Path.home() / ".agents" / "skills" / "portable" / "agents" / "openai.yaml"
+    claude_frontmatter = yaml.safe_load(claude_document.read_text(encoding="utf-8").split("---", 2)[1])
+    assert claude_frontmatter["disable-model-invocation"] is False
+    assert yaml.safe_load(codex_metadata.read_text(encoding="utf-8"))["policy"] == {"allow_implicit_invocation": True}
+    model_cache_dirs = {package.runtime: package.cache_dir for package in installed.skill_packages}
+
+    write_runtime_config({"skills": {"invocation": {"portable": "explicit"}}})
+    with patch("forge.install.installer._ensure_hook_dispatcher"):
+        preview = installer.plan_update()
+        synced = installer.update()
+
+    claude_frontmatter = yaml.safe_load(claude_document.read_text(encoding="utf-8").split("---", 2)[1])
+    assert claude_frontmatter["disable-model-invocation"] is True
+    assert yaml.safe_load(codex_metadata.read_text(encoding="utf-8"))["policy"] == {"allow_implicit_invocation": False}
+    explicit_cache_dirs = {package.runtime: package.cache_dir for package in synced.skill_packages}
+    assert explicit_cache_dirs.keys() == model_cache_dirs.keys()
+    assert all(explicit_cache_dirs[runtime] != model_cache_dirs[runtime] for runtime in explicit_cache_dirs)
+    assert {
+        file.action for file in preview.files if file.target_path in {str(claude_document), str(codex_metadata)}
+    } == {"update"}
 
 
 def test_runtime_packages_copy_sync_stale_cleanup_and_disable(

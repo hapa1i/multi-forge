@@ -2,7 +2,8 @@ schema_version: 1
 name: challenge
 description: Pressure-test a claim, recommendation, or assumption. Defaults to skepticism.
 runtimes: [claude_code, codex]
-capabilities: [task_arguments]
+capabilities: [task_arguments, invocation_policy]
+allow_implicit_invocation: false
 claude_frontmatter:
   argument-hint: '[claim or objection]'
   effort: high

@@ -1222,8 +1222,11 @@ not a bypass; sidecars need a satisfying image. `forge extension doctor` remains
 ### C.5 Multi-scope installation (skill resolution)
 
 Sources are neutral (`forge-skill.yaml` + `content.md`) or legacy (`SKILL.md`). Checkouts admit only tracked/unignored
-paths; links need eligible targets and unavailable Git state blocks planning. `allow_implicit_invocation` owns
-invocation; executables use their entry point. Codex emits family `openai`, no exact model, and ignores Claude sessions.
+paths; links need eligible targets and unavailable Git state blocks planning. Portable `allow_implicit_invocation`
+declares the cross-runtime source policy, and all shipped sources default false. The user authority is
+`~/.forge/config.yaml`: `skills.invocation.<name>` defaults to `explicit` and may opt a name into `model`. Enable/sync
+compiles the effective mode into both runtime outputs; malformed config fails safe to explicit-only. Executables use
+their entry point. Codex emits family `openai`, no exact model, and ignores Claude sessions.
 
 SKILLS planning is explicit over scope/runtime/profile/skill:
 

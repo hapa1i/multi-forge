@@ -1595,6 +1595,14 @@ portable set is `challenge`, `smoke-test`, `review`, `review-docs`, `understand`
 `consensus`. The workflow frontends do not imply Codex workers by default: worker runtime is selected independently and
 the default worker set remains Claude-backed. `walkthrough` and `qa` remain Claude-only manual-test frontends.
 
+Skill selection permission is global user configuration, not an enable-time flag. Every shipped source defaults to
+human/explicit-only invocation, and `~/.forge/config.yaml` may opt individual names into model invocation under
+`skills.invocation`. Installer planning resolves that mapping with an absent-name default of `explicit`, then gives the
+effective boolean to the compiler for both Claude's `disable-model-invocation` frontmatter and Codex's
+`agents/openai.yaml` policy. Enable materializes the current mapping; sync recompiles tracked runtime packages after a
+configuration change. The Claude settings preset is not an authority because it cannot govern Codex output. Malformed
+skill configuration degrades to the explicit-only default.
+
 `forge extension enable --runtime claude|codex|all` is repeatable and filters every resolved module against its declared
 runtime owners. Profile-selected wrong-owner modules become visible skips; a wrong-owner module named through `--with`
 is a conflict, as is an explicit runtime selection that leaves no effective module. With no flag, a new enable keeps

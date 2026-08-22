@@ -475,7 +475,7 @@ result still exits zero, and `query --scope all` keeps its skip-and-continue par
 | `forge clean`                    | Preview/remove orphaned state (`--scope`, `--yes`, `--json`)                                                    |
 | `forge config`                   | Manage global runtime preferences                                                                               |
 | `forge config show`              | Show effective config plus downstream-retention status (`--raw`, `--json`)                                      |
-| `forge config set`               | Set a top-level or dotted runtime key                                                                           |
+| `forge config set`               | Set a top-level or dotted runtime key; skill modes are `explicit` or `model`                                    |
 | `forge config edit`              | Validate and replace the user-owned runtime config                                                              |
 | `forge config reset`             | Reset one top-level key or the whole runtime config                                                             |
 | `forge config migrate-retention` | Preview/apply legacy proxy-retention migration (`--yes`, `--json`)                                              |
@@ -521,8 +521,8 @@ ownership.
 
 **Design principles:**
 
-- **Narrow global config** -- `forge config` owns runtime preferences and shared telemetry lifecycle only; routing stays
-  per-proxy and workflow state stays per-session
+- **Narrow global config** -- `forge config` owns runtime preferences, shared telemetry lifecycle, and skill invocation
+  policy; routing stays per-proxy and workflow state stays per-session
 - **Explicit verbs** -- non-leaf groups print help; leaves perform the action
 - **Launch through Forge** -- `forge session start`, `forge session resume`, or `forge claude start --proxy` sets up env
   vars correctly

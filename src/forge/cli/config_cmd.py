@@ -124,6 +124,7 @@ def set_cmd(key_value: str) -> None:
         forge config set proxy_mode=sidecar
         forge config set status_timeout=0.5
         forge config set context_limit=1000000
+        forge config set skills.invocation.review=model
         forge config set statusline.cost_mode=actual
         forge config set provider_trace.inject_provider_user=true
         forge config set telemetry.downstream.retention_days=30
@@ -381,6 +382,21 @@ def edit_cmd() -> None:
                 err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
                 sys.exit(1)
 
+        skills_section = edited_data.get("skills")
+        if isinstance(skills_section, dict) and isinstance(skills_section.get("invocation"), dict):
+            try:
+                known_skills = _forge_skill_names()
+            except (OSError, ValueError) as e:
+                print_error(f"Unable to discover Forge skills: {e}")
+                err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+                sys.exit(1)
+            unknown_skills = [name for name in skills_section["invocation"] if name not in known_skills]
+            if unknown_skills:
+                print_error(f"Unknown Forge skill(s): {', '.join(unknown_skills)}")
+                err_console.print(f"[dim]Available: {', '.join(known_skills)}[/dim]")
+                err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+                sys.exit(1)
+
         write_runtime_config(dict(edited_data))
         success = True
         console.print("[green]Updated[/green] runtime configuration")
@@ -500,6 +516,15 @@ def _unknown_segments(segments: list[Any]) -> list[Any]:
     return [s for s in segments if s not in SEGMENT_NAMES]
 
 
+def _forge_skill_names() -> tuple[str, ...]:
+    """Return bundled Forge skill names without parsing source contents."""
+
+    from forge.install.installer import get_extensions_root
+    from forge.install.skill_compiler import discover_skill_source_names
+
+    return discover_skill_source_names(get_extensions_root() / "skills")
+
+
 def _nested_sections() -> dict[tuple[str, ...], type]:
     """Map nested config paths to their dataclasses (the dotted-key registry).
 
@@ -508,11 +533,13 @@ def _nested_sections() -> dict[tuple[str, ...], type]:
     from forge.runtime_config import (
         RuntimeDownstreamRetentionConfig,
         RuntimeProviderTraceConfig,
+        RuntimeSkillsConfig,
         RuntimeTelemetryConfig,
         StatusLineConfig,
     )
 
     return {
+        ("skills",): RuntimeSkillsConfig,
         ("statusline",): StatusLineConfig,
         ("provider_trace",): RuntimeProviderTraceConfig,
         ("telemetry",): RuntimeTelemetryConfig,
@@ -540,6 +567,9 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
 
     sections = _nested_sections()
     parts = tuple(key.split("."))
+    if parts[:2] == ("skills", "invocation"):
+        _set_skill_invocation(parts, value, console)
+        return
     section_path, subkey = parts[:-1], parts[-1]
     section_name = ".".join(section_path)
     section_cls = sections.get(section_path)
@@ -601,6 +631,61 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
 
     write_runtime_config(data)
     console.print(f"[green]Set[/green] {key}={coerced_sub}")
+
+
+def _set_skill_invocation(parts: tuple[str, ...], value: str, console: Console) -> None:
+    """Set ``skills.invocation.<skill>`` while preserving sibling overrides."""
+
+    if len(parts) != 3 or not parts[2]:
+        print_error("Expected format: skills.invocation.<skill>=explicit|model")
+        sys.exit(1)
+
+    skill_name = parts[2]
+    try:
+        known_skills = _forge_skill_names()
+    except (OSError, ValueError) as e:
+        print_error(f"Unable to discover Forge skills: {e}")
+        sys.exit(1)
+    if skill_name not in known_skills:
+        print_error(f"Unknown Forge skill: '{skill_name}'")
+        err_console.print(f"\n[dim]Available: {', '.join(known_skills)}[/dim]")
+        sys.exit(1)
+
+    config_path = get_config_path()
+    if config_path.is_file():
+        from ruamel.yaml import YAML
+
+        ruamel = YAML()
+        ruamel.preserve_quotes = True
+        with open(config_path) as f:
+            data = ruamel.load(f) or {}
+    else:
+        data = {}
+
+    skills = data.get("skills")
+    if not isinstance(skills, dict):
+        skills = {}
+        data["skills"] = skills
+    invocation = skills.get("invocation")
+    if not isinstance(invocation, dict):
+        invocation = {}
+        skills["invocation"] = invocation
+    invocation[skill_name] = value
+
+    known_fields = {f.name for f in fields(RuntimeConfig)}
+    try:
+        RuntimeConfig(**{k: v for k, v in dict(data).items() if k in known_fields})
+    except (ValueError, TypeError) as e:
+        print_error(f"Invalid configuration: {e}")
+        sys.exit(1)
+
+    write_runtime_config(data)
+    console.print(f"[green]Set[/green] skills.invocation.{skill_name}={value}")
+    print_tip(
+        "Run 'forge extension sync' to apply the new invocation mode to installed packages.",
+        blank_before=False,
+        console=console,
+    )
 
 
 def _print_downstream_retention_status(console: Console, resolution: Any) -> None:

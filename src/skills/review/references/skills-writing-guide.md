@@ -49,10 +49,12 @@ closing braces; the delimiters are omitted here so this documentary file is not 
 List every used capability in the manifest's `capabilities`. Shared `license`, `compatibility`, `metadata`, and
 `allowed_tools` values belong in their typed manifest fields. Put genuinely Claude-only frontmatter such as
 `argument-hint`, `effort`, or a Claude-tool-specific `allowed-tools` value under `claude_frontmatter`, but never declare
-the same field in both places. Declare invocation policy once with `allow_implicit_invocation`; the adapter derives
-Claude's `disable-model-invocation` and Codex's matching policy. The Claude field is forbidden in a neutral
-`claude_frontmatter` block. Put optional Codex UI metadata under `codex_interface`. Runtime bindings stay in compiler
-adapters, never in model-family resources; adding a runtime must not create files such as `code-openai-codex.md`.
+the same field in both places. Declare invocation policy once with `allow_implicit_invocation`; Forge-owned skills use
+`false` as their source default. The adapter derives Claude's `disable-model-invocation` and Codex's matching policy,
+then installer planning may overlay the user's cross-runtime `skills.invocation.<name>` preference. The Claude field is
+forbidden in a neutral `claude_frontmatter` block. Put optional Codex UI metadata under `codex_interface`. Runtime
+bindings stay in compiler adapters, never in model-family resources; adding a runtime must not create files such as
+`code-openai-codex.md`.
 
 The neutral-source and emitted-package gates scan the whole tree. Do not place `$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`,
 Claude tool names/invocation syntax, or other runtime-specific instructions in neutral content or shared auxiliaries.
