@@ -1,4 +1,4 @@
-"""Regression coverage for one ownership scan during native-relocate deletion."""
+"""Regression coverage for transcript ownership scans during native-relocate deletion."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Callable
 import pytest
 
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session.claude import cleanup as cleanup_module
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import Derivation
 from tests.fixtures.session_state import publish_session
@@ -154,3 +155,35 @@ def test_native_relocate_partial_launch_still_runs_one_guarded_scan(
 
     assert scan_calls == [(str(project), (RELOCATED_PARENT_ID,))]
     assert not relocated.exists()
+
+
+def test_relocated_transcript_rechecks_ownership_after_ordinary_cleanup(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sibling published during ordinary cleanup must protect the relocated transcript."""
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=CHILD_ID,
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+
+    def _publish_sibling(**_kwargs: object) -> None:
+        _publish(
+            manager,
+            project,
+            "late-sibling",
+            session_id=None,
+            relocated_parent_id=RELOCATED_PARENT_ID,
+        )
+
+    monkeypatch.setattr(cleanup_module, "cleanup_session", _publish_sibling)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert SessionStore(str(project), "late-sibling").exists()
+    assert relocated.exists(), "the sibling published during cleanup still owns the relocated transcript"

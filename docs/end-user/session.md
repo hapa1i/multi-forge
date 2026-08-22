@@ -418,7 +418,9 @@ it, set authority while inactive, and only then resume through Forge.
 `authority show` is read-only. It reports configured role/tier, exact covered/read/control inventories, the locally
 observed configuration epoch and denials, and one of four launch-support states: `verified`, `unverified`,
 `unsupported`, or `not_running`. A marked session whose journal is missing or inconsistent reports its configuration
-history as `unproven`; malformed journals are errors. The local append-only journal is not tamper-proof.
+history as `unproven`; malformed journals are errors. An unreadable runtime active registry is also an error because
+this command never repairs state; run `forge session list` to apply the registry's normal self-healing policy, then
+retry. The local append-only journal is not tamper-proof.
 
 ### Human-courier planner/producer workflow
 

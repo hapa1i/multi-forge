@@ -235,6 +235,22 @@ def test_live_matching_preflight_is_verified_and_show_is_read_only(
         active.clear_session("planner", forge_root=str(temp_env))
 
 
+def test_malformed_active_registry_is_an_actionable_read_only_error(temp_env: Path) -> None:
+    _seed(temp_env)
+    active_path = ActiveSessionStore().index_path
+    active_path.parent.mkdir(parents=True, exist_ok=True)
+    active_path.write_text('{"version":', encoding="utf-8")
+    before = (active_path.read_bytes(), active_path.stat().st_mtime_ns)
+
+    with pytest.raises(ForgeOpError, match="active-session registry.*forge session list"):
+        ops.get_session_authority_report(
+            ctx=ExecutionContext.from_cwd(),
+            session_name="planner",
+        )
+
+    assert (active_path.read_bytes(), active_path.stat().st_mtime_ns) == before
+
+
 def test_malformed_history_is_a_read_error(temp_env: Path) -> None:
     _seed(temp_env)
     journal = temp_env / ".forge" / "artifacts" / "planner" / "authority" / "events.jsonl"

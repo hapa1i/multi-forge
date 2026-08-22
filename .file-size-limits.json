@@ -12,7 +12,20 @@
   },
   "rules": [
     {
-      "pattern": "docs/board/done/*/*.md",
+      "_comment": "Ratified historical snapshot exception; keep this path exact.",
+      "pattern": "docs/board/done/runtime_abstraction/checklist.md",
+      "max_lines": 5000,
+      "target_tokens": {
+        "anthropic": 40000,
+        "tiktoken": 20000
+      },
+      "max_tokens": {
+        "anthropic": 40000
+      }
+    },
+    {
+      "_comment": "Ratified historical snapshot exception; keep this path exact.",
+      "pattern": "docs/board/done/session_op_layer_extraction/checklist.md",
       "max_lines": 5000,
       "target_tokens": {
         "anthropic": 40000,

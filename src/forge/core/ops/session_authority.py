@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
+from dacite import DaciteError
+
 from forge.core.reactive.env import get_run_identity
 from forge.core.state import FileLockTimeoutError
 from forge.session.active import ActiveSessionStore
@@ -174,7 +176,14 @@ def get_session_authority_report(*, ctx: ExecutionContext, session_name: str | N
     history, epoch = _configuration_history(authority, runtime, events)
     covered, read_only, control = authority_coverage(authority, runtime)
 
-    active_entry = ActiveSessionStore().peek_session(state.name, forge_root=str(resolved.store.forge_root))
+    active_store = ActiveSessionStore()
+    try:
+        active_entry = active_store.peek_session(state.name, forge_root=str(resolved.store.forge_root))
+    except (OSError, ValueError, DaciteError, FileLockTimeoutError) as exc:
+        raise ForgeOpError(
+            f"could not inspect the active-session registry at {active_store.index_path} without modifying it; "
+            "run 'forge session list' to repair runtime-only state, then retry"
+        ) from exc
     active = active_entry is not None
     launch_support: AuthorityLaunchSupport | None = None
     if authority is not None and authority.role == "advisory":

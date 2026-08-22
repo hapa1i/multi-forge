@@ -584,6 +584,18 @@ chmod +x /tmp/forge-invocation-bin/claude /tmp/forge-invocation-bin/codex
         assert claude_allows_model("challenge") is True
         assert codex_allows_model("challenge") is True
 
+        reset = synced_container.exec("cd /forge && /forge/.venv/bin/forge config reset skills")
+        assert reset.returncode == 0, reset.stderr
+        assert "forge extension sync" in reset.stdout
+        resynced = synced_container.exec(
+            "cd /forge && PATH=/tmp/forge-invocation-bin:$PATH /forge/.venv/bin/forge extension sync --scope user"
+        )
+        assert resynced.returncode == 0, resynced.stderr
+        assert claude_allows_model("review") is False
+        assert codex_allows_model("review") is False
+        assert claude_allows_model("challenge") is False
+        assert codex_allows_model("challenge") is False
+
     def test_runtime_disable_then_sync_does_not_resurrect_codex(
         self,
         synced_container: ContainerLike,

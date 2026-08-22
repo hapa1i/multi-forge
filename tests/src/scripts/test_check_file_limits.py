@@ -183,10 +183,23 @@ class TestConfigResolution:
 
     def test_done_checklists_receive_only_the_ratified_historical_exception(self):
         config = json.loads((REPO_ROOT / ".file-size-limits.json").read_text())
-        done = get_limits("docs/board/done/runtime_abstraction/checklist.md", config)
+        runtime_snapshot = get_limits("docs/board/done/runtime_abstraction/checklist.md", config)
+        op_layer_snapshot = get_limits("docs/board/done/session_op_layer_extraction/checklist.md", config)
+        unrelated_card = get_limits("docs/board/done/unrelated/card.md", config)
+        unrelated_checklist = get_limits("docs/board/done/unrelated/checklist.md", config)
         living = get_limits("docs/design.md", config)
-        assert done["target_tokens"] == {"anthropic": 40000, "tiktoken": 20000}
-        assert done["max_tokens"] == {"anthropic": 40000}
+        historical_target = {"anthropic": 40000, "tiktoken": 20000}
+        historical_max = {"anthropic": 40000}
+        ordinary_target = {"anthropic": 25000, "tiktoken": 12000}
+        ordinary_max = {"anthropic": 30000}
+        assert runtime_snapshot["target_tokens"] == historical_target
+        assert runtime_snapshot["max_tokens"] == historical_max
+        assert op_layer_snapshot["target_tokens"] == historical_target
+        assert op_layer_snapshot["max_tokens"] == historical_max
+        assert unrelated_card["target_tokens"] == ordinary_target
+        assert unrelated_card["max_tokens"] == ordinary_max
+        assert unrelated_checklist["target_tokens"] == ordinary_target
+        assert unrelated_checklist["max_tokens"] == ordinary_max
         assert living["target_tokens"] == {"anthropic": 25000, "tiktoken": 12000}
         assert living["max_tokens"] == {"anthropic": 30000}
 

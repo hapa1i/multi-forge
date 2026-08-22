@@ -30,7 +30,12 @@ _logger = logging.getLogger(__name__)
 _MAX_DIAGNOSTIC_CHARS = 200
 _FORGE_OVERHEAD_WARNING_SECONDS = 0.1
 _SECRET_ASSIGNMENT_RE = re.compile(r"(?im)\b(api[_-]?key|token|secret|password|authorization)\b(\s*[:=]\s*)([^\r\n]*)")
-_TOKEN_PREFIX_RE = re.compile(r"\b(?:sk|gh[pousr])-[A-Za-z0-9_-]{8,}\b|\bgh[pousr]_[A-Za-z0-9_]{8,}\b")
+# A control-terminated token fragment may become a longer rendered token. Defer
+# that partial match so the post-render pass can redact the complete value.
+_TOKEN_PREFIX_RE = re.compile(
+    r"(?:\b(?:sk|gh[pousr])-[A-Za-z0-9_-]{8,}\b|\bgh[pousr]_[A-Za-z0-9_]{8,}\b)"
+    r"(?![\x00-\x09\x0b-\x0c\x0e-\x1f\x7f])"
+)
 _TERMINAL_CONTROL_SEQUENCE_RE = re.compile(
     r"(?:\x1b\](?:[^\x07\x1b\r\n]|\x1b(?!\\))*(?:\x07|\x1b\\))"  # one-line OSC controls
     r"|(?:\x1b[P^_][^\r\n]*?\x1b\\)"  # one-line DCS, PM, and APC strings terminated by ST
@@ -39,6 +44,9 @@ _TERMINAL_CONTROL_SEQUENCE_RE = re.compile(
     r"|(?:\x1b[@-_])"  # remaining two-byte escape sequences
     r"|[\x80-\x9f]"  # decoded C1 controls, including DCS, CSI, ST, and OSC
 )
+_C0_DEL_DROP_TRANSLATION = {
+    codepoint: None for codepoint in range(0x80) if (codepoint < 0x20 and codepoint != 0x0A) or codepoint == 0x7F
+}
 _PYTEST_FAILURE_SUMMARY_RE = re.compile(r"^\s*(?P<kind>FAILED|ERROR)\s+\S")
 _PYTEST_SHORT_SUMMARY_MARKER_RE = re.compile(r"^\s*=+\s+short test summary info\s+=+\s*$", re.IGNORECASE)
 
@@ -75,6 +83,13 @@ def _redacted_diagnostic(value: str | bytes | None) -> str:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
     text = _TERMINAL_CONTROL_SEQUENCE_RE.sub("", text).replace("\x1b", "")
+    text = _redact_secrets(text)
+    rendered = _render_terminal_text(text)
+    return text if rendered == text else _redact_secrets(rendered)
+
+
+def _redact_secrets(text: str) -> str:
+    """Apply configured and heuristic secret redaction to diagnostic text."""
     for credential in CREDENTIALS.values():
         for env_var in credential.env_vars:
             secret = os.environ.get(env_var.name) if env_var.secret else None
@@ -83,6 +98,56 @@ def _redacted_diagnostic(value: str | bytes | None) -> str:
     text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text)
     text = _TOKEN_PREFIX_RE.sub("[REDACTED]", text)
     return text
+
+
+def _render_terminal_text(value: str) -> str:
+    """Apply basic cursor motion and return text without unsafe C0 controls.
+
+    Backspace and carriage return can overwrite printable cells. Rendering them
+    between redaction passes prevents raw or control-inserted secrets from evading
+    exact replacement; tabs become spaces and other C0/DEL controls are discarded.
+    Control-free streams use ``str.translate`` to keep ordinary Stop diagnostics
+    inside the Forge-owned latency budget.
+    """
+    if "\b" not in value and "\r" not in value and "\t" not in value:
+        return value.translate(_C0_DEL_DROP_TRANSLATION)
+
+    rendered: list[str] = []
+    line: list[str] = []
+    cursor = 0
+
+    for character in value:
+        if character == "\n":
+            rendered.extend(line)
+            rendered.append(character)
+            line = []
+            cursor = 0
+            continue
+        if character == "\r":
+            cursor = 0
+            continue
+        if character == "\b":
+            cursor = max(0, cursor - 1)
+            continue
+        if character == "\t":
+            next_tab_stop = ((cursor // 8) + 1) * 8
+            if len(line) < next_tab_stop:
+                line.extend(" " for _ in range(next_tab_stop - len(line)))
+            cursor = next_tab_stop
+            continue
+        if ord(character) < 0x20 or character == "\x7f":
+            continue
+
+        if cursor < len(line):
+            line[cursor] = character
+        else:
+            if cursor > len(line):
+                line.extend(" " for _ in range(cursor - len(line)))
+            line.append(character)
+        cursor += 1
+
+    rendered.extend(line)
+    return "".join(rendered)
 
 
 def _bounded_diagnostic(value: str | bytes | None) -> str:

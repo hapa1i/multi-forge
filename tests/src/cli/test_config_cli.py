@@ -348,6 +348,15 @@ class TestConfigReset:
         assert "Reset" in result.output
         assert not (home / "config.yaml").exists()
 
+    def test_reset_all_reminds_when_skill_invocation_overrides_change(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text("skills:\n  invocation:\n    review: model\n")
+
+        result = CliRunner().invoke(config, ["reset", "--yes"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" in result.output
+
     def test_reset_single_key(self):
         home = get_forge_home()
         (home / "config.yaml").write_text("proxy_mode: sidecar\nstatus_timeout: 0.5\n")
@@ -360,6 +369,28 @@ class TestConfigReset:
         data = yaml.safe_load((home / "config.yaml").read_text())
         assert "proxy_mode" not in data
         assert data["status_timeout"] == 0.5
+
+    def test_reset_skills_reminds_when_invocation_overrides_change(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text(
+            "proxy_mode: sidecar\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = CliRunner().invoke(config, ["reset", "skills"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" in result.output
+
+    def test_reset_unrelated_key_does_not_print_skill_sync_guidance(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text(
+            "proxy_mode: sidecar\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = CliRunner().invoke(config, ["reset", "proxy_mode"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" not in result.output
 
     def test_reset_no_file(self):
         runner = CliRunner()
@@ -773,7 +804,19 @@ class TestConfigEdit:
         )
 
         assert result.exit_code == 0
+        assert "forge extension sync" in result.output
         assert get_runtime_config().skills.invocation == {"review": "model", "challenge": "explicit"}
+
+    def test_edit_unrelated_change_does_not_print_skill_sync_guidance(self, monkeypatch):
+        (get_forge_home() / "config.yaml").write_text("skills:\n  invocation:\n    review: model\n")
+
+        result = self._run_edit_with(
+            "proxy_mode: sidecar\nskills:\n  invocation:\n    review: model\n",
+            monkeypatch,
+        )
+
+        assert result.exit_code == 0
+        assert "forge extension sync" not in result.output
 
     def test_edit_rejects_invalid_skill_invocation_mode(self, monkeypatch):
         result = self._run_edit_with("skills:\n  invocation:\n    review: automatic\n", monkeypatch)

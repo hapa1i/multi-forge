@@ -2192,14 +2192,15 @@ class SessionManager:
                 entry.forge_root or entry.worktree_path,
                 _raw_data,
             )
-            _reference_scan_ids = list(_cleanup_ids)
-            _append_unique_string(_reference_scan_ids, _relocated_parent_session_id)
-            _shared_transcript_ids = self._find_shared_transcript_sessions(
-                _transcript_project_root,
-                _reference_scan_ids,
-                exclude_name=name,
-                exclude_forge_root=entry_forge_root,
-            )
+            if _cleanup_ids:
+                _reference_scan_ids = list(_cleanup_ids)
+                _append_unique_string(_reference_scan_ids, _relocated_parent_session_id)
+                _shared_transcript_ids = self._find_shared_transcript_sessions(
+                    _transcript_project_root,
+                    _reference_scan_ids,
+                    exclude_name=name,
+                    exclude_forge_root=entry_forge_root,
+                )
 
         if delete_transcripts and _claude_session_id:
             assert _transcript_project_root is not None
@@ -2260,11 +2261,19 @@ class SessionManager:
                 # Replaces an earlier guard that compared index identity (parent_forge_root/
                 # project_root) instead of the parent's resolved Claude CWD, and so missed
                 # root-level-worktree parents and had no sibling awareness.
-                _reloc_shared = (
-                    {_relocated_parent_session_id: _shared_transcript_ids[_relocated_parent_session_id]}
-                    if _relocated_parent_session_id in _shared_transcript_ids
-                    else {}
-                )
+                if _relocated_parent_session_id in _shared_transcript_ids:
+                    # A cached positive can only make cleanup conservative if its owner disappears.
+                    _reloc_shared = {_relocated_parent_session_id: _shared_transcript_ids[_relocated_parent_session_id]}
+                else:
+                    # Another process can publish a sibling while ordinary transcript cleanup
+                    # runs. That owner must be visible here; a cached absence is not authority
+                    # to destroy the relocated transcript.
+                    _reloc_shared = self._find_shared_transcript_sessions(
+                        _transcript_project_root,
+                        [_relocated_parent_session_id],
+                        exclude_name=name,
+                        exclude_forge_root=entry_forge_root,
+                    )
                 if _reloc_shared:
                     logger.info(
                         "Skipping relocated-transcript cleanup: %s still referenced by %s",

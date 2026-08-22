@@ -100,6 +100,24 @@ class TestAuthorityLifecycle:
         active = forge_workspace.read_json("$HOME/.forge/sessions/active.json")
         assert active["sessions"] == {}
 
+    def test_show_reports_malformed_active_registry_without_repair(self, forge_workspace: ContainerLike) -> None:
+        forge_workspace.exec("forge extension enable --scope user --profile standard")
+        created = forge_workspace.exec("cd /workspace && forge session start planner --no-launch --authority advisory")
+        assert created.returncode == 0, created.stderr
+        active_path = "$HOME/.forge/sessions/active.json"
+        written = forge_workspace.write_file(active_path, '{"version":')
+        assert written.returncode == 0, written.stderr
+        before = forge_workspace.read_file(active_path)
+
+        shown = forge_workspace.exec("cd /workspace && forge session authority show planner --json")
+
+        assert shown.returncode == 1
+        assert shown.stdout == ""
+        assert "active-session registry" in shown.stderr
+        assert "forge session list" in shown.stderr
+        assert "Traceback" not in shown.stderr
+        assert forge_workspace.read_file(active_path) == before
+
 
 class TestWorktreeSemantics:
     """Tests for worktree ownership and --worktree flag."""

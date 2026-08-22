@@ -305,6 +305,7 @@ def edit_cmd() -> None:
     console = Console(width=200)
 
     config_path = ensure_config()
+    original_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
     editor_argv = resolve_editor_argv()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -341,7 +342,7 @@ def edit_cmd() -> None:
 
         known_fields = {f.name for f in fields(RuntimeConfig)}
         try:
-            RuntimeConfig(**{k: v for k, v in dict(edited_data).items() if k in known_fields})
+            validated_config = RuntimeConfig(**{k: v for k, v in dict(edited_data).items() if k in known_fields})
         except (ValueError, TypeError) as e:
             print_error(f"Invalid configuration: {e}")
             err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
@@ -400,6 +401,8 @@ def edit_cmd() -> None:
         write_runtime_config(dict(edited_data))
         success = True
         console.print("[green]Updated[/green] runtime configuration")
+        if validated_config.skills.invocation != original_skill_invocation:
+            _print_skill_invocation_sync_tip(console)
 
     finally:
         if success and tmp_path.exists():
@@ -425,6 +428,8 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
         console.print("[dim]No config file to reset (already using defaults).[/dim]")
         return
 
+    original_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
+
     if key is None:
         if not yes:
             if not click.confirm("Reset all configuration to defaults?"):
@@ -434,6 +439,8 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
         reset_runtime_config()
         console.print("[green]Reset[/green] all configuration to defaults")
         console.print(f"[dim]Removed {display_path(config_path)}[/dim]")
+        if original_skill_invocation:
+            _print_skill_invocation_sync_tip(console)
         return
 
     known_fields = {f.name for f in fields(RuntimeConfig)}
@@ -458,6 +465,9 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
 
     default_val = getattr(RuntimeConfig(), key)
     console.print(f"[green]Reset[/green] {key} (default: {default_val})")
+    updated_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
+    if updated_skill_invocation != original_skill_invocation:
+        _print_skill_invocation_sync_tip(console)
 
 
 # --- Helpers ---
@@ -470,6 +480,15 @@ def _persist_or_clear(data: MutableMapping[str, Any], config_path: Path) -> None
     else:
         config_path.unlink()
         reset_runtime_config()
+
+
+def _print_skill_invocation_sync_tip(console: Console) -> None:
+    """Tell users when installed runtime packages need recompilation."""
+    print_tip(
+        "Run 'forge extension sync' to apply the new invocation mode to installed packages.",
+        blank_before=False,
+        console=console,
+    )
 
 
 _COERCE_ERROR = object()
@@ -681,11 +700,7 @@ def _set_skill_invocation(parts: tuple[str, ...], value: str, console: Console) 
 
     write_runtime_config(data)
     console.print(f"[green]Set[/green] skills.invocation.{skill_name}={value}")
-    print_tip(
-        "Run 'forge extension sync' to apply the new invocation mode to installed packages.",
-        blank_before=False,
-        console=console,
-    )
+    _print_skill_invocation_sync_tip(console)
 
 
 def _print_downstream_retention_status(console: Console, resolution: Any) -> None:
