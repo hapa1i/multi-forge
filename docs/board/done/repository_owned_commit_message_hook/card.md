@@ -1,6 +1,6 @@
 # Repository-Owned Commit Message Hook
 
-**Lane**: `doing/`
+**Lane**: `done/`
 
 ## Goal
 

@@ -7,6 +7,23 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-08-22
 
+### Own commit-message normalization in the repository
+
+**Goal/outcome**: Preserve the existing commit-message cleanup while removing Multi-Forge's hidden dependency on a
+personal Git hook, executable, and mapping.
+
+**Key changes**:
+
+- Ported the complete normalization mapping and behavior into tracked repository files and registered it only for
+  pre-commit's real `commit-msg` Git-hook stage.
+- Made the default installation create both `pre-commit` and `commit-msg` hooks, documented migration away from global
+  `core.hooksPath`, and corrected agent guidance that attributed staged-file behavior to the personal hook.
+- Added characterization for all mappings and a temporary-repository proof that the generated hook rewrites the pending
+  message before Git creates a commit.
+
+**Verification**: 11 focused tests; 9,594 unit tests with 117 deselected; 1,057 regressions; full pre-commit and diff
+checks pass. PR [#238](https://github.com/hapa1i/multi-forge/pull/238).
+
 ### Put context limits and document ownership in the repository
 
 **Goal/outcome**: Make context-size enforcement visible to contributors and leave every living context document with

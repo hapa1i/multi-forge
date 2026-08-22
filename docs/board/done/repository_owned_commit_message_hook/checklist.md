@@ -24,11 +24,12 @@ Activation base: `5d9fadc4` (`main`, 2026-08-22).
 
 - [x] Update contributor setup and repository guidance with the authoritative files, installation command, and migration
   from global hooks.
-- [ ] Update the change log and close the card after verification.
+- [x] Update the change log and close the card after verification.
 
 ## Verification
 
 - [x] Run focused normalizer and pre-commit configuration tests: 11 passed.
 - [x] Run unit and regression suites: 9,594 unit passed with 117 deselected; 1,057 regression passed.
 - [x] Run full pre-commit and `git diff --check`; both pass after Black and mdformat's mechanical first-run changes.
-- [ ] Commit, push, open the PR, and record its link.
+- [x] Commit and push the implementation as `c30ee67f`; open [PR #238](https://github.com/hapa1i/multi-forge/pull/238)
+  and record its link.
