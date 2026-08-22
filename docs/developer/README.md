@@ -10,8 +10,8 @@ git clone <repo-url>
 cd multi-forge
 uv sync
 
-# Install pre-commit hooks
-pre-commit install
+# Install the repository-owned pre-commit and commit-msg hooks
+uv run pre-commit install --install-hooks
 
 # Editable install for development
 ./scripts/setup.sh --local
@@ -20,6 +20,34 @@ pre-commit install
 cp .env.example .env
 # Edit .env with your API keys and credentials (secrets only)
 ```
+
+### Repository-owned Git hooks
+
+The command above installs both hook types declared by [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml):
+
+- `pre-commit` runs the repository's source, documentation, secret, and size checks.
+- `commit-msg` runs [`scripts/normalize-commit-msg.py`](../../scripts/normalize-commit-msg.py) before Git creates the
+  commit. Its authoritative replacements live in
+  [`config/normalize-text-mapping.json`](../../config/normalize-text-mapping.json).
+
+Do not use a global `core.hooksPath` for this checkout. Pre-commit refuses to install while that setting is active, and
+a shared hook directory would hide which version of the normalizer or policy Multi-Forge used. Inspect the active source
+before installation:
+
+```bash
+git config --show-origin --get-all core.hooksPath
+```
+
+If this prints a global setting, remove or migrate that setting before running the installation command. For a setting
+owned by the global Git config, the direct removal is:
+
+```bash
+git config --global --unset-all core.hooksPath
+```
+
+The message hook preserves the established normalization behavior: configured symbols are replaced, configured phrases
+or complete attribution lines are removed, and an emoji-only message retains its bracketed label rather than becoming
+empty. It changes the pending message file and exits successfully, so Git records only the normalized form.
 
 ### Exercising unreleased hook code
 
