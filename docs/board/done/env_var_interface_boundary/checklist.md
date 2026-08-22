@@ -56,8 +56,8 @@ Findings shaping the plan:
   way a wide-terminal user disables truncation — read at `status_line.py:1712`, `=0` disables). **But it is undocumented
   in `docs/` today**, so public-diagnostic requires the Phase 2 doc task below, or the table is self-inconsistent day
   one. Assertion: recorded in the table with rationale + a linked Phase 2 doc task.
-- [x] **Decision D-EV-2 — classification-table home.** New `design_appendix.md` section (reference material) + a
-  one-line pointer from `design.md` §3.10 (one-authority rule). The card's own table becomes a stale snapshot after
+- [x] **Decision D-EV-2 — classification-table home.** New reference section in the former consolidated design appendix
+  \+ a one-line pointer from `design.md` §3.10 (one-authority rule). The card's own table becomes a stale snapshot after
   Phase 1 — fine (cards are context, design docs are contract); Phase 1 does **not** update the card table. Assertion:
   one authority, no duplicated live table.
 - [x] **Decision D-EV-3 — guard mechanics: two-layer.** Assertion: approach recorded with the false-positive tradeoff.

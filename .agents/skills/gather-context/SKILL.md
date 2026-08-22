@@ -1,6 +1,6 @@
 ---
 name: gather-context
-description: Core Forge context load for blueprint, companion docs, and board files.
+description: Routed Forge context load for the active task's design, implementation notes, and board state.
 ---
 
 # gather-context
@@ -9,21 +9,31 @@ Use this skill when the user asks to run the `gather-context`, or asks for a cor
 
 ## Command Template
 
-Core context load for Forge.
+Load Forge context in two passes so domain partitioning reduces aggregate context as well as individual file size.
 
-**Read design blueprint and appendix**:
+**Always read the routing set first**:
 
 1. **Design Overview**: @docs/design.md
-2. **Design Appendix**: @docs/design_appendix.md
-3. **Workflow Design**: @docs/design_workflows.md
-4. **CLI Reference**: @docs/cli_reference.md
-
-**Read board and gap tracking**:
-
-1. **Change Log**: @docs/board/change_log.md
-2. **Implementation Notes**: @docs/board/impl_notes.md
-3. **Active Cards**: inspect `docs/board/doing/`; if it is empty, inspect the `docs/board/todo/<slug>/` card named by
+2. **Change Log**: @docs/board/change_log.md
+3. **Implementation Notes Index**: @docs/board/impl_notes.md
+4. **Active Cards**: inspect `docs/board/doing/`; if it is empty, inspect the `docs/board/todo/<slug>/` card named by
    the user.
+
+**Then load only the domains implicated by the user request and active card**:
+
+- **Sessions**: @docs/design_sessions.md and @docs/board/impl_notes/sessions.md
+- **Runtime or telemetry**: @docs/design_runtime.md and/or @docs/design_telemetry.md, plus
+  @docs/board/impl_notes/runtime_telemetry.md
+- **Installation or core ownership**: @docs/design_installation.md and/or the relevant core sections in @docs/design.md,
+  plus @docs/board/impl_notes/core_installation.md
+- **Workflows or memory**: @docs/design_workflows.md and/or @docs/design_memory.md; add the implementation-note ledger
+  named by @docs/board/impl_notes.md only when it contains relevant precedent
+- **CLI surfaces**: @docs/cli_reference.md
+- **Documentation or context-limit work**: @.file-size-limits.json and @docs/developer/documentation_guidelines.md
+
+Follow explicit links from the selected card when they identify another required contract. Do not load every domain by
+default. If the user explicitly asks for a full repository context load, read all domain design documents, all three
+implementation-note ledgers, the CLI reference, and the context-size policy.
 
 ---
 

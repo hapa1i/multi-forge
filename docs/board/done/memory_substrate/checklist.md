@@ -235,7 +235,7 @@ Synced every current/normative doc to the shipped memory-writer/transfer vocabul
   §5.6 "Naming note" block removed and replaced with the 3-layer taxonomy table (raw / project / transfer); stale
   symbols fixed (`process_handoff`→`assemble_transfer_context`, `run_handoff_agent`→`run_memory_writer`,
   `HandoffConfig`→`MemoryWriterConfig`, `handoff_agent.py`→`memory_writer.py`).
-- [x] `docs/design_appendix.md`: `handoff_timeout`→`memory_writer_timeout`; §C.3 marker row description → "Spawn the
+- [x] `docs/design_installation.md`: `handoff_timeout`→`memory_writer_timeout`; §C.3 marker row description → "Spawn the
   memory writer" (KEEP `kind="handoff"`); `handoff_agent.py`→`memory_writer.py`; §G strategy wording.
 - [x] `docs/diagrams.md`: node `Handoff` / `W6b` → "Memory Writer" / "(memory writer)"; edge "resume handoff" → "resume
   transfer". Marker edge `enqueues stop/index/handoff` KEPT (kind).
@@ -263,16 +263,16 @@ Synced every current/normative doc to the shipped memory-writer/transfer vocabul
 
 ### Acceptance
 
-| Test                     | Fixture | Assertion                                                                                                                                                                               | Test File |
-| ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| No stale "handoff agent" | n/a     | `rg -ni "handoff[ -]agent" docs/design.md docs/design_appendix.md docs/diagrams.md docs/end-user docs/developer docs/board/impl_notes.md docs/board/README.md CLAUDE.md src/skills` = 0 | manual    |
-| No stale symbols         | n/a     | `rg -n "process_handoff\|run_handoff_agent\|resolve_handoff_base_url\|handoff_agent\.py\|HandoffConfig\|HandoffResult"` over current docs = 0                                           | manual    |
-| No stale resume wording  | n/a     | `rg -ni -- "--resume-mode handoff\|resume_mode: handoff"` over current docs = 0                                                                                                         | manual    |
-| Renamed CLI in docs      | n/a     | `rg -ni "forge session handoff show\|forge handoff run"` over current docs + `src/skills` = 0                                                                                           | manual    |
-| Renames landed           | n/a     | `memory.md` / `16-memory.md` exist; `handoff.md` / `16-handoff.md` gone                                                                                                                 | manual    |
-| KEEPs intact             | n/a     | `kind="handoff"`, `enqueue_handoff_marker`, `artifacts/<session>/handoff`, `queued_handoff` unchanged in `src/forge/`                                                                   | manual    |
-| Design doc accurate      | n/a     | §5.6 taxonomy table present; "Naming note" block removed; command table shows `forge memory report show`                                                                                | review    |
-| Touched tests green      | repo    | `uv run pytest tests/src/review/test_skill_content.py tests/src/session/test_models.py tests/regression/test_bug_handoff_forge_root.py` passes (142)                                    | all       |
+| Test                     | Fixture | Assertion                                                                                                                                                                        | Test File |
+| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| No stale "handoff agent" | n/a     | `rg -ni "handoff[ -]agent" docs/design.md docs/design_*.md docs/diagrams.md docs/end-user docs/developer docs/board/impl_notes.md docs/board/README.md CLAUDE.md src/skills` = 0 | manual    |
+| No stale symbols         | n/a     | `rg -n "process_handoff\|run_handoff_agent\|resolve_handoff_base_url\|handoff_agent\.py\|HandoffConfig\|HandoffResult"` over current docs = 0                                    | manual    |
+| No stale resume wording  | n/a     | `rg -ni -- "--resume-mode handoff\|resume_mode: handoff"` over current docs = 0                                                                                                  | manual    |
+| Renamed CLI in docs      | n/a     | `rg -ni "forge session handoff show\|forge handoff run"` over current docs + `src/skills` = 0                                                                                    | manual    |
+| Renames landed           | n/a     | `memory.md` / `16-memory.md` exist; `handoff.md` / `16-handoff.md` gone                                                                                                          | manual    |
+| KEEPs intact             | n/a     | `kind="handoff"`, `enqueue_handoff_marker`, `artifacts/<session>/handoff`, `queued_handoff` unchanged in `src/forge/`                                                            | manual    |
+| Design doc accurate      | n/a     | §5.6 taxonomy table present; "Naming note" block removed; command table shows `forge memory report show`                                                                         | review    |
+| Touched tests green      | repo    | `uv run pytest tests/src/review/test_skill_content.py tests/src/session/test_models.py tests/regression/test_bug_handoff_forge_root.py` passes (142)                             | all       |
 
 ---
 

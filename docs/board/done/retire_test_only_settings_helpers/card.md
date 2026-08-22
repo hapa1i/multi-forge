@@ -20,7 +20,8 @@ Reverified on `5664258b`: all three helpers have no production caller; `restore_
 None is exported, documented as a supported surface, registered as an entry point, or referenced by packaged extension
 assets. The live installer uses `backup_settings`, rollback-state capture/restore, `set_scalar`, and the actual
 merge/conflict machinery. Authority:
-[`docs/design_appendix.md` "C.3 Settings merge rules"](../../../design_appendix.md#c3-settings-merge-rules) and DG4.
+[`docs/design_installation.md` "C.3 Settings merge rules"](../../../design_installation.md#c3-settings-merge-rules) and
+DG4.
 
 The pre-change focused baseline covering settings merge, installer transactions, and runtime-disable rollback is 111
 passing tests.

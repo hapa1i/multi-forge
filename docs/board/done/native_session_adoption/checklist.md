@@ -495,7 +495,7 @@ used by all four creation paths, which is broader than this card. Not attempted 
   module-level constant. Assertion: `claude_session_id` and `confirmed.launch` stay unset; `context_delivery` stays
   `None`. Verified by `test_binds_the_thread_without_claude_fields`.
 - [x] `CodexConfirmed.rollout_source` docstring gains **both** the missing `discovered_post_exit` and the new `adopted`,
-  and `design_appendix.md` §I.1 gains `adopted`.
+  and `design_sessions.md` §I.1 gains `adopted`.
 - [x] Resume dispatch needs no new code. Assertion: `session_runtime(manifest) == "codex"` routes to `run_codex_resume`.
   Verified by `test_adopted_session_routes_to_codex_resume_with_no_new_dispatch` against the existing branch at
   `cli/session_lifecycle.py:1345`.

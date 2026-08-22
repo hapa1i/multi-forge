@@ -121,8 +121,9 @@ Implemented 2026-07-06 on `refactor/hook-matcher-consolidation`. Verification co
 - `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py` -- 16 passed.
 - `uv run pre-commit run --files ...` over this card's changed code/tests/docs -- clean after hook-applied formatting.
 
-Design/end-user doc sync: no matcher internals are documented in `docs/design.md`, `docs/design_appendix.md`, or
-`docs/end-user`; `docs/end-user/hook.md` only documents the public `forge hook disable` surface and needed no change.
+Design/end-user doc sync: no matcher internals are documented in `docs/design.md`, the former consolidated design
+appendix, or `docs/end-user`; `docs/end-user/hook.md` only documents the public `forge hook disable` surface and needed
+no change.
 
 Post-merge board closeout: moved this card to `done/` and removed the stale `proposed/` duplicate left by the local
 planning commit. Verification: `make pre-commit-md`.

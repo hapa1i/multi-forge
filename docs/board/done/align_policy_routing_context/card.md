@@ -16,7 +16,7 @@ read commands describe the session that actually ran.
 Rechecked on merged `main` at `f6df4a40`: policy setup still probes nonexistent `intent.proxy.proxy_id`, making the
 current id permanently null, while shadow `status` and `show` still use different implicit-session resolvers. Session
 intent/confirmation ownership is defined in
-[`docs/design.md` §3.3](../../../design.md#33-session-file-schema-forgesessionjson).
+[`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson).
 
 The retained final regression artifact collected `6 failed, 10 passed` on that unchanged production cursor. The six
 failures covered the matching current-proxy route, sole-local `show` selection, and missing/ambiguous JSON or human

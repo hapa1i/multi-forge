@@ -152,7 +152,7 @@ order.
 ## Execution Waves
 
 The canonical wave definitions and finding ranges live in
-[`review_combined.md` § Backlog Conversion and Sequencing](../../review_combined.md#backlog-conversion-and-sequencing).
+[`review_combined.md` § Backlog Conversion and Sequencing](../../reviews/whole_repo_execution.md#backlog-conversion-and-sequencing).
 The ordering constraint is:
 
 1. resolve DG1–DG4 and reproduce every CRITICAL/HIGH finding on its execution branch;

@@ -40,8 +40,8 @@ following-release rejection of proxy-local keys retires this limitation.
 - Tests cover defaults, omitted values, global precedence, identical/conflicting legacy values, one-call startup,
   best-effort errors, cap bootstrap, and current-month retention boundaries.
 - Add a marked D015 regression that fails on the dual-pruner merged-main baseline.
-- `docs/design.md`, `docs/design_appendix.md`, runtime configuration docs, and operator guidance move ownership only
-  when the implementation ships.
+- `docs/design.md`, the former consolidated design appendix, runtime configuration docs, and operator guidance move
+  ownership only when the implementation ships.
 
 ## Verification
 

@@ -22,7 +22,7 @@ Ready.
 ## Relevant Files
 
 - src/forge/session/transfer.py:895
-- docs/design_appendix.md
+- docs/design_sessions.md
 
 ## Open Questions
 

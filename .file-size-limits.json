@@ -1,0 +1,102 @@
+{
+  "_comment": "Repository-owned file size policy. Rules are checked in order; first match wins.",
+  "_usage": "Markdown near its target is counted with Claude Opus 5. Provider use and cached evidence are explicit in this tracked policy.",
+  "_patterns": "No slash matches a basename. Slash-separated patterns match the full relative path by segment.",
+  "_limits": "Provider-backed prose uses Anthropic counts for target and hard-limit verdicts. Its tiktoken target is a conservative one-way screen only; above it, a matching content-hash provider count is required. Local-only source rules use tiktoken as their authoritative hard limit.",
+  "token_count": {
+    "methods": [
+      "claude-opus-5",
+      "local-tiktoken"
+    ],
+    "cache": ".file-token-counts.json"
+  },
+  "rules": [
+    {
+      "pattern": "docs/board/done/*/*.md",
+      "max_lines": 5000,
+      "target_tokens": {
+        "anthropic": 40000,
+        "tiktoken": 20000
+      },
+      "max_tokens": {
+        "anthropic": 40000
+      }
+    },
+    {
+      "pattern": "*.md",
+      "max_lines": 2500,
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000
+      }
+    },
+    {
+      "pattern": "*.txt",
+      "max_lines": 2000,
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000
+      }
+    },
+    {
+      "_comment": "Source rules pin local-tiktoken so source never leaves the machine. Multi-Forge keeps its established local ceilings; prose calibration does not redefine source limits.",
+      "pattern": "test_*.py",
+      "max_lines": 5000,
+      "token_methods": [
+        "local-tiktoken"
+      ],
+      "max_tokens": {
+        "tiktoken": 50000
+      }
+    },
+    {
+      "pattern": "*.py",
+      "max_lines": 2500,
+      "token_methods": [
+        "local-tiktoken"
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
+    },
+    {
+      "pattern": "*.js",
+      "max_lines": 2500,
+      "token_methods": [
+        "local-tiktoken"
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
+    },
+    {
+      "pattern": "*.ts",
+      "max_lines": 2500,
+      "token_methods": [
+        "local-tiktoken"
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
+    },
+    {
+      "pattern": "*.rst",
+      "max_lines": 2500,
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000
+      }
+    }
+  ],
+  "whitelisted_paths": [],
+  "_probe": "For provider-backed prose, target_tokens.tiktoken is the conservative local screen. A file clearing it locally is accepted without a provider call. Above it, pre-commit requires a current SHA-256-keyed count in .file-token-counts.json; a keyful refresh command obtains that evidence from Claude Opus 5. A fallback tiktoken count never decides the provider target or ceiling."
+}

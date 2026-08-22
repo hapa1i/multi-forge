@@ -64,9 +64,9 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
 
 - [x] `docs/cli_reference.md`: added `forge extension doctor` to the Installation table (`--json`).
 - [x] `docs/design.md` §5.1: new opening paragraph frames the two install layers -- the `forge` tool (global-tool
-  install, prerequisite) vs extensions into `.claude/`; names `forge extension doctor`. `docs/design_appendix.md` §C:
-  lead-in documents the tool distribution, the four install kinds + detection rules, the minimal-PATH probe semantics,
-  and the `--json` shape (anchor-safe -- no §C.1--C.6 renumbering).
+  install, prerequisite) vs extensions into `.claude/`; names `forge extension doctor`. `docs/design_installation.md`
+  §C: lead-in documents the tool distribution, the four install kinds + detection rules, the minimal-PATH probe
+  semantics, and the `--json` shape (anchor-safe -- no §C.1--C.6 renumbering).
 - [x] `docs/end-user/README.md` install guide reflects the Day-1 global install (done in Phase 2).
 - **Assertion (met):** cli_reference + design.md §5.1 + appendix §C name `forge extension doctor` and the global-install
   Day-1 path; board_contract "Design Doc Sync" satisfied (CLI + installer + Day-1 behavior all covered).

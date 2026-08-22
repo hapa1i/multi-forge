@@ -49,4 +49,4 @@ No Forge workflow command is authorized for this member.
 - `uv build` and `./scripts/test-wheel-runtime.sh` passed; the Docker lifecycle exercised built-wheel dual-runtime
   enable, sync, runtime-scoped disable, and full disable.
 - Full pre-commit passed after expected Markdown normalization. Opus 5 local counts are 29,985 for `design.md` and
-  29,984 for `design_appendix.md`; 894 local links across 369 board documents resolve.
+  29,984 for the former consolidated design appendix; 894 local links across 369 board documents resolve.

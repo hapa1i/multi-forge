@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
-**Finding**: D005 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D005 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- implemented and verified on `fix/preserve-supervisor-edit-identity`; review and merge are tracked
 by the active epic before Wave 1 closes.
@@ -65,8 +66,9 @@ remains an independent bounded-presentation concern and must not reduce cache id
 Cache contents are runtime-only and may be invalidated; no durable migration is required. Do not change hook wire
 formats, deterministic regex-policy inputs, multi-file ordering, whole-file deletion handling, or cache TTL policy.
 Avoid placing raw action content in logs or persisted cache keys; hash the canonical representation. Shadow
-configuration reconstruction is outside this member: [D026](../../review_combined.md#design-conformance-findings) and
-its omitted `supervisor_effort` remain separately owned and must not be partially fixed here.
+configuration reconstruction is outside this member:
+[D026](../../reviews/whole_repo_design_findings.md#design-conformance-findings) and its omitted `supervisor_effort`
+remain separately owned and must not be partially fixed here.
 
 ## Outcome
 

@@ -28,7 +28,7 @@ Current focus: complete -- order 22 shipped in PR #201 (`b350b4d5`); orders 23--
 - [x] Run the focused direct script tests (six passed) and real default, explicit-local, and provider repository
   token-count smokes.
 - [x] Run the full unit suite (9,216 passed, 1 skipped, 122 deselected) and regression suite (915 passed).
-- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,986) and `design_appendix.md` (29,987) stay
-  below 30,000 tokens; and audit 356 board documents, 882 local links, zero missing links, and Wave 7's 21 done / one
-  doing / 13 todo lanes without a Forge workflow.
+- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,986) and the former consolidated design
+  appendix (29,987) stay below 30,000 tokens; and audit 356 board documents, 882 local links, zero missing links, and
+  Wave 7's 21 done / one doing / 13 todo lanes without a Forge workflow.
 - [x] Open PR #201, merge it as `b350b4d5` after all five checks pass, and close order 22 without activating order 23.

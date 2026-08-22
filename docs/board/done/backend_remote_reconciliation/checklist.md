@@ -39,7 +39,7 @@ a 32-agent adversarial review, and ready to open. Closeout (lane move) follows t
   `_warned_absent_backend_source` latch (not the value-keyed unknown-source set).
 - [x] Genericize provider-coupled comments/docstrings (`run_id.py`, `reactive/env.py`, `reactive/tagger.py`,
   `ops/provider_trace.py`, `converters.py`, `client_adapter.py`, `provider_trace_logger.py`) and normative docs
-  (`design.md` §3.14, `design_appendix.md` §A.14, `cli_reference.md`, `end-user/proxy.md` incl. the alias note).
+  (`design.md` §3.14, `design_telemetry.md` §A.14, `cli_reference.md`, `end-user/proxy.md` incl. the alias note).
 - [x] Tests updated to the new names + removed fallback; new regression
   `tests/regression/test_bug_provider_trace_inject_alias.py` (old key honored + one warning, new key wins, no
   unknown-key reject). Focused suite: 185 passed.
@@ -99,7 +99,7 @@ a 32-agent adversarial review, and ready to open. Closeout (lane move) follows t
 
 ### PR 2 docs + verification
 
-- [x] `docs/cli_reference.md` (`forge backend reconcile` row), `docs/design_appendix.md` §A.14 (remote-reconcile op /
+- [x] `docs/cli_reference.md` (`forge backend reconcile` row), `docs/design_telemetry.md` §A.14 (remote-reconcile op /
   adapter-registry seam / comparative buckets / deferred window), `docs/end-user/proxy.md` remote-reconcile subsection.
 - [x] `uv run pytest tests/src/core/ops/test_backend_reconciliation.py tests/src/cli/test_backend_reconcile.py tests/src/backend/remote/test_openrouter_remote.py`
   -> 52 passed; broader `tests/src/{backend,core/ops,cli}` -> 2322 passed; `make pre-commit` clean (mypy + pyright).
@@ -137,7 +137,7 @@ protocol already declares the window methods + per-path credential fields, so no
 - [x] change_log entries: PR 1 (2026-06-19) and PR 2 (2026-06-20) -- newest-first.
 - [x] Promote durable lessons to `impl_notes.md` after human review (promoted 2026-06-20: registry-presence capability +
   total external-data coercers; plus the review-agent worktree-isolation hazard).
-- [x] Verify design/end-user docs match shipped behavior (cli_reference, design_appendix §A.14, end-user/proxy.md
+- [x] Verify design/end-user docs match shipped behavior (cli_reference, design_telemetry.md §A.14, end-user/proxy.md
   updated in PR 1 + PR 2).
 - [x] Move `doing/backend_remote_reconciliation -> done/backend_remote_reconciliation` after the PR 2 merge (this
   commit).

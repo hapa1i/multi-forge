@@ -204,9 +204,9 @@ post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project 
   not implemented; seam stays `enrollment_gated`; `untrusted` reserved for a future source-dive) + the stale registry
   `note`/comment claims rewritten + `design.md` §5.5.5 sync.
   - Assertion: no "unprobed"/"only SessionStart"/"settles pre-enrollment" claim remains in the normative surfaces
-    (`docs/design.md`, `docs/design_appendix.md`, `src/`, `tests/src/`); board card/checklist round-2 snapshot lines
-    annotated as superseded by round 3; registry + preflight + CLI tests assert the new values; preflight behavior
-    unchanged.
+    (`docs/design.md`, the former consolidated design appendix, `src/`, `tests/src/`); board card/checklist round-2
+    snapshot lines annotated as superseded by round 3; registry + preflight + CLI tests assert the new values; preflight
+    behavior unchanged.
   - **Done 2026-06-10**: 63 runtime/preflight/CLI unit tests green (assertions updated to `partial`); mypy clean;
     stale-claim grep empty over the normative surfaces above; card.md/checklist.md round-2 snapshots annotated; live
     `forge runtime list --json` renders `pretool_policy: partial`; change_log entry.
@@ -550,7 +550,7 @@ per-project config; the committed-vs-not distinction is the user's gitignore cho
     presence-gated skip, user-content preservation through the cycle); file 15/15 green (12 pre-existing unchanged).
 
 - [x] Slice 6 -- docs/board sync: design.md §5 install model + §4.1.4/§3.9 "manual registration until Phase 6" caveats
-  rewritten to installer-registered (+ceremony); design_appendix §E module table + codex registration subsection;
+  rewritten to installer-registered (+ceremony); design_installation.md §C module table + codex registration subsection;
   end-user hook.md "not auto-installed" bullets replaced; change_log entry.
 
   - Assertion: grep gate -- no stale "not auto-installed"/"installer support is planned" claim on normative surfaces;
@@ -595,7 +595,7 @@ and confirmation* surface even though the underlying behavior is codex-cli's.
   `scripts/experiments/codex-hooks/upstream-issues/pretooluse-malformed-fails-open.md` (probe 30h reproduction). **Owed
   before filing**: the exact codex docs citation + `gh issue create --repo openai/codex` (outward-facing —
   operator-confirmed).
-- [x] Docs synced: design.md §5 (verify-enrollment), design_appendix §N.3 (both guards), card Risks bullets annotated
+- [x] Docs synced: design.md §5 (verify-enrollment), design_sessions.md §I.3 (both guards), card Risks bullets annotated
   with the shipped mitigations.
 
 ## Deferred

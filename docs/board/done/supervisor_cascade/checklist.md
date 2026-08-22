@@ -87,7 +87,7 @@
 ## Slice 6 — Docs + closeout
 
 - [x] `design.md` §4.1.2 cascade block + §4.1.5 resolver-hop sentence + CLI table row.
-- [x] `design_appendix.md` §D ownership rows; §A.13 per-emitter table `plan-check` row.
+- [x] the former consolidated design appendix §D ownership rows; §A.13 per-emitter table `plan-check` row.
 - [x] `docs/end-user/policy.md` cascade subsection.
 - [x] `change_log.md` entry (Goal / Key changes / Verification). Durable lessons drafted for impl_notes (human gate).
 - [x] Card moved from `doing/` to `done/` on `main`.

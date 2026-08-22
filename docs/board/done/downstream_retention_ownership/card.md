@@ -29,8 +29,8 @@ Choose and document:
 ## Evidence
 
 - Review: [`review_combined.md` DG3 and D015](../../review_combined.md#decision-gates).
-- Audit configuration: `docs/design_appendix.md` §A.11.
-- Unified provider lifecycle retention: `docs/design_appendix.md` §A.14.
+- Audit configuration: `docs/design_telemetry.md` §A.11.
+- Unified provider lifecycle retention: `docs/design_telemetry.md` §A.14.
 - Startup pruners: `src/forge/proxy/server.py:228,245` at the review baseline.
 
 ## Decision

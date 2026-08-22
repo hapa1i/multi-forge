@@ -21,8 +21,8 @@ migration.
 Rechecked on `9a334b18`: `generated_file` still appears only in the `MemoryIntent` declaration and one direct
 deserialization fixture; no source, resource, extension, CLI, or documentation path consumes it. `SessionStore.read`
 already strips two retired fields before strict dacite decoding, providing the established migration seam. Authority:
-[`docs/design.md` "3.3 Session file schema"](../../../design.md#33-session-file-schema-forgesessionjson) and DG4's
-durable-state rule.
+[`docs/design_sessions.md` "3.3 Session file schema"](../../../design_sessions.md#33-session-file-schema-forgesessionjson)
+and DG4's durable-state rule.
 
 ## Acceptance Criteria
 

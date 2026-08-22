@@ -145,8 +145,9 @@ Acceptance (Phase 2):
 ## Phase 3 -- Design-doc sync (ship with the code)
 
 - [x] `design.md` §3.2 contract-files table: add `~/.forge/projects.json` (owner, purpose, versioned durable state).
-- [x] `design_appendix.md`: document the schema, the single canonicalization rule (mechanism + macOS case/Unicode
-  handling), and the strict-CLI / fail-open-hook read split (with the detect-and-surface `degraded` contract).
+- [x] the former consolidated design appendix: document the schema, the single canonicalization rule (mechanism + macOS
+  case/Unicode handling), and the strict-CLI / fail-open-hook read split (with the detect-and-surface `degraded`
+  contract).
 - [x] **Disambiguate the lookalike files** in the docs: `~/.forge/projects.json` (user-global, machine-written trust
   registry) vs `.forge/project.toml` (repo-local, user-authored compat pin) -- one line so a reader never conflates
   them.

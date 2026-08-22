@@ -20,7 +20,7 @@ importer; `AbstractLLMClient` has no implementer; no production path raises `Too
 methods have zero callers. The synthetic ToolCallError metrics test is the only live behavior worth moving.
 Compatibility is governed by
 [`docs/developer/coding_standards.md` "Compatibility evidence before deletion"](../../../developer/coding_standards.md#compatibility-evidence-before-deletion)
-and [`docs/design_appendix.md` "E. Shared LLM Client"](../../../design_appendix.md#e-shared-llm-client-srcforgecorellm).
+and [`docs/design.md` "E. Shared LLM Client"](../../../design.md#e-shared-llm-client-srcforgecorellm).
 
 ## Acceptance Criteria
 

@@ -29,7 +29,7 @@ concurrent artifact refresh cannot make index state describe newer bytes than th
 
 Authority comes from the exact-state ordering contract in
 [`wire_transcript_reindex_guard`](../../done/wire_transcript_reindex_guard/card.md) and the search artifact boundary in
-[`docs/design.md`](../../../design.md#38-session-artifacts-plans--transcripts).
+[`docs/design_sessions.md`](../../../design_sessions.md#38-session-artifacts-plans-transcripts).
 
 ## Acceptance criteria
 

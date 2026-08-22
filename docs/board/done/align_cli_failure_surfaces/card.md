@@ -19,7 +19,7 @@ split to stdout; four editor paths still pass the whole `$EDITOR` string as argv
 empty-output exit 1 for JSON scalars and `workspace: null`, a raw `ValueError` for malformed IPv6 syntax, exit 0 for
 both missing-command cases, and the two split-stream failures. The authority is
 [`docs/developer/cli_style_guidelines.md`](../../../developer/cli_style_guidelines.md) plus
-[`docs/design_appendix.md` §A.8](../../../design_appendix.md#a8-status-line-guidance-3611).
+[`docs/design_telemetry.md` §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611).
 
 The retained final regression artifact collected `19 failed, 4 passed` on that unchanged production cursor. Ten failures
 cover top-level/workspace input shapes and malformed proxy URL syntax, five cover root/show exit and diagnostic streams,

@@ -10,7 +10,7 @@ Its `checklist.md` was for coordination and sequencing only; member cards remain
 downstream source key, provider-trace is source-capability gated, and the final consumer
 [`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) shipped via PR #41 (generic refactor) + PR
 #42 (`forge backend reconcile` MVP). With all members in `done/`, the epic closes -- the shared contract is fully
-discharged and the normative design docs (design.md §3.14, design_appendix §A.14) are now the source of truth.
+discharged and the normative design docs (design.md §3.14, design_telemetry.md §A.14) are now the source of truth.
 
 ## Why an epic, not a merged card
 
@@ -102,7 +102,7 @@ coupling -- contract item 2) then PR 2 (MVP single-id `forge backend reconcile`)
 closes to `done/`. The shared contract held end to end: remote reconciliation consumed the shipped
 downstream/`backend_id` + `core/usage/measurement.py` seam (contract item 4) rather than re-authoring it, and
 provider-trace is fully source-capability gated (contract item 2). Normative architecture lives in design.md §3.14 and
-design_appendix §A.14; the standalone [`openrouter_user_direct_callers`](../openrouter_user_direct_callers/card.md)
+design_telemetry.md §A.14; the standalone [`openrouter_user_direct_callers`](../openrouter_user_direct_callers/card.md)
 follow-on is an independent card, not an epic member.
 
 ## Not in scope here

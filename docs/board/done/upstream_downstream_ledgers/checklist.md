@@ -89,8 +89,8 @@ Locked implementation decisions (2026-06-18):
   downstream shards so retention cannot erase active-month spend before cap bootstrap.
 - [x] Keep cap accounting off the best-effort write path; bootstrap reconciliation must not treat missing downstream
   writes as authoritative zero spend.
-- [x] Update [design.md](../../../design.md) §3.14 and [design_appendix.md](../../../design_appendix.md) schema notes
-  for any durable schema decisions made in this phase, or record the deferral as checklist debt.
+- [x] Update [design.md](../../../design.md) §3.14 and [telemetry design](../../../design_telemetry.md) schema notes for
+  any durable schema decisions made in this phase, or record the deferral as checklist debt.
 - [x] Add fixture-driven tests for permissions, malformed lines, newer schemas, nullable cost, and no plaintext body
   persistence.
 
@@ -151,12 +151,12 @@ Locked implementation decisions (2026-06-18):
 ## Phase 5 -- Migration, Docs, And Closeout
 
 - [x] Update [design.md](../../../design.md) §3.14 and related sections to describe the two-plane model as shipped.
-- [x] Update [design_appendix.md](../../../design_appendix.md) with upstream/downstream schemas, retention, read policy,
-  and migration/reset guidance.
+- [x] Update [design_telemetry.md](../../../design_telemetry.md) with upstream/downstream schemas, retention, read
+  policy, and migration/reset guidance.
 - [x] Update [cli_reference.md](../../../cli_reference.md) for any changed `forge activity`, `forge proxy costs`, or
   diagnostic command behavior.
 - [x] Update relevant end-user docs for cost/activity/proxy telemetry behavior.
-- [x] Verify [design.md](../../../design.md) §3.14, [design_appendix.md](../../../design_appendix.md) §A.12-A.14,
+- [x] Verify [design.md](../../../design.md) §3.14, [design_telemetry.md](../../../design_telemetry.md) §A.12-A.14,
   [cli_reference.md](../../../cli_reference.md), and end-user cost/activity docs match shipped behavior after the open
   Phase 2/3/4 items land.
 - [x] Add a compact change-log entry when implementation ships.

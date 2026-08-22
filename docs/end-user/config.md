@@ -90,7 +90,7 @@ proxy with `forge proxy stop <id> && forge proxy start <id>` after changing prox
 retention or `log_tool_failures`.
 
 **In-session access (read-only):** Type `%config` in the Claude prompt to see effective config. See
-[hook.md](hook.md#in-session-commands--commands) for all `%` commands.
+[hook.md](hook.md#in-session-commands-commands) for all `%` commands.
 
 ---
 

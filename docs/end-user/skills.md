@@ -438,7 +438,7 @@ forge extension enable --scope project
 forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
-See [design_appendix.md §C.5](../design_appendix.md#c5-multi-scope-installation-skill-resolution) for details.
+See [design_installation.md §C.5](../design_installation.md#c5-multi-scope-installation-skill-resolution) for details.
 
 ### Panel fails with "No active proxy found"
 

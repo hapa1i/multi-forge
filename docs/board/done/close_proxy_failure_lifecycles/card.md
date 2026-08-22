@@ -16,8 +16,8 @@ read itself fails.
 Rechecked on merged `main` at `4774f69e`: failed `start_proxy(..., skip_proxy_file=True)` removes the registry entry
 while preserving `proxy.yaml`. Both passthrough transports read non-200 bodies before entering a cleanup guard. The
 lifecycle and passthrough contracts are in
-[`docs/design_appendix.md` §A.1](../../../design_appendix.md#a1-proxy-overlay-schema-364--user-edit-surface) and
-[§A.11](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x).
+[`docs/design_runtime.md` §A.1](../../../design_runtime.md#a1-proxy-overlay-schema-364-user-edit-surface) and
+[§A.11](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x).
 
 ## Acceptance Criteria
 

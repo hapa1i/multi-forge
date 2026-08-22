@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
-**Finding**: D001 (CRITICAL) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D001 (CRITICAL) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- implemented and verified on `fix/preserve-policy-intent-on-enable` as the first Wave 1 member.
 

@@ -73,10 +73,10 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   fail-loud contract: no dispatch, no freeze, and a `CurationResult.error` naming the re-pin/clear path; `None` resolves
   to the default Claude lane. Verified: `test_invalid_explicit_lane_fails_loud_no_dispatch_no_freeze`,
   `test_unknown_runtime_fails_loud_not_silent_claude`.
-- [x] **Broaden the Claude-specific freeze wording** to runtime dispatch. `design.md`, `design_appendix.md`, and
-  `consumer_lane_freeze.py` described the aux freeze as firing "at the actual `run_claude_session` call" -- stale for
-  the codex arm, which freezes after the preflight gate and before `codex exec`. Reworded to "the actual runtime
-  dispatch (`run_claude_session`, or `codex exec` on shadow-curation's codex lane)".
+- [x] **Broaden the Claude-specific freeze wording** to runtime dispatch. `design.md`, the former consolidated design
+  appendix, and `consumer_lane_freeze.py` described the aux freeze as firing "at the actual `run_claude_session` call"
+  -- stale for the codex arm, which freezes after the preflight gate and before `codex exec`. Reworded to "the actual
+  runtime dispatch (`run_claude_session`, or `codex exec` on shadow-curation's codex lane)".
 
 ## Review follow-ups (2026-06-30, commits `f819cfea` + `5ff3f646` + `05cafaf0`)
 
@@ -92,9 +92,9 @@ Three P3 nits from a re-review of the round-1/2 work:
   clears both env vars, and `_require_codex_ready_cached` fails loud unless the live preflight resolves
   `auth_source=codex_store` / `subscription_quota` (actionable message instead of a confusing downstream mismatch).
   Re-ran the real-codex E2E: green (19.9s).
-- [x] **Sync the dispatch wording** (`design_appendix.md`, this card's "What T6b adds" table). Both said the CLI threads
-  `dispatched_lane.runtime_id`; the code threads the full `LaneRecord` and validates it via `resolve_lane` before arm
-  selection. Reworded to match the shipped seam.
+- [x] **Sync the dispatch wording** (the former consolidated design appendix, this card's "What T6b adds" table). Both
+  said the CLI threads `dispatched_lane.runtime_id`; the code threads the full `LaneRecord` and validates it via
+  `resolve_lane` before arm selection. Reworded to match the shipped seam.
 
 ## Phase 2 -- observability + docs (design synced; closeout pending)
 
@@ -102,12 +102,13 @@ Three P3 nits from a re-review of the round-1/2 work:
   code in T6b). The `runtime=codex` / `billing_mode=subscription_quota` usage event (`forge telemetry activity`) rides
   the invoker's `emit_codex_usage` (shared with T4) and is now asserted by the real-codex E2E
   (`test_shadow_curation_codex_smoke.py`). No T6b-specific observability code was needed.
-- [x] Design-doc sync: `design_appendix.md` consumer-lane note extended with a **Shadow-curation codex arm (T6b)**
-  paragraph (fail-loud vs fail-open, `operation` pinned vs the supervisor's `None`, freeze-past-the-skip-gate) and the
-  T6a `claude-max` paragraph's "no codex arm; that is T6b" forward-ref narrowed. `cli_reference.md` lane-set bullet now
-  states `--runtime codex` dispatches a real arm for `supervisor`/`shadow_curation` only. `design.md` resolver narrative
-  needed no change (runtime-keyed dispatch already described). end-user `policy.md`/`memory.md`: no change -- the curate
-  UX is unchanged except the new fail-loud preflight hint, which is self-explanatory.
+- [x] Design-doc sync: the consumer-lane note in the former consolidated design appendix gained a **Shadow-curation
+  codex arm (T6b)** paragraph (fail-loud vs fail-open, `operation` pinned vs the supervisor's `None`,
+  freeze-past-the-skip-gate) and the T6a `claude-max` paragraph's "no codex arm; that is T6b" forward-ref narrowed.
+  `cli_reference.md` lane-set bullet now states `--runtime codex` dispatches a real arm for
+  `supervisor`/`shadow_curation` only. `design.md` resolver narrative needed no change (runtime-keyed dispatch already
+  described). end-user `policy.md`/`memory.md`: no change -- the curate UX is unchanged except the new fail-loud
+  preflight hint, which is self-explanatory.
 - [x] Epic updated: `epic_consumer_lanes/checklist.md` current-focus + roster note "Phase 1 landed in-branch"; T6c
   (memory-writer) + team-supervisor deferral already recorded in the epic card T6b row and this card.
 

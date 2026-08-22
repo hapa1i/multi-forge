@@ -22,7 +22,7 @@ Only `add_from_state` calls another member internally; 18 executable calls remai
 ordinary fixture to transaction-safe builders. The authority is
 [`docs/design.md` "3.2 Contract files"](../../../design.md#32-contract-files-authoritative-paths) and the row-first
 transaction contract in
-[`docs/design.md` "3.3 Session file schema"](../../../design.md#33-session-file-schema-forgesessionjson).
+[`docs/design_sessions.md` "3.3 Session file schema"](../../../design_sessions.md#33-session-file-schema-forgesessionjson).
 
 ## Acceptance Criteria
 

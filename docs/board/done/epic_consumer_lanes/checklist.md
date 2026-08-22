@@ -9,9 +9,9 @@ T1a (PR #51, `b84e2462`), T3 (PR #52, `e66490af`), **T2** (PR #54, squash `ff3b9
 are all **done** -- the spine (pure resolver + byte-identical Claude-default supervisor), the backend axis
 (runtime-native subscription sources), and the headline capability demo (codex-exec supervisor lane) are on `main`, all
 four cards in `done/`. T2's three decisions are resolved (A = Option (c), user 2026-06-26: `runtime_native` owns its
-auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and `design_appendix.md` §A.2.1 is synced. T4
+auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and `design_runtime.md` §A.2.1 is synced. T4
 proved a swappable non-Claude lane behind the narrow `SupervisorConfig.supervisor_runtime` field (blind/transfer-fed,
-read-only, direct-to-OpenAI, fail-open); it also synced `design.md` §3.6.12 + `design_appendix.md` §G to describe both
+read-only, direct-to-OpenAI, fail-open); it also synced `design.md` §3.6.12 + `design_runtime.md` §G to describe both
 supervisor arms, closing the §G/§3.6.12 sync T3 deferred. **T5** (lane observability) is **done** (PR #56, `4fc705b4`)
 and closed to `done/lane_observability/`: two honest read surfaces (`forge telemetry activity` per-call
 `runtime`/`billing_mode`; `forge policy supervisor status` the full `(runtime, backend, model)` lane), the three M3
@@ -133,26 +133,26 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 
 ## Design-doc sync (board_contract "Design Doc Sync")
 
-- [x] T2 ships -> update `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
+- [x] T2 ships -> update `design_runtime.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
   `reachable_via`; `chatgpt` added to the shipped-catalog table; operator-view paragraph documents the runtime-owned
   read surface). Done on branch `backend_subscription_sources`.
-- [x] T1a/T3 ship -> update `design_appendix.md` §G + `design.md` §3.6.12 (lane resolver layered over subprocess
+- [x] T1a/T3 ship -> update `design_runtime.md` §G + `design.md` §3.6.12 (lane resolver layered over subprocess
   routing). **Done in T4 (PR #55):** §G's consumer-lane paragraph describes both supervisor arms (claude_code default +
   codex override); §3.6.12 notes the codex arm bypasses the proxy chain. (T3 deferred this "to >1 wired consumer"; T4 is
   that consumer.)
-- [x] T5 ships -> update `design_appendix.md` §G (Observability paragraph: the two read surfaces + `operation=None`
+- [x] T5 ships -> update `design_runtime.md` §G (Observability paragraph: the two read surfaces + `operation=None`
   upstream-parity fix; per-emitter coverage table gains checker/reviewer/team-tagger rows) and `cli_reference.md`
   (`forge telemetry activity` lane columns + `forge policy supervisor status` row). Done in PR #56.
 - [x] T1b ships -> updated `design.md` §3.5 (`intent.consumer_lanes` CLI-written, `confirmed.consumer_lanes`
   hook-written write-once) + §3.6.2 (consumer-lane binding invariant: intent=requested, confirmed=frozen/immutable);
-  `design_appendix.md` §G (supervisor lane now the persisted/frozen `consumer_lanes` binding, hook-injected; T5
+  `design_runtime.md` §G (supervisor lane now the persisted/frozen `consumer_lanes` binding, hook-injected; T5
   observability reads the frozen binding, `not executable` on drift); `cli_reference.md` (`--supervisor-runtime` launch
   control + `set --runtime` row + status drift). Done on branch `consumer_lane_binding` (Slice 5).
 
 ## Closeout (epic) -- DONE 2026-07-01
 
 - [x] Epic -> `done/`. Every *live* member is `done/` (T1a/T2/T3/T4/T5/T1b/T6a/T6b/T6c + sibling T0 + T7) and the shared
-  lane contract is folded into normative design docs (design.md §3.5/§3.6.2, design_appendix.md §G), meeting the
+  lane contract is folded into normative design docs (design.md §3.5/§3.6.2, design_runtime.md §G), meeting the
   board_contract "Epics" close criterion. T6c shipped and closed to `done/memory_writer_codex_dispatch/` (PR #62). The
   last deferred follow-on -- **team-supervisor codex dispatch** -- is **re-filed as a standalone card**
   (`docs/board/proposed/team_supervisor_plan_context/`), **not** an outstanding epic member: it is blocked on

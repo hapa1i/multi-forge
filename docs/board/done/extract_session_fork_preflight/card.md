@@ -19,7 +19,7 @@ resolution, transfer/rewind strategy, routing, and later mutation. Its preflight
 proxies before the mutation call, while target/session checks are split between the callback and `SessionManager`. Wave
 6 already established that launch prerequisites must run before child creation. Authority:
 [`docs/design.md` "3.12 Command-core ops"](../../../design.md#312-command-core-ops-shared-implementation),
-[`docs/design.md` "3.9 Session Resume"](../../../design.md#39-session-resume-context-management), and
+[`docs/design_sessions.md` "3.9 Session Resume"](../../../design_sessions.md#39-session-resume-context-management), and
 [`docs/developer/cli_style_guidelines.md` "Command Shape"](../../../developer/cli_style_guidelines.md#command-shape).
 
 ## Acceptance Criteria

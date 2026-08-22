@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: D021 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D021 (MEDIUM) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #140 (`ecc79aa2`) on 2026-08-07.
 
@@ -15,8 +16,8 @@ of rewriting it as a retry failure and eventually moving it out of the live queu
 
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#forge-owned-durable-state): unsupported newer
   schemas require an actionable upgrade error and cannot be silently coerced.
-- [`docs/design.md` §3.13](../../../design.md#313-async-work-queue) and
-  [`docs/design_appendix.md` §B.2](../../../design_appendix.md#b2-processing-contract): retry metadata and poison moves
+- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue) and
+  [`docs/design_sessions.md` §B.2](../../../design_sessions.md#b2-processing-contract): retry metadata and poison moves
   describe handler failures, while skipped work remains pending.
 - PR #139 (`de8adaac`): bounded windows with resident deferred or skipped work advance `.scan-cursor`; D021 must join
   that outcome so future markers cannot pin later actionable work behind the startup cap.
@@ -51,7 +52,7 @@ outcome.
   and no attempt, error, or failed count for the newer marker.
 - Docker startup-queue coverage proves a non-exempt JSON command leaves the future marker unchanged, processes a later
   current-schema marker, keeps stdout as one valid document, and emits upgrade guidance on stderr.
-- Update `docs/design_appendix.md` §B.2 with the shipped newer-schema outcome.
+- Update `docs/design_sessions.md` §B.2 with the shipped newer-schema outcome.
 - Run `tests/src/core/workqueue/test_queue.py` and `tests/src/cli/test_startup_queue.py`, then
   `./scripts/test-integration.sh tests/integration/cli/test_startup_queue_integration.py`, `make test-regression`, and
   `make pre-commit`.
@@ -86,4 +87,5 @@ The first future marker in a process contributes one actionable upgrade diagnost
 later future markers remain silent without changing foreground JSON. Future markers participate in PR #139's bounded
 scan cursor, so a window full of unsupported work yields to later current-schema markers. Malformed JSON,
 missing/non-integer/older schema versions, lock contention, absent handlers, handler failures, and poison markers retain
-their existing outcomes. The normative queue contract is synchronized in `docs/design.md` and `docs/design_appendix.md`.
+their existing outcomes. The normative queue contract is synchronized in `docs/design.md` and the former consolidated
+design appendix.

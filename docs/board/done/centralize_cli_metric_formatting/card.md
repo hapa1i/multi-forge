@@ -19,7 +19,7 @@ adaptive two-to-six-decimal cost detail, four-decimal sub-cent activity detail, 
 fractional-cent status metrics, and four-decimal tiny-cap precision. Collapsing these into one hard-coded format would
 create UX drift. The unchanged proxy, cost, activity, and status-line characterization passes 600 tests. Authority:
 [`docs/developer/cli_style_guidelines.md`](../../../developer/cli_style_guidelines.md) and
-[`docs/design_appendix.md` "A.8 Status line guidance"](../../../design_appendix.md#a8-status-line-guidance-3611).
+[`docs/design_telemetry.md` "A.8 Status line guidance"](../../../design_telemetry.md#a8-status-line-guidance-3611).
 
 ## Acceptance Criteria
 

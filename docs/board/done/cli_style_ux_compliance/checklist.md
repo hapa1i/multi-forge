@@ -80,7 +80,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - [x] **A2** -- delete `[1m]` from the `--model` help string (`session_lifecycle.py:909`). **Assertion:**
   `forge session start --help` renders `...claude-sonnet-4-6)` with no `[1m]`; a help-render test asserts `[1m]` absent.
   **Coupling:** `session_op_layer_extraction` will refactor this file -- land A2 first as a one-char fix; do not block
-  on that card (card [Sequencing](card.md#sequencing--coupling)).
+  on that card (card [Sequencing](card.md#sequencing-coupling)).
 - [x] **A4** -- add `--json` (dest `as_json`) to `search clean_cmd` (`search.py:383`); emit a stable
   preview/pruned-count shape matching `forge clean --json`, human path unchanged. **Assertion:** `search clean --json`
   prints parseable JSON on **stdout**, diagnostics on **stderr**, and a preview run reports the orphan count without
@@ -247,8 +247,8 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - [x] C2 has a closure state before moving this card to `done/`: either the public wording pass shipped here, or it was
   explicitly deferred to a named follow-up separate from `backend_instance_identity_model`.
 - [x] Integration: none expected (host CLI + help rendering; no `claude -p`/Docker path). Confirm and record.
-- [x] Docs synced for behavior changes: `cli_reference.md` (A5 logs group, C1 `--period`), `design_appendix.md` /
-  `end-user/*` where the changed surface is documented.
+- [x] Docs synced for behavior changes: `cli_reference.md` (A5 logs group, C1 `--period`), the former consolidated
+  design appendix / `end-user/*` where the changed surface is documented.
 - [x] `docs/board/change_log.md` updated per shipped slice (S2/S3/S5 name their clean breaks; B pass is one polish
   entry).
 - [x] cli_style index (this card) annotated per shipped slice; refuted-candidate list in `card.md` preserved.

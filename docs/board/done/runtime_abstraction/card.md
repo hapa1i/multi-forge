@@ -56,8 +56,8 @@ The current implementation already separates model gateways and subprocess routi
   cost decisions.
 - `derive_model_routes()`, `resolve_subprocess_routing()`, and `WorkerRoutingPlan` move workflow routing toward a
   capability-based contract that can later feed non-Claude invokers (see
-  [design.md §3.6.12](../../../design.md#3612-subprocess-routing-resolution-normative) and
-  [design_appendix.md §L](../../../design_appendix.md#l-subprocess-routing-reference) for the current contract).
+  [design.md §3.6.12](../../../design_runtime.md#3612-subprocess-routing-resolution-normative) and
+  [design_runtime.md §L](../../../design_runtime.md#g-subprocess-routing-reference) for the current contract).
 - `--subprocess-proxy` lets a direct Claude Code frontend route headless child work through an API-backed proxy, which
   is an important transitional bridge.
 - Proxy request logs, verb-level cost attribution, `forge proxy costs`, and per-proxy spend caps provide an initial
@@ -573,9 +573,9 @@ identical requests with identical token counts begin producing a more sycophanti
 alone cannot identify that drift without an eval or golden-prompt layer.
 
 **Implementation path: lean on sidecar mode.** Forge already has `--sidecar` mode (see
-[design.md §7](../../../design.md#7-isolation-and-proxy-modes)) which bundles Claude Code + Forge proxy in a single
-Docker container, sharing networking and lifecycle. This is the cleanest implementation surface for an always-on proxy
-because:
+[design.md §7](../../../design_runtime.md#7-isolation-and-proxy-modes)) which bundles Claude Code + Forge proxy in a
+single Docker container, sharing networking and lifecycle. This is the cleanest implementation surface for an always-on
+proxy because:
 
 - The proxy is guaranteed to be running when Claude Code is running (lifecycle coupling, not advisory).
 - `ANTHROPIC_BASE_URL` resolves to the in-container proxy by construction; no accidental direct-mode escape.
@@ -712,11 +712,11 @@ because such rewrites might be cryptographically allowed.
 ### Curated Transfer as Cross-Runtime Substrate
 
 > **Vocabulary (reconciled with the shipped transfer taxonomy, 2026-05-30).** This card was drafted using "curated
-> handoff." The shipped taxonomy ([design.md §3.9](../../../design.md#39-session-resume-context-management)) calls
-> resume/fork context assembly **transfer** (`transfer.py`, `--resume-mode transfer`, `assemble_transfer_context`), and
-> the separate Stop-time project-doc updater the **memory writer**
-> ([design.md §5.6](../../../design.md#56-designated-memory-docs)). The concept this card calls "curated handoff" is
-> therefore **curated transfer** -- the `ai-curated` transfer strategy, repositioned as the primary
+> handoff." The shipped taxonomy ([design.md §3.9](../../../design_sessions.md#39-session-resume-context-management))
+> calls resume/fork context assembly **transfer** (`transfer.py`, `--resume-mode transfer`,
+> `assemble_transfer_context`), and the separate Stop-time project-doc updater the **memory writer**
+> ([design_memory.md §5](../../../design_memory.md#5-designated-memory-docs)). The concept this card calls "curated
+> handoff" is therefore **curated transfer** -- the `ai-curated` transfer strategy, repositioned as the primary
 > cross-runtime/cross-topology substrate. The removed `forge session handoff` CLI surface is a tombstone (it redirects
 > to `forge memory report show`) and hosts no transfer verbs; the canonical surface is the top-level `forge transfer`
 > group (see Phase 1).
@@ -735,11 +735,12 @@ level of decisions, current work, and intent. It:
 - Strips dead-end exploration that consumed parent tokens but produced no value for the child.
 - Is auditable, diffable, and editable by the user before launch.
 - Is runtime-neutral -- any runtime that can read markdown can consume it.
-- Mitigates the underspecification problem ([design.md §4.1.2](../../../design.md#412-semantic-policy-the-supervisor))
-  by making implicit intent explicit.
+- Mitigates the underspecification problem
+  ([design_workflows.md §1.2](../../../design_workflows.md#12-semantic-policy-the-supervisor)) by making implicit intent
+  explicit.
 
 **Fidelity-vs-agency reframe.** The existing transfer strategies in
-[design.md §3.9](../../../design.md#39-session-resume-context-management) (`minimal`, `structured`, `full`,
+[design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (`minimal`, `structured`, `full`,
 `ai-curated`) are positioned as a fidelity spectrum where native is the lossless ideal and curated is the lossy
 fallback. This proposal reframes the trade-off:
 
@@ -759,7 +760,7 @@ binding, branching, indexed retrieval, local SQLite storage, and curation are al
 should not take `ctx` as a dependency: `ctx` is prior art and inspiration only, and curated transfer is central to
 Forge's session, policy, and usage story. The transfer schema is Forge-owned and canonical (now shipped); no `ctx`
 interop is planned, though an optional import/export bridge could be added later on the existing schema (see
-`docs/design_appendix.md` §M.4).
+`docs/design_sessions.md` §H.4).
 
 **Required for cross-runtime resume:**
 
@@ -834,7 +835,7 @@ the payoff that justifies Phase 4. Phase 6 is reserved for once everything else 
 
 No new architecture; mostly documentation and small CLI additions.
 
-- Reposition `ai-curated` in [design.md §3.9](../../../design.md#39-session-resume-context-management) as the
+- Reposition `ai-curated` in [design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) as the
   cross-everything primary substrate rather than one strategy among four.
 - Add `forge session resume <parent> --fresh --review` (opens the per-child user-notes overlay in `$EDITOR` before child
   launch; `--review` requires `--fresh` transfer mode). This stays the ergonomic workflow entry point -- a convenience
@@ -853,7 +854,7 @@ No new architecture; mostly documentation and small CLI additions.
   `forge session context` (a running session's runtime context, now folded into `forge session show`).
 - Document the agency-at-boundaries frame and the curated-transfer-as-interchange principle in `design.md`.
 - Define the Forge-owned transfer schema; `ctx` stays prior art and inspiration only, not a dependency or planned peer
-  (see `docs/design_appendix.md` §M.4).
+  (see `docs/design_sessions.md` §H.4).
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
   evidence, open questions, runtime hints, and user notes overlay.
 
@@ -963,7 +964,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   recursion guard and `FORGE_SESSION` identifier? Should `FORGE_DEPTH` become a derived property of the run tree?
 - How should Forge interoperate with [ctx](https://github.com/dchu917/ctx)? **Resolved (Phase 1, 2026-05-31):** `ctx` is
   prior art and inspiration only — Forge will not take it as a dependency. The Forge-owned schema is canonical
-  (`docs/design_appendix.md` §M.4) and no `ctx` interop is planned; an optional import/export bridge could be added
+  (`docs/design_sessions.md` §H.4) and no `ctx` interop is planned; an optional import/export bridge could be added
   later on the existing schema, but is not committed work.
 - Should `forge session resume --fresh --review` be the default behavior or an explicit flag? **Resolved (Phase 1,
   2026-05-31):** explicit flag (opt-in) -- a plain `--fresh` resume launches immediately, and `--review` stays opt-in so

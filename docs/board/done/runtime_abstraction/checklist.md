@@ -42,12 +42,12 @@ default stays transfer) relocates the parent JSONL and resumes byte-for-byte, wi
 `2663c06` (MUTATE), `d0eb708` (sidecar plumbing), and `5991896` (sidecar `--user` fix), plus the 2f docs slice:
 `wire_shape`/`intercept`/`audit` config, the thinking-preserving `anthropic_passthrough` wire, redacted audit logs with
 `forge proxy audit show|diff`, override-mode controls on the signature-safe path, and host-persistent sidecar audit.
-`docs/design.md` §7.x + §3.4/§3.7/§4.0, `docs/design_appendix.md` §A.11/§A.12, and `docs/end-user/proxy.md` reflect it.
+`docs/design.md` §7.x + §3.4/§3.7/§4.0, `docs/design_telemetry.md` §A.11/§A.12, and `docs/end-user/proxy.md` reflect it.
 All Phase 2 slice boxes are ticked.
 
 **Phase 1 complete (2026-05-31).** Schema-backed curated transfer, the `children/<child>.notes.md` overlay, and the
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
-`docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
+`docs/design_sessions.md` §H reflects it. All Phase 1 boxes are ticked.
 
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
 (instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) + 4e
@@ -136,9 +136,9 @@ Phase 0 gaps carried forward:
 - [x] Define the Forge-owned curated transfer schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
-  - Verification (2026-05-31): `docs/design_appendix.md` §M documents the contract -- §M.1 child-agnostic frontmatter
-    (`schema_version: 1`, `schema`, `strategy`, `lineage`, `target_runtime`), §M.2 the 8 canonical sections (Lineage,
-    Goal/Current Task, Decisions cited, Current State, Relevant Files, Open Questions, Runtime Hints, User Notes), §M.3
+  - Verification (2026-05-31): `docs/design_sessions.md` §H documents the contract -- §H.1 child-agnostic frontmatter
+    (`schema_version: 1`, `schema`, `strategy`, `lineage`, `target_runtime`), §H.2 the 8 canonical sections (Lineage,
+    Goal/Current Task, Decisions cited, Current State, Relevant Files, Open Questions, Runtime Hints, User Notes), §H.3
     the three-file layout + overlay. Shipped in `2b70c29`.
 - [x] Implement the curated transfer schema in `src/forge/session/transfer.py`.
   - Assertion: generated transfer markdown has stable sections for the schema fields; existing
@@ -159,31 +159,31 @@ Phase 0 gaps carried forward:
 - [x] Define the user notes overlay convention.
   - Assertion: docs/code state where user notes live, how they compose with generated content, and that regeneration
     never overwrites authoritative user notes.
-  - Verification (2026-05-31): `children/<child>.notes.md` is the editable overlay (design.md §3.9, appendix §M.3);
-    `prev_sessions.py` composes notes after the frozen snapshot at launch, `ensure_child` never overwrites an existing
-    child, and `forge transfer regenerate` rewrites only `generated.md`. Covered by `test_prev_sessions.py`
-    (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`, `test_compose_skips_empty_notes`). Shipped in
-    `2b70c29`.
+  - Verification (2026-05-31): `children/<child>.notes.md` is the editable overlay (design.md §3.9,
+    `docs/design_sessions.md` §H.3); `prev_sessions.py` composes notes after the frozen snapshot at launch,
+    `ensure_child` never overwrites an existing child, and `forge transfer regenerate` rewrites only `generated.md`.
+    Covered by `test_prev_sessions.py` (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`,
+    `test_compose_skips_empty_notes`). Shipped in `2b70c29`.
 - [x] Decide how `ctx` relates to Forge transfer.
   - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
   - Decision (2026-05-31): `ctx` is **prior art and inspiration only -- never a dependency**. The Forge-owned transfer
     schema is canonical and no `ctx` interop is planned (an optional import/export bridge could be added later on the
-    existing schema, but is not committed work). Recorded in `docs/design_appendix.md` §M.4; the matching `card.md`
+    existing schema, but is not committed work). Recorded in `docs/design_sessions.md` §H.4; the matching `card.md`
     prose and Open Question are aligned and marked resolved.
 - [x] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
   - Assertion: Phase 5 can tune transfer presentation for Codex without changing transcript source artifacts or schema
     semantics.
-  - Verification (2026-05-31): the schema reserves `target_runtime` (frontmatter + `TRANSFER_TARGET_RUNTIME`, appendix
-    §M.1) and code owns the section skeleton, so Phase 5 retargets presentation without touching transcript artifacts or
-    schema semantics. Closeout gates cleared -- the `ctx` posture is recorded (§M.4) and both default-behavior Open
-    Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase 1 boxes are now ticked; the
-    card stays in `doing/` for Phases 2-6.
+  - Verification (2026-05-31): the schema reserves `target_runtime` (frontmatter + `TRANSFER_TARGET_RUNTIME`,
+    `docs/design_sessions.md` §H.1) and code owns the section skeleton, so Phase 5 retargets presentation without
+    touching transcript artifacts or schema semantics. Closeout gates cleared -- the `ctx` posture is recorded (§H.4)
+    and both default-behavior Open Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase
+    1 boxes are now ticked; the card stays in `doing/` for Phases 2-6.
 
 ## Phase 2 - Optional Audit Proxy (compacted 2026-06-09; shipped 2026-05-31 -> 2026-06-01)
 
 Compacted per the board-contract size policy when Phase 6 planning pushed this file over the 30k-token hook. Full slice
 detail (acceptance tables, review-fix lists) lives in git history and the change_log 2026-06-01 "Phase 2: optional audit
-proxy" entry; `design.md` §7.x and `design_appendix.md` §A.11/§A.12 are normative for shipped behavior. Sliced
+proxy" entry; `design.md` §7.x and `design_telemetry.md` §A.11/§A.12 are normative for shipped behavior. Sliced
 OBSERVE-before-MUTATE; two axes kept distinct everywhere: **wire shape** (`openai_translated` | `anthropic_passthrough`)
 and **intercept mode** (`passthrough` | `inspect` | `override`).
 
@@ -294,7 +294,8 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
 
 Compacted per the board-contract size policy. Full slice detail (assertions, verification bodies, review-fix lists)
 lives in git history and the change_log 2026-06-01 "runtime_abstraction Phase 4 (Slices 4a-4f)" + 2026-06-02 hardening
-entries; `design.md` §3.14/§4.1.4/§4.1.5/§5.5.5 and `design_appendix.md` §A.13/§C.1/§F.5 are normative.
+entries; `design.md` §3.14/§4.1.4/§4.1.5/§5.5.5 and the former consolidated design appendix §A.13/§C.1/§F.5 are
+normative.
 
 - [x] 4a run-tree env contract: `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)` stamped at the single env choke
   point, orthogonal to `FORGE_DEPTH` (its three recursion guards unchanged); interactive launches mint a fresh root in
@@ -381,7 +382,7 @@ ids; no credential extraction; interactive OAuth session untouched). The deferre
     exact+snapshot-estimated); `test_cost_logger.py` (`runs_with_records` presence); `test_activity.py` (exact renders
     without `~`); regression `tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py` (shared-root
     undercount guard).
-- [x] **4g.5 - Docs + board sync.** design.md §3.14 (run-tree join sentence), design_appendix.md §A.9 (cost-record
+- [x] **4g.5 - Docs + board sync.** design.md §3.14 (run-tree join sentence), design_telemetry.md §A.9 (cost-record
   schema gains `forge_run_id`/`forge_root_run_id`, additive at `schema_version` 1) + §A.13 (`proxy_request_exact` as a
   read-time provenance label; `source_refs` stays null by design), this Open Decision resolution, and this slice block.
 - [x] **4g.0 - Feasibility canary (GATING) -- PASSED 2026-06-08 on Claude Code 2.1.168.**
@@ -539,7 +540,8 @@ output/secrets/paths):**
     leak); (4) nested `[hooks]` TOML branch covered; (5) version compare pads components (`0.131` meets `0.131.0`); (6)
     **decision:** stored-auth is PRESENCE-based -- do NOT gate on `auth.credentials.status` (same false-fail-closed risk
     as overallStatus; validity is proven at 5b), documented + tested; (2) stale credential docs fixed
-    (`authentication.md` + `design_appendix.md`); (7) per-worker doctor cost recorded as the 5b note above.
+    (`authentication.md` + the former consolidated design appendix); (7) per-worker doctor cost recorded as the 5b note
+    above.
   - Design-doc debt (-> 5f): `design.md` §5.5.5 still frames the preflight as a *future* first consumer of the registry;
     flip it to "shipped" in 5f's comprehensive Phase 5 design sync (the approved plan batches Phase 5 design sync
     there).
@@ -688,8 +690,8 @@ bridge is a cross-runtime resume-delivery op, not a workflow runner; §5.5.5 was
   - Assertion: design docs describe shipped Phase 5 behavior (documentation-guidelines Rule 2); no stale 5-event /
     `codex_hooks` claim remains outside `done/` (sweep confirmed none survived; the `design.md`/`card.md` `SessionStart`
     refs now name initial-message delivery).
-- [x] `design_appendix.md`: §A.13 enums flip `codex_exec` (route) + `codex_jsonl` (reporter) from reserved -> emitted;
-  per-emitter table gains the `transfer-curate` row (tags `session`); §M.1 `target_runtime` comment de-staled.
+- [x] `design_telemetry.md`: §A.13 enums flip `codex_exec` (route) + `codex_jsonl` (reporter) from reserved -> emitted;
+  per-emitter table gains the `transfer-curate` row (tags `session`); §H.1 `target_runtime` comment de-staled.
 - [x] New end-user guide `docs/end-user/transfer.md`: the `forge transfer show|regenerate|edit|diff` group + the
   three-file model + the honest cross-runtime workflow (`regenerate --target-runtime codex` -> `show` -> manual
   `codex exec`; one-command bridge is Phase 6). Registered in `README.md`; `session.md` artifact note repointed to it.
@@ -697,11 +699,11 @@ bridge is a cross-runtime resume-delivery op, not a workflow runner; §5.5.5 was
   deferred). The dated 5a change_log "provisional" line is left as a historical snapshot (board-contract: don't rewrite
   dated entries).
 
-**Verification (2026-06-09):** `make pre-commit` clean (mdformat + the new guide); `design.md`/`design_appendix.md`
-under the tiktoken size hook; grep gates clean (`SessionStart` outside `done/` names initial-message delivery;
-`codex_exec`/`codex_jsonl` shown as emitted); `forge transfer --help`/`regenerate --help` confirm the guide matches the
-shipped CLI; the documented `regenerate -> show -> codex exec` path is covered end-to-end by the 5e real-codex E2E
-(`tests/integration/core/test_claude_to_codex_resume.py`). **Phase 5 complete.**
+**Verification (2026-06-09):** `make pre-commit` clean (mdformat + the new guide); `design.md`/the former consolidated
+design appendix under the tiktoken size hook; grep gates clean (`SessionStart` outside `done/` names initial-message
+delivery; `codex_exec`/`codex_jsonl` shown as emitted); `forge transfer --help`/`regenerate --help` confirm the guide
+matches the shipped CLI; the documented `regenerate -> show -> codex exec` path is covered end-to-end by the 5e
+real-codex E2E (`tests/integration/core/test_claude_to_codex_resume.py`). **Phase 5 complete.**
 
 ### Open risks (carry into execution; verify empirically)
 

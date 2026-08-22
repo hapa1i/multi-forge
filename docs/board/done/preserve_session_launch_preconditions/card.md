@@ -18,7 +18,8 @@ fresh rewind resume ignores `resume_transcript_ready`, while the worktree-fork s
 argparse rejection phrases still disable JSON process-wide without naming `--output-format`; the common fork UUID check
 runs after child creation and incorrectly gates transfer and `--no-launch`; launch confirmation guards only its import
 and missing-manifest update race; and both derived and explicit invalid resume names reach transfer-context creation
-before validation. [`docs/design.md` §§3.3, 3.9](../../../design.md#33-session-file-schema-forgesessionjson) define
+before validation.
+[`docs/design_sessions.md` §§3.3, 3.9](../../../design_sessions.md#33-session-file-schema-forgesessionjson) define
 durable mutation and launch ordering.
 
 The retained regression artifact produces `15 failed, 7 passed` on that unchanged cursor. Each finding has a direct

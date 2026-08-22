@@ -192,17 +192,17 @@ full unit suite 7079 passed.
   `confirmed.consumer_lanes` added to hook writes (policy-check freeze, **write-once**, confirmed-first dispatch).
 - [x] design.md §3.6.2 gained the consumer-lane binding invariant (intent = requested `LaneRecord`, confirmed = frozen
   immutable, set only by resolving commands); the §3.6.12 `supervisor_runtime="codex"` mention repointed to the
-  `consumer_lanes` binding. design_appendix §G: supervisor lane is now the persisted/frozen binding the hook **injects**
-  (not `run_supervisor_check`-resolved); the T5 observability paragraph reads the frozen binding, `not executable` on
-  drift, never rewrites.
+  `consumer_lanes` binding. design_runtime.md §G: supervisor lane is now the persisted/frozen binding the hook
+  **injects** (not `run_supervisor_check`-resolved); the T5 observability paragraph reads the frozen binding,
+  `not executable` on drift, never rewrites.
 - [x] cli_reference.md: `--supervisor-runtime` added to the start/fork launch-controls paragraph; a
   `set <target> --runtime` row added; the status row no longer says "only `runtime` is bound" (now the bound lane +
   drift). The `consumer_lanes.*` raw-`set` rejection is noted in design.md §3.5/§3.6.2.
 - [x] Epic checklist "Design-doc sync" T1b row ticked with the shipped doc list.
 
-**Verification:** `rg supervisor_runtime docs/{design,design_appendix,design_workflows,cli_reference}.md docs/end-user/`
--> only the one deliberate historical sentence in §G ("T1b replaced the narrow `supervisor_runtime` override...");
-`make pre-commit` (mdformat) clean.
+**Verification:** `rg supervisor_runtime docs/design*.md docs/cli_reference.md docs/end-user/` -> only the one
+deliberate historical sentence in §G ("T1b replaced the narrow `supervisor_runtime` override..."); `make pre-commit`
+(mdformat) clean.
 
 ## Acceptance tests (fixture-grounded)
 

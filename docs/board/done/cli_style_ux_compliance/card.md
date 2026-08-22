@@ -19,16 +19,16 @@ lanes) enumerated all **135 commands/subcommands** via live `forge ... --help`, 
 **adversarial verifier** tried to *refute* each finding against the live help, source, the style guide's own exception
 list, `docs/board/impl_notes.md`, and the guard tests. 90 candidates -> **63 survivors** (27 refuted, 30%). Every
 high-severity survivor was then independently re-verified against code (file:line) on the current checkout before this
-card -- which **corrected two auditor claims** (see [Provenance](#provenance)).
+card -- which **corrected two auditor claims** (see [Provenance](#provenance-how-to-trust-the-classifications)).
 
 **Type**: single **batch** card, deliberately **not an epic**. The items share a *theme* (CLI-surface correctness +
 polish), not a shared contract, sequencing decision, or code seam (`board_contract.md` epic test). Batch A is one
-coherent bug family; B/C are grouped by risk. Coupling notes under [Sequencing & coupling](#sequencing--coupling).
+coherent bug family; B/C are grouped by risk. Coupling notes under [Sequencing & coupling](#sequencing-coupling).
 
 **Relation to sibling cards**: distinct file surfaces from `doing/accidental_complexity_cleanup` (that card removes dead
 code + duplication; this fixes output routing + help text) and `proposed/session_op_layer_extraction` (that restructures
 the Claude launch path). One overlap: item **A2** edits a help string in `session_lifecycle.py`, which
-`session_op_layer_extraction` will refactor -- see [Sequencing & coupling](#sequencing--coupling).
+`session_op_layer_extraction` will refactor -- see [Sequencing & coupling](#sequencing-coupling).
 
 **References**: `docs/developer/cli_style_guidelines.md` (the authority every Batch-A item cites, by section);
 `docs/developer/coding_standards.md` §5 (research-preview clean-break rules -- Batch C relies on these);

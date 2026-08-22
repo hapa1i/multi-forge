@@ -6,7 +6,7 @@ Card: [card.md](card.md).
 
 **Epic closed (2026-06-20).** The last live member `backend_remote_reconciliation` shipped via PR #41 (generic refactor)
 and PR #42 (MVP `forge backend reconcile`) and moved to `done/`. With every member concern `done/`, the epic moves to
-`done/` as a historical coordinator; normative architecture now lives in design.md §3.14 and design_appendix §A.14.
+`done/` as a historical coordinator; normative architecture now lives in design.md §3.14 and design_telemetry.md §A.14.
 
 ## Active Coordination
 

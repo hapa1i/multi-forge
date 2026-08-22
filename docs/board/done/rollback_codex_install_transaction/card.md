@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
 
-**Findings**: D013 and D014 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Findings**: D013 and D014 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #144 (`37a03209`) on 2026-08-08.
 
@@ -13,10 +14,10 @@ installed-manifest commit fails.
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §C.4](../../../design_appendix.md#c4-durable-installproject-files): filesystem mutation
-  precedes the atomic tracking commit, and a later failure must restore or report an honest state.
-- [`docs/design_appendix.md` §C.6](../../../design_appendix.md#c6-codex-hook-registration-hooks-codex-owned-half): Forge
-  owns only its marker-delimited block and must preserve outside TOML and file mode.
+- [`docs/design_installation.md` §C.4](../../../design_installation.md#c4-durable-installproject-files): filesystem
+  mutation precedes the atomic tracking commit, and a later failure must restore or report an honest state.
+- [`docs/design_installation.md` §C.6](../../../design_installation.md#c6-codex-hook-registration-hooks-codex-owned-half):
+  Forge owns only its marker-delimited block and must preserve outside TOML and file mode.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#internal-boundaries-module-to-module): unexpected
   internal failures are surfaced through the typed boundary rather than leaking raw implementation exceptions.
 

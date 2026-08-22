@@ -41,6 +41,6 @@ Current focus: closed -- order 31 shipped in PR #210; orders 32--35 remain parke
   follow-up's first pass reformatted board prose and exposed two test annotations; its clean rerun passed.
 - Review probes reproduced the dropped-notice and unreadable-active-registry failures before their focused fixes; the
   effective-route and `--into` probes confirmed the documented alignment and vacuous old test respectively.
-- Documentation: Claude Opus 5 counts are 29,979 for `design.md` and 29,966 for `design_appendix.md`; all 894 local
-  links across 367 board documents resolve; Wave 7 is 31 done and four todo.
+- Documentation: Claude Opus 5 counts are 29,979 for `design.md` and 29,966 for the former consolidated design appendix;
+  all 894 local links across 367 board documents resolve; Wave 7 is 31 done and four todo.
 - No Forge workflow command was used.

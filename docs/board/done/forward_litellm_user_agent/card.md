@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: O001 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
+**Finding**: O001 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- shipped in PR #152 (`983e4470`).
 
@@ -13,7 +14,7 @@ metadata path.
 
 ## Design Authority
 
-- [`docs/design_appendix.md` backend provider vocabulary](../../../design_appendix.md#a21-backend-instance-catalog-365--unified-backend-phase-12):
+- [`docs/design_runtime.md` backend provider vocabulary](../../../design_runtime.md#a21-backend-instance-catalog-365-unified-backend-phase-12):
   backend-instance provider values and the collapsed client-factory routing enum are distinct vocabularies.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#5-interface-changes): translate external values at a
   typed boundary rather than comparing incompatible literals.

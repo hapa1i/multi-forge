@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: O004 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
+**Finding**: O004 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- shipped in PR #153 (`8f030ef4`).
 
@@ -15,8 +16,9 @@ security-sensitive headers.
 
 - [`responses_passthrough.py` header relay contract](../../../../src/forge/proxy/responses_passthrough.py): the sibling
   passthrough forwards all response headers except an explicit hop-by-hop/security/proxy-owned denylist.
-- [`docs/design.md` §7 audit passthrough contract](../../../design.md#7-isolation-and-proxy-modes): Anthropic
-  passthrough preserves its upstream wire result while Forge adds only its own correlation/accounting behavior.
+- [`docs/design_runtime.md` §7 audit passthrough contract](../../../design_runtime.md#7-isolation-and-proxy-modes):
+  Anthropic passthrough preserves its upstream wire result while Forge adds only its own correlation/accounting
+  behavior.
 
 ## Evidence
 

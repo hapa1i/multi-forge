@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: D022 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D022 (MEDIUM) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #141 (`d2ed2349`) on 2026-08-07.
 
@@ -13,8 +14,9 @@ always names the strategy that actually ran.
 
 ## Design Authority
 
-- [`docs/design.md` §3.9](../../../design.md#39-session-resume-context-management): transfer supports the enumerated
-  `minimal`, `structured`, `full`, and `ai-curated` strategies, while native derivations record no strategy.
+- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management): transfer supports
+  the enumerated `minimal`, `structured`, `full`, and `ai-curated` strategies, while native derivations record no
+  strategy.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#internal-boundaries-module-to-module): internal
   invalid input is rejected without fallback or silent defaults.
 - `src/forge/session/transfer.py::parse_transfer_context_strategy`: the existing canonical parser rejects unknown and

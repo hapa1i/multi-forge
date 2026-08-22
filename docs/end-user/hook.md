@@ -426,7 +426,7 @@ parameters before the Read executes — zero token cost, no retry needed.
 
 ### user-prompt-submit (UserPromptSubmit)
 
-Purpose: dispatch direct user commands (`%` commands). See [In-session commands](#in-session-commands--commands) below
+Purpose: dispatch direct user commands (`%` commands). See [In-session commands](#in-session-commands-commands) below
 for the full list.
 
 ---

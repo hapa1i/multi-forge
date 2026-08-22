@@ -98,7 +98,7 @@ more confusing, not less.
   endpoint/connection-value shapes.
 - [x] Add tests proving remote definitions never enter the PID/port runtime registry and local definitions still map to
   their lifecycle adapter where needed. Covered by `tests/src/backend/test_sources.py`.
-- [x] Update [design_appendix.md](../../../design_appendix.md) for the shipped source-definition schema and static-vs-
+- [x] Update [runtime design](../../../design_runtime.md) for the shipped source-definition schema and static-vs-
   runtime ownership before moving to the next phase.
 
 ## Phase 2 -- Template And Auth Integration
@@ -127,7 +127,7 @@ more confusing, not less.
   `ProxyConfig` or transformed before strict dataclass loading.
 - [x] Add no-secret tests for env, credential-file, `auth_ignore_env`, missing key, connection-value provenance, and
   strict-loader rejection of unsupported source shapes.
-- [x] Update [design_appendix.md](../../../design_appendix.md), [cli_reference.md](../../../cli_reference.md) if user
+- [x] Update [runtime design](../../../design_runtime.md), [cli_reference.md](../../../cli_reference.md) if user
   template syntax changes, and relevant `docs/end-user/*` guides as template/source behavior ships. Updated the design
   appendix and proxy end-user guide; no CLI command syntax changed in Phase 2.
 
@@ -182,7 +182,7 @@ more confusing, not less.
 - [x] Add regression coverage for provider-trace broadening, proxied/direct measurement precedence, downstream source-id
   joins, duplicate-`downstream_event_id` merge behavior for the new source key, post-merge read-side filtering, and no
   double-count in `forge activity` / `forge proxy costs show`.
-- [x] Update [design.md](../../../design.md) §3.14 and [design_appendix.md](../../../design_appendix.md) for the shipped
+- [x] Update [design.md](../../../design.md) §3.14 and [runtime design](../../../design_runtime.md) for the shipped
   downstream attribution key and writer ownership before moving to closeout.
 
 ## Phase 5 -- Migration And Closeout

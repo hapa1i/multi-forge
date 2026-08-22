@@ -159,7 +159,7 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
   observable. **Verified:** `test_policy_supervisor.py` (json-shows-degraded, table-shows-degraded, configured-null) +
   `test_session_lane.py::test_show_json_flags_supervisor_degraded` (supervisor-only).
 - [x] Design-doc sync: `design_workflows.md` §1.2 (T7 named as the one sanctioned lane-fallback exception);
-  `design_appendix.md` §G (overlay-vs-binding, reset map, cross-resume, telemetry); `cli_reference.md` (status + lane
+  `design_runtime.md` §G (overlay-vs-binding, reset map, cross-resume, telemetry); `cli_reference.md` (status + lane
   show rows); end-user `policy.md` (mid-session degrade note). `design.md` §3.5/§3.6.2 needed no change -- the overlay
   reuses the existing `confirmed.policy.policy_states` ownership, no new durable field.
 - [x] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T7 done. (Closeout: updated when the card moved

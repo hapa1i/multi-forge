@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: O003 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
+**Finding**: O003 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- shipped in PR #138 (`4a601dc2`) on 2026-08-07.
 
@@ -15,8 +16,8 @@ without losing the completed turn result to a post-run traceback or recreating p
 
 - [`docs/design.md` §3.2](../../../design.md#32-contract-files-authoritative-paths): deletion owns terminal manifest and
   index removal, and production updates may not recreate a published session.
-- [`docs/design.md` §3.9](../../../design.md#39-session-resume-context-management): headless and interactive Codex
-  frontends record the same CLI-owned turn facts after their runtime exits.
+- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management): headless and
+  interactive Codex frontends record the same CLI-owned turn facts after their runtime exits.
 - `src/forge/core/ops/codex_session.py::_update_manifest_if_present`: the shared Codex frontend contract treats
   concurrent deletion as a visible post-turn warning and removes only an empty or lock-only directory shell.
 

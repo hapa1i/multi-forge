@@ -203,9 +203,9 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 - [x] **Privacy warning.** Surface "dropped-window code/transcript sent to `<model>`" (same posture as `ai-curated`)
   when rewind sends the dropped window to the curation model. **Assertion:**
   `test_resume_fresh_rewind_privacy_warning_for_code_delta_llm` emits the warning.
-- [x] **Docs.** Update `docs/design.md` §3.9 (matrix from Slice 1 finalized to shipped state), `docs/design_appendix.md`
-  §H (schema marker/frontmatter), `docs/cli_reference.md` (fork/resume `--strategy rewind --drop-last`), and
-  `docs/end-user/transfer.md`. Make the fork/resume asymmetry explicit: fork rewind is worktree/`--into` only and
+- [x] **Docs.** Update `docs/design.md` §3.9 (matrix from Slice 1 finalized to shipped state), the former consolidated
+  design appendix §H (schema marker/frontmatter), `docs/cli_reference.md` (fork/resume `--strategy rewind --drop-last`),
+  and `docs/end-user/transfer.md`. Make the fork/resume asymmetry explicit: fork rewind is worktree/`--into` only and
   rejects same-dir/sidecar; `resume --fresh --strategy rewind` is legitimately same-directory because it resumes the
   fresh truncated UUID `<R>`, not the parent's UUID. **Assertion:** each doc reflects shipped behavior, not aspiration.
 
@@ -255,7 +255,7 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
   path unit tests cannot cover (see Current focus + `design.md:765`).
 - [x] Pre-commit clean on the touched surface (this closeout is board/docs-only markdown; mdformat + hygiene hooks
   pass). The code itself landed pre-commit-clean via PR #66.
-- [x] design.md §3.9 matrix, design_appendix.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior
+- [x] design.md §3.9 matrix, design_sessions.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior
   (re-verified on merged `main`: the §3.9 matrix carries the `Rewind` row and self-discloses the integration caveat; §H
   carries the `rewind` strategy + `rewind-code-delta` schema marker; both CLI/end-user docs document
   `--strategy rewind --drop-last N` and the same-dir/sidecar fork rejection).

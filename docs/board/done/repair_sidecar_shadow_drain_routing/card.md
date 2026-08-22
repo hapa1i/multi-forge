@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md).
 
-**Finding**: D039 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D039 (MEDIUM) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #132 (`dc963a7c`) on 2026-08-06 as the final Wave 2 member.
 
@@ -13,9 +14,9 @@ enqueue a marker whose paths the later host drain can resolve.
 
 ## Design Authority
 
-- [`docs/design.md` §7](../../../design.md#7-isolation-and-proxy-modes): the sidecar sees project `.forge/` through its
-  `/workspace` mount while pending-work markers retain host checkout and Forge-root paths.
-- [`docs/design.md` §3.10](../../../design.md#310-hook-handlers) and
+- [`docs/design_runtime.md` §7](../../../design_runtime.md#7-isolation-and-proxy-modes): the sidecar sees project
+  `.forge/` through its `/workspace` mount while pending-work markers retain host checkout and Forge-root paths.
+- [`docs/design_sessions.md` §3.10](../../../design_sessions.md#310-hook-handlers) and
   [`docs/design_workflows.md` §1.2](../../../design_workflows.md#12-semantic-policy-the-supervisor): Stop enqueues a
   shadow marker when a pending candidate exists; a later host CLI drains it.
 

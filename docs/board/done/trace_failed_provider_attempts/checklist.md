@@ -42,7 +42,7 @@ Current focus: O045 implementation and verification are complete; publish it wit
   coverage (10 passed).
 - [x] Run `make test-unit` (9,309 passed, 1 skipped), `make test-regression` (936 passed), and targeted Docker
   proxy/telemetry integration (6 passed).
-- [x] Run `make pre-commit`; verify `design.md` at 29,990 Opus-5 tokens, `design_appendix.md` at 29,979, `change_log.md`
-  at 24,162, all 965 board links, and staged diff hygiene.
+- [x] Run `make pre-commit`; verify `design.md` at 29,990 Opus-5 tokens, the former consolidated design appendix at
+  29,979, `change_log.md` at 24,162, all 965 board links, and staged diff hygiene.
 - [x] Commit, push, and open an independent draft PR.
 - [x] After PR #216 merged as `634ff40e`, close order 1 before activating order 2.

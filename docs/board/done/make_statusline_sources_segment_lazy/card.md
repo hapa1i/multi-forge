@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: D018 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D018 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #154 (`c4f14037`) after implementation, verification, and independent review.
 
@@ -12,8 +13,8 @@ Run proxy and session discovery only when the resolved status-line segment layou
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §A.8](../../../design_appendix.md#a8-status-line-guidance-3611): configured segments select
-  information from stdin, session state, registry state, and live proxy truth.
+- [`docs/design_telemetry.md` §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611): configured segments
+  select information from stdin, session state, registry state, and live proxy truth.
 - [`statusline/context.py` lazy-source contract](../../../../src/forge/cli/statusline/context.py): expensive derivations
   run only when an enabled segment accesses them.
 

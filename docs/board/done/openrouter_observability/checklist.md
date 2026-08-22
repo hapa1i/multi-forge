@@ -118,7 +118,7 @@ via new sanitized, leak-gated headers. Identity foundation every later phase joi
   `request.state` before both branches; added getter `_forge_session_command` beside `_forge_run_ids` (consumed by the
   Phase 3 trace writer). - *Verified*: valid → stored; spoofed/over-long → `None`; build_upstream_headers drops all
   `X-Forge-*` (allowlist already excludes — asserted, not re-stripped). New `test_server_forge_headers.py` (10 tests).
-- [x] Design-doc sync: `design_appendix.md` §A.13 region now documents the two headers as internal Forge↔proxy
+- [x] Design-doc sync: `design_telemetry.md` §A.13 region now documents the two headers as internal Forge↔proxy
   correlation only (dropped upstream), distinct from the Phase 5 `user` field.
 
 | Test                                                        | Fixture                                                           | Assertion                                                                        | Test File                                      |
@@ -250,7 +250,7 @@ and probe 2.
 - [x] Design-doc sync: `design.md §3.14` now names the **fourth** provider-trace plane (lifecycle/correlation under
   `providers/openrouter/traces/<month>_<pid>.jsonl`, written at the proxy `on_complete` seam, joined by `request_id` +
   run-tree ids, **not** wiped by `forge proxy costs reset`, direct-OpenRouter-only) + a `provider_trace:` yaml block;
-  `design_appendix.md` gains `### A.14 Provider-trace plane schema` (cloned the §A.13 ledger-schema style — path/owner
+  `design_telemetry.md` gains `### A.14 Provider-trace plane schema` (cloned the §A.13 ledger-schema style — path/owner
   table, field-groups table, metadata-only/direct-only/`timeout_seen`/`first_chunk_seen` semantics, run-tree join note).
   **`docs/end-user/proxy.md` is deferred to Phase 4** — it lands with the `forge provider trace` read CLI (no
   user-facing surface exists yet to document).
@@ -289,7 +289,7 @@ only** -- no remote lookup (that is the reconciliation card). Depends on Phase 3
   the terminal narrative). Wired in `cli/hooks/{direct_commands,commands}.py` + help; scope policy in
   `cli_reference §2`. - *Verified*: 6 tests in `tests/src/cli/hooks/test_direct_commands_provider.py`.
 - [x] Docs sync: `docs/cli_reference.md` Provider-trace table + `%` scope/commands; `docs/end-user/proxy.md` new
-  "Provider trace" section (Day-1 rule); `design.md §3.14` + `design_appendix.md §A.14` read-surface note.
+  "Provider trace" section (Day-1 rule); `design.md §3.14` + `design_telemetry.md §A.14` read-surface note.
 
 | Test                                          | Fixture                                                   | Assertion                                                                                                                                                    | Test File                              |
 | --------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
@@ -395,7 +395,7 @@ record for account-side lookup**. Last phase by design. Depends on Phase 1 + pro
 - [x] All phase acceptance tables green: `make test-unit` 6205 passed; scoped proxy integration 8 passed
   (`test_forge_run_id_correlation.py` + `test_provider_trace_e2e.py`).
 - [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
-- [x] Design + end-user docs synced: design.md §3.14 (four planes + Phase 5 injection), design_appendix §A.14 (read
+- [x] Design + end-user docs synced: design.md §3.14 (four planes + Phase 5 injection), design_telemetry.md §A.14 (read
   surface + injection bullet), cli_reference (`forge provider trace`), `docs/end-user/proxy.md` (provider-trace section
   \+ `inject_openrouter_user`).
 - [x] Change-log entry (`docs/board/change_log.md`): Phases 3-5 recorded (goal, key changes, verification).

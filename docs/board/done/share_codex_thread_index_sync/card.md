@@ -18,7 +18,7 @@ durable index column. `IndexStore.update_codex_thread` already owns scoped resol
 warning, durable update, and best-effort failure handling. The focused pre-change Codex op/adoption/index baseline is
 201 passing tests. Authority:
 [`docs/design.md` "3.12 Command-core ops"](../../../design.md#312-command-core-ops-shared-implementation) and
-[`docs/design_appendix.md` "I. Codex Runtime Reference"](../../../design_appendix.md#i-codex-runtime-reference).
+[`docs/design_sessions.md` "I. Codex Runtime Reference"](../../../design_sessions.md#i-codex-runtime-reference).
 
 ## Acceptance Criteria
 

@@ -83,8 +83,8 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
   remains failure, and every other plan entry requires a non-null route (today's `_raise_no_route_error` behavior).
   Scope honesty: this matrix is a plan-level invariant, NOT a global `RoutingResult` contract -- the shared resolver
   already returns successful route-null results for opaque routing (`source="explicit"` base-URL passthrough,
-  `core/reactive/routing.py:315-323`; `require_route=False` opaque session-proxy acceptance, design_appendix §G.1). The
-  core type docstring documents only the additive `runtime_native => route=None by design`; the plan-level matrix is
+  `core/reactive/routing.py:315-323`; `require_route=False` opaque session-proxy acceptance, design_runtime.md §G.1).
+  The core type docstring documents only the additive `runtime_native => route=None by design`; the plan-level matrix is
   pinned in `resolve_invocation_routing` tests.
 
 - [x] **D2b -- Card wording vs backend identity.** The normative card now says selection uses the runtime registry and
@@ -309,10 +309,10 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
 ## Phase 5: Docs sync and closeout
 
 - [x] 5.1 Design docs updated with the shipped contract: `design_workflows.md` §3.5 (replace the "Portable frontend
-  boundary (Axis 1 vs Axis 2)" paragraph), `design.md` §5.1 portable-set sentence, `design_appendix.md` §C.5 portable
-  list and §G (`runtime_native` RoutingSource literal), `cli_reference.md` workflow section (runtime axis, D7 semantics,
-  `model_selection` output field), CLAUDE.md skills/portability paragraph. The normative card wording was already
-  aligned in Phase 0 (D2b/D9); closeout verifies the durable design docs match it.
+  boundary (Axis 1 vs Axis 2)" paragraph), `design.md` §5.1 portable-set sentence, `design_installation.md` §C.5
+  portable list and §G (`runtime_native` RoutingSource literal), `cli_reference.md` workflow section (runtime axis, D7
+  semantics, `model_selection` output field), CLAUDE.md skills/portability paragraph. The normative card wording was
+  already aligned in Phase 0 (D2b/D9); closeout verifies the durable design docs match it.
 - [x] 5.2 End-user docs (`docs/end-user/skills.md` and any workflow guide); QA checklist sections +
   `test-count`/`last-updated` header; walkthrough checklist if it exercises workflow verbs.
 - [x] 5.3 Verification recorded: focused suites, `make test-unit`, targeted integration from 3.4, `make pre-commit`.

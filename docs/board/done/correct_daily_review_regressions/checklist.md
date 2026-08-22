@@ -59,6 +59,6 @@ Final verification: the combined focused slice passed 249 tests; the manifest/St
 non-streaming/streaming Docker boundaries passed four tests, and the review follow-up Stop Docker boundary passed;
 `make test-unit` passed 9,331 tests with 124 deselected; and the clean `make test-regression` rerun passed 1,059 tests.
 `make pre-commit`, `git diff --check`, the 420-document and 1,028-local-link board check, and the design-size checks
-passed (`design.md` 30,000 Opus tokens, `design_appendix.md` 29,988, `design_workflows.md` 18,052). The existing
-attempt-boundary, strict workflow-type, and bounded Stop-diagnostic wording remains accurate, so no normative design
-edit is required.
+passed (`design.md` 30,000 Opus tokens, the former consolidated design appendix 29,988, `design_workflows.md` 18,052).
+The existing attempt-boundary, strict workflow-type, and bounded Stop-diagnostic wording remains accurate, so no
+normative design edit is required.

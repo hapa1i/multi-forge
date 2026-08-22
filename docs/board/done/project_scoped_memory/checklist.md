@@ -137,11 +137,11 @@ whether the memory writer runs (session-scoped). `--memory on|off` on fork/resum
     path stays session-scoped.
   - Shipped: `_enable_session_scoped` keeps the override path; bare prints a `Tip:` when `$FORGE_SESSION` is set;
     change_log entry added (2026-05-24).
-- [x] Design docs: update `design.md §5.6` and `design_appendix.md §G`.
+- [x] Design docs: update `design.md §5.6` and `design_runtime.md §G`.
   - Assertion: ownership is stated as passport (doc contract) vs project activation (checkout consent) vs session
     override (sparse). Reflects shipped Slice-1 behavior, not the full card target.
-  - Shipped: `design.md §5.6.6` (project-scoped activation) and `design_appendix.md §G.5` (config schema + resolver
-    merge table).
+  - Shipped: `design.md §5.6.6` (project-scoped activation) and `design_runtime.md §G.5` (config schema + resolver merge
+    table).
 
 Acceptance tests (Slice 1):
 
@@ -353,7 +353,7 @@ Tracks Forge-local execution decisions. For broader card framing, see
 
 - [x] Final compact `change_log.md` entry with verification.
 - [x] Promote durable lessons to `impl_notes.md` after human review.
-- [x] Verify `design.md §5.6`, `design_appendix.md §G`, and `docs/board/README.md` reflect all shipped changes.
+- [x] Verify `design.md §5.6`, `design_runtime.md §G`, and `docs/board/README.md` reflect all shipped changes.
 - [x] Create `docs/board/todo/memory_substrate/card.md` (intermediate card).
 - [x] Update `docs/board/todo/runtime_abstraction/card.md` to reference memory substrate.
 - [x] `git mv` the card directory `doing/ -> done/` after final merge to `main`.

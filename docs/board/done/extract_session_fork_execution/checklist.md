@@ -45,6 +45,6 @@ Current focus: closed -- order 32 shipped in PR #211; orders 33--35 remain parke
 - Quality: the first `make pre-commit` applied formatters and exposed two read-only protocol annotations; the clean
   rerun passed. CI's Python 3.11 isort then expanded two import groups that the local Python 3.13 hook left compact; the
   portable form and all replacement checks passed. Final Opus 5 counts are 29,993 for `design.md` and 29,966 for
-  `design_appendix.md`; the board audit found 368 documents, 894 local links, and no missing target. Wave 7 is 32 done
+  `design_telemetry.md`; the board audit found 368 documents, 894 local links, and no missing target. Wave 7 is 32 done
   and three todo.
 - No Forge workflow command was used.

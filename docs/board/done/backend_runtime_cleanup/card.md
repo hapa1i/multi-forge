@@ -59,9 +59,9 @@ config).
 - `forge model backend delete` currently resolves its positional as a local adapter/source operand and uses `--port` to
   target a specific instance; without `--port`, it deletes the adapter config directory.
 - `forge proxy delete` accepts one or more proxy ids and `--all`; that shape is the desired operator precedent.
-- `docs/design_appendix.md` says `create` and `delete` remain local adapter/config operations because built-in remote
-  sources are not user-created durable state. This card should preserve that no-lifecycle boundary while improving local
-  runtime cleanup.
+- the former consolidated design appendix says `create` and `delete` remain local adapter/config operations because
+  built-in remote sources are not user-created durable state. This card should preserve that no-lifecycle boundary while
+  improving local runtime cleanup.
 
 ## Vocabulary dependency
 
@@ -141,25 +141,25 @@ make the asymmetry explicit in help and docs.
 
 ## Tests
 
-| Test                          | Fixture                                                                                   | Assertion                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Stop by runtime id            | Registry has `litellm-4000`                                                               | stops/unregisters that instance; config remains                            |
-| Stop multiple runtime ids     | Registry has two instances                                                                | both are attempted; failures are reported per target                       |
-| Stop all runtime instances    | Registry has two instances                                                                | `stop --all --yes` removes both and leaves adapter config intact           |
-| Stop all includes pidless     | Registry has `pid=None` instance                                                          | unregisters it, reports no process killed, exits zero                      |
-| Empty all                     | Empty registry                                                                            | `stop --all` prints a no-target message and exits zero                     |
-| Conflict guard                | `stop litellm-4000 --all`                                                                 | exits non-zero                                                             |
-| Missing target guard          | `stop` with no target and no `--all`                                                      | exits non-zero with a `forge model backend list` tip                       |
-| Remote stop boundary          | `stop openrouter`                                                                         | exits with intentional no-local-lifecycle message; no registry edit        |
-| Stop rejects local source     | `stop litellm-openai-local`                                                               | exits with tip to use the runtime instance id from `backend list`          |
-| Stop port clean break         | `stop litellm --port 4000`                                                                | exits non-zero; `--port` is no longer a stop option                        |
-| Start remains config-oriented | `start litellm-4000`                                                                      | still rejected; start continues to use local source ids or adapter config  |
-| Delete runtime-id precedence  | `delete litellm-4000` with that id in registry                                            | exits with a `stop litellm-4000` tip, not "Unknown backend adapter/source" |
-| Delete port clean break       | `delete litellm --port 4000`                                                              | exits non-zero; `--port` is no longer a delete option                      |
-| Adapter config spelling       | `delete litellm --yes`                                                                    | still deletes config and stops matching instances                          |
-| Remote delete boundary        | `delete openrouter`                                                                       | exits with intentional no-local-config message; no registry edit           |
-| Docs sync                     | help, `docs/cli_reference.md`, `docs/end-user/proxy.md`, `docs/design_appendix.md` §A.2.1 | start/config vs stop/runtime vs delete/config semantics are documented     |
-| Source vocabulary guard       | `forge model backend --help` / stop/delete help                                           | "source" is defined or avoided; no unexplained `SOURCE_ID`-style leak      |
+| Test                          | Fixture                                                                                  | Assertion                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Stop by runtime id            | Registry has `litellm-4000`                                                              | stops/unregisters that instance; config remains                            |
+| Stop multiple runtime ids     | Registry has two instances                                                               | both are attempted; failures are reported per target                       |
+| Stop all runtime instances    | Registry has two instances                                                               | `stop --all --yes` removes both and leaves adapter config intact           |
+| Stop all includes pidless     | Registry has `pid=None` instance                                                         | unregisters it, reports no process killed, exits zero                      |
+| Empty all                     | Empty registry                                                                           | `stop --all` prints a no-target message and exits zero                     |
+| Conflict guard                | `stop litellm-4000 --all`                                                                | exits non-zero                                                             |
+| Missing target guard          | `stop` with no target and no `--all`                                                     | exits non-zero with a `forge model backend list` tip                       |
+| Remote stop boundary          | `stop openrouter`                                                                        | exits with intentional no-local-lifecycle message; no registry edit        |
+| Stop rejects local source     | `stop litellm-openai-local`                                                              | exits with tip to use the runtime instance id from `backend list`          |
+| Stop port clean break         | `stop litellm --port 4000`                                                               | exits non-zero; `--port` is no longer a stop option                        |
+| Start remains config-oriented | `start litellm-4000`                                                                     | still rejected; start continues to use local source ids or adapter config  |
+| Delete runtime-id precedence  | `delete litellm-4000` with that id in registry                                           | exits with a `stop litellm-4000` tip, not "Unknown backend adapter/source" |
+| Delete port clean break       | `delete litellm --port 4000`                                                             | exits non-zero; `--port` is no longer a delete option                      |
+| Adapter config spelling       | `delete litellm --yes`                                                                   | still deletes config and stops matching instances                          |
+| Remote delete boundary        | `delete openrouter`                                                                      | exits with intentional no-local-config message; no registry edit           |
+| Docs sync                     | help, `docs/cli_reference.md`, `docs/end-user/proxy.md`, `docs/design_runtime.md` §A.2.1 | start/config vs stop/runtime vs delete/config semantics are documented     |
+| Source vocabulary guard       | `forge model backend --help` / stop/delete help                                          | "source" is defined or avoided; no unexplained `SOURCE_ID`-style leak      |
 
 ## Open questions
 

@@ -29,7 +29,7 @@ capture-cleanup case, one typed-error case, and two valid-value controls.
 
 [`docs/developer/coding_standards.md`](../../../developer/coding_standards.md) requires explicit boundary validation,
 typed operational failures, and deterministic resource cleanup.
-[`docs/design_appendix.md` §A.1](../../../design_appendix.md#a1-proxy-overlay-schema-364--user-edit-surface) defines the
+[`docs/design_runtime.md` §A.1](../../../design_runtime.md#a1-proxy-overlay-schema-364-user-edit-surface) defines the
 transported proxy fields and failed-start cleanup posture.
 
 ## Acceptance Criteria

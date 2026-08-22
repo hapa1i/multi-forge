@@ -2,8 +2,10 @@
 
 **Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
-**Findings**: D002–D004 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings) and the
-related O028 subset in the [`code and maintenance inventory`](../../review_combined.md#code-and-maintenance-findings).
+**Findings**: D002–D004 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings) and the related O028
+subset in the
+[`code and maintenance inventory`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- implemented on `fix/harden-supervisor-verdict-boundary`; review and merge are tracked by the active
 epic before D005 starts.

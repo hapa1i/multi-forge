@@ -12,15 +12,15 @@ registration, generated files, and the installed manifest without combining thre
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §C.3](../../../design_appendix.md#c3-settings-merge-rules): settings removal uses the
-  pre-Forge baseline, compares tracked values, and preserves user edits.
-- [`docs/design_appendix.md` §C.4](../../../design_appendix.md#c4-durable-installproject-files): filesystem work
+- [`docs/design_installation.md` §C.3](../../../design_installation.md#c3-settings-merge-rules): settings removal uses
+  the pre-Forge baseline, compares tracked values, and preserves user edits.
+- [`docs/design_installation.md` §C.4](../../../design_installation.md#c4-durable-installproject-files): filesystem work
   precedes atomic tracking, later failures preserve or restore an honest state, and incomplete rollback is named.
-- [`docs/design_appendix.md` §C.6](../../../design_appendix.md#c6-codex-hook-registration-hooks-codex-owned-half): Forge
-  owns only one marker-delimited Codex block and preserves user content outside it.
+- [`docs/design_installation.md` §C.6](../../../design_installation.md#c6-codex-hook-registration-hooks-codex-owned-half):
+  Forge owns only one marker-delimited Codex block and preserves user content outside it.
 - [`testing_guidelines.md` integration requirements](../../../developer/testing_guidelines.md#when-to-run-integration-tests):
   installer changes require targeted Docker integration coverage rather than host-only tests.
-- [`review_combined.md`](../../review_combined.md#design-conformance-findings): D012–D014 and D019.
+- [`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings): D012–D014 and D019.
 
 ## Reproduction Record
 

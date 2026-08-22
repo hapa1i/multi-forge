@@ -200,7 +200,7 @@ at its first policy check; a fork's child gets its own binding). Launch-time `--
 hook escalates to the frontier when no plan exists yet (unlike `forge policy supervisor set <target> --cascade` or
 `forge policy supervisor cascade on`, which resolves the plan eagerly). See [session.md](end-user/session.md).
 
-Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)):
+Codex runtime ([design.md §3.9](design_sessions.md#39-session-resume-context-management)):
 `forge session start <name> --runtime codex` launches the interactive `codex` TUI (bare, or an interactive bridge with
 `--resume-from <parent>`); adding `--task "…"` instead runs a headless first turn and requires `--resume-from`
 (`--strategy` default `ai-curated`, `--sandbox` default `workspace-write`; Claude-only flags rejected).

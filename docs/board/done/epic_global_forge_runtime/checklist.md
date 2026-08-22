@@ -132,7 +132,7 @@ their focused **86-test** suite.
 ## Closeout (epic)
 
 - [x] Every live member card is `done/`; retired T2 is excluded from the live/shipped count with its outcome recorded.
-- [x] design.md / design_appendix §C / cli_reference reflect the shipped install + hook-ownership model.
+- [x] design.md / design_installation.md §C / cli_reference reflect the shipped install + hook-ownership model.
 - [x] Repointed every inbound board link that targeted the epic's former `doing/` path, including done-member back-links
   and standalone follow-ups such as [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md)
   and [`forge_project_compat_mutator_sweep`](../../done/forge_project_compat_mutator_sweep/card.md) (non-member; its

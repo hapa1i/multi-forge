@@ -203,7 +203,7 @@ session config even when enforcement is disabled — useful for verifying fixes 
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI command
 > `forge policy enable/disable` mutates the session intent.
 
-For the full list of `%` commands, see [`hook.md`](hook.md#in-session-commands--commands).
+For the full list of `%` commands, see [`hook.md`](hook.md#in-session-commands-commands).
 
 ---
 

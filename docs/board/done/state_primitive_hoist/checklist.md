@@ -25,9 +25,9 @@ Incorporated from checklist review (each verified against the code before applyi
   (`gc.py:594`), so "forge clean won't delete" is untestable. The real surface is `forge search clean` / search reads
   and their unreadable-vs-corrupt routing (`cli/search.py:383`).
 - **Phase 2 (Medium):** dropped "wire usage-events retention" as an option -- telemetry logs **accumulate indefinitely**
-  by design (design_appendix §A.9, `:498`), so a live retention caller is a behavior change, not a refactor. Phase 2 now
-  moves the live pruner and **deletes** the dead exported `prune_usage_events`; retention policy is left to a separate
-  design/simplicity card.
+  by design (design_telemetry.md §A.9, `:498`), so a live retention caller is a behavior change, not a refactor. Phase 2
+  now moves the live pruner and **deletes** the dead exported `prune_usage_events`; retention policy is left to a
+  separate design/simplicity card.
 - **Phase 1 (Medium):** the private telemetry `_now_iso` helpers were **not** byte-identical to `now_iso`; they emitted
   second-precision `Z` timestamps while `core.state.now_iso` is intentionally tested as `+00:00`. Implementation
   preserves bytes by moving that format to `core.state.utc_timestamp_z()` and deleting the private local helpers.
@@ -184,9 +184,9 @@ precedent `tests/regression/test_bug_state_unreadable_not_deleted.py` (PR #50 fa
 
 - **impl_notes** "One pruner for all JSONL planes" names `proxy/retention.py::prune_jsonl_shards` as the canonical home;
   update that note's path after Slice 2 moves it to `core/state/retention.py`.
-- These are internal primitive moves with **no** user-facing or ownership-model change, so `design.md`/`design_appendix`
-  are expected untouched. Confirm at closeout; if a `core/state` leaf becomes a documented ownership boundary, add the
-  breadcrumb.
+- These are internal primitive moves with **no** user-facing or ownership-model change, so the canonical design
+  documents are expected untouched. Confirm at closeout; if a `core/state` leaf becomes a documented ownership boundary,
+  add the breadcrumb.
 
 ## Closeout
 

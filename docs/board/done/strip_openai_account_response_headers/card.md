@@ -31,4 +31,5 @@ response headers; this member closes only the verified OpenAI selectors.
 ## Verification
 
 Run focused response-header and passthrough tests, full unit/regression suites, targeted Docker proxy routing coverage,
-and `make pre-commit`. Sync the response-relay contract in `docs/design_appendix.md` if its explicit denylist is named.
+and `make pre-commit`. Sync the response-relay contract in the former consolidated design appendix if its explicit
+denylist is named.

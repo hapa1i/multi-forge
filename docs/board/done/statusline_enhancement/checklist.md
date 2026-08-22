@@ -3,8 +3,8 @@
 Execution plan for [`card.md`](./card.md). Full design: `~/.claude/plans/giggly-swimming-wren.md`.
 
 This card is complete and lives under `done/`. All five implementation phases plus both review rounds shipped; design
-docs (`design_appendix.md §A.8`, `docs/end-user/config.md`), the change log, impl_notes, and the QA checklist (§8.4) are
-synced. Kept as a historical snapshot — design docs and code are now normative.
+docs (`design_telemetry.md §A.8`, `docs/end-user/config.md`), the change log, impl_notes, and the QA checklist (§8.4)
+are synced. Kept as a historical snapshot — design docs and code are now normative.
 
 ## Maintenance
 
@@ -12,7 +12,7 @@ synced. Kept as a historical snapshot — design docs and code are now normative
 - Tick a task only when its assertion is satisfied and verification is recorded.
 - Add short blocker notes inline under the relevant phase.
 - Move completed-session details to `docs/board/change_log.md`; keep only active plan state here.
-- Update design docs per phase as code ships (`docs/design_appendix.md §A.8`).
+- Update design docs per phase as code ships (`docs/design_telemetry.md §A.8`).
 
 ## Current Focus
 
@@ -162,7 +162,7 @@ is a typed, mechanical extract verified by the metrics-integration suite.
 
 ## Closeout
 
-- [ ] Update `docs/design_appendix.md §A.8` (status line gets `session_id` via stdin; new `statusline:` section,
+- [ ] Update `docs/design_telemetry.md §A.8` (status line gets `session_id` via stdin; new `statusline:` section,
   `cost_mode`, segments, `show_rate_limits` removal). Update `docs/end-user/` config/status guidance.
 - [ ] `docs/board/change_log.md` entry (incl. `show_rate_limits` clean-break reset note).
 - [ ] Promote durable lessons to `impl_notes.md` after human review.

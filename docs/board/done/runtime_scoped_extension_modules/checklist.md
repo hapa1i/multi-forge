@@ -259,9 +259,9 @@ or enum changes. Do not commit an import-broken intermediate state.
   **Assertion**: each invariant has a test that violates it and observes a specific rejection. Invariant 3 uses the
   declared row identities (`target_path`; `(key_path, stable_id)`).
 
-- [x] Record the load-bearing premises in `design_appendix.md` section C.4. **Assertion**: documents the F3 reading of
-  invariant 5, and that "Claude by construction" breaks the moment a third Codex-owned module appears -- such a module
-  must ship its own migration step.
+- [x] Record the load-bearing premises in `design_installation.md` section C.4. **Assertion**: documents the F3 reading
+  of invariant 5, and that "Claude by construction" breaks the moment a third Codex-owned module appears -- such a
+  module must ship its own migration step.
 
 ## Phase 3 -- Selection rule and module planning outcomes
 
@@ -317,14 +317,15 @@ planner; this phase applies that selection to every module and exposes the outco
   `checklist/2-extension.md:20,27,93,96` also read `modules_enabled` (the card's inventory names only `:190`, the
   section heading). Per `testing_guidelines.md` "Updating the QA checklist" step 3, also update
   `<!-- test-count: ~N -->` and `<!-- last-updated: YYYY-MM-DD -->` in `src/skills/qa/resources/checklist.md`.
-- [x] Update normative design docs: `design.md:1365,1384`; `design_appendix.md:1028,1033,1225`;
-  `design_workflows.md:355`; `cli_reference.md:116`. **Assertion**: every "selects only outputs of the SKILLS module"
-  disclaimer is gone -- its spread across six docs is the card's third piece of evidence that the axis was mis-scoped.
+- [x] Update normative design docs: `design.md:1365,1384`; lines 1028, 1033, and 1225 of the former consolidated design
+  appendix; `design_workflows.md:355`; `cli_reference.md:116`. **Assertion**: every "selects only outputs of the SKILLS
+  module" disclaimer is gone -- its spread across six docs is the card's third piece of evidence that the axis was
+  mis-scoped.
 - [x] Update end-user and agent-context docs: `end-user/hook.md:97,118,301,321`; `end-user/skills.md:403`;
   `end-user/README.md:59`; `end-user/manual_testing.md`; `AGENTS.md`. **Assertion**: keep the scope-mismatch paragraph
   at `hook.md:114-116` intact while updating module names around it.
 - [x] Do **not** rename the unrelated identifiers. **Assertion**: hook handler names `codex-session-start` /
-  `codex-policy-check` and the probe directory `scripts/experiments/codex-hooks/` (evidence for `design_appendix.md`
+  `codex-policy-check` and the probe directory `scripts/experiments/codex-hooks/` (evidence for `design_workflows.md`
   section I.2) are unchanged. Only the module *value* dies.
 - [x] Add the `docs/board/change_log.md` entry. **Assertion**: phase-completion sized (25-40 lines per
   `board_contract.md`); records the `codex-hooks` clean break, both version bumps, and that no reset is required.
@@ -392,13 +393,13 @@ status cases to `test_extension_enable.py` unless the surface grows enough to ju
 - [x] `docs/board/change_log.md` entry added, recording the clean break and both version bumps.
 
 - [x] Design docs describe shipped behavior, including the F3 reading of invariant 5 and the load-bearing "Claude by
-  construction" premise in `design_appendix.md` section C.4.
+  construction" premise in `design_installation.md` section C.4.
 
 - [x] Both scoped greps are clean. A repo-wide grep cannot pass -- this checklist, `card.md`, and historical board
   entries intentionally contain the term -- and a literal-string grep alone misses every `CODEX_HOOKS` identifier site.
   Run both:
 
-  - `rg -n 'codex-hooks' src/forge src/skills docs/design_appendix.md docs/design.md docs/design_workflows.md docs/cli_reference.md docs/end-user README.md CONTRIBUTING.md AGENTS.md`
+  - `rg -n 'codex-hooks' src/forge src/skills docs/design_*.md docs/design.md docs/design_workflows.md docs/cli_reference.md docs/end-user README.md CONTRIBUTING.md AGENTS.md`
   - `rg -n 'CODEX_HOOKS' src/forge tests/`
 
   **Allowlist** (verified as probe-directory or historical references, none of which name the module value):

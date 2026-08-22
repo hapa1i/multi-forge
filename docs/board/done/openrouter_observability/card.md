@@ -12,7 +12,7 @@ OpenRouter's UI or Forge activity/cost surfaces.
 
 **References**: OpenRouter `session_id` request field; Forge proxy cost logs (`~/.forge/costs/requests/`), request logs
 (`~/.forge/logs/requests/`), run-tree headers (`X-Forge-Run-ID`, `X-Forge-Root-Run-ID`), the `core.llm`
-`CompletionResponse` / `StreamEvent` abstraction, and the usage ledger cross-plane refs in `docs/design_appendix.md`
+`CompletionResponse` / `StreamEvent` abstraction, and the usage ledger cross-plane refs in `docs/design_telemetry.md`
 §A.13.
 
 ## Investigation findings & locked decisions (2026-06-15)

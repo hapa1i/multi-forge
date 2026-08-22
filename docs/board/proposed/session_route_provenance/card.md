@@ -13,10 +13,10 @@ authority, enforcement, authorship attestation, or content guarantee. Generic mo
 
 **References**: [design.md §3](../../../design.md#3-shared-contracts-file-based-state-system) (session state),
 [design.md §3.4](../../../design.md#34-proxy-vs-no-proxy-mode) (routing ownership),
-[design.md §3.7](../../../design.md#37-proxy-runtime-truth) (live proxy facts),
-[design.md §3.9](../../../design.md#39-session-resume-context-management) (launch lifecycle),
-[design_appendix.md §A.5](../../../design_appendix.md#a5-model-catalog-368) (intrinsic model catalog),
-[design_appendix.md §A.8](../../../design_appendix.md#a8-status-line-guidance-3611) (status-line sources),
+[design.md §3.7](../../../design_runtime.md#37-proxy-runtime-truth) (live proxy facts),
+[design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (launch lifecycle),
+[design_runtime.md §A.5](../../../design_runtime.md#a5-model-catalog-368) (intrinsic model catalog),
+[design_telemetry.md §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611) (status-line sources),
 `src/forge/session/launch_confirmation.py` (existing Claude-only route/auth confirmation),
 `src/forge/core/ops/session_context.py` (current model context), and the sibling authority card.
 

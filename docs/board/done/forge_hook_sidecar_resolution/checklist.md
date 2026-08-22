@@ -141,7 +141,7 @@ Acceptance table (fixture-grounded):
 - [x] `design.md §7` (sidecar mounts + narrow exception): document that sidecar sessions inject Forge runtime hooks at
   the in-container user scope (`/root/.claude`, via the `.forge/sidecar-home` mount) using the bare image-PATH
   `forge hook` form; host project `.claude` is never mutated; statusLine relies on `forge` on the image PATH.
-- [x] `design_appendix §C` / `§C.6` records the sidecar exception alongside user-scope ownership (T5).
+- [x] `design_installation.md §C` / `§C.6` records the sidecar exception alongside user-scope ownership (T5).
 - [x] Update epic `checklist.md`: record seam 5 verification, the command-form resolution + the retired
   `SIDECAR_RUNTIME_HOOK_WARNING`, and advance the cursor to T6 with T8 parked.
 - [x] Add the compact `docs/board/change_log.md` entry (goal / key changes / verification).

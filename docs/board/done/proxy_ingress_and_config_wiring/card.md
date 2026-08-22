@@ -12,7 +12,7 @@ owed adversarial pass is resolved -- see "Open questions (resolved)".
 modules," not one contract.
 
 **References**: `docs/design.md` §3.7 (proxy runtime truth), §7.x (wire shape / intercept), §3.5 (ownership);
-`docs/design_appendix.md` §A.11-A.12 (intercept/audit config), §C (install model); `docs/board/impl_notes.md`
+`docs/design_telemetry.md` §A.11-A.12 (intercept/audit config), §C (install model); `docs/board/impl_notes.md`
 ("Per-proxy config blocks must be wired through BOTH loader hops"; "Shared cost/usage vocabulary Literals live in a
 telemetry leaf" -- the eager-`__init__` trap; the `responses_ingress` extraction precedent).
 

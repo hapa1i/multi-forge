@@ -74,8 +74,8 @@ merged as `a1c54a05`, and the member's lane/link closeout completed on 2026-08-2
 ## Closeout
 
 - [ ] Every live member is `done/` or has an explicit terminal outcome; no proposed member is counted as shipped.
-- [ ] `docs/design.md`, `docs/design_appendix.md`, relevant workflow/CLI docs, and end-user guides describe only shipped
-  behavior and preserve the no-attestation boundary.
+- [ ] `docs/design.md`, `docs/design_workflows.md`, relevant workflow/CLI docs, and end-user guides describe only
+  shipped behavior and preserve the no-attestation boundary.
 - [ ] Aggregate unit, regression, integration, pre-commit, and relative-link checks pass on the final integrated head.
 - [ ] Add the epic closeout to `docs/board/change_log.md`; promote only human-approved durable lessons to
   `docs/board/impl_notes.md`.

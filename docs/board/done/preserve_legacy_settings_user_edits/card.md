@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
 
-**Finding**: D019 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D019 (MEDIUM) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #146 (`3f3a3c6d`) after implementation, verification, and independent review.
 
@@ -13,10 +14,10 @@ tracked Forge-owned values.
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §C.3](../../../design_appendix.md#c3-settings-merge-rules): legacy removal compares values
-  and preserves user edits.
-- [`docs/design_appendix.md` §C.4](../../../design_appendix.md#c4-durable-installproject-files): settings and ownership
-  metadata form a reversible transition whose failures retain an actionable ownership state.
+- [`docs/design_installation.md` §C.3](../../../design_installation.md#c3-settings-merge-rules): legacy removal compares
+  values and preserves user edits.
+- [`docs/design_installation.md` §C.4](../../../design_installation.md#c4-durable-installproject-files): settings and
+  ownership metadata form a reversible transition whose failures retain an actionable ownership state.
 
 ## Evidence
 

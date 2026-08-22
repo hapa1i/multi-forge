@@ -23,7 +23,7 @@ source-identity **key**. The shared contract and member list live in the
 `src/forge/proxy/provider_trace_logger.py` (the cost + audit + provider-trace planes -- the three per-call/downstream
 planes), `src/forge/core/ops/usage_summary.py` (joins the tangle today), `src/forge/policy/store.py`
 (`confirmed.policy.decisions` -- the accidental outcome side-channel), [design.md §3.14](../../../design.md),
-[design_appendix §A.12-A.14](../../../design_appendix.md).
+[design_telemetry.md §A.12-A.14](../../../design_telemetry.md).
 
 ## Problem
 

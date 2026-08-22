@@ -56,8 +56,8 @@ Foundation for every later phase; ships the compiled-cache digest clean break (c
   packages.
   - Assertion: validation passes with the sentinel present for both runtimes; `test_skill_validation.py`.
 - [x] 1.5 Doc sync (board contract: design docs update with the phase): `docs/design.md` §5.1 and
-  `docs/design_appendix.md` §C describe the sentinel as an emitted, always-copied ledger file and record the one-time
-  cache-digest change.
+  `docs/design_installation.md` §C describe the sentinel as an emitted, always-copied ledger file and record the
+  one-time cache-digest change.
   - Verification recorded: 675 install unit tests passed with 1 skipped, 20 Docker installer tests passed, and mypy
     completed successfully after the Phase 1 changes.
 
@@ -193,8 +193,9 @@ One UI-agnostic operation shared by installer planning, status, and GC (card §D
 
 Doc updates ship with their phases (1.5, 4.5, 5.5, 6.7); this phase is the consistency audit and board closeout.
 
-- [x] Consistency audit: `docs/design.md`, `docs/design_appendix.md`, `docs/cli_reference.md`, `docs/end-user/README.md`
-  (Day 1 flow), and `docs/end-user/skills.md` reflect shipped behavior; no phase left checklist debt.
+- [x] Consistency audit: `docs/design.md`, `docs/design_telemetry.md`, `docs/cli_reference.md`,
+  `docs/end-user/README.md` (Day 1 flow), and `docs/end-user/skills.md` reflect shipped behavior; no phase left
+  checklist debt.
 - [x] `docs/board/change_log.md` entry with Goal / Key changes / Verification, naming both research-preview clean
   breaks: the one-time compiled-cache digest change and the status `--json` schema-v2 object.
 - [x] Durable lessons proposed via `.forge/memory/shadow_impl_notes.md` for human promotion (not directly to

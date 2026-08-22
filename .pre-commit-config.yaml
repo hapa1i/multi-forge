@@ -69,6 +69,19 @@ repos:
     types: [python]
     pass_filenames: false
     require_serial: true
+  - id: file-size-limits
+    name: repository file-size limits
+    language: system
+    entry: ./scripts/check-file-limits.py
+    files: \.(md|txt|py|js|ts|rst)$
+    require_serial: true
+  - id: markdown-links
+    name: repository Markdown links
+    language: system
+    entry: ./scripts/check-markdown-links.py
+    files: \.md$
+    pass_filenames: false
+    require_serial: true
 - repo: https://github.com/hukkin/mdformat
   rev: 1.0.0
   hooks:

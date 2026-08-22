@@ -8,10 +8,10 @@ without changing them. This card adds an explicit model-first route-selection co
 It neither depends on authority mode nor changes authority inheritance.
 
 **References**: [design.md §3.4](../../../design.md#34-proxy-vs-no-proxy-mode),
-[design.md §3.6.12](../../../design.md#3612-subprocess-routing-resolution-normative),
-[design.md §3.9](../../../design.md#39-session-resume-context-management),
-[design_appendix.md §A.5](../../../design_appendix.md#a5-model-catalog-368),
-[design_appendix.md §G](../../../design_appendix.md#g-subprocess-routing-reference),
+[design.md §3.6.12](../../../design_runtime.md#3612-subprocess-routing-resolution-normative),
+[design.md §3.9](../../../design_sessions.md#39-session-resume-context-management),
+[design_runtime.md §A.5](../../../design_runtime.md#a5-model-catalog-368),
+[design_runtime.md §G](../../../design_runtime.md#g-subprocess-routing-reference),
 `src/forge/core/models/direct_model.py`, `src/forge/backend/sources.py`, `src/forge/session/model_pin.py`,
 `src/forge/review/models.py`, `src/forge/review/routing.py`, and `src/forge/core/reactive/routing.py`.
 
@@ -216,7 +216,7 @@ its committed routing event. This integration adds evidence only and does not al
 10. Fresh/fork/forced-child behavior preserves existing session and authority inheritance semantics.
 11. Clean-wheel verification covers the new packaged route catalog and at least one direct and one proxy model route.
 12. User documentation distinguishes Claude-native `/model`, legacy Forge `--model`, and model-first `--route-model`.
-13. Activation updates `design.md` session routing semantics and replaces `design_appendix.md` §G.4's workflow
+13. Activation updates `design.md` session routing semantics and replaces `design_runtime.md` §G.4's workflow
     `preferred_proxy`/`provider_refs` derivation order with the shared route catalog's authoritative order.
 
 ## Risks

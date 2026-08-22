@@ -36,4 +36,5 @@ per render. No Forge workflow command is authorized for this member.
 - Focused status-line units/regressions: 348 passed; full units: 9,304 passed, one skipped, 122 deselected.
 - Regressions: 925 passed. Targeted Docker status-line integration: 17 passed.
 - Full pre-commit passed after expected import, Python, and Markdown normalization. Opus 5 local counts are 29,993 for
-  `design.md` and 29,956 for `design_appendix.md`; 894 local links across 370 board documents resolve.
+  `design.md` and 29,956 for the former consolidated design appendix; 894 local links across 370 board documents
+  resolve.

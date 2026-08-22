@@ -17,7 +17,7 @@ mechanism decisions and acceptance mapping.
 managed Codex packages. That is declined in `enable` (see Rejected alternative) and reframed here: removal is real and
 wanted, but it belongs on the verb that already owns removal.
 
-**References**: `docs/design_appendix.md` sections C.3-C.6; `docs/developer/cli_style_guidelines.md` (destructive
+**References**: `docs/design_installation.md` sections C.3-C.6; `docs/developer/cli_style_guidelines.md` (destructive
 verbs); `docs/developer/testing_guidelines.md` (integration triggers); `docs/board/impl_notes.md` ("Runtime skill
 packages are compiled artifacts with separate ownership").
 
@@ -52,7 +52,7 @@ Making `enable --runtime <r>` remove the omitted runtimes was rejected on three 
   `--without commands` does not delete previously installed commands. A destructive runtime axis inside an otherwise
   additive verb trades one inconsistency for an unrecoverable one.
 - **Failure model.** Enable writes files and commits tracking last, with rollback restoring what it created
-  (`design_appendix.md` section C.4). Removal needs the settings/ownership-sidecar path, Codex managed-block removal
+  (`design_installation.md` section C.4). Removal needs the settings/ownership-sidecar path, Codex managed-block removal
   with boundary preservation, and the re-trust notice -- states `impl_notes.md` calls an "honest hooks-off recovery
   state", acceptable to reach from a command the user knew was destructive, not from an install.
 
@@ -138,8 +138,8 @@ requirement and the reason the shipped sibling schema remains load-bearing.
 - **Removing one runtime's hooks must not re-render the other's command bytes** -- otherwise the surviving runtime is
   forced through a needless re-trust.
 - **Preserved boundaries**: unrelated `config.toml` bytes survive and a whitespace-only remainder deletes the file
-  (`design_appendix.md` section C.6); Claude settings use the existing smart unmerge that removes Forge additions and
-  keeps user changes (`installer.py:2439-2456`).
+  (`design_installation.md` section C.6); Claude settings use the existing smart unmerge that removes Forge additions
+  and keeps user changes (`installer.py:2439-2456`).
 
 ### Decisions
 
@@ -173,11 +173,11 @@ Written against pre-dependency code. Line references and the two **RESOLVED** en
   inherits the refusal rather than inventing it. The checklist scopes the preflight to removals that actually touch the
   Codex config (D-preflight-scoped).
 - `disable --all --yes` attempts every tracked scope, aggregates failures, and exits non-zero if any remain
-  (`design_appendix.md` section C.4). `--runtime` must compose without weakening that aggregate exit contract.
+  (`design_installation.md` section C.4). `--runtime` must compose without weakening that aggregate exit contract.
 - `scripts/setup.sh --uninstall` deletes `$FORGE_HOME` only after a fully successful disable and preserves tracking on
   failure. It passes no runtime filter, so it remains on the complete-removal path.
-- Disable refuses to traverse a package root or descendant replaced by a symlink (`invalid-target`, `design_appendix.md`
-  section C.5). That refusal applies unchanged.
+- Disable refuses to traverse a package root or descendant replaced by a symlink (`invalid-target`, section C.5 of the
+  former consolidated design appendix). That refusal applies unchanged.
 - Codex trust covers registered command bytes and config location, and `trusted_hash` is not computable by Forge
   (sections C.6, I.2). Re-trust cost is a fact to disclose, never a state to check.
 
@@ -227,7 +227,7 @@ None. The checklist fixes the D-last wording contract and the `--all` dispositio
 - Disabling a runtime the installation does not manage exits 0 with an explicit no-op message.
 - A missing Codex managed block clears stale ownership; partial/duplicate markers and a leaf symlink refuse before
   mutation; a balanced block is removed while outside-marker manual commands remain user-owned and warning-only.
-- `cli_reference.md` Installation table, `design_appendix.md` sections C.3-C.6, `docs/end-user/hook.md`,
+- `cli_reference.md` Installation table, `design_installation.md` sections C.3-C.6, `docs/end-user/hook.md`,
   `docs/end-user/skills.md`, and the changelog record the flag, the D-last behavior, and the re-trust consequence.
 
 **Verification contract** (`testing_guidelines.md` names installer changes):

@@ -253,8 +253,8 @@ recorded on this card -- both before the card may move to `done/`.
 - [x] `design.md` project-identity paragraph: command mutations check the target state owner's root; hooks diagnose
   leniently; background work refuses without failing foreground; global-only registries are exempt; WorktreeCreate does
   not copy an ignored pin.
-- [x] `design_appendix.md` Project compatibility pin: record strict-reader-versus-enforcer semantics, the three
-  postures, D6 partial-result/exit contract, D7 bounded marker behavior, and D3 exemption.
+- [x] The project-compatibility section in the former consolidated design appendix records strict-reader-versus-enforcer
+  semantics, the three postures, D6 partial-result/exit contract, D7 bounded marker behavior, and D3 exemption.
 - [x] End-user docs: update `config.md`, memory/session/hook guides, `search.md`, and `policy.md` for refusals,
   recovery, failed-marker behavior, WorktreeCreate, and global exemptions.
 - [x] Implement D8's shared recovery formatter and update every caller/test. The T8 no-bypass resolution remains

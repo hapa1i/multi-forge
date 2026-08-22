@@ -21,7 +21,7 @@ duplicate block is test-organization cleanup for this path-ownership pass, not a
 unchanged installer, runtime-removal, unmanaged-package, skill-planning, and extension characterization passes 348
 tests. Authority:
 [`docs/design.md` "3.5 File ownership boundaries"](../../../design.md#35-file-ownership-boundaries-normative) and
-[`docs/design_appendix.md` "C. Install Model Reference"](../../../design_appendix.md#c-install-model-reference).
+[`docs/design_installation.md` "C. Install Model Reference"](../../../design_installation.md#c-install-model-reference).
 
 ## Acceptance Criteria
 

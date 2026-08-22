@@ -129,7 +129,7 @@ Ratified decisions:
 - [x] Add neutral tests in `tests/src/session/test_session_events.py`; name the helper contract in the epic checklist so
   M2 must consume rather than fork it.
 - [x] Sync the shared event ownership, paths, lock/failure behavior, local-tamper caveat, and C4 absence vocabulary into
-  `docs/design.md`/`docs/design_appendix.md` with M1 described as the sole shipped consumer.
+  `docs/design.md` and the former consolidated design appendix with M1 described as the sole shipped consumer.
 
 ## Phase 2 -- Authority intent, coverage inventory, and human control plane
 
@@ -214,7 +214,7 @@ Ratified decisions:
     worktree or worktree fork, the journal disappears with the complete `.forge/artifacts/<session>` tree. Tests pin
     both sides of this containing-tree boundary rather than promising retention outside it.
 - [x] Sync the one-root-id/preflight/lifecycle/retention architecture into `docs/design.md` and the runtime-specific
-  seam details into `docs/design_appendix.md`.
+  seam details into the former consolidated design appendix.
 
 ## Phase 4 -- Runtime authority guards and ordinary-policy preservation
 
@@ -251,7 +251,7 @@ Ratified decisions:
 - [x] Extend Docker hook and installer coverage for real registered rows, both runtime wire responses, disabled/open
   ordinary policy, malformed inputs, journal failure, and the host dispatcher fast path.
 - [x] Sync the authority-before-policy boundary and fail-closed-vs-runtime-non-delivery limitation into
-  `docs/design_workflows.md`, `docs/design_appendix.md`, and `docs/end-user/hook.md`.
+  `docs/design_workflows.md`, `docs/design_sessions.md`, and `docs/end-user/hook.md`.
 
 ## Phase 5 -- Honest authority posture read
 
@@ -385,7 +385,7 @@ Ratified decisions:
   and regression suites passed 9,447 tests with 117 deselected and 1,053 tests, respectively; eight targeted Docker/CLI
   integration cases passed; and `make pre-commit`, `git diff --check`, and the relative-link sweep passed. The checklist
   measured 8,572 tokens. The intentionally bypassed design-size gate measured 31,415 tokens for `design.md` and 31,273
-  for `design_appendix.md`; compaction remains a separate follow-up as directed.
+  for the former consolidated design appendix; compaction remains a separate follow-up as directed.
 
 ## Deferred and out of scope
 

@@ -17,8 +17,8 @@ budget, and citation semantics distinct.
 Reverified on `7c925880`: rewind imports four private transfer helpers but still copies `_coerce_text`,
 `_render_str_list`, and decision/change rendering. Earlier Wave 6 work changed rewind citation behavior, demonstrating
 why copied rendering logic needs an owned seam. Authority:
-[`docs/design_appendix.md` "H. Transfer Context Schema"](../../../design_appendix.md#h-transfer-context-schema) and
-[`docs/design.md` "3.9 Session Resume"](../../../design.md#39-session-resume-context-management).
+[`docs/design_sessions.md` "H. Transfer Context Schema"](../../../design_sessions.md#h-transfer-context-schema) and
+[`docs/design_sessions.md` "3.9 Session Resume"](../../../design_sessions.md#39-session-resume-context-management).
 
 ## Acceptance Criteria
 
