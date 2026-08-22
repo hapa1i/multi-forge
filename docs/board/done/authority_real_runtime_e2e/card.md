@@ -1,6 +1,8 @@
 # Real-runtime authority end-to-end validation
 
-**Status**: Active (2026-08-22). **Branch**: `test/authority-real-runtime-e2e`.
+**Status**: Done -- shipped via [PR #235](https://github.com/hapa1i/multi-forge/pull/235) (merge `8e47f017`, 2026-08-22
+UTC) and closed to `done/` on 2026-08-22. Execution evidence is retained in [checklist.md](checklist.md). **Branch**:
+`test/authority-real-runtime-e2e`.
 
 **Relationship**: post-ship validation for [Artifact Authority Mode](../../done/artifact_authority_mode/card.md). This
 card adds no authority behavior or new runtime contract; it closes the real-model test gap left by M1's hermetic seam

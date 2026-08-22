@@ -43,8 +43,10 @@ and journal chain inside disposable Docker identities.
 - Synchronized the bundled QA image identity, isolated the installer's no-Codex boundary, bounded hung runtime
   processes, and moved paid credentials from process arguments into atomic owner-only stdin writes.
 
-**Verification**: Three real-model Docker cases; 437 non-slow integration tests with 10,615 deselected; 207 focused
-authority tests; 9,447 unit with 117 deselected; 1,056 regression; full pre-commit, diff, and 1,227-link checks.
+**Verification**: Three real-model Docker cases; 437 non-slow integration tests with 10,615 deselected plus 13
+current-head canonical Docker-helper cases; 207 focused authority tests; 9,447 unit with 117 deselected; 1,057
+regression; full pre-commit, diff, and 1,227-link checks. PR #235 merged as `8e47f017` with all five GitHub checks
+passing; the card closed to `done/` on 2026-08-22.
 
 ## 2026-08-21
 

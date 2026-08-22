@@ -1,10 +1,13 @@
 # Real-runtime authority E2E execution checklist
 
+Closeout: shipped in [PR #235](https://github.com/hapa1i/multi-forge/pull/235) (merge `8e47f017`) and moved to `done/`
+on 2026-08-22.
+
 **Card**: [card.md](card.md). **Branch**: `test/authority-real-runtime-e2e`, based on `main` at `5dfec4c2`.
 
 ## Current focus
 
-Implement post-ship validation without changing the shipped authority contract. Both runtimes execute inside the
+The validation shipped via PR #235 and this checklist retains its execution evidence. Both runtimes execute inside the
 disposable integration container. Codex receives only an ephemeral API credential and the two non-secret trusted hook
 hashes recreated at their original absolute paths; host auth/config files remain untouched.
 
@@ -57,7 +60,8 @@ the launch journal recorded the same-run denial and terminal event.
 - [x] Add a compact completed-work entry to `docs/board/change_log.md`; design and end-user docs remain unchanged
   because this card adds validation only.
 - [x] Commit, push the separate branch, and open a PR with real-model cost/prerequisite disclosure and exact evidence.
-- [ ] After merge, move this card `doing/ -> done/` and repoint inbound board links.
+- [x] After merge, move this card `doing/ -> done/` and repoint inbound board links. PR #235 merged as `8e47f017`; the
+  card moved to `done/` on 2026-08-22, and no inbound board links required changes.
 
 ## Review repair
 
@@ -70,7 +74,8 @@ the launch journal recorded the same-run denial and terminal event.
 - [x] Stream fixture file content over `docker exec -i`, publish through an atomic same-directory temporary file, and
   use mode `0600` for all real-runtime credentials and prompts.
 
-Evidence (2026-08-22): 3 real-model authority cases passed in 46.73 s; 13 Docker file-helper cases passed; the 32-case
-proxy/Claude/installer regression cluster passed; the complete non-slow integration target passed with 437 tests and
-10,615 deselections in 10m17s; 9,447 unit tests passed with 117 deselections; 1,056 regression tests passed; full
-pre-commit and diff checks passed.
+Evidence (2026-08-22): 3 real-model authority cases passed in 46.73 s; the canonical integration runner collected and
+passed all 13 Docker file-helper cases after their integration marker was added; the 32-case proxy/Claude/installer
+regression cluster passed; the pre-marker complete non-slow integration target passed with 437 tests and 10,615
+deselections in 10m17s; 9,447 unit tests passed with 117 deselections; 1,057 regression tests passed; full pre-commit,
+diff checks, and all five GitHub checks passed.
