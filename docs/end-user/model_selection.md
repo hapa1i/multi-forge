@@ -166,8 +166,8 @@ launch, and a request may select a different tier or alternative.
 The optional status-line `marking` segment shows `mark:yes`, `mark:no`, or `mark:?` for the request model. Its source is
 a dated provider declaration matched conjunctively against the canonical model and runtime/route/backend/billing scope.
 `no` means the provider declared that exact scoped model unmarked; Forge did not inspect the output or admit it as safe.
-The production catalog intentionally contains no declarations at launch of this feature, so results remain unknown until
-a separate source review adds one.
+An `effective_from` value becomes eligible on that UTC calendar date. The production catalog intentionally contains no
+declarations at launch of this feature, so results remain unknown until a separate source review adds one.
 
 Provider declarations do not replace isolation. The supported marking-sensitive workflow is still a fresh, transfer-free
 producer in a distinct worktree: do not seed it with planner transcripts or other possibly marked content. Even an exact

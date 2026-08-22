@@ -340,19 +340,10 @@ def _configuration_history(
 
 
 def _active_preflight_matches(state: SessionState, events: list[Any], active_entry: Any) -> bool:
-    authority = state.intent.authority
-    if authority is None:
+    active_facts = _matching_active_authority_facts(state, active_entry)
+    if active_facts is None:
         return False
-    run_id = active_entry.authority_run_id
-    config_digest = authority_config_sha256(authority, session_runtime(state))
-    hook_digest = active_entry.authority_hook_registration_sha256
-    if (
-        run_id is None
-        or active_entry.authority_config_sha256 != config_digest
-        or hook_digest is None
-        or hook_digest != authority_hook_contract_sha256(session_runtime(state))
-    ):
-        return False
+    run_id, config_digest, hook_digest = active_facts
     preflight = any(
         event.event_type == "launch_preflight"
         and event.outcome == "success"
@@ -368,9 +359,24 @@ def _active_preflight_matches(state: SessionState, events: list[Any], active_ent
 
 
 def _active_abort_matches(state: SessionState, events: list[Any], active_entry: Any) -> bool:
+    active_facts = _matching_active_authority_facts(state, active_entry)
+    if active_facts is None:
+        return False
+    run_id, config_digest, hook_digest = active_facts
+    return any(
+        event.event_type == "launch_aborted"
+        and event.outcome == "error"
+        and event.run_id == run_id
+        and event.payload["effective_config_sha256"] == config_digest
+        and event.payload["hook_registration_sha256"] == hook_digest
+        for event in events
+    )
+
+
+def _matching_active_authority_facts(state: SessionState, active_entry: Any) -> tuple[str, str, str] | None:
     authority = state.intent.authority
     if authority is None:
-        return False
+        return None
     run_id = active_entry.authority_run_id
     config_digest = authority_config_sha256(authority, session_runtime(state))
     hook_digest = active_entry.authority_hook_registration_sha256
@@ -380,15 +386,8 @@ def _active_abort_matches(state: SessionState, events: list[Any], active_entry: 
         or hook_digest is None
         or hook_digest != authority_hook_contract_sha256(session_runtime(state))
     ):
-        return False
-    return any(
-        event.event_type == "launch_aborted"
-        and event.outcome == "error"
-        and event.run_id == run_id
-        and event.payload["effective_config_sha256"] == config_digest
-        and event.payload["hook_registration_sha256"] == hook_digest
-        for event in events
-    )
+        return None
+    return run_id, config_digest, hook_digest
 
 
 def _current_root_run_id() -> str | None:

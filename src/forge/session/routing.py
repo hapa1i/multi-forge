@@ -267,11 +267,11 @@ def _validate_routing_event(event: SessionEvent, *, verify_catalog_normalization
     elif event.runtime != "claude_code":
         raise SessionEventValidationError(f"route kind {kind!r} requires claude_code runtime", field="runtime")
     elif kind == "direct":
-        _require_direct(event.payload, verify_catalog_normalization=verify_catalog_normalization)
+        _require_direct(event, verify_catalog_normalization=verify_catalog_normalization)
     elif kind == "proxy":
-        _require_proxy(event.payload, verify_catalog_normalization=verify_catalog_normalization)
+        _require_proxy(event, verify_catalog_normalization=verify_catalog_normalization)
     else:
-        _require_custom(event.payload, verify_catalog_normalization=verify_catalog_normalization)
+        _require_custom(event, verify_catalog_normalization=verify_catalog_normalization)
 
 
 def custom_route_fingerprint(base_url: str) -> str:
@@ -345,7 +345,8 @@ def _validate_routing_continuity(events: list[SessionEvent]) -> None:
         aborts.add(event.run_id)
 
 
-def _require_direct(payload: dict[str, Any], *, verify_catalog_normalization: bool) -> None:
+def _require_direct(event: SessionEvent, *, verify_catalog_normalization: bool) -> None:
+    payload = event.payload
     route = payload["route"]
     _all_none(route, ("backend_id", "proxy_id", "template", "custom_route_fingerprint"))
     if payload["tier_mappings"] or payload["model_alternatives"]:
@@ -354,8 +355,7 @@ def _require_direct(payload: dict[str, Any], *, verify_catalog_normalization: bo
         raise SessionEventValidationError("direct default_tier must be null", field="payload")
     if payload["billing_mode"] != "unknown":
         raise SessionEventValidationError("direct billing_mode must be unknown", field="payload")
-    if payload["route_scope_tags"] != ["route:direct", "runtime:claude_code"]:
-        raise SessionEventValidationError("direct route_scope_tags are invalid", field="payload")
+    _require_route_scope_tags(event)
     expected = []
     if payload["direct_model"] is not None:
         expected.append(("direct", None, None, payload["direct_model"]))
@@ -377,7 +377,8 @@ def _require_direct(payload: dict[str, Any], *, verify_catalog_normalization: bo
         )
 
 
-def _require_proxy(payload: dict[str, Any], *, verify_catalog_normalization: bool) -> None:
+def _require_proxy(event: SessionEvent, *, verify_catalog_normalization: bool) -> None:
+    payload = event.payload
     route = payload["route"]
     if not route["template"] or not payload["default_tier"] or not payload["tier_mappings"]:
         raise SessionEventValidationError(
@@ -388,14 +389,7 @@ def _require_proxy(payload: dict[str, Any], *, verify_catalog_normalization: boo
         raise SessionEventValidationError("proxy default_tier requires an effective tier mapping", field="payload")
     if route["custom_route_fingerprint"] is not None or payload["direct_model"] is not None:
         raise SessionEventValidationError("proxy route carries forbidden direct/custom fields", field="payload")
-    expected = {"route:proxy", "runtime:claude_code"}
-    if route["backend_id"]:
-        expected.add(f"backend:{route['backend_id']}")
-    billing = payload["billing_mode"]
-    if billing != "unknown":
-        expected.add(f"billing:{billing}")
-    if payload["route_scope_tags"] != sorted(expected):
-        raise SessionEventValidationError("proxy route_scope_tags do not match proved route facts", field="payload")
+    _require_route_scope_tags(event)
     expected_slots = [("tier_default", tier, None, model) for tier, model in payload["tier_mappings"].items()]
     expected_slots.extend(
         ("model_alternative", tier, request_model, route_model)
@@ -421,7 +415,8 @@ def _require_proxy(payload: dict[str, Any], *, verify_catalog_normalization: boo
             )
 
 
-def _require_custom(payload: dict[str, Any], *, verify_catalog_normalization: bool) -> None:
+def _require_custom(event: SessionEvent, *, verify_catalog_normalization: bool) -> None:
+    payload = event.payload
     route = payload["route"]
     if (
         not route["custom_route_fingerprint"]
@@ -438,8 +433,7 @@ def _require_custom(payload: dict[str, Any], *, verify_catalog_normalization: bo
         raise SessionEventValidationError("custom route carries forbidden model/proxy fields", field="payload")
     if payload["billing_mode"] != "unknown":
         raise SessionEventValidationError("custom billing_mode must be unknown", field="payload")
-    if payload["route_scope_tags"] != ["route:custom", "runtime:claude_code"]:
-        raise SessionEventValidationError("custom route_scope_tags are invalid", field="payload")
+    _require_route_scope_tags(event)
     _require_snapshot_slots(payload, [])
     _require_canonical_field(payload, "requested_model", verify=verify_catalog_normalization)
     if payload["selected_model"] is not None:
@@ -470,8 +464,20 @@ def _require_runtime_native(event: SessionEvent) -> None:
         raise SessionEventValidationError("runtime_native maps and marking snapshots must be empty", field="payload")
     if payload["billing_mode"] != "unknown":
         raise SessionEventValidationError("runtime_native billing_mode must be unknown", field="payload")
-    if payload["route_scope_tags"] != ["route:runtime_native", "runtime:codex"]:
-        raise SessionEventValidationError("runtime_native route_scope_tags are invalid", field="payload")
+    _require_route_scope_tags(event)
+
+
+def _require_route_scope_tags(event: SessionEvent) -> None:
+    """Require scope tags to be derived only from proven facts stored in this event."""
+    payload = event.payload
+    route = payload["route"]
+    expected = {f"route:{route['kind']}", f"runtime:{event.runtime}"}
+    if route["backend_id"]:
+        expected.add(f"backend:{route['backend_id']}")
+    if payload["billing_mode"] != "unknown":
+        expected.add(f"billing:{payload['billing_mode']}")
+    if payload["route_scope_tags"] != sorted(expected):
+        raise SessionEventValidationError("route_scope_tags do not match proven route facts", field="payload")
 
 
 def _validate_marking_snapshot(

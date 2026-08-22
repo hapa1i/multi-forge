@@ -113,7 +113,7 @@ Review these as one coherent contract; changing one may require reopening downst
 - [x] Compare complete normalized declarations for `changed_since_launch`; do not synthesize a marking entry when no
   launch snapshot exists.
 - [x] Test marked, unmarked, unknown, future-effective, invalid, ambiguous-match, and catalog-load failures with fixture
-  data only.
+  data only; evaluate `effective_from` against the UTC calendar date.
 
 ## Phase 2 -- Routing journal and history projection
 
@@ -126,6 +126,8 @@ Review these as one coherent contract; changing one may require reopening downst
   - abort: launcher + same operation/run/payload + error + `route_projection_failed`.
 - [x] Enforce direct/proxy/custom/runtime-native payload invariants, route-kind/runtime compatibility, manifest-runtime
   continuity, and existing `BillingMode` vocabulary.
+- [x] Validate route-scope tags by deriving the expected set from the same event's stored route/runtime/backend/billing
+  facts on current and historical reads; do not freeze kind-specific literal lists.
 - [x] Canonicalize and SHA-256 fingerprint only the custom route's HTTP(S) origin after userinfo, password, path, query,
   and fragment are excluded; pin same-origin collisions and reject an uncanonicalizable origin before journal mutation.
 - [x] Generate direct, tier-default, and model-alternative marking slots without collapsing route-distinct duplicates.
@@ -179,6 +181,8 @@ Review these as one coherent contract; changing one may require reopening downst
 - [x] Preserve route commitment on spawn exception, nonzero child exit, cancellation, or post-child launcher failure.
 - [x] Keep preparation failure free of routing history and preserve existing authority-preflight evidence.
 - [x] Keep `confirmed.launch` best-effort, Claude-only, and semantically unchanged.
+- [x] Keep template-resolved sidecar proxy identity local to routing evidence; do not rebind the existing
+  `confirmed.launch`, runner, presentation callback, or launch-result `proxy_id`.
 - [x] Verify unmarked routing does not depend on global active registration and does not weaken M1's launch/mutation
   serialization.
 
@@ -189,7 +193,8 @@ Review these as one coherent contract; changing one may require reopening downst
 - [x] Add `forge session model history [session] [--json]` with the stable object wrapper and full validated events.
 - [x] Register the intentional user-facing `model` subgroup without adding a `route` alias or changing existing session
   command spellings/output streams.
-- [x] Add read-only `%session model show [session]`; reject/omit history and every mutation form.
+- [x] Add read-only `%session model show [session]` as a fixed-size human summary; omit maps, declaration arrays,
+  history, and every mutation form.
 - [x] Update `%h`/`%help`, `%session` docstrings, and both invalid/empty usage strings to include
   `%session model show [session]`; pin their hook JSON payloads.
 - [x] Resolve omitted session names using the existing session resolver; explicit missing/ambiguous targets fail
@@ -218,6 +223,8 @@ Review these as one coherent contract; changing one may require reopening downst
 
 - [x] Extend proxy `GET /` with `runtime.backend_id` and `runtime.model_alternatives` from effective loaded config,
   without credentials or session state.
+- [x] Preserve the existing `runtime.tier_mappings`, `runtime.context_windows`, and top-level tier key shape, including
+  configured empty tiers; the new runtime fields are additive.
 - [x] Apply the same runtime ZDR substitutions to exposed/committed tier defaults and model-alternative values that
   proxy dispatch applies.
 - [x] Extend neutral `ProxyRuntimeTruth` parsing defensively for new and older response shapes.
@@ -226,8 +233,8 @@ Review these as one coherent contract; changing one may require reopening downst
 - [x] Resolve proxy request routing in server order: explicit request tier, proxy default; matching model alternative,
   then tier default.
 - [x] Require authoritative live proxy truth for proxy `mark:yes/no`; config/registry fallback renders `mark:?`.
-- [x] Read direct scope facts only from a supported route commit and render `mark:?` in M2 because direct backend
-  identity remains unproven; keep missing/unproven/legacy evidence unknown as well.
+- [x] Render direct `mark:?` without reading session state or the routing journal because M2 cannot prove direct backend
+  identity and no durable fact can refine the result.
 - [x] Omit only the segment when stdin has no model id.
 - [x] Resolve expected catalog/source/mapping failures to `mark:?`; preserve the registry's unexpected-producer
   fail-open behavior.
@@ -284,13 +291,14 @@ Review these as one coherent contract; changing one may require reopening downst
 | D3 malformed history                     | Duplicate/orphan/mismatched/runtime/newer/unreadable cases      | Contextual command error; no best-effort record skipping                                       | `tests/src/session/test_routing.py`                                                                                                   |
 | Route projection isolation               | Manifest with sentinel `confirmed_by` and other confirmed state | `route_commit` changes atomically; `confirmed_by` and every other confirmed field remain exact | `tests/src/session/test_models.py`, `tests/src/core/ops/test_session_routing.py`                                                      |
 | Projection and legacy reads              | Atomic failure, old pointer, legacy launch, absent state        | Exact dereference/fallback; no synthetic history or snapshot                                   | `tests/src/core/ops/test_session_model.py`                                                                                            |
-| Marking catalog and scopes               | Valid/invalid, marked/unmarked/unknown/future/overlap data      | Strict schema; conjunctive proven scope; full normalized output                                | `tests/src/core/models/test_model_practices.py`                                                                                       |
+| Marking catalog and scopes               | Valid/invalid, marked/unmarked/unknown/future/overlap data      | Strict schema; conjunctive proven scope; UTC-effective dates; full normalized output           | `tests/src/core/models/test_model_practices.py`                                                                                       |
 | Shared model normalization               | Alias, prefix, `[1m]`, unknown, removed models                  | Neutral helper reused; caller-specific direct/context/proxy behavior preserved                 | `tests/src/core/models/test_model_reference.py`                                                                                       |
 | Stable model show variants               | Every route/evidence/live/legacy combination                    | Exact JSON including billing/scope and launch/live separation                                  | `tests/src/core/ops/test_session_model.py`                                                                                            |
 | Terminal command contract                | Both leaves, omitted/explicit/ambiguous targets                 | Intentional `model` noun, `--json`, stdout/stderr, no `route` alias                            | `tests/src/cli/test_session_model.py`                                                                                                 |
-| Direct-command contract                  | Show, history/mutation refusal, empty/bad input, help           | Read-only mirror; exact `%h` and usage JSON                                                    | `tests/src/cli/test_user_prompt_dispatcher.py`                                                                                        |
-| Live proxy truth                         | Current/older/unreachable GET responses and ZDR maps            | Backend/alternatives authoritative only at runtime; fallbacks labelled                         | `tests/src/proxy/test_model_routes.py`, `tests/src/proxy/test_server_backend_identity.py`, `tests/src/core/ops/test_session_model.py` |
-| Marking statusline                       | Explicit/default/alternative/direct/old-proxy cases             | Exact `mark:yes/no/?`; default order unchanged; source-lazy; exit zero                         | `tests/src/cli/statusline/test_statusline_registry.py`                                                                                |
+| Direct-command contract                  | Show with large maps, history/mutation refusal, bad input, help | Fixed-size read-only summary; exact `%h` and usage JSON; no map/history dump                   | `tests/src/cli/test_user_prompt_dispatcher.py`                                                                                        |
+| Live proxy truth                         | Current/partial/older/unreachable GET responses and ZDR maps    | Additive backend/alternatives; prior tier/context shape preserved; fallbacks labelled          | `tests/src/proxy/test_model_routes.py`, `tests/src/proxy/test_server_backend_identity.py`, `tests/src/core/ops/test_session_model.py` |
+| Marking statusline                       | Explicit/default/alternative/direct/old-proxy cases             | Exact `mark:yes/no/?`; direct makes no journal read; default order unchanged; exit zero        | `tests/src/cli/statusline/test_statusline_registry.py`                                                                                |
+| Sidecar route identity isolation         | Template resolves to a running sidecar proxy                    | Resolved id enters only route evidence; legacy launch/runner/presentation ids remain unchanged | `tests/src/core/ops/test_claude_sidecar_launch.py`                                                                                    |
 | Artifact retention parity                | Delete/clean/incognito, transcript flags, owning tree           | Authority and routing directories share one lifetime                                           | `tests/src/session/test_authority_retention.py`                                                                                       |
 | Managed launch composition               | Claude/Codex paths with authority absent/advisory/producer      | One root run id; required ordering; no route/authority dependency inversion                    | `tests/integration/docker/test_session_lifecycle.py`, `tests/integration/core/test_codex_session_start.py`                            |
 | Clean-wheel resource                     | Built wheel in isolated environment                             | Packaged empty catalog loads; read/statusline import paths work                                | `scripts/test-wheel-runtime.sh`                                                                                                       |
@@ -330,19 +338,22 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
 
 ### Execution evidence (2026-08-22)
 
-- Focused final rerun: `uv run pytest -q` over authority launch/read, Codex session, and marking statusline modules --
-  101 passed.
-- Full unit: `make test-unit` -- 9,718 passed, 117 deselected.
+- Focused review-follow-up rerun: `uv run pytest -q` over model reads, authority launch/read, route validation, sidecar
+  launch, proxy runtime truth, statusline, and direct-command modules -- 313 passed.
+- Full unit: `make test-unit` -- 9,721 passed, 117 deselected.
 - Full regression: `make test-regression` -- 1,067 passed.
 - Managed launch/proxy/sidecar integration: one targeted `./scripts/test-integration.sh` invocation -- 17 passed; the
   exact host lifecycle route operation -- 1 passed. The real Codex start boundary was rerun after the final callback
-  typing correction -- 1 passed.
+  typing correction -- 1 passed. Review follow-up reran proxy runtime truth and composed authority/route launch -- 2
+  passed.
 - Distribution: `uv build` produced the 0.9.4 sdist and wheel. `./scripts/test-wheel-runtime.sh` passed a clean Python
   3.12 install, dependency check, packaged empty-catalog/read/statusline imports, and LiteLLM start/health smoke.
 - Repository gate: `make pre-commit` passed every hook, including Ruff, Black, mypy, Pyright, file limits, Markdown
-  links, and mdformat; `git diff --check` passed. No required final suite has a failure or skip. The first pre-commit
-  pass exposed three related typing defects and stale Markdown token hashes; the typing defects were corrected and the
-  affected 101-test slice passed before the final gate rerun.
+  links, and mdformat; `git diff --check` passed. No required final suite has a failure or skip. During review
+  follow-up, the first unit run had 9,720 passes and one stale token-cache assertion after doc edits; refreshing the two
+  tracked provider counts produced the clean full result above. The first follow-up pre-commit run normalized two files
+  and exposed seven provenance-test typing defects; the fixes passed targeted mypy and 32 tests before the clean full
+  gate.
 
 ## Phase 8 -- Review and closeout
 

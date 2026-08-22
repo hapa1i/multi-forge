@@ -191,7 +191,8 @@ package-owned `core/data/model_practices.yaml` separately records dated, source-
 conjunctive runtime/route/backend/billing scope. Route journals snapshot the declaration resolved at launch, while
 terminal reads compare that snapshot with the current catalog. Live marking entries are generated only from the new
 authoritative runtime maps; config and route-commit fallbacks stay visibly non-live. The initial production catalog is
-valid and intentionally empty, so every model resolves to `unknown` until a separately reviewed source change lands.
+valid and intentionally empty, so every model resolves to `unknown` until a separately reviewed source change lands. An
+`effective_from` date becomes eligible on that UTC calendar date.
 
 **Tier selection precedence:**
 

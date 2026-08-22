@@ -357,7 +357,6 @@ def _produce_marking(ctx: RenderContext) -> Optional[str]:
         resolve_model_practice,
     )
     from forge.core.models.model_reference import strip_transport_model_suffix
-    from forge.session.exceptions import ForgeSessionError
 
     try:
         catalog = load_model_practices()
@@ -393,33 +392,11 @@ def _produce_marking(ctx: RenderContext) -> Optional[str]:
             declaration = resolve_model_practice(canonical, scope, catalog=catalog)
             return fmt.format_marking(declaration["status"])
 
-        # Direct/custom output is deliberately unknown in M2. Still validate a
-        # projected direct route so malformed durable evidence does not become a
-        # silent positive/negative in a later catalog revision.
-        _read_supported_direct_route(ctx)
+        # Direct/custom output is deliberately unknown in M2. No durable read can
+        # refine that result until a separately designed backend evidence source exists.
         return fmt.format_marking("unknown")
-    except (ModelPracticesError, ForgeSessionError, OSError):
+    except (ModelPracticesError, OSError):
         return fmt.format_marking("unknown")
-
-
-def _read_supported_direct_route(ctx: RenderContext) -> None:
-    manifest = ctx.manifest
-    if not isinstance(manifest, dict):
-        return
-    name = manifest.get("name")
-    forge_root = manifest.get("forge_root") or ctx.forge_root
-    if not isinstance(name, str) or not name or not isinstance(forge_root, str) or not forge_root:
-        return
-    from forge.session.routing import derive_routing_history
-    from forge.session.store import SessionStore
-
-    store = SessionStore(forge_root, name)
-    state = store.read()
-    history = derive_routing_history(store.forge_root, state)
-    if history.status != "supported" or history.effective_commit is None:
-        return
-    if history.effective_commit.payload["route"]["kind"] != "direct":
-        return
 
 
 # Every segment name now has a producer (no reserved names remain). The
@@ -502,11 +479,7 @@ def render_plan(ctx: RenderContext, plan: RenderPlan) -> tuple[list[str], list[s
             # Fail-open: the status line must always render (exit 0). A producer
             # bug or malformed upstream payload degrades that ONE segment to
             # absent, never crashing the whole line.
-            logger.debug(
-                "status-line: producer %r failed; dropping segment",
-                segment.name,
-                exc_info=True,
-            )
+            logger.debug("status-line: producer %r failed; dropping segment", segment.name, exc_info=True)
             continue
         if rendered is None:
             continue

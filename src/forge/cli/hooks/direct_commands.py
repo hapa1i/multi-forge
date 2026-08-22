@@ -212,7 +212,10 @@ def _handle_session_model(argv: list[str]) -> None:
 
     from forge.core.ops.context import ExecutionContext
     from forge.core.ops.session import ForgeOpError
-    from forge.core.ops.session_model import get_session_model_report
+    from forge.core.ops.session_model import (
+        MODEL_REPORT_LIMITATIONS,
+        get_session_model_report,
+    )
     from forge.session.exceptions import ForgeSessionError
 
     try:
@@ -226,7 +229,13 @@ def _handle_session_model(argv: list[str]) -> None:
     except (ForgeOpError, ForgeSessionError, ValueError) as exc:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {exc}"}))
         return
-    click.echo(json.dumps({"decision": "block", "reason": json.dumps(report.to_dict(), indent=2)}))
+    from forge.cli.session_model import session_model_summary_rows
+
+    lines = ["Session model:"]
+    lines.extend(f"  {field}: {value}" for field, value in session_model_summary_rows(report.to_dict()))
+    lines.append("Limitations:")
+    lines.extend(f"  - {limitation}" for limitation in MODEL_REPORT_LIMITATIONS)
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
 def _handle_session_show(argv: list[str]) -> None:

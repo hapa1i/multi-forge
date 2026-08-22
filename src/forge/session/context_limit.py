@@ -23,7 +23,7 @@ def _context_window_for_proxy_model(model: str) -> int:
     )
 
     lookup_model = strip_transport_model_suffix(model)
-    if model.endswith("[1m]"):
+    if lookup_model != model:
         canonical_model = resolve_model_id(lookup_model)
         one_m_model = canonical_model if canonical_model.endswith("-1m") else f"{canonical_model}-1m"
         if model_exists(one_m_model):

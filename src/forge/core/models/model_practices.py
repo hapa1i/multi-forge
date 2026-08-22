@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 import yaml
 
 from forge.core.models.catalog import load_model_catalog, resolve_model_id
+from forge.core.state import utc_today
 
 MODEL_PRACTICES_SCHEMA_VERSION = 1
 PRACTICE_STATUSES = frozenset({"marked", "unmarked"})
@@ -163,7 +164,7 @@ def resolve_model_practice(
         return unknown_model_practice()
     scope = set(validate_route_scope_tags(list(route_scope_tags)))
     declarations = (catalog or load_model_practices()).models.get(canonical_model, ())
-    today = on_date or date.today()
+    today = on_date or utc_today()
     matches = [
         declaration
         for declaration in declarations

@@ -86,6 +86,17 @@ def test_future_declaration_and_unknown_model_resolve_unknown() -> None:
     assert resolve_model_practice(None, scope, catalog=catalog) == unknown_model_practice()
 
 
+def test_effective_date_defaults_to_the_utc_calendar() -> None:
+    catalog = parse_model_practices(_catalog(_declaration(effective_from="2026-08-23")))
+    scope = ["backend:openrouter", "route:proxy", "runtime:claude_code"]
+
+    with patch("forge.core.models.model_practices.utc_today", return_value=date(2026, 8, 23)) as utc_today:
+        resolved = resolve_model_practice("claude-opus-5", scope, catalog=catalog)
+
+    assert resolved == _declaration(effective_from="2026-08-23")
+    utc_today.assert_called_once_with()
+
+
 @pytest.mark.parametrize(
     "raw",
     [

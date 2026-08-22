@@ -123,9 +123,24 @@ class TestUserPromptSubmitDispatcher:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
+        report = {
+            "schema_version": 1,
+            "session": "planner",
+            "runtime": "claude_code",
+            "active": True,
+            "route_intent": {"kind": "proxy"},
+            "route_commit": {"kind": "proxy", "evidence_source": "route_commit"},
+            "live_proxy": {"evidence_source": "runtime", "default_tier": "sonnet"},
+            "history_status": "supported",
+            "marking": {
+                "launch_entries": [{"large": "payload"}] * 20,
+                "live_proxy_entries": [{"large": "payload"}] * 30,
+            },
+            "limitations": ["route commitment only", "no per-request or authorship attestation"],
+        }
         monkeypatch.setattr(
             "forge.core.ops.session_model.get_session_model_report",
-            lambda **_kwargs: Mock(to_dict=lambda: {"schema_version": 1, "session": "planner"}),
+            lambda **_kwargs: Mock(to_dict=lambda: report),
         )
 
         result = CliRunner().invoke(
@@ -137,7 +152,11 @@ class TestUserPromptSubmitDispatcher:
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["decision"] == "block"
-        assert json.loads(payload["reason"])["session"] == "planner"
+        assert "Session: planner" in payload["reason"]
+        assert "Launch marking entries: 20" in payload["reason"]
+        assert "Live marking entries: 30" in payload["reason"]
+        assert "large" not in payload["reason"]
+        assert len(payload["reason"].splitlines()) == 15
 
     @pytest.mark.parametrize(
         "prompt",

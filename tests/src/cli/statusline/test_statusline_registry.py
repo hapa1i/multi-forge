@@ -665,22 +665,28 @@ class TestLazyContext:
 
         assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
 
-    def test_marking_expected_session_source_failure_renders_unknown(self):
-        from forge.session.exceptions import ForgeSessionError
-
+    def test_direct_marking_does_not_read_session_state(self):
         fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=False,
+            runtime=None,
+            is_proxy_authoritative=False,
+            manifest={"name": "planner", "forge_root": "/tmp/example"},
+            is_session_authoritative=True,
+            config=RuntimeConfig(),
+            forge_root="/tmp/example",
+        )
         with (
             patch(
                 "forge.core.models.model_practices.load_model_practices",
                 return_value=object(),
             ),
-            patch(
-                "forge.cli.statusline.registry._read_supported_direct_route",
-                side_effect=ForgeSessionError("manifest unavailable"),
-            ),
+            patch("forge.session.store.SessionStore.read") as read_session,
         ):
-            _where, stream = render_segments(_ctx(fixture), ["marking"])
+            _where, stream = render_segments(ctx, ["marking"])
 
+        read_session.assert_not_called()
         assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
 
     def test_marking_unexpected_producer_failure_drops_only_segment(self):

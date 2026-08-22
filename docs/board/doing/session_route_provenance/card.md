@@ -89,9 +89,9 @@ The implementation keeps four planes distinct:
 Normative limits:
 
 - Proxy `runtime.active_tier` is the proxy's configured default, not the current tier of a particular session.
-- `forge session model show` and `%session model show` have no status-line stdin. They report
-  `current_request_tier: null` and `current_request_source: unavailable`; they never relabel the proxy default as the
-  session's current tier.
+- `forge session model show` and `%session model show` have no status-line stdin. The shared report retains
+  `current_request_tier: null` and `current_request_source: unavailable`; the direct command emits a fixed-size human
+  summary of that report. Neither surface relabels the proxy default as the session's current tier.
 - The opt-in status-line segment may report the observed request tier because that process receives Claude Code's
   current model id. It labels the source in documentation as request-observed, not session-persisted.
 - `session model history` is launch routing history. It does not claim per-request model use, authorship, admission, or
@@ -103,8 +103,9 @@ Normative limits:
 
 1. **Typed read surfaces**: `forge session model show [session] [--json]` renders a stable evidence vector containing
    session/runtime/active state, route intent, latest supported route commitment, live proxy identity and mappings when
-   available, provider-declared marking, history support, and limitations. `%session model show [session]` is the
-   read-only in-session mirror. There is no mutating direct-command surface.
+   available, provider-declared marking, history support, and limitations. `%session model show [session]` is a
+   fixed-size, read-only in-session summary derived from the same report; full maps and declaration arrays remain on the
+   terminal `--json` surface. There is no mutating direct-command surface.
 2. **Launch routing history**: `forge session model history [session] [--json]` reads
    `.forge/artifacts/<session>/routing/events.jsonl` strictly and reports `history_status: supported | unproven | null`.
    The direct command does not mirror history in v1, avoiding an unbounded hook response.
@@ -568,7 +569,7 @@ Catalog rules:
   sorted unique route scope; `effective_from` is an ISO date or null when the provider stated no effective date;
 - `unmarked` requires an affirmative provider declaration and is never inferred from silence, model age, failed
   detection, or absence of a known marking announcement;
-- a future-dated `effective_from` declaration does not match until that date;
+- a future-dated `effective_from` declaration does not match until that UTC calendar date;
 - unknown schema versions, unknown fields/tags, invalid models/dates/URLs, duplicate declarations, or more than one
   declaration matching the same derived route state make the packaged catalog invalid;
 - launch/show catalog failure is an actionable command or launch-preparation error. The status line remains exit-zero
@@ -629,8 +630,9 @@ M2 extends proxy `GET /` runtime truth with two secret-free fields sourced from 
 - `runtime.backend_id`: canonical backend instance id or null;
 - `runtime.model_alternatives`: effective tier-to-request-alias-to-route-model map.
 
-The existing `runtime.tier_mappings` and `routing.default_tier` remain authoritative for live defaults. Config/registry
-fallback may expose the same shape but is labelled non-authoritative.
+The existing `runtime.tier_mappings`, `runtime.context_windows`, and `routing.default_tier` fields retain their prior
+shape and remain authoritative for live defaults. Config/registry fallback may expose the same shape but is labelled
+non-authoritative.
 
 The default-off `marking` segment declares both proxy and session shared sources:
 
@@ -639,8 +641,9 @@ The default-off `marking` segment declares both proxy and session shared sources
   precedence;
 - a matching live model alternative wins before the tier default, matching proxy dispatch;
 - non-unknown proxy output requires authoritative `GET /`; registry/config fallback renders `mark:?`;
-- direct output reads only supported session route commitment facts; because M2 deliberately leaves direct backend
-  identity unproven, direct output remains `mark:?` until a separately designed evidence source closes that gap;
+- direct output performs no session or routing-journal read: because M2 deliberately leaves direct backend identity
+  unproven, durable route facts cannot refine the result and direct output remains `mark:?` until a separately designed
+  evidence source closes that gap;
 - missing observed model omits only the marking segment;
 - expected catalog/source/mapping failures render `mark:?`; unexpected producer failures drop only the segment;
 - the status-line process always exits zero and `DEFAULT_ORDER` remains unchanged.
@@ -691,6 +694,8 @@ color, enforcement decision, or admission outcome.
 ## V1 acceptance boundary
 
 01. Existing Claude `--model`, `--proxy`, and `--no-proxy` behavior remains byte-compatible outside added provenance.
+    Sidecar template resolution may populate the routing payload's proxy id but does not rebind the legacy
+    `confirmed.launch`, runner, presentation callback, or launch-result proxy id.
 02. Every managed attempt crossing the routing commitment boundary appends exactly one locked, complete routing commit
     before child invocation, regardless of requested read/status surfaces.
 03. The exact D1 ordering and failure matrix hold with M1 active and inactive. Routing append failure compensates every
@@ -706,12 +711,15 @@ color, enforcement decision, or admission outcome.
 07. `session model show --json` implements every stable variant rule, exposes committed billing/scope facts, keeps
     journal-derived launch marking separate from authoritative live-proxy marking, and never reports proxy default as
     current request tier.
-08. `%session model show [session]` is read-only, mirrors the CLI leaf spelling, and emits no history dump.
+08. `%session model show [session]` is read-only, mirrors the CLI leaf spelling, and emits a fixed-size human summary
+    without history, mapping, or declaration-array dumps.
 09. `session model history --json` returns validated full events in append order and distinguishes
     `supported | unproven | null`.
-10. Proxy `GET /` exposes canonical backend id and model alternatives without credentials; fallbacks remain labelled.
-11. The package-owned marking catalog validates the exact schema, scope grammar, dates, URLs, and canonical model keys.
-    Production data is intentionally all unknown; marked/unmarked fixtures exercise both output paths.
+10. Proxy `GET /` additively exposes canonical backend id and model alternatives without credentials, preserving the
+    existing tier-mapping/context-window shape; fallbacks remain labelled.
+11. The package-owned marking catalog validates the exact schema, scope grammar, UTC-effective dates, URLs, and
+    canonical model keys. Production data is intentionally all unknown; marked/unmarked fixtures exercise both output
+    paths.
 12. Claude status-line marking selects explicit request tier/alternative before proxy default, uses authoritative live
     proxy truth for non-unknown proxy output, remains default-off, and always fails open.
 13. Codex route history is `runtime_native` with unknown exact backend/model/billing and empty marking snapshots.

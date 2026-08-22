@@ -1374,6 +1374,7 @@ def _run_sidecar_claude_session(
     container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(host_forge_root)
     container_env[FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR] = str(host_launch_root)
 
+    routing_proxy_id = proxy_id
     if "LITELLM_BASE_URL" not in container_env:
         try:
             from forge.config.loader import load_proxy_instance_config
@@ -1388,7 +1389,7 @@ def _run_sidecar_claude_session(
                     _resolved_pid = _resolved.proxy_id
 
             if _resolved_pid:
-                proxy_id = _resolved_pid
+                routing_proxy_id = _resolved_pid
                 _pcfg = load_proxy_instance_config(_resolved_pid)
                 if _pcfg and _pcfg.upstream_base_url:
                     container_env["LITELLM_BASE_URL"] = _pcfg.upstream_base_url
@@ -1435,7 +1436,7 @@ def _run_sidecar_claude_session(
         manifest,
         effective_template=effective_template,
         runtime_base_url=runtime_base_url,
-        proxy_id=proxy_id,
+        proxy_id=routing_proxy_id,
     )
     commit_launch_routing(
         store=store,

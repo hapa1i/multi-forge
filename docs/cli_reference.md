@@ -558,7 +558,8 @@ Shared commands (mirrors CLI syntax):
 
 - `%session list` (calls the same command-core op as `forge session list`)
 - `%session show [name]` (defaults to the current session)
-- `%session model show [name]` (read-only route/marking provenance; defaults to the current session; no history dump)
+- `%session model show [name]` (fixed-size read-only route/marking summary; defaults to the current session; no maps or
+  history dump)
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)

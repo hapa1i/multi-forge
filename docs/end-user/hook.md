@@ -457,9 +457,10 @@ Type these directly in the Claude prompt to interact with Forge without switchin
 > `forge policy enable/disable` mutates session intent. `%policy check` is read-only — it evaluates but doesn't change
 > enforcement state.
 
-`%session model show [name]` uses the same stable read operation as `forge session model show`, including labelled
-runtime/config/commit fallback and provider-declaration metadata. The direct command deliberately has no history or
-mutation form; use `forge session model history [name]` in a terminal for the full validated journal.
+`%session model show [name]` uses the same read operation as `forge session model show` but emits a fixed-size human
+summary of evidence sources and marking-entry counts. It does not embed model maps, declaration arrays, or history in
+the conversation. Use terminal `forge session model show [name] --json` for the full stable report and
+`forge session model history [name]` for the validated journal.
 
 > **Compatibility:** Mutating `%policy` forms, including supervisor set/on/off/remove/reload/cascade, and
 > `%cancel-verification` strict-check the resolved session's Forge root. A refusal is returned through the normal

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -27,12 +28,14 @@ def test_session_model_show_forwards_omitted_or_explicit_target(
     monkeypatch: pytest.MonkeyPatch, session_name: str | None
 ) -> None:
     seen: list[str | None] = []
+
+    def model_report(**kwargs: Any) -> SimpleNamespace:
+        seen.append(kwargs["session_name"])
+        return SimpleNamespace(to_dict=lambda: {"schema_version": 1, "session": "planner"})
+
     monkeypatch.setattr(
         "forge.cli.session_model.get_session_model_report",
-        lambda **kwargs: (
-            seen.append(kwargs["session_name"])
-            or SimpleNamespace(to_dict=lambda: {"schema_version": 1, "session": "planner"})
-        ),
+        model_report,
     )
     argv = ["session", "model", "show", "--json"]
     if session_name is not None:
@@ -61,7 +64,7 @@ def test_session_model_read_error_uses_stderr(monkeypatch: pytest.MonkeyPatch) -
 def test_session_model_history_human_output_keeps_ids_slots_and_limitations(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    event = {
+    event: dict[str, Any] = {
         "timestamp": "2026-08-22T12:00:00Z",
         "event_id": "sevt_0123456789abcdef0123456789abcdef",
         "event_type": "launch_routing_committed",

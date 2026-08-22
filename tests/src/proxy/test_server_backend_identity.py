@@ -144,7 +144,14 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
 
     assert response["runtime"]["backend_id"] == "openrouter"
     assert response["runtime"]["tier_mappings"] == {
+        "haiku": "",
         "sonnet": "qwen/qwen3.8-27b",
         "opus": "anthropic/claude-opus-5",
     }
+    assert response["runtime"]["context_windows"] == {
+        "haiku": 200_000,
+        "sonnet": 200_000,
+        "opus": 200_000,
+    }
+    assert response["tiers"]["haiku"] == {"model": "", "context_window": 200_000}
     assert response["runtime"]["model_alternatives"] == {"opus": {"opus": "qwen/qwen3.8-2.4t-a95b"}}

@@ -1757,7 +1757,8 @@ async def root(request: Request):
         "sonnet": provider_config.tiers.sonnet,
         "opus": provider_config.tiers.opus,
     }
-    tier_models, model_alternatives = effective_proxy_model_maps(config.proxy)
+    tier_models = {tier: _model_for_zdr_policy(model) for tier, model in configured_tier_models.items()}
+    _, model_alternatives = effective_proxy_model_maps(config.proxy)
     relevant_zdr_fallbacks: dict[str, str] = {}
     if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False):
         configured_models = {strip_transport_model_suffix(model) for model in configured_tier_models.values()}
@@ -1812,18 +1813,18 @@ async def root(request: Request):
     runtime_section = {
         "template": active_template,
         "provider": preferred_provider,
-        "backend_id": getattr(config.proxy, "backend", "") or None,
+        "backend_id": _backend_instance_id(),
         "tier_mappings": tier_models,
         "model_alternatives": model_alternatives,
         "configured_tier_mappings": configured_tier_models,
         "context_windows": {tier: get_context_window(model) for tier, model in tier_models.items()},
         "active_tier": default_tier,
-        "active_context_window": (get_context_window(runtime_active_model) if runtime_active_model else None),
+        "active_context_window": get_context_window(runtime_active_model) if runtime_active_model else None,
         "data_policy": {
             "zdr": (
                 "required"
                 if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False)
-                else ("allow_non_zdr" if preferred_provider == "openrouter" else "not_applicable")
+                else "allow_non_zdr" if preferred_provider == "openrouter" else "not_applicable"
             ),
             "zdr_fallbacks": relevant_zdr_fallbacks,
         },

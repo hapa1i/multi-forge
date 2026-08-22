@@ -7,7 +7,7 @@ Stored values and returned bounds use UTC consistently across time zones.
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from enum import StrEnum
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -63,6 +63,11 @@ def now_iso() -> str:
 def utc_timestamp_z() -> str:
     """Return the current UTC time as a second-precision ISO8601 ``Z`` timestamp."""
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def utc_today() -> date:
+    """Return the current UTC calendar date."""
+    return datetime.now(UTC).date()
 
 
 def parse_iso(s: str, *, assume_naive_utc: bool = False) -> datetime:

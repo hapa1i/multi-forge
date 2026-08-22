@@ -208,7 +208,8 @@ ambient env. Manifest-gated: absent for ambient sessions (no `FORGE_SESSION`).
 `mark:no`, or `mark:?`. For a proxy route it applies server routing precedence (explicit request tier before proxy
 default; matching model alternative before tier default) and requires the new authoritative live backend and mapping
 fields for `yes` or `no`. Older/unreachable proxy responses and config/route-commit fallback render `?`. Direct mode
-also renders `?` in this version because Forge has no authoritative direct backend identity. A missing stdin model omits
+also renders `?` in this version because Forge has no authoritative direct backend identity; that unconditional result
+does not read session state or the growing routing journal on the status-line polling path. A missing stdin model omits
 only this segment. Catalog, source, and expected mapping failures resolve to `?`; unexpected producer failures retain
 the registry's segment-level fail-open behavior. `no` means a matching provider declaration says unmarked—it is not
 detection, admission, or an authorship claim. The segment is not in `DEFAULT_ORDER`.

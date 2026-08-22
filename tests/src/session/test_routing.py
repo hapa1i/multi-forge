@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -34,9 +35,9 @@ def _state(*, runtime: str = "claude_code") -> SessionState:
     )
 
 
-def _payload(*, kind: str = "direct") -> dict[str, object]:
+def _payload(*, kind: str = "direct") -> dict[str, Any]:
     direct_model = "claude-opus-5" if kind == "direct" else None
-    base: dict[str, object] = {
+    base: dict[str, Any] = {
         "route": {
             "kind": kind,
             "backend_id": None,
@@ -78,7 +79,7 @@ def _payload(*, kind: str = "direct") -> dict[str, object]:
     return base
 
 
-def _commit(state: SessionState, run: str, payload: dict[str, object] | None = None):
+def _commit(state: SessionState, run: str, payload: dict[str, Any] | None = None):
     return new_routing_event(
         state,
         event_type=ROUTING_COMMIT_EVENT,
@@ -88,7 +89,7 @@ def _commit(state: SessionState, run: str, payload: dict[str, object] | None = N
     )
 
 
-def _abort(state: SessionState, run: str, payload: dict[str, object] | None = None):
+def _abort(state: SessionState, run: str, payload: dict[str, Any] | None = None):
     return new_routing_event(
         state,
         event_type=ROUTING_ABORT_EVENT,

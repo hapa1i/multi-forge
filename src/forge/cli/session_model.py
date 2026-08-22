@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import Any
 
 import click
 from rich.table import Table
@@ -40,25 +41,11 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
         click.echo(json.dumps(payload, indent=2))
         return
 
-    commit = payload["route_commit"]
-    live = payload["live_proxy"]
     table = Table(show_header=False, box=None)
     table.add_column("Field", style="bold")
     table.add_column("Value")
-    table.add_row("Session", payload["session"])
-    table.add_row("Runtime", payload["runtime"])
-    table.add_row("Active", "yes" if payload["active"] else "no")
-    table.add_row("Intent", payload["route_intent"]["kind"])
-    table.add_row(
-        "Committed route",
-        commit["kind"] if commit and commit["kind"] else "unavailable",
-    )
-    table.add_row("Route evidence", commit["evidence_source"] if commit else "none")
-    table.add_row("History", payload["history_status"] or "no claim")
-    table.add_row("Live proxy", live["evidence_source"])
-    table.add_row("Default tier", live["default_tier"] or "-")
-    table.add_row("Launch marking entries", str(len(payload["marking"]["launch_entries"])))
-    table.add_row("Live marking entries", str(len(payload["marking"]["live_proxy_entries"])))
+    for field, value in session_model_summary_rows(payload):
+        table.add_row(field, value)
     console.print(table)
     console.print("\n[bold]Limitations[/bold]")
     for limitation in payload["limitations"]:
@@ -102,6 +89,25 @@ def history_cmd(session_name: str | None, as_json: bool) -> None:
     console.print("\n[bold]Limitations[/bold]")
     for limitation in MODEL_REPORT_LIMITATIONS:
         console.print(f"- {limitation}")
+
+
+def session_model_summary_rows(payload: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return the fixed-size human summary shared by terminal and direct reads."""
+    commit = payload["route_commit"]
+    live = payload["live_proxy"]
+    return [
+        ("Session", payload["session"]),
+        ("Runtime", payload["runtime"]),
+        ("Active", "yes" if payload["active"] else "no"),
+        ("Intent", payload["route_intent"]["kind"]),
+        ("Committed route", commit["kind"] if commit and commit["kind"] else "unavailable"),
+        ("Route evidence", commit["evidence_source"] if commit else "none"),
+        ("History", payload["history_status"] or "no claim"),
+        ("Live proxy", live["evidence_source"]),
+        ("Default tier", live["default_tier"] or "-"),
+        ("Launch marking entries", str(len(payload["marking"]["launch_entries"]))),
+        ("Live marking entries", str(len(payload["marking"]["live_proxy_entries"]))),
+    ]
 
 
 def _model_slot_summary(snapshots: object) -> str:
