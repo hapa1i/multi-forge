@@ -1,7 +1,7 @@
 # Correct Recent Daily-Review Regressions
 
-**Lane**: `doing/` -- implementation verified in [PR #239](https://github.com/hapa1i/multi-forge/pull/239), awaiting
-review and merge.
+**Lane**: `done/` -- shipped in [PR #239](https://github.com/hapa1i/multi-forge/pull/239) (`60af6b66`) on 2026-08-22
+with all five GitHub checks passing.
 
 ## Goal
 

@@ -2,9 +2,8 @@
 
 Activation base: `5d9fadc4` (`main`, 2026-08-22).
 
-Current focus: implementation and required verification are complete in
-[PR #239](https://github.com/hapa1i/multi-forge/pull/239), including the verified terminal-rendering review follow-up;
-await review and merge before post-merge closeout.
+Current focus: complete -- [PR #239](https://github.com/hapa1i/multi-forge/pull/239) merged as `60af6b66` on 2026-08-22
+with all five GitHub checks passing, and the card is closed in `done/`.
 
 ## Verification and design mapping
 
@@ -53,4 +52,4 @@ await review and merge before post-merge closeout.
   check.
 - [x] Review the final diff and synchronize the session design and end-user authority guidance.
 - [x] Commit, push, and open [PR #239](https://github.com/hapa1i/multi-forge/pull/239).
-- [ ] After merge, record the completed work in `change_log.md` and move the card to `done/`.
+- [x] After merge, record the completed work in `change_log.md` and move the card to `done/`.

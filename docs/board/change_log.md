@@ -7,6 +7,25 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-08-22
 
+### Correct recent review regressions
+
+**Goal/outcome**: Close five independently reproduced regressions in recent session, hook, authority, configuration, and
+repository-policy changes without weakening the surrounding ownership, read-only, or latency contracts.
+
+**Key changes**:
+
+- Revalidated relocated-transcript ownership at the destructive unlink boundary and translated malformed active-registry
+  reads into actionable, non-repairing authority errors.
+- Redacted diagnostics before and after terminal rendering, kept ordinary streams on the bulk C0/DEL path, and preserved
+  failure-excerpt semantics and the Stop overhead budget.
+- Emitted extension-sync reminders only when config edit/reset changed invocation overrides, and narrowed the
+  40,000-token historical exception to the two ratified checklist snapshots.
+
+**Verification**: 171 focused tests before review and 66 focused Stop/hook tests after review; four required targeted
+Docker boundaries, with the Stop boundary rerun after final remediation; 9,588 unit tests with 117 deselected; 1,067
+regressions; full pre-commit, diff, board, and link checks. A 1.01 MB control-free diagnostic measured 29.5 ms median
+(36.6 ms for full excerpt selection). PR #239 merged as `60af6b66` with all five GitHub checks passing.
+
 ### Put context limits and document ownership in the repository
 
 **Goal/outcome**: Make context-size enforcement visible to contributors and leave every living context document with
