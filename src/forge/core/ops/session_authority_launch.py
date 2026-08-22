@@ -52,6 +52,7 @@ class AuthorityLaunchAttempt:
     hook_registration_sha256: str | None
     marker: str | None
     exit_code: int | None = None
+    pre_invocation_aborted: bool = False
 
     @property
     def marked(self) -> bool:
@@ -60,6 +61,19 @@ class AuthorityLaunchAttempt:
     def complete(self, exit_code: int) -> None:
         """Record the child result for the transaction's required terminal event."""
         self.exit_code = exit_code
+
+    def abort_before_child(self, *, reason_code: str) -> None:
+        """Append M1 compensation and suppress the normal terminal event."""
+        self.pre_invocation_aborted = True
+        append_launch_aborted(
+            store=self.store,
+            state=self.state,
+            root=self.root,
+            operation=self.operation,
+            config_sha256=self.config_sha256,
+            hook_sha256=self.hook_registration_sha256,
+            reason_code=reason_code,
+        )
 
 
 class AuthoritySeamPreflightError(ForgeOpError):
@@ -163,19 +177,27 @@ def authority_launch_transaction(
         raise
     finally:
         terminal_error: Exception | None = None
-        try:
-            _append_run_ended(attempt, caught)
-        except Exception as exc:  # required journal failure must be surfaced
-            terminal_error = exc
-        finally:
+        if not attempt.pre_invocation_aborted:
             try:
-                active.clear_session(attempt.state.name, forge_root=str(store.forge_root))
-            except Exception:
-                logger.debug(
-                    "Failed to clear marked active session '%s'",
-                    attempt.state.name,
-                    exc_info=True,
-                )
+                _append_run_ended(attempt, caught)
+            except Exception as exc:  # required journal failure must be surfaced
+                terminal_error = exc
+        clear_error: Exception | None = None
+        try:
+            active.clear_session(attempt.state.name, forge_root=str(store.forge_root))
+        except Exception as exc:
+            clear_error = exc
+            logger.debug(
+                "Failed to clear marked active session '%s'",
+                attempt.state.name,
+                exc_info=True,
+            )
+        if clear_error is not None and attempt.pre_invocation_aborted:
+            if caught is not None:
+                raise ForgeOpError(f"{caught}; active-state cleanup also failed: {clear_error}") from caught
+            raise ForgeOpError(
+                f"pre-invocation launch abort could not clear active state: {clear_error}"
+            ) from clear_error
         if terminal_error is not None:
             if caught is None:
                 outcome = "unknown" if attempt.exit_code is None else str(attempt.exit_code)
@@ -523,21 +545,43 @@ def _best_effort_launch_aborted(
     reason_code: str,
 ) -> None:
     try:
-        event = new_authority_event(
-            state,
-            event_type="launch_aborted",
-            run_id=root.run_id,
-            origin_surface="launcher",
+        append_launch_aborted(
+            store=store,
+            state=state,
+            root=root,
             operation=operation,
-            outcome="error",
-            reason_code=reason_code,
             config_sha256=config_sha256,
-            hook_registration_sha256=hook_sha256,
+            hook_sha256=hook_sha256,
+            reason_code=reason_code,
         )
-        append_authority_event(str(store.forge_root), event)
     except Exception:
         logger.debug(
             "Failed to append authority launch_aborted for '%s'",
             state.name,
             exc_info=True,
         )
+
+
+def append_launch_aborted(
+    *,
+    store: SessionStore,
+    state: SessionState,
+    root: RunIdentity,
+    operation: str,
+    config_sha256: str,
+    hook_sha256: str | None,
+    reason_code: str,
+) -> None:
+    """Append required authority compensation for a launch that cannot invoke its child."""
+    event = new_authority_event(
+        state,
+        event_type="launch_aborted",
+        run_id=root.run_id,
+        origin_surface="launcher",
+        operation=operation,
+        outcome="error",
+        reason_code=reason_code,
+        config_sha256=config_sha256,
+        hook_registration_sha256=hook_sha256,
+    )
+    append_authority_event(str(store.forge_root), event)

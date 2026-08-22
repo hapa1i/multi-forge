@@ -100,7 +100,7 @@ def _handle_cmd_help() -> None:
             {
                 "decision": "block",
                 "reason": "Direct commands:\n"
-                "- %session show [name] | list\n"
+                "- %session show [name] | list | model show [name]\n"
                 "- %proxy list | show <id> | audit show|diff [id]\n"
                 "- %clean [--scope workspace|project|all]\n"
                 "- %plan\n"
@@ -122,20 +122,38 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
 
     - `%session list` (optionally: `--no-incognito` / `--include-incognito`)
     - `%session show [name]` (default: current session from FORGE_SESSION)
+    - `%session model show [name]` (read-only route provenance)
 
     Always emits `{decision:block}` when handled.
     """
 
     if not argv:
-        click.echo(json.dumps({"decision": "block", "reason": "Usage: %session list | show [name]"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": "Usage: %session list | show [name] | model show [name]",
+                }
+            )
+        )
         return
 
     sub = argv[0].lower()
     if sub == "show":
         _handle_session_show(argv[1:])
         return
+    if sub == "model":
+        _handle_session_model(argv[1:])
+        return
     if sub != "list":
-        click.echo(json.dumps({"decision": "block", "reason": "Usage: %session list | show [name]"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": "Usage: %session list | show [name] | model show [name]",
+                }
+            )
+        )
         return
 
     include_incognito = True
@@ -184,6 +202,31 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
             )
 
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
+
+
+def _handle_session_model(argv: list[str]) -> None:
+    """Handle only the read-only ``%session model show [name]`` surface."""
+    if not argv or argv[0].lower() != "show" or len(argv) > 2:
+        click.echo(json.dumps({"decision": "block", "reason": "Usage: %session model show [name]"}))
+        return
+
+    from forge.core.ops.context import ExecutionContext
+    from forge.core.ops.session import ForgeOpError
+    from forge.core.ops.session_model import get_session_model_report
+    from forge.session.exceptions import ForgeSessionError
+
+    try:
+        report = get_session_model_report(
+            ctx=ExecutionContext.from_cwd(),
+            session_name=argv[1] if len(argv) == 2 else None,
+        )
+    except (StateCorruptedError, StateUnreadableError) as exc:
+        _emit_state_error_block(exc)
+        return
+    except (ForgeOpError, ForgeSessionError, ValueError) as exc:
+        click.echo(json.dumps({"decision": "block", "reason": f"Error: {exc}"}))
+        return
+    click.echo(json.dumps({"decision": "block", "reason": json.dumps(report.to_dict(), indent=2)}))
 
 
 def _handle_session_show(argv: list[str]) -> None:
@@ -261,7 +304,14 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
     """
 
     if not argv:
-        click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show|diff [id]"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": "Usage: %proxy list | show <id> | audit show|diff [id]",
+                }
+            )
+        )
         return
 
     sub = argv[0].lower()
@@ -281,7 +331,14 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
     if sub == "audit":
         action = argv[1].lower() if len(argv) > 1 else ""
         if action not in ("show", "diff"):
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy audit show|diff [id]"}))
+            click.echo(
+                json.dumps(
+                    {
+                        "decision": "block",
+                        "reason": "Usage: %proxy audit show|diff [id]",
+                    }
+                )
+            )
             return
         target = argv[2] if len(argv) > 2 else None
         if action == "show":
@@ -290,7 +347,14 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
             _handle_proxy_audit_diff(target)
         return
 
-    click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show|diff [id]"}))
+    click.echo(
+        json.dumps(
+            {
+                "decision": "block",
+                "reason": "Usage: %proxy list | show <id> | audit show|diff [id]",
+            }
+        )
+    )
 
 
 def _handle_proxy_audit_show(proxy_id: str | None) -> None:
@@ -551,7 +615,12 @@ def _handle_cmd_policy(data: dict[str, Any], argv: list[str]) -> None:
         return
 
     click.echo(
-        json.dumps({"decision": "block", "reason": "Usage: %policy status | enable | disable | check | supervisor"})
+        json.dumps(
+            {
+                "decision": "block",
+                "reason": "Usage: %policy status | enable | disable | check | supervisor",
+            }
+        )
     )
 
 
@@ -1158,7 +1227,15 @@ def _handle_policy_check(argv: list[str]) -> None:
             cwd=str(cwd),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        click.echo(json.dumps({"decision": "block", "passed": False, "reason": "Error: git not found or timed out"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": False,
+                    "reason": "Error: git not found or timed out",
+                }
+            )
+        )
         return
 
     if root_proc.returncode != 0:
@@ -1178,18 +1255,42 @@ def _handle_policy_check(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "passed": False, "reason": "Error: git not found"}))
         return
     except subprocess.TimeoutExpired:
-        click.echo(json.dumps({"decision": "block", "passed": False, "reason": "Error: git diff timed out"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": False,
+                    "reason": "Error: git diff timed out",
+                }
+            )
+        )
         return
 
     if proc.returncode != 0:
         msg = proc.stderr.strip()[:200] if proc.stderr else "unknown error"
-        click.echo(json.dumps({"decision": "block", "passed": False, "reason": f"Error: git diff failed: {msg}"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": False,
+                    "reason": f"Error: git diff failed: {msg}",
+                }
+            )
+        )
         return
 
     diff_output = proc.stdout
     if not diff_output.strip():
         label = "staged" if staged else "unstaged"
-        click.echo(json.dumps({"decision": "block", "passed": True, "reason": f"No {label} changes to check."}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": True,
+                    "reason": f"No {label} changes to check.",
+                }
+            )
+        )
         return
 
     file_diffs = _split_diff_per_file(diff_output)
@@ -1210,7 +1311,15 @@ def _handle_policy_check(argv: list[str]) -> None:
     try:
         engine = build_engine(list(bundles), fail_mode="closed", bundle_config=bundle_config or None)
     except Exception as e:
-        click.echo(json.dumps({"decision": "block", "passed": False, "reason": f"Error building policy engine: {e}"}))
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": False,
+                    "reason": f"Error building policy engine: {e}",
+                }
+            )
+        )
         return
 
     all_violations: list[str] = []

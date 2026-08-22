@@ -34,6 +34,8 @@ class TestSessionConfigRouting:
             assert "proxy" in data
             assert "routing" in data
             assert "runtime" in data
+            assert data["runtime"]["backend_id"] == "litellm-gemini-test"
+            assert isinstance(data["runtime"]["model_alternatives"], dict)
 
     def test_routing_note_mentions_session_non_authoritative(self, proxy_server: str) -> None:
         """Routing section should explicitly document session non-authoritative rule."""

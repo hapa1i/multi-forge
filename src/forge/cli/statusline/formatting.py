@@ -940,6 +940,13 @@ def format_launch(launch: dict[str, Any]) -> str | None:
     return f"{DIM}·{RESET}".join(parts)
 
 
+def format_marking(status: str) -> str:
+    """Render provider-declared text-marking metadata as an explicit tri-state."""
+    value = {"marked": "yes", "unmarked": "no"}.get(status, "?")
+    color = GREEN if value == "yes" else RED if value == "no" else YELLOW
+    return f"{DIM}mark:{RESET}{color}{value}{RESET}"
+
+
 def format_forge_cost(micros: int | None) -> str | None:
     """Render Forge's *additional* headless cost for the session as ``forge +$X.XX``.
 

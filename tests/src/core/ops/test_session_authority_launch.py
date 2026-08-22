@@ -10,6 +10,7 @@ from typing import cast
 import pytest
 
 import forge.core.ops.session_authority_launch as launch
+import forge.core.ops.session_routing as routing_ops
 from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.ops.session import ForgeOpError
@@ -21,7 +22,9 @@ from forge.session.authority import (
     authority_hook_contract_sha256,
     read_authority_events,
 )
+from forge.session.events import SessionEvent
 from forge.session.models import AuthorityIntent, create_session_state
+from forge.session.routing import derive_routing_history, read_routing_events
 from forge.session.store import SessionStore
 
 
@@ -77,6 +80,336 @@ def test_marked_launch_commits_preflight_and_start_before_runner(
     assert {event.run_id for event in events} == {root.run_id}
     assert events[-1].outcome == "success"
     assert events[-1].reason_code is None
+
+
+def test_pre_invocation_abort_skips_run_ended_and_clears_active(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+
+    with pytest.raises(ForgeOpError, match="projection failed"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            assert attempt is not None
+            attempt.abort_before_child(reason_code="route_projection_failed")
+            raise ForgeOpError("projection failed")
+
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    events = read_authority_events(str(tmp_path), "planner")
+    assert [event.event_type for event in events] == [
+        "launch_preflight",
+        "run_started",
+        "launch_aborted",
+    ]
+
+
+def test_pre_invocation_abort_reports_authority_and_active_cleanup_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    original_append = launch.append_authority_event
+
+    def fail_abort(root: str, event: SessionEvent) -> None:
+        if getattr(event, "event_type", None) == "launch_aborted":
+            raise OSError("abort disk full")
+        original_append(root, event)
+
+    monkeypatch.setattr(launch, "append_authority_event", fail_abort)
+    monkeypatch.setattr(
+        active,
+        "clear_session",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("locked")),
+    )
+
+    with pytest.raises(ForgeOpError) as raised:
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            assert attempt is not None
+            try:
+                attempt.abort_before_child(reason_code="route_projection_failed")
+            except OSError as exc:
+                raise ForgeOpError(f"projection failed; authority abort failed: {exc}") from exc
+
+    assert "authority abort failed: abort disk full" in str(raised.value)
+    assert "active-state cleanup also failed: locked" in str(raised.value)
+    assert "run_ended" not in [event.event_type for event in read_authority_events(str(tmp_path), "planner")]
+
+
+def test_route_preparation_failure_writes_no_routing_history_or_invokes_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    invoked = False
+    monkeypatch.setattr(
+        routing_ops,
+        "load_model_practices",
+        lambda: (_ for _ in ()).throw(ValueError("catalog invalid")),
+    )
+
+    with pytest.raises(ValueError, match="catalog invalid"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ):
+            state = store.read()
+            routing_ops.build_claude_routing_payload(
+                state,
+                effective_template=None,
+                runtime_base_url=None,
+                proxy_id=None,
+                effective_direct_model="claude-opus-5",
+            )
+            invoked = True
+
+    assert invoked is False
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    assert not (tmp_path / ".forge" / "artifacts" / "planner" / "routing").exists()
+    authority = read_authority_events(str(tmp_path), "planner")
+    assert [event.event_type for event in authority] == [
+        "launch_preflight",
+        "run_started",
+        "run_ended",
+    ]
+    assert authority[-1].reason_code == "launcher_exception"
+
+
+def test_routing_append_failure_compensates_marked_transaction_without_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    root = new_root_run_identity()
+    invoked = False
+    monkeypatch.setattr(
+        routing_ops,
+        "append_routing_event",
+        lambda *_args: (_ for _ in ()).throw(OSError("routing disk full")),
+    )
+
+    with pytest.raises(ForgeOpError, match="required routing commit append failed"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=root,
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            routing_ops.commit_launch_routing(
+                store=store,
+                state=store.read(),
+                root=root,
+                operation="start",
+                payload=routing_ops.build_claude_routing_payload(
+                    store.read(),
+                    effective_template=None,
+                    runtime_base_url=None,
+                    proxy_id=None,
+                    effective_direct_model="claude-opus-5",
+                ),
+                authority_attempt=attempt,
+            )
+            invoked = True
+
+    assert invoked is False
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    authority = read_authority_events(str(tmp_path), "planner")
+    assert [event.event_type for event in authority] == [
+        "launch_preflight",
+        "run_started",
+        "launch_aborted",
+    ]
+    assert authority[-1].reason_code == "routing_commit_failed"
+    assert {event.run_id for event in authority} == {root.run_id}
+    assert not (tmp_path / ".forge" / "artifacts" / "planner" / "routing").exists()
+
+
+def test_projection_failure_compensates_routing_then_authority_without_run_ended(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    root = new_root_run_identity()
+    routing_types: list[str] = []
+    real_append = routing_ops.append_routing_event
+
+    def record_append(forge_root: str | Path, event: SessionEvent) -> Path:
+        routing_types.append(event.event_type)
+        return real_append(forge_root, event)
+
+    monkeypatch.setattr(routing_ops, "append_routing_event", record_append)
+    monkeypatch.setattr(
+        store,
+        "update",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("manifest read-only")),
+    )
+
+    with pytest.raises(ForgeOpError, match="route projection failed"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=root,
+            operation="resume",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            state = store.read()
+            routing_ops.commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="resume",
+                payload=routing_ops.build_claude_routing_payload(
+                    state,
+                    effective_template=None,
+                    runtime_base_url=None,
+                    proxy_id=None,
+                    effective_direct_model="claude-sonnet-5",
+                ),
+                authority_attempt=attempt,
+            )
+
+    assert routing_types == ["launch_routing_committed", "launch_aborted"]
+    routing = read_routing_events(tmp_path, store.read())
+    assert routing[0].payload == routing[1].payload
+    assert {event.run_id for event in routing} == {root.run_id}
+    authority = read_authority_events(str(tmp_path), "planner")
+    assert [event.event_type for event in authority] == [
+        "launch_preflight",
+        "run_started",
+        "launch_aborted",
+    ]
+    assert authority[-1].reason_code == "route_projection_failed"
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+
+
+def test_projection_compensation_failures_are_aggregated_and_child_is_suppressed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    root = new_root_run_identity()
+    invoked = False
+    real_route_append = routing_ops.append_routing_event
+    real_authority_append = launch.append_authority_event
+
+    def fail_route_abort(forge_root: str | Path, event: SessionEvent) -> Path:
+        if event.event_type == "launch_aborted":
+            raise OSError("routing compensation disk full")
+        return real_route_append(forge_root, event)
+
+    def fail_authority_abort(forge_root: str, event: SessionEvent) -> None:
+        if event.event_type == "launch_aborted":
+            raise OSError("authority compensation disk full")
+        real_authority_append(forge_root, event)
+
+    monkeypatch.setattr(routing_ops, "append_routing_event", fail_route_abort)
+    monkeypatch.setattr(launch, "append_authority_event", fail_authority_abort)
+    monkeypatch.setattr(
+        store,
+        "update",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("manifest read-only")),
+    )
+
+    with pytest.raises(ForgeOpError) as raised:
+        with launch.authority_launch_transaction(
+            store=store,
+            root=root,
+            operation="resume",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            state = store.read()
+            routing_ops.commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="resume",
+                payload=routing_ops.build_claude_routing_payload(
+                    state,
+                    effective_template=None,
+                    runtime_base_url=None,
+                    proxy_id=None,
+                    effective_direct_model="claude-opus-5",
+                ),
+                authority_attempt=attempt,
+            )
+            invoked = True
+
+    message = str(raised.value)
+    assert "route projection failed: manifest read-only" in message
+    assert "routing abort failed: routing compensation disk full" in message
+    assert "authority abort failed: authority compensation disk full" in message
+    assert invoked is False
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    history = derive_routing_history(tmp_path, store.read())
+    assert history.status == "unproven"
+    assert [event.event_type for event in read_authority_events(str(tmp_path), "planner")] == [
+        "launch_preflight",
+        "run_started",
+    ]
+
+
+def test_spawn_failure_after_projection_retains_route_with_same_root_run_id(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    root = new_root_run_identity()
+
+    with pytest.raises(FileNotFoundError, match="missing child"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=root,
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            state = store.read()
+            routing_ops.commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="start",
+                payload=routing_ops.build_claude_routing_payload(
+                    state,
+                    effective_template=None,
+                    runtime_base_url=None,
+                    proxy_id=None,
+                    effective_direct_model="claude-opus-5",
+                ),
+                authority_attempt=attempt,
+            )
+            raise FileNotFoundError("missing child")
+
+    state = store.read()
+    routing = read_routing_events(tmp_path, state)
+    authority = read_authority_events(str(tmp_path), "planner")
+    assert derive_routing_history(tmp_path, state).status == "supported"
+    assert state.confirmed.route_commit is not None
+    assert state.confirmed.route_commit.run_id == root.run_id
+    assert {event.run_id for event in [*routing, *authority]} == {root.run_id}
+    assert authority[-1].event_type == "run_ended"
+    assert authority[-1].reason_code == "child_never_spawned"
 
 
 def test_spawn_failure_is_distinct_from_nonzero_exit(tmp_path: Path) -> None:
@@ -417,7 +750,10 @@ def test_unmarked_launch_wraps_lock_open_failure_as_actionable_command_error(
 
     monkeypatch.setattr(launch, "authority_session_lock", lambda *_args, **_kwargs: UnopenableLock())
 
-    with pytest.raises(ForgeOpError, match="could not coordinate launch.*authority lock.*permission denied"):
+    with pytest.raises(
+        ForgeOpError,
+        match="could not coordinate launch.*authority lock.*permission denied",
+    ):
         with launch.authority_launch_transaction(
             store=store,
             root=new_root_run_identity(),

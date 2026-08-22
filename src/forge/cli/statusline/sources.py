@@ -82,20 +82,14 @@ def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
             if match:
                 runtime_dict: dict[str, Any] = {}
                 try:
-                    from forge.config.loader import load_proxy_instance_config
+                    from forge.config.loader import load_config
                     from forge.core.models import get_context_window_tokens
+                    from forge.proxy.model_routes import effective_proxy_model_maps
 
-                    proxy_config = load_proxy_instance_config(proxy_id)
-                    if proxy_config is not None:
-                        tier_models = {
-                            tier: model
-                            for tier, model in [
-                                ("haiku", proxy_config.tiers.haiku),
-                                ("sonnet", proxy_config.tiers.sonnet),
-                                ("opus", proxy_config.tiers.opus),
-                            ]
-                            if model
-                        }
+                    forge_config = load_config(proxy_id=proxy_id)
+                    proxy_config = forge_config.proxy
+                    tier_models, model_alternatives = effective_proxy_model_maps(proxy_config)
+                    if tier_models:
                         context_windows: dict[str, int] = {}
                         for tier, model in tier_models.items():
                             try:
@@ -105,7 +99,9 @@ def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
                         active_tier = proxy_config.default_tier or "sonnet"
                         active_cw = context_windows.get(active_tier) or context_windows.get("sonnet")
                         runtime_dict = {
+                            "backend_id": proxy_config.backend or None,
                             "tier_mappings": tier_models,
+                            "model_alternatives": model_alternatives,
                             "context_windows": context_windows,
                             "active_tier": active_tier,
                             "active_context_window": active_cw,

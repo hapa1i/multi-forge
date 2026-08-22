@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.effort import validate_claude_effort
+from forge.core.run_id import is_valid_run_id
 from forge.core.state import now_iso
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.policy.types import FailMode
@@ -541,6 +542,22 @@ class LaunchConfirmed:
     api_key_source: str | None = None
 
 
+@dataclass(frozen=True)
+class RouteCommitConfirmed:
+    """Pointer to one validated routing-journal commitment."""
+
+    event_id: str
+    run_id: str
+
+    def __post_init__(self) -> None:
+        from .events import is_valid_session_event_id
+
+        if not is_valid_session_event_id(self.event_id):
+            raise ValueError("route_commit.event_id must match sevt_<32 lowercase hex>")
+        if not is_valid_run_id(self.run_id):
+            raise ValueError("route_commit.run_id must be a valid Forge run id")
+
+
 @dataclass
 class CodexConfirmed:
     """Codex runtime facts captured by the CLI (hook-free), refreshed per run.
@@ -655,6 +672,9 @@ class SessionConfirmed:
     # Immutable launch facts (route + api-key posture), CLI-owned, set once at start.
     # Stays None for Codex-runtime sessions (codex below is their auth breadcrumb).
     launch: LaunchConfirmed | None = None
+
+    # Latest effective launch-route pointer. Details remain journal-owned.
+    route_commit: RouteCommitConfirmed | None = None
 
     # Codex runtime facts (thread_id, rollout, auth posture), CLI-owned, hook-free.
     codex: CodexConfirmed | None = None

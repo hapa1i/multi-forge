@@ -74,6 +74,7 @@ from forge.session.store import MANIFEST_FILENAME, SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
 from .session_authority_launch import authority_launch_transaction
+from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
 
@@ -358,6 +359,18 @@ def _run_first_codex_turn(
         worktree_path=Path(cwd),
         codex_preflight=preflight,
     ) as authority_attempt:
+        routing_payload = build_runtime_native_routing_payload()
+
+        def commit_routing_before_invoke() -> None:
+            commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="start",
+                payload=routing_payload,
+                authority_attempt=authority_attempt,
+            )
+
         bridge = bridge_session_to_codex(
             ctx=ctx,
             parent=parent,
@@ -374,6 +387,7 @@ def _run_first_codex_turn(
             staged_context_path=staged_context_path,
             run_identity=root,
             authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+            before_invoke=commit_routing_before_invoke,
         )
         if authority_attempt is not None:
             authority_attempt.complete(bridge.codex.returncode)
@@ -558,6 +572,14 @@ def continue_codex_session(
                 timeout_seconds=timeout_seconds,
                 label="codex-resume",
                 resume_thread_id=thread_id,
+            )
+            commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="resume",
+                payload=build_runtime_native_routing_payload(),
+                authority_attempt=authority_attempt,
             )
             result = CodexHeadlessInvoker().run(request)
         if authority_attempt is not None:

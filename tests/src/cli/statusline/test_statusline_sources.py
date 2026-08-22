@@ -23,6 +23,7 @@ from forge.cli.statusline import sources as status_sources
 from forge.cli.statusline import throttle as status_throttle
 from forge.cli.statusline import types as status_types
 from forge.cli.statusline.types import TranscriptStats
+from forge.proxy import runtime_truth as proxy_runtime_truth
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 _INPUT = {
@@ -112,15 +113,23 @@ def test_source_facts_have_one_lower_owner_and_all_consumers_use_it() -> None:
     assert _SOURCE_FUNCTIONS <= _top_level_definitions(status_sources)
     assert _SOURCE_FUNCTIONS.isdisjoint(_top_level_definitions(sl))
     assert set(status_types.__all__) == {"ProxyRuntimeTruth", "TranscriptStats"}
-    assert {"ProxyRuntimeTruth", "TranscriptStats"} <= _top_level_definitions(status_types)
+    assert _top_level_definitions(status_types) == {"TranscriptStats"}
+    assert "ProxyRuntimeTruth" in _top_level_definitions(proxy_runtime_truth)
+    assert status_types.ProxyRuntimeTruth is proxy_runtime_truth.ProxyRuntimeTruth
     assert all("forge.cli.status_line" not in _imported_modules(module) for module in _LOWER_MODULES)
 
     assert {
         "status_sources.detect_proxy",
         "status_sources.discover_session",
     } <= _dotted_attributes(sl)
-    assert {"sources.get_git_branch", "sources.get_transcript_stats"} <= _dotted_attributes(status_context)
-    assert {"sources.compute_cache_hit_rate", "sources.get_line_change_values"} <= _dotted_attributes(status_registry)
+    assert {
+        "sources.get_git_branch",
+        "sources.get_transcript_stats",
+    } <= _dotted_attributes(status_context)
+    assert {
+        "sources.compute_cache_hit_rate",
+        "sources.get_line_change_values",
+    } <= _dotted_attributes(status_registry)
 
 
 def test_rendering_has_one_lower_owner_and_the_command_stays_thin() -> None:
@@ -132,11 +141,20 @@ def test_rendering_has_one_lower_owner_and_the_command_stays_thin() -> None:
     assert _top_level_definitions(status_rendering) == {"render_output"}
     assert "rendering.render_output" in _dotted_attributes(sl)
     assert "formatting.render_categories" in _dotted_attributes(status_rendering)
-    assert list(inspect.signature(status_formatting.render_categories).parameters) == ["where", "stream"]
+    assert list(inspect.signature(status_formatting.render_categories).parameters) == [
+        "where",
+        "stream",
+    ]
 
 
 def test_statusline_consumers_use_only_public_formatting_names() -> None:
-    for module in (sl, status_context, status_palette, status_registry, status_rendering):
+    for module in (
+        sl,
+        status_context,
+        status_palette,
+        status_registry,
+        status_rendering,
+    ):
         private_calls = {name for name in _dotted_attributes(module) if name.startswith(("fmt._", "formatting._"))}
         assert private_calls == set()
 

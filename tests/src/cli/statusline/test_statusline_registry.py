@@ -30,6 +30,7 @@ from forge.cli.statusline.registry import (
     resolve_plan,
 )
 from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
+from forge.core.models.model_practices import ModelPracticesError
 from forge.runtime_config import RuntimeConfig
 
 
@@ -44,11 +45,27 @@ def _render(fixture, *, proxy=None, session=None, stats=None, api_key=True):
     runner = CliRunner()
     with contextlib.ExitStack() as es:
         es.enter_context(patch.object(sl, "_get_terminal_width", return_value=200))
-        es.enter_context(patch.object(status_sources, "detect_proxy", return_value=(proxy or (False, None, False))))
-        es.enter_context(patch.object(status_sources, "discover_session", return_value=(session or (None, False))))
+        es.enter_context(
+            patch.object(
+                status_sources,
+                "detect_proxy",
+                return_value=(proxy or (False, None, False)),
+            )
+        )
+        es.enter_context(
+            patch.object(
+                status_sources,
+                "discover_session",
+                return_value=(session or (None, False)),
+            )
+        )
         es.enter_context(patch.object(status_sources, "get_git_branch", return_value=None))
         es.enter_context(
-            patch.object(status_sources, "get_transcript_stats", return_value=(stats or TranscriptStats()))
+            patch.object(
+                status_sources,
+                "get_transcript_stats",
+                return_value=(stats or TranscriptStats()),
+            )
         )
         res = runner.invoke(
             status_line,
@@ -364,6 +381,7 @@ class TestRegistryInvariants:
             "spend_cap": proxy,
             "launch": session,
             "forge_cost": session,
+            "marking": both,
         }
 
         assert {segment.name: segment.sources for segment in SEGMENTS} == expected
@@ -377,6 +395,7 @@ class TestRegistryInvariants:
         assert resolve_plan(["model"]).sources == proxy
         assert resolve_plan(["breadcrumb"]).sources == session
         assert resolve_plan(["cost"]).sources == both
+        assert resolve_plan(["marking"]).sources == both
         assert resolve_plan([]).sources == both
         assert resolve_plan(["from_newer_forge"]).sources == both
 
@@ -451,3 +470,225 @@ class TestLazyContext:
         assert len(stream) == 1
         assert status_formatting.HOOK_DOUBLE_FIRE_INDICATOR in stream[0]
         assert status_formatting.HOOK_CLEANUP_INDICATOR in stream[0]
+
+    def test_marking_uses_explicit_tier_and_model_alternative_before_default(self):
+        fixture = {
+            **FIXTURE_PROXY,
+            "model": {"id": "claude-opus-5[1m]", "display_name": "Opus"},
+        }
+        runtime = ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "runtime": {
+                    "backend_id": "openrouter",
+                    "active_tier": "sonnet",
+                    "tier_mappings": {
+                        "opus": "anthropic/default-opus",
+                        "sonnet": "anthropic/default-sonnet",
+                    },
+                    "model_alternatives": {"opus": {"claude-opus-5": "anthropic/claude-opus-5"}},
+                },
+            }
+        )
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=True,
+            runtime=runtime,
+            is_proxy_authoritative=True,
+            manifest=None,
+            is_session_authoritative=False,
+            config=RuntimeConfig(),
+        )
+        with (
+            patch(
+                "forge.core.models.model_practices.load_model_practices",
+                return_value=object(),
+            ),
+            patch(
+                "forge.core.models.model_practices.resolve_model_practice",
+                return_value={"status": "marked"},
+            ) as resolve,
+        ):
+            _where, stream = render_segments(ctx, ["marking"])
+
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:yes"
+        assert resolve.call_args.args[0] == "claude-opus-5"
+        assert resolve.call_args.args[1] == [
+            "backend:openrouter",
+            "route:proxy",
+            "runtime:claude_code",
+        ]
+
+    def test_marking_provider_declared_unmarked_renders_no(self):
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        runtime = ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "runtime": {
+                    "backend_id": "openrouter",
+                    "active_tier": "sonnet",
+                    "tier_mappings": {"sonnet": "anthropic/claude-sonnet-5"},
+                    "model_alternatives": {},
+                },
+            }
+        )
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=True,
+            runtime=runtime,
+            is_proxy_authoritative=True,
+            manifest=None,
+            is_session_authoritative=False,
+            config=RuntimeConfig(),
+        )
+        with (
+            patch(
+                "forge.core.models.model_practices.load_model_practices",
+                return_value=object(),
+            ),
+            patch(
+                "forge.core.models.model_practices.resolve_model_practice",
+                return_value={"status": "unmarked"},
+            ),
+        ):
+            _where, stream = render_segments(ctx, ["marking"])
+
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:no"
+
+    def test_marking_does_not_relabel_explicit_backend_pass_through_as_default(self):
+        fixture = {
+            **FIXTURE_PROXY,
+            "model": {"id": "openai/gpt-5.5", "display_name": "GPT-5.5"},
+        }
+        runtime = ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "runtime": {
+                    "backend_id": "openrouter",
+                    "active_tier": "sonnet",
+                    "tier_mappings": {"sonnet": "anthropic/claude-sonnet-5"},
+                    "model_alternatives": {},
+                },
+            }
+        )
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=True,
+            runtime=runtime,
+            is_proxy_authoritative=True,
+            manifest=None,
+            is_session_authoritative=False,
+            config=RuntimeConfig(),
+        )
+        with (
+            patch(
+                "forge.core.models.model_practices.load_model_practices",
+                return_value=object(),
+            ),
+            patch("forge.core.models.model_practices.resolve_model_practice") as resolve,
+        ):
+            _where, stream = render_segments(ctx, ["marking"])
+
+        resolve.assert_not_called()
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
+
+    def test_marking_requires_authoritative_proxy_truth(self):
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        runtime = ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "runtime": {
+                    "active_tier": "sonnet",
+                    "tier_mappings": {"sonnet": "model"},
+                },
+            }
+        )
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=True,
+            runtime=runtime,
+            is_proxy_authoritative=False,
+            manifest=None,
+            is_session_authoritative=False,
+            config=RuntimeConfig(),
+        )
+        with patch(
+            "forge.core.models.model_practices.load_model_practices",
+            return_value=object(),
+        ):
+            _where, stream = render_segments(ctx, ["marking"])
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
+
+    def test_marking_requires_new_runtime_route_fields(self):
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        runtime = ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "runtime": {
+                    "active_tier": "sonnet",
+                    "tier_mappings": {"sonnet": "anthropic/claude-sonnet-5"},
+                },
+            }
+        )
+        ctx = RenderContext(
+            data=fixture,
+            is_proxy=True,
+            runtime=runtime,
+            is_proxy_authoritative=True,
+            manifest=None,
+            is_session_authoritative=False,
+            config=RuntimeConfig(),
+        )
+        with (
+            patch(
+                "forge.core.models.model_practices.load_model_practices",
+                return_value=object(),
+            ),
+            patch("forge.core.models.model_practices.resolve_model_practice") as resolve,
+        ):
+            _where, stream = render_segments(ctx, ["marking"])
+
+        resolve.assert_not_called()
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
+
+    def test_marking_omits_only_itself_without_stdin_model_id(self):
+        _where, stream = render_segments(_ctx(FIXTURE_MINIMAL), ["marking"])
+        assert stream == []
+
+    def test_marking_catalog_failure_renders_unknown(self):
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        with patch(
+            "forge.core.models.model_practices.load_model_practices",
+            side_effect=ModelPracticesError("catalog unavailable"),
+        ):
+            _where, stream = render_segments(_ctx(fixture), ["marking"])
+
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
+
+    def test_marking_expected_session_source_failure_renders_unknown(self):
+        from forge.session.exceptions import ForgeSessionError
+
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        with (
+            patch(
+                "forge.core.models.model_practices.load_model_practices",
+                return_value=object(),
+            ),
+            patch(
+                "forge.cli.statusline.registry._read_supported_direct_route",
+                side_effect=ForgeSessionError("manifest unavailable"),
+            ),
+        ):
+            _where, stream = render_segments(_ctx(fixture), ["marking"])
+
+        assert status_formatting._ANSI_RE.sub("", stream[0]) == "mark:?"
+
+    def test_marking_unexpected_producer_failure_drops_only_segment(self):
+        fixture = {**FIXTURE_PROXY, "model": {"id": "sonnet", "display_name": "Sonnet"}}
+        with patch(
+            "forge.core.models.model_practices.load_model_practices",
+            side_effect=RuntimeError("producer bug"),
+        ):
+            _where, stream = render_segments(_ctx(fixture), ["marking"])
+
+        assert stream == []

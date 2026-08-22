@@ -70,6 +70,11 @@ _ENVELOPE_FIELDS = frozenset(
 )
 
 
+def is_valid_session_event_id(value: object) -> bool:
+    """Return whether a value uses the shared schema-v1 session-event id form."""
+    return isinstance(value, str) and _EVENT_ID_RE.fullmatch(value) is not None
+
+
 class SessionEventError(ForgeSessionError):
     """Base error for strict session-event state."""
 
@@ -191,7 +196,7 @@ def validate_session_event(
         )
 
     _require_string(record, "event_id", record_number)
-    if _EVENT_ID_RE.fullmatch(record["event_id"]) is None:
+    if not is_valid_session_event_id(record["event_id"]):
         raise SessionEventValidationError("must match sevt_<32 lowercase hex>", record=record_number, field="event_id")
 
     timestamp = _require_string(record, "timestamp", record_number)

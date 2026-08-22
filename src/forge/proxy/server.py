@@ -43,6 +43,7 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
@@ -80,6 +81,11 @@ from forge.proxy.data_models import (
 )
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
+from forge.proxy.model_routes import (
+    effective_proxy_model_maps,
+    model_for_zdr_policy,
+    openrouter_zdr_fallbacks,
+)
 from forge.proxy.passthrough_ingress import handle_anthropic_passthrough
 from forge.proxy.ports import (
     NoAvailablePortError,
@@ -641,7 +647,7 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
         provider_cfg = config.proxy.get_provider()
         alt_models = provider_cfg.model_alternatives.get(tier, {})
         if original_model_name and alt_models:
-            lookup = original_model_name.removesuffix("[1m]")
+            lookup = strip_transport_model_suffix(original_model_name)
             if lookup in alt_models:
                 return alt_models[lookup]
     except Exception:
@@ -650,26 +656,9 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
     return fallback_model
 
 
-_BUILTIN_OPENROUTER_ZDR_FALLBACKS = {
-    # Full bundled-default/alternative audit against OpenRouter's ZDR endpoint
-    # catalog on 2026-08-21. These were the seven slugs without an eligible
-    # endpoint. Request-level provider.zdr remains authoritative if this dated
-    # snapshot becomes stale in either direction.
-    "anthropic/claude-fable-5": "anthropic/claude-opus-5",
-    "qwen/qwen3.6-flash": "qwen/qwen3.8-27b",
-    "qwen/qwen3.6-plus": "qwen/qwen3.8-27b",
-    "qwen/qwen3.6-max-preview": "qwen/qwen3.8-2.4t-a95b",
-    "qwen/qwen3.7-plus": "qwen/qwen3.8-27b",
-    "qwen/qwen3.7-max": "qwen/qwen3.8-2.4t-a95b",
-    "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
-}
-
-
 def _openrouter_zdr_fallbacks(provider_cfg: object) -> dict[str, str]:
     """Return built-in ZDR fallbacks plus user-owned replacements."""
-    fallbacks = dict(_BUILTIN_OPENROUTER_ZDR_FALLBACKS)
-    fallbacks.update(getattr(provider_cfg, "zdr_fallbacks", {}))
-    return fallbacks
+    return openrouter_zdr_fallbacks(provider_cfg)
 
 
 def _model_for_zdr_policy(model_name: str) -> str:
@@ -679,19 +668,14 @@ def _model_for_zdr_policy(model_name: str) -> str:
     local mapping avoids dispatching models already known to have no ZDR
     endpoint; unknown or stale cases remain fail-closed at OpenRouter.
     """
-    if config.proxy.preferred_provider != "openrouter":
+    provider = config.proxy.preferred_provider
+    if provider != "openrouter":
         return model_name
-
-    provider_cfg = config.proxy.get_provider("openrouter")
-    if getattr(provider_cfg, "allow_non_zdr", False):
-        return model_name
-
-    lookup = model_name.removesuffix("[1m]")
-    fallback = _openrouter_zdr_fallbacks(provider_cfg).get(lookup)
-    if fallback:
-        logger.info("Required-ZDR routing replaced model %r with %r", model_name, fallback)
-        return fallback
-    return model_name
+    provider_cfg = config.proxy.get_provider(provider)
+    effective = model_for_zdr_policy(model_name, provider=provider, provider_config=provider_cfg)
+    if effective != model_name:
+        logger.info("Required-ZDR routing replaced model %r with %r", model_name, effective)
+    return effective
 
 
 def _resolve_model_with_alternatives(
@@ -1773,10 +1757,10 @@ async def root(request: Request):
         "sonnet": provider_config.tiers.sonnet,
         "opus": provider_config.tiers.opus,
     }
-    tier_models = {tier: _model_for_zdr_policy(model) for tier, model in configured_tier_models.items()}
+    tier_models, model_alternatives = effective_proxy_model_maps(config.proxy)
     relevant_zdr_fallbacks: dict[str, str] = {}
     if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False):
-        configured_models = {model.removesuffix("[1m]") for model in configured_tier_models.values()}
+        configured_models = {strip_transport_model_suffix(model) for model in configured_tier_models.values()}
         relevant_zdr_fallbacks = {
             primary: fallback
             for primary, fallback in _openrouter_zdr_fallbacks(provider_config).items()
@@ -1828,16 +1812,18 @@ async def root(request: Request):
     runtime_section = {
         "template": active_template,
         "provider": preferred_provider,
+        "backend_id": getattr(config.proxy, "backend", "") or None,
         "tier_mappings": tier_models,
+        "model_alternatives": model_alternatives,
         "configured_tier_mappings": configured_tier_models,
         "context_windows": {tier: get_context_window(model) for tier, model in tier_models.items()},
         "active_tier": default_tier,
-        "active_context_window": get_context_window(runtime_active_model) if runtime_active_model else None,
+        "active_context_window": (get_context_window(runtime_active_model) if runtime_active_model else None),
         "data_policy": {
             "zdr": (
                 "required"
                 if preferred_provider == "openrouter" and not getattr(provider_config, "allow_non_zdr", False)
-                else "allow_non_zdr" if preferred_provider == "openrouter" else "not_applicable"
+                else ("allow_non_zdr" if preferred_provider == "openrouter" else "not_applicable")
             ),
             "zdr_fallbacks": relevant_zdr_fallbacks,
         },

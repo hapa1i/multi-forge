@@ -18,9 +18,12 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.session import LAUNCH_MODE_HOST, ActiveSessionEntry, SessionStore
 from forge.session.models import SessionState, session_state_to_dict
+from forge.session.routing import read_routing_events
 
 _ISO_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$")
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_EVENT_ID_RE = re.compile(r"^sevt_[0-9a-f]{32}$")
+_RUN_ID_RE = re.compile(r"^run_[0-9a-f]+$")
 
 
 @pytest.fixture
@@ -54,6 +57,10 @@ def _normalize_manifest_value(value: object, *, project: Path) -> object:
             return "<timestamp>"
         if _UUID_RE.match(value):
             return "<uuid>"
+        if _EVENT_ID_RE.match(value):
+            return "<event_id>"
+        if _RUN_ID_RE.match(value):
+            return "<run_id>"
         normalized = value
         path_variants = {str(project), str(project.resolve())}
         for path in sorted(path_variants, key=len, reverse=True):
@@ -77,11 +84,23 @@ def _mark_resumable(project: Path, name: str) -> None:
     store.update(timeout_s=5.0, mutate=_mutate)
 
 
+def _assert_route_commit(project: Path, state: SessionState, *, operation: str) -> None:
+    events = read_routing_events(project, state)
+    assert len(events) == 1
+    assert events[0].operation == operation
+    assert events[0].payload["route"]["kind"] == "direct"
+    assert state.confirmed.route_commit is not None
+    assert state.confirmed.route_commit.event_id == events[0].event_id
+    assert state.confirmed.route_commit.run_id == events[0].run_id
+
+
 def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
     result = runner.invoke(main, ["session", "start", "char-start", "--no-launch"])
 
     assert result.exit_code == 0, result.output
     state = SessionStore(str(temp_env), "char-start").read()
+    assert state.confirmed.route_commit is None
+    assert not (temp_env / ".forge" / "artifacts" / "char-start" / "routing").exists()
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
   "name": "char-start",
@@ -126,6 +145,7 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     "subagents": null,
     "is_sandboxed": false,
     "launch": null,
+    "route_commit": null,
     "codex": null,
     "adoption": null,
     "derivation": null,
@@ -152,7 +172,9 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
     captured: dict[str, str] = {}
 
     def _capture_manifest(*_args: object, **_kwargs: object) -> int:
-        captured["json"] = _manifest_json(SessionStore(str(temp_env), "char-incognito").read(), project=temp_env)
+        state = SessionStore(str(temp_env), "char-incognito").read()
+        _assert_route_commit(temp_env, state, operation="incognito")
+        captured["json"] = _manifest_json(state, project=temp_env)
         return 0
 
     with patch("forge.core.ops.claude_session.invoke_claude", side_effect=_capture_manifest):
@@ -211,6 +233,10 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
       "api_key_available_to_child": true,
       "api_key_source": "env"
     },
+    "route_commit": {
+      "event_id": "<event_id>",
+      "run_id": "<run_id>"
+    },
     "codex": null,
     "adoption": null,
     "derivation": null,
@@ -231,10 +257,21 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
     assert result.exit_code == 0, result.output
 
     with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
-        result = runner.invoke(main, ["session", "resume", "char-start", "--fresh", "--child-name", "char-child"])
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "resume",
+                "char-start",
+                "--fresh",
+                "--child-name",
+                "char-child",
+            ],
+        )
 
     assert result.exit_code == 0, result.output
     state = SessionStore(str(temp_env), "char-child").read()
+    _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
   "name": "char-child",
@@ -287,6 +324,10 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
       "api_key_available_to_child": true,
       "api_key_source": "env"
     },
+    "route_commit": {
+      "event_id": "<event_id>",
+      "run_id": "<run_id>"
+    },
     "codex": null,
     "adoption": null,
     "derivation": {
@@ -326,6 +367,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
 
     assert result.exit_code == 0, result.output
     state = SessionStore(str(temp_env), "char-reconnect").read()
+    _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
   "name": "char-reconnect",
@@ -378,6 +420,10 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
       "api_key_available_to_child": true,
       "api_key_source": "env"
     },
+    "route_commit": {
+      "event_id": "<event_id>",
+      "run_id": "<run_id>"
+    },
     "codex": null,
     "adoption": null,
     "derivation": null,
@@ -404,9 +450,13 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     )
 
     with (
-        patch("forge.cli.session_lifecycle._get_active_session_entry", return_value=active_entry),
         patch(
-            "forge.session.manager.SessionManager._generate_relaunch_name", return_value="char-active-child"
+            "forge.cli.session_lifecycle._get_active_session_entry",
+            return_value=active_entry,
+        ),
+        patch(
+            "forge.session.manager.SessionManager._generate_relaunch_name",
+            return_value="char-active-child",
         ) as generate_relaunch_name,
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
     ):
@@ -415,6 +465,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     assert result.exit_code == 0, result.output
     generate_relaunch_name.assert_called_once_with(forge_root=str(temp_env))
     state = SessionStore(str(temp_env), "char-active-child").read()
+    _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
   "name": "char-active-child",
@@ -467,6 +518,10 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "api_key_available_to_child": true,
       "api_key_source": "env"
     },
+    "route_commit": {
+      "event_id": "<event_id>",
+      "run_id": "<run_id>"
+    },
     "codex": null,
     "adoption": null,
     "derivation": null,
@@ -501,6 +556,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
 
     assert result.exit_code == 0, result.output
     state = SessionStore(str(temp_env), "char-native-child").read()
+    _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
   "schema_version": 1,
   "name": "char-native-child",
@@ -552,6 +608,10 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
       "proxy_cost_baseline_started_at": null,
       "api_key_available_to_child": true,
       "api_key_source": "env"
+    },
+    "route_commit": {
+      "event_id": "<event_id>",
+      "run_id": "<run_id>"
     },
     "codex": null,
     "adoption": null,

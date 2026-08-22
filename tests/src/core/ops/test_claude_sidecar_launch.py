@@ -63,6 +63,44 @@ class _FakeManager:
         return self._state
 
 
+def _proxy_routing_payload() -> dict[str, Any]:
+    return {
+        "route": {
+            "kind": "proxy",
+            "backend_id": None,
+            "proxy_id": None,
+            "template": "litellm-openai",
+            "custom_route_fingerprint": None,
+        },
+        "requested_model": None,
+        "selected_tier": None,
+        "selected_model": None,
+        "default_tier": "sonnet",
+        "direct_model": None,
+        "tier_mappings": {"sonnet": "openai/gpt-5"},
+        "model_alternatives": {},
+        "billing_mode": "unknown",
+        "route_scope_tags": ["route:proxy", "runtime:claude_code"],
+        "marking_snapshots": [
+            {
+                "slot": "tier_default",
+                "tier": "sonnet",
+                "request_model": None,
+                "route_model": "openai/gpt-5",
+                "canonical_model": "gpt-5",
+                "declaration": {
+                    "status": "unknown",
+                    "basis": None,
+                    "source_url": None,
+                    "checked_at": None,
+                    "effective_from": None,
+                    "route_scope": [],
+                },
+            }
+        ],
+    }
+
+
 def _launch_split_root_sidecar(
     tmp_path: Path,
     *,
@@ -96,6 +134,10 @@ def _launch_split_root_sidecar(
         patch("forge.sidecar.docker.is_docker_available", return_value=True),
         patch("forge.sidecar.get_secrets_for_template", return_value={}),
         patch("forge.sidecar.run_sidecar_session", return_value=0) as run_sidecar,
+        patch(
+            "forge.core.ops.claude_session.build_claude_routing_payload",
+            return_value=_proxy_routing_payload(),
+        ),
     ):
         result = start_claude_session(
             manager=_FakeManager(state, store),  # type: ignore[arg-type]
@@ -149,7 +191,9 @@ def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
     assert not (worktree / ".forge").exists()
 
 
-def test_sidecar_launch_mounts_prompt_hidden_by_split_forge_root(tmp_path: Path) -> None:
+def test_sidecar_launch_mounts_prompt_hidden_by_split_forge_root(
+    tmp_path: Path,
+) -> None:
     worktree = tmp_path / "checkout"
     prompt_file = worktree / ".forge" / "launch-context" / "split-sidecar.md"
     prompt_file.parent.mkdir(parents=True)

@@ -48,6 +48,10 @@ from forge.core.models.catalog import (
     model_exists,
     resolve_model_id,
 )
+from forge.core.models.model_reference import (
+    normalize_model_reference,
+    strip_transport_model_suffix,
+)
 from forge.core.models.types import (
     ModelCatalog,
     ModelSpec,
@@ -77,4 +81,6 @@ __all__ = [
     "ModelCatalog",
     "ModelSpec",
     "TemperatureSpec",
+    "normalize_model_reference",
+    "strip_transport_model_suffix",
 ]

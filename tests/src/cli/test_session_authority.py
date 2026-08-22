@@ -75,7 +75,8 @@ def test_set_show_and_clear_round_trip(runner: CliRunner, temp_env: Path) -> Non
         "observed_denials": {"count": 0, "first_at": None, "last_at": None},
         "limitations": report["limitations"],
     }
-    assert len(report["limitations"]) == 4
+    assert len(report["limitations"]) == 5
+    assert any("authority abort evidence and active-state cleanup fail" in item for item in report["limitations"])
     assert store.read().intent.authority is None
     assert [event.event_type for event in read_authority_events(str(temp_env), "worker")] == [
         "authority_configured",

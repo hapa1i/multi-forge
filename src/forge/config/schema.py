@@ -978,6 +978,7 @@ def _validate_static_tier_override_constraints(tiers: TierModels, overrides: Tie
             get_model_spec,
             resolve_model_id,
         )
+        from forge.core.models.model_reference import strip_transport_model_suffix
     except Exception:
         # Catalog import can fail during early bootstrap; provider APIs still
         # reject unsupported overrides at request time as a safety net.
@@ -992,7 +993,7 @@ def _validate_static_tier_override_constraints(tiers: TierModels, overrides: Tie
         if not model_name:
             continue
 
-        lookup_name = model_name.removesuffix("[1m]")
+        lookup_name = strip_transport_model_suffix(model_name)
         try:
             canonical_model = resolve_model_id(lookup_name)
             spec = get_model_spec(canonical_model)

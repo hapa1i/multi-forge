@@ -98,6 +98,63 @@ def test_command_recognition(
 
 
 class TestUserPromptSubmitDispatcher:
+    @pytest.mark.parametrize("prompt", ["%session", "%session invalid"])
+    def test_session_usage_lists_model_show(self, prompt: str) -> None:
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": prompt, "transcript_path": ""}),
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["reason"] == ("Usage: %session list | show [name] | model show [name]")
+
+    def test_direct_command_help_lists_session_model_show(self) -> None:
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": "%help", "transcript_path": ""}),
+        )
+
+        assert result.exit_code == 0
+        assert "- %session show [name] | list | model show [name]" in json.loads(result.output)["reason"]
+
+    def test_session_model_show_is_read_only_and_returns_report(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "forge.core.ops.session_model.get_session_model_report",
+            lambda **_kwargs: Mock(to_dict=lambda: {"schema_version": 1, "session": "planner"}),
+        )
+
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": "%session model show planner", "transcript_path": ""}),
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["decision"] == "block"
+        assert json.loads(payload["reason"])["session"] == "planner"
+
+    @pytest.mark.parametrize(
+        "prompt",
+        ["%session model", "%session model history", "%session model set planner"],
+    )
+    def test_session_model_direct_command_rejects_non_show_forms(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prompt: str
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": prompt, "transcript_path": ""}),
+        )
+        assert result.exit_code == 0
+        assert json.loads(result.output)["reason"] == "Usage: %session model show [name]"
+
     def test_cancel_verification_sets_override(self, tmp_path: Path, monkeypatch) -> None:
         """%cancel-verification persists verification.bypass override."""
         monkeypatch.chdir(tmp_path)
@@ -290,11 +347,26 @@ class TestSessionShowDirectCommand:
         import subprocess
 
         subprocess.run(["git", "init"], cwd=str(path), capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=str(path), capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=str(path),
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=str(path),
+            capture_output=True,
+            check=True,
+        )
         (path / "README.md").write_text("# Test\n")
         subprocess.run(["git", "add", "."], cwd=str(path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "init"], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "init"],
+            cwd=str(path),
+            capture_output=True,
+            check=True,
+        )
 
     def test_session_show_current_from_env(self, tmp_path: Path, monkeypatch) -> None:
         """Default %session show uses FORGE_SESSION env var."""
@@ -561,7 +633,10 @@ class TestPlanDirectCommands:
         state.forge_root = str(tmp_path)
         state.confirmed.latest_plan_path = ".claude/plans/stale.md"
         state.confirmed.artifacts["plans"] = [
-            {"kind": "approved", "snapshot_path": ".forge/artifacts/planner/plans/real.md"}
+            {
+                "kind": "approved",
+                "snapshot_path": ".forge/artifacts/planner/plans/real.md",
+            }
         ]
         SessionStore(str(tmp_path), "planner").write(state)
         monkeypatch.setenv("FORGE_SESSION", "planner")
@@ -587,7 +662,10 @@ class TestPlanDirectCommands:
         state = create_session_state("planner", worktree_path=str(tmp_path))
         state.forge_root = str(tmp_path)
         state.confirmed.artifacts["plans"] = [
-            {"kind": "approved", "snapshot_path": ".forge/artifacts/planner/plans/gone.md"}
+            {
+                "kind": "approved",
+                "snapshot_path": ".forge/artifacts/planner/plans/gone.md",
+            }
         ]
         SessionStore(str(tmp_path), "planner").write(state)
         monkeypatch.setenv("FORGE_SESSION", "planner")
@@ -1219,7 +1297,12 @@ class TestGuardCheck:
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add test"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add test"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    assert True\n")
 
         runner = CliRunner()
@@ -1242,7 +1325,12 @@ class TestGuardCheck:
         src_dir.mkdir()
         (src_dir / "foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add src"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add src"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (src_dir / "foo.py").write_text("def compute():\n    return 42\n")
 
         runner = CliRunner()
@@ -1268,7 +1356,12 @@ class TestGuardCheck:
         src_dir.mkdir()
         (src_dir / "foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add files"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add files"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    assert True\n")
         (src_dir / "foo.py").write_text("def compute():\n    return 42\n")
 
@@ -1295,7 +1388,12 @@ class TestGuardCheck:
         src_dir.mkdir()
         (src_dir / "bar.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add files"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add files"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
 
         # Modify test file and stage it
         (tests_dir / "test_bar.py").write_text("def test_bar():\n    pass\n")
@@ -1305,7 +1403,10 @@ class TestGuardCheck:
         (src_dir / "bar.py").write_text("x = 1\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%policy check --staged --bundle tdd", "transcript_path": ""}
+        payload = {
+            "prompt": "%policy check --staged --bundle tdd",
+            "transcript_path": "",
+        }
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1324,7 +1425,12 @@ class TestGuardCheck:
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add test"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add test"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    pass\n")
 
         runner = CliRunner()
@@ -1347,7 +1453,12 @@ class TestGuardCheck:
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add test"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add test"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    pass\n")
 
         runner = CliRunner()
@@ -1369,7 +1480,12 @@ class TestGuardCheck:
         src_dir.mkdir()
         (src_dir / "foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add src"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add src"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (src_dir / "foo.py").write_text("x = 1\n")
 
         runner = CliRunner()
@@ -1429,7 +1545,12 @@ class TestGuardCheck:
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text("# placeholder\n")
         subprocess.run(["git", "add", "."], cwd=str(tmp_path), capture_output=True, check=True)
-        subprocess.run(["git", "commit", "-m", "add test"], cwd=str(tmp_path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add test"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            check=True,
+        )
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    assert True\n")
 
         from forge.policy.engine import PolicyEngine
@@ -1676,7 +1797,10 @@ class TestGuardSupervisorToggle:
         symlink_plan.symlink_to(real_plan)
 
         runner = CliRunner()
-        payload = {"prompt": f"%policy supervisor reload {symlink_plan}", "transcript_path": ""}
+        payload = {
+            "prompt": f"%policy supervisor reload {symlink_plan}",
+            "transcript_path": "",
+        }
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
