@@ -3,8 +3,8 @@
 Activation base: `5d9fadc4` (`main`, 2026-08-22).
 
 Current focus: implementation and required verification are complete in
-[PR #239](https://github.com/hapa1i/multi-forge/pull/239); verify and publish the accepted review follow-up before
-post-merge closeout.
+[PR #239](https://github.com/hapa1i/multi-forge/pull/239), including the verified terminal-rendering review follow-up;
+await review and merge before post-merge closeout.
 
 ## Verification and design mapping
 
@@ -42,7 +42,7 @@ post-merge closeout.
   fragments to post-render redaction; rerun the boundary successfully.
 - [x] Run 66 focused Stop/hook tests, the targeted Docker hook boundary, 1,067 regressions, 9,588 unit tests with 117
   deselected, and full pre-commit.
-- [ ] Commit and push the follow-up, update the PR description, and confirm GitHub checks pass again.
+- [x] Commit and push the follow-up, update the PR description, and confirm all five GitHub checks pass again.
 
 ## Verification and closeout
 
