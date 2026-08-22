@@ -517,6 +517,8 @@ class TestStopVerificationDocker:
 
         failure_id = "FAILED tests/integration/test_widget.py::test_late_failure"
         captured_error = "ERROR    root:mod.py:10 captured error noise " + ("x" * 80)
+        secret = "sk-test-secret-value"
+        disguised_secret = f"{secret[:10]}X\b{secret[10:]}"
         policy_workspace.mkdir("/tmp/verification-bin")
         policy_workspace.write_file(
             "/tmp/verification-bin/uv",
@@ -527,7 +529,8 @@ class TestStopVerificationDocker:
             f"printf '%s\\n' '{captured_error}'\n"
             "printf '\\033[36m%s\\033[0m\\n' "
             "'=========================== short test summary info ============================'\n"
-            f"printf '\\033[31m%s\\033[0m\\n' '{failure_id} - AssertionError: expected true'\n"
+            f"printf '\\033[31m%s\\033[0m\\n' "
+            f"'{failure_id} - AssertionError: {disguised_secret}'\n"
             "printf '\\033[31m%s\\033[0m\\n' '1 failed in 0.01s'\n"
             "printf '%s\\n' 'third-party plugin warning: unrelated cache notice' >&2\n"
             "exit 1\n",
@@ -548,6 +551,9 @@ class TestStopVerificationDocker:
         assert "captured error noise" not in persisted
         assert "third-party plugin warning" not in persisted
         assert "\x1b" not in persisted
+        assert "\b" not in persisted
+        assert secret not in persisted
+        assert "[REDACTED]" in persisted
         assert len(persisted) <= 200
         assert f"Error: {persisted}\n\n" in stderr
 

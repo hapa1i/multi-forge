@@ -75,6 +75,7 @@ def _redacted_diagnostic(value: str | bytes | None) -> str:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
     text = _TERMINAL_CONTROL_SEQUENCE_RE.sub("", text).replace("\x1b", "")
+    text = _render_terminal_text(text)
     for credential in CREDENTIALS.values():
         for env_var in credential.env_vars:
             secret = os.environ.get(env_var.name) if env_var.secret else None
@@ -83,6 +84,51 @@ def _redacted_diagnostic(value: str | bytes | None) -> str:
     text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text)
     text = _TOKEN_PREFIX_RE.sub("[REDACTED]", text)
     return text
+
+
+def _render_terminal_text(value: str) -> str:
+    """Apply basic cursor motion and return text without unsafe C0 controls.
+
+    Backspace and carriage return can overwrite printable cells. Rendering them
+    before redaction prevents control-inserted secrets from evading exact
+    replacement; tabs become spaces and other C0/DEL controls are discarded.
+    """
+    rendered: list[str] = []
+    line: list[str] = []
+    cursor = 0
+
+    for character in value:
+        if character == "\n":
+            rendered.extend(line)
+            rendered.append(character)
+            line = []
+            cursor = 0
+            continue
+        if character == "\r":
+            cursor = 0
+            continue
+        if character == "\b":
+            cursor = max(0, cursor - 1)
+            continue
+        if character == "\t":
+            next_tab_stop = ((cursor // 8) + 1) * 8
+            if len(line) < next_tab_stop:
+                line.extend(" " for _ in range(next_tab_stop - len(line)))
+            cursor = next_tab_stop
+            continue
+        if ord(character) < 0x20 or character == "\x7f":
+            continue
+
+        if cursor < len(line):
+            line[cursor] = character
+        else:
+            if cursor > len(line):
+                line.extend(" " for _ in range(cursor - len(line)))
+            line.append(character)
+        cursor += 1
+
+    rendered.extend(line)
+    return "".join(rendered)
 
 
 def _bounded_diagnostic(value: str | bytes | None) -> str:

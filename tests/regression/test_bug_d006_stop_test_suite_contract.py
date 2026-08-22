@@ -148,6 +148,54 @@ def test_terminal_controls_are_removed_before_environment_secret_redaction(
     assert verification._redacted_diagnostic(split_secret) == "[REDACTED]"
 
 
+def test_rendered_backspaces_are_normalized_before_environment_secret_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "boundary-secret-material-for-redaction"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    split_at = 12
+    disguised = f"{secret[:split_at]}X\b{secret[split_at:]}"
+
+    assert secret not in disguised
+    assert disguised.replace("X\b", "") == secret
+    assert verification._redacted_diagnostic(disguised) == "[REDACTED]"
+
+
+def test_unsafe_c0_controls_do_not_cross_the_diagnostic_boundary() -> None:
+    sanitized = verification._redacted_diagnostic("before\x00\a\tfield\v\f\rafter\x7f\nnext")
+
+    assert "\n" in sanitized
+    assert all(character == "\n" or (ord(character) >= 0x20 and character != "\x7f") for character in sanitized)
+
+
+def test_backspace_rendered_secret_is_redacted_before_persistence_and_display(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store, manifest, _ = _configured_store(tmp_path, on_incomplete="warn")
+    transcript = _write_transcript(tmp_path / "transcript.jsonl")
+    secret = "boundary-secret-material-for-redaction"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    disguised = f"{secret[:12]}X\b{secret[12:]}"
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_kwargs: subprocess.CompletedProcess(cmd, 1, stdout=b"", stderr=disguised.encode()),
+    )
+
+    allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+    assert allow is True and message is None
+    displayed = capsys.readouterr().err
+    persisted = store.read().confirmed.verification
+    assert persisted is not None and persisted.last_error is not None
+    assert "[REDACTED]" in displayed
+    assert "[REDACTED]" in persisted.last_error
+    assert "\b" not in displayed
+    assert "\b" not in persisted.last_error
+
+
 def test_terminal_hyperlink_controls_preserve_visible_diagnostic_text() -> None:
     linked_failure = "\x1b]8;;https://example.test\x1b\\FAILED test_widget.py::test_failure\x1b]8;;\x1b\\"
 

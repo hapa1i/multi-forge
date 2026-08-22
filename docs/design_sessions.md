@@ -35,7 +35,9 @@ the current directory — a read-only CLI scan of one encoded project directory,
 resolve sessions by identity and never scan. Adoption also inverts transcript ownership, so
 `SessionManager.delete_session` exempts an adopted session's native transcript from `delete_transcripts` (including the
 `delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
-session. Adoption resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root
+session. Relocated transcripts use the same ownership scan; a cached owner remains conservatively protected, while a
+cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
+cleanup. Adoption resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root
 with a symlink is supported; a descendant destination that escapes the resolved root or aliases the native transcript is
 refused, and rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
 `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
@@ -98,6 +100,9 @@ Absence is `unmarked` and retains legacy behavior. Advisory defaults to `shell_c
 The role is provider- and model-neutral. It is mutated only by authority-bearing creation flags or the typed inactive-
 session `authority set|clear` operations, never by generic overrides. Fresh derivation inherits advisory authority and
 its tier; producer authority is deliberately dropped. An explicit child designation wins before first launch.
+`authority show` reads the manifest, authority journal, and runtime active registry without repairing any of them. A
+malformed active registry is therefore an actionable read error; `session list` remains the explicit runtime-state
+self-healing path.
 
 **`intent.subprocess_proxy`**: optional proxy ID used only by Forge-spawned subprocesses:
 
@@ -554,8 +559,8 @@ result classifier records `passed`, `incomplete`, `misconfigured`, or `infrastru
 absent from the last assistant message, a non-zero test exit, or a test timeout after launch is incomplete and follows
 the configured posture. Missing or multiline promise configuration is misconfigured. Unavailable inputs, worktree or
 executable failures, and other execution errors are infrastructure failures and allow Stop with a diagnostic.
-Persistence failure also allows Stop. Captured subprocess diagnostics are secret-redacted and bounded before display or
-persistence.
+Persistence failure also allows Stop. Captured subprocess diagnostics have terminal sequences removed and C0 cursor
+motion rendered before secret redaction, then are bounded before display or persistence.
 
 The memory writer runs asynchronously in a detached process after a later, non-exempt Forge CLI startup drains the
 handoff marker. Memory doc updates are eventually consistent; this is acceptable because they benefit future sessions,
