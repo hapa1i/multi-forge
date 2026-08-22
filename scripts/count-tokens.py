@@ -25,6 +25,7 @@ Usage:
     count-tokens --model gemini-2.5-flash file.md      # gemini-2.5-flash -> local-tiktoken
     count-tokens --model gpt-4 file.md                 # tiktoken (local)
     count-tokens --methods claude-opus-5,gemini-2.5-flash,local-tiktoken file.md
+    count-tokens --per-file --json file1.md file2.md # one JSON object per file
     count-tokens --local file.md                       # tiktoken only, no API calls
     count-tokens --local --model gpt-4o file.md        # tiktoken only, via o200k_base
     cat file.txt | count-tokens                        # stdin
@@ -46,6 +47,12 @@ LOCAL_METHOD = "local-tiktoken"
 
 # Encoding used when tiktoken has no model-specific one (e.g. for Claude models).
 FALLBACK_ENCODING = "cl100k_base"
+
+# Limits are meaningful only for the tokenizer family that produced a count.
+FAMILY_ANTHROPIC = "anthropic"
+FAMILY_GEMINI = "gemini"
+FAMILY_TIKTOKEN = "tiktoken"
+FAMILY_NONE = "none"
 
 # Key files consulted only when the matching environment variable is unset. The
 # environment always wins, so an exported or direnv-loaded key keeps working
@@ -86,6 +93,9 @@ def _detect_provider(model: str) -> str:
 # git pre-commit hook). Anthropic takes seconds; Gemini takes milliseconds.
 _ANTHROPIC_TIMEOUT_S = 10.0
 _GEMINI_TIMEOUT_MS = 10_000
+# A local fallback is already available, so provider outage should not spend the
+# SDK default of three total attempts on every near-limit file in a commit.
+_API_MAX_RETRIES = 1
 
 
 def _count_anthropic(
@@ -105,12 +115,16 @@ def _count_anthropic(
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         # Let the SDK resolve the environment itself: ANTHROPIC_AUTH_TOKEN is a
         # bearer token, not an api_key, so forcing it into api_key would break it.
-        client = anthropic.Anthropic(timeout=_ANTHROPIC_TIMEOUT_S)
+        client = anthropic.Anthropic(timeout=_ANTHROPIC_TIMEOUT_S, max_retries=_API_MAX_RETRIES)
     else:
         key = _read_key_file(key_file)
         if not key:
             return None
-        client = anthropic.Anthropic(timeout=_ANTHROPIC_TIMEOUT_S, api_key=key)
+        client = anthropic.Anthropic(
+            timeout=_ANTHROPIC_TIMEOUT_S,
+            max_retries=_API_MAX_RETRIES,
+            api_key=key,
+        )
     try:
         result = client.messages.count_tokens(
             model=model,
@@ -139,7 +153,13 @@ def _count_gemini(
     if not key:
         return None
     try:
-        client = genai.Client(api_key=key, http_options={"timeout": _GEMINI_TIMEOUT_MS})
+        client = genai.Client(
+            api_key=key,
+            http_options={
+                "timeout": _GEMINI_TIMEOUT_MS,
+                "retry_options": {"attempts": _API_MAX_RETRIES + 1},
+            },
+        )
         result = client.models.count_tokens(model=model, contents=text)
         return result.total_tokens
     except (errors.APIError, httpx.HTTPError):
@@ -218,7 +238,7 @@ def _count_one(
     local_model: str | None = None,
     key_file: str | Path | None = None,
     gemini_key_file: str | Path | None = None,
-) -> tuple[int, str] | None:
+) -> tuple[int, str, str] | None:
     """Run a single method. Returns None when it is unavailable, so the caller
     can move to the next link in the chain.
 
@@ -230,20 +250,28 @@ def _count_one(
     """
     if method == LOCAL_METHOD:
         local_result = _count_tiktoken(text, local_model)
-        return (local_result[0], f"tiktoken local ({local_result[1]})") if local_result is not None else None
+        if local_result is None:
+            return None
+        return local_result[0], f"tiktoken local ({local_result[1]})", FAMILY_TIKTOKEN
 
     provider = _detect_provider(method)
 
     if provider == "anthropic":
         provider_count = _count_anthropic(text, method, key_file or DEFAULT_ANTHROPIC_KEY_FILE)
-        return (provider_count, f"anthropic API ({method})") if provider_count is not None else None
+        if provider_count is None:
+            return None
+        return provider_count, f"anthropic API ({method})", FAMILY_ANTHROPIC
     if provider == "gemini":
         provider_count = _count_gemini(text, method, gemini_key_file or DEFAULT_GEMINI_KEY_FILE)
-        return (provider_count, f"gemini API ({method})") if provider_count is not None else None
+        if provider_count is None:
+            return None
+        return provider_count, f"gemini API ({method})", FAMILY_GEMINI
     if provider == "openai":
         # tiktoken is the real tokenizer for these models, not an approximation.
         local_result = _count_tiktoken(text, method)
-        return (local_result[0], f"tiktoken ({method} / {local_result[1]})") if local_result is not None else None
+        if local_result is None:
+            return None
+        return local_result[0], f"tiktoken ({method} / {local_result[1]})", FAMILY_TIKTOKEN
 
     # Unrecognised model name: skip rather than guess, and let the chain continue.
     return None
@@ -256,10 +284,10 @@ def count_tokens(
     methods: str | list[str] | None = None,
     key_file: str | Path | None = None,
     gemini_key_file: str | Path | None = None,
-) -> tuple[int, str]:
+) -> tuple[int, str, str]:
     """Count tokens by walking the method chain; first success wins.
 
-    Returns (count, method_description).
+    Returns (count, method_description, tokenizer_family).
 
     When ``local`` is True, always uses tiktoken and never touches a provider
     API, still honouring ``model``'s own tokenizer when tiktoken knows it (e.g.
@@ -291,7 +319,7 @@ def count_tokens(
             file=sys.stderr,
         )
         sys.exit(1)
-    return fallback[0], f"tiktoken ({fallback[1]} fallback)"
+    return fallback[0], f"tiktoken ({fallback[1]} fallback)", FAMILY_TIKTOKEN
 
 
 def _read_input(files: list[str]) -> tuple[str, str]:
@@ -366,7 +394,12 @@ def main() -> None:
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Emit a machine-readable object with tokens and the method that ran",
+        help="Emit tokens, method, and tokenizer family as a machine-readable object",
+    )
+    parser.add_argument(
+        "--per-file",
+        action="store_true",
+        help="Count each named file independently instead of concatenating them",
     )
     parser.add_argument(
         "--quiet",
@@ -376,16 +409,49 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.per_file:
+        if not args.files or "-" in args.files:
+            parser.error("--per-file requires one or more named files")
+        for file_path in args.files:
+            text, _ = _read_input([file_path])
+            if text.strip():
+                token_count, method, family = count_tokens(
+                    text,
+                    args.model,
+                    local=args.local,
+                    methods=args.methods,
+                    key_file=args.key_file,
+                    gemini_key_file=args.gemini_key_file,
+                )
+            else:
+                token_count, method, family = 0, "empty input", FAMILY_NONE
+
+            if args.json:
+                print(
+                    json.dumps(
+                        {"path": file_path, "tokens": token_count, "method": method, "family": family},
+                        separators=(",", ":"),
+                    )
+                )
+            elif args.quiet:
+                print(f"{file_path}\t{token_count}")
+            else:
+                print(f"{file_path}: {token_count:,} tokens ({method})")
+        return
+
     text, _ = _read_input(args.files)
 
     if not text.strip():
-        if args.quiet:
+        if args.json:
+            print(json.dumps({"tokens": 0, "method": "empty input", "family": FAMILY_NONE}, separators=(",", ":")))
+        elif args.quiet:
             print("0")
         else:
             print("0 tokens (empty input)")
         return
 
-    token_count, method = count_tokens(
+    token_count, method, family = count_tokens(
         text,
         args.model,
         local=args.local,
@@ -395,7 +461,7 @@ def main() -> None:
     )
 
     if args.json:
-        print(json.dumps({"tokens": token_count, "method": method}, separators=(",", ":")))
+        print(json.dumps({"tokens": token_count, "method": method, "family": family}, separators=(",", ":")))
     elif args.quiet:
         print(token_count)
         # Method goes to stderr so the count on stdout stays machine-parseable,

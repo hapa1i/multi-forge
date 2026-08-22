@@ -89,42 +89,42 @@ class TestResolveMethods:
 class TestCountTokensChain:
     def test_first_working_method_wins(self, monkeypatch):
         monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: 123)
-        count, method = count_tokens(SAMPLE, methods=["claude-opus-5", LOCAL_METHOD])
+        count, method, _family = count_tokens(SAMPLE, methods=["claude-opus-5", LOCAL_METHOD])
         assert count == 123
         assert "anthropic API (claude-opus-5)" == method
 
     def test_falls_through_when_method_unavailable(self, monkeypatch):
         monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: None)
-        count, method = count_tokens(SAMPLE, methods=["claude-opus-5", LOCAL_METHOD])
+        count, method, _family = count_tokens(SAMPLE, methods=["claude-opus-5", LOCAL_METHOD])
         assert count > 0
         assert method == "tiktoken local (cl100k_base)"
 
     def test_openai_step_reports_the_encoding_it_used(self):
-        count, method = count_tokens(SAMPLE, methods=["gpt-4o"])
+        count, method, _family = count_tokens(SAMPLE, methods=["gpt-4o"])
         assert count > 0
         assert method == "tiktoken (gpt-4o / o200k_base)"
 
     def test_walks_past_multiple_dead_methods(self, monkeypatch):
         monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: None)
         monkeypatch.setattr(mod, "_count_gemini", lambda text, model, key_file=None: 77)
-        count, method = count_tokens(SAMPLE, methods=["claude-opus-5", "gemini-2.5-flash", LOCAL_METHOD])
+        count, method, _family = count_tokens(SAMPLE, methods=["claude-opus-5", "gemini-2.5-flash", LOCAL_METHOD])
         assert count == 77
         assert "gemini API" in method
 
     def test_unknown_model_is_skipped_not_guessed(self, monkeypatch):
         monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: 55)
-        count, _ = count_tokens(SAMPLE, methods=["mystery-model-9", "claude-opus-5"])
+        count, _, _family = count_tokens(SAMPLE, methods=["mystery-model-9", "claude-opus-5"])
         assert count == 55
 
     def test_exhausted_chain_still_returns_a_count(self):
         """A chain with no usable method degrades to tiktoken rather than failing."""
-        count, method = count_tokens(SAMPLE, methods=["mystery-model-9"])
+        count, method, _family = count_tokens(SAMPLE, methods=["mystery-model-9"])
         assert count > 0
         assert "cl100k_base fallback" in method
 
     def test_local_flag_never_calls_provider(self):
         # The no_network fixture fails the test if a provider is reached.
-        count, method = count_tokens(SAMPLE, "claude-opus-5", local=True)
+        count, method, _family = count_tokens(SAMPLE, "claude-opus-5", local=True)
         assert count > 0
         assert method.startswith("tiktoken local")
 
@@ -135,17 +135,17 @@ class TestCountTokensChain:
 class TestLocalHonoursModel:
     def test_local_uses_model_specific_encoding(self):
         """--local --model gpt-4o must use o200k_base, not the generic fallback."""
-        _, method = count_tokens(SAMPLE, "gpt-4o", local=True)
+        _, method, _family = count_tokens(SAMPLE, "gpt-4o", local=True)
         assert method == "tiktoken local (o200k_base)"
 
     def test_local_falls_back_for_non_tiktoken_model(self):
-        _, method = count_tokens(SAMPLE, "claude-opus-5", local=True)
+        _, method, _family = count_tokens(SAMPLE, "claude-opus-5", local=True)
         assert method == "tiktoken local (cl100k_base)"
 
     def test_bare_local_step_in_a_chain_stays_generic(self, monkeypatch):
         """--model only steers the local step under --local, not inside a chain."""
         monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: None)
-        _, method = count_tokens(SAMPLE, "gpt-4o", methods=["claude-opus-5", LOCAL_METHOD])
+        _, method, _family = count_tokens(SAMPLE, "gpt-4o", methods=["claude-opus-5", LOCAL_METHOD])
         assert method == "tiktoken local (cl100k_base)"
 
 
@@ -174,7 +174,7 @@ class TestEncodingLoadFailure:
             return None if model == "gpt-4o" else real_load(model)
 
         monkeypatch.setattr(mod, "_load_encoding", flaky)
-        count, method = count_tokens(SAMPLE, methods=["gpt-4o", LOCAL_METHOD])
+        count, method, _family = count_tokens(SAMPLE, methods=["gpt-4o", LOCAL_METHOD])
         assert count > 0
         assert method == "tiktoken local (cl100k_base)"
 
@@ -252,6 +252,7 @@ class TestAnthropicCredentialResolution:
         f.write_text("sk-from-file\n")
         assert REAL_COUNT_ANTHROPIC(SAMPLE, "claude-opus-5", f) == 999
         assert seen["api_key"] == "sk-from-file"
+        assert seen["max_retries"] == 1
 
     def test_env_var_wins_over_key_file(self, monkeypatch, tmp_path):
         seen = self._capture(monkeypatch)
@@ -278,7 +279,7 @@ class TestAnthropicCredentialResolution:
         # Restore the real function over the autouse no_network stub: the SDK
         # client is faked above, so no request actually leaves the process.
         monkeypatch.setattr(mod, "_count_anthropic", REAL_COUNT_ANTHROPIC)
-        count, method = count_tokens(SAMPLE, methods=["claude-opus-5"], key_file=f)
+        count, method, _family = count_tokens(SAMPLE, methods=["claude-opus-5"], key_file=f)
         assert count == 999
         assert method == "anthropic API (claude-opus-5)"
         assert seen["api_key"] == "sk-threaded"
@@ -325,6 +326,7 @@ class TestGeminiCredentialResolution:
         f.write_text("gem-from-file\n")
         assert REAL_COUNT_GEMINI(SAMPLE, "gemini-2.5-flash", f) == 42
         assert seen["api_key"] == "gem-from-file"
+        assert seen["http_options"]["retry_options"] == {"attempts": 2}
 
     def test_env_var_wins_over_key_file(self, monkeypatch, tmp_path):
         seen = self._capture(monkeypatch)
@@ -339,7 +341,7 @@ class TestGeminiCredentialResolution:
         f = tmp_path / "key"
         f.write_text("gem-threaded\n")
         monkeypatch.setattr(mod, "_count_gemini", REAL_COUNT_GEMINI)
-        count, method = count_tokens(SAMPLE, methods=["gemini-2.5-flash"], gemini_key_file=f)
+        count, method, _family = count_tokens(SAMPLE, methods=["gemini-2.5-flash"], gemini_key_file=f)
         assert count == 42
         assert method == "gemini API (gemini-2.5-flash)"
         assert seen["api_key"] == "gem-threaded"
@@ -353,7 +355,7 @@ class TestOpenAINeedsNoKey:
         counting endpoint, so a key would be dead configuration.
         """
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        count, method = count_tokens(SAMPLE, methods=["gpt-4o"])
+        count, method, _family = count_tokens(SAMPLE, methods=["gpt-4o"])
         assert count > 0
         assert method == "tiktoken (gpt-4o / o200k_base)"
 
@@ -361,14 +363,105 @@ class TestOpenAINeedsNoKey:
         assert not hasattr(mod, "DEFAULT_OPENAI_KEY_FILE")
 
 
-def test_json_cli_reports_count_and_method(monkeypatch, capsys):
+class TestTokenizerFamily:
+    def test_local_step_reports_tiktoken(self):
+        _, _, family = count_tokens(SAMPLE, methods=[LOCAL_METHOD])
+        assert family == mod.FAMILY_TIKTOKEN
+
+    def test_openai_step_reports_tiktoken(self):
+        _, _, family = count_tokens(SAMPLE, methods=["gpt-4o"])
+        assert family == mod.FAMILY_TIKTOKEN
+
+    def test_anthropic_step_reports_anthropic(self, monkeypatch):
+        monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: 42)
+        _, _, family = count_tokens(SAMPLE, methods=["claude-opus-5"])
+        assert family == mod.FAMILY_ANTHROPIC
+
+    def test_gemini_step_reports_gemini(self, monkeypatch):
+        monkeypatch.setattr(mod, "_count_gemini", lambda text, model, key_file=None: 42)
+        _, _, family = count_tokens(SAMPLE, methods=["gemini-2.5-flash"])
+        assert family == mod.FAMILY_GEMINI
+
+    def test_provider_fallback_reports_the_tokenizer_that_ran(self, monkeypatch):
+        monkeypatch.setattr(mod, "_count_anthropic", lambda text, model, key_file=None: None)
+        _, method, family = count_tokens(SAMPLE, methods=["claude-opus-5", LOCAL_METHOD])
+        assert method.startswith("tiktoken")
+        assert family == mod.FAMILY_TIKTOKEN
+
+
+def test_json_cli_reports_count_method_and_family(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["count-tokens", "--json"])
     monkeypatch.setattr(mod, "_read_input", lambda files: (SAMPLE, "stdin"))
-    monkeypatch.setattr(mod, "count_tokens", lambda *args, **kwargs: (17, "anthropic API (claude-opus-5)"))
+    monkeypatch.setattr(
+        mod,
+        "count_tokens",
+        lambda *args, **kwargs: (17, "anthropic API (claude-opus-5)", mod.FAMILY_ANTHROPIC),
+    )
 
     mod.main()
 
     assert json.loads(capsys.readouterr().out) == {
         "tokens": 17,
         "method": "anthropic API (claude-opus-5)",
+        "family": "anthropic",
     }
+
+
+@pytest.mark.parametrize("text", ["", "   \n\t  \n"])
+def test_json_cli_stays_machine_readable_for_empty_input(monkeypatch, capsys, text):
+    monkeypatch.setattr(sys, "argv", ["count-tokens", "--json"])
+    monkeypatch.setattr(mod, "_read_input", lambda files: (text, "stdin"))
+
+    mod.main()
+
+    assert json.loads(capsys.readouterr().out) == {
+        "tokens": 0,
+        "method": "empty input",
+        "family": "none",
+    }
+
+
+def test_per_file_json_counts_named_files_independently(monkeypatch, capsys, tmp_path):
+    first = tmp_path / "first.md"
+    second = tmp_path / "second.md"
+    first.write_text("first input")
+    second.write_text("")
+    seen = []
+
+    def fake_count(text, *args, **kwargs):
+        seen.append(text)
+        return 7, "tiktoken local (cl100k_base)", mod.FAMILY_TIKTOKEN
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["count-tokens", "--per-file", "--json", str(first), str(second)],
+    )
+    monkeypatch.setattr(mod, "count_tokens", fake_count)
+
+    mod.main()
+
+    payloads = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert seen == ["first input"]
+    assert payloads == [
+        {
+            "path": str(first),
+            "tokens": 7,
+            "method": "tiktoken local (cl100k_base)",
+            "family": "tiktoken",
+        },
+        {"path": str(second), "tokens": 0, "method": "empty input", "family": "none"},
+    ]
+
+
+def test_per_file_rejects_stdin(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["count-tokens", "--per-file", "--json", "-"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        mod.main()
+
+    assert exc_info.value.code == 2
+
+
+def test_provider_retry_budget_is_bounded_for_hook_latency():
+    assert mod._API_MAX_RETRIES == 1

@@ -17,6 +17,9 @@ get_limits = mod.get_limits
 get_token_methods = mod.get_token_methods
 resolve_config_path = mod.resolve_config_path
 check_file = mod.check_file
+check_files = mod.check_files
+count_tokens_many = mod.count_tokens_many
+limit_for_family = mod.limit_for_family
 DEFAULT_TOKEN_METHODS = mod.DEFAULT_TOKEN_METHODS
 
 
@@ -172,17 +175,41 @@ class TestConfigResolution:
         config = json.loads((REPO_ROOT / ".file-size-limits.json").read_text())
         done = get_limits("docs/board/done/runtime_abstraction/checklist.md", config)
         living = get_limits("docs/design.md", config)
-        assert done["max_tokens"] == 40000
-        assert living["target_tokens"] == 25000
-        assert living["max_tokens"] == 30000
+        assert done["max_tokens"] == {"anthropic": 40000, "tiktoken": 20000}
+        assert living["target_tokens"] == {"anthropic": 25000, "tiktoken": 12000}
+        assert living["max_tokens"] == {"anthropic": 30000, "tiktoken": 15000}
 
 
-class TestTargetsAndAuthority:
+class TestLimitForFamily:
+    def test_selects_only_the_family_that_ran(self):
+        limits = {"anthropic": 30000, "tiktoken": 15000}
+        assert limit_for_family(limits, "anthropic") == 30000
+        assert limit_for_family(limits, "tiktoken") == 15000
+        assert limit_for_family(limits, "gemini") is None
+
+    def test_scalar_limit_remains_compatible(self):
+        assert limit_for_family(30000, "anthropic") == 30000
+        assert limit_for_family(30000, "tiktoken") == 30000
+
+    def test_rejects_boolean_and_malformed_limits(self):
+        assert limit_for_family(True, "tiktoken") is None
+        assert limit_for_family({"tiktoken": True}, "tiktoken") is None
+        assert limit_for_family({"tiktoken": "many"}, "tiktoken") is None
+
+
+class TestTargetsAndFamilies:
     @staticmethod
     def _config(**rule):
         return {
             "token_count": {"methods": ["claude-opus-5", "local-tiktoken"]},
-            "rules": [{"pattern": "*.md", "max_lines": 100, "max_tokens": 30000, **rule}],
+            "rules": [
+                {
+                    "pattern": "*.md",
+                    "max_lines": 100,
+                    "max_tokens": {"anthropic": 30000, "tiktoken": 15000},
+                    **rule,
+                }
+            ],
         }
 
     def test_target_is_warning_not_failure(self, monkeypatch, tmp_path):
@@ -193,19 +220,173 @@ class TestTargetsAndAuthority:
             mod,
             "count_tokens",
             lambda _path, methods: (
-                (10000, "tiktoken local (cl100k_base)")
+                (16000, "tiktoken local (cl100k_base)", "tiktoken")
                 if methods == ["local-tiktoken"]
-                else (26000, "anthropic API (claude-opus-5)")
+                else (26000, "anthropic API (claude-opus-5)", "anthropic")
             ),
         )
-        errors, warnings = check_file("doc.md", self._config(target_tokens=25000))
+        errors, warnings = check_file(
+            "doc.md",
+            self._config(
+                target_tokens={"anthropic": 25000, "tiktoken": 12000},
+            ),
+        )
         assert errors == []
         assert "26,000 tokens exceeds target" in warnings[0]
 
-    def test_large_fallback_requires_authoritative_count(self, monkeypatch, tmp_path):
+    def test_large_fallback_uses_the_conservative_local_limit(self, monkeypatch, tmp_path):
         path = tmp_path / "doc.md"
         path.write_text("text\n")
         monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(mod, "count_tokens", lambda _path, _methods: (16000, "tiktoken local (cl100k_base)"))
-        errors, _ = check_file("doc.md", self._config(authoritative_required_local_tokens=15000))
-        assert "authoritative token count required" in errors[0]
+        monkeypatch.setattr(
+            mod,
+            "count_tokens",
+            lambda _path, _methods: (16000, "fallback wording can change", "tiktoken"),
+        )
+        errors, _ = check_file("doc.md", self._config())
+        assert "16,000 tokens exceeds limit of 15,000" in errors[0]
+
+    def test_near_target_fallback_is_visible_as_a_local_warning(self, monkeypatch, tmp_path):
+        path = tmp_path / "doc.md"
+        path.write_text("text\n")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            mod,
+            "count_tokens",
+            lambda _path, _methods: (13000, "fallback", "tiktoken"),
+        )
+        errors, warnings = check_file(
+            "doc.md",
+            self._config(
+                target_tokens={"anthropic": 25000, "tiktoken": 12000},
+            ),
+        )
+        assert errors == []
+        assert "13,000 tokens exceeds target of 12,000" in warnings[0]
+
+    def test_unconfigured_family_warns_instead_of_silently_passing(self, monkeypatch, tmp_path):
+        path = tmp_path / "doc.md"
+        path.write_text("text\n")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            mod,
+            "count_tokens",
+            lambda _path, methods: (
+                (16000, "local", "tiktoken") if methods == ["local-tiktoken"] else (26000, "gemini", "gemini")
+            ),
+        )
+        errors, warnings = check_file("doc.md", self._config())
+        assert errors == []
+        assert "no max_tokens configured for the 'gemini' tokenizer" in warnings[0]
+
+    def test_local_only_chain_counts_once(self, monkeypatch, tmp_path):
+        path = tmp_path / "doc.md"
+        path.write_text("text\n")
+        monkeypatch.chdir(tmp_path)
+        calls = []
+        monkeypatch.setattr(
+            mod,
+            "count_tokens",
+            lambda _path, methods: calls.append(methods) or (100, "local", "tiktoken"),
+        )
+
+        check_file("doc.md", self._config(token_methods=["local-tiktoken"]))
+
+        assert calls == [["local-tiktoken"]]
+
+
+class TestBatchCounting:
+    def test_count_tokens_many_uses_one_per_file_process(self, monkeypatch):
+        seen = {}
+
+        def fake_run(command, **kwargs):
+            seen["command"] = command
+            seen["kwargs"] = kwargs
+            return mod.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=(
+                    '{"path":"one.md","tokens":11,"method":"local","family":"tiktoken"}\n'
+                    '{"path":"two.md","tokens":22,"method":"local","family":"tiktoken"}\n'
+                ),
+                stderr="",
+            )
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        counts = count_tokens_many(["one.md", "two.md"], ["local-tiktoken"])
+
+        assert seen["command"][-4:] == ["--per-file", "--json", "one.md", "two.md"]
+        assert seen["kwargs"] == {"capture_output": True, "text": True}
+        assert counts == {
+            "one.md": (11, "local", "tiktoken"),
+            "two.md": (22, "local", "tiktoken"),
+        }
+
+    def test_check_files_batches_local_counts_and_only_probes_large_docs(self, monkeypatch, tmp_path):
+        small = tmp_path / "small.md"
+        large = tmp_path / "large.md"
+        small.write_text("small\n")
+        large.write_text("large\n")
+        monkeypatch.chdir(tmp_path)
+        calls = []
+
+        def fake_count_many(paths, methods):
+            calls.append((paths, methods))
+            if methods == ["local-tiktoken"]:
+                return {
+                    "small.md": (1000, "local", "tiktoken"),
+                    "large.md": (16000, "local", "tiktoken"),
+                }
+            return {"large.md": (26000, "anthropic API (claude-opus-5)", "anthropic")}
+
+        monkeypatch.setattr(mod, "count_tokens_many", fake_count_many)
+        config = {
+            "token_count": {"methods": ["claude-opus-5", "local-tiktoken"]},
+            "rules": [
+                {
+                    "pattern": "*.md",
+                    "max_lines": 100,
+                    "target_tokens": {"anthropic": 25000, "tiktoken": 12000},
+                    "max_tokens": {"anthropic": 30000, "tiktoken": 15000},
+                }
+            ],
+        }
+
+        errors, warnings = check_files(["small.md", "large.md"], config)
+
+        assert errors == []
+        assert len(warnings) == 1
+        assert "large.md: 26,000 tokens exceeds target" in warnings[0]
+        assert calls == [
+            (["small.md", "large.md"], ["local-tiktoken"]),
+            (["large.md"], ["claude-opus-5", "local-tiktoken"]),
+        ]
+
+
+def test_shipped_policy_covers_every_reachable_tokenizer_family():
+    config = json.loads((REPO_ROOT / ".file-size-limits.json").read_text())
+    for rule in config["rules"]:
+        methods = get_token_methods(config, rule)
+        reachable = {"tiktoken" if method == "local-tiktoken" else "anthropic" for method in methods}
+        configured = set(rule["max_tokens"])
+        assert reachable <= configured, f"{rule['pattern']} lacks limits for {reachable - configured}"
+
+
+def test_shipped_prose_fallback_limits_preserve_a_two_x_safety_ratio():
+    config = json.loads((REPO_ROOT / ".file-size-limits.json").read_text())
+    for rule in config["rules"]:
+        max_tokens = rule["max_tokens"]
+        if "anthropic" not in max_tokens:
+            continue
+        assert max_tokens["tiktoken"] * 2 <= max_tokens["anthropic"]
+        target_tokens = rule.get("target_tokens")
+        if target_tokens:
+            assert target_tokens["tiktoken"] * 2 <= target_tokens["anthropic"]
+
+
+def test_shipped_policy_has_no_stale_probe_knobs():
+    config = json.loads((REPO_ROOT / ".file-size-limits.json").read_text())
+    for rule in config["rules"]:
+        assert "provider_probe_local_tokens" not in rule
+        assert "authoritative_required_local_tokens" not in rule

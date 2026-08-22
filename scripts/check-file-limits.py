@@ -2,8 +2,10 @@
 """
 Check file size limits (lines and tokens) for staged git files.
 
-Loads the repository-owned root policy.
-Token counting runs `count-tokens` over the chain in `token_count.methods`.
+Loads repository-owned config when present, then falls back to its bundled default.
+Token counting runs `count-tokens` over the chain in `token_count.methods`; the
+tokenizer that answers selects which per-family limit applies, since a count from
+one tokenizer family is not comparable to a limit written for another.
 
 Usage:
     check-file-limits                          # Check staged files
@@ -20,8 +22,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Method name and tokenizer family for offline counting, as `count-tokens`
+# names them on the wire (`--methods` input, `--json` "family" output).
+LOCAL_METHOD = "local-tiktoken"
+FAMILY_TIKTOKEN = "tiktoken"
+
 # A repository must opt into provider counting in its tracked policy.
-DEFAULT_TOKEN_METHODS = ["local-tiktoken"]
+DEFAULT_TOKEN_METHODS = [LOCAL_METHOD]
 
 
 def get_script_dir() -> Path:
@@ -129,17 +136,19 @@ def get_token_methods(config: dict, limits: dict | None = None) -> list[str]:
     return chain or list(DEFAULT_TOKEN_METHODS)
 
 
-def count_tokens(file_path: str, methods: list[str]) -> tuple[int, str] | None:
-    """Count tokens using count-tokens script."""
+def count_tokens(file_path: str, methods: list[str]) -> tuple[int, str, str] | None:
+    """Count tokens using count-tokens script.
+
+    Returns (count, method_description, tokenizer_family), or None when no count
+    could be obtained. count-tokens walks the chain and degrades to its offline
+    tokenizer, so a missing key or a rate limit yields a count from a different
+    family rather than no count at all.
+    """
     count_tokens_path = get_script_dir() / "count-tokens.py"
     if not count_tokens_path.exists():
         print(f"Warning: count-tokens not found: {count_tokens_path}", file=sys.stderr)
         return None
 
-    # count-tokens walks the chain and always returns a count, so a missing key
-    # or a rate limit degrades to the next method instead of failing the commit.
-    # The chain leads with a Claude model so limits are enforced against the same
-    # token counts Claude Code reports -- see config/file-size-limits.json.
     result = subprocess.run(
         [str(count_tokens_path), "--methods", ",".join(methods), "--json", file_path],
         capture_output=True,
@@ -151,14 +160,140 @@ def count_tokens(file_path: str, methods: list[str]) -> tuple[int, str] | None:
 
     try:
         payload = json.loads(result.stdout)
-        return int(payload["tokens"]), str(payload["method"])
+        return int(payload["tokens"]), str(payload["method"]), str(payload["family"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None
+
+
+def count_tokens_many(file_paths: list[str], methods: list[str]) -> dict[str, tuple[int, str, str]]:
+    """Count files independently in one token-counter process."""
+    if not file_paths:
+        return {}
+
+    count_tokens_path = get_script_dir() / "count-tokens.py"
+    if not count_tokens_path.exists():
+        print(f"Warning: count-tokens not found: {count_tokens_path}", file=sys.stderr)
+        return {}
+
+    result = subprocess.run(
+        [
+            str(count_tokens_path),
+            "--methods",
+            ",".join(methods),
+            "--per-file",
+            "--json",
+            *file_paths,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"Warning: count-tokens failed for {len(file_paths)} file(s): {result.stderr}", file=sys.stderr)
+        return {}
+
+    counts: dict[str, tuple[int, str, str]] = {}
+    try:
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            counts[str(payload["path"])] = (
+                int(payload["tokens"]),
+                str(payload["method"]),
+                str(payload["family"]),
+            )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        print("Warning: count-tokens returned malformed per-file output", file=sys.stderr)
+        return {}
+    return counts
 
 
 def format_number(n: int) -> str:
     """Format number with thousands separator."""
     return f"{n:,}"
+
+
+def limit_for_family(spec: object, family: str) -> int | None:
+    """Resolve a token limit for the tokenizer family that produced a count.
+
+    A mapping keys limits per family; a bare number applies to whichever family
+    ran, which keeps older single-limit rules working. Returns None when this
+    family has no configured limit instead of borrowing another tokenizer's
+    incomparable threshold.
+    """
+    if isinstance(spec, bool) or spec is None:
+        return None
+    if isinstance(spec, (int, float)):
+        return int(spec)
+    if isinstance(spec, dict):
+        value = spec.get(family)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return int(value)
+    return None
+
+
+def measure_tokens(file_path: str, methods: list[str], max_spec: object) -> tuple[int, str, str] | None:
+    """Count tokens, skipping the provider when the local count already clears.
+
+    A policy may set the local-family limit conservatively enough that clearing
+    it proves the provider-family limit also clears. In that case the local
+    ceiling doubles as the provider probe threshold, with no second knob to
+    drift. Only a local failure needs an authoritative provider count that may
+    overturn the estimate.
+    """
+    if all(method == LOCAL_METHOD for method in methods):
+        # The chain is already the probe; running both would count twice.
+        return count_tokens(file_path, methods)
+
+    local_limit = limit_for_family(max_spec, FAMILY_TIKTOKEN)
+    if local_limit is not None:
+        local = count_tokens(file_path, [LOCAL_METHOD])
+        if local is not None and local[0] <= local_limit:
+            return local
+    return count_tokens(file_path, methods)
+
+
+def describe_token_limits(spec: object) -> str:
+    """Render scalar or per-family token thresholds for dry-run output."""
+    if isinstance(spec, dict):
+        if not spec:
+            return "none configured"
+        return ", ".join(f"{family} {format_number(int(value))}" for family, value in spec.items())
+    if isinstance(spec, (int, float)) and not isinstance(spec, bool):
+        return f"{format_number(int(spec))} (any tokenizer)"
+    return "none configured"
+
+
+def _evaluate_token_count(
+    file_path: str,
+    limits: dict,
+    measured: tuple[int, str, str] | None,
+) -> tuple[list[str], list[str]]:
+    """Evaluate one measured token count against its configured thresholds."""
+    if measured is None:
+        return [], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    tokens, method, family = measured
+    max_tokens = limit_for_family(limits.get("max_tokens"), family)
+    target_tokens = limit_for_family(limits.get("target_tokens"), family)
+    if max_tokens is None:
+        if tokens > 0:
+            warnings.append(
+                f"{file_path}: no max_tokens configured for the '{family}' tokenizer "
+                f"({method}); token limit not enforced"
+            )
+    elif tokens > max_tokens:
+        errors.append(
+            f"{file_path}: {format_number(tokens)} tokens exceeds limit of {format_number(max_tokens)} ({method})"
+        )
+    elif target_tokens is not None and tokens > target_tokens:
+        warnings.append(
+            f"{file_path}: {format_number(tokens)} tokens exceeds target of "
+            f"{format_number(target_tokens)} ({method})"
+        )
+    return errors, warnings
 
 
 def check_file(file_path: str, config: dict, check_tokens: bool = True) -> tuple[list[str], list[str]]:
@@ -180,7 +315,6 @@ def check_file(file_path: str, config: dict, check_tokens: bool = True) -> tuple
         return errors, warnings
 
     max_lines = limits.get("max_lines", 2000)
-    max_tokens = limits.get("max_tokens", 25000)
 
     # Check lines (fast)
     lines = count_lines(file_path)
@@ -189,43 +323,78 @@ def check_file(file_path: str, config: dict, check_tokens: bool = True) -> tuple
         # Don't bother checking tokens if lines already failed
         return errors, warnings
 
-    # Check tokens (`count-tokens` over the configured method chain)
+    # Whichever tokenizer answers decides which limit applies. An unreachable
+    # provider degrades to the offline tokenizer and its separately calibrated
+    # limit instead of blocking the commit.
     if check_tokens:
         methods = get_token_methods(config, limits)
-        local_result = count_tokens(file_path, ["local-tiktoken"])
-        probe_at = limits.get("provider_probe_local_tokens")
-        measured: tuple[int, str] | None
-        if local_result is not None and probe_at is not None and local_result[0] < probe_at:
-            measured = local_result
-        else:
-            measured = count_tokens(file_path, methods)
-        if measured is not None:
-            tokens, method = measured
-            target_tokens = limits.get("target_tokens")
-            require_authoritative_at = limits.get("authoritative_required_local_tokens")
-            is_authoritative = method.startswith("anthropic API")
-            if (
-                not is_authoritative
-                and require_authoritative_at is not None
-                and local_result is not None
-                and local_result[0] >= require_authoritative_at
-            ):
-                errors.append(
-                    f"{file_path}: authoritative token count required at "
-                    f"{format_number(local_result[0])} local tokens (used {method})"
-                )
-            elif tokens > max_tokens:
-                errors.append(
-                    f"{file_path}: {format_number(tokens)} tokens exceeds limit of "
-                    f"{format_number(max_tokens)} ({method})"
-                )
-            elif target_tokens is not None and tokens > target_tokens:
-                warnings.append(
-                    f"{file_path}: {format_number(tokens)} tokens exceeds target of "
-                    f"{format_number(target_tokens)} ({method})"
-                )
+        measured = measure_tokens(file_path, methods, limits.get("max_tokens"))
+        token_errors, token_warnings = _evaluate_token_count(file_path, limits, measured)
+        errors.extend(token_errors)
+        warnings.extend(token_warnings)
 
     return errors, warnings
+
+
+def check_files(file_paths: list[str], config: dict, check_tokens: bool = True) -> tuple[list[str], list[str]]:
+    """Check files while batching token-counter process startup."""
+    all_errors: list[str] = []
+    all_warnings: list[str] = []
+    token_candidates: list[str] = []
+
+    for file_path in file_paths:
+        errors, warnings = check_file(file_path, config, check_tokens=False)
+        all_errors.extend(errors)
+        all_warnings.extend(warnings)
+        if (
+            check_tokens
+            and not errors
+            and is_whitelisted(file_path, config)
+            and get_limits(file_path, config) is not None
+            and Path(file_path).exists()
+        ):
+            token_candidates.append(file_path)
+
+    if not token_candidates:
+        return all_errors, all_warnings
+
+    local_results = count_tokens_many(token_candidates, [LOCAL_METHOD])
+    measured_results: dict[str, tuple[int, str, str]] = {}
+    provider_groups: dict[tuple[str, ...], list[str]] = {}
+
+    for file_path in token_candidates:
+        limits = get_limits(file_path, config)
+        if limits is None:
+            continue
+        methods = get_token_methods(config, limits)
+        local_result = local_results.get(file_path)
+        if all(method == LOCAL_METHOD for method in methods):
+            if local_result is not None:
+                measured_results[file_path] = local_result
+            continue
+
+        local_limit = limit_for_family(limits.get("max_tokens"), FAMILY_TIKTOKEN)
+        if local_result is not None and local_limit is not None and local_result[0] <= local_limit:
+            measured_results[file_path] = local_result
+            continue
+        provider_groups.setdefault(tuple(methods), []).append(file_path)
+
+    for group_methods, grouped_paths in provider_groups.items():
+        measured_results.update(count_tokens_many(grouped_paths, list(group_methods)))
+
+    for file_path in token_candidates:
+        limits = get_limits(file_path, config)
+        if limits is None:
+            continue
+        errors, warnings = _evaluate_token_count(
+            file_path,
+            limits,
+            measured_results.get(file_path),
+        )
+        all_errors.extend(errors)
+        all_warnings.extend(warnings)
+
+    return all_errors, all_warnings
 
 
 def main():
@@ -236,7 +405,7 @@ def main():
     )
     parser.add_argument(
         "--config",
-        help="Policy file (default: <git-root>/.file-size-limits.json)",
+        help="Policy file (default: <git-root>/.file-size-limits.json, then bundled fallback)",
     )
     parser.add_argument(
         "files",
@@ -279,21 +448,21 @@ def main():
 
     if args.dry_run:
         print(f"Config: {config_path}")
-        print(f"Token method chain: {' -> '.join(get_token_methods(config))}")
+        print(f"Default token method chain: {' -> '.join(get_token_methods(config))}")
         print(f"Would check {len(files_to_check)} file(s):")
         for f in files_to_check:
-            limits = get_limits(f, config)
-            print(f"  {f} (max {limits['max_lines']} lines, {limits['max_tokens']} tokens)")
+            limits = get_limits(f, config) or {}
+            chain = " -> ".join(get_token_methods(config, limits))
+            print(f"  {f}")
+            print(f"      lines:  max {format_number(limits.get('max_lines', 2000))}")
+            print(f"      tokens: {describe_token_limits(limits.get('max_tokens'))}")
+            print(f"      chain:  {chain}")
         return
 
-    all_errors = []
-    all_warnings = []
-    for file_path in files_to_check:
-        if args.verbose:
+    if args.verbose:
+        for file_path in files_to_check:
             print(f"Checking: {file_path}")
-        errors, warnings = check_file(file_path, config, check_tokens=not args.skip_tokens)
-        all_errors.extend(errors)
-        all_warnings.extend(warnings)
+    all_errors, all_warnings = check_files(files_to_check, config, check_tokens=not args.skip_tokens)
 
     if all_warnings:
         print("File size target warnings:", file=sys.stderr)

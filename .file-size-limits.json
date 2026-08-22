@@ -2,6 +2,7 @@
   "_comment": "Repository-owned file size policy. Rules are checked in order; first match wins.",
   "_usage": "Markdown near its limit is counted with Claude Opus 5. Provider use is explicit in this tracked policy; local fallback is named in diagnostics.",
   "_patterns": "No slash matches a basename. Slash-separated patterns match the full relative path by segment.",
+  "_limits": "Token thresholds are keyed by tokenizer family and expressed in that family's own tokens. Whichever method answers selects its limit, so an unreachable provider degrades to the tiktoken count and the tiktoken limit rather than blocking a commit.",
   "token_count": {
     "methods": [
       "claude-opus-5",
@@ -12,67 +13,93 @@
     {
       "pattern": "docs/board/done/*/*.md",
       "max_lines": 5000,
-      "target_tokens": 40000,
-      "max_tokens": 40000,
-      "provider_probe_local_tokens": 20000,
-      "authoritative_required_local_tokens": 24000
+      "target_tokens": {
+        "anthropic": 40000,
+        "tiktoken": 20000
+      },
+      "max_tokens": {
+        "anthropic": 40000,
+        "tiktoken": 20000
+      }
     },
     {
       "pattern": "*.md",
       "max_lines": 2500,
-      "target_tokens": 25000,
-      "max_tokens": 30000,
-      "provider_probe_local_tokens": 12000,
-      "authoritative_required_local_tokens": 15000
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000,
+        "tiktoken": 15000
+      }
     },
     {
       "pattern": "*.txt",
       "max_lines": 2000,
-      "target_tokens": 25000,
-      "max_tokens": 30000,
-      "provider_probe_local_tokens": 12000,
-      "authoritative_required_local_tokens": 15000
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000,
+        "tiktoken": 15000
+      }
     },
     {
+      "_comment": "Source rules pin local-tiktoken so source never leaves the machine. Multi-Forge keeps its established local ceilings; prose calibration does not redefine source limits.",
       "pattern": "test_*.py",
       "max_lines": 5000,
-      "max_tokens": 50000,
       "token_methods": [
         "local-tiktoken"
-      ]
+      ],
+      "max_tokens": {
+        "tiktoken": 50000
+      }
     },
     {
       "pattern": "*.py",
       "max_lines": 2500,
-      "max_tokens": 30000,
       "token_methods": [
         "local-tiktoken"
-      ]
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
     },
     {
       "pattern": "*.js",
       "max_lines": 2500,
-      "max_tokens": 30000,
       "token_methods": [
         "local-tiktoken"
-      ]
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
     },
     {
       "pattern": "*.ts",
       "max_lines": 2500,
-      "max_tokens": 30000,
       "token_methods": [
         "local-tiktoken"
-      ]
+      ],
+      "max_tokens": {
+        "tiktoken": 30000
+      }
     },
     {
       "pattern": "*.rst",
       "max_lines": 2500,
-      "target_tokens": 25000,
-      "max_tokens": 30000,
-      "provider_probe_local_tokens": 12000,
-      "authoritative_required_local_tokens": 15000
+      "target_tokens": {
+        "anthropic": 25000,
+        "tiktoken": 12000
+      },
+      "max_tokens": {
+        "anthropic": 30000,
+        "tiktoken": 15000
+      }
     }
   ],
-  "whitelisted_paths": []
+  "whitelisted_paths": [],
+  "_probe": "The tiktoken limit doubles as the provider probe threshold: a file clearing it locally is in budget, so no API call is made. Only files that fail locally are sent for an authoritative count that can overturn the estimate. Markdown's 15k against a 30k Opus budget holds even at the measured near-2x worst case, which is what makes skipping the call sound."
 }
