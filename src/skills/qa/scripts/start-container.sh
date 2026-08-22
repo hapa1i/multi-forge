@@ -26,7 +26,11 @@ if command -v claude &>/dev/null; then
     CLAUDE_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
 fi
 CLAUDE_VERSION="${CLAUDE_VERSION:-latest}"
-IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}"
+if command -v codex &>/dev/null; then
+    CODEX_VERSION="$(codex --version 2>/dev/null | awk '{print $NF}')"
+fi
+CODEX_VERSION="${CODEX_VERSION:-latest}"
+IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}-codex-${CODEX_VERSION}"
 
 # Helpers
 error() { echo "ERROR: $*" >&2; }
@@ -371,6 +375,7 @@ if [[ "$needs_build" == "true" ]]; then
         if ! docker build \
             -f "$DOCKERFILE" \
             --build-arg "CLAUDE_VERSION=$CLAUDE_VERSION" \
+            --build-arg "CODEX_VERSION=$CODEX_VERSION" \
             --build-arg "FORGE_REV=$FORGE_REV" \
             -t "$IMAGE_NAME" \
             "$REPO_ROOT"; then

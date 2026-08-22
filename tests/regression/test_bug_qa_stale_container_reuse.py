@@ -49,6 +49,10 @@ def _make_stubs(bin_dir: Path, image_rev: str) -> None:
         bin_dir / "claude",
         'echo "9.9.9 (stub)"\n',
     )
+    _write_exec(
+        bin_dir / "codex",
+        'echo "codex-cli 8.8.8"\n',
+    )
 
     _write_exec(
         bin_dir / "git",

@@ -1,8 +1,9 @@
-# Build a Forge development image with Claude Code.
+# Build a Forge development image with Claude Code and Codex CLI.
 #
 # Build with npm (default):
 #   docker build -f docker/Dockerfile.forge -t forge-claude-test .
-#   docker build -f docker/Dockerfile.forge --build-arg CLAUDE_VERSION=2.1.7 -t forge-claude-test:npm-2.1.7 .
+#   docker build -f docker/Dockerfile.forge --build-arg CLAUDE_VERSION=2.1.7 \
+#     --build-arg CODEX_VERSION=0.149.0 -t forge-claude-test:2.1.7-codex-0.149.0 .
 #
 # Build with Anthropic's native installer:
 #   docker build -f docker/Dockerfile.forge --build-arg INSTALL_METHOD=native -t forge-claude-test:native .
@@ -98,6 +99,18 @@ RUN CI=1 claude --version \
 # Install Forge on the selected Claude Code toolchain.
 FROM ${INSTALL_METHOD}-toolchain AS forge-install
 
+# Real-runtime integration tests exercise Codex in the same disposable image.
+# The native Claude toolchain has no Node.js; on the default npm toolchain the
+# package install is redundant. Keep this cached layer before Forge source copies.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG CODEX_VERSION=latest
+RUN npm install -g @openai/codex@${CODEX_VERSION} \
+    && codex --version
+
 # Copy only manifests first so uv sync is re-run only when deps change.
 # --no-install-project skips the editable project install (needs source tree).
 COPY pyproject.toml uv.lock ./
@@ -129,8 +142,8 @@ FROM forge-install AS final
 # Forge source revision (used by test runner to detect stale images)
 ARG FORGE_REV=unknown
 
-LABEL org.opencontainers.image.title="Forge Claude Dev Container"
-LABEL org.opencontainers.image.description="Claude Code + Forge development environment for E2E testing"
+LABEL org.opencontainers.image.title="Forge Runtime Test Container"
+LABEL org.opencontainers.image.description="Claude Code + Codex CLI + Forge environment for E2E testing"
 LABEL org.opencontainers.image.revision=${FORGE_REV}
 
 CMD ["/bin/bash"]

@@ -146,19 +146,15 @@ def run_claude_print(
     Returns:
         Tuple of (exit_code, stdout, stderr).
 
-    SECURITY: API key and prompt are written to temp files via single-quoted
-    heredocs (no shell expansion) and never appear in the command string.
+    SECURITY: API key and prompt are streamed over stdin into owner-only temp
+    files and never appear in a process argument.
     """
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
 
-    workspace.exec(
-        "printf '%s' > /tmp/.anthropic_key && chmod 600 /tmp/.anthropic_key",
-        timeout=5,
-    )
-    key_result = workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
+    key_result = workspace.write_file("/tmp/.anthropic_key", api_key, timeout=5, mode=0o600)
     if key_result.returncode != 0:
         pytest.fail("Failed to write API key")
-    prompt_result = workspace.exec(f"cat > /tmp/.forge_prompt << 'FORGE_PROMPT_EOF'\n{prompt}\nFORGE_PROMPT_EOF")
+    prompt_result = workspace.write_file("/tmp/.forge_prompt", prompt, timeout=5, mode=0o600)
     if prompt_result.returncode != 0:
         pytest.fail("Failed to write prompt")
 

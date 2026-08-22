@@ -52,7 +52,11 @@ if command -v claude &>/dev/null; then
     CLAUDE_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
 fi
 CLAUDE_VERSION="${CLAUDE_VERSION:-latest}"
-IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}"
+if command -v codex &>/dev/null; then
+    CODEX_VERSION="$(codex --version 2>/dev/null | awk '{print $NF}')"
+fi
+CODEX_VERSION="${CODEX_VERSION:-latest}"
+IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}-codex-${CODEX_VERSION}"
 
 get_forge_rev() {
     # Use git revision to detect stale test images (code is COPY'd at build time).
@@ -83,7 +87,7 @@ if ! docker info &> /dev/null; then
     exit 1
 fi
 
-info "Using Docker image: $IMAGE_NAME (Claude Code $CLAUDE_VERSION)"
+info "Using Docker image: $IMAGE_NAME (Claude Code $CLAUDE_VERSION, Codex CLI $CODEX_VERSION)"
 
 needs_build=false
 if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
@@ -111,6 +115,7 @@ if [[ "$needs_build" == "true" ]]; then
     if ! docker build \
         -f "$DOCKERFILE" \
         --build-arg "CLAUDE_VERSION=$CLAUDE_VERSION" \
+        --build-arg "CODEX_VERSION=$CODEX_VERSION" \
         --build-arg "FORGE_REV=$FORGE_REV" \
         -t "$IMAGE_NAME" \
         "$REPO_ROOT"; then

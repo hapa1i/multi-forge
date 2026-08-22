@@ -25,6 +25,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-22
+
+### Validate artifact authority through real runtimes
+
+**Goal/outcome**: Close the shipped authority feature's real-model gap by proving its production launch, hook, denial,
+and journal chain inside disposable Docker identities.
+
+**Key changes**:
+
+- Versioned the runtime test image by both installed Claude Code and Codex CLI versions and installed both real runtimes
+  in the cached toolchain layer.
+- Added paid release tests for a real Claude advisory denial, its producer control, and a real Codex advisory denial;
+  each uses the public session CLI and asserts filesystem plus correlated journal evidence instead of model prose.
+- Recreated only Codex's non-secret hook trust hashes at their original absolute paths; no host config was mutated and
+  no `auth.json` was copied.
+- Synchronized the bundled QA image identity, isolated the installer's no-Codex boundary, bounded hung runtime
+  processes, and moved paid credentials from process arguments into atomic owner-only stdin writes.
+
+**Verification**: Three real-model Docker cases; 437 non-slow integration tests with 10,615 deselected; 207 focused
+authority tests; 9,447 unit with 117 deselected; 1,056 regression; full pre-commit, diff, and 1,227-link checks.
+
 ## 2026-08-21
 
 ### Enforce managed-session artifact authority
