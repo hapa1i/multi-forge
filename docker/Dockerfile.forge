@@ -3,7 +3,7 @@
 # Build with npm (default):
 #   docker build -f docker/Dockerfile.forge -t forge-claude-test .
 #   docker build -f docker/Dockerfile.forge --build-arg CLAUDE_VERSION=2.1.7 \
-#     --build-arg CODEX_VERSION=0.149.0 -t forge-claude-test:claude-2.1.7-codex-0.149.0 .
+#     --build-arg CODEX_VERSION=0.149.0 -t forge-claude-test:2.1.7-codex-0.149.0 .
 #
 # Build with Anthropic's native installer:
 #   docker build -f docker/Dockerfile.forge --build-arg INSTALL_METHOD=native -t forge-claude-test:native .

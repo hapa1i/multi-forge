@@ -15,6 +15,7 @@ SHELL_RUNNERS = (
     REPO_ROOT / "src" / "skills" / "qa" / "scripts" / "start-container.sh",
 )
 PYTHON_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "docker.py"
+FORGE_DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.forge"
 EXPECTED_SHELL_TAG = "forge-claude-test:${CLAUDE_VERSION}-codex-${CODEX_VERSION}"
 
 
@@ -36,3 +37,14 @@ def test_python_fixture_uses_the_same_codex_versioned_identity() -> None:
     source = PYTHON_FIXTURE.read_text(encoding="utf-8")
     assert 'f"forge-claude-test:{CLAUDE_CODE_VERSION}-codex-{CODEX_CLI_VERSION}"' in source
     assert 'f"CODEX_VERSION={CODEX_CLI_VERSION}"' in source
+
+
+def test_dockerfile_example_uses_the_canonical_image_tag_shape() -> None:
+    source = FORGE_DOCKERFILE.read_text(encoding="utf-8")
+    example = re.search(
+        r"--build-arg CLAUDE_VERSION=(?P<claude>[\w.-]+) \\\n"
+        r"#\s+--build-arg CODEX_VERSION=(?P<codex>[\w.-]+) -t "
+        r"forge-claude-test:(?P=claude)-codex-(?P=codex) \.",
+        source,
+    )
+    assert example is not None

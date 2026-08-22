@@ -12,6 +12,8 @@ import pytest
 
 from tests.fixtures.docker import ContainerLike
 
+pytestmark = pytest.mark.integration
+
 
 def test_write_and_read_file(clean_workspace: ContainerLike):
     """Test writing and reading a simple text file."""
