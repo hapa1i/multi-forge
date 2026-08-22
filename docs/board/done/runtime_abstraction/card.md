@@ -760,7 +760,7 @@ binding, branching, indexed retrieval, local SQLite storage, and curation are al
 should not take `ctx` as a dependency: `ctx` is prior art and inspiration only, and curated transfer is central to
 Forge's session, policy, and usage story. The transfer schema is Forge-owned and canonical (now shipped); no `ctx`
 interop is planned, though an optional import/export bridge could be added later on the existing schema (see
-`docs/design_sessions.md` §M.4).
+`docs/design_sessions.md` §H.4).
 
 **Required for cross-runtime resume:**
 
@@ -854,7 +854,7 @@ No new architecture; mostly documentation and small CLI additions.
   `forge session context` (a running session's runtime context, now folded into `forge session show`).
 - Document the agency-at-boundaries frame and the curated-transfer-as-interchange principle in `design.md`.
 - Define the Forge-owned transfer schema; `ctx` stays prior art and inspiration only, not a dependency or planned peer
-  (see `docs/design_sessions.md` §M.4).
+  (see `docs/design_sessions.md` §H.4).
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
   evidence, open questions, runtime hints, and user notes overlay.
 
@@ -964,7 +964,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   recursion guard and `FORGE_SESSION` identifier? Should `FORGE_DEPTH` become a derived property of the run tree?
 - How should Forge interoperate with [ctx](https://github.com/dchu917/ctx)? **Resolved (Phase 1, 2026-05-31):** `ctx` is
   prior art and inspiration only — Forge will not take it as a dependency. The Forge-owned schema is canonical
-  (`docs/design_sessions.md` §M.4) and no `ctx` interop is planned; an optional import/export bridge could be added
+  (`docs/design_sessions.md` §H.4) and no `ctx` interop is planned; an optional import/export bridge could be added
   later on the existing schema, but is not committed work.
 - Should `forge session resume --fresh --review` be the default behavior or an explicit flag? **Resolved (Phase 1,
   2026-05-31):** explicit flag (opt-in) -- a plain `--fresh` resume launches immediately, and `--review` stays opt-in so

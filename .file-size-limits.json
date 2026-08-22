@@ -1,13 +1,14 @@
 {
   "_comment": "Repository-owned file size policy. Rules are checked in order; first match wins.",
-  "_usage": "Markdown near its limit is counted with Claude Opus 5. Provider use is explicit in this tracked policy; local fallback is named in diagnostics.",
+  "_usage": "Markdown near its target is counted with Claude Opus 5. Provider use and cached evidence are explicit in this tracked policy.",
   "_patterns": "No slash matches a basename. Slash-separated patterns match the full relative path by segment.",
-  "_limits": "Token thresholds are keyed by tokenizer family and expressed in that family's own tokens. Whichever method answers selects its limit, so an unreachable provider degrades to the tiktoken count and the tiktoken limit rather than blocking a commit.",
+  "_limits": "Provider-backed prose uses Anthropic counts for target and hard-limit verdicts. Its tiktoken target is a conservative one-way screen only; above it, a matching content-hash provider count is required. Local-only source rules use tiktoken as their authoritative hard limit.",
   "token_count": {
     "methods": [
       "claude-opus-5",
       "local-tiktoken"
-    ]
+    ],
+    "cache": ".file-token-counts.json"
   },
   "rules": [
     {
@@ -18,8 +19,7 @@
         "tiktoken": 20000
       },
       "max_tokens": {
-        "anthropic": 40000,
-        "tiktoken": 20000
+        "anthropic": 40000
       }
     },
     {
@@ -30,8 +30,7 @@
         "tiktoken": 12000
       },
       "max_tokens": {
-        "anthropic": 30000,
-        "tiktoken": 15000
+        "anthropic": 30000
       }
     },
     {
@@ -42,8 +41,7 @@
         "tiktoken": 12000
       },
       "max_tokens": {
-        "anthropic": 30000,
-        "tiktoken": 15000
+        "anthropic": 30000
       }
     },
     {
@@ -95,11 +93,10 @@
         "tiktoken": 12000
       },
       "max_tokens": {
-        "anthropic": 30000,
-        "tiktoken": 15000
+        "anthropic": 30000
       }
     }
   ],
   "whitelisted_paths": [],
-  "_probe": "The tiktoken limit doubles as the provider probe threshold: a file clearing it locally is in budget, so no API call is made. Only files that fail locally are sent for an authoritative count that can overturn the estimate. Markdown's 15k against a 30k Opus budget holds even at the measured near-2x worst case, which is what makes skipping the call sound."
+  "_probe": "For provider-backed prose, target_tokens.tiktoken is the conservative local screen. A file clearing it locally is accepted without a provider call. Above it, pre-commit requires a current SHA-256-keyed count in .file-token-counts.json; a keyful refresh command obtains that evidence from Claude Opus 5. A fallback tiktoken count never decides the provider target or ceiling."
 }

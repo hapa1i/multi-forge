@@ -118,11 +118,11 @@ markers control execution eligibility.
 - `cli/status_line.py`, `statusline/` → telemetry design §A.8 (segment registry, lazy `RenderContext`)
 
 Citation shorthand in the finding tables is fixed as follows: bare `§N` means `docs/design.md`; `workflows` means
-`docs/design_workflows.md`; historical `appendix §X` citations route by the section map above (A by subject, B/H/I/J/M
-to session design, C/D to installation design, E to core design, F to workflow design, and G/L to runtime design);
-`cli_reference` means `docs/cli_reference.md`; `coding_standards` means `docs/developer/coding_standards.md`; and
-`impl_notes` means `docs/board/impl_notes.md`. Board cards must expand these to full paths so moved excerpts remain
-attributable.
+`docs/design_workflows.md`; historical `appendix §X` citations route by the section map above (A by subject, B/H/I/J to
+session design, historical M to current session-design §H, C/D to installation design, E to core design, F to workflow
+design, and G/L to runtime design); `cli_reference` means `docs/cli_reference.md`; `coding_standards` means
+`docs/developer/coding_standards.md`; and `impl_notes` means `docs/board/impl_notes.md`. Board cards must expand these
+to full paths so moved excerpts remain attributable.
 
 ## Conformance Summary
 

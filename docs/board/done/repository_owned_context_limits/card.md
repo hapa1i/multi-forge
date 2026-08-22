@@ -18,7 +18,8 @@ Claude Opus 5, and split oversized living documents without losing their contrac
 - Migration is semantically lossless. Unique requirements, schemas, examples, caveats, rationale, and failure semantics
   must remain; exact duplicates may be integrated into a named canonical passage.
 - Bare `scripts/count-tokens.py` becomes Opus-first with a local fallback. Results identify both the method and
-  tokenizer family that ran, and the repository policy supplies thresholds for every reachable family.
+  tokenizer family that ran. Provider-backed policy uses local counts only as a conservative screen and keeps
+  content-hash-keyed Opus evidence in the repository so keyless checks reach the same verdict.
 
 ## Acceptance
 

@@ -203,8 +203,8 @@ def assemble_codex_transfer(
         raise ForgeOpError(str(e)) from e
     composed = compose_child_context(transfer_root, parent, child)
     frontmatter, body, _ = parse_transfer_frontmatter(composed)
-    # schema=="full" is stamped only for a successful ai-curated body (design appendix
-    # §M.1); any deterministic fallback is "compatibility-fallback".
+    # schema=="full" is stamped only for a successful ai-curated body (design_sessions.md
+    # §H.1); any deterministic fallback is "compatibility-fallback".
     curation_ran = frontmatter is not None and frontmatter.get("schema") == "full"
     return CodexTransferAssembly(
         transfer_path=transfer.context_file or child_path(transfer_root, parent, child),

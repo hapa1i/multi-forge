@@ -8,6 +8,8 @@ Activation base: `0bc42799` (`main`, 2026-08-22).
 - [x] Align `count-tokens.py` with the configured Opus-first chain while retaining explicit local mode and returning the
   tokenizer family as machine-readable policy input.
 - [x] Document config precedence, provider disclosure, targets, hard limits, and the historical exception.
+- [x] Keep provider-backed verdicts deterministic with SHA-256-keyed Opus evidence; make missing counters and stale or
+  unavailable evidence fail visibly, including in keyless CI.
 
 ## Design migration ledger
 
@@ -61,8 +63,8 @@ Fidelity evidence against activation base `0bc42799`:
   zero missing heading or content instances.
 - The repository link audit passes 566 Markdown sources, including same-document fragments and every moved ledger.
 - Paired counts across the 20 resulting living/context documents put Opus at 1.597x-1.902x the local cl100k count
-  (median 1.673x). The checked-in 12,000/15,000 local thresholds preserve a 2x safety ratio against the 25,000/30,000
-  Opus target and ceiling instead of using the median as a hard-limit conversion.
+  (median 1.673x). The checked-in 12,000 local screen preserves a 2x safety ratio against the 25,000 Opus target instead
+  of using the median as a verdict conversion; files above it require cached provider evidence.
 
 Authoritative counts (`anthropic API (claude-opus-5)`):
 
@@ -96,10 +98,13 @@ Authoritative counts (`anthropic API (claude-opus-5)`):
 
 Verification evidence:
 
-- 101 focused token-policy and Markdown-link tests pass.
-- 9,576 unit tests pass with 117 deselected; 1,057 regression tests pass.
+- 108 focused token-policy and Markdown-link tests pass.
+- 9,583 unit tests pass with 117 deselected; 1,057 regression tests pass.
 - The repository link audit passes all 566 tracked Markdown sources.
 - The file-size hook passes against all 1,658 eligible repository files in 3.2 seconds after per-file counts were
   batched into one process per method chain.
 - Full pre-commit, Markdown pre-commit, and `git diff --check` pass.
-- PR [#237](https://github.com/hapa1i/multi-forge/pull/237) opened from the verified four-commit implementation head.
+- PR [#237](https://github.com/hapa1i/multi-forge/pull/237) opened from the verified implementation branch.
+- Review repair: the keyless all-files path uses nine current SHA-256-keyed Opus counts, emits no false local-target
+  warnings, and rejects missing/stale evidence or total token-counter failure instead of changing verdicts with ambient
+  credentials.

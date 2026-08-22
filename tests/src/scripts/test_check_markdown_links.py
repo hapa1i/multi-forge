@@ -63,3 +63,15 @@ def test_rejects_repository_escape(tmp_path):
 
     assert len(failures) == 1
     assert failures[0].reason == "target escapes repository"
+
+
+def test_retired_consolidated_design_token_has_no_live_references():
+    """The removed path must not survive in source comments that the Markdown audit cannot see."""
+    candidates = [
+        *REPO_ROOT.glob("src/**/*.py"),
+        *REPO_ROOT.glob("tests/**/*.py"),
+        *REPO_ROOT.glob("docs/**/*.md"),
+    ]
+    retired_token = "design_" + "appendix"
+    references = [path.relative_to(REPO_ROOT) for path in candidates if retired_token in path.read_text()]
+    assert references == []

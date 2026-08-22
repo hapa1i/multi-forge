@@ -47,7 +47,7 @@ All Phase 2 slice boxes are ticked.
 
 **Phase 1 complete (2026-05-31).** Schema-backed curated transfer, the `children/<child>.notes.md` overlay, and the
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
-`docs/design_sessions.md` §M reflect it. All Phase 1 boxes are ticked.
+`docs/design_sessions.md` §H reflects it. All Phase 1 boxes are ticked.
 
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
 (instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) + 4e
@@ -136,9 +136,9 @@ Phase 0 gaps carried forward:
 - [x] Define the Forge-owned curated transfer schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
-  - Verification (2026-05-31): `docs/design_sessions.md` §M documents the contract -- §M.1 child-agnostic frontmatter
-    (`schema_version: 1`, `schema`, `strategy`, `lineage`, `target_runtime`), §M.2 the 8 canonical sections (Lineage,
-    Goal/Current Task, Decisions cited, Current State, Relevant Files, Open Questions, Runtime Hints, User Notes), §M.3
+  - Verification (2026-05-31): `docs/design_sessions.md` §H documents the contract -- §H.1 child-agnostic frontmatter
+    (`schema_version: 1`, `schema`, `strategy`, `lineage`, `target_runtime`), §H.2 the 8 canonical sections (Lineage,
+    Goal/Current Task, Decisions cited, Current State, Relevant Files, Open Questions, Runtime Hints, User Notes), §H.3
     the three-file layout + overlay. Shipped in `2b70c29`.
 - [x] Implement the curated transfer schema in `src/forge/session/transfer.py`.
   - Assertion: generated transfer markdown has stable sections for the schema fields; existing
@@ -159,25 +159,25 @@ Phase 0 gaps carried forward:
 - [x] Define the user notes overlay convention.
   - Assertion: docs/code state where user notes live, how they compose with generated content, and that regeneration
     never overwrites authoritative user notes.
-  - Verification (2026-05-31): `children/<child>.notes.md` is the editable overlay (design.md §3.9, appendix §M.3);
-    `prev_sessions.py` composes notes after the frozen snapshot at launch, `ensure_child` never overwrites an existing
-    child, and `forge transfer regenerate` rewrites only `generated.md`. Covered by `test_prev_sessions.py`
-    (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`, `test_compose_skips_empty_notes`). Shipped in
-    `2b70c29`.
+  - Verification (2026-05-31): `children/<child>.notes.md` is the editable overlay (design.md §3.9,
+    `docs/design_sessions.md` §H.3); `prev_sessions.py` composes notes after the frozen snapshot at launch,
+    `ensure_child` never overwrites an existing child, and `forge transfer regenerate` rewrites only `generated.md`.
+    Covered by `test_prev_sessions.py` (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`,
+    `test_compose_skips_empty_notes`). Shipped in `2b70c29`.
 - [x] Decide how `ctx` relates to Forge transfer.
   - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
   - Decision (2026-05-31): `ctx` is **prior art and inspiration only -- never a dependency**. The Forge-owned transfer
     schema is canonical and no `ctx` interop is planned (an optional import/export bridge could be added later on the
-    existing schema, but is not committed work). Recorded in `docs/design_sessions.md` §M.4; the matching `card.md`
+    existing schema, but is not committed work). Recorded in `docs/design_sessions.md` §H.4; the matching `card.md`
     prose and Open Question are aligned and marked resolved.
 - [x] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
   - Assertion: Phase 5 can tune transfer presentation for Codex without changing transcript source artifacts or schema
     semantics.
-  - Verification (2026-05-31): the schema reserves `target_runtime` (frontmatter + `TRANSFER_TARGET_RUNTIME`, appendix
-    §M.1) and code owns the section skeleton, so Phase 5 retargets presentation without touching transcript artifacts or
-    schema semantics. Closeout gates cleared -- the `ctx` posture is recorded (§M.4) and both default-behavior Open
-    Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase 1 boxes are now ticked; the
-    card stays in `doing/` for Phases 2-6.
+  - Verification (2026-05-31): the schema reserves `target_runtime` (frontmatter + `TRANSFER_TARGET_RUNTIME`,
+    `docs/design_sessions.md` §H.1) and code owns the section skeleton, so Phase 5 retargets presentation without
+    touching transcript artifacts or schema semantics. Closeout gates cleared -- the `ctx` posture is recorded (§H.4)
+    and both default-behavior Open Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase
+    1 boxes are now ticked; the card stays in `doing/` for Phases 2-6.
 
 ## Phase 2 - Optional Audit Proxy (compacted 2026-06-09; shipped 2026-05-31 -> 2026-06-01)
 
@@ -691,7 +691,7 @@ bridge is a cross-runtime resume-delivery op, not a workflow runner; §5.5.5 was
     `codex_hooks` claim remains outside `done/` (sweep confirmed none survived; the `design.md`/`card.md` `SessionStart`
     refs now name initial-message delivery).
 - [x] `design_telemetry.md`: §A.13 enums flip `codex_exec` (route) + `codex_jsonl` (reporter) from reserved -> emitted;
-  per-emitter table gains the `transfer-curate` row (tags `session`); §M.1 `target_runtime` comment de-staled.
+  per-emitter table gains the `transfer-curate` row (tags `session`); §H.1 `target_runtime` comment de-staled.
 - [x] New end-user guide `docs/end-user/transfer.md`: the `forge transfer show|regenerate|edit|diff` group + the
   three-file model + the honest cross-runtime workflow (`regenerate --target-runtime codex` -> `show` -> manual
   `codex exec`; one-command bridge is Phase 6). Registered in `README.md`; `session.md` artifact note repointed to it.

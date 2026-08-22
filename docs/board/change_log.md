@@ -14,16 +14,17 @@ room to grow, without shortening the design contracts or historical evidence tha
 
 **Key changes**:
 
-- Added a tracked file-size policy, family-tagged Opus-first counting with conservative local fallback thresholds, and a
-  batched pre-commit gate whose provider use and thresholds are repository-owned.
+- Added a tracked file-size policy, family-tagged Opus-first counting, conservative local screens, and a batched
+  pre-commit gate whose provider use and thresholds are repository-owned. Near-target provider evidence is cached by
+  exact content hash so keyless CI and keyful contributors reach the same verdict; missing evidence fails visibly.
 - Partitioned the core architecture, workflow memory, changelog, implementation notes, and whole-repository review by
   stable domains; all appendix links now target their canonical owners and the retired appendix path is gone.
-- Added a repository-wide Markdown path-and-fragment audit and updated contributor context routing for the new document
-  map.
+- Added a repository-wide Markdown path-and-fragment audit and changed contributor context loading to route through the
+  overview, active card, and implementation-note index before selecting only relevant domain documents.
 - Preserved all 142 original design headings, 985 non-navigation paragraphs, 52 fenced examples, 26 changelog blocks, 46
   implementation-note sections, and 11 review sections under a recorded lossless-migration audit.
 
-**Verification**: 101 focused policy/link tests; 9,576 unit tests with 117 deselected; 1,057 regressions; all 566
+**Verification**: 108 focused policy/link tests; 9,583 unit tests with 117 deselected; 1,057 regressions; all 566
 tracked Markdown sources pass the link audit; the all-files size gate passes in 3.2 seconds; full pre-commit and diff
 checks pass. The 20 living/context documents measured with `claude-opus-5` are below 25,000 tokens, and all migrated
 canonical design documents are at or below the 23,000-token migration target.

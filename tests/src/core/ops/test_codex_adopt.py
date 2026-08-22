@@ -215,7 +215,7 @@ class TestCodexAdoptWrites:
         assert state.intent.launch is not None
         assert state.intent.launch.runtime == CODEX_RUNTIME
 
-        # The Claude arm's fields must stay unset (card Phase 2, design_appendix I.1).
+        # The Claude arm's fields must stay unset (card Phase 2, design_sessions.md §I.1).
         assert state.confirmed.claude_session_id is None
         assert state.confirmed.launch is None
         assert state.confirmed.codex.context_delivery is None
