@@ -1,0 +1,78 @@
+{
+  "_comment": "Repository-owned file size policy. Rules are checked in order; first match wins.",
+  "_usage": "Markdown near its limit is counted with Claude Opus 5. Provider use is explicit in this tracked policy; local fallback is named in diagnostics.",
+  "_patterns": "No slash matches a basename. Slash-separated patterns match the full relative path by segment.",
+  "token_count": {
+    "methods": [
+      "claude-opus-5",
+      "local-tiktoken"
+    ]
+  },
+  "rules": [
+    {
+      "pattern": "docs/board/done/*/*.md",
+      "max_lines": 5000,
+      "target_tokens": 40000,
+      "max_tokens": 40000,
+      "provider_probe_local_tokens": 20000,
+      "authoritative_required_local_tokens": 24000
+    },
+    {
+      "pattern": "*.md",
+      "max_lines": 2500,
+      "target_tokens": 25000,
+      "max_tokens": 30000,
+      "provider_probe_local_tokens": 12000,
+      "authoritative_required_local_tokens": 15000
+    },
+    {
+      "pattern": "*.txt",
+      "max_lines": 2000,
+      "target_tokens": 25000,
+      "max_tokens": 30000,
+      "provider_probe_local_tokens": 12000,
+      "authoritative_required_local_tokens": 15000
+    },
+    {
+      "pattern": "test_*.py",
+      "max_lines": 5000,
+      "max_tokens": 50000,
+      "token_methods": [
+        "local-tiktoken"
+      ]
+    },
+    {
+      "pattern": "*.py",
+      "max_lines": 2500,
+      "max_tokens": 30000,
+      "token_methods": [
+        "local-tiktoken"
+      ]
+    },
+    {
+      "pattern": "*.js",
+      "max_lines": 2500,
+      "max_tokens": 30000,
+      "token_methods": [
+        "local-tiktoken"
+      ]
+    },
+    {
+      "pattern": "*.ts",
+      "max_lines": 2500,
+      "max_tokens": 30000,
+      "token_methods": [
+        "local-tiktoken"
+      ]
+    },
+    {
+      "pattern": "*.rst",
+      "max_lines": 2500,
+      "target_tokens": 25000,
+      "max_tokens": 30000,
+      "provider_probe_local_tokens": 12000,
+      "authoritative_required_local_tokens": 15000
+    }
+  ],
+  "whitelisted_paths": []
+}
