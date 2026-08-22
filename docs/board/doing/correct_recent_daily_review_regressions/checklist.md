@@ -3,8 +3,8 @@
 Activation base: `5d9fadc4` (`main`, 2026-08-22).
 
 Current focus: implementation and required verification are complete in
-[PR #239](https://github.com/hapa1i/multi-forge/pull/239); keep post-merge closeout in this lane until the fix ships on
-`main`.
+[PR #239](https://github.com/hapa1i/multi-forge/pull/239); verify and publish the accepted review follow-up before
+post-merge closeout.
 
 ## Verification and design mapping
 
@@ -28,6 +28,21 @@ Current focus: implementation and required verification are complete in
 - [x] Wrap strict active-registry inspection failures as actionable operation errors.
 - [x] Share conditional skill-invocation sync guidance across config mutation paths.
 - [x] Narrow the repository policy to the two exact historical paths.
+
+## PR #239 review follow-up
+
+- [x] Reproduce the carriage-return leak on PR head and confirm that `main` redacts the same raw secret.
+- [x] Benchmark a 1.01 MB control-free diagnostic on `main` (28.3 ms) and PR head (144.8 ms median).
+- [x] Add fail-first direct and persistence/display regressions for destructive carriage-return rendering.
+- [x] Redact both before and after rendering, skipping the second pass when rendering leaves text unchanged.
+- [x] Keep control-free diagnostics on C-speed C0/DEL translation (29.5 ms median after the final fix).
+- [x] Confirm DEL is discarded rather than emulated as backspace: its extra printable `X` remains visible, so the
+  configured secret is not rendered and does not cross the diagnostic boundary.
+- [x] Resolve the targeted Docker run's follow-on partial token-prefix match by deferring control-terminated heuristic
+  fragments to post-render redaction; rerun the boundary successfully.
+- [x] Run 66 focused Stop/hook tests, the targeted Docker hook boundary, 1,067 regressions, 9,588 unit tests with 117
+  deselected, and full pre-commit.
+- [ ] Commit and push the follow-up, update the PR description, and confirm GitHub checks pass again.
 
 ## Verification and closeout
 

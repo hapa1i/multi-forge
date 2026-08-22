@@ -24,8 +24,8 @@ context-size exceptions to their two ratified snapshots.
 
 - Rescan relocated-transcript ownership at its destructive boundary after ordinary transcript cleanup can interleave
   with session publication.
-- Normalize rendered backspaces before secret replacement and remove unsafe residual C0/C1 terminal controls before
-  diagnostics cross persistence or display boundaries.
+- Bracket destructive C0 cursor rendering with secret replacement, remove unsafe residual controls, and keep ordinary
+  control-free streams on a bulk sanitization path before diagnostics cross persistence or display boundaries.
 - Translate strict, non-repairing active-registry read failures at the authority operation boundary without mutating
   runtime state.
 - Detect changed skill-invocation overrides after successful config edit/reset operations and print the established
@@ -37,6 +37,7 @@ context-size exceptions to their two ratified snapshots.
 
 - Preserve shared/adopted transcript ownership safeguards and ordinary transcript cleanup behavior.
 - Preserve diagnostic text needed for pytest failure selection, redaction-before-bounding, and the 200-character limit.
+- Preserve the under-100-ms Forge-owned Stop budget outside the explicitly excluded test subprocess wall time.
 - Keep `authority show` read-only; it must neither prune nor recreate `active.json`.
 - Do not emit skill-package sync guidance for unrelated config edits/resets or no-op resets.
 - Preserve the ratified 40,000-token limits for exactly the two historical checklist snapshots.
@@ -45,10 +46,11 @@ context-size exceptions to their two ratified snapshots.
 
 1. Each verified failure has a regression test that fails on the activation base and passes with the fix.
 2. A sibling published during ordinary cleanup protects the relocated transcript when deletion reaches unlink.
-3. No unsafe terminal control reaches persisted/displayed diagnostics, and a backspace-obfuscated environment secret is
-   redacted after applying its rendered text semantics.
+3. No unsafe terminal control reaches persisted/displayed diagnostics; raw secrets are redacted before destructive
+   rendering and backspace-reconstructed secrets are redacted afterward.
 4. Malformed active runtime state produces an actionable command error while the file's bytes and mtime remain intact.
 5. Config edit/reset prints sync guidance exactly when the stored skill-invocation overrides change.
 6. Unrelated completed-card Markdown receives the ordinary Markdown limits; both named snapshots retain their exception.
 7. Focused tests, required session/hook/installer integration slices, full unit/regression suites, pre-commit,
    board/link, and diff checks pass before publication.
+8. A one-megabyte control-free diagnostic stays on the bulk sanitization path and within the Forge-owned budget.

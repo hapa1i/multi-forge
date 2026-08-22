@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -161,6 +162,36 @@ def test_rendered_backspaces_are_normalized_before_environment_secret_redaction(
     assert verification._redacted_diagnostic(disguised) == "[REDACTED]"
 
 
+@pytest.mark.parametrize("cursor_motion", ["backspace", "carriage-return"])
+def test_token_prefix_redaction_brackets_cursor_rendering(cursor_motion: str) -> None:
+    token = "sk-test-secret-value"
+    diagnostic = f"{token[:10]}X\b{token[10:]}" if cursor_motion == "backspace" else f"{token}\rX"
+
+    sanitized = verification._redacted_diagnostic(diagnostic)
+
+    assert "REDACTED]" in sanitized
+    assert token not in sanitized
+
+
+def test_raw_secret_is_redacted_before_carriage_return_rendering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "boundary-secret-material-for-redaction"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+
+    assert verification._redacted_diagnostic(f"{secret}\rX") == "XREDACTED]"
+
+
+def test_control_free_terminal_rendering_avoids_python_character_iteration() -> None:
+    class _IterationTrap(str):
+        def __iter__(self) -> Iterator[str]:
+            raise AssertionError("control-free diagnostics must use the C-speed sanitization path")
+
+    diagnostic = _IterationTrap("FAILED tests/test_widget.py::test_failure\n" * 25_000)
+
+    assert verification._render_terminal_text(diagnostic) == diagnostic
+
+
 def test_unsafe_c0_controls_do_not_cross_the_diagnostic_boundary() -> None:
     sanitized = verification._redacted_diagnostic("before\x00\a\tfield\v\f\rafter\x7f\nnext")
 
@@ -168,16 +199,29 @@ def test_unsafe_c0_controls_do_not_cross_the_diagnostic_boundary() -> None:
     assert all(character == "\n" or (ord(character) >= 0x20 and character != "\x7f") for character in sanitized)
 
 
-def test_backspace_rendered_secret_is_redacted_before_persistence_and_display(
+def test_del_is_discarded_without_emulating_destructive_backspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    secret = "boundary-secret-material-for-redaction"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    disguised = f"{secret[:12]}X\x7f{secret[12:]}"
+
+    sanitized = verification._redacted_diagnostic(disguised)
+
+    assert sanitized == f"{secret[:12]}X{secret[12:]}"
+    assert secret not in sanitized
+
+
+@pytest.mark.parametrize("cursor_motion", ["backspace", "carriage-return"])
+def test_cursor_rendered_secret_is_redacted_before_persistence_and_display(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    cursor_motion: str,
 ) -> None:
     store, manifest, _ = _configured_store(tmp_path, on_incomplete="warn")
     transcript = _write_transcript(tmp_path / "transcript.jsonl")
     secret = "boundary-secret-material-for-redaction"
     monkeypatch.setenv("OPENAI_API_KEY", secret)
-    disguised = f"{secret[:12]}X\b{secret[12:]}"
+    disguised = f"{secret[:12]}X\b{secret[12:]}" if cursor_motion == "backspace" else f"{secret}\rX"
     monkeypatch.setattr(
         subprocess,
         "run",
@@ -190,8 +234,10 @@ def test_backspace_rendered_secret_is_redacted_before_persistence_and_display(
     displayed = capsys.readouterr().err
     persisted = store.read().confirmed.verification
     assert persisted is not None and persisted.last_error is not None
-    assert "[REDACTED]" in displayed
-    assert "[REDACTED]" in persisted.last_error
+    assert "REDACTED]" in displayed
+    assert "REDACTED]" in persisted.last_error
+    assert secret not in displayed
+    assert secret not in persisted.last_error
     assert "\b" not in displayed
     assert "\b" not in persisted.last_error
 

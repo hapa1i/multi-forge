@@ -559,8 +559,10 @@ result classifier records `passed`, `incomplete`, `misconfigured`, or `infrastru
 absent from the last assistant message, a non-zero test exit, or a test timeout after launch is incomplete and follows
 the configured posture. Missing or multiline promise configuration is misconfigured. Unavailable inputs, worktree or
 executable failures, and other execution errors are infrastructure failures and allow Stop with a diagnostic.
-Persistence failure also allows Stop. Captured subprocess diagnostics have terminal sequences removed and C0 cursor
-motion rendered before secret redaction, then are bounded before display or persistence.
+Persistence failure also allows Stop. Captured subprocess diagnostics have terminal sequences removed, then secret
+redaction brackets C0 cursor rendering so neither raw secrets nor render-reconstructed secrets cross the boundary;
+remaining unsafe controls are removed before the result is bounded for display or persistence. Control-free streams use
+bulk translation instead of Python character iteration to preserve the Forge-owned latency budget.
 
 The memory writer runs asynchronously in a detached process after a later, non-exempt Forge CLI startup drains the
 handoff marker. Memory doc updates are eventually consistent; this is acceptable because they benefit future sessions,
