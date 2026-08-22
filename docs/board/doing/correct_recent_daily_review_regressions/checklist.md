@@ -2,8 +2,9 @@
 
 Activation base: `5d9fadc4` (`main`, 2026-08-22).
 
-Current focus: implementation and required verification are complete; publish the review branch and keep post-merge
-closeout in this lane until the fix ships on `main`.
+Current focus: implementation and required verification are complete in
+[PR #239](https://github.com/hapa1i/multi-forge/pull/239); keep post-merge closeout in this lane until the fix ships on
+`main`.
 
 ## Verification and design mapping
 
@@ -36,5 +37,5 @@ closeout in this lane until the fix ships on `main`.
 - [x] Run full pre-commit, including type, board/link, file-size, formatting, and secret checks; run the final diff
   check.
 - [x] Review the final diff and synchronize the session design and end-user authority guidance.
-- [ ] Commit, push, and open the bugfix PR.
+- [x] Commit, push, and open [PR #239](https://github.com/hapa1i/multi-forge/pull/239).
 - [ ] After merge, record the completed work in `change_log.md` and move the card to `done/`.
