@@ -265,12 +265,12 @@ Field contracts:
 
 Route invariants:
 
-| Kind             | Required                                                                                     | Forbidden/empty                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `direct`         | Claude runtime; `direct_model` when Forge resolves the fixed default/pin                     | Proxy fields, fingerprint, maps                                 |
-| `proxy`          | Claude runtime; proxy id, template, default tier, effective tier map; backend id when proven | Fingerprint, direct model                                       |
-| `custom`         | Claude runtime; secret-free fingerprint                                                      | Proxy identity, backend id, direct model, maps                  |
-| `runtime_native` | Codex runtime through envelope/scope tag                                                     | All model, proxy, backend, billing-specific, and marking fields |
+| Kind             | Required                                                                                                 | Forbidden/empty                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `direct`         | Claude runtime; `direct_model` when Forge resolves the fixed default/pin                                 | Proxy fields, fingerprint, maps                                               |
+| `proxy`          | Claude runtime; proxy id, template, default tier, effective tier map; backend id when proven             | Fingerprint, direct model                                                     |
+| `custom`         | Claude runtime; secret-free fingerprint                                                                  | Proxy identity, backend id, direct model, maps                                |
+| `runtime_native` | Codex runtime; `billing_mode=unknown`; scope tags are exactly `route:runtime_native` and `runtime:codex` | Model, proxy, and backend fields are null/empty; `marking_snapshots` is empty |
 
 Unknown mapped models remain in the exact route maps. Their marking slot has `canonical_model: null` and an unknown
 declaration rather than dropping the route fact.
