@@ -156,6 +156,24 @@ When forking into the reviewer/executor role instead, pin the child directly:
 forge session fork planner --name reviewer --model claude-opus-4-6
 ```
 
+### Read Route And Provider-Declaration Evidence
+
+Use `forge session model show <session> --json` to compare configured intent, the route Forge committed before launch,
+and currently reachable proxy mappings. Use `forge session model history <session> --json` for the complete strictly
+validated commit/abort sequence. These are route-provenance reads, not per-request traces: a proxy may change after
+launch, and a request may select a different tier or alternative.
+
+The optional status-line `marking` segment shows `mark:yes`, `mark:no`, or `mark:?` for the request model. Its source is
+a dated provider declaration matched conjunctively against the canonical model and runtime/route/backend/billing scope.
+`no` means the provider declared that exact scoped model unmarked; Forge did not inspect the output or admit it as safe.
+The production catalog intentionally contains no declarations at launch of this feature, so results remain unknown until
+a separate source review adds one.
+
+Provider declarations do not replace isolation. The supported marking-sensitive workflow is still a fresh, transfer-free
+producer in a distinct worktree: do not seed it with planner transcripts or other possibly marked content. Even an exact
+live `unmarked` declaration says nothing about content already in context, later provider/proxy changes, watermark
+persistence, or authorship.
+
 ### Direct-Mode Planner Constraint
 
 If the planner runs in direct mode (no proxy, `ANTHROPIC_API_KEY` only), `should_supervisor_use_direct()` makes the

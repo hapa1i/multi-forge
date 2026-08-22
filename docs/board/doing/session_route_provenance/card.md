@@ -1,8 +1,8 @@
 # Session Route Provenance and Marking
 
 **Status**: Doing (activated 2026-08-22). Planning and implementation are tracked in [checklist.md](checklist.md) on the
-per-card branch `feat/session-route-provenance`. The contract and checklist await human review; code implementation does
-not begin until that review gate is checked.
+per-card branch `feat/session-route-provenance`. The user ratified the contract and checklist after two review rounds;
+implementation is active through PR creation.
 
 **Epic**: M2 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
 owns the shared event envelope, run correlation, cross-journal compensation, and presentation boundaries with
@@ -240,7 +240,23 @@ The routing payload has this exact schema; every key is present:
   "model_alternatives": {},
   "billing_mode": "unknown",
   "route_scope_tags": ["route:direct", "runtime:claude_code"],
-  "marking_snapshots": []
+  "marking_snapshots": [
+    {
+      "slot": "direct",
+      "tier": null,
+      "request_model": null,
+      "route_model": "claude-opus-5",
+      "canonical_model": "claude-opus-5",
+      "declaration": {
+        "status": "unknown",
+        "basis": null,
+        "source_url": null,
+        "checked_at": null,
+        "effective_from": null,
+        "route_scope": []
+      }
+    }
+  ]
 }
 ```
 
@@ -268,7 +284,7 @@ Route invariants:
 | Kind             | Required                                                                                                 | Forbidden/empty                                                               |
 | ---------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `direct`         | Claude runtime; `direct_model` when Forge resolves the fixed default/pin                                 | Proxy fields, fingerprint, maps                                               |
-| `proxy`          | Claude runtime; proxy id, template, default tier, effective tier map; backend id when proven             | Fingerprint, direct model                                                     |
+| `proxy`          | Claude runtime; template, default tier, effective tier map; proxy/backend ids when proven                | Fingerprint, direct model                                                     |
 | `custom`         | Claude runtime; secret-free fingerprint                                                                  | Proxy identity, backend id, direct model, maps                                |
 | `runtime_native` | Codex runtime; `billing_mode=unknown`; scope tags are exactly `route:runtime_native` and `runtime:codex` | Model, proxy, and backend fields are null/empty; `marking_snapshots` is empty |
 
@@ -650,14 +666,15 @@ color, enforcement decision, or admission outcome.
   origin/outcome vocabulary, compensation, lock/write helpers, and no-attestation language.
 - V1 keeps authority role/tier out of the status line. `marking` remains a distinct default-off segment.
 
-## Existing foundation
+## Pre-M2 foundation
 
 - Claude `--model` on start/resume/fork, including persisted direct and proxy-alternative pins.
 - Persisted `resume --proxy` / `--no-proxy` routing overrides and template auto-start.
 - Claude-only `confirmed.launch`, `session show --json`, session context model maps, status-line stdin model identity,
   and live proxy truth.
 - Direct transcript model-transition reads and proxy downstream `mapped_model` evidence, retained as separate planes.
-- Runtime-neutral `forge.session.events` envelope/path/lock/read/write primitives with the `routing` domain reserved.
+- Runtime-neutral `forge.session.events` envelope/path/lock/read/write primitives had the `routing` domain reserved for
+  this member.
 - M1's root-run launch transaction and authority abort vocabulary. M2 extends that seam; it does not fork it.
 
 ## Non-goals

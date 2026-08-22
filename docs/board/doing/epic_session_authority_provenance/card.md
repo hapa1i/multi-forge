@@ -1,10 +1,10 @@
 # Epic: Session Authority and Provenance
 
 **Epic** -- coordinating card for the independently shippable members below. Lane: `doing/` (activated 2026-08-21);
-shared contracts C1-C5 were accepted and frozen for M1. M2 proposes one evidence-conditional clarification to C3 at its
+shared contracts C1-C5 were accepted and frozen for M1. M2 ratified one evidence-conditional clarification to C3 at its
 human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 and is
 the epic's first done member. M2 [Session Route Provenance and Marking](../session_route_provenance/card.md) entered
-`doing/` on its separate member branch on 2026-08-22; its contract/checklist await human review before implementation.
+`doing/` on its separate member branch on 2026-08-22; its contract/checklist passed review and implementation is active.
 Coordination is tracked in [checklist.md](checklist.md), and no epic batch is authorized.
 
 **Purpose**: keep artifact authority and session route provenance semantically separate while preventing their journal,

@@ -441,6 +441,8 @@ Type these directly in the Claude prompt to interact with Forge without switchin
 | `%h` / `%help`                               | Show command help                                         |
 | `%config`                                    | Show effective runtime config (read-only)                 |
 | `%session list`                              | List sessions                                             |
+| `%session show [name]`                       | Show session details (defaults to current)                |
+| `%session model show [name]`                 | Show model-route provenance (read-only)                   |
 | `%plan`                                      | Show the current session's recorded plan file path        |
 | `%proxy list`                                | List proxies (read-only)                                  |
 | `%proxy show <id>`                           | Show proxy details (read-only)                            |
@@ -454,6 +456,10 @@ Type these directly in the Claude prompt to interact with Forge without switchin
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI
 > `forge policy enable/disable` mutates session intent. `%policy check` is read-only — it evaluates but doesn't change
 > enforcement state.
+
+`%session model show [name]` uses the same stable read operation as `forge session model show`, including labelled
+runtime/config/commit fallback and provider-declaration metadata. The direct command deliberately has no history or
+mutation form; use `forge session model history [name]` in a terminal for the full validated journal.
 
 > **Compatibility:** Mutating `%policy` forms, including supervisor set/on/off/remove/reload/cascade, and
 > `%cancel-verification` strict-check the resolved session's Forge root. A refusal is returned through the normal

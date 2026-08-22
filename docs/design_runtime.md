@@ -154,8 +154,10 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
     "opus": { "model": "o3", "context_window": 200000 }
   },
   "runtime": {
+    "backend_id": "openrouter",
     "configured_tier_mappings": { "...": "..." },
     "tier_mappings": { "...": "..." },
+    "model_alternatives": { "opus": { "claude-opus-4-8": "anthropic/claude-opus-4.8" } },
     "data_policy": { "zdr": "not_applicable", "zdr_fallbacks": {} }
   }
 }
@@ -164,6 +166,10 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 **Key points:**
 
 - Proxy and session state remain independent; status tools read both (see §3.6.2).
+- `runtime.backend_id`, `runtime.tier_mappings`, and `runtime.model_alternatives` are secret-free effective loaded
+  routing facts. The exposed tier and alternative targets include the same active ZDR substitutions used for dispatch.
+  Older responses that omit the additive fields remain readable, but callers label config or launch-commit recovery as
+  fallback rather than live runtime evidence.
 - Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
   `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
   identity fields available; the nested `downstream_retention` object carries the recovery detail.
@@ -179,6 +185,13 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is token-telemetry-only. The
   launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental data/JSON framer serves
   both raw passthrough usage taps; accumulators own protocol event merging and lifecycle semantics.
+
+**Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The
+package-owned `core/data/model_practices.yaml` separately records dated, source-linked provider declarations under
+conjunctive runtime/route/backend/billing scope. Route journals snapshot the declaration resolved at launch, while
+terminal reads compare that snapshot with the current catalog. Live marking entries are generated only from the new
+authoritative runtime maps; config and route-commit fallbacks stay visibly non-live. The initial production catalog is
+valid and intentionally empty, so every model resolves to `unknown` until a separately reviewed source change lands.
 
 **Tier selection precedence:**
 

@@ -384,6 +384,9 @@ To avoid writer conflicts:
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
+  - `confirmed.route_commit`, a runtime-neutral `{event_id, run_id}` pointer to the newest effective event in the
+    session's routing journal. The route projector updates only this field atomically; it does not rotate `confirmed_by`
+    or rewrite other confirmed facts
   - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at`,
     `context_delivery` — is CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes
     (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream (headless), receipt files, and
@@ -410,9 +413,10 @@ To avoid writer conflicts:
     (`--resume-mode native`, `--fork-session`) do **not** pre-seed — Claude mints the child UUID and the hook records
     it; Stop/StopFailure reconcile when native fork launches materialize a child UUID after startup.
 - Shared session-event storage (`forge.session.events`) owns contained domain paths, schema-v1 envelopes, ids, enums,
-  strict ordered reads, and lock/fsync-backed required appends. Authority control, launch, and hook surfaces are M1's
-  sole shipped domain consumer; they write only `.forge/artifacts/<session>/authority/events.jsonl`. The reserved
-  `routing` domain exists for the proposed M2 consumer but M1 never creates it.
+  strict ordered reads, and lock/fsync-backed required appends. Authority control, launch, and hook surfaces write only
+  `.forge/artifacts/<session>/authority/events.jsonl`; managed launch routing writes only
+  `.forge/artifacts/<session>/routing/events.jsonl`. Each domain validates its own payload and continuity rules while
+  reusing the same envelope and root run identity.
 - Hooks write:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or

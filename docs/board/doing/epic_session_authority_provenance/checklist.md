@@ -5,14 +5,15 @@ not replace either member's execution checklist. The normative contract is [card
 
 ## Current focus
 
-The epic was activated on 2026-08-21 with C1-C5 accepted and frozen for M1. M2 proposes one evidence-conditional C3
+The epic was activated on 2026-08-21 with C1-C5 accepted and frozen for M1. M2 ratified one evidence-conditional C3
 clarification at its human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped
 via PR #234 (merge `a1c54a05`) and closed to `done/` on 2026-08-22; its
 [execution checklist](../../done/artifact_authority_mode/checklist.md) retains the member evidence. M2
 [Session Route Provenance and Marking](../session_route_provenance/card.md) entered `doing/` on
 `feat/session-route-provenance` on 2026-08-22. Its contract and
-[execution checklist](../session_route_provenance/checklist.md) await human review before implementation. No epic batch
-is authorized.
+[execution checklist](../session_route_provenance/checklist.md) passed human review, including the cross-member abort
+reader correction, fixture-grounded acceptance matrix, CLI/documentation surfaces, and transaction-seam clarification;
+implementation is active on the member branch. No epic batch is authorized.
 
 ## Activation bookkeeping
 
@@ -27,7 +28,7 @@ is authorized.
   cost, spawn-boundary reason codes, and artifact containing-tree matrix.
 - [x] No implementation or commit began during ratification; execution remains at the user-requested review boundary.
 - [x] After M1 closeout, M2 was accepted for detailed planning on its own branch, moved to `doing/`, and received a
-  decision-grounded checklist; implementation remains paused for human review.
+  decision-grounded checklist; the user ratified the reviewed checklist before source implementation.
 
 Activation and ratification verification (2026-08-21): all affected local Markdown links resolve, `git diff --check`
 passes, and `make pre-commit-md` passes.
@@ -50,7 +51,7 @@ These close only with member evidence; M1 must implement the neutral seam withou
 - [x] **C5 -- presentation:** M1 ships only `session authority show`; it adds no status-line segment and no combined
   authority/marking badge.
 - [x] M1 tests leave an explicit neutral-helper contract for M2, including enum and schema drift guards.
-- [ ] **M2 composition -- C3 clarification and abort presentation:** ratify that a landed authority abort supersedes
+- [x] **M2 composition -- C3 clarification and abort presentation:** ratify that a landed authority abort supersedes
   same-run start evidence in the M1 reader even when active clear fails; simultaneous abort/clear failure retains the
   epic's explicit evidence limitation.
 
@@ -60,13 +61,21 @@ explicit future routing/projection insertion boundary. Strict absence/history re
 pinned by focused, full-unit, regression, and Docker acceptance tests; exact results live in the M1 checklist. PR #234
 merged as `a1c54a05`, and the member's lane/link closeout completed on 2026-08-22.
 
+M2 pre-merge evidence (2026-08-22): routing reuses the shared envelope, lock/path helper, root run identity, and marked
+launch transaction while remaining independently readable for unmarked sessions. Failure-injection tests pin
+same-payload compensation, abort precedence, active-state cleanup, and child suppression; integration tests compose
+authority, routing, proxy, sidecar, and both runtime launch boundaries. On the member branch, 9,718 unit tests and 1,067
+regression tests pass, targeted integration passes as 17 plus one exact host lifecycle case, and the isolated wheel
+smoke loads the packaged all-unknown catalog. The member remains `doing/` pending PR review and merge, so aggregate
+acceptance and epic closeout below remain open.
+
 ## Member sequence
 
 - [x] **M1 -- Artifact Authority Mode (done):** checklist reviewed, implemented, verified, docs synchronized, merged via
   PR #234, and closed from `doing/` to `done/` with inbound links repointed.
 - [x] **M2 -- Session Route Provenance and Marking (doing):** accepted for detailed planning after M1 closeout; separate
   branch/checklist created with mandatory reuse of M1's journal/run-correlation seam.
-- [ ] Review and ratify M2 D1-D8 before source implementation.
+- [x] Review and ratify M2 D1-D8 before source implementation.
 - [ ] Implement, verify, document, and close M2 independently; do not fork the shared helper or vocabulary.
 
 ## Aggregate acceptance (deferred until both members ship)

@@ -1045,11 +1045,16 @@ result instead of printing a second document; verification failure does not undo
 The proxy `GET /` endpoint is the authoritative source for:
 
 - Proxy identity
-- Tier→model mappings
+- Canonical runtime backend id
+- Effective tier→model and per-tier model-alternative mappings, after any active ZDR substitution
 - Current health status
 - Runtime metrics (requests, tokens, latency)
 
-File caches (index.json, proxy.yaml) are convenience; proxy state is truth.
+The added `runtime.backend_id` and `runtime.model_alternatives` fields are secret-free. Older proxies remain compatible:
+`forge session model show` falls back from live runtime to current `proxy.yaml`, then the supported launch commitment,
+and labels the source instead of presenting fallback as live truth. The opt-in status-line `marking` segment is
+stricter: without the authoritative live fields it renders `mark:?`, never a config-derived yes/no. File caches
+(`index.json`, `proxy.yaml`) are operational conveniences; a reachable proxy is runtime truth.
 
 ### Gotchas
 
