@@ -681,6 +681,11 @@ def _set_skill_invocation(parts: tuple[str, ...], value: str, console: Console) 
 
     write_runtime_config(data)
     console.print(f"[green]Set[/green] skills.invocation.{skill_name}={value}")
+    print_tip(
+        "Run 'forge extension sync' to apply the new invocation mode to installed packages.",
+        blank_before=False,
+        console=console,
+    )
 
 
 def _print_downstream_retention_status(console: Console, resolution: Any) -> None:

@@ -521,8 +521,8 @@ ownership.
 
 **Design principles:**
 
-- **Narrow global config** -- `forge config` owns runtime preferences and shared telemetry lifecycle only; routing stays
-  per-proxy and workflow state stays per-session
+- **Narrow global config** -- `forge config` owns runtime preferences, shared telemetry lifecycle, and skill invocation
+  policy; routing stays per-proxy and workflow state stays per-session
 - **Explicit verbs** -- non-leaf groups print help; leaves perform the action
 - **Launch through Forge** -- `forge session start`, `forge session resume`, or `forge claude start --proxy` sets up env
   vars correctly

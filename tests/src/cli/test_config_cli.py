@@ -407,6 +407,8 @@ class TestConfigSetSkills:
         result = runner.invoke(config, ["set", "skills.invocation.review=model"])
 
         assert result.exit_code == 0, result.output
+        assert "Set skills.invocation.review=model" in result.output
+        assert "Run 'forge extension sync' to apply the new invocation mode" in result.output
         data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
         assert data["skills"]["invocation"] == {"review": "model"}
         assert get_runtime_config().skills.allows_model_invocation("review") is True
