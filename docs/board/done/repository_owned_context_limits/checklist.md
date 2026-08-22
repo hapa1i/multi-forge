@@ -92,7 +92,7 @@ Authoritative counts (`anthropic API (claude-opus-5)`):
 ## Verification and closeout
 
 - [x] Run focused script/link tests, unit, regression, Markdown pre-commit, full pre-commit, and `git diff --check`.
-- [ ] Update the change log, close the card, push the branch, and open the PR.
+- [x] Update the change log, close the card, push the branch, and open the PR.
 
 Verification evidence:
 
@@ -102,3 +102,4 @@ Verification evidence:
 - The file-size hook passes against all 1,658 eligible repository files in 3.2 seconds after per-file counts were
   batched into one process per method chain.
 - Full pre-commit, Markdown pre-commit, and `git diff --check` pass.
+- PR [#237](https://github.com/hapa1i/multi-forge/pull/237) opened from the verified four-commit implementation head.
