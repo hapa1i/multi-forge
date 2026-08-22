@@ -353,6 +353,6 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
 - [x] Update the epic checklist with aggregate M1+M2 evidence.
 - [ ] Add a proportionate completed-work entry to `docs/board/change_log.md`; promote only human-approved durable
   lessons to `docs/board/impl_notes.md`.
-- [ ] Re-read the commit/PR description and remove filler, inventory, and process narration.
+- [x] Re-read the commit/PR description and remove filler, inventory, and process narration.
 - [ ] After merge, move M2 `doing/ -> done/`, repoint inbound links, and close the epic only when its aggregate
   acceptance and closeout are complete.
