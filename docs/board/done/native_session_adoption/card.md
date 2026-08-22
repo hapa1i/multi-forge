@@ -249,7 +249,7 @@ All ingredients exist; nothing constructs a manifest *from* a rollout today:
 - Resume dispatch needs zero new code: `session_runtime(manifest) == "codex"` routes to `run_codex_resume` (dispatch
   `cli/session_lifecycle.py:1348`; defined in `cli/session_codex.py:237`), cross-CWD by design.
 - Fold in the known doc lag: the `CodexConfirmed.rollout_source` docstring (`session/models.py:531-533`) lists only two
-  of the three existing values (`discovered_post_exit` is missing, though `design_appendix.md` §I.1 lists all three);
+  of the three existing values (`discovered_post_exit` is missing, though `design_sessions.md` §I.1 lists all three);
   add `discovered_post_exit` and `adopted` together.
 
 ### Invariant amendments (design-doc sync owed with Phase 1)

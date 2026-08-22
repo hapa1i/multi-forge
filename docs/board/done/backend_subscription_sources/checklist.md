@@ -125,7 +125,7 @@ all three design decisions resolved (A = Option (c), user 2026-06-26; B/C below)
 
 - [x] Acceptance tests (table below) -- all rows covered in `test_sources.py`, `test_lanes.py`,
   `test_backend_commands.py` (61 focused tests pass).
-- [x] Design-doc sync: `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
+- [x] Design-doc sync: `design_runtime.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
   `reachable_via`; `chatgpt` added to the shipped-catalog table; operator-view paragraph documents the runtime-owned
   read surface). Epic checklist §A.2.1 design-doc-sync item ticked.
 - [x] `change_log.md` entry (newest-first) added. mypy clean.

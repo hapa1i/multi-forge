@@ -24,7 +24,7 @@ Reverified on `93957659`: `needs_reindex` is definition/test-only while the star
 decomposes, and rewrites all three search stores before marking the transcript indexed. The existing state contract
 compares only `mtime` and size; it is not a content hash and cannot distinguish same-size content changes whose `mtime`
 is deliberately restored. The focused 58-test search-state/startup-queue baseline passes. Authority:
-[`docs/design.md` "3.8 Session artifacts"](../../../design.md#38-session-artifacts-plans--transcripts).
+[`docs/design_sessions.md` "3.8 Session artifacts"](../../../design_sessions.md#38-session-artifacts-plans-transcripts).
 
 ## Acceptance Criteria
 

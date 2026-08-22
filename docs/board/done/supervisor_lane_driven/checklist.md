@@ -98,7 +98,7 @@ New `TestSupervisorLaneDispatch` class; existing tests untouched.
   (`shadow_runner.py:142`, `usage_command="supervisor-shadow"`). Both route through the seam -> single-emit. 215
   `tests/src/policy/semantic` pass (incl. shadow).
 - [x] `mypy` + `pyright` clean on changed source. `make pre-commit` clean.
-- [x] **Design-doc sync**: `design_appendix.md` §G consumer-lane layering note added. **Debt (deferred):** design.md
+- [x] **Design-doc sync**: `design_runtime.md` §G consumer-lane layering note added. **Debt (deferred):** design.md
   §3.6.12 narrative left unchanged -- the supervisor is one byte-identical consumer; defer the §3.6.12 lane paragraph to
   T1b/T6 when >1 consumer is wired and a durable binding exists. (Epic design-doc-sync item stays open for that.)
 - [x] `change_log.md` entry added (2026-06-25, newest-first).

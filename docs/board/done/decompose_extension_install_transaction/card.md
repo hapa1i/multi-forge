@@ -19,8 +19,9 @@ and tracking commit boundary established by Wave 4.
 Reverified on `b72fab14`, `init()` remains 425 lines spanning compiled-skill materialization, dispatcher/files, Claude
 settings/ownership, stale-file cleanup, Codex registration, and final tracking. These phases have different failure and
 rollback semantics; “split the method” is unsafe unless the existing fault matrix remains explicit. Authority:
-[`docs/design_appendix.md` "C. Install Model Reference"](../../../design_appendix.md#c-install-model-reference) and
-[`docs/design.md` "5.1 Extensions install model"](../../../design.md#51-extensions-install-model).
+[`docs/design_installation.md` "C. Install Model Reference"](../../../design_installation.md#c-install-model-reference)
+and
+[`docs/design_installation.md` "5.1 Extensions install model"](../../../design_installation.md#51-extensions-install-model).
 
 Order-5 review also found 21 patches of the installer module's `get_target_root` binding across eight test files. The
 component integration helper caused 11 failures once planning reached lower path policy and was repaired on order 5 by

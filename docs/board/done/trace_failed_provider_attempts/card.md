@@ -20,7 +20,7 @@ downstream event identity.
 
 Current seams: `src/forge/proxy/server.py` around the generic completion exception and
 `src/forge/proxy/responses_passthrough.py` around request/open/non-200 handling. Authority:
-[`design_appendix.md` provider trace](../../../design_appendix.md) and the existing `ProviderTraceRecord` lifecycle.
+[`design_telemetry.md` provider trace](../../../design_telemetry.md) and the existing `ProviderTraceRecord` lifecycle.
 
 ## Acceptance Criteria
 

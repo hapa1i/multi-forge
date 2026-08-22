@@ -72,7 +72,7 @@ All 15 tests pass. The card's acceptance table plus the Phase 0 regression guard
 ## Phase 4 -- Closeout
 
 - [x] `make pre-commit` clean; `mypy` + `pyright` pass on `src/forge/core/lanes.py` + the test.
-- [x] Design-doc sync: nothing to sync for T1a (internal + additive). The `design_appendix.md` §G / `design.md` §3.6.12
+- [x] Design-doc sync: nothing to sync for T1a (internal + additive). The `design_runtime.md` §G / `design.md` §3.6.12
   update lands with T3 when a consumer is wired (tracked in the epic checklist).
 - [x] `change_log.md` entry added (2026-06-25). Epic roster T1a -> done flips at merge.
 - [x] After the PR merges to `main`, move `doing/consumer_lane_resolver/` -> `done/` (board_contract closeout). Merged

@@ -15,10 +15,12 @@ setup. This `AGENTS.md` is the primary repository-wide agent context. `CLAUDE.md
 imports this file; keep shared instructions here and only Claude-specific routing there.
 `docs/developer/coding_standards.md`, `testing_guidelines.md`, `documentation_guidelines.md`, `cli_style_guidelines.md`,
 and `board_contract.md` define code style, test policy, doc writing, CLI command shape, and board workflow rules.
-`docs/board/README.md` is a board directory guide with examples, not the authority. Update `docs/design.md` and
-`docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
-installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide
-so wheel-installed users get the right Day 1 path.
+`docs/board/README.md` is a board directory guide with examples, not the authority. Update `docs/design.md` or the
+corresponding session, runtime, telemetry, installation, workflow, or memory design document when architecture or file
+ownership changes. When changing config ownership, auth resolution, installer behavior, proxy/session semantics, or
+workflow prerequisites, also update the relevant `docs/end-user/*` guide so wheel-installed users get the right Day 1
+path. Repository file-size thresholds and token-counter policy live in the tracked root `.file-size-limits.json`; a
+personal hook may invoke the checker, but it does not own Multi-Forge's limits.
 
 Board quick semantics: `todo/` means accepted but parked; starting a todo card means create or switch to the execution
 branch, move the card directory to `doing/`, and create/update its `checklist.md`. `doing/` is active work; `paused/` is

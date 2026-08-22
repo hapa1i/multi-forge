@@ -28,7 +28,7 @@ global retention is a documented operator choice and is not replaced by a new pl
 
 ## Expected Behavior
 
-The [§A.11 no-plaintext posture](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
+The [§A.11 no-plaintext posture](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
 applies to debug diagnostics as well as request logs. Tool events may retain stage, status, bounded tool/request IDs,
 counts, flags, parameter names, and event enums. Tool inputs, schemas/descriptions, tool-result/error content, and
 arbitrary nested caller data do not belong in this plane.

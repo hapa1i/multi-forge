@@ -50,7 +50,7 @@ The real gap is **shape and coverage, not correctness**:
 1. **`has_api_key` is a capability, not a payer.** `infer_billing_mode`'s only subscription-relevant input is "is a key
    resolvable," which cannot distinguish key-billed from subscription-billed when both exist. The status line already
    encodes this exact rule -- it refuses to infer an API payer from `ANTHROPIC_API_KEY` presence
-   (`cli/statusline/context.py:139-151`; design_appendix **§A.8** "Billing-aware cost": billing mode is "an explicit
+   (`cli/statusline/context.py:139-151`; design_telemetry.md **§A.8** "Billing-aware cost": billing mode is "an explicit
    declaration, never inferred from a key"). So the inference function is the **wrong shape** for subscription
    detection.
 2. **No Claude subscription signal exists at all.** A `src/`-wide search finds **no** Anthropic OAuth/subscription
@@ -59,7 +59,7 @@ The real gap is **shape and coverage, not correctness**:
    subscription-authed.
 3. **The reserved modes are empty on the Claude side.** `BillingMode` already declares
    `subscription_interactive | subscription_headless_credit | subscription_quota` (`core/usage/ledger.py:66-72`,
-   design_appendix §A.13), but only **Codex** emits a subscription mode today.
+   design_telemetry.md §A.13), but only **Codex** emits a subscription mode today.
 
 So T0 is not "fix `billing.py`." It is: **prove whether the already-allowed keyless OAuth path actually rides the Max
 subscription, and if so add a preflight-resolved subscription signal** (mirroring the codex sibling) so the `claude-max`
@@ -216,6 +216,6 @@ inference (forbidden -- design §3.14).
 | `BillingPosture` (Q3 resolved -> no gap)    | `backend/sources.py:24`                                                                                                              | `Literal["per_token","subscription_quota","free"]` already carries `subscription_quota`; Q3 = quota, so no extension needed                                                                                                                                 |
 | Proven codex sibling (key-first precedence) | `core/runtime/codex_preflight.py:365-403` (`_resolve_codex_auth`)                                                                    | `stored API key` -> `api` **before** `stored ChatGPT tokens` -> `subscription_quota`, at **preflight**                                                                                                                                                      |
 | Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                                                                                                                            |
-| Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                                                                                                                               |
-| Reserved subscription modes                 | design_appendix **§A.13**                                                                                                            | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                                                                                                                           |
+| Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_telemetry.md **§A.8**                                                                    | declarative `cost_mode`; never infers payer from key presence                                                                                                                                                                                               |
+| Reserved subscription modes                 | design_telemetry.md **§A.13**                                                                                                        | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                                                                                                                           |
 | Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => the stored OAuth *path* (subscription **candidate**; durable label needs a declared `claude-max`) -- a dependable *gate*, not sufficient proof |

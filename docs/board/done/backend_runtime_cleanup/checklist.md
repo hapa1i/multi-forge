@@ -148,7 +148,7 @@ re-raises `SystemExit` only when a single target (`:1154`).
 - [x] `docs/cli_reference.md` "Model management" table: update the `backend stop` row (stop a **runtime instance** by
   id; `--all`) and `backend delete` row (**config-only**; `--port` removed); confirm the `backend start` row still reads
   source/adapter. **Assertion:** the three rows match shipped help.
-- [x] `docs/design_appendix.md` §A.2.1 (the `forge model backend` operator-view paragraph): update the "`start` and
+- [x] `docs/design_runtime.md` §A.2.1 (the `forge model backend` operator-view paragraph): update the "`start` and
   `stop` accept local source ids or legacy adapter operands" sentence to the new split -- `stop` takes runtime instance
   ids + `--all`; `start` stays source/adapter; `delete` is config-only. **Assertion:** the paragraph names the
   start/stop asymmetry and the `--port` removal.
@@ -200,7 +200,7 @@ re-raises `SystemExit` only when a single target (`:1154`).
 - [x] Integration: none expected (host CLI + registry file; no `claude -p`/Docker path). Confirm and record if that
   holds.
 - [x] `change_log.md` entry added (feature-completion size).
-- [x] Docs synced: `cli_reference.md`, `design_appendix.md` §A.2.1, `end-user/proxy.md`.
+- [x] Docs synced: `cli_reference.md`, `design_runtime.md` §A.2.1, `end-user/proxy.md`.
 - [x] cli_style index annotated: **B1 shipped** (strike the group-help rows folded here); note the remaining B1 metavar
   \+ B2-B5 rows stay in `doing/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
 - [x] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).

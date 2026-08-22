@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: D011 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D011 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #134 (`6be815bf`) on 2026-08-06.
 
@@ -17,8 +18,8 @@ so transient I/O cannot trigger corruption handling or destructive queue outcome
   strict on content and must surface actionable failures without inventing corruption.
 - `src/forge/core/state/exceptions.py`: `StateUnreadableError` already defines failed reads as distinct from
   `StateCorruptedError` and forbids treating them as deletable corruption.
-- [`docs/design.md` §3.13](../../../design.md#313-async-work-queue): queue retries and poison handling apply to work
-  execution failures, not bytes that Forge could not read.
+- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue): queue retries and poison handling
+  apply to work execution failures, not bytes that Forge could not read.
 
 ## Evidence
 
@@ -48,8 +49,8 @@ Workqueue drains now distinguish unreadable bytes from malformed content. An unr
 does not increment retry or poison state, contributes a structured non-fatal diagnostic, and does not stop a later
 selected marker. CLI startup owns rendering that diagnostic on stderr, so a foreground `--json` result stays parseable;
 malformed markers still move directly to `failed/`, and handler failures keep their bounded retry behavior. The queue
-processing contract is synchronized in `docs/design.md` and `docs/design_appendix.md` without implementing D021's
-newer-schema outcome.
+processing contract is synchronized in `docs/design.md` and the former consolidated design appendix without implementing
+D021's newer-schema outcome.
 
 The marked D011 regression failed on the branch base with `StateCorruptedError` and passed after the fix. Focused
 reader, caller, workqueue, and CLI coverage passed (198); the Docker startup-queue file passed (9), including a real

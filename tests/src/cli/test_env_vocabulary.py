@@ -329,9 +329,9 @@ def scan_docs_for_internal_names(paths: list[Path], repo_root: Path) -> list[Env
     return offenders
 
 
-def _appendix_table() -> dict[str, str]:
-    appendix = (_repo_root() / "docs" / "design_appendix.md").read_text(encoding="utf-8")
-    section = appendix.split("### A.7b Forge env-var vocabulary", maxsplit=1)[1].split("\n### ", maxsplit=1)[0]
+def _installation_design_table() -> dict[str, str]:
+    design = (_repo_root() / "docs" / "design_installation.md").read_text(encoding="utf-8")
+    section = design.split("### A.7b Forge env-var vocabulary", maxsplit=1)[1].split("\n### ", maxsplit=1)[0]
 
     table: dict[str, str] = {}
     for line in section.splitlines():
@@ -347,8 +347,8 @@ def _appendix_table() -> dict[str, str]:
     return table
 
 
-def test_env_vocab_mapping_matches_design_appendix_table() -> None:
-    assert _appendix_table() == ENV_CLASSES
+def test_env_vocab_mapping_matches_installation_design_table() -> None:
+    assert _installation_design_table() == ENV_CLASSES
 
 
 def test_env_vocab_covers_live_product_env_inventory() -> None:
@@ -357,7 +357,7 @@ def test_env_vocab_covers_live_product_env_inventory() -> None:
 
 
 def test_regex_only_forge_tokens_are_not_classified_as_env_vars() -> None:
-    table = _appendix_table()
+    table = _installation_design_table()
     assert "FORGE_MAX_DEPTH" not in table
     assert "WT_FORGE_LOG_SNAPSHOTS" not in table
     assert "FORGE_REV" not in table

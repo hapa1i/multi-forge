@@ -127,10 +127,10 @@ instead of inventing a fixture.
 
 ## Phase 4 -- Docs
 
-- [x] Correct `docs/design_appendix.md:1262`. **Assertion**: the clause currently reads "disable refuses a tracked path
-  that no longer matches the scope mapping" -- refusing the *path*. Restate it as refusing the *operation* and
-  preserving tracking. This compression is what made the defect read as intended behavior; the docstring at
-  `installer.py:2469-2471` ("Forge refuses to edit the unexpected file") needs the same correction.
+- [x] Correct line 1262 of the former consolidated design appendix. **Assertion**: the clause currently reads "disable
+  refuses a tracked path that no longer matches the scope mapping" -- refusing the *path*. Restate it as refusing the
+  *operation* and preserving tracking. This compression is what made the defect read as intended behavior; the docstring
+  at `installer.py:2469-2471` ("Forge refuses to edit the unexpected file") needs the same correction.
 - [x] Add the `docs/board/change_log.md` entry (newest first: Goal / Key changes / Verification). **Assertion**: bug-fix
   sized per `board_contract.md` (5-10 lines); states the behavior change -- a previously silent success now exits
   non-zero -- and the known limitation for already-orphaned blocks.
@@ -177,7 +177,7 @@ note, not an omission.
 
 - [x] Every box above ticked with verification recorded.
 - [x] `docs/board/change_log.md` entry added.
-- [x] `docs/design_appendix.md:1262` and the `installer.py` docstring reflect shipped behavior.
+- [x] `docs/design_installation.md:1262` and the `installer.py` docstring reflect shipped behavior.
 - [x] Card moved `doing/` -> `done/`, and the five inbound links repointed from `../../doing/...` to `../../done/...`:
   [extension_disable_runtime](../../done/extension_disable_runtime/card.md) (3) and
   [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) (2). These were repointed once

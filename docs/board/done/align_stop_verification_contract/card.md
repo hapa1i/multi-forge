@@ -5,7 +5,7 @@
 **Decision**: [`stop_verification_contract`](../../done/stop_verification_contract/card.md) (DG1; D006, U002–U003).
 
 **Findings**: D006 (HIGH), U002 (MEDIUM), and U003 (LOW) in
-[`review_combined.md`](../../review_combined.md#design-conformance-findings).
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- implemented and verified on `fix/align-stop-verification-contract` as the first Wave 2 member.
 

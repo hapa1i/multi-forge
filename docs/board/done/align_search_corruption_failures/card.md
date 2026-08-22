@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: D017 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D017 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #151 (`efbefce9`).
 

@@ -151,7 +151,7 @@ review + closeout.
 - [x] Adversarial review workflow on the full diff before final (9 agents, 7 dimensions + refute-by-default verify): 0
   blockers/majors/minors in production code; 1 confirmed nit (no direct 0600 assertion on the request shard) -> fixed
   via `test_written_shard_is_owner_only_0600`; 1 rejected (passthrough coverage, out of scope).
-- [x] Docs: design.md §7.x (renamed A.11 anchor + Request-log-hygiene note) + design_appendix §A.11 (new `logging`
+- [x] Docs: design.md §7.x (renamed A.11 anchor + Request-log-hygiene note) + design_telemetry.md §A.11 (new `logging`
   block: YAML, field table, plane note) + end-user `proxy.md` (Request diagnostics logging section) + `cli_reference.md`
   (`forge logs` delta; `forge proxy show --raw` already covers block rendering).
 - [x] Fold the claim corrections above into `card.md` (Resolution section + Status update).

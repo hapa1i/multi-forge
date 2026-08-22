@@ -27,9 +27,9 @@ local exception class and admitted the separate provider-side catch-all leak as 
 
 ## Expected Behavior
 
-[`docs/design_appendix.md` §A.11](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
+[`docs/design_telemetry.md` §A.11](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
 and the durable
-[proxy-log hygiene note](../../impl_notes.md#no-caller-content-in-proxy-logs-redactor-excludes-caller-free-text-proxy_log_hygiene-review-2026-06-16)
+[proxy-log hygiene note](../../impl_notes/runtime_telemetry.md#no-caller-content-in-proxy-logs-redactor-excludes-caller-free-text-proxy_log_hygiene-review-2026-06-16)
 permit counts, flags, enums, bounded identifiers, and structural metadata in ordinary module logs. Caller prompts,
 message content, tool descriptions/schemas, raw arguments, and whole tool-call objects require an explicitly opted-in
 raw-content plane.

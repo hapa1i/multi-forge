@@ -199,13 +199,18 @@ Forge uses files instead of a database:
 
 ## Project Docs
 
-| Document                                      | Purpose                                             |
-| --------------------------------------------- | --------------------------------------------------- |
-| [design.md](../design.md)                     | Core architecture and design                        |
-| [design_appendix.md](../design_appendix.md)   | Reference details (schemas, tables)                 |
-| [design_workflows.md](../design_workflows.md) | Policy, skills, workflow runners, and memory design |
-| [cli_reference.md](../cli_reference.md)       | Terminal and direct-command inventory               |
-| [end-user/](../end-user/)                     | End-user guides (sessions, proxies, policies, etc.) |
+| Document                                            | Purpose                                               |
+| --------------------------------------------------- | ----------------------------------------------------- |
+| [design.md](../design.md)                           | Core architecture and shared state                    |
+| [design_sessions.md](../design_sessions.md)         | Sessions, transfer, hooks, queues, and Codex          |
+| [design_runtime.md](../design_runtime.md)           | Proxies, backends, routing, clients, and isolation    |
+| [design_telemetry.md](../design_telemetry.md)       | Status, spend, audit, usage, and provider lifecycle   |
+| [design_installation.md](../design_installation.md) | Configuration, credentials, and extensions            |
+| [design_workflows.md](../design_workflows.md)       | Policy, skills, and workflow runners                  |
+| [design_memory.md](../design_memory.md)             | Designated memory, passports, writers, and activation |
+| [design_history.md](../design_history.md)           | Retired contracts and removal rationale               |
+| [cli_reference.md](../cli_reference.md)             | Terminal and direct-command inventory                 |
+| [end-user/](../end-user/)                           | End-user guides (sessions, proxies, policies, etc.)   |
 
 ## Common Tasks
 

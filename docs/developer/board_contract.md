@@ -158,11 +158,11 @@ During card execution:
 
 ## Board Memory Files
 
-| File                                 | Role                                         | Maintenance contract                                                                         |
-| ------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `docs/board/change_log.md`           | Completed-work record                        | Newest first, compact, includes goal/key changes/verification                                |
-| `docs/board/impl_notes.md`           | Human-approved durable implementation memory | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
-| `.forge/memory/shadow_impl_notes.md` | Shadow proposals for `impl_notes.md`         | Memory writer may append; humans review and promote                                          |
+| File                                 | Role                                      | Maintenance contract                                               |
+| ------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------ |
+| `docs/board/change_log.md`           | Current completed-work record             | Newest first; rotate complete old entries verbatim into `archive/` |
+| `docs/board/impl_notes.md`           | Durable-memory index                      | Route human-approved decisions to its domain ledgers               |
+| `.forge/memory/shadow_impl_notes.md` | Shadow proposals for implementation notes | Memory writer may append; humans review and promote                |
 
 Card checklists are edited directly during implementation. Do not track card checklists as memory-writer memory docs.
 
@@ -205,7 +205,8 @@ If more than 10 files changed, summarize by package instead of listing every fil
 
 ## Implementation Notes Policy
 
-`impl_notes.md` is not a session diary. It stores durable memory that should influence future decisions.
+`impl_notes.md` is not a session diary. It is the index for durable memory that should influence future decisions;
+promote a note to the narrowest domain ledger linked there.
 
 Promote only:
 
@@ -258,8 +259,9 @@ wc -l docs/board/*.md docs/board/*/*/*.md
 ./scripts/count-tokens.py docs/board/doing/<slug>/checklist.md
 ```
 
-Compact `change_log.md` by summarizing the oldest tail entries first. Preserve dates, goals, decisions, verification,
-and deferred items.
+Rotate `change_log.md` by moving complete oldest date blocks into a dated file under `docs/board/archive/`. Do not
+summarize, merge, or shorten historical entries as part of a size migration. Keep the current file's archive index
+linked and newest-first.
 
-Prune obsolete or duplicated `impl_notes.md` entries instead of appending forever. If a note is not useful for a future
-session's decisions, it belongs in the change log or nowhere.
+Partition implementation notes by decision domain behind `impl_notes.md`; do not copy a note into multiple ledgers.
+Removing a genuinely obsolete or duplicated note requires an explicit content review, not a size-only rewrite.

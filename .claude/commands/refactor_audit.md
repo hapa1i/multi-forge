@@ -116,8 +116,8 @@ judging.
 
 This repo's authority map:
 
-- `docs/design.md` §3.5 (file ownership), §3.12 (command-core ops), §3.14 (telemetry plane separation) and the other
-  design docs (`design_appendix.md`, `design_workflows.md`, `cli_reference.md`) — normative shipped architecture.
+- `docs/design.md` §3.5 (file ownership) and §3.12 (command-core ops), plus the session, runtime, telemetry,
+  installation, workflow, memory, and CLI design documents — normative shipped architecture.
 - `docs/developer/coding_standards.md` (§1 module structure, §5 internal clean-break rules) and
   `docs/developer/cli_style_guidelines.md` (ops are UI-agnostic; CLI owns rendering).
 - `docs/developer/testing_guidelines.md` — test mirroring, monkeypatch/fixture policy, the documented

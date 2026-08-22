@@ -14,12 +14,12 @@ validation, failure, recovery, and concurrent deletion without combining eight i
 
 - [`docs/design.md` §3.2](../../../design.md#32-contract-files-authoritative-paths): the manifest is the durable session
   reservation, the global index is its discovery cache, and deletion must remain terminal.
-- [`docs/design.md` §3.3](../../../design.md#33-session-file-schema-forgesessionjson): session manifests are strict
-  durable workflow records with field-owned intent, overrides, and confirmed facts.
-- [`docs/design.md` §3.9](../../../design.md#39-session-resume-context-management): `intent.launch.runtime` is immutable
-  dispatch identity, and transfer strategies describe what actually ran.
-- [`docs/design.md` §3.13](../../../design.md#313-async-work-queue) and
-  [`docs/design_appendix.md` §B](../../../design_appendix.md#b-work-queue-internals): deferred markers are versioned
+- [`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson): session
+  manifests are strict durable workflow records with field-owned intent, overrides, and confirmed facts.
+- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management):
+  `intent.launch.runtime` is immutable dispatch identity, and transfer strategies describe what actually ran.
+- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue) and
+  [`docs/design_sessions.md` §B](../../../design_sessions.md#b-work-queue-internals): deferred markers are versioned
   durable work with explicit success, retry, skip, and poison outcomes.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#5-interface-changes): malformed, unreadable, and
   newer-schema state are distinct outcomes; internal inputs are rejected rather than silently defaulted.

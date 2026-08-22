@@ -54,8 +54,8 @@ the authoritative contract and session manifests only as resolved participation 
     `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/board/README.md`,
     `docs/design.md`, `docs/end-user/handoff.md`, `tests/integration/cli/`, `tests/src/cli/test_session_memory.py`,
     `src/skills/qa/resources/checklist/`, and `src/skills/walkthrough/resources/checklist.md`.
-  - Verification: 8 UPDATE (including old-model YAML config in handoff.md, design_appendix.md G.2, and design.md
-    DesignatedDoc schema), 2 REMOVE, 5 KEEP -- full inventory with line numbers in impl_notes.md. Includes
+  - Verification: 8 UPDATE (including old-model YAML config in handoff.md, the former consolidated design appendix G.2,
+    and design.md DesignatedDoc schema), 2 REMOVE, 5 KEEP -- full inventory with line numbers in impl_notes.md. Includes
     test_session_handoff_show.py (KEEP) and this card (KEEP).
 - [x] Decide which existing helpers stay private.
   - Assertion: reusable storage, validation, and handoff helpers are named, and public compatibility aliases are

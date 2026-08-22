@@ -346,9 +346,9 @@ Installer recovery has its own acceptance contract:
   cleanup/re-enable path because editable source and cache paths can hide packaging errors.
 
 Implementation must update the normative runtime-skill ownership and partial-write sections in `docs/design.md` and
-`docs/design_appendix.md`, the `extension status --json` and `clean` contracts in `docs/cli_reference.md`, the relevant
-Day 1 extension guide and durable-state reset sequence under `docs/end-user/`, and board change/implementation notes at
-closeout.
+`docs/design_installation.md`, the `extension status --json` and `clean` contracts in `docs/cli_reference.md`, the
+relevant Day 1 extension guide and durable-state reset sequence under `docs/end-user/`, and board change/implementation
+notes at closeout.
 
 ## Related
 

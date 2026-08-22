@@ -120,4 +120,4 @@ Not fail-loud, not fail-open -- no user watches a terminal.
 - T6a (done), T6b (done) -- the binding + the codex dispatch seam + the template.
 - T4 (done) -- the original supervisor codex arm.
 - **If D1=A**, T6c is the epic's first lane to relax the read-only scope guard; record the trust posture in the epic
-  card + design docs (design.md scope note, design_appendix §G).
+  card + design docs (design.md scope note, design_runtime.md §G).

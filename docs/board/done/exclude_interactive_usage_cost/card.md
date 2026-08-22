@@ -16,7 +16,7 @@ cannot re-enter Forge-added cost through a shared root.
 Rechecked on merged `main` at `7280d177`: `_join_session_cost()` still builds roots and sums `per_run` before filtering
 interactive events. A disposable characterization returned 500,000 micro-USD for an all-interactive root and 530,000 for
 a mixed root whose only non-interactive cost was 30,000. The two-plane no-blend rule is load-bearing in
-[`docs/design_appendix.md` §A.8](../../../design_appendix.md#a8-status-line-guidance-3611).
+[`docs/design_telemetry.md` §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611).
 
 That shape is latent in the shipped system: §A.13 reserves the `claude_interactive` route without a production emitter,
 and managed interactive launches do not freshly stamp the proxy correlation headers needed by the root-addressed cost

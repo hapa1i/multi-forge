@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: O002 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
+**Finding**: O002 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- shipped in PR #149 (`c20b8d10`) after independent review.
 
@@ -13,8 +14,8 @@ refused or fails.
 
 ## Design Authority
 
-- [`docs/design.md` §3.6.3](../../../design.md#363-proxy-lifecycle-ux): the proxy surface owns configuration and process
-  lifecycle.
+- [`docs/design_runtime.md` §3.6.3](../../../design_runtime.md#363-proxy-lifecycle-ux): the proxy surface owns
+  configuration and process lifecycle.
 - [`cli_style_guidelines.md` failure rules](../../../developer/cli_style_guidelines.md#review-checklist): a failed leaf
   exits non-zero and must not present success.
 

@@ -205,8 +205,8 @@ Reuse seams, confirmed by symbol on this branch:
 
 - [x] `design.md §3.10` (Hook handlers / Deployment model): hooks resolve the global `forge` via the dispatcher; note
   the no-op gate + `FORGE_SESSION` short-circuit.
-- [x] `design_appendix §C` (install model): metadata home, resolution contract, the rendered absolute-path form, and the
-  shim-staleness (stamp + sync-re-render + doctor drift) contract.
+- [x] `design_installation.md §C` (install model): metadata home, resolution contract, the rendered absolute-path form,
+  and the shim-staleness (stamp + sync-re-render + doctor drift) contract.
 - [x] Epic `card.md` shared-contract **seam 3** (Forge-binary resolution): record chosen shape, metadata home, and
   gate-parity strategy; amend **seam 2** if parity is stdlib-duplication rather than codegen-from-source.
 

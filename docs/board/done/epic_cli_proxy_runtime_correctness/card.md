@@ -16,12 +16,12 @@ status-line source discovery tell one observable truth without combining seven i
   has one global policy and one pruner, with fail-closed conflict handling.
 - [`cli_style_guidelines.md`](../../../developer/cli_style_guidelines.md#output-streams): scriptable output is one
   stable JSON result, diagnostics/errors use stderr, and failed leaves exit non-zero.
-- [`docs/design.md` §3.6.3](../../../design.md#363-proxy-lifecycle-ux): proxy configuration and process lifecycle are
-  owned by the proxy surface.
-- [`docs/design_appendix.md` §A.8](../../../design_appendix.md#a8-status-line-guidance-3611): status-line sources are
+- [`docs/design_runtime.md` §3.6.3](../../../design_runtime.md#363-proxy-lifecycle-ux): proxy configuration and process
+  lifecycle are owned by the proxy surface.
+- [`docs/design_telemetry.md` §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611): status-line sources are
   selected to serve configured segments and runtime truth.
-- [`docs/design_appendix.md` §A.11](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
-  and [§A.14](../../../design_appendix.md#a14-provider-lifecycle-fields-in-downstream-telemetry-314): audit/provider
+- [`docs/design_telemetry.md` §A.11](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
+  and [§A.14](../../../design_telemetry.md#a14-provider-lifecycle-fields-in-downstream-telemetry-314): audit/provider
   records share downstream shards, while request diagnostics remain separate.
 - [`review_combined.md`](../../review_combined.md): D015--D018 and O001--O004. O003 already shipped in Wave 3 and is not
   readmitted here.

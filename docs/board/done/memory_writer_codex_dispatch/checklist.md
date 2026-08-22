@@ -97,7 +97,7 @@ Forge's own `parse_codex_jsonl_stream` -- the exact `runtime_is_error` the arm s
 - [x] Confirmed the `runtime=codex`/`billing_mode=subscription_quota`/`route=codex_exec` usage event rides
   `emit_codex_usage` (shared with T4/T6b) -- asserted in the augment E2E. No new observability code.
   `forge session lane show` surfaces the bound codex lane via existing T5/T6a machinery.
-- [x] Design-doc sync: `design_appendix.md` §G -- **Memory-writer codex arm (T6c)** paragraph added (best-effort-async
+- [x] Design-doc sync: `design_runtime.md` §G -- **Memory-writer codex arm (T6c)** paragraph added (best-effort-async
   degrade; per-mode sandbox; first workspace-write lane; permission-scan not ported; deferral note updated).
   `cli_reference.md` -- `--runtime codex` note now lists `memory_writer` (T6c); only `team_supervisor` lacks a codex
   lane. `design.md` -- freeze-trigger line notes the memory-writer codex lane (read-only or workspace-write). end-user

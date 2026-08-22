@@ -17,8 +17,8 @@ override/direct/inheritance calculation. All three choose only `routing.proxy_id
 existing `_resume_context_ref` correctly falls back through `routing.proxy_id or routing.template`. The production CLI
 resolver populates both fields, but `ResolvedRouting` permits template-only values and inherited legacy manifests carry
 only a template. The focused resume/mode/routing baseline is 73 passing tests. Authority:
-[`docs/design.md` "3.9 Session Resume"](../../../design.md#39-session-resume-context-management) and
-[`docs/design.md` "3.6.12 Subprocess routing resolution"](../../../design.md#3612-subprocess-routing-resolution-normative).
+[`docs/design_sessions.md` "3.9 Session Resume"](../../../design_sessions.md#39-session-resume-context-management) and
+[`docs/design_runtime.md` "3.6.12 Subprocess routing resolution"](../../../design_runtime.md#3612-subprocess-routing-resolution-normative).
 
 ## Acceptance Criteria
 

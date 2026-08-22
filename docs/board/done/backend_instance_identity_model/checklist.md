@@ -51,7 +51,7 @@ card dir; it is not promoted to design docs.
 ## Phase 2 -- Design decision
 
 **Deliverable**: decisions recorded in `card.md` as the chosen target architecture; promoted to `design.md` /
-`design_appendix.md §A.2.1` only when the corresponding code ships (board contract: cards are aspirational, design docs
+`design_runtime.md §A.2.1` only when the corresponding code ships (board contract: cards are aspirational, design docs
 are contract).
 
 - [x] **OQ-1 -- object shape.** Decide whether the target is a rename of `ModelSource` or a split into backend kind +
@@ -143,8 +143,8 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S6 -- Docs and closeout
 
-- [x] Update shipped docs for implemented behavior only. **Assertion:** `docs/design.md`, `docs/design_appendix.md`,
-  `docs/end-user/proxy.md`, and `docs/cli_reference.md` match the final CLI/config/telemetry behavior.
+- [x] Update shipped docs for implemented behavior only. **Assertion:** `docs/design.md`, the former consolidated design
+  appendix, `docs/end-user/proxy.md`, and `docs/cli_reference.md` match the final CLI/config/telemetry behavior.
 - [x] Add board closeout entries. **Assertion:** `docs/board/change_log.md` records shipped behavior, and
   `docs/board/impl_notes.md` records only durable invariants for review.
 

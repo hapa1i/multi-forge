@@ -305,8 +305,8 @@ assertions):
 
 - [x] Update `design.md` §3.10/§5.1 with the shipped migration ordering, explicit per-root mutation boundary,
   operation-scoped duplicate guard, and transient hooks-off recovery contract.
-- [x] Update `design_appendix.md` §C.2–C.6 with tracked-root candidate discovery, final selected-root enrollment, Claude
-  tracked/fallback cleanup, Codex marker cleanup, tracking reconciliation, and re-trust behavior.
+- [x] Update `design_installation.md` §C.2–C.6 with tracked-root candidate discovery, final selected-root enrollment,
+  Claude tracked/fallback cleanup, Codex marker cleanup, tracking reconciliation, and re-trust behavior.
 - [x] Add `forge extension cleanup-project` to `docs/cli_reference.md` and document preview/`--yes` behavior.
 - [x] Update wheel-user Day 1/recovery guidance in `docs/end-user/README.md`, `docs/end-user/hook.md`, and
   `docs/end-user/config.md`; update QA/walkthrough extension-hook checks for a pre-T5 migration fixture.

@@ -216,7 +216,7 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 
 - [x] `design.md §3.10` (Hook handlers / Deployment model): describe the **shipped** user-scope-only registration
   cutover in present tense; statusLine stays project-scoped (D3).
-- [x] `design_appendix §C` (install model): scope model + module inventory reflect hooks/codex-hooks → user-only,
+- [x] `design_installation.md §C` (install model): scope model + module inventory reflect hooks/codex-hooks → user-only,
   status-line → project/local; `§C.6` notes the Codex byte cutover + re-trust.
 - [x] `cli_reference.md`: `forge extension enable` scope semantics + the `doctor` double-fire report + changed
   next-steps.

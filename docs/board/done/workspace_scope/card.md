@@ -24,7 +24,7 @@ Definition).
 > [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md).
 
 **References**: design.md §3 (session/proxy state contracts; §3.2 contract files), §3.9 (resume across path boundaries),
-§3.14 (activity/cost planes), cli_reference.md §2 (direct command scope policy), design_appendix.md §G (subprocess
+§3.14 (activity/cost planes), cli_reference.md §2 (direct command scope policy), design_runtime.md §G (subprocess
 routing), §A.13 (activity read surface)
 
 ## Summary

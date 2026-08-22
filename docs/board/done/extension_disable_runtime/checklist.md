@@ -225,7 +225,7 @@ No CLI, no filesystem. This is the contract every later phase reads.
 
 - [x] Add the runtime-scoped removal entry point, reusing `uninstall()`'s boundary validation. **Assertion**:
   `_tracked_file_boundary` + `validate_path_within_boundary` run on the filtered subset, so the `invalid-target` refusal
-  for a symlink-replaced package root still applies (`design_appendix.md` section C.5).
+  for a symlink-replaced package root still applies (`design_installation.md` section C.5).
 - [x] Keep every runtime-spelled request on the runtime-scoped engine, including full coverage (D-full-coverage).
   **Assertion**: full mode selects attributed plus unattributed rows, deletes the row on success, and still uses the
   Codex/failure rules below; it does not call `uninstall()` wholesale. Bare disable stays unchanged.
@@ -248,7 +248,7 @@ No CLI, no filesystem. This is the contract every later phase reads.
   `tests/src/install/test_registered_commands_contract.py` passes unchanged. Codex `trusted_hash` covers command bytes
   and config location, so a re-render forces a needless ceremony on the runtime that was kept.
 - [x] Preserve Codex config boundaries. **Assertion**: bytes outside the markers survive; a whitespace-only remainder
-  deletes the file (`design_appendix.md` section C.6).
+  deletes the file (`design_installation.md` section C.6).
 - [x] Implement the failure taxonomy above, including reconciliation-write failure. **Assertion**: each boundary behaves
   as tabled; mutation precedes the tracking write (F2, application order); reconciliation-write failure restores the
   settings subtransaction, exits non-zero naming the tracking path and any rollback failure, and neither retries nor
@@ -304,9 +304,9 @@ No CLI, no filesystem. This is the contract every later phase reads.
   paragraph; distinguish stale-absent ownership, unsafe markers, and preserved manual outside-marker commands.
 - [x] `docs/cli_reference.md` Installation table -- the flag, last-runtime behavior, `--all` disposition/completion
   contract, and the reconciliation-write exception.
-- [x] `docs/design_appendix.md` sections C.3-C.6 -- runtime-scoped removal, coherent-row requirements, the reversible
-  settings/sidecar subtransaction including zero survivors and the legacy/no-sidecar safety exception, unattributed-row
-  retention, and Codex marker outcomes.
+- [x] `docs/design_installation.md` sections C.3-C.6 -- runtime-scoped removal, coherent-row requirements, the
+  reversible settings/sidecar subtransaction including zero survivors and the legacy/no-sidecar safety exception,
+  unattributed-row retention, and Codex marker outcomes.
 - [x] `docs/board/change_log.md` -- feature-completion sized (15-25 lines).
 - [x] QA: extend `src/skills/qa/resources/checklist/18-disable.md`; update `<!-- test-count: -->` and
   `<!-- last-updated: -->` in `checklist.md` if the checkbox count changes.
@@ -393,8 +393,8 @@ legacy/no-sidecar `unmerge` fallback, per the card.
 
 - [x] Every box ticked with verification recorded.
 - [x] `docs/board/change_log.md` entry added.
-- [x] `cli_reference.md`, `design_appendix.md` sections C.3-C.6, `end-user/hook.md`, and `end-user/skills.md` describe
-  shipped behavior.
+- [x] `cli_reference.md`, `design_installation.md` sections C.3-C.6, `end-user/hook.md`, and `end-user/skills.md`
+  describe shipped behavior.
 - [x] Card moved `doing/` -> `done/` and inbound links repointed from `../../doing/extension_disable_runtime/...`:
   `done/runtime_scoped_extension_modules/card.md` (3), its `checklist.md` (2),
   `done/disable_scope_mismatch_orphan/card.md` (2), its `checklist.md` (1).

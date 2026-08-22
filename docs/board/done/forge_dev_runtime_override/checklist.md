@@ -163,11 +163,11 @@ Recording fix (D2):
   escapes env-derived values; JSON fixtures cover set/unset and valid/invalid states.
 - [x] Stale-shim surfacing is covered as the upgrade path: the doctor fixture pins source-hash drift independently of
   the version stamp, and sync retains the existing re-render path. The fixture passed in the Phase 3 focused command.
-- [x] Docs: `design.md` §3.10 deployment-model paragraph (the resolver narrative names the override); `design_appendix`
-  §C.4 (override branch precedence + the D2 recording table) and §A.7b row (**Public**, per D6);
-  **`docs/end-user/hook.md`** (Public-contract user surface); developer docs (`CLAUDE.md` / `docs/developer/`) with the
-  command-scoped example and the relaunch-required note. `docs/cli_reference.md` also defines the doctor payload. All
-  six changed doc surfaces passed mdformat; claims were checked against the rendered/package implementation.
+- [x] Docs: `design_sessions.md` §3.10 deployment-model paragraph (the resolver narrative names the override);
+  `design_installation.md` §C.4 (override branch precedence + the D2 recording table) and §A.7b row (**Public**, per
+  D6); **`docs/end-user/hook.md`** (Public-contract user surface); developer docs (`CLAUDE.md` / `docs/developer/`) with
+  the command-scoped example and the relaunch-required note. `docs/cli_reference.md` also defines the doctor payload.
+  All six changed doc surfaces passed mdformat; claims were checked against the rendered/package implementation.
 - [x] `tests/src/cli/test_env_vocabulary.py` parity row matches the appendix table (Public class): targeted guard passed
   (`9 passed`).
 - [x] D5 write-back: the [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) card's
@@ -254,8 +254,8 @@ Doctor, env, and byte contracts:
 - [x] `change_log.md` entry records the goal, key changes, and complete branch verification without claiming shipment.
 - [x] Durable lessons -> `impl_notes.md` after two rounds of human review: resolution-vs-gate boundary, total D2
   transition table, lexical launcher classification, and the separate hard branch required by a fail-loud override.
-- [x] `design.md` §3.10 / `design_appendix` §C.4 / §A.7b / `docs/end-user/hook.md` verified against the implemented
-  behavior; no shipped-state claim is made before merge.
+- [x] `design.md` §3.10 / `design_installation.md` §C.4 / §A.7b / `docs/end-user/hook.md` verified against the
+  implemented behavior; no shipped-state claim is made before merge.
 - [x] Card `doing/ -> done/`; inbound links repointed (epic card members table, epic checklist focus, the
   `proposed/statusline_gui_reachability` Related row).
 - [x] Epic notified: T8 was the last live member -- epic closeout items (seam boxes, design-doc verification, epic lane

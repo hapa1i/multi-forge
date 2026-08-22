@@ -90,9 +90,9 @@ context box below anticipated. Issue #1 (reset clears `fhealth-*.json`) and the 
   *Files*: `src/forge/cli/statusline/context.py`.
 - [x] `forge proxy costs reset` also clears the derived `fhealth-*.json` cache (Issue #1) so a wiped ledger cannot
   replay stale health until TTL: added to the table-driven `_RESET_TARGETS` (drives both the `--dry-run` preview and the
-  delete loop); `design_appendix.md §A.9` now names both `fcost-`/`fhealth-` caches. *Verify*: unit -- reset removes
+  delete loop); `design_telemetry.md §A.9` now names both `fcost-`/`fhealth-` caches. *Verify*: unit -- reset removes
   `fhealth-deadbeef.json` but preserves the bare `deadbeef.json` cache-hit entry; `--dry-run` lists the
-  supervisor-health cache. *Files*: `src/forge/cli/proxy_costs.py`, `docs/design_appendix.md`.
+  supervisor-health cache. *Files*: `src/forge/cli/proxy_costs.py`, `docs/design_runtime.md`.
 
 ### Phase 2: render `SUP!N <kind>` (posture-preserving, golden-safe)
 
@@ -125,8 +125,8 @@ render is byte-identical to the planned shape. The §A.8 supervisor-health parag
   unchanged; `test_raising_reader_degrades_to_posture_only` -- posture present, no `!`. *Files*:
   `tests/src/cli/test_statusline_forge_segments.py`, `tests/src/cli/test_statusline_registry.py`.
 
-**Design-doc updates**: status-line segment reference (`design_appendix.md §A.8`) -- describe the `SUP!N <kind>` suffix,
-posture preservation, ASCII `!`, yellow/red tiers, and the ledger source.
+**Design-doc updates**: status-line segment reference (`design_telemetry.md §A.8`) -- describe the `SUP!N <kind>`
+suffix, posture preservation, ASCII `!`, yellow/red tiers, and the ledger source.
 
 ### Phase 3: `forge activity` failing-open line + end-user doc + closeout
 
@@ -147,8 +147,8 @@ streak-vs-window semantic gap (review point 3).
   failing-open + fallback cases. *Files*: `src/forge/cli/activity.py`, `src/forge/core/ops/usage_summary.py`.
 - [x] `docs/end-user/session.md`: note after the `forge activity` description -- `SUP!N timeout` means recent frontier
   checks are failing open, pointing to `forge activity <session>`, explicit that `SUP!N` is the consecutive streak vs
-  the window aggregate; session-end example updated. Plus `policy.md` cross-reference and `design_appendix.md §A.13`.
-  *Files*: `docs/end-user/session.md`, `docs/end-user/policy.md`, `docs/design_appendix.md`.
+  the window aggregate; session-end example updated. Plus `policy.md` cross-reference and `design_telemetry.md §A.13`.
+  *Files*: `docs/end-user/session.md`, `docs/end-user/policy.md`, `docs/design_sessions.md`.
 - [x] `make pre-commit` clean; `change_log.md` feature-completion entry; durable lessons promoted to `impl_notes.md`.
   The deferred kinds (parse/auth), exact reset, and the decision-log/upstream path are recorded in
   `upstream_downstream_ledgers` -- not lost. *Files*: `docs/board/change_log.md`, `docs/board/impl_notes.md`.

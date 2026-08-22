@@ -214,7 +214,7 @@ the epic closeout after human review). One item deferred to T5: the invoker's `w
 
 ### Phase 6 -- Docs + closeout
 
-- [x] design.md §3.6.12 + design_appendix.md §G note the codex supervisor arm (first non-claude consumer lane): §G's
+- [x] design.md §3.6.12 + design_runtime.md §G note the codex supervisor arm (first non-claude consumer lane): §G's
   consumer-lane paragraph now describes both arms (claude_code default + codex override) with the blind/transfer-fed,
   read-only, direct-to-OpenAI, fail-open semantics; §3.6.12 notes the codex arm bypasses the proxy chain. Committed
   `919f12c`.
@@ -258,7 +258,7 @@ Two issues a 2026-06-27 review caught after Phases 1-6 (both confirmed against s
   (`run_supervisor_check` returns a structured fail-open, no exception escapes).
 - [x] **Updated the Phase 2/5 tests** that patched `preflight_codex` -> now patch `read_fresh_codex_preflight` (the arm
   no longer calls `preflight_codex`). Supervisor suite: **106 passed**.
-- [x] **Docs:** card codex-arm + preflight bullets corrected; design_appendix §G notes the cached-preflight model.
+- [x] **Docs:** card codex-arm + preflight bullets corrected; design_runtime.md §G notes the cached-preflight model.
   change_log carries the fix at closeout.
 
 ### Phase 8 -- Review fixes (M1-M5 + nits)

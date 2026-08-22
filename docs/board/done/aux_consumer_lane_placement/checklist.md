@@ -105,7 +105,7 @@ verified against the code and fixed:
   `test_supervisor_e2e.py`); the hook freeze wiring is unit-covered (`test_team_hook_lane_freeze.py`), so the routine
   run is the memory-writer path.
 - [x] Docs sync: `design.md` §3.5 (intent setter spans 4 consumers + `forge session lane`; freeze point varies by
-  consumer) / §3.6.2 (the general lane CLI), `design_appendix.md` §G (new "Aux consumers on claude-max (T6a)" para --
+  consumer) / §3.6.2 (the general lane CLI), `design_runtime.md` §G (new "Aux consumers on claude-max (T6a)" para --
   billing-only, dispatch byte-identical), `cli_reference.md` (new "Session lane" subsection), end-user
   `docs/end-user/policy.md` (aux-consumer claude-max via `forge session lane`).
 - [x] Pre-commit clean on the full changed set (isort, ruff, black, mypy, pyright, mdformat) -- 2026-06-30.

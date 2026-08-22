@@ -305,7 +305,7 @@ portable skill tranche. Axis 2 worker dispatch and the other explicit scope boun
 ## Documentation and operator verification
 
 - [x] Update `docs/design.md` when runtime/installer ownership changes.
-- [x] Update `docs/design_appendix.md` §C scope/module/tracking contracts and the runtime reference.
+- [x] Update `docs/design_installation.md` §C scope/module/tracking contracts and the runtime reference.
 - [x] Update `docs/design_workflows.md` §3 skills architecture, capability vocabulary, compile model, and Axis 2
   limitation.
 - [x] Update `docs/cli_reference.md` for any runtime/scope selection, status, doctor, or error surfaces.

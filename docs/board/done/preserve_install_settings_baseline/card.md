@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
 
-**Finding**: D012 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D012 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #145 (`f069226f`) after implementation, verification, and independent review.
 
@@ -13,10 +14,10 @@ baseline for whole-installation and runtime-scoped disable.
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §C.3](../../../design_appendix.md#c3-settings-merge-rules): disable smart-unmerges tracked
-  values against the pre-Forge backup while preserving user changes and backup history.
-- [`docs/design_appendix.md` §C.4](../../../design_appendix.md#c4-durable-installproject-files): the installation row
-  owns durable settings metadata and all knowable paths are validated before mutation.
+- [`docs/design_installation.md` §C.3](../../../design_installation.md#c3-settings-merge-rules): disable smart-unmerges
+  tracked values against the pre-Forge backup while preserving user changes and backup history.
+- [`docs/design_installation.md` §C.4](../../../design_installation.md#c4-durable-installproject-files): the
+  installation row owns durable settings metadata and all knowable paths are validated before mutation.
 
 ## Evidence
 

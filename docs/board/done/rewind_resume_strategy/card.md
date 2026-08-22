@@ -243,7 +243,7 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 5. **Identity + cleanup.** Fresh-UUID truncated copy (no envelope rewrite); delete `<R>.jsonl` with the session, no
    parent-id reference-counting; test the parent/sibling transcript is never touched.
 6. **Fallback + privacy + docs.** Fallback to plain native-relocate (+ "code-delta unavailable" note) on AI failure;
-   privacy warning; design.md / design_appendix.md §H / cli_reference.md / end-user `transfer.md` updates.
+   privacy warning; design.md / design_sessions.md §H / cli_reference.md / end-user `transfer.md` updates.
 
 ## Acceptance tests
 

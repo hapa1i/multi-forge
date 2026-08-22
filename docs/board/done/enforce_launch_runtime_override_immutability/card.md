@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: D008 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D008 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- independently reviewed and shipped in PR #136 (`8ebdb644`) on 2026-08-06.
 
@@ -13,10 +14,10 @@ supported sibling launch overrides usable.
 
 ## Design Authority
 
-- [`docs/design.md` §3.9](../../../design.md#39-session-resume-context-management): Codex/Claude launcher dispatch uses
-  immutable raw `intent.launch.runtime`; `forge session set launch.runtime` is rejected.
-- [`docs/design.md` §3.3](../../../design.md#33-session-file-schema-forgesessionjson): effective intent is a derived
-  view and cannot replace field-owned launch identity.
+- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management): Codex/Claude
+  launcher dispatch uses immutable raw `intent.launch.runtime`; `forge session set launch.runtime` is rejected.
+- [`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson): effective
+  intent is a derived view and cannot replace field-owned launch identity.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#internal-boundaries-module-to-module): invalid
   internal mutations are rejected without silent fallback.
 

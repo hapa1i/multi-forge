@@ -28,9 +28,9 @@ is tracked in `checklist.md`.
 subscription today, a local Ollama tomorrow -- a *registration + a consumer's lane choice*, not a bespoke rewrite each
 time.
 
-**References**: design.md §3.6 (config ownership), §3.6.12 + design_appendix.md §G (subprocess routing -- the resolver
-to lift), design_workflows.md §3.5 (runtime registry + invoker seam), design_appendix.md §A.2.1 (ModelSource catalog =
-the "backend"), impl_notes.md (unified-backend invariants; runtime seam = capability half + lifecycle half).
+**References**: design.md §3.6 (config ownership), §3.6.12 + design_runtime.md §G (subprocess routing -- the resolver to
+lift), design_workflows.md §3.5 (runtime registry + invoker seam), design_runtime.md §A.2.1 (ModelSource catalog = the
+"backend"), impl_notes.md (unified-backend invariants; runtime seam = capability half + lifecycle half).
 
 ---
 
@@ -315,7 +315,7 @@ substrate. That deferred work is now a standalone follow-on card, `docs/board/pr
   model changes.
 
 **Epic close criterion met** (board_contract "Epics"): every *live* member card is `done/`, and the shared lane contract
-is folded into normative design docs (design.md §3.5/§3.6.2, design_appendix.md §G). The single remaining follow-on is
+is folded into normative design docs (design.md §3.5/§3.6.2, design_runtime.md §G). The single remaining follow-on is
 re-filed as an independent card, so the coordinator is no longer load-bearing.
 
 **Member outcome**: T1a, T2, T3, T4, T5, T1b, T6a, T6b, T6c all `done/`; T0 (sibling) `done/`; T7 `done/`.

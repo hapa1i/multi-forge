@@ -19,7 +19,8 @@ call `datetime.fromisoformat` directly with divergent offset, naive, and invalid
 relative-time functions still deliberately differ in register and invalid fallback. The unchanged characterization slice
 passes 679 tests. Authority:
 [`docs/developer/coding_standards.md` "System boundaries"](../../../developer/coding_standards.md#system-boundaries-external-data)
-and [`docs/design.md` "3.14 Cost tracking and spend caps"](../../../design.md#314-cost-tracking-and-spend-caps).
+and
+[`docs/design_telemetry.md` "3.14 Cost tracking and spend caps"](../../../design_telemetry.md#314-cost-tracking-and-spend-caps).
 
 ## Acceptance Criteria
 

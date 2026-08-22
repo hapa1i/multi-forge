@@ -167,8 +167,8 @@ below.
 
 **Acceptance rows advanced**: all.
 
-- [x] Update `docs/design.md` and `docs/design_appendix.md` with the outer-field ownership boundary or an explicit
-  pointer to the normative workflow section, per the repository architecture/file-ownership rule.
+- [x] Update `docs/design.md` and the former consolidated design appendix with the outer-field ownership boundary or an
+  explicit pointer to the normative workflow section, per the repository architecture/file-ownership rule.
 
 - [x] Re-read every affected design/end-user/board/CLI/QA/walkthrough claim against shipped behavior; remove ordering or
   byte-preservation promises not enforced by tests.
@@ -247,8 +247,8 @@ correctness patch.
 - `./scripts/test-integration.sh tests/integration/docker/test_installer.py -k 'user_content_preserved_through_cycle or full_profile_memory_passport_assets' -v`:
   `2 passed, 16 deselected`.
 
-- `make pre-commit` and `git diff --check`: clean. `docs/design_appendix.md` remains within its budget at `29,967`
-  Claude Opus 4.6 tokens.
+- `make pre-commit` and `git diff --check`: clean. the former consolidated design appendix remains within its budget at
+  `29,967` Claude Opus 4.6 tokens.
 
 - `uv build`: wheel and sdist built successfully and were separately reinstalled. Both artifacts passed full-profile
   user/local extension enable, packaged walkthrough version/assertion/PyYAML checks, three-delimiter upgrade without a

@@ -3,7 +3,7 @@
 **Epic**: [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md).
 
 **Findings**: D007 (HIGH) and D024 (MEDIUM) in
-[`review_combined.md`](../../review_combined.md#design-conformance-findings).
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #131 (`3e090ef5`) as the second Wave 2 member.
 
@@ -14,10 +14,10 @@ state instead of clobbering it, and prevent PreCompact snapshots from hiding the
 
 ## Design Authority
 
-- [`docs/design.md` §3.8](../../../design.md#38-session-artifacts-plans--transcripts): transcript records carry
-  `session_id` and `copied_path`, and UUID-named transcript destinations are idempotent.
-- [`docs/design.md` §3.10](../../../design.md#310-hook-handlers): repeated Stop invocation must be safe and artifact
-  capture is idempotent by UUID.
+- [`docs/design_sessions.md` §3.8](../../../design_sessions.md#38-session-artifacts-plans-transcripts): transcript
+  records carry `session_id` and `copied_path`, and UUID-named transcript destinations are idempotent.
+- [`docs/design_sessions.md` §3.10](../../../design_sessions.md#310-hook-handlers): repeated Stop invocation must be
+  safe and artifact capture is idempotent by UUID.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#forge-owned-durable-state): malformed manifest state
   is not silently defaulted or skipped; known legacy state is explicitly detected and migrated or surfaced.
 

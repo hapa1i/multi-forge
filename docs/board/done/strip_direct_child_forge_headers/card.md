@@ -17,7 +17,7 @@ Reproduced on merged `main` at `55fcda59`: the retained D020 regression supplies
 names plus user and malformed lines to a direct child, then fails because the four Forge lines remain. On that base, the
 unproven-target return in `_apply_correlation_headers()` preceded `ANTHROPIC_CUSTOM_HEADERS` filtering even though its
 docstring said inherited Forge-owned lines were stripped first. The trust contract is
-[`docs/design.md` §3.14](../../../design.md#314-cost-tracking-and-spend-caps).
+[`docs/design_telemetry.md` §3.14](../../../design_telemetry.md#314-cost-tracking-and-spend-caps).
 
 ## Acceptance Criteria
 

@@ -18,8 +18,8 @@ artifact while `assemble_transfer_context()` falls back to `confirmed.transcript
 `--depth` remains a Click integer despite the documented `N|all`; `resolve_lineage()` still accepts zero or negative
 values into an empty lineage; and ordinary Claude reattach still rejects other fresh-only flags without checking
 explicit strategy/depth parameter sources.
-[`docs/design.md` §3.9](../../../design.md#39-session-resume-context-management) defines fail-fast context assembly and
-depth.
+[`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management) defines fail-fast
+context assembly and depth.
 
 The retained regression module then failed on `26ab5f29` in seven expected cases while two compatibility controls
 passed: manager did not raise, fork called `fork_session()`, Click rejected `all`, zero/negative depth launched with

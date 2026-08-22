@@ -297,12 +297,13 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
     `workflow` as a flat "Available bundle"; reworded to split CLI-discoverable `BUNDLES` (tdd/coding_standards) from
     the dynamic manifest-only `workflow` path.
 
-- [x] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_appendix §B` (says schema
-  **v2**) with the code's emitted + strictly-accepted `schema_version` (`core/workqueue`). Verify which side is right,
-  fix the drifted one. **Assertion**: doc and code agree (grep the emitted `schema_version` + the strict-read guard; one
-  authoritative value). **Verified 2026-07-04**: code is authoritative -- `MARKER_SCHEMA_VERSION = 1`, `queue.py` emits
-  1 and strictly rejects `!= 1`. The **doc** drifted; fixed `design_appendix §B.1` header `(v2) -> (v1)` + example
-  `schema_version: 2 -> 1`. The unrelated downstream `schema_version=2` references (a different schema) stay.
+- [x] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_sessions.md §B` (says
+  schema **v2**) with the code's emitted + strictly-accepted `schema_version` (`core/workqueue`). Verify which side is
+  right, fix the drifted one. **Assertion**: doc and code agree (grep the emitted `schema_version` + the strict-read
+  guard; one authoritative value). **Verified 2026-07-04**: code is authoritative -- `MARKER_SCHEMA_VERSION = 1`,
+  `queue.py` emits 1 and strictly rejects `!= 1`. The **doc** drifted; fixed `design_sessions.md §B.1` header
+  `(v2) -> (v1)` + example `schema_version: 2 -> 1`. The unrelated downstream `schema_version=2` references (a different
+  schema) stay.
 
 - [x] **Micro-cleanup (b) -- Reporter/Confidence literal dedup** (confirmed in scope, #7-style): import
   `Reporter`/`Confidence` from their owner instead of re-declaring them in `core/telemetry/downstream.py`.
@@ -332,7 +333,7 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
 | #17 methods gone                | --                                                                             | `grep` clean in `core/llm`; credentials suite green                                   | `tests/src/core/llm/test_credentials.py`                 |
 | Gap A (real; fixed)             | `fail_open=True` decision, warning without an `_INFRA_FAILURE_PREFIXES` prefix | `supervisor evaluate` exits 2 (not 0)                                                 | `tests/src/cli/test_policy_supervisor.py`                |
 | WorkflowPolicy demoted          | --                                                                             | `get_all_bundles` gone; `policy list`/`enable` unchanged; pipeline still imports      | `tests/src/policy/workflow/test_registry_integration.py` |
-| marker schema doc = code        | --                                                                             | `design_appendix §B.1` says v1, matching `MARKER_SCHEMA_VERSION`                      | (doc-only)                                               |
+| marker schema doc = code        | --                                                                             | `design_sessions.md §B.1` says v1, matching `MARKER_SCHEMA_VERSION`                   | (doc-only)                                               |
 | Reporter/Confidence single-src  | import from `downstream` and `usage.vocabulary`                                | no duplicate `Literal` decl; both resolve to the one leaf object; no import cycle     | `tests/src/core/telemetry/`, `tests/src/core/usage/`     |
 
 ### Phase C closeout
@@ -349,7 +350,7 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
   in the `core/telemetry/vocabulary.py` leaf, never in `core/usage`, because `usage/__init__ -> emit -> downstream`
   cycles.
 - [x] Docs synced: WorkflowPolicy decision landed in `policy.md` (experimental/manifest-only); marker-schema doc drift
-  fixed in `design_appendix §B.1`.
+  fixed in `design_sessions.md §B.1`.
 - [x] Card moved `doing/ -> done/` after merge to `main` (PR #74, `534c9fcf`).
 
 ---

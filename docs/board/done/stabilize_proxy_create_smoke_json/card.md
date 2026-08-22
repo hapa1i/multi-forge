@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
-**Finding**: D016 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
+**Finding**: D016 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Lane**: `done/` -- shipped in PR #150 (`61580fdb`) after independent review.
 
@@ -15,8 +16,8 @@ fails, while retaining the successfully created proxy.
 
 - [`cli_style_guidelines.md` scripting/output rules](../../../developer/cli_style_guidelines.md#output-streams): JSON is
   one stable result on stdout, diagnostics use stderr, and failed leaves exit non-zero.
-- [`docs/design.md` §3.6.3](../../../design.md#363-proxy-lifecycle-ux): create owns proxy creation and optional
-  lifecycle verification.
+- [`docs/design_runtime.md` §3.6.3](../../../design_runtime.md#363-proxy-lifecycle-ux): create owns proxy creation and
+  optional lifecycle verification.
 
 ## Evidence
 

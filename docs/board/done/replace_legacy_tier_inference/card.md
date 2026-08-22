@@ -19,7 +19,8 @@ Reverified on `358b39d6`: no repository config defines any queried `_MODEL` envi
 `get_client` call already passes the tier resolved by the request boundary, and the authentication retry passes that
 same tier. The only omitted-tier call is a regression that directly exercises all-tier invalidation; one earlier
 regression is the sole direct consumer of `_get_tier_for_model`. Cache keys and tier hyperparameters both use the tier
-argument. Authority: [`docs/design.md` "3.6.1 Definitions"](../../../design.md#361-definitions-normative) and the
+argument. Authority:
+[`docs/design_installation.md` "3.6.1 Definitions"](../../../design_installation.md#361-definitions-normative) and the
 user-owned [`proxy.default_tier`](../../../end-user/proxy.md#proxy-file-format-user-edit-surface).
 
 ## Acceptance Criteria

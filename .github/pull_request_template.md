@@ -29,7 +29,7 @@ What changed? Predict the shape of the diff for the reviewer.
 
 - [ ] Design docs updated if architecture changed:
   - `docs/design.md`
-  - `docs/design_appendix.md`
+  - relevant `docs/design_<domain>.md` files
   - `docs/design_workflows.md`
   - `docs/cli_reference.md`
 - [ ] N/A — no doc updates needed

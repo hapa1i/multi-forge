@@ -15,8 +15,8 @@ Preserve template-declared tool-ignore and prompt-cache settings through the tem
 
 Rechecked on merged `main` at `7c76a099`: `tool_prefixes_to_ignore` exists only on `ProxyConfig`, while
 `create_proxy_file()` omits it and also lets `prompt_caching`/`auto_cache_min_tokens` fall back to instance defaults.
-[`docs/design_appendix.md` §A.1](../../../design_appendix.md#a1-proxy-overlay-schema-364--user-edit-surface) assigns
-proxy overlay ownership and precedence.
+[`docs/design_runtime.md` §A.1](../../../design_runtime.md#a1-proxy-overlay-schema-364-user-edit-surface) assigns proxy
+overlay ownership and precedence.
 
 ## Acceptance Criteria
 

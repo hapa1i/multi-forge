@@ -179,8 +179,8 @@ Before treating any complexity as a candidate, check whether the project already
 
 This repo's authority map:
 
-- `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` — normative shipped
-  architecture.
+- `docs/design.md` and the session, runtime, telemetry, installation, workflow, memory, and CLI design documents —
+  normative shipped architecture.
 - `CLAUDE.md` and `docs/developer/coding_standards.md` — standing directives, including the boundary framework and the
   research-preview clean-break policy (§5) that governs remediation shape.
 - `docs/board/impl_notes.md` — human-approved durable decisions; the record most refuted findings lean on.

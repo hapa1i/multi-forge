@@ -101,8 +101,8 @@ runs last so it lands on the smallest stable surface.
   characterization listed on the card, create the member checklist, and record the branch/base in this epic.
 - Config and re-export deprecations do not authorize deletion in the first release carrying their warning (planning
   baseline: version 0.9.4). A later release must open a new card after the promised compatibility window.
-- Architecture/file-ownership changes update `docs/design.md` or `docs/design_appendix.md` only when the production
-  change ships. Bundled-skill, dependency, and installer members require build/clean-install verification.
+- Architecture/file-ownership changes update `docs/design.md` or the former consolidated design appendix only when the
+  production change ships. Bundled-skill, dependency, and installer members require build/clean-install verification.
 
 ## Shared Constraints
 

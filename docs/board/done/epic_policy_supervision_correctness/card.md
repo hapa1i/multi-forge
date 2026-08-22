@@ -16,8 +16,8 @@ that prompts and throttle caches identify the complete edit being judged.
   open; only identical diffs may share a cached result.
 - [`docs/design_workflows.md` §1.6](../../../design_workflows.md#16-policy-state-and-ownership): supervisor and team
   supervisor configuration are session-owned policy intent.
-- [`review_combined.md`](../../review_combined.md#design-conformance-findings): D001–D005, with the related O028 parser
-  subset from the code and maintenance inventory.
+- [`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings): D001–D005, with the
+  related O028 parser subset from the code and maintenance inventory.
 
 ## Reproduction Record
 

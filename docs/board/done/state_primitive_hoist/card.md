@@ -32,9 +32,10 @@ re-verify before the Slice that touches it).
 primitive; packages import down), not one load-bearing contract. Each slice is independently landable.
 
 **References**: `docs/design.md` §3.5 (file ownership), §3.14 (telemetry planes joined, not merged);
-`docs/design_appendix.md` §A.13-A.14 (ledger/downstream schemas); `docs/developer/coding_standards.md` §5 (durable-state
-discipline); `docs/board/impl_notes.md` ("One pruner for all JSONL planes", proxy_log_hygiene; "shared cost/usage
-vocabulary Literals live in a telemetry leaf"); archetype `docs/board/done/session_op_layer_extraction/card.md`.
+`docs/design_telemetry.md` §A.13-A.14 (ledger/downstream schemas); `docs/developer/coding_standards.md` §5
+(durable-state discipline); `docs/board/impl_notes.md` ("One pruner for all JSONL planes", proxy_log_hygiene; "shared
+cost/usage vocabulary Literals live in a telemetry leaf"); archetype
+`docs/board/done/session_op_layer_extraction/card.md`.
 
 ---
 

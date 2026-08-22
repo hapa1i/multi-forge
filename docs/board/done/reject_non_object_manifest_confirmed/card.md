@@ -2,7 +2,8 @@
 
 **Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
 
-**Finding**: O006 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
+**Finding**: O006 (HIGH) in
+[`review_combined.md`](../../reviews/whole_repo_maintenance_findings.md#code-and-maintenance-findings).
 
 **Lane**: `done/` -- shipped in PR #135 (`00692356`) on 2026-08-06.
 
@@ -13,8 +14,8 @@ Python exception through session read, repair, and delete paths.
 
 ## Design Authority
 
-- [`docs/design.md` §3.3](../../../design.md#33-session-file-schema-forgesessionjson): manifests are strict durable
-  workflow records with typed `intent`, `overrides`, and `confirmed` sections.
+- [`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson): manifests are
+  strict durable workflow records with typed `intent`, `overrides`, and `confirmed` sections.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#forge-owned-durable-state): invalid durable state
   must fail with a typed, actionable classification and must not be silently defaulted or clobbered.
 

@@ -17,7 +17,7 @@ Current `src/forge` contains 13 suppressions without a reason comment across pol
 numeric narrowing, session repair, usage summary, installer/runtime removal, semantic plan normalization, and proxy
 client construction. Other suppressions already demonstrate the required `# type: ignore[...]  # reason` form.
 
-Authority: [`coding_standards.md` Comments](../../../developer/coding_standards.md#comments).
+Authority: [`coding_standards.md` Comments](../../../developer/coding_standards.md#7-code-comments).
 
 ## Acceptance Criteria
 

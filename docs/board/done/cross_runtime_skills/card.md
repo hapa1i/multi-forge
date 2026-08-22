@@ -185,7 +185,7 @@ from Codex, until the engine dispatches through the runtime registry. That engin
   Codex install path).
 - **Duplicate discovery within Codex's own scan chain** (NOT cross-runtime double-fire): a skill in more than one of
   Codex's scanned dirs does **not** merge -- duplicate `name`s become ambiguous selectors. Install to exactly one Codex
-  scope and track it (cf. `design_appendix.md` §C.5).
+  scope and track it (cf. `design_installation.md` §C.5).
 - **Scope-privacy leak** -- Forge's `local` (personal, gitignored) has no Codex skill home; mapping it onto the shared
   `.agents/skills` would publish a personal skill into the team/committed dir. Codex skills are user + project only (see
   target shape 4).
@@ -214,7 +214,7 @@ Axis 2; that is an explicit boundary rather than a Codex-native claim.
   (`InstallModule.SKILLS`), `src/forge/install/codex_hooks.py` (Codex settings pattern; installs no skills).
 - Engine (Axis 2): `src/forge/review/engine.py` (`run_claude_session`); `src/forge/core/invoker/__init__.py`.
 - Registry: `src/forge/core/runtime/registry.py` (`RuntimeSpec.skill_scopes`).
-- Design: `docs/design_workflows.md` §3, §4.5; `docs/design_appendix.md` §C, §C.5, §C.6.
+- Design: `docs/design_workflows.md` §3, §4.5; `docs/design_installation.md` §C, §C.5, §C.6.
 - External (verified 2026-07-06): `agentskills.io/specification` -- closed frontmatter allowlist (`name`==dir;
   `description`; `license`; `compatibility`; `metadata`; `allowed-tools` space-separated + experimental; **no**
   `when_to_use`) plus a Validation section; `developers.openai.com/codex/skills` (`.agents/skills` /
@@ -278,8 +278,8 @@ Implementation was accepted after human review and shipped through PR #107. This
   checkout-reference, compiler-source, or post-disable ownership leak remained.
 - The second-review gates passed: `8,158` unit tests with one skip, `521` regression tests, `2` targeted Docker
   lifecycle tests, `uv build`, `make pre-commit`, `make pre-commit-md`, and `git diff --check`. The current QA parser
-  reports v1.0.30 / 589 assertions; walkthrough-state reports `93 passed`, and `docs/design_appendix.md` remains below
-  its limit at 29,987 tokens.
+  reports v1.0.30 / 589 assertions; walkthrough-state reports `93 passed`, and the former consolidated design appendix
+  remains below its limit at 29,987 tokens.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 

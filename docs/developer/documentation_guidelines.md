@@ -11,16 +11,16 @@ This file explains how to write and maintain docs. The board workflow itself is 
 
 Use one authoritative source per domain:
 
-| Domain                                        | Authority                                                                                        |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Repository overview                           | `README.md`                                                                                      |
-| Shipped architecture and ownership            | `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` |
-| Documentation writing and maintenance         | This file                                                                                        |
-| Work-board lanes, cards, checklists, closeout | `docs/developer/board_contract.md`                                                               |
-| Coding style and durable-state rules          | `docs/developer/coding_standards.md`                                                             |
-| CLI command shape and recovery output         | `docs/developer/cli_style_guidelines.md`                                                         |
-| Test policy                                   | `docs/developer/testing_guidelines.md`                                                           |
-| User-facing behavior                          | `docs/end-user/*`                                                                                |
+| Domain                                        | Authority                                                                  |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| Repository overview                           | `README.md`                                                                |
+| Shipped architecture and ownership            | `docs/design.md`, its domain design documents, and `docs/cli_reference.md` |
+| Documentation writing and maintenance         | This file                                                                  |
+| Work-board lanes, cards, checklists, closeout | `docs/developer/board_contract.md`                                         |
+| Coding style and durable-state rules          | `docs/developer/coding_standards.md`                                       |
+| CLI command shape and recovery output         | `docs/developer/cli_style_guidelines.md`                                   |
+| Test policy                                   | `docs/developer/testing_guidelines.md`                                     |
+| User-facing behavior                          | `docs/end-user/*`                                                          |
 
 `docs/board/README.md` is a directory guide with examples. It is not the normative board contract.
 
@@ -55,6 +55,22 @@ proxy/session semantics, workflow prerequisites, or end-user behavior changes.
 Design docs are normative architecture docs. This section defines writing expectations; card-execution procedure lives
 in [`board_contract.md`](board_contract.md#design-doc-sync).
 
+Route architecture changes to the narrowest authority:
+
+| Document                      | Contract domain                                                   |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `docs/design.md`              | Core architecture, shared state, file ownership, command-core ops |
+| `docs/design_sessions.md`     | Sessions, launch, transfer, hooks, queues, Codex, event journals  |
+| `docs/design_runtime.md`      | Proxies, backends, models, routing, shared clients, isolation     |
+| `docs/design_telemetry.md`    | Status, spend, audit, usage, and provider lifecycle               |
+| `docs/design_installation.md` | Configuration, credentials, extensions, registration, test setup  |
+| `docs/design_workflows.md`    | Policy, skills, and workflow runners                              |
+| `docs/design_memory.md`       | Designated memory, passports, writers, and activation             |
+| `docs/cli_reference.md`       | Terminal and direct-command inventory                             |
+
+Retired contracts that still carry useful removal rationale live in `docs/design_history.md`; they are evidence, not
+shipped architecture.
+
 - Describe shipped behavior, not desired future behavior.
 - If a card is mid-execution, document the hybrid shipped state accurately.
 
@@ -71,17 +87,17 @@ Cards may contain aspirational target architecture. Design docs should not.
 
 ## Where To Document What
 
-| What                          | Where                                                                                            | When to update                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| Aspirational proposal         | `docs/board/proposed/<slug>/card.md`                                                             | When drafting or revising a proposal       |
-| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`                                                                 | When work is accepted but not active       |
-| Active execution plan         | `docs/board/doing/<slug>/checklist.md`                                                           | During active card work                    |
-| Paused in-progress work       | `docs/board/paused/<slug>/card.md`                                                               | When partially-done work goes on hold      |
-| Completed work                | `docs/board/change_log.md`                                                                       | At phase/card closeout                     |
-| Durable implementation memory | `docs/board/impl_notes.md`                                                                       | After human review                         |
-| Normative architecture        | `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` | As code ships                              |
-| End-user behavior             | `docs/end-user/*`                                                                                | When user-facing setup or behavior changes |
-| Setup/development workflow    | `docs/developer/*`                                                                               | When maintainer workflow changes           |
+| What                          | Where                                         | When to update                             |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------ |
+| Aspirational proposal         | `docs/board/proposed/<slug>/card.md`          | When drafting or revising a proposal       |
+| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`              | When work is accepted but not active       |
+| Active execution plan         | `docs/board/doing/<slug>/checklist.md`        | During active card work                    |
+| Paused in-progress work       | `docs/board/paused/<slug>/card.md`            | When partially-done work goes on hold      |
+| Completed work                | `docs/board/change_log.md` and its archives   | At phase/card closeout                     |
+| Durable implementation memory | `docs/board/impl_notes.md` and domain ledgers | After human review                         |
+| Normative architecture        | Design map above and `docs/cli_reference.md`  | As code ships                              |
+| End-user behavior             | `docs/end-user/*`                             | When user-facing setup or behavior changes |
+| Setup/development workflow    | `docs/developer/*`                            | When maintainer workflow changes           |
 
 The board-specific rules for these files live in [`board_contract.md`](board_contract.md).
 
@@ -160,18 +176,40 @@ Avoid AI filler words:
 
 ## Size Limits
 
-Agents degrade when docs grow too large. Use [`scripts/count-tokens.py`](../../scripts/count-tokens.py); it defaults to
-local tiktoken counting so size checks work offline:
+Agents degrade when docs grow too large. The tracked [`.file-size-limits.json`](../../.file-size-limits.json) owns this
+repository's limits and ordered counting methods. The standard pre-commit hook reads that file directly; a personal hook
+may supply the executable, but it cannot silently replace repository policy.
+
+Resolution is explicit `--config`, then the current Git root's `.file-size-limits.json`, then the checker's own checkout
+fallback. A repository policy therefore wins over any personal fallback regardless of which hook installation invokes
+the checker.
+
+Markdown counting is Opus-first, with local tiktoken as an explicitly reported fallback:
 
 ```bash
 ./scripts/count-tokens.py docs/design.md
+./scripts/count-tokens.py --local docs/design.md
+./scripts/check-file-limits.py --dry-run docs/design.md
 ```
 
-Hard guidance:
+The default command reports both the method and tokenizer family that produced the count. The checker batches a local
+pass and probes the provider only after a file reaches its configured local threshold. Each result is compared only with
+the threshold for its own tokenizer family; human-readable method wording is never parsed as policy. Multi-Forge's
+12,000-token local target and 15,000-token local ceiling are deliberately conservative against the measured near-2x
+Opus/tiktoken worst case, so an unavailable provider cannot apply an Opus-denominated number to a local count or
+silently approve a near-limit file.
 
-- Keep individual agent/context docs below roughly 25k tokens.
-- Avoid files longer than 2k lines; many readers and tools truncate around there.
-- Split reference details into appendix files when the main doc becomes slow to scan.
+Repository policy:
+
+- Living Markdown targets at most 25,000 Opus tokens and fails above 30,000.
+- Newly partitioned design documents should leave additional room and target at most 23,000 Opus tokens.
+- Closed card snapshots have a ratified 40,000-token exception because shortening historical evidence would be lossy.
+- Avoid files longer than 2,500 lines; many readers and tools truncate before then.
+- Partition by domain or archive complete historical blocks before raising a limit. Change a limit only through an
+  explicit edit to the tracked policy.
+
+Claude Code's `CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS` controls one reader's output, not repository document size, and
+Codex has no corresponding repository policy surface used here. Neither setting overrides this gate.
 
 ---
 

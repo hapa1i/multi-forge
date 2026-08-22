@@ -25,7 +25,7 @@ Current focus: complete -- order 24 shipped in PR #203 (`0d041b83`); orders 25--
 - [x] Run focused resume, native-mode, rewind, review, and routing regression tests (79 passed).
 - [x] Run the full unit suite (9,220 passed, one skipped, 122 deselected), regression suite (921 passed), and targeted
   Docker session resume coverage (16 passed, 53 deselected).
-- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and `design_appendix.md` (29,990) stay
-  below 30,000 tokens; and audit 358 board documents, 882 local links, zero missing links, and Wave 7's 23 done / one
-  doing / 11 todo lanes without a Forge workflow.
+- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and the former consolidated design
+  appendix (29,990) stay below 30,000 tokens; and audit 358 board documents, 882 local links, zero missing links, and
+  Wave 7's 23 done / one doing / 11 todo lanes without a Forge workflow.
 - [x] Open PR #203, merge it as `0d041b83` after all five checks pass, and close order 24 without activating order 25.

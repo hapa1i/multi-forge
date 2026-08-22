@@ -12,9 +12,9 @@ malformed arguments, or unvalidated correlation values into ordinary logs or deb
 
 ## Design Authority
 
-- [`docs/design_appendix.md` §A.11](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
+- [`docs/design_telemetry.md` §A.11](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
   defines metadata/redacted capture and a no-plaintext posture for proxy diagnostics.
-- [`docs/board/impl_notes.md`](../../impl_notes.md#no-caller-content-in-proxy-logs-redactor-excludes-caller-free-text-proxy_log_hygiene-review-2026-06-16)
+- [`docs/board/impl_notes.md`](../../impl_notes/runtime_telemetry.md#no-caller-content-in-proxy-logs-redactor-excludes-caller-free-text-proxy_log_hygiene-review-2026-06-16)
   records that ordinary proxy module logs may carry metadata only; raw stream chunks require explicit opt-in.
 - [`docs/developer/coding_standards.md` §5](../../../developer/coding_standards.md#system-boundaries-external-data)
   requires best-effort external-input handling to degrade to a safe, visible default.

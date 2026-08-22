@@ -778,7 +778,7 @@ def test_ai_curated_output_matches_golden_fixture() -> None:
                 {"text": "  ", "citation": "turn 3"},
             ],
             "current_state": "  Ready.  ",
-            "files": ["  src/forge/session/transfer.py:895  ", "docs/design_appendix.md", "", 3],
+            "files": ["  src/forge/session/transfer.py:895  ", "docs/design_sessions.md", "", 3],
             "open_questions": [],
         },
         model_used="model-a",

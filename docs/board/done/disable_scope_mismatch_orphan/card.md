@@ -11,9 +11,9 @@ flag involved. Fixing it inside a feature card would have hidden a live defect b
 card's "preflight refusal leaves tracking untouched" contract is inherited rather than invented. It has no dependency on
 [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) and can ship at any time.
 
-**Origin**: found while verifying a constraint for the runtime-disable card, 2026-07-29. `design_appendix.md` section
-C.6 states that "disable refuses a tracked path that no longer matches the scope mapping". The code refuses to *edit
-that file* but does not refuse the *operation*, and the difference orphans user state.
+**Origin**: found while verifying a constraint for the runtime-disable card, 2026-07-29. the former consolidated design
+appendix section C.6 states that "disable refuses a tracked path that no longer matches the scope mapping". The code
+refuses to *edit that file* but does not refuse the *operation*, and the difference orphans user state.
 
 ---
 
@@ -44,7 +44,8 @@ moves or re-points `CODEX_HOME` and later disables hits this.
 
 **Severity is "silent orphan", not data loss.** No user content is destroyed; the block is preserved. But the user is
 left with active hooks, no owner, and no diagnostic -- and the warning goes to the logger, which is off by default
-(`log_level: off`, `design_appendix.md` section A.7). So in the default configuration the failure is completely silent.
+(`log_level: off`, `design_installation.md` section A.7). So in the default configuration the failure is completely
+silent.
 
 ## Goal
 
@@ -58,7 +59,7 @@ that owns it survives so a later command can remove it. Never both gone.
 - Detect the mismatch **before** any removal work begins, not midway through `uninstall()`. It is a pure comparison of
   the tracked path against `get_codex_config_path(scope, project_root)` and needs no filesystem mutation to evaluate.
 - On mismatch: make no filesystem change, leave the tracking row intact, print an error naming both paths, and exit
-  non-zero. This matches the existing `invalid-target` refusal posture (`design_appendix.md` section C.5) and the
+  non-zero. This matches the existing `invalid-target` refusal posture (`design_installation.md` section C.5) and the
   fail-closed rule for explicit CLI mutations (`coding_standards.md` section 5).
 - The error must be actionable. The user's real options are to restore `CODEX_HOME` to the value the row records and
   retry, or to remove the block by hand. Name both, and name the tracked path so hand-editing is possible.
@@ -68,8 +69,8 @@ file, including a tampered tracking file. Removing the block at a path the curre
 defeat the guard's purpose. Refusing keeps the guard and fixes only the orphaning.
 
 **`--all` composes without weakening its aggregate contract.** `disable --all --yes` already attempts every scope,
-aggregates failures, and exits non-zero if any remain (`design_appendix.md` section C.4). A refused scope becomes one
-such failure: other scopes still proceed, and the aggregate exit stays non-zero.
+aggregates failures, and exits non-zero if any remain (`design_installation.md` section C.4). A refused scope becomes
+one such failure: other scopes still proceed, and the aggregate exit stays non-zero.
 
 **`setup.sh --uninstall` inherits correct behavior for free.** It deletes `$FORGE_HOME` only after a fully successful
 disable and preserves tracking on failure. Today a mismatch reports success while orphaning; after the fix it reports
@@ -86,8 +87,8 @@ failure and preserves `installed.json`, which is the honest outcome.
 - The same function separately warns about `result.leftover_commands` (Forge hook commands outside the managed block).
   That is a different condition -- a successful removal with residue -- and must keep warning rather than become a
   refusal, or a user with a hand-added registration can never disable.
-- `log_level` defaults to `off` (`design_appendix.md` section A.7), so the current warning reaches nobody by default.
-  The fix must use the CLI error surface (`forge.cli.output` helpers per `CLAUDE.md`), not only the logger.
+- `log_level` defaults to `off` (`design_installation.md` section A.7), so the current warning reaches nobody by
+  default. The fix must use the CLI error surface (`forge.cli.output` helpers per `CLAUDE.md`), not only the logger.
 - `uninstall()` has no partial-failure reporting today: it either completes or raises. A preflight refusal must
   therefore land before the first mutation, which is also what makes "tracking untouched" trivially true.
 
@@ -113,7 +114,7 @@ failure and preserves `installed.json`, which is the honest outcome.
   the failure.
 - Regression test lives at `tests/regression/test_bug_disable_codex_scope_mismatch_orphan.py` per
   `testing_guidelines.md`, asserting the exact failure mode: block still present **and** tracking row still present.
-- `design_appendix.md` section C.6's "refuses a tracked path" sentence is corrected to say what is refused -- the
+- `design_installation.md` section C.6's "refuses a tracked path" sentence is corrected to say what is refused -- the
   operation, not just the edit -- and the changelog records the behavior change.
 
 **Verification**: unit plus the named regression test. `testing_guidelines.md` names installer changes as an integration

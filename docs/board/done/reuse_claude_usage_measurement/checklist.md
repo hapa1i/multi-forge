@@ -26,7 +26,7 @@ Current focus: complete -- order 25 shipped in PR #204 (`356ea665`); orders 26--
 - [x] Run focused usage emitter, ledger, and usage regression tests (118 passed, 891 deselected).
 - [x] Run the full unit suite (9,222 passed, one skipped, 122 deselected), regression suite (921 passed), and targeted
   Docker proxy-panel telemetry/cost integration (one passed).
-- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and `design_appendix.md` (29,990) stay
-  below 30,000 tokens; and audit 359 board documents, 882 local links, zero missing links, and Wave 7's 24 done / one
-  doing / 10 todo lanes without a Forge workflow.
+- [x] Run full pre-commit and `git diff --check`; confirm `design.md` (29,974) and the former consolidated design
+  appendix (29,990) stay below 30,000 tokens; and audit 359 board documents, 882 local links, zero missing links, and
+  Wave 7's 24 done / one doing / 10 todo lanes without a Forge workflow.
 - [x] Open PR #204, merge it as `356ea665` after all five checks pass, and close order 25 without activating order 26.

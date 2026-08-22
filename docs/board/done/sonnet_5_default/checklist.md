@@ -61,8 +61,8 @@
 
 - [x] `proxy.md`, `model_selection.md`, `session.md`, QA `4-proxy.md` + index `last-updated`, and the 5
   `claude-opus`-default docs (skills/workflow/cli_reference/session/README).
-- [x] Design docs verified: `design_appendix.md`/`design.md` reference the template *name* only, not tier defaults — no
-  change needed.
+- [x] Design docs verified: the former consolidated design appendix/`design.md` reference the template *name* only, not
+  tier defaults — no change needed.
 
 ## Phase H — closeout
 

@@ -15,7 +15,7 @@ if the schema has to land in slices consumed before completion.
 keep their Codex installation untouched. Today `forge extension enable --scope user --runtime claude` still registers
 Forge's Codex hook block in `$CODEX_HOME/config.toml`, because `--runtime` filters only the SKILLS module.
 
-**References**: `docs/design.md` section 5.1; `docs/design_appendix.md` sections C.1-C.6; `docs/cli_reference.md`
+**References**: `docs/design.md` section 5.1; `docs/design_installation.md` sections C.1-C.6; `docs/cli_reference.md`
 (Installation); `docs/developer/coding_standards.md` section 5 (durable state, clean breaks); `docs/board/impl_notes.md`
 ("Runtime skill packages are compiled artifacts with separate ownership", "Hook runtime ownership and recovery follow
 the execution environment").
@@ -32,9 +32,10 @@ consequences:
 - **The Codex-only case needs four flags.** The installer hard-codes the recovery string
   `--profile minimal --with skills --without commands --runtime codex` (`src/forge/cli/extensions.py:152-160`) as a tip
   when Claude Code is absent. A four-flag incantation shipped inside an error message is evidence the axis is wrong.
-- **Every doc that mentions the flag has to disclaim it.** `cli_reference.md`, `design.md`, `design_appendix.md`,
-  `end-user/skills.md`, `end-user/manual_testing.md`, and `AGENTS.md` all carry a variant of "selects only outputs of
-  the SKILLS module". A selector whose name needs correcting wherever it appears is mis-scoped, not under-documented.
+- **Every doc that mentions the flag has to disclaim it.** `cli_reference.md`, `design.md`, the former consolidated
+  design appendix, `end-user/skills.md`, `end-user/manual_testing.md`, and `AGENTS.md` all carry a variant of "selects
+  only outputs of the SKILLS module". A selector whose name needs correcting wherever it appears is mis-scoped, not
+  under-documented.
 
 `codex-hooks` exists as a separate module only because the runtime axis cannot reach modules. It and `hooks` are already
 the same shape: both are `SETTINGS_ONLY_MODULES` (`src/forge/install/models.py:117-123`) and both are omitted at
@@ -148,8 +149,8 @@ conflict or failure records its pair even if the current package emits no rows. 
 mere resolution: it preserves sync coverage for today's intentionally empty `commands` and `agents` sources, while a
 failed or skipped path records no new pair.
 
-The Codex half of `hooks` is best-effort (`design_appendix.md` section C.6): a missing `codex` binary or config conflict
-degrades to a visible skip and does not set `InstallPlan.has_conflicts`. On a first install it writes no
+The Codex half of `hooks` is best-effort (`design_installation.md` section C.6): a missing `codex` binary or config
+conflict degrades to a visible skip and does not set `InstallPlan.has_conflicts`. On a first install it writes no
 `(hooks, codex)` pair. On re-enable, an inconclusive or omitted Codex outcome preserves a prior pair when
 `codex_config_path` still witnesses an on-disk managed block; otherwise disable would lose the only cleanup ownership
 record. The Claude half stays blocking.
@@ -160,10 +161,11 @@ best-effort skip therefore leaves `codex-hooks` in `modules_enabled` with no blo
 `codex_config_path` being set -- migration must key on that, never on the module value.
 
 **Derived migration for all recoverable v1/v2 state.** Normalize in memory on read, persist v3 on the next successful
-mutation, per the shipped v1 precedent (`design_appendix.md` section C.4). Both historical schemas use complete frozen
-DTO graphs, including file and settings rows; they never deserialize through live v3 nested types. No reset is required,
-so the schema change is not itself a user-visible break -- unlike the `codex-hooks` module value, which is. That
-released value is the only deleted module name normalized; any other unknown module remains corrupted durable state.
+mutation, per the shipped v1 precedent (`design_installation.md` section C.4). Both historical schemas use complete
+frozen DTO graphs, including file and settings rows; they never deserialize through live v3 nested types. No reset is
+required, so the schema change is not itself a user-visible break -- unlike the `codex-hooks` module value, which is.
+That released value is the only deleted module name normalized; any other unknown module remains corrupted durable
+state.
 
 | Prior state               | Skills attribution                                                                    | `(hooks, codex)`               | Everything else        |
 | ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------ | ---------------------- |
@@ -182,7 +184,7 @@ ownership cannot be derived receives an explicit `unattributed_reason` tag and i
 rather than defaulted to Claude. Silent attribution is what would let a later `disable --runtime claude` delete a Codex
 file.
 
-**v3 invariants** (extending the v2 list in `design_appendix.md` section C.4, all enforced before mutation):
+**v3 invariants** (extending the v2 list in `design_installation.md` section C.4, all enforced before mutation):
 
 1. Every `(module, runtime)` pair names a module that exists and a runtime that declares that module as an owner.
 2. Every `InstalledFile` and `InstalledSettingsEntry` carries exactly one valid attribution form. An attributed pair is
@@ -218,12 +220,12 @@ shapes and ordering.
   The merged module inherits this unchanged; Codex hook registration stays user-scope-only.
 - Registered hook rows are a byte contract, keyed on `(event, matcher, command, timeout)`
   (`tests/src/install/test_registered_commands_contract.py`). Codex trust hashes the registered command bytes and config
-  location (`design_appendix.md` section C.6), and `trusted_hash` is not computable by Forge. The module rename must not
-  change rendered bytes, or every existing Codex install is forced through the ceremony for nothing.
+  location (`design_installation.md` section C.6), and `trusted_hash` is not computable by Forge. The module rename must
+  not change rendered bytes, or every existing Codex install is forced through the ceremony for nothing.
 
 **Must not break.** The module *value* `codex-hooks` dies. These are unrelated and must not be renamed: the hook handler
 names `codex-session-start` / `codex-policy-check`, and the probe directory `scripts/experiments/codex-hooks/` cited as
-evidence by `design_appendix.md` section I.2.
+evidence by `design_sessions.md` section I.2.
 
 ## Impact inventory (verified by grep, 2026-07-29)
 
@@ -233,7 +235,7 @@ evidence by `design_appendix.md` section I.2.
 
 | Surface                   | Files                                                                                                              |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Normative design          | `design.md:1365,1384`; `design_appendix.md:1028,1033,1225`; `design_workflows.md:355`; `cli_reference.md:116`      |
+| Normative design          | `design.md:1365,1384`; `design_workflows.md:1028,1033,1225`; `design_workflows.md:355`; `cli_reference.md:116`     |
 | End-user                  | `end-user/hook.md:97,114,297,317`; `end-user/skills.md:403`; `end-user/README.md:59`; `end-user/manual_testing.md` |
 | Contributor/agent context | `README.md:127`; `CONTRIBUTING.md:22`; `AGENTS.md`                                                                 |
 | QA checklists             | `qa/resources/checklist.md:32`; `checklist/2-extension.md:190`; `checklist/6-hook.md:29-30`                        |

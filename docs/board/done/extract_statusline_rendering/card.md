@@ -22,7 +22,7 @@ three lower modules import it upward, and 16 source/test files consume the comma
 empty category lists to `render_categories`, while `_transcript_cache`/`_numstat_cache` cannot help across one-render
 processes and `RenderContext` already caches per-render facts. Nine test patches target only the entrypoint's terminal
 width source, so that seam can remain command-owned while render helpers move cleanly. Authority:
-[`docs/design_appendix.md` "A.8 Status line guidance"](../../../design_appendix.md#a8-status-line-guidance-3611).
+[`docs/design_telemetry.md` "A.8 Status line guidance"](../../../design_telemetry.md#a8-status-line-guidance-3611).
 
 ## Acceptance Criteria
 

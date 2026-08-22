@@ -8,7 +8,8 @@ Three skills verify that Forge is installed and working correctly, with escalati
 | Walkthrough | `/forge:walkthrough`                              | Install + assert in sandbox, verify real system untouched | Claude Code only | SKILLS module       |
 | Full QA     | `/forge:qa`                                       | Full checklist in Docker                                  | Claude Code only | `full` profile      |
 
-- Canonical architecture: [`docs/design_appendix.md` section D](../design_appendix.md#d-interactive-manual-testing)
+- Canonical architecture:
+  [`docs/design_installation.md` section D](../design_installation.md#d-interactive-manual-testing)
 - Testing guidelines: [`testing_guidelines.md`](../developer/testing_guidelines.md)
 
 ---

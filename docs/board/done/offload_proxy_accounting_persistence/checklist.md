@@ -27,8 +27,8 @@ Current focus: implementation and behavior proof are complete; finish the publis
   remove the now-test-only `log_request_cost` production wrapper.
 - [x] Record the explicit boundary around opt-in passthrough response-body audit and unbounded, non-dropping queueing;
   do not invent an implicit drop/backpressure policy.
-- [x] Synchronize accounting ownership in `docs/design.md` and `docs/design_appendix.md` without broadening public
-  schemas.
+- [x] Synchronize accounting ownership in `docs/design.md` and the former consolidated design appendix without
+  broadening public schemas.
 
 ## Phase 3 -- Verify and publish
 

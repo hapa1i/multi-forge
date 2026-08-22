@@ -39,4 +39,4 @@ write with file and directory `fsync`. Request-side inspect and mutation audit p
 
 Add deterministic slow-I/O concurrency tests and shutdown-flush/failure tests. Run focused cost/cap/server tests, full
 unit and regression suites, targeted Docker proxy/telemetry/cap integration, and `make pre-commit`. Update the
-accounting ownership text in `docs/design_appendix.md` if the persistence mechanism changes.
+accounting ownership text in the former consolidated design appendix if the persistence mechanism changes.

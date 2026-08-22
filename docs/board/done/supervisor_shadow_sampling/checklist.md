@@ -118,7 +118,7 @@ Decisions locked during planning (corrections to the card):
 
 ## Docs / closeout
 
-- [x] `design_workflows.md` §1.2 shadow-sampling paragraph; `design_appendix.md` §A.13 `supervisor-shadow` emitter row.
+- [x] `design_workflows.md` §1.2 shadow-sampling paragraph; `design_telemetry.md` §A.13 `supervisor-shadow` emitter row.
 - [x] `change_log.md` entry; notes additive `SupervisorConfig` schema break (old Forge can't read new manifests).
 - [x] `impl_notes.md` durable lessons — promoted (capture/check split; queue reliability boundary at spawn →
   per-candidate atomic claim; count lifecycle states for cap/dedup; single ledger emitter via `usage_command`;

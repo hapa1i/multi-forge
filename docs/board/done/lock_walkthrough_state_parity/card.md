@@ -17,9 +17,9 @@ Rechecked on `3260a6fa`: both 1,190-line scripts still differ only in two skill-
 state-machine suite still imports only the walkthrough copy, and broad mypy still excludes the same-named QA script.
 Installed skill packages must remain executable without importing the Forge tool environment, so replacing one copy with
 a package import is not a safe simplification. Authority:
-[`docs/design_appendix.md` "D. Interactive Manual Testing"](../../../design_appendix.md#d-interactive-manual-testing)
+[`docs/design_installation.md` "D. Interactive Manual Testing"](../../../design_installation.md#d-interactive-manual-testing)
 and
-[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test--smoke-test-forgewalkthrough-forgeqa).
+[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test-smoke-test-forgewalkthrough-forgeqa).
 
 ## Acceptance Criteria
 

@@ -3,7 +3,7 @@
 **Epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
 **Finding**: corrective follow-up to D005 (HIGH) in
-[`review_combined.md`](../../review_combined.md#design-conformance-findings).
+[`review_combined.md`](../../reviews/whole_repo_design_findings.md#design-conformance-findings).
 
 **Related shipped member**: [`preserve_supervisor_edit_identity`](../preserve_supervisor_edit_identity/card.md).
 

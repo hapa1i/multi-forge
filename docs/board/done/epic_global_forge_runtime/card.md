@@ -24,8 +24,8 @@ durable user/global `forge` from any hook environment, with explicit process-sco
 `src/forge/install/codex_hooks.py` (`get_codex_config_path`, managed block markers `:56`, trust-byte pinning),
 `src/forge/install/hooks.py` (shared hook command detection), `src/forge/install/settings_merge.py` (Claude
 append+dedupe merge/`unmerge` `:505,:705,:731`), `src/forge/install/installer.py` (scope detection, source-hooks load
-`:817`, tracked hook registration), `src/forge/sidecar/container.py` (sidecar mounts + env), `docs/design_appendix.md`
-§C.6, `board_contract.md`.
+`:817`, tracked hook registration), `src/forge/sidecar/container.py` (sidecar mounts + env), the former consolidated
+design appendix §C.6, `board_contract.md`.
 
 ---
 

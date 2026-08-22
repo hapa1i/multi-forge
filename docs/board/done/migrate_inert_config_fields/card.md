@@ -30,7 +30,7 @@ migration is independent of user-config deprecation.
 Rechecked on `c99be7a3`: `enable_preamble` and `manifest_filename` remain declaration-only; `openai_api_mode` remains in
 four shipped templates and is passed through template and proxy-instance loaders without a runtime consumer.
 `MANIFEST_FILENAME` still owns every session path. The authority is
-[`docs/design.md` "3.6 Configuration System"](../../../design.md#36-configuration-system),
+[`docs/design_installation.md` "3.6 Configuration System"](../../../design_installation.md#36-configuration-system),
 [`docs/design.md` "3.2 Contract files"](../../../design.md#32-contract-files-authoritative-paths), and the DG4 warning
 window.
 

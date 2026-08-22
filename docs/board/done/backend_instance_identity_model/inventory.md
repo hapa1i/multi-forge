@@ -174,7 +174,7 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Boundary:** derived route/auth/lifecycle facts, not canonical identity fields.
 - **Fields:** `proxy.family`, template/config `backend_dependency`, and `TEMPLATE_ENV_VARS`.
 - **Owners/readers:** `src/forge/config/schema.py`, `src/forge/config/loader.py`,
-  `src/forge/core/auth/template_secrets.py`, `docs/design_appendix.md`.
+  `src/forge/core/auth/template_secrets.py`, the former consolidated design appendix.
 - **Current meaning:** these are derived from or adjacent to `ModelSource`/template data: route family, local lifecycle
   dependency, and template-facing credential compatibility.
 - **Migration note:** they may need updates when source/backend identity moves, but they are not themselves the object
@@ -183,11 +183,11 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 ## Human-Facing Term Inventory
 
 - **Already migrated by C2:** `forge model backend` help, tables, `docs/cli_reference.md`, `docs/end-user/proxy.md`, and
-  `docs/design_appendix.md` §A.2.1 use "backend", "backend instance", and "adapter" for public CLI concepts. The
+  `docs/design_runtime.md` §A.2.1 use "backend", "backend instance", and "adapter" for public CLI concepts. The
   `runtime` word remains reserved for the agent/runtime axis.
 - **Machine names intentionally still visible:** `source_id`, `source_kind`, `ModelSource`, and telemetry `backend_id`
   remain because they are telemetry/config/code contracts, not prose cleanup. The main literal-bearing docs are
-  `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_appendix.md`, and this board card/checklist.
+  `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_runtime.md`, and this board card/checklist.
 - **Design/docs literals:** `proxy.source` is visible only as a legacy rejected config field; `ModelSource` is the
   current implementation object; `backend_dependency` and `TEMPLATE_ENV_VARS` are derived compatibility surfaces. Those
   should not be renamed until the Phase 2 model and Phase 3 compatibility plan exist.

@@ -142,7 +142,7 @@ to FAIL with the guards stashed (non-vacuous); `make pre-commit` clean. Changelo
 - [x] Preserve the "provenance is recorded, never inferred" discipline already in `ledger.py`. Each emitter **stamps**
   `route`/`reporter`/`confidence` from what it actually knows at emit time; the reader never derives them, and a
   `source_refs`-joined cost record never upgrades event-local `confidence` (`test_proxy_target_sets_cost_request_id`).
-- [x] **Design-doc sync**: `design.md` §3.14 (one terse provenance sentence) + `design_appendix.md` §A.13 (Provenance
+- [x] **Design-doc sync**: `design.md` §3.14 (one terse provenance sentence) + `design_telemetry.md` §A.13 (Provenance
   row + the three `Literal` definitions + the cost-scope/`unavailable`-vs-`unknown`/additive-at-v1 notes) updated for
   **shipped fields only**. `docs/auth_cost_metric.md` §1 plane-3 row extended to list the new fields (folding begun; not
   deleted until superseded at card close).
@@ -167,7 +167,7 @@ Policies" table) are kept **schema-compatible** but NOT implemented in this card
 `route`/`reporter`/`confidence` (additive, defaulted, schema stays v1); 4 emitters stamp today's provenance
 (catalog→`inferred`, structural-no-cost→`unavailable`); `__init__` re-exports the literals. 58 targeted tests green
 (`test_ledger` + `test_emit` + dependent read surfaces `test_usage_summary`/`test_usage`/double-count regression);
-`make pre-commit` clean. Design-doc sync: `design.md` §3.14, `design_appendix.md` §A.13, `auth_cost_metric.md` §1.
+`make pre-commit` clean. Design-doc sync: `design.md` §3.14, `design_telemetry.md` §A.13, `auth_cost_metric.md` §1.
 Changelog entry added. **No integration run** — pure host-side dataclass + JSONL round-trip, no Docker/`claude -p`/proxy
 path (contrast Phase 2/4). Deferred to Phase 2: cost-record nullable `cost_micros` + provenance, and the "v1 cost record
 loads" acceptance row.
@@ -208,7 +208,7 @@ unchanged.)
   request, from accumulated recorded spend." Changelog records the breaking change + reset path.
 - [x] **Phase-coupling decision: (b) ship Phase 3 standalone** (user-approved). Strict-removal is self-contained; Phase
   2 later upgrades the wording to "reported route cost" and makes cost nullable.
-- [x] **Design-doc sync**: `design.md` §3.7 (post-event behavior, no strict/preflight) + `design_appendix.md` §A.9
+- [x] **Design-doc sync**: `design.md` §3.7 (post-event behavior, no strict/preflight) + `design_telemetry.md` §A.9
   (removed the `cap_mode` table row + reworded the unrelated "strict multi-process" line) + `auth_cost_metric.md` §6
   (keys row + enforcement prose) + `end-user/proxy.md` (post-vs-strict removed, upgrade reset note added) + QA
   `7-costs.md` (cap_mode-removed rejection step; stale setup lines dropped) + QA index test-count/last-updated bumped.
@@ -288,7 +288,7 @@ both gateways) and **remove the catalog entirely** (not flag it). Provenance shi
 - [x] **Verb cost-evidence (review-found):** `ProxyCostDelta.reported_request_count` + `VerbCostResult.cost_measured`
   (from that delta, not `bool(deltas)`); `emit.py` logs `cost_micro_usd=None` / `confidence="unavailable"` for a
   passthrough verb that moved tokens but reported no cost.
-- [x] **Design-doc sync**: `design.md` §3.14, `design_appendix.md` §A.9 + §A.13, `auth_cost_metric.md` (planes table +
+- [x] **Design-doc sync**: `design.md` §3.14, `design_telemetry.md` §A.9 + §A.13, `auth_cost_metric.md` (planes table +
   §7
   - F6), and QA `7-costs.md` fixtures repointed from `estimated`/`pricing_source` to `reporter`/`confidence`.
 
@@ -320,7 +320,7 @@ passthrough window), so a `cost_measured=False` verb rendered `reported: true, c
 verb level (the request display was already correct via nullable `_reported_micros`). Fixed with `_verb_cost_reported`
 (trusts `cost_measured`; legacy records fall back to `total > 0`); `_scope_verb_records_to_proxy` now re-derives
 `cost_measured` for the scoped subset from per-proxy `reported_request_count`. Remaining "estimated" proxy/request
-dollar-cost language synced across `auth_cost_metric.md`, `design.md`, `design_appendix.md`, and
+dollar-cost language synced across `auth_cost_metric.md`, `design.md`, the former consolidated design appendix, and
 end-user/{proxy,config,session}.md; the attribution-snapshot sense (`estimated:true` verb field,
 `verb_snapshot_estimated` enum, concurrency caveat) is preserved as accurate.
 
@@ -413,8 +413,9 @@ segment. Never merge.
   `test_statusline_forge_segments.py::{TestFormatHelpers,TestLaunchProducer}`.
 - [~] `forge +$Y` distinct segment — **deferred to Phase 5** (see Shipped notes). `cost_mode=api|subscription` stays an
   explicit declaration (Bug #1).
-- [x] **Design + end-user docs sync**: `design_appendix.md` §A.7 (new key) + §A.8 (billing-as-declaration, `launch`
-  segment); `docs/end-user/config.md` + `authentication.md` (new key, corrected `cost_mode=auto`, the `omit` control).
+- [x] **Design + end-user docs sync**: the former consolidated design appendix §A.7 (new key) + §A.8
+  (billing-as-declaration, `launch` segment); `docs/end-user/config.md` + `authentication.md` (new key, corrected
+  `cost_mode=auto`, the `omit` control).
 
 **Acceptance**
 
@@ -468,7 +469,7 @@ included** (deferred here from Phase 4).
   `run_claude_session` seam) + updated memory/workers assertions (direct verb/worker now `runtime_native`).
   **Verification**: 5285 unit pass; **6 real-Claude integration tests pass on 2.1.165** (98s) — 5a verdict + self-report
   pipeline confirmed end-to-end; `make pre-commit` clean.
-- [x] **5f design-doc sync**: `design.md` §3.14 (headless self-report + `forge +$Y`), `design_appendix.md` §A.13
+- [x] **5f design-doc sync**: `design.md` §3.14 (headless self-report + `forge +$Y`), `design_telemetry.md` §A.13
   (`reporter=claude_code` + `measurement_source=runtime_native` emitted; precedence + per-worker paragraphs rewritten;
   corrected a stale `inferred`→`reported`) + §A.8 (`forge_cost` default-off, `forge_cost_ttl`, "Forge session cost"),
   `vocabulary.py`/`ledger.py` comments (claude_code/runtime_native emitted).
@@ -500,16 +501,16 @@ deliberate, test-visible choice — not silently diverging.
   names, or `forge proxy costs` authority — zero unsafe dollar prose survives Phases 2–5. The only substantive change
   was the `forge activity` honest-label fix (folded into Bug #7).
 - [x] **Bug #5**: `OPENROUTER_BASE_URL` (non-secret connection value) added to both credential tables
-  (`end-user/authentication.md`, `design_appendix.md §A.6`); `anthropic-passthrough` added to
+  (`end-user/authentication.md`, `design_installation.md §A.6`); `anthropic-passthrough` added to
   `anthropic-api.unlocks_features` (`capabilities.py`, + `test_capabilities.py` assertion) and a "which auth?" row.
-- [x] **Bug #6**: `auth_ignore_env` reworded in `authentication.md` + `design_appendix.md §A.6` — it changes the key
+- [x] **Bug #6**: `auth_ignore_env` reworded in `authentication.md` + `design_installation.md §A.6` — it changes the key
   **source** (file vs env) for both interactive and headless; the interactive/headless separation is
   `interactive_anthropic_api_key` (the G4 key, shipped Phase 4). Cross-referenced.
 - [x] Updated `end-user/{authentication,config,proxy,session,policy}.md`; added the user-facing "which surface answers
   which question?" table to `proxy.md` (adapted from the internal `auth_cost_metric.md` table) with cross-links from
   `session.md` + `config.md`.
 - [x] Folded `auth_cost_metric.md` into an **internal audit map** — banner + links to `design.md §3.14` /
-  `design_appendix.md §A.8/§A.9/§A.13`; preserved the durable reference (three planes, resolution chain, file index);
+  `design_telemetry.md §A.8/§A.9/§A.13`; preserved the durable reference (three planes, resolution chain, file index);
   **rewrote** the Phase-4-falsified findings (F1/F2 → RESOLVED, §14 `has_api_key` deleted, billing-mode-as-declaration)
   rather than keeping them verbatim; deleted the superseded operator playbook + proposals (P1/P2 shipped in Phase 4).
 
@@ -604,7 +605,7 @@ cap counters live in a separate process the CLI cannot reach, so the printed `Ti
 - [x] **Production**: `proxy_costs.py` (`costs_cmd` → `costs_group` + `show_cmd` + `reset_cmd`; `_RESET_TARGETS` with
   the 4th derived-cache target); `proxy.py` registers `costs_group`. **Verified**: 25 unit tests + manual smoke (dry-run
   lists, `--yes` wiped files + printed restart tip, post-reset `show` reads zero).
-- [x] **Docs**: design.md (§4.0 rows for `show`/`reset`), design_appendix.md (§A.9 reset paragraph), end-user
+- [x] **Docs**: design.md (§4.0 rows for `show`/`reset`), design_telemetry.md (§A.9 reset paragraph), end-user
   `proxy.md`/`session.md`/`config.md`, `auth_cost_metric.md` command-reference + file/symbol index (`costs_group`); all
   `forge proxy costs` invocations → `show`. Source/test comments naming the runnable view (`usage_summary.py`,
   `metrics.py`, `cost_tracking.py`, `test_bug_cost_log_non_dict_line.py`, `test_cost_tracking.py`) updated; board
@@ -641,7 +642,7 @@ binds there: `5h:85%↻2h · 7d:30%`.
   **Verified**: 164 status-line unit tests; live render `5h:8% · 7d:52%↻1d`.
 - [x] **Tests**: `test_status_line.py` (`TestHeatColor`, rewritten `TestFormatRateLimits`/`TestRateLimitsObjectShape`,
   day + inline-reset tests); `test_statusline_billing.py` + `test_status_line_integration.py` assertions `RL:` → `5h:`.
-- [x] **Docs**: `config.md` (cost_mode quota = both windows + heat + `↻`), `design_appendix.md` §status-line,
+- [x] **Docs**: `config.md` (cost_mode quota = both windows + heat + `↻`), `design_telemetry.md` §status-line,
   `auth_cost_metric.md` (format + state table); QA `8-status-line.md` (fixture seeds `seven_day` + `resets_at`, asserts
   `5h:37% · 7d:82%` heat-mapped with `7d:82%↻2d`).
 

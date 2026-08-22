@@ -91,8 +91,8 @@ cross-references.**
   allowed in troubleshooting docs only) is the likely answer. `FORGE_DEBUG` is already classified as public diagnostic.
 - Guard mechanics: literal scan of user-visible strings (the `test_output.py` pattern) vs AST walk over help/error call
   sites -- pick whichever survives f-string composition.
-- Classification table home: `design_appendix.md` (reference material) with a pointer from design.md §3.4/§3.10, or a
-  new appendix section -- decide at execution per documentation_guidelines' one-authority rule.
+- Classification table home: the former consolidated design appendix (reference material) with a pointer from design.md
+  §3.4/§3.10, or a new appendix section -- decide at execution per documentation_guidelines' one-authority rule.
 
 ## Acceptance tests
 

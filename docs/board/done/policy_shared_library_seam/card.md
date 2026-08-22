@@ -18,7 +18,7 @@ and decisions.
 
 **References**: `docs/design_workflows.md` §1.2 (reactive node taxonomy and semantic supervisor bar), §2.1
 (shared-library table to extend), and §3.5 (runners); `docs/design.md` §3.6.12 (normative subprocess routing);
-`docs/design_appendix.md` §E (`core.llm`) and §G (routing details); `docs/board/impl_notes.md` (import boundaries,
+`docs/design_runtime.md` §E (`core.llm`) and §G (routing details); `docs/board/impl_notes.md` (import boundaries,
 supervisor launch controls, and single-emitter invariants).
 
 ---

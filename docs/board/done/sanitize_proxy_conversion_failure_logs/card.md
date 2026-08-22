@@ -20,7 +20,7 @@ SSE error remained generic.
 
 ## Expected Behavior
 
-The [§A.11 no-plaintext posture](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
+The [§A.11 no-plaintext posture](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
 permits fixed context, request IDs, safe exception classes, and lifecycle flags in ordinary logs. Provider response
 values and exception rendering that can embed them belong only in an explicitly sanctioned raw-content plane.
 

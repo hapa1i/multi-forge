@@ -15,8 +15,8 @@ non-streaming failures reach clients and telemetry as failures rather than succe
 - [`docs/developer/coding_standards.md` §5](../../../developer/coding_standards.md#system-boundaries-external-data)
   requires critical external-data failures to fail with a clear error and best-effort paths to degrade visibly and
   safely.
-- [`docs/design.md` §7.x](../../../design.md#7x-optional-always-on-proxy-audit-and-control) and
-  [`docs/design_appendix.md` §A.11](../../../design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)
+- [`docs/design_runtime.md` §7.x](../../../design_runtime.md#7x-optional-always-on-proxy-audit-and-control) and
+  [`docs/design_telemetry.md` §A.11](../../../design_telemetry.md#a11-intercept-audit-and-request-logging-configuration-7x)
   reserve ordinary proxy logs for metadata and keep provider/caller plaintext in explicit bounded planes.
 - [`docs/end-user/proxy.md`](../../../end-user/proxy.md#proxy-metrics) defines failed-request and failure-type
   accounting as operator-visible proxy truth.

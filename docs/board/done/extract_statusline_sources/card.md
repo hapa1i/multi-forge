@@ -17,7 +17,7 @@ package and invert its current imports away from the monolithic command module.
 Reverified on `43130c3d`, `status_line.py` was 1,789 lines. `statusline.context`, `palette`, and `registry` imported the
 command module for types, constants, and source helpers, so the existing package had not established a lower layer.
 Authority:
-[`docs/design_appendix.md` "A.8 Status line guidance"](../../../design_appendix.md#a8-status-line-guidance-3611) and
+[`docs/design_telemetry.md` "A.8 Status line guidance"](../../../design_telemetry.md#a8-status-line-guidance-3611) and
 [`docs/developer/coding_standards.md` "Code Organization"](../../../developer/coding_standards.md#1-code-organization).
 
 ## Acceptance Criteria

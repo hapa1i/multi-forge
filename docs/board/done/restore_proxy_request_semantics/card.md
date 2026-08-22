@@ -16,9 +16,8 @@ constraints while translating or force-enabling reasoning.
 
 Rechecked on merged `main` at `7f705aad`: undocumented tier environment variables override proxy config, auth retry
 omits the resolved tier, reasoning pinning leaves incompatible sampling fields, and Anthropic `tool_choice:any` maps to
-OpenAI `auto`.
-[`docs/design_appendix.md` §A.1](../../../design_appendix.md#a1-proxy-overlay-schema-364--user-edit-surface) defines
-proxy precedence and the translated wire contract.
+OpenAI `auto`. [`docs/design_runtime.md` §A.1](../../../design_runtime.md#a1-proxy-overlay-schema-364-user-edit-surface)
+defines proxy precedence and the translated wire contract.
 
 The appendix's generic internal layering note ends in `env`, but its explicit hyperparameter chain is request value,
 per-tier proxy override, then catalog default. No documentation or repository producer defines the direct

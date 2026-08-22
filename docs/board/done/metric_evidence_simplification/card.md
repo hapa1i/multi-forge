@@ -225,7 +225,7 @@ These came out of the auth/cost/usage audit and should be handled with or before
 
    - Define metric evidence fields that separate route, reporter, measurement source, payer, confidence, and scope.
    - Decide whether to evolve the existing usage ledger or introduce a broader metric-event ledger.
-   - Update `docs/design.md` and `docs/design_appendix.md` only for shipped slices.
+   - Update `docs/design.md` and the former consolidated design appendix only for shipped slices.
 
 2. **Cost source replacement**
 
