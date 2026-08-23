@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import FrozenInstanceError, dataclass
 
@@ -22,7 +23,7 @@ from forge.core.models.model_routes import (
 
 
 @pytest.fixture(autouse=True)
-def _clear_catalog_cache() -> None:
+def _clear_catalog_cache() -> Iterator[None]:
     clear_model_route_catalog_cache()
     yield
     clear_model_route_catalog_cache()
