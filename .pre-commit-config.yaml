@@ -1,4 +1,5 @@
-default_stages: [ pre-commit ]
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -81,6 +82,11 @@ repos:
     entry: ./scripts/check-markdown-links.py
     files: \.md$
     require_serial: true
+  - id: normalize-commit-msg
+    name: normalize commit message
+    language: system
+    entry: ./scripts/normalize-commit-msg.py
+    stages: [commit-msg]
 - repo: https://github.com/hukkin/mdformat
   rev: 1.0.0
   hooks:
