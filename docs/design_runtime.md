@@ -73,6 +73,14 @@ Forge subprocesses (workflow workers, semantic and team supervisors, memory writ
 when they need Forge-owned transport selection. This replaced ad-hoc resolution paths that implemented different
 fallback chains with different semantics. Intentional direct and runtime-native arms bypass the resolver.
 
+Interactive main-session model selection does **not** use this ambient subprocess chain.
+`forge.core.ops.session_model_routing` owns its read-only plan: explicit proxy/no-proxy, compatible persisted route,
+new-Claude direct, then ordered package-catalog candidates. It inspects template/instance tier maps and backend-source
+credentials without scanning unrelated running proxies or starting a process. `realize_session_model_route()` realizes
+only the selected plan, calls `ensure_proxy()` once when startup/reuse is required, revalidates concrete identity and
+compatibility, and treats every post-selection failure as terminal. The plan's exact selected-model context window is
+the input to session resume/fork budget preflight; intent mutation remains a later lifecycle transaction.
+
 **Resolution chain** (sources not supplied by a caller are skipped):
 
 | Step | Source             | Behavior                                                                                        |

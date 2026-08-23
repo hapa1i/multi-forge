@@ -581,6 +581,21 @@ multi-forge/
   - `forge claude start --no-proxy` is a bare launcher (no session state) -- see below.
   - Tier/model routing doesn't apply—it's proxy-only. Claude Code uses Anthropic models directly.
 
+Interactive model-first selection is planned in `forge.core.ops.session_model_routing`, separately from the subprocess
+resolver. Its read-only stage normalizes one explicit model request, applies strict explicit proxy/no-proxy constraints,
+then preserves a compatible persisted route before consulting ordered `model_routes.yaml` candidates. A new Claude
+request remains direct. Runtime proxy-registry order never changes automatic candidate order.
+
+Proxy compatibility comes from the concrete template or instance's effective tier defaults and `model_alternatives`; an
+opaque custom base URL cannot establish compatibility for an explicit model request. Automatic candidate admission reads
+template ownership and credential/lifecycle requirements from `forge.backend.sources` without starting anything. After
+the first admissible candidate is selected, a separate realization step invokes `ensure_proxy()` at most once for that
+exact route, validates live identity and the concrete config, and never falls through to another source on failure.
+
+Tier resolution is deterministic: explicit model tier, serving intrinsic Claude tier, serving proxy default, then a
+unique serving tier. Remaining ambiguity is an error. The plan carries the selected tier's effective model and exact
+catalog context window so resume/fork budget checks can run before the atomic session-intent transition.
+
 **Normative rule:** A session records which proxy it is running with (`confirmed.proxy`), but **cannot override**
 proxy-owned routing properties. (Proxy requests do not carry a stable session identifier.)
 

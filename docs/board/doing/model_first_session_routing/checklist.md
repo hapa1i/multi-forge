@@ -7,9 +7,9 @@ wins.
 
 ## Current focus
 
-Implement the side-effect-free route planner next. The package-owned route catalog and strict manifest-v2 neutral route
-intent are complete; lifecycle callers remain unchanged until route precedence, admission, and tier selection are
-independently tested.
+Integrate the independently tested route plan with lifecycle callers next. Catalog ordering, manifest-v2 neutral intent,
+read-only precedence/admission/tier selection, and the single-candidate realization boundary are complete; lifecycle
+integration must consume the plan's exact selected-tier context limit before intent mutation.
 
 ## Activation and review
 
@@ -110,23 +110,23 @@ tier resolution, context-preflight inputs, and pure intent transitions. `forge.s
 Claude-pin adapter; `forge.core.ops.session_model` remains read-only reporting; `forge.core.ops.session_routing` retains
 provenance preparation and commit. **Blockers:** None.
 
-- [ ] Build the interactive route plan in `forge.core.ops.session_model_routing`: strict explicit proxy/no-proxy
+- [x] Build the interactive route plan in `forge.core.ops.session_model_routing`: strict explicit proxy/no-proxy
   precedence, then compatible persisted/inherited routing, then new-Claude direct routing, then catalog selection for an
   explicit incompatible or unbound non-Claude request.
-- [ ] Validate explicit and persisted routes from their concrete template tier maps. Treat a template-less custom base
+- [x] Validate explicit and persisted routes from their concrete template tier maps. Treat a template-less custom base
   URL as unverifiable for explicit `--model`, while leaving bare custom-route relaunch unchanged.
-- [ ] Inspect automatic candidates without starting a proxy. Resolve source prerequisites through the backend-source and
+- [x] Inspect automatic candidates without starting a proxy. Resolve source prerequisites through the backend-source and
   credential registries; do not duplicate credential ids or lifecycle metadata in the route catalog.
-- [ ] Select the first admissible candidate and call `ensure_proxy()` exactly once for that candidate. Reuse/start
+- [x] Select the first admissible candidate and call `ensure_proxy()` exactly once for that candidate. Reuse/start
   failures, health or identity mismatches, and post-selection compatibility errors are hard failures with no fallback.
-- [ ] Resolve tiers in the accepted order: explicit tier; serving intrinsic Claude tier; serving proxy default; unique
+- [x] Resolve tiers in the accepted order: explicit tier; serving intrinsic Claude tier; serving proxy default; unique
   serving tier; otherwise an ambiguity error naming candidates and a usable `--model-tier` command.
-- [ ] Reject `--model-tier` without `--model`, direct-tier mismatch, non-serving explicit tiers, uncatalogued provider
+- [x] Reject `--model-tier` without `--model`, direct-tier mismatch, non-serving explicit tiers, uncatalogued provider
   refs, non-Claude direct/no-proxy requests, and unsupported custom routes before intent mutation or child invocation.
 - [ ] Resolve the selected tier's effective context window and run resume/fork context-budget preflight before
   committing intent. A failure leaves prior session intent byte-equivalent; any already-started proxy follows ordinary
   lifecycle.
-- [ ] Update `docs/design.md` §3.4 and `docs/design_runtime.md` §3.6.12 in this phase when planner ownership,
+- [x] Update `docs/design.md` §3.4 and `docs/design_runtime.md` §3.6.12 in this phase when planner ownership,
   precedence, and failure boundaries ship.
 
 ## Phase 4 -- Interactive CLI and launch transaction
@@ -228,6 +228,7 @@ Removal waits for that test to pass. **Blockers:** None.
   (pyright retained its existing missing-source warning for PyYAML).
 - Phase 2: manifest/transition focus -- 180 passed; all non-integration `tests/src/session` tests -- 1,428 passed, 89
   integration tests deselected.
+- Phase 3 planner/catalog/manifest focus -- 198 passed; targeted Ruff, Black, mypy, and pyright passed.
 - Focused implementation tests: pending.
 - Required targeted integration: pending.
 - Aggregate unit/regression/pre-commit: pending.
