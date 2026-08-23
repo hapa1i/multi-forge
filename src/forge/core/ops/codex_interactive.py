@@ -88,6 +88,7 @@ from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
 
 from .session_authority_launch import authority_launch_transaction
+from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +311,15 @@ def start_interactive_codex_session(
                 authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
             )
 
+        commit_launch_routing(
+            store=store,
+            state=state,
+            root=root,
+            operation="start",
+            payload=build_runtime_native_routing_payload(),
+            authority_attempt=authority_attempt,
+        )
+
         if authority_attempt is not None:
             exit_code = runner()
             authority_attempt.complete(exit_code)
@@ -475,6 +485,15 @@ def reattach_codex_session(
                 resume_thread_id=thread_id,
                 authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
             )
+
+        commit_launch_routing(
+            store=store,
+            state=state,
+            root=root,
+            operation="resume",
+            payload=build_runtime_native_routing_payload(),
+            authority_attempt=authority_attempt,
+        )
 
         if authority_attempt is not None:
             exit_code = runner()

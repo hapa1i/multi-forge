@@ -268,13 +268,20 @@ Code preset). Set keys with `forge config set statusline.<key>=<value>`:
 
 **Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, think, loop, sidecar`. Opt-in
 segments (add to `segments` to enable): `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
-`audit`, `drift`, `spend_cap`, `launch`, `forge_cost`, `hooks`. `forge config set` rejects unknown names; an empty list
-restores the default bar. The `hooks` segment shows `HOOK!` for legacy cleanup-required state and `HOOKx2` only for an
-actual duplicate event/matcher/handler. The `launch` segment shows how the session reached the model (`direct` /
-`proxy:<id>`) and the api-key posture (`key:env|file|none|omit`); it appears only for Forge-managed sessions, not
-ambient `claude`. The `forge_cost` segment shows `forge +$Y` — the LLM cost Forge added for this session (memory writer,
-supervisor, review fan-out), **excluding** the main interactive session, reported-or-nothing (subscription/OAuth
-sessions show nothing) and distinct from Claude's own `cost`; Forge-managed sessions only.
+`audit`, `drift`, `spend_cap`, `launch`, `forge_cost`, `hooks`, `marking`. `forge config set` rejects unknown names; an
+empty list restores the default bar. The `hooks` segment shows `HOOK!` for legacy cleanup-required state and `HOOKx2`
+only for an actual duplicate event/matcher/handler. The `launch` segment shows how the session reached the model
+(`direct` / `proxy:<id>`) and the api-key posture (`key:env|file|none|omit`); it appears only for Forge-managed
+sessions, not ambient `claude`. The `forge_cost` segment shows `forge +$Y` — the LLM cost Forge added for this session
+(memory writer, supervisor, review fan-out), **excluding** the main interactive session, reported-or-nothing
+(subscription/OAuth sessions show nothing) and distinct from Claude's own `cost`; Forge-managed sessions only.
+
+The default-off `marking` segment renders the observed request model's provider-declared text-marking posture as
+`mark:yes`, `mark:no`, or `mark:?`. Proxy yes/no requires authoritative live backend and tier/alternative mappings;
+older or unreachable proxy responses, config/launch fallback, direct mode, missing route evidence, or an unknown model
+render `?`. A missing stdin model omits only this segment. `mark:no` means a matching dated provider declaration says
+unmarked—it is not a content scan, an admission decision, or proof of authorship. The production declaration catalog
+ships empty, so current results are intentionally `?` until a separately source-reviewed declaration is added.
 
 Source discovery follows the selected fields. A `path,branch` layout never contacts a proxy or reads the Forge session
 index/manifest; fields that need proxy or managed-session facts acquire each source once per refresh and share it. The
@@ -283,7 +290,7 @@ proxy/session discovery only: selected fields can still perform their own git, t
 work.
 
 ```bash
-forge config set statusline.segments=path,model,cost,cache_hit,spend_cap
+forge config set statusline.segments=path,model,cost,cache_hit,spend_cap,marking
 forge config set statusline.palette=earthy
 forge config set statusline.cost_mode=subscription
 ```

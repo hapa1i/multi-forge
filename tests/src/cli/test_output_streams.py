@@ -107,7 +107,9 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-def test_session_authority_show_json_owns_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_session_authority_show_json_owns_stdout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     report = SimpleNamespace(to_dict=lambda: {"session": "planner", "role": None})
     monkeypatch.setattr(
         "forge.cli.session_authority.get_session_authority_report",
@@ -118,6 +120,23 @@ def test_session_authority_show_json_owns_stdout(monkeypatch: pytest.MonkeyPatch
 
     assert result.exit_code == 0
     assert json.loads(result.stdout) == {"session": "planner", "role": None}
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("leaf", ["show", "history"])
+def test_session_model_json_leaves_own_stdout(monkeypatch: pytest.MonkeyPatch, leaf: str) -> None:
+    report = SimpleNamespace(to_dict=lambda: {"schema_version": 1, "session": "planner", "events": []})
+    target = (
+        "forge.cli.session_model.get_session_model_report"
+        if leaf == "show"
+        else "forge.cli.session_model.get_session_model_history_report"
+    )
+    monkeypatch.setattr(target, lambda **_kwargs: report)
+
+    result = CliRunner().invoke(main, ["session", "model", leaf, "planner", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["session"] == "planner"
     assert result.stderr == ""
 
 
@@ -139,8 +158,13 @@ def test_selectorless_human_session_show_is_stderr_only() -> None:
     assert "No session specified" in result.stderr
 
 
-def test_human_workflow_preflight_failure_is_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("forge.review.engine.preflight_check", lambda *_args, **_kwargs: ["missing runtime"])
+def test_human_workflow_preflight_failure_is_stderr_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "forge.review.engine.preflight_check",
+        lambda *_args, **_kwargs: ["missing runtime"],
+    )
 
     result = CliRunner().invoke(_human_workflow_preflight_failure)
 
@@ -151,7 +175,9 @@ def test_human_workflow_preflight_failure_is_stderr_only(monkeypatch: pytest.Mon
     assert "forge workflow list-models" in result.stderr
 
 
-def test_extension_version_failure_is_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_extension_version_failure_is_stderr_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     plan = SimpleNamespace(has_conflicts=False, requires_claude_version=True, skill_packages=[])
     installer = SimpleNamespace(plan=lambda **_kwargs: plan)
     version_check = SimpleNamespace(ok=False, reason="Claude Code is too old.", version="1.0.0")

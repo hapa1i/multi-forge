@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import forge.core.ops.session_authority as ops
+import forge.core.ops.session_authority_launch as launch
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
@@ -18,8 +19,9 @@ from forge.session.authority import (
     authority_config_sha256,
     authority_hook_contract_sha256,
     new_authority_event,
+    read_authority_events,
 )
-from forge.session.events import SessionEventValidationError
+from forge.session.events import SessionEvent, SessionEventValidationError
 from forge.session.models import AuthorityIntent, LaunchIntent
 from tests.fixtures.session_state import publish_session
 
@@ -235,7 +237,107 @@ def test_live_matching_preflight_is_verified_and_show_is_read_only(
         active.clear_session("planner", forge_root=str(temp_env))
 
 
-def test_malformed_active_registry_is_an_actionable_read_only_error(temp_env: Path) -> None:
+def test_matching_launch_abort_supersedes_visible_run_started(temp_env: Path) -> None:
+    store = _seed(temp_env)
+    state = store.read()
+    authority = state.intent.authority
+    assert authority is not None
+    root = new_root_run_identity()
+    config_digest = authority_config_sha256(authority, "claude_code")
+    hook_digest = authority_hook_contract_sha256("claude_code")
+    for event_type, outcome, reason in (
+        ("launch_preflight", "success", None),
+        ("run_started", "success", None),
+        ("launch_aborted", "error", "route_projection_failed"),
+    ):
+        append_authority_event(
+            str(temp_env),
+            new_authority_event(
+                state,
+                event_type=event_type,
+                run_id=root.run_id,
+                origin_surface="launcher",
+                operation="resume",
+                outcome=outcome,
+                reason_code=reason,
+                config_sha256=config_digest,
+                hook_registration_sha256=hook_digest,
+            ),
+        )
+    active = ActiveSessionStore()
+    active.upsert_session(
+        "planner",
+        worktree_path=str(temp_env),
+        launch_mode="host",
+        launcher_pid=os.getpid(),
+        forge_root=str(temp_env),
+        authority_run_id=root.run_id,
+        authority_config_sha256=config_digest,
+        authority_hook_registration_sha256=hook_digest,
+    )
+    try:
+        report = ops.get_session_authority_report(
+            ctx=ExecutionContext.from_cwd(),
+            session_name="planner",
+        )
+        assert report.launch_support == "aborted"
+    finally:
+        active.clear_session("planner", forge_root=str(temp_env))
+
+
+def test_late_run_started_append_failure_is_reported_as_aborted(
+    temp_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _seed(temp_env)
+    active = ActiveSessionStore()
+    real_append = launch.append_authority_event
+
+    monkeypatch.setattr(
+        launch,
+        "_preflight_authority_seam",
+        lambda *_args, **_kwargs: authority_hook_contract_sha256("claude_code"),
+    )
+
+    def land_then_fail(root: str, event: SessionEvent) -> None:
+        real_append(root, event)
+        if getattr(event, "event_type", None) == "run_started":
+            raise OSError("append acknowledgement lost")
+
+    monkeypatch.setattr(launch, "append_authority_event", land_then_fail)
+    monkeypatch.setattr(
+        active,
+        "clear_session",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("active registry locked")),
+    )
+
+    with pytest.raises(ForgeOpError, match="active registry locked"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="resume",
+            launch_mode="host",
+            worktree_path=temp_env,
+            active_store=active,
+        ):
+            pytest.fail("the failed run_started append must not enter the child boundary")
+
+    report = ops.get_session_authority_report(
+        ctx=ExecutionContext.from_cwd(),
+        session_name="planner",
+    )
+    assert report.active is True
+    assert report.launch_support == "aborted"
+    assert [event.event_type for event in read_authority_events(str(temp_env), "planner")][-3:] == [
+        "launch_preflight",
+        "run_started",
+        "launch_aborted",
+    ]
+    ActiveSessionStore().clear_session("planner", forge_root=str(temp_env))
+
+
+def test_malformed_active_registry_is_an_actionable_read_only_error(
+    temp_env: Path,
+) -> None:
     _seed(temp_env)
     active_path = ActiveSessionStore().index_path
     active_path.parent.mkdir(parents=True, exist_ok=True)
@@ -278,6 +380,9 @@ def test_authority_mutation_wraps_lock_open_failure_as_command_error(
 
     monkeypatch.setattr(ops, "authority_session_lock", lambda *_args, **_kwargs: UnopenableLock())
 
-    with pytest.raises(ForgeOpError, match="could not change authority.*authority lock.*permission denied"):
+    with pytest.raises(
+        ForgeOpError,
+        match="could not change authority.*authority lock.*permission denied",
+    ):
         with ops._authority_mutation_lock(store, operation="set"):
             pytest.fail("authority mutation continued without its authority lock")

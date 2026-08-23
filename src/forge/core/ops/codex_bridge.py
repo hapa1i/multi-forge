@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -306,6 +306,7 @@ def bridge_session_to_codex(
     staged_context_path: Path | None = None,
     run_identity: RunIdentity | None = None,
     authority_marker: str | None = None,
+    before_invoke: Callable[[], None] | None = None,
 ) -> CodexBridgeResult:
     """Hand ``parent``'s curated transfer to a headless ``codex exec`` run implementing ``task``.
 
@@ -324,7 +325,9 @@ def bridge_session_to_codex(
     the caller already ran it once. ``output_root`` is the transfer write/read root when
     the child session's forge_root differs from ``ctx.forge_root`` (worktree sessions) --
     GC resolves the child's relative ``context_file`` under the child's indexed
-    forge_root, so writing the snapshot anywhere else would orphan it.
+    forge_root, so writing the snapshot anywhere else would orphan it. ``before_invoke``
+    runs after the request and environment are fixed but before the invoker is called; the
+    managed-session caller uses that boundary for its required route commitment.
 
     Raises ``ForgeOpError`` for an unknown strategy, a missing parent, or a non-ready Codex
     runtime (with setup guidance). The Codex run's own success/failure is reported on the
@@ -402,6 +405,8 @@ def bridge_session_to_codex(
             timeout_seconds=timeout_seconds,
             label="codex-bridge",
         )
+        if before_invoke is not None:
+            before_invoke()
         result = CodexHeadlessInvoker().run(request)
 
     return CodexBridgeResult(

@@ -344,6 +344,61 @@ def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
     return fmt.format_forge_cost(micros)
 
 
+def _produce_marking(ctx: RenderContext) -> Optional[str]:
+    """Render provider-declared text-marking posture for the observed model route."""
+    model = ctx.data.get("model")
+    model_id = model.get("id") if isinstance(model, dict) else None
+    if not isinstance(model_id, str) or not model_id:
+        return None
+
+    from forge.core.models.model_practices import (
+        ModelPracticesError,
+        load_model_practices,
+        resolve_model_practice,
+    )
+    from forge.core.models.model_reference import strip_transport_model_suffix
+
+    try:
+        catalog = load_model_practices()
+        if ctx.is_proxy:
+            if ctx.runtime is None or not ctx.is_proxy_authoritative:
+                return fmt.format_marking("unknown")
+            if not ctx.runtime.has_authoritative_route_truth:
+                return fmt.format_marking("unknown")
+            request_model = strip_transport_model_suffix(model_id)
+            if "/" in request_model:
+                # The proxy may preserve provider/model requests as explicit
+                # backend pass-through routes. Runtime defaults cannot prove
+                # which provider-specific path handled one.
+                return fmt.format_marking("unknown")
+            tier = fmt.explicit_tier_from_model(model_id) or ctx.runtime.active_tier
+            if not isinstance(tier, str) or not tier:
+                return fmt.format_marking("unknown")
+            alternatives = ctx.runtime.model_alternatives.get(tier, {})
+            if not isinstance(alternatives, dict):
+                return fmt.format_marking("unknown")
+            route_model = alternatives.get(request_model)
+            if not isinstance(route_model, str) or not route_model:
+                route_model = ctx.runtime.tier_mappings.get(tier)
+            if not isinstance(route_model, str) or not route_model:
+                return fmt.format_marking("unknown")
+            from forge.core.models.model_reference import normalize_model_reference
+
+            canonical = normalize_model_reference(route_model)
+            scope: list[str] = ["route:proxy", "runtime:claude_code"]
+            if ctx.runtime.backend_id:
+                scope.append(f"backend:{ctx.runtime.backend_id}")
+            scope.sort()
+            declaration = resolve_model_practice(canonical, scope, catalog=catalog)
+            return fmt.format_marking(declaration["status"])
+
+        # Direct/custom output is deliberately unknown in M2. No durable read can
+        # refine that result until a separately designed backend evidence source exists.
+        return fmt.format_marking("unknown")
+    except (ModelPracticesError, OSError):
+        return fmt.format_marking("unknown")
+
+
 # Every segment name now has a producer (no reserved names remain). The
 # allowlist == producer-names equality test (test_statusline_registry.py)
 # enforces this two-way sync whenever a segment is added.
@@ -368,6 +423,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("spend_cap", _produce_spend_cap, _PROXY_SOURCE),
     Segment("launch", _produce_launch, _SESSION_SOURCE),
     Segment("forge_cost", _produce_forge_cost, _SESSION_SOURCE),
+    Segment("marking", _produce_marking, _PROXY_AND_SESSION_SOURCES),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

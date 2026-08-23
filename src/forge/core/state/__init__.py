@@ -45,6 +45,7 @@ from .timestamps import (
     now_iso,
     parse_iso,
     try_parse_iso,
+    utc_today,
     utc_timestamp_z,
 )
 
@@ -78,6 +79,7 @@ __all__ = [
     "prune_jsonl_shards",
     # Timestamps
     "now_iso",
+    "utc_today",
     "utc_timestamp_z",
     "parse_iso",
     "try_parse_iso",

@@ -38,6 +38,7 @@ from forge.session.codex_handoff import (
     write_observation_receipt,
 )
 from forge.session.models import CodexConfirmed, create_session_state
+from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
 
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "codex"
@@ -91,14 +92,20 @@ def _write_transcript(path: Path) -> None:
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:00Z",
-                "message": {"role": "user", "content": [{"type": "text", "text": "Plan the bridge CLI."}]},
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "Plan the bridge CLI."}],
+                },
             }
         ),
         json.dumps(
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:01Z",
-                "message": {"role": "assistant", "content": [{"type": "text", "text": "Flag shape on start."}]},
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Flag shape on start."}],
+                },
             }
         ),
     ]
@@ -238,6 +245,11 @@ class TestStartCodexSession:
         assert state.confirmed.codex.thread_id == _SUCCESS_TID
         assert state.confirmed.codex.auth_method == "chatgpt_tokens"
         assert state.confirmed.codex.auth_source == "codex_store"
+        events = read_routing_events(proj, state)
+        assert [event.payload["route"]["kind"] for event in events] == ["runtime_native"]
+        assert state.confirmed.route_commit is not None
+        assert state.confirmed.route_commit.event_id == events[0].event_id
+        assert state.confirmed.route_commit.run_id == events[0].run_id
         assert state.confirmed.codex.billing_mode == "subscription_quota"
         assert state.confirmed.derivation is not None
         assert state.confirmed.derivation.parent_session == "planner"
@@ -320,7 +332,12 @@ class TestStartCodexSession:
         from forge.core.runtime.codex_preflight import CodexPreflightError
 
         proj, ctx = _make_project(tmp_path, monkeypatch)
-        not_ready = replace(_preflight(), ready=False, installed=False, blocking_reason="codex CLI not found")
+        not_ready = replace(
+            _preflight(),
+            ready=False,
+            installed=False,
+            blocking_reason="codex CLI not found",
+        )
         with patch(
             "forge.core.ops.codex_session.assert_codex_ready",
             side_effect=CodexPreflightError(not_ready),
@@ -446,7 +463,11 @@ class TestStartCodexHookDelivery:
 
         with _codex_mocks(on_codex_spawn=self._enrolled_hook(proj, transcript_path=rollout)) as codex:
             result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
             )
 
         assert result.context_delivery == "session_start_hook"
@@ -470,7 +491,11 @@ class TestStartCodexHookDelivery:
 
         with _codex_mocks() as codex:  # no hook plays: the staged file is never consumed
             result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
             )
 
         assert result.context_delivery == "hook_undelivered"
@@ -500,7 +525,11 @@ class TestStartCodexHookDelivery:
 
         with _codex_mocks(on_codex_spawn=_observe_only):
             result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
             )
 
         assert result.context_delivery == "hook_undelivered"
@@ -516,7 +545,11 @@ class TestStartCodexHookDelivery:
 
         with _codex_mocks(on_codex_spawn=self._enrolled_hook(proj, session_id="not-this-thread")):
             result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
             )
 
         assert result.context_delivery == "hook_undelivered"
@@ -538,7 +571,11 @@ class TestStartCodexHookDelivery:
             on_codex_spawn=self._enrolled_hook(proj, transcript_path=rollout),
         ):
             result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
             )
 
         assert result.thread_id == _SUCCESS_TID
@@ -561,7 +598,13 @@ class TestStartCodexHookDelivery:
 
         with patch("forge.core.ops.codex_session.assert_codex_ready", return_value=incapable):
             with pytest.raises(ForgeOpError, match="hook-capable"):
-                start_codex_session(ctx=ctx, name="impl", parent="planner", task="t", context_delivery="hook")
+                start_codex_session(
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    task="t",
+                    context_delivery="hook",
+                )
 
         assert not SessionStore(str(proj), "impl").exists()
 
@@ -652,7 +695,13 @@ class TestStartCodexSessionGC:
         ctx = ExecutionContext(cwd=proj, worktree_root=repo, project_root=repo, forge_root=proj)
 
         with _codex_mocks():
-            result = start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it", create_worktree=True)
+            result = start_codex_session(
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                create_worktree=True,
+            )
 
         assert result.codex.success
         entry = SessionManager().get_session_entry("impl", forge_root=None)
@@ -776,7 +825,10 @@ class TestContinueCodexSession:
         elsewhere = tmp_path / "elsewhere"
         elsewhere.mkdir()
         invocation_ctx = ExecutionContext(
-            cwd=elsewhere, worktree_root=elsewhere, project_root=elsewhere, forge_root=proj
+            cwd=elsewhere,
+            worktree_root=elsewhere,
+            project_root=elsewhere,
+            forge_root=proj,
         )
 
         with _codex_mocks() as codex:
@@ -787,6 +839,11 @@ class TestContinueCodexSession:
         # Cross-CWD: the turn runs in the session's recorded worktree, not the invocation cwd.
         assert codex.call.kwargs["cwd"] == str(proj)
         assert codex.stdin == "Keep going"
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        events = read_routing_events(proj, state)
+        assert [event.operation for event in events] == ["resume"]
+        assert state.confirmed.route_commit is not None
+        assert state.confirmed.route_commit.run_id == events[0].run_id
 
     def test_deleted_during_resume_returns_result_without_recreating_state(
         self,
@@ -863,7 +920,12 @@ class TestContinueCodexSession:
         from dataclasses import replace
 
         proj, ctx = _make_project(tmp_path, monkeypatch)
-        state = create_session_state(name="impl", worktree_path=str(proj), runtime="codex", parent_session="planner")
+        state = create_session_state(
+            name="impl",
+            worktree_path=str(proj),
+            runtime="codex",
+            parent_session="planner",
+        )
         state.confirmed.codex = CodexConfirmed(
             thread_id=_SUCCESS_TID,
             auth_method="chatgpt_tokens",

@@ -40,6 +40,8 @@ A session is **not** a proxy routing identity.
 - Session manifest (per Forge project): `<forge_root>/.forge/sessions/<name>/forge.session.json`
 - Global session index: `~/.forge/sessions/index.json` (name, forge_root, project_root, last-used-at, UUID)
 - Active-session registry: `~/.forge/sessions/active.json` (runtime-only live launches; self-heals stale entries)
+- Launch journals: `<forge_root>/.forge/artifacts/<name>/{authority,routing}/events.jsonl` (strict append-only local
+  evidence; each domain exists only after it is used)
 
 <!-- forge-env-vocab: diagnostic:start -->
 
@@ -61,6 +63,7 @@ The session file includes hook-confirmed facts such as:
   validated by the SessionStart hook; only a native `--fork-session` lets Claude mint it, which the hook records)
 - `confirmed.transcript_path`
 - `confirmed.started_with_proxy` (snapshot from the SessionStart hook; `{base_url, proxy_id?, template?, port?}`)
+- `confirmed.route_commit` (the latest effective routing journal `{event_id, run_id}` pointer; not a copied route)
 
 > `proxy_id` is a same-machine convenience; `base_url` is the primary runtime truth, and `template` is best-effort
 > metadata.
@@ -173,6 +176,10 @@ forge session list            # Sessions across the workspace (default: --scope 
 forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
+# Model-route provenance (read-only)
+forge session model show [name] [--json]
+forge session model history [name] [--json]
+
 # What a session did (operation outcomes + model calls)
 forge telemetry activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
 forge telemetry activity [name] --period week --json
@@ -208,6 +215,35 @@ forge session authority clear <name>
 # Sandboxed session shell
 forge session shell [name]
 ```
+
+### Inspect model-route provenance
+
+`forge session model show [name] --json` keeps configured intent, the durable launch commitment, and current proxy facts
+separate. A supported `route_commit` is dereferenced through the exact routing journal event and includes the committed
+billing mode and route-scope tags. For proxy sessions, `live_proxy.evidence_source` is resolved in order: live
+`runtime`, current `proxy_config`, supported `route_commit`, then `unavailable`. Only `runtime` is authoritative live
+evidence; the other values are labelled fallback. The terminal read cannot see a specific request, so
+`current_request_tier` stays null rather than reporting the proxy default as though the user selected it.
+
+`forge session model history [name] --json` returns every validated event in append order. `history_status` means:
+
+- `supported`: the projected event is the newest effective commit, or a complete aborted-only history needs no
+  projection.
+- `unproven`: a journal exists but is empty, inconsistent with the projection, or contains an uncompensated effective
+  commit. An empty file can be residue from a failed first append; complete abort events are interpretable evidence.
+- `null`: neither a projection nor a routing journal exists.
+
+Existing manifests are not backfilled. If only legacy `confirmed.launch` exists, `show` labels it
+`legacy_confirmed_launch`, uses null event/run ids, and invents neither history nor marking snapshots. `supported`
+starts with the first route-provenance journal event. Missing journals and malformed/unreadable records are not silently
+repaired: inconsistent evidence stays `unproven`, while malformed history is an actionable read error. Historical
+route-model strings remain immutable route facts if a later package catalog removes an id; that removal makes the
+current provider-declaration result unknown instead of invalidating an otherwise valid journal.
+
+These surfaces report the route Forge committed before invoking a managed child. They do not prove which route handled
+each request, what content a model authored, or whether any marking exists in generated text. Route and authority
+journals survive ordinary session delete/clean with the containing artifact tree, including `--keep-transcripts`
+choices; they disappear together only when cleanup removes an owning nested Forge root.
 
 If Forge still sees a live launch in `~/.forge/sessions/active.json`, `forge session delete <name>` refuses to delete
 the session (exit 1) and `forge session delete --all` skips the live ones (deleting the rest). Liveness self-heals, so a

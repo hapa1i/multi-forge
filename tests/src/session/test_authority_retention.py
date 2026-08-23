@@ -8,10 +8,13 @@ from pathlib import Path
 import pytest
 
 import forge.session.worktree as worktree_pkg
+from forge.core.ops.session_routing import build_claude_routing_payload
+from forge.core.reactive.env import new_root_run_identity
 from forge.session import IndexStore, SessionManager, SessionStore
 from forge.session.authority import read_authority_events
 from forge.session.cleanup import clean_old_sessions
 from forge.session.models import AuthorityIntent
+from forge.session.routing import append_routing_event, new_routing_event
 
 
 def _init_project(path: Path) -> None:
@@ -27,7 +30,7 @@ def _start_marked(
     name: str,
     *,
     incognito: bool = False,
-) -> Path:
+) -> tuple[Path, Path]:
     manager.start_session(
         name,
         worktree_path=str(root),
@@ -37,7 +40,24 @@ def _start_marked(
     )
     events = read_authority_events(str(root), name)
     assert [event.event_type for event in events] == ["authority_configured"]
-    return root / ".forge" / "artifacts" / name / "authority" / "events.jsonl"
+    store = SessionStore(str(root), name)
+    state = store.read()
+    routing = new_routing_event(
+        state,
+        event_type="launch_routing_committed",
+        run_id=new_root_run_identity().run_id,
+        operation="start",
+        payload=build_claude_routing_payload(
+            state,
+            effective_template=None,
+            runtime_base_url=None,
+            proxy_id=None,
+            effective_direct_model="claude-opus-5",
+        ),
+    )
+    routing_journal = append_routing_event(root, routing)
+    authority_journal = root / ".forge" / "artifacts" / name / "authority" / "events.jsonl"
+    return authority_journal, routing_journal
 
 
 @pytest.mark.parametrize("delete_transcripts", [False, True])
@@ -55,7 +75,7 @@ def test_delete_preserves_authority_journal_when_forge_root_remains(
     monkeypatch.chdir(project)
 
     manager = SessionManager(index_store=IndexStore())
-    journal = _start_marked(manager, project, "retained")
+    authority_journal, routing_journal = _start_marked(manager, project, "retained")
 
     manager.delete_session(
         "retained",
@@ -64,7 +84,8 @@ def test_delete_preserves_authority_journal_when_forge_root_remains(
         force=True,
     )
 
-    assert journal.is_file()
+    assert authority_journal.is_file()
+    assert routing_journal.is_file()
     assert not SessionStore(str(project), "retained").exists()
 
 
@@ -83,7 +104,7 @@ def test_age_cleanup_preserves_authority_journal_with_transcript_setting(
     monkeypatch.chdir(project)
 
     manager = SessionManager(index_store=IndexStore())
-    journal = _start_marked(manager, project, "old-marked")
+    authority_journal, routing_journal = _start_marked(manager, project, "old-marked")
     manager.index_store.update_session(
         "old-marked",
         last_accessed_at="2000-01-01T00:00:00Z",
@@ -98,7 +119,8 @@ def test_age_cleanup_preserves_authority_journal_with_transcript_setting(
     )
 
     assert result.deleted == ["old-marked"]
-    assert journal.is_file()
+    assert authority_journal.is_file()
+    assert routing_journal.is_file()
 
 
 def test_incognito_cleanup_preserves_journal_when_forge_root_remains(
@@ -113,10 +135,11 @@ def test_incognito_cleanup_preserves_journal_when_forge_root_remains(
     monkeypatch.chdir(project)
 
     manager = SessionManager(index_store=IndexStore())
-    journal = _start_marked(manager, project, "private", incognito=True)
+    authority_journal, routing_journal = _start_marked(manager, project, "private", incognito=True)
     manager.delete_session("private", delete_transcripts=True, delete_worktree=False, force=True)
 
-    assert journal.is_file()
+    assert authority_journal.is_file()
+    assert routing_journal.is_file()
 
 
 def test_root_level_worktree_delete_preserves_parent_root_journal(
@@ -133,7 +156,7 @@ def test_root_level_worktree_delete_preserves_parent_root_journal(
     monkeypatch.chdir(project)
 
     manager = SessionManager(index_store=IndexStore())
-    journal = _start_marked(manager, project, "producer")
+    authority_journal, routing_journal = _start_marked(manager, project, "producer")
     store = SessionStore(str(project), "producer")
 
     def mark_owned_worktree(state) -> None:
@@ -158,7 +181,8 @@ def test_root_level_worktree_delete_preserves_parent_root_journal(
     manager.delete_session("producer", delete_worktree=True, force=True)
 
     assert not checkout.exists()
-    assert journal.is_file()
+    assert authority_journal.is_file()
+    assert routing_journal.is_file()
 
 
 def test_owning_worktree_delete_removes_journal_with_nested_forge_root(
@@ -175,7 +199,7 @@ def test_owning_worktree_delete_removes_journal_with_nested_forge_root(
     monkeypatch.chdir(nested_root)
 
     manager = SessionManager(index_store=IndexStore())
-    journal = _start_marked(manager, nested_root, "nested-producer")
+    authority_journal, routing_journal = _start_marked(manager, nested_root, "nested-producer")
     store = SessionStore(str(nested_root), "nested-producer")
 
     def mark_owned_worktree(state) -> None:
@@ -200,4 +224,5 @@ def test_owning_worktree_delete_removes_journal_with_nested_forge_root(
     manager.delete_session("nested-producer", delete_worktree=True, force=True)
 
     assert not checkout.exists()
-    assert not journal.exists()
+    assert not authority_journal.exists()
+    assert not routing_journal.exists()

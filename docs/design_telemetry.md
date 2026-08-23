@@ -152,12 +152,12 @@ coverage.
 
 Status line reads Claude Code's stdin JSON plus two env-var-addressed sources:
 
-| Source            | Address                                | What it provides                                                       | Availability          |
-| ----------------- | -------------------------------------- | ---------------------------------------------------------------------- | --------------------- |
-| Claude Code stdin | piped JSON                             | model, workspace, context_window, cost, rate_limits, session_id        | Always                |
-| Session file      | `FORGE_SESSION`                        | Intent, overrides, confirmed facts                                     | Always (file)         |
-| Proxy registry    | `ANTHROPIC_BASE_URL` -> reverse lookup | proxy_id, template, port                                               | Always (file)         |
-| Proxy `GET /`     | `ANTHROPIC_BASE_URL` -> query          | tier mappings, context windows, metrics, intercept posture, spend caps | Only if proxy running |
+| Source            | Address                                | What it provides                                                  | Availability          |
+| ----------------- | -------------------------------------- | ----------------------------------------------------------------- | --------------------- |
+| Claude Code stdin | piped JSON                             | model, workspace, context_window, cost, rate_limits, session_id   | Always                |
+| Session file      | `FORGE_SESSION`                        | Intent, overrides, confirmed facts                                | Always (file)         |
+| Proxy registry    | `ANTHROPIC_BASE_URL` -> reverse lookup | proxy_id, template, port                                          | Always (file)         |
+| Proxy `GET /`     | `ANTHROPIC_BASE_URL` -> query          | backend, tier/alternative maps, context, metrics, intercept, caps | Only if proxy running |
 
 **Information strategy:**
 
@@ -180,16 +180,16 @@ default 10, `>= 1`). `forge config set`/`edit` is the strict allowlist gate (rej
 enums; the on-disk loader fails open per-subtree); the renderer drops unknown names and falls back to `DEFAULT_ORDER` if
 a non-empty config resolves to nothing. The flat `show_rate_limits` key was removed (clean break) — `rate_limits` is now
 an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor`, `policy`, `audit`, `drift`,
-`spend_cap`, `launch`, `forge_cost`. Full key/segment reference: `docs/end-user/config.md`.
+`spend_cap`, `launch`, `forge_cost`, `marking`. Full key/segment reference: `docs/end-user/config.md`.
 
 **Segment-lazy source acquisition.** `types.py` owns neutral facts, `sources.py` fail-open acquisition, `formatting.py`
 presentation/ANSI width/truncate/wrap, and `rendering.py` palette/hardening/final layout. `status_line.py` owns only
 stdin, plan-shared proxy/session acquisition, terminal width, and stdout; lower modules never import it. Registry
 requirements are unioned once: `path`, `branch`, `lines`, `tokens`, `think`, and `hooks` need neither shared source;
 `model`, `rate_limits`, `cache_hit`, `audit`, `drift`, and `spend_cap` need proxy; `breadcrumb`, `loop`, `sidecar`,
-`supervisor`, `policy`, `launch`, and `forge_cost` need session; `cost` needs both. Thus `[path, branch]` touches
-neither shared source. Lazy `RenderContext.cached_property` is the process-local per-render cache; persistent throttles
-remain file-backed. The empty/default layout requests both sources and stays byte-compatible and fail-open.
+`supervisor`, `policy`, `launch`, and `forge_cost` need session; `cost` and `marking` need both. Thus `[path, branch]`
+touches neither shared source. Lazy `RenderContext.cached_property` is the process-local per-render cache; persistent
+throttles remain file-backed. The empty/default layout requests both sources and stays byte-compatible and fail-open.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
 real `$`; `cost_mode=subscription` shows quota burn instead of dollar spend — both the 5h and weekly windows,
@@ -203,6 +203,16 @@ not locally priced).
 (`direct` / `proxy:<id>` / `custom`) and the api-key posture (`key:env|file|none|omit`). It describes how the session
 reached the model and whether a key was made available — honest auth provenance the status line cannot infer from the
 ambient env. Manifest-gated: absent for ambient sessions (no `FORGE_SESSION`).
+
+**Provider-declared text marking.** The opt-in `marking` segment renders the observed stdin model as `mark:yes`,
+`mark:no`, or `mark:?`. For a proxy route it applies server routing precedence (explicit request tier before proxy
+default; matching model alternative before tier default) and requires the new authoritative live backend and mapping
+fields for `yes` or `no`. Older/unreachable proxy responses and config/route-commit fallback render `?`. Direct mode
+also renders `?` in this version because Forge has no authoritative direct backend identity; that unconditional result
+does not read session state or the growing routing journal on the status-line polling path. A missing stdin model omits
+only this segment. Catalog, source, and expected mapping failures resolve to `?`; unexpected producer failures retain
+the registry's segment-level fail-open behavior. `no` means a matching provider declaration says unmarked—it is not
+detection, admission, or an authorship claim. The segment is not in `DEFAULT_ORDER`.
 
 **Forge session cost (`forge_cost`, Phase 5).** The opt-in `forge +$Y` segment shows **Forge-added LLM spend for this
 session, excluding the main interactive harness** (`route=claude_interactive`) — what Forge spent *on top of* the

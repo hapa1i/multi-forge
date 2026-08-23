@@ -46,6 +46,7 @@ from forge.session.codex_handoff import (
 from forge.session.exceptions import ManifestCorruptedError, ManifestUnreadableError
 from forge.session.index import IndexStore
 from forge.session.models import CodexConfirmed, create_session_state
+from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
@@ -86,14 +87,20 @@ def _write_transcript(path: Path) -> None:
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:00Z",
-                "message": {"role": "user", "content": [{"type": "text", "text": "Plan the frontend."}]},
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "Plan the frontend."}],
+                },
             }
         ),
         json.dumps(
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:01Z",
-                "message": {"role": "assistant", "content": [{"type": "text", "text": "Bare means interactive."}]},
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Bare means interactive."}],
+                },
             }
         ),
     ]
@@ -237,6 +244,11 @@ class TestBareInteractiveStart:
         assert state.confirmed.codex.rollout_source == ROLLOUT_SOURCE_POST_EXIT
         assert state.confirmed.codex.context_delivery is None
         assert state.confirmed.codex.auth_method == "chatgpt_tokens"
+        events = read_routing_events(proj, state)
+        assert [event.operation for event in events] == ["start"]
+        assert events[0].payload["route"]["kind"] == "runtime_native"
+        assert state.confirmed.route_commit is not None
+        assert state.confirmed.route_commit.run_id == events[0].run_id
 
     def test_no_rollout_keeps_session_with_warning(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
@@ -373,7 +385,11 @@ class TestBridgeInteractiveStart:
         invoke = _FakeInvoke(side_effect=_enrolled_hook)
         with _interactive_mocks():
             result = start_interactive_codex_session(
-                ctx=ctx, name="impl", parent="planner", context_delivery="hook", invoke=invoke
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                context_delivery="hook",
+                invoke=invoke,
             )
 
         assert invoke.kwargs["initial_prompt"] is None  # context rode the hook, not the prompt
@@ -393,7 +409,11 @@ class TestBridgeInteractiveStart:
 
         with _interactive_mocks():
             result = start_interactive_codex_session(
-                ctx=ctx, name="impl", parent="planner", context_delivery="hook", invoke=invoke
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                context_delivery="hook",
+                invoke=invoke,
             )
 
         assert result.context_delivery == "hook_undelivered"
@@ -411,7 +431,11 @@ class TestBridgeInteractiveStart:
         with _interactive_mocks(hook_seam="disabled"):
             with pytest.raises(ForgeOpError, match="hook-capable"):
                 start_interactive_codex_session(
-                    ctx=ctx, name="impl", parent="planner", context_delivery="hook", invoke=_FakeInvoke()
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    context_delivery="hook",
+                    invoke=_FakeInvoke(),
                 )
         assert not SessionStore(str(proj), "impl").exists()
 
@@ -430,7 +454,10 @@ class TestBridgeInteractiveStart:
 
         with _interactive_mocks():
             result = start_interactive_codex_session(
-                ctx=ctx, name="impl", parent="planner", invoke=_FakeInvoke(side_effect=_observe_and_stray_rollout)
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                invoke=_FakeInvoke(side_effect=_observe_and_stray_rollout),
             )
 
         assert result.thread_id == _TID  # receipt-sourced, not the stray rollout
@@ -486,7 +513,11 @@ class TestBridgeInteractiveStart:
             ):
                 with pytest.raises(RuntimeError, match="staging failed"):
                     start_interactive_codex_session(
-                        ctx=ctx, name="impl", parent="planner", context_delivery="hook", invoke=_FakeInvoke()
+                        ctx=ctx,
+                        name="impl",
+                        parent="planner",
+                        context_delivery="hook",
+                        invoke=_FakeInvoke(),
                     )
 
         assert not SessionStore(str(proj), "impl").exists()
@@ -504,7 +535,10 @@ class TestBridgeInteractiveStart:
         with _interactive_mocks():
             with pytest.raises(RuntimeError, match="spawn failed"):
                 start_interactive_codex_session(
-                    ctx=ctx, name="impl", parent="planner", invoke=_FakeInvoke(side_effect=_boom)
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    invoke=_FakeInvoke(side_effect=_boom),
                 )
 
         assert SessionStore(str(proj), "impl").exists()
@@ -520,7 +554,10 @@ class TestBridgeInteractiveStart:
 
         with _interactive_mocks():
             start_interactive_codex_session(
-                ctx=ctx, name="impl", parent="planner", invoke=_FakeInvoke(side_effect=_check_active)
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                invoke=_FakeInvoke(side_effect=_check_active),
             )
 
         assert seen["during"] is True
@@ -545,7 +582,11 @@ class TestBridgeInteractiveStart:
         with _interactive_mocks():
             with pytest.raises(ForgeOpError, match="Unknown strategy"):
                 start_interactive_codex_session(
-                    ctx=ctx, name="impl", parent="planner", strategy=strategy, invoke=_FakeInvoke()
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    strategy=strategy,
+                    invoke=_FakeInvoke(),
                 )
         assert not SessionStore(str(proj), "impl").exists()
 
@@ -556,7 +597,12 @@ class TestReattachCodexSession:
         _seed_codex_session(proj)
         elsewhere = tmp_path / "elsewhere"
         elsewhere.mkdir()
-        ctx = ExecutionContext(cwd=elsewhere, worktree_root=elsewhere, project_root=elsewhere, forge_root=proj)
+        ctx = ExecutionContext(
+            cwd=elsewhere,
+            worktree_root=elsewhere,
+            project_root=elsewhere,
+            forge_root=proj,
+        )
         invoke = _FakeInvoke()
 
         with _interactive_mocks():
@@ -567,6 +613,11 @@ class TestReattachCodexSession:
         assert invoke.kwargs["cwd"] == str(proj)  # the session's recorded worktree
         assert result.thread_id == _TID
         assert result.context_delivery is None
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        events = read_routing_events(proj, state)
+        assert [event.operation for event in events] == ["resume"]
+        assert state.confirmed.route_commit is not None
+        assert state.confirmed.route_commit.run_id == events[0].run_id
 
     def test_refusals_match_headless_resume(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
@@ -585,7 +636,12 @@ class TestReattachCodexSession:
         _seed_codex_session(proj)
 
         def _observe_drift(**kw: Any) -> None:
-            write_observation_receipt(_session_dir(proj), session_id=_TID_B, transcript_path=None, source="resume")
+            write_observation_receipt(
+                _session_dir(proj),
+                session_id=_TID_B,
+                transcript_path=None,
+                source="resume",
+            )
 
         with _interactive_mocks():
             result = reattach_codex_session(ctx=ctx, name="impl", invoke=_FakeInvoke(side_effect=_observe_drift))
@@ -600,7 +656,12 @@ class TestReattachCodexSession:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         _seed_codex_session(proj)
         stage_pending_context(_session_dir(proj), "stale staged context")
-        write_observation_receipt(_session_dir(proj), session_id=_TID_B, transcript_path=None, source="startup")
+        write_observation_receipt(
+            _session_dir(proj),
+            session_id=_TID_B,
+            transcript_path=None,
+            source="startup",
+        )
 
         with _interactive_mocks():
             result = reattach_codex_session(ctx=ctx, name="impl", invoke=_FakeInvoke())

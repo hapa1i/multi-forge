@@ -384,6 +384,66 @@ class TestSessionState:
         assert manifest.intent is not None
         assert manifest.confirmed is not None
 
+    def test_route_commit_projection_round_trips_without_changing_confirmation_owner(
+        self,
+    ) -> None:
+        from dataclasses import asdict
+
+        import dacite
+
+        from forge.session.models import RouteCommitConfirmed, SessionConfirmed
+
+        confirmed = SessionConfirmed(confirmed_at="2026-08-22T12:00:00Z", confirmed_by="hook:stop")
+        before = asdict(confirmed)
+        confirmed.route_commit = RouteCommitConfirmed(
+            event_id="sevt_0123456789abcdef0123456789abcdef",
+            run_id="run_0123456789ab",
+        )
+
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+
+        assert restored.confirmed_by == before["confirmed_by"]
+        assert restored.confirmed_at == before["confirmed_at"]
+        assert restored.route_commit == confirmed.route_commit
+
+    def test_old_manifest_without_route_commit_deserializes(self) -> None:
+        import dacite
+
+        restored = dacite.from_dict(
+            SessionConfirmed,
+            {"confirmed_by": "hook:stop"},
+            config=dacite.Config(strict=True),
+        )
+
+        assert restored.route_commit is None
+        assert restored.confirmed_by == "hook:stop"
+
+    @pytest.mark.parametrize(
+        "route_commit",
+        [
+            {"event_id": "sevt_0123456789abcdef0123456789abcdef"},
+            {
+                "event_id": "sevt_0123456789abcdef0123456789abcdef",
+                "run_id": "run_0123456789ab",
+                "extra": True,
+            },
+            {"event_id": "not-an-event", "run_id": "run_0123456789ab"},
+            {
+                "event_id": "sevt_0123456789abcdef0123456789abcdef",
+                "run_id": "not-a-run",
+            },
+        ],
+    )
+    def test_malformed_or_unknown_route_commit_fields_are_rejected(self, route_commit: dict[str, object]) -> None:
+        import dacite
+
+        with pytest.raises((dacite.DaciteError, ValueError)):
+            dacite.from_dict(
+                SessionConfirmed,
+                {"route_commit": route_commit},
+                config=dacite.Config(strict=True),
+            )
+
 
 class TestSessionIndex:
     """Test SessionIndex dataclass."""
@@ -853,7 +913,11 @@ class TestConsumerLanes:
         from forge.core.lanes import Lane, LaneError
 
         rec = LaneRecord("ghost_runtime", "ghost_backend", "ghost-model")
-        assert (rec.runtime_id, rec.backend_id, rec.model) == ("ghost_runtime", "ghost_backend", "ghost-model")
+        assert (rec.runtime_id, rec.backend_id, rec.model) == (
+            "ghost_runtime",
+            "ghost_backend",
+            "ghost-model",
+        )
         # The validating twin rejects the same values.
         with pytest.raises(LaneError):
             Lane("ghost_runtime", "ghost_backend", "ghost-model")
@@ -861,7 +925,11 @@ class TestConsumerLanes:
     @pytest.mark.parametrize("field", ["runtime_id", "backend_id", "model"])
     def test_lanerecord_rejects_empty_fields(self, field: str) -> None:
         """Each LaneRecord field must be a non-empty string."""
-        kwargs = {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}
+        kwargs = {
+            "runtime_id": "codex",
+            "backend_id": "chatgpt",
+            "model": "gpt-5-codex",
+        }
         kwargs[field] = ""
         with pytest.raises(ValueError, match=field):
             LaneRecord(**kwargs)

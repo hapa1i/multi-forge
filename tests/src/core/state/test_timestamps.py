@@ -17,7 +17,7 @@ from forge.core.state import (
     parse_iso,
 )
 from forge.core.state import timestamps as timestamps_module
-from forge.core.state import try_parse_iso, utc_timestamp_z
+from forge.core.state import try_parse_iso, utc_timestamp_z, utc_today
 
 
 class TestNowIso:
@@ -57,6 +57,17 @@ class TestUtcTimestampZ:
         result = utc_timestamp_z()
         assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", result)
         assert parse_iso(result).tzinfo is UTC
+
+    def test_utc_today_uses_the_utc_calendar(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, timezone: tzinfo | None = None) -> "FrozenDateTime":
+                assert timezone is UTC
+                return cls(2026, 8, 23, 0, 30, tzinfo=timezone)
+
+        monkeypatch.setattr(timestamps_module, "datetime", FrozenDateTime)
+
+        assert utc_today() == datetime(2026, 8, 23).date()
 
     def test_now_iso_has_single_def(self) -> None:
         repo_root = Path(__file__).resolve().parents[4]

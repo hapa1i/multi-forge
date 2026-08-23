@@ -157,6 +157,8 @@ update of an already tracked package can be repaired by sync.
 | `forge session authority show [name]`   | Show the configured role, exact coverage inventory, journal support, and live launch support (`--json`)                                                                                                                 |
 | `forge session authority set <name>`    | Assign `--role advisory\|producer` to an inactive session; advisory `--tier` defaults to `shell_closed`                                                                                                                 |
 | `forge session authority clear <name>`  | Remove the complete authority designation from an inactive session                                                                                                                                                      |
+| `forge session model show [name]`       | Show route intent, latest supported route commitment, labelled live-proxy fallback, and provider-declared marking (`--json`)                                                                                            |
+| `forge session model history [name]`    | Show every strictly validated routing event in append order and its `supported\|unproven\|null` status (`--json`)                                                                                                       |
 | `forge session delete <name>...`        | Delete one or more sessions (`--all` for bulk deletion)                                                                                                                                                                 |
 | `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                   |
 | `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                        |
@@ -536,7 +538,7 @@ scope rationale remain in design.md.
 
 ### 2.1 Scope policy table
 
-- **Session / plan**: allow `%session list`, `%session show [name]`, and `%plan`.
+- **Session / plan**: allow `%session list`, `%session show [name]`, `%session model show [name]`, and `%plan`.
 - **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
   `%proxy edit`, `%proxy set`, and `%proxy delete`.
 - **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
@@ -556,6 +558,8 @@ Shared commands (mirrors CLI syntax):
 
 - `%session list` (calls the same command-core op as `forge session list`)
 - `%session show [name]` (defaults to the current session)
+- `%session model show [name]` (fixed-size read-only route/marking summary; defaults to the current session; no maps or
+  history dump)
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)

@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 import forge.cli.session as session_cli
 from forge.cli.main import main
+from forge.config.loader import write_proxy_instance_config
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.models import (
@@ -425,6 +426,7 @@ class TestResumeNativeMode:
         """--fresh --resume-mode native --proxy should apply routing override."""
         with successful_claude_launch():
             runner.invoke(main, ["session", "start", "proxy-native"])
+        write_proxy_instance_config("test-proxy", _proxy_cfg())
 
         store = SessionStore(str(temp_env), "proxy-native")
 
@@ -443,7 +445,7 @@ class TestResumeNativeMode:
                     (),
                     {
                         "proxy_id": "test-proxy",
-                        "template": "litellm-test",
+                        "template": "litellm-openai",
                         "base_url": "http://localhost:9999",
                         "context_limit": None,
                     },
@@ -612,6 +614,7 @@ class TestProxyDirectFlags:
             base_url="http://localhost:9999",
             proxy_id="test-proxy",
         )
+        write_proxy_instance_config("test-proxy", _proxy_cfg())
 
         with (
             patch(
@@ -656,6 +659,7 @@ class TestProxyDirectFlags:
             base_url="http://localhost:9999",
             proxy_id="test-proxy",
         )
+        write_proxy_instance_config("test-proxy", _proxy_cfg())
 
         with (
             patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=routing),

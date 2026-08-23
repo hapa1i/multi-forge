@@ -167,10 +167,11 @@ Notes:
 
 **Session event journals:**
 
-- The authority domain writes `<forge_root>/.forge/artifacts/{session_name}/authority/events.jsonl`. The shared
-  authority-neutral `forge.session.events` module owns the schema-v1 envelope, `sevt_` ids, UTC timestamps, frozen
-  origin/operation/outcome enums, strict JSON validation, and domain payload hook. M1 is the only shipped consumer;
-  route history remains proposed and no routing journal is created.
+- The authority domain writes `<forge_root>/.forge/artifacts/{session_name}/authority/events.jsonl`; managed route
+  provenance writes `<forge_root>/.forge/artifacts/{session_name}/routing/events.jsonl`. The shared runtime-neutral
+  `forge.session.events` module owns the schema-v1 envelope, `sevt_` ids, UTC timestamps, frozen
+  origin/operation/outcome enums, strict JSON validation, and domain payload hook. Authority and routing keep separate
+  payload and continuity validators and never read each other's journal to authorize behavior.
 - Path construction validates the session name, uses an explicit domain allowlist, resolves beneath the owning
   `forge_root`, and rejects absolute/traversal/symlink escape shapes before creation. Each journal has its own lock.
   Appends write one compact UTF-8 JSON object plus newline, reject non-JSON values, flush/fsync the file and directory,
@@ -178,11 +179,11 @@ Notes:
   malformed, duplicate-id, and newer-schema records without skipping a line.
 - Authority configuration, inheritance, preflight, and lifecycle appends are required transactions. Denial logging is
   best effort only after the runtime deny is already fixed; a journal failure cannot weaken it.
-- Absence is not proof. A marked session with missing or manifest-inconsistent history reports `unproven`; an unmarked
-  session with no journal reports `null`. Malformed history is an error. The append-only convention is local evidence,
-  not tamper resistance against humans or external processes.
-- Session delete/clean never selectively removes the authority directory, regardless of transcript flags. The journal
-  follows its containing Forge root: root-level worktree sessions retain it in the parent root, while deleting an owned
+- Absence is not proof. Authority and routing readers distinguish absent history, unsupported projection, and malformed
+  history according to their domain contracts; malformed history is an error. The append-only convention is local
+  evidence, not tamper resistance against humans or external processes.
+- Session delete/clean never selectively removes either journal directory, regardless of transcript flags. Both follow
+  their containing Forge root: root-level worktree sessions retain them in the parent root, while deleting an owned
   checkout that contains a nested/forked Forge root removes the complete artifact tree with that checkout.
 
 **Plan snapshots:**
@@ -421,10 +422,10 @@ lifetime, preventing a concurrent control-plane command from assigning authority
 unmarked environment; its existing active registration remains best-effort. A marked launch instead proves the runtime
 seam, requires active registration, and durably appends `launch_preflight` then `run_started` under the lock before
 releasing it and invoking the child. Set/clear use the same lock and turn live-launch contention into a short,
-actionable refusal. The invoker does not remint the identity. Forge always attempts same-run `run_ended` and clears
-marked active state. A failed preflight produces `launch_aborted` and no started claim. A spawn exception after the
-commit is `child_never_spawned`; a spawned child returning nonzero is `child_exited_nonzero`, so `run_started` means
-“Forge committed to invoke,” not “the child was observed alive.”
+actionable refusal. The invoker does not remint the identity. Outside an explicitly compensated pre-invocation abort,
+Forge attempts same-run `run_ended` and clears marked active state. A failed preflight produces `launch_aborted` and no
+started claim. A spawn exception after the commit is `child_never_spawned`; a spawned child returning nonzero is
+`child_exited_nonzero`, so `run_started` means “Forge committed to invoke,” not “the child was observed alive.”
 
 Advisory Claude requires the exact catch-all registration and current executable dispatcher. Advisory Codex requires
 exactly one user-scope no-matcher `codex-policy-check` row with the installed command bytes and timeout, then performs
@@ -432,8 +433,21 @@ the empirical `codex-session-start` enrollment check for every attempt. Advisory
 selected image has an equivalent pre-spawn proof; Forge therefore does not stage the host-only authority catch-all in
 sidecar settings. Producer launches record config/lifecycle posture without requiring an enforcement seam; unmarked
 launches keep the legacy path and create no authority events. Only a validated advisory attempt receives the internal
-marker, containing session/runtime, the one root run id, and config/hook digests. The transaction exposes the future M2
-insertion point after authority preflight, but M1 writes no routing journal or projection.
+marker, containing session/runtime, the one root run id, and config/hook digests.
+
+**Routing launch transaction:** After routing, context/runtime preparation, and child argv/environment are fixed, every
+managed Claude host/sidecar and Codex headless/interactive attempt appends `launch_routing_committed`, then atomically
+projects its `{event_id, run_id}` into `confirmed.route_commit`, before invoking the child. Marked launches do this in
+the yielded authority transaction body, after `launch_preflight` and `run_started`; unmarked launches use the same
+serialized boundary without authority events. Both journals and the projection reuse the one root `RunIdentity`.
+
+Routing append failure compensates any authority journal already touched. Projection failure compensates in reverse
+touch order: the exact immutable route payload is appended as same-run `launch_aborted:route_projection_failed`, then
+authority receives its same-run abort. Every compensation is attempted and secondary failures are aggregated without
+invoking the child. A landed authority abort supersedes `run_started`, active-state clear is attempted, and no
+`run_ended` is appended for that pre-invocation failure. If both the authority abort and active-state clear fail,
+diagnostics disclose the remaining temporary ambiguity. Spawn or child failure after a successful projection retains the
+effective route; authority records its normal terminal outcome.
 
 ### 3.10 Hook handlers
 
@@ -874,9 +888,8 @@ boundary and are disclosed as fail-open seams.
 
 ## J. Session Event Journal Reference
 
-`forge.session.events` is the authority-neutral owner of the schema-v1 event envelope and storage mechanics. Artifact
-authority is the sole shipped consumer. `routing` is reserved as a separate allowed domain for the proposed route-
-provenance card; M1 does not create its path.
+`forge.session.events` is the runtime-neutral owner of the schema-v1 event envelope and storage mechanics. Artifact
+authority and launch routing are separate shipped consumers with separate domain validators and journal paths.
 
 ```json
 {
@@ -906,13 +919,20 @@ The authority payload has exactly `role`, `tier`, `effective_config_sha256`, `ho
 The authority event set is `authority_configured`, `authority_cleared`, `authority_inherited`, `launch_preflight`,
 `launch_aborted`, `run_started`, `run_ended`, `request_denied`, and `mutation_refused`.
 
+The routing event set is `launch_routing_committed` and `launch_aborted`. Its exact secret-free payload freezes route
+identity, selected/default model facts, effective tier and alternative maps, billing mode, route-scope tags, and
+provider-declaration snapshots. An abort must repeat the same run, operation, and payload as its preceding commit.
+`confirmed.route_commit` stores only the effective event and run ids; it is a latest-state pointer, not another copy of
+the route.
+
 The contained path is `.forge/artifacts/<session>/<domain>/events.jsonl`. Path resolution requires an existing Forge
 root, validates the session and domain before creating directories, rejects existing symlink components, and uses one
 per-journal lock. Required append opens without following symlinks, accepts only a singly linked regular file, enforces
 private modes, writes one compact UTF-8 record plus newline, and fsyncs both file and containing directory. Failures are
-typed and propagated. The ordered reader returns an empty sequence only when the file is absent; it skips no malformed
-record.
+typed and propagated. The ordered reader returns an empty sequence for an absent or zero-record file and skips no
+malformed record; a domain that distinguishes those states also checks the contained journal path's existence.
 
-Domain readers preserve three distinct absence meanings: an unmarked session with no journal makes no claim (`null`), a
-currently marked session without consistent configuration history is `unproven`, and malformed/unreadable history is an
-error. Local append-only storage is not a tamper-proof audit log.
+Domain readers preserve distinct absence meanings. Routing history is `null` only when both projection and journal are
+absent, `supported` when the projection and effective commit agree (or a complete aborted-only journal needs no
+projection), and `unproven` for empty or inconsistent evidence. Malformed/unreadable history is an error. Local
+append-only storage is not a tamper-proof audit log.

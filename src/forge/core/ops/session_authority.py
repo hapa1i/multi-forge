@@ -9,8 +9,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
-from dacite import DaciteError
-
 from forge.core.reactive.env import get_run_identity
 from forge.core.state import FileLockTimeoutError
 from forge.session.active import ActiveSessionStore
@@ -28,8 +26,9 @@ from forge.session.store import SessionStore
 
 from .context import ExecutionContext
 from .session import ForgeOpError, ResolveSessionResult, resolve_session
+from .session_active import read_active_session_strict
 
-AuthorityLaunchSupport = Literal["unsupported", "unverified", "verified", "not_running"]
+AuthorityLaunchSupport = Literal["unsupported", "unverified", "verified", "aborted", "not_running"]
 AuthorityConfigurationHistory = Literal["supported", "unproven"]
 
 AUTHORITY_LIMITATIONS = (
@@ -37,6 +36,8 @@ AUTHORITY_LIMITATIONS = (
     "Runtime hook timeout, non-delivery, dispatcher failure, or discarded malformed output can fail open.",
     "The local journal is append-only by convention and is not tamper-proof.",
     "Authority does not attest authorship, semantic independence, admission, merge, or provider compliance.",
+    "If both authority abort evidence and active-state cleanup fail, a pre-invocation attempt can temporarily appear "
+    "started until live state is repaired.",
 )
 AUTHORITY_MUTATION_LOCK_TIMEOUT_S = 0.25
 
@@ -176,14 +177,7 @@ def get_session_authority_report(*, ctx: ExecutionContext, session_name: str | N
     history, epoch = _configuration_history(authority, runtime, events)
     covered, read_only, control = authority_coverage(authority, runtime)
 
-    active_store = ActiveSessionStore()
-    try:
-        active_entry = active_store.peek_session(state.name, forge_root=str(resolved.store.forge_root))
-    except (OSError, ValueError, DaciteError, FileLockTimeoutError) as exc:
-        raise ForgeOpError(
-            f"could not inspect the active-session registry at {active_store.index_path} without modifying it; "
-            "run 'forge session list' to repair runtime-only state, then retry"
-        ) from exc
+    active_entry = read_active_session_strict(resolved.store)
     active = active_entry is not None
     launch_support: AuthorityLaunchSupport | None = None
     if authority is not None and authority.role == "advisory":
@@ -192,6 +186,8 @@ def get_session_authority_report(*, ctx: ExecutionContext, session_name: str | N
             launch_support = "unsupported"
         elif not active:
             launch_support = "not_running"
+        elif _active_abort_matches(state, events, active_entry):
+            launch_support = "aborted"
         else:
             launch_support = "verified" if _active_preflight_matches(state, events, active_entry) else "unverified"
 
@@ -344,19 +340,10 @@ def _configuration_history(
 
 
 def _active_preflight_matches(state: SessionState, events: list[Any], active_entry: Any) -> bool:
-    authority = state.intent.authority
-    if authority is None:
+    active_facts = _matching_active_authority_facts(state, active_entry)
+    if active_facts is None:
         return False
-    run_id = active_entry.authority_run_id
-    config_digest = authority_config_sha256(authority, session_runtime(state))
-    hook_digest = active_entry.authority_hook_registration_sha256
-    if (
-        run_id is None
-        or active_entry.authority_config_sha256 != config_digest
-        or hook_digest is None
-        or hook_digest != authority_hook_contract_sha256(session_runtime(state))
-    ):
-        return False
+    run_id, config_digest, hook_digest = active_facts
     preflight = any(
         event.event_type == "launch_preflight"
         and event.outcome == "success"
@@ -369,6 +356,38 @@ def _active_preflight_matches(state: SessionState, events: list[Any], active_ent
         event.event_type == "run_started" and event.outcome == "success" and event.run_id == run_id for event in events
     )
     return preflight and started
+
+
+def _active_abort_matches(state: SessionState, events: list[Any], active_entry: Any) -> bool:
+    active_facts = _matching_active_authority_facts(state, active_entry)
+    if active_facts is None:
+        return False
+    run_id, config_digest, hook_digest = active_facts
+    return any(
+        event.event_type == "launch_aborted"
+        and event.outcome == "error"
+        and event.run_id == run_id
+        and event.payload["effective_config_sha256"] == config_digest
+        and event.payload["hook_registration_sha256"] == hook_digest
+        for event in events
+    )
+
+
+def _matching_active_authority_facts(state: SessionState, active_entry: Any) -> tuple[str, str, str] | None:
+    authority = state.intent.authority
+    if authority is None:
+        return None
+    run_id = active_entry.authority_run_id
+    config_digest = authority_config_sha256(authority, session_runtime(state))
+    hook_digest = active_entry.authority_hook_registration_sha256
+    if (
+        run_id is None
+        or active_entry.authority_config_sha256 != config_digest
+        or hook_digest is None
+        or hook_digest != authority_hook_contract_sha256(session_runtime(state))
+    ):
+        return None
+    return run_id, config_digest, hook_digest
 
 
 def _current_root_run_id() -> str | None:

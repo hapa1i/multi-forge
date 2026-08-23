@@ -90,6 +90,10 @@ requirements. If you customize a template under `~/.forge/templates/<name>.yaml`
 existing backend such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend
 auto-start and remote upstream URLs from that backend at proxy creation time.
 
+If you edit a copied `proxy.yaml` directly, `backend` must start with a lowercase letter or digit and may contain only
+lowercase letters, digits, `.`, `_`, or `-`. Forge reports a malformed value as an invalid `proxy.backend` before a
+managed session launches; it does not silently reinterpret spellings such as `OpenRouter`.
+
 OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_BASE_URL` only when you intentionally
 route OpenRouter-compatible traffic through a different endpoint; new proxies created from OpenRouter templates will
 copy that resolved upstream URL into `proxy.yaml`.
@@ -1045,11 +1049,16 @@ result instead of printing a second document; verification failure does not undo
 The proxy `GET /` endpoint is the authoritative source for:
 
 - Proxy identity
-- Tier→model mappings
+- Canonical runtime backend id
+- Effective tier→model and per-tier model-alternative mappings, after any active ZDR substitution
 - Current health status
 - Runtime metrics (requests, tokens, latency)
 
-File caches (index.json, proxy.yaml) are convenience; proxy state is truth.
+The added `runtime.backend_id` and `runtime.model_alternatives` fields are secret-free. Older proxies remain compatible:
+`forge session model show` falls back from live runtime to current `proxy.yaml`, then the supported launch commitment,
+and labels the source instead of presenting fallback as live truth. The opt-in status-line `marking` segment is
+stricter: without the authoritative live fields it renders `mark:?`, never a config-derived yes/no. File caches
+(`index.json`, `proxy.yaml`) are operational conveniences; a reachable proxy is runtime truth.
 
 ### Gotchas
 

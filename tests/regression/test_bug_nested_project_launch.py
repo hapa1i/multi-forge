@@ -14,6 +14,7 @@ supervisor.py (2 sites), handoff.py (1 site).
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 
 import pytest
 
@@ -143,7 +144,10 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
             _launch_for_test(
@@ -186,7 +190,10 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
             _launch_for_test(
@@ -230,10 +237,26 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         lock_error = FileLockTimeoutError(lock_path=checkout / ".forge" / "sessions" / "executor.lock", timeout_s=5.0)
+        real_update = store.update
+
+        def fail_best_effort_updates(*, timeout_s, mutate):
+            current = store.read()
+            candidate = deepcopy(current)
+            mutate(candidate)
+            if candidate.confirmed.route_commit != current.confirmed.route_commit:
+                return real_update(timeout_s=timeout_s, mutate=mutate)
+            raise lock_error
+
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
-            patch("forge.core.ops.claude_session.SessionStore.update", side_effect=lock_error),
+            patch(
+                "forge.core.ops.claude_session.SessionStore.update",
+                side_effect=fail_best_effort_updates,
+            ),
         ):
             result = _launch_for_test(
                 manifest=state,
@@ -278,7 +301,10 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
             _launch_for_test(
@@ -355,7 +381,10 @@ class TestLaunchCallsitesUseLaunchRoot:
         monkeypatch.chdir(tmp_path / "checkout")
 
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
             _launch_for_test(
@@ -398,7 +427,10 @@ class TestLaunchCallsitesUseLaunchRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch(
+                "forge.core.ops.claude_session._build_session_env",
+                return_value=({}, []),
+            ),
             patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
             _launch_for_test(

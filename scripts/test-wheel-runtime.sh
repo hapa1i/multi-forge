@@ -37,6 +37,17 @@ fi
 
 uv pip install --python "${SMOKE_VENV}/bin/python" "${SMOKE_WHEELS[0]}"
 uv pip check --python "${SMOKE_VENV}/bin/python"
+"${SMOKE_VENV}/bin/python" -c '
+from forge.cli.statusline.registry import SEGMENTS
+from forge.core.models.model_practices import load_model_practices
+from forge.core.ops.session_model import SessionModelReport
+
+catalog = load_model_practices(force_reload=True)
+assert catalog.schema_version == 1
+assert catalog.models == {}
+assert SessionModelReport({"schema_version": 1}).to_dict() == {"schema_version": 1}
+assert any(segment.name == "marking" for segment in SEGMENTS)
+'
 
 export FORGE_HOME="$SMOKE_FORGE_HOME"
 export LITELLM_LOCAL_MODEL_COST_MAP=true

@@ -82,6 +82,7 @@ from .session_authority_launch import (
     AuthorityLaunchAttempt,
     authority_launch_transaction,
 )
+from .session_routing import build_claude_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
 
@@ -551,6 +552,7 @@ def launch_claude_session(
                 warnings=warnings,
                 run_identity=root,
                 authority_attempt=authority_attempt,
+                routing_operation=authority_operation,
             )
         else:
             result = _run_host_claude_session(
@@ -558,6 +560,7 @@ def launch_claude_session(
                 store=store,
                 session_id=session_id,
                 resume_id=resume_id,
+                effective_template=effective_template,
                 runtime_base_url=runtime_base_url,
                 proxy_id=proxy_id,
                 fork_session=fork_session,
@@ -574,6 +577,7 @@ def launch_claude_session(
                 warnings=warnings,
                 run_identity=root,
                 authority_attempt=authority_attempt,
+                routing_operation=authority_operation,
             )
         if authority_attempt is not None:
             authority_attempt.complete(result.exit_code)
@@ -1303,6 +1307,7 @@ def _run_sidecar_claude_session(
     warnings: list[str],
     run_identity: RunIdentity,
     authority_attempt: AuthorityLaunchAttempt | None,
+    routing_operation: str,
 ) -> ClaudeSessionLaunchResult:
     if effective_template is None or runtime_base_url is None:
         raise ForgeOpError("Direct sessions are not supported with --sidecar")
@@ -1369,6 +1374,7 @@ def _run_sidecar_claude_session(
     container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(host_forge_root)
     container_env[FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR] = str(host_launch_root)
 
+    routing_proxy_id = proxy_id
     if "LITELLM_BASE_URL" not in container_env:
         try:
             from forge.config.loader import load_proxy_instance_config
@@ -1383,6 +1389,7 @@ def _run_sidecar_claude_session(
                     _resolved_pid = _resolved.proxy_id
 
             if _resolved_pid:
+                routing_proxy_id = _resolved_pid
                 _pcfg = load_proxy_instance_config(_resolved_pid)
                 if _pcfg and _pcfg.upstream_base_url:
                     container_env["LITELLM_BASE_URL"] = _pcfg.upstream_base_url
@@ -1423,6 +1430,21 @@ def _run_sidecar_claude_session(
         store,
         mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True),
         label="sidecar sandbox confirmation",
+    )
+
+    routing_payload = build_claude_routing_payload(
+        manifest,
+        effective_template=effective_template,
+        runtime_base_url=runtime_base_url,
+        proxy_id=routing_proxy_id,
+    )
+    commit_launch_routing(
+        store=store,
+        state=manifest,
+        root=run_identity,
+        operation=routing_operation,
+        payload=routing_payload,
+        authority_attempt=authority_attempt,
     )
 
     try:
@@ -1499,6 +1521,7 @@ def _run_host_claude_session(
     store: SessionStore,
     session_id: str | None,
     resume_id: str | None,
+    effective_template: str | None,
     runtime_base_url: str | None,
     proxy_id: str | None,
     fork_session: bool | None,
@@ -1515,6 +1538,7 @@ def _run_host_claude_session(
     warnings: list[str],
     run_identity: RunIdentity,
     authority_attempt: AuthorityLaunchAttempt | None,
+    routing_operation: str,
 ) -> ClaudeSessionLaunchResult:
     _update_manifest_best_effort(
         store,
@@ -1539,12 +1563,13 @@ def _run_host_claude_session(
         proxy_cost_baseline_started_at=(_proxy_cost_baseline.started_at if _proxy_cost_baseline else None),
     )
 
+    effective_direct_model: str | None = None
     if runtime_base_url is None:
         from forge.runtime_config import get_default_direct_model
 
-        direct_model = manifest.intent.launch.direct_model if manifest.intent.launch else None
-        direct_model = direct_model or get_default_direct_model()
-        error = apply_direct_model_env(env_vars, direct_model)
+        effective_direct_model = manifest.intent.launch.direct_model if manifest.intent.launch else None
+        effective_direct_model = effective_direct_model or get_default_direct_model()
+        error = apply_direct_model_env(env_vars, effective_direct_model)
         if error:
             raise ForgeOpError(error)
     elif manifest.intent.launch and manifest.intent.launch.direct_model and proxy_id:
@@ -1566,6 +1591,22 @@ def _run_host_claude_session(
     }
     if fork_session is not None:
         invoke_kwargs["fork_session"] = fork_session
+
+    routing_payload = build_claude_routing_payload(
+        manifest,
+        effective_template=effective_template,
+        runtime_base_url=runtime_base_url,
+        proxy_id=proxy_id,
+        effective_direct_model=effective_direct_model,
+    )
+    commit_launch_routing(
+        store=store,
+        state=manifest,
+        root=run_identity,
+        operation=routing_operation,
+        payload=routing_payload,
+        authority_attempt=authority_attempt,
+    )
 
     def runner() -> int:
         return invoke(**invoke_kwargs)

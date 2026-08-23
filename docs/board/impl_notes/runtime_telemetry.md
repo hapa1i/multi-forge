@@ -171,9 +171,11 @@ template, auth, telemetry, or local lifecycle ownership:
   shared-display behavior with a multi-key fixture, not a single-provider one.
 - **`proxy.backend` has two validation postures.** Template load is strict: old `proxy.source`, unknown backends,
   ambiguous shorthand, missing values, and runtime-native backends fail loudly before proxy creation. Runtime
-  `proxy.yaml` is user-owned ("edit freely"), so an unrecognized `backend` is a misconfiguration to warn-and-degrade on,
-  not corruption to reject: `_backend_instance_id` (`proxy/server.py`) warns **once** (module-level set guard) and
-  returns the raw value; capability gates (provider-trace, OpenRouter user, responses ingress) fail safe on an unknown
+  `proxy.yaml` is user-owned ("edit freely"): an unknown but canonical-form `backend` is a misconfiguration to
+  warn-and-degrade on, not corruption to reject. Malformed spellings fail schema validation with `proxy.backend` named;
+  canonical ids start with a lowercase letter or digit and contain only lowercase letters, digits, `.`, `_`, or `-`.
+  `_backend_instance_id` (`proxy/server.py`) warns **once** (module-level set guard) and returns an unknown
+  canonical-form value; capability gates (provider-trace, OpenRouter user, responses ingress) fail safe on an unknown
   id.
 - **Telemetry `source_id`/`source_kind` are origin/correlation, not backend identity.** The backend identity field is
   downstream `backend_id`; the source fields remain the origin axis (`proxy`, `provider`, reporter). The schema-v2

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +17,7 @@ from forge.cli.main import main
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
+from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     _configure_mock_fork_manager,
@@ -256,7 +258,27 @@ class TestResumeProjectScoping:
             launcher_pid=os.getpid(),
         )
 
-        with successful_claude_launch() as mock_invoke:
+        proxy_instance = _proxy_cfg()
+        provider = SimpleNamespace(
+            tiers=proxy_instance.tiers,
+            model_alternatives={},
+            allow_non_zdr=False,
+            zdr_fallbacks={},
+        )
+        proxy = SimpleNamespace(
+            preferred_provider="litellm",
+            get_provider=lambda _provider: provider,
+            default_tier="sonnet",
+            active_template="template-a",
+            backend="",
+        )
+        with (
+            patch(
+                "forge.core.ops.session_routing.load_config",
+                return_value=SimpleNamespace(proxy=proxy),
+            ),
+            successful_claude_launch() as mock_invoke,
+        ):
             result = runner.invoke(main, ["session", "resume", "shared", "--force"])
 
         assert result.exit_code == 0, result.output
@@ -312,6 +334,11 @@ class TestSessionFork:
             "FORGE_PROXY_WIRE_SHAPE",
         ]
         assert kwargs["model"] is None
+        child = SessionStore(str(temp_env), "fork-child").read()
+        events = read_routing_events(temp_env, child)
+        assert [event.operation for event in events] == ["fork"]
+        assert child.confirmed.route_commit is not None
+        assert child.confirmed.route_commit.run_id == events[0].run_id
 
     def test_non_direct_sidecar_fork_uses_sidecar_launcher(self, runner: CliRunner, temp_env: Path) -> None:
         """A sidecar parent should fork through the sidecar launch path."""
@@ -1343,7 +1370,10 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session_fork._cwd_forge_root", return_value=str(parent_nested_root)),
+            patch(
+                "forge.cli.session_fork._cwd_forge_root",
+                return_value=str(parent_nested_root),
+            ),
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch(
                 "forge.core.ops.session_fork_execution._detect_parent_extensions",
@@ -1824,7 +1854,10 @@ class TestSessionFork:
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
-            patch("forge.core.ops.session_fork_execution._prepare_worktree_extensions", return_value=None),
+            patch(
+                "forge.core.ops.session_fork_execution._prepare_worktree_extensions",
+                return_value=None,
+            ),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
@@ -1895,7 +1928,10 @@ class TestSessionFork:
             ),
             patch("forge.cli.session_lifecycle._warn_if_hooks_missing"),
             patch("forge.cli.session_lifecycle._warn_if_version_outdated"),
-            patch("forge.core.ops.session_fork_execution._prepare_worktree_extensions", return_value=None),
+            patch(
+                "forge.core.ops.session_fork_execution._prepare_worktree_extensions",
+                return_value=None,
+            ),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
@@ -1999,7 +2035,15 @@ class TestSessionForkIntoPreflight:
         ):
             result = runner.invoke(
                 main,
-                ["session", "fork", "planner", "--into", str(into_dir), "--proxy", "test-proxy"],
+                [
+                    "session",
+                    "fork",
+                    "planner",
+                    "--into",
+                    str(into_dir),
+                    "--proxy",
+                    "test-proxy",
+                ],
             )
 
         assert result.exit_code == 1
@@ -2156,7 +2200,10 @@ class TestSessionForkIntoPreflight:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session_fork._cwd_forge_root", return_value=str(parent_nested_root)),
+            patch(
+                "forge.cli.session_fork._cwd_forge_root",
+                return_value=str(parent_nested_root),
+            ),
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",

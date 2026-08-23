@@ -100,6 +100,88 @@ class TestAuthorityLifecycle:
         active = forge_workspace.read_json("$HOME/.forge/sessions/active.json")
         assert active["sessions"] == {}
 
+    def test_route_commit_composes_with_unmarked_advisory_and_producer_launches(
+        self, forge_workspace: ContainerLike
+    ) -> None:
+        enabled = forge_workspace.exec("forge extension enable --scope user --profile standard")
+        assert enabled.returncode == 0, enabled.stderr
+
+        cases = [
+            ("route-unmarked", None),
+            ("route-advisory", "advisory"),
+            ("route-producer", "producer"),
+        ]
+        for name, role in cases:
+            authority_arg = f" --authority {role}" if role is not None else ""
+            launched = forge_workspace.exec(f"cd /workspace && forge session start {name}{authority_arg}")
+            assert launched.returncode == 0, launched.stderr
+
+            routing_journal = forge_workspace.read_file(f"/workspace/.forge/artifacts/{name}/routing/events.jsonl")
+            routing_events = [json.loads(line) for line in routing_journal.splitlines()]
+            assert [event["event_type"] for event in routing_events] == ["launch_routing_committed"]
+            route_event = routing_events[0]
+            assert route_event["payload"]["route"]["kind"] == "direct"
+
+            manifest = json.loads(forge_workspace.read_file(f"/workspace/.forge/sessions/{name}/forge.session.json"))
+            assert manifest["confirmed"]["route_commit"] == {
+                "event_id": route_event["event_id"],
+                "run_id": route_event["run_id"],
+            }
+
+            if role is not None:
+                authority_journal = forge_workspace.read_file(
+                    f"/workspace/.forge/artifacts/{name}/authority/events.jsonl"
+                )
+                authority_events = [json.loads(line) for line in authority_journal.splitlines()]
+                lifecycle = [event for event in authority_events if event["run_id"] is not None]
+                assert [event["event_type"] for event in lifecycle] == [
+                    "launch_preflight",
+                    "run_started",
+                    "run_ended",
+                ]
+                assert {event["run_id"] for event in lifecycle} == {route_event["run_id"]}
+
+    def test_host_lifecycle_commands_commit_their_exact_route_operation(self, forge_workspace: ContainerLike) -> None:
+        enabled = forge_workspace.exec("forge extension enable --scope user --profile standard")
+        assert enabled.returncode == 0, enabled.stderr
+
+        started = forge_workspace.exec("cd /workspace && forge session start route-parent")
+        assert started.returncode == 0, started.stderr
+        _simulate_hook_uuid(forge_workspace, "route-parent", "route-parent-uuid")
+
+        resumed = forge_workspace.exec("cd /workspace && forge session resume route-parent")
+        assert resumed.returncode == 0, resumed.stderr
+        forked = forge_workspace.exec("cd /workspace && forge session fork route-parent --name route-fork")
+        assert forked.returncode == 0, forked.stderr
+        incognito = forge_workspace.exec("cd /workspace && forge session incognito route-incognito --no-proxy")
+        assert incognito.returncode == 0, incognito.stderr
+
+        expected_operations = {
+            "route-parent": ["start", "resume"],
+            "route-fork": ["fork"],
+            "route-incognito": ["incognito"],
+        }
+        for name, expected in expected_operations.items():
+            journal = forge_workspace.read_file(f"/workspace/.forge/artifacts/{name}/routing/events.jsonl")
+            events = [json.loads(line) for line in journal.splitlines()]
+            assert [event["operation"] for event in events] == expected
+            assert all(event["payload"]["route"]["kind"] == "direct" for event in events)
+
+        for name in ("route-parent", "route-fork"):
+            events = [
+                json.loads(line)
+                for line in forge_workspace.read_file(
+                    f"/workspace/.forge/artifacts/{name}/routing/events.jsonl"
+                ).splitlines()
+            ]
+            manifest = json.loads(forge_workspace.read_file(f"/workspace/.forge/sessions/{name}/forge.session.json"))
+            assert manifest["confirmed"]["route_commit"] == {
+                "event_id": events[-1]["event_id"],
+                "run_id": events[-1]["run_id"],
+            }
+
+        assert not forge_workspace.file_exists("/workspace/.forge/sessions/route-incognito/forge.session.json")
+
     def test_show_reports_malformed_active_registry_without_repair(self, forge_workspace: ContainerLike) -> None:
         forge_workspace.exec("forge extension enable --scope user --profile standard")
         created = forge_workspace.exec("cd /workspace && forge session start planner --no-launch --authority advisory")

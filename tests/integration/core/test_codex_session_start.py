@@ -34,6 +34,7 @@ from forge.core.runtime.codex_preflight import CodexPreflight, preflight_codex
 from forge.core.usage.ledger import read_usage_events
 from forge.session.manager import SessionManager
 from forge.session.models import create_session_state
+from forge.session.routing import read_routing_events
 from forge.session.transfer import _CurationCall
 from tests.fixtures.session_state import publish_session
 
@@ -70,14 +71,20 @@ def _write_planning_transcript(path: Path) -> None:
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:00Z",
-                "message": {"role": "user", "content": [{"type": "text", "text": "Let's plan a tiny adder."}]},
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "Let's plan a tiny adder."}],
+                },
             }
         ),
         json.dumps(
             {
                 "requestId": "r1",
                 "timestamp": "2026-01-01T00:00:01Z",
-                "message": {"role": "assistant", "content": [{"type": "text", "text": "A pure add(a, b)."}]},
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "A pure add(a, b)."}],
+                },
             }
         ),
     ]
@@ -154,6 +161,12 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert state.confirmed.derivation.parent_session == "planner"
     assert state.confirmed.derivation.context_file == ".forge/prev_sessions/planner/children/impl.md"
     assert SessionManager().get_session_entry("impl", forge_root=str(tmp_path)).codex_thread_id == result.thread_id
+    routing = read_routing_events(tmp_path, state)
+    assert [event.operation for event in routing] == ["start"]
+    assert routing[0].payload["route"]["kind"] == "runtime_native"
+    assert routing[0].run_id == result.root_run_id
+    assert state.confirmed.route_commit is not None
+    assert state.confirmed.route_commit.event_id == routing[0].event_id
 
     # The snapshot is keyed by the real session name -- no synthetic per-run children.
     children = tmp_path / ".forge" / "prev_sessions" / "planner" / "children"
@@ -193,6 +206,11 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert refreshed.confirmed.codex.last_run_at is not None
     assert refreshed.confirmed.codex.last_run_at >= state.confirmed.codex.last_run_at
     assert SessionManager().get_session_entry("impl", forge_root=str(tmp_path)).codex_thread_id == resume.thread_id
+    routing = read_routing_events(tmp_path, refreshed)
+    assert [event.operation for event in routing] == ["start", "resume"]
+    assert routing[-1].run_id == resume.root_run_id
+    assert refreshed.confirmed.route_commit is not None
+    assert refreshed.confirmed.route_commit.event_id == routing[-1].event_id
 
     # The resume turn opens its own run tree, attributed to the same session.
     resume_events = read_usage_events(root_run_id=resume.root_run_id)

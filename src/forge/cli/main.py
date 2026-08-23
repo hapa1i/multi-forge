@@ -39,6 +39,7 @@ from .session import session  # noqa: E402
 from .session_authority import session_authority  # noqa: E402
 from .session_lane import session_lane  # noqa: E402
 from .session_memory import session_memory  # noqa: E402
+from .session_model import session_model  # noqa: E402
 from .status_line import status_line  # noqa: E402
 from .telemetry import telemetry  # noqa: E402
 from .transfer import transfer as transfer_cmd  # noqa: E402
@@ -488,6 +489,7 @@ session.add_command(transfer_cmd, name="transfer")
 session.add_command(session_memory, name="memory")
 session.add_command(session_lane, name="lane")
 session.add_command(session_authority, name="authority")
+session.add_command(session_model, name="model")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402
