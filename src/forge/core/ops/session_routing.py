@@ -39,6 +39,7 @@ def build_runtime_native_routing_payload() -> dict[str, Any]:
             "proxy_id": None,
             "template": None,
             "custom_route_fingerprint": None,
+            "wire_shape": None,
         },
         "requested_model": None,
         "selected_tier": None,
@@ -89,7 +90,7 @@ def build_claude_routing_payload(
             kind="custom",
             custom_route_fingerprint=custom_route_fingerprint(runtime_base_url),
             requested_model=requested_model,
-            selected_tier=applied_direct_model.tier if applied_direct_model is not None else None,
+            selected_tier=None,
             route_scope_tags=["route:custom", "runtime:claude_code"],
         )
 
@@ -111,6 +112,7 @@ def build_claude_routing_payload(
     if backend_id is not None:
         scope.append(f"backend:{backend_id}")
     scope.sort()
+    wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
     snapshots = [
         _marking_snapshot("tier_default", tier, None, model, scope, catalog) for tier, model in tier_mappings.items()
     ]
@@ -121,7 +123,6 @@ def build_claude_routing_payload(
     )
     selected_model = None
     if applied_direct_model is not None:
-        wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
         if wire_shape == ANTHROPIC_PASSTHROUGH:
             selected_model = applied_direct_model.canonical_model
         else:
@@ -134,6 +135,7 @@ def build_claude_routing_payload(
         backend_id=backend_id,
         proxy_id=proxy_id,
         template=template,
+        wire_shape=wire_shape,
         requested_model=requested_model,
         selected_tier=applied_direct_model.tier if applied_direct_model is not None else None,
         selected_model=selected_model,
@@ -155,14 +157,18 @@ def commit_launch_routing(
     authority_attempt: AuthorityLaunchAttempt | None,
 ) -> RouteCommitConfirmed:
     """Commit routing and its pointer before a managed child can be invoked."""
-    immutable_payload = deepcopy(payload)
-    commit = new_routing_event(
-        state,
-        event_type=ROUTING_COMMIT_EVENT,
-        run_id=root.run_id,
-        operation=operation,
-        payload=immutable_payload,
-    )
+    try:
+        immutable_payload = deepcopy(payload)
+        commit = new_routing_event(
+            state,
+            event_type=ROUTING_COMMIT_EVENT,
+            run_id=root.run_id,
+            operation=operation,
+            payload=immutable_payload,
+        )
+    except Exception as primary:
+        authority_errors = _compensate_authority(authority_attempt, "routing_commit_failed")
+        raise _routing_failure("routing commit validation", primary, authority_errors) from primary
     try:
         append_routing_event(store.forge_root, commit)
     except Exception as primary:
@@ -234,6 +240,7 @@ def _payload(
     proxy_id: str | None = None,
     template: str | None = None,
     custom_route_fingerprint: str | None = None,
+    wire_shape: str | None = None,
     requested_model: str | None = None,
     selected_tier: str | None = None,
     selected_model: str | None = None,
@@ -251,6 +258,7 @@ def _payload(
             "proxy_id": proxy_id,
             "template": template,
             "custom_route_fingerprint": custom_route_fingerprint,
+            "wire_shape": wire_shape,
         },
         "requested_model": requested_model,
         "selected_tier": selected_tier,

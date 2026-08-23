@@ -443,16 +443,17 @@ projects its `{event_id, run_id}` into `confirmed.route_commit`, before invoking
 the yielded authority transaction body, after `launch_preflight` and `run_started`; unmarked launches use the same
 serialized boundary without authority events. Both journals and the projection reuse the one root `RunIdentity`.
 
-Routing append failure compensates any authority journal already touched. Projection failure compensates in reverse
-touch order: the exact immutable route payload is appended as same-run `launch_aborted:route_projection_failed`, then
-authority receives its same-run abort. Every compensation is attempted and secondary failures are aggregated without
-invoking the child. A landed authority abort supersedes `run_started`, active-state clear is attempted, and no
-`run_ended` is appended for that pre-invocation failure. If both the authority abort and active-state clear fail,
-diagnostics disclose the remaining temporary ambiguity. Spawn or child failure after a successful projection retains the
-effective route, session, transfer snapshot, worktree, and any completed child work; authority records its normal
-terminal outcome. Claude routing provenance records only an actually applied model pin as `selected_model`: an ignored
-request remains visible as `requested_model`, and Anthropic passthrough records the canonical unchanged client model
-rather than substituting a tier default.
+Routing construction, validation, or append failure compensates any authority journal already touched. Projection
+failure compensates in reverse touch order: the exact immutable route payload is appended as same-run
+`launch_aborted:route_projection_failed`, then authority receives its same-run abort. Every compensation is attempted
+and secondary failures are aggregated without invoking the child. A landed authority abort supersedes `run_started`,
+active-state clear is attempted, and no `run_ended` is appended for that pre-invocation failure. If both the authority
+abort and active-state clear fail, diagnostics disclose the remaining temporary ambiguity. Spawn or child failure after
+a successful projection retains the effective route, session, transfer snapshot, worktree, and any completed child work;
+authority records its normal terminal outcome. Claude routing provenance records only an actually applied model pin as
+`selected_model`: an ignored request remains visible as `requested_model`, and Anthropic passthrough records the
+canonical unchanged client model rather than substituting a tier default. Proxy route payloads carry `wire_shape` as the
+durable discriminator for that validation; legacy events without the field retain translated-mapping validation.
 
 ### 3.10 Hook handlers
 

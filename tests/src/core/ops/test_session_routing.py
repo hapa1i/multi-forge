@@ -13,7 +13,11 @@ from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
 from forge.session import SessionStore, create_session_state
-from forge.session.routing import read_routing_events
+from forge.session.routing import (
+    ROUTING_COMMIT_EVENT,
+    new_routing_event,
+    read_routing_events,
+)
 
 
 def _store(tmp_path: Path, *, runtime: str = "codex") -> tuple[SessionStore, Any]:
@@ -119,6 +123,7 @@ def test_proxy_payload_captures_effective_zdr_defaults_and_alternatives(
         "proxy_id": "qwen-1",
         "template": "openrouter-qwen",
         "custom_route_fingerprint": None,
+        "wire_shape": "openai_translated",
     }
     assert payload["tier_mappings"] == {
         "sonnet": "qwen/qwen3.8-27b",
@@ -206,6 +211,17 @@ def test_anthropic_passthrough_records_applied_client_model_not_tier_default(
     assert payload["selected_tier"] == "opus"
     assert payload["selected_model"] == "claude-opus-4-6"
     assert payload["tier_mappings"]["opus"] == "claude-opus-5"
+    assert payload["route"]["wire_shape"] == "anthropic_passthrough"
+
+    event = new_routing_event(
+        state,
+        event_type=ROUTING_COMMIT_EVENT,
+        run_id=new_root_run_identity().run_id,
+        operation="start",
+        payload=payload,
+    )
+
+    assert event.payload == payload
 
 
 @pytest.mark.parametrize("launch_mode", ["host", "sidecar"])

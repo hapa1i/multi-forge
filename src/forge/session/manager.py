@@ -2277,7 +2277,9 @@ class SessionManager:
                     # publication lock used by every session creator across the final
                     # owner scan and unlink, so a sibling can land entirely before the
                     # decision or only after the old copy is gone (and then recreate it
-                    # during native-relocate preparation).
+                    # during native-relocate preparation). Unlike list_sessions, this
+                    # narrow destructive path intentionally performs manifest reads
+                    # under the lock because an unlocked probe would reopen the race.
                     def _unlink_if_unreferenced(
                         sessions: list[tuple[str, SessionIndexEntry]],
                     ) -> None:

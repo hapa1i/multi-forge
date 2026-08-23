@@ -344,6 +344,49 @@ def test_projection_failure_compensates_routing_then_authority_without_run_ended
     assert active.peek_session("planner", forge_root=str(tmp_path)) is None
 
 
+def test_routing_validation_failure_compensates_authority_without_run_ended(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    root = new_root_run_identity()
+    state = store.read()
+    payload = routing_ops.build_claude_routing_payload(
+        state,
+        effective_template=None,
+        runtime_base_url=None,
+        proxy_id=None,
+        applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
+    )
+    payload["selected_model"] = "claude-sonnet-5"
+
+    with pytest.raises(ForgeOpError, match="routing commit validation failed"):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=root,
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ) as attempt:
+            routing_ops.commit_launch_routing(
+                store=store,
+                state=state,
+                root=root,
+                operation="start",
+                payload=payload,
+                authority_attempt=attempt,
+            )
+
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    authority = read_authority_events(str(tmp_path), "planner")
+    assert [event.event_type for event in authority] == [
+        "launch_preflight",
+        "run_started",
+        "launch_aborted",
+    ]
+    assert authority[-1].reason_code == "routing_commit_failed"
+    assert not (tmp_path / ".forge" / "artifacts" / "planner" / "routing").exists()
+
+
 def test_projection_compensation_failures_are_aggregated_and_child_is_suppressed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
