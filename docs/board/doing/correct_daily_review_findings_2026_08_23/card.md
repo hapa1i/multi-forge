@@ -2,8 +2,6 @@
 
 **Lane**: `doing/`
 
-**Epic**: [`epic_daily_review_remediation_2026_08_23`](../epic_daily_review_remediation_2026_08_23/card.md)
-
 **Delivery**: Implemented in `080eb4c0` for [PR #243](https://github.com/hapa1i/multi-forge/pull/243); terminal closeout
 waits for merge.
 

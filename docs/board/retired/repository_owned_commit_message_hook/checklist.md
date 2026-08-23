@@ -1,9 +1,8 @@
-# Repository-Owned Commit Message Hook Checklist
+# Retired Repository-Owned Commit Message Hook Checklist
 
 Activation base: `effff0b4` (`main`, 2026-08-23). Source material: closed PR #238 (`c30ee67f`).
 
-Current focus: review and merge [PR #243](https://github.com/hapa1i/multi-forge/pull/243); implementation and integrated
-verification are complete.
+Current focus: complete the explicit cancellation without presenting the rejected implementation as shipped.
 
 ## Port and Correction
 
@@ -17,10 +16,10 @@ verification are complete.
 
 - [x] Prove default installation creates both Git hooks in an isolated repository.
 - [x] Run focused normalizer/configuration tests and the integrated pre-commit suite.
-- [x] Record the new PR rather than presenting closed PR #238 as shipped.
+- [x] Record that neither closed PR #238 nor the removed PR #243 implementation shipped.
 
-## Verification Evidence
+## Retirement
 
-- The 23 focused normalizer and Markdown-hook tests pass, including both adjacent-inline regressions.
-- An isolated temporary repository installs and runs the real `commit-msg` hook before commit creation.
-- `make pre-commit` passes with the repository-owned mapping, script, and hook registration on the integrated head.
+- [x] Remove the mapping, executable hook, tests, pre-commit registration, and contributor guidance.
+- [x] Preserve this stopped-work record in `retired/` with no replacement and no shipped credit.
+- [x] Confirm the reduced PR contains no functional normalizer files or configuration.

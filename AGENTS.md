@@ -58,9 +58,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
 
-The repository-owned pre-commit configuration installs both the ordinary `pre-commit` checks and the `commit-msg`
-normalizer; do not rely on a global `core.hooksPath`. Use `\U` escapes for emoji that must survive in source strings. If
-a pre-commit hook reformats a staged file, review and restage it before retrying the commit.
+The configured global pre-commit hook normalizes staged text, including replacing emoji with ASCII. Use `\U` escapes for
+emoji that must survive in source strings. If a hook reformats a staged file, review and restage it before retrying the
+commit.
 
 ## Release & UX Verification
 
