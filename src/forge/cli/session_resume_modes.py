@@ -8,6 +8,7 @@ from pathlib import Path
 from forge.cli.output import console, handle_session_error, print_error_with_tip
 from forge.cli.session_routing import ResolvedRouting
 from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
+from forge.core.ops.session_model_routing import ResolvedModelRoute
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
@@ -27,6 +28,8 @@ def _resume_fresh_rewind(
     routing: ResolvedRouting | None,
     direct: bool,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -42,7 +45,11 @@ def _resume_fresh_rewind(
     )
 
     effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
-    context_limit = _resolve_context_limit(effective_proxy_ref)
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(effective_proxy_ref)
+    )
 
     try:
         child_manifest, transfer_result = manager.resume_session(
@@ -130,6 +137,8 @@ def _resume_fresh_rewind(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
             parent_name=parent,
         ),
     )
@@ -144,6 +153,8 @@ def _resume_fresh_native(
     routing: ResolvedRouting | None,
     direct: bool,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -158,7 +169,11 @@ def _resume_fresh_native(
     )
 
     effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
-    context_limit = _resolve_context_limit(effective_proxy_ref)
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(effective_proxy_ref)
+    )
 
     try:
         child_manifest, transfer_result = manager.resume_session(
@@ -200,6 +215,8 @@ def _resume_fresh_native(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
             parent_name=parent,
         ),
     )

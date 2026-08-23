@@ -23,7 +23,7 @@ from forge.review.engine import (
     run_multi_review,
 )
 from forge.review.models import DEFAULT_MODELS, ModelAvailability, ModelSpec, PromptMode
-from forge.review.routing import WorkerRoutingPlan
+from forge.review.routing import WorkerRoutingPlan, derive_model_routes
 
 _CODEX_SUCCESS_STREAM = (Path(__file__).resolve().parents[2] / "fixtures/codex/exec_json_success.jsonl").read_text()
 
@@ -43,24 +43,16 @@ def _claude_cli_available(monkeypatch):
 def _spec(
     name: str = "test-model",
     family: str = "openai",
-    preferred_proxy: str | None = "test-proxy",
-    provider_refs: tuple[tuple[str, str], ...] | None = None,
+    direct: bool = False,
     prompt: str | None = None,
     prompt_mode: PromptMode = "override",
     runtime: str = "claude_code",
 ) -> ModelSpec:
-    if provider_refs is None:
-        if preferred_proxy:
-            provider_refs = (("openrouter", f"openai/{name}"),)
-        else:
-            provider_refs = (("direct", name),)
     return ModelSpec(
         name=name,
-        model_id=name,
-        family=family,
-        provider_refs=provider_refs,
+        model_id=("codex-default" if runtime == "codex" else "claude-opus-4-6" if direct else "gpt-5.6-sol"),
+        family="anthropic" if direct and runtime != "codex" else family,
         description="Test",
-        preferred_proxy=preferred_proxy,
         prompt=prompt,
         prompt_mode=prompt_mode,
         runtime=runtime,
@@ -72,7 +64,6 @@ def _codex_spec() -> ModelSpec:
         name="codex",
         model_id="codex-default",
         family="openai",
-        provider_refs=(),
         description="Native Codex",
         runtime="codex",
     )
@@ -166,29 +157,13 @@ def _mock_popen(stdout: str = "review output", returncode: int = 0, stderr: str 
 class TestRunMultiReview:
     def test_default_claude_quorum_request_shape_golden(self):
         specs = list(DEFAULT_MODELS.values())
-        routes = [
-            (
-                _route(
-                    provider="openrouter",
-                    model_ref=spec.provider_refs[0][1],
-                    family=spec.family,
-                )
-                if spec.preferred_proxy
-                else _route(
-                    provider="direct",
-                    model_ref=spec.provider_refs[0][1],
-                    family=spec.family,
-                    credential="anthropic-api",
-                )
-            )
-            for spec in specs
-        ]
+        routes = [derive_model_routes(spec)[0] for spec in specs]
         plan = _plan(
             *[
                 _routing_result(
                     route=route,
-                    base_url=None if route.provider == "direct" else f"http://proxy-{idx}:8096",
-                    source="direct" if route.provider == "direct" else "preferred_proxy",
+                    base_url=(None if route.provider == "direct" else f"http://proxy-{idx}:8096"),
+                    source=("direct" if route.provider == "direct" else "preferred_proxy"),
                 )
                 for idx, route in enumerate(routes)
             ]
@@ -218,9 +193,15 @@ class TestRunMultiReview:
         with (
             patch("forge.review.engine.resolve_env_or_credential", return_value=None),
             patch("forge.review.engine.build_claude_env", side_effect=build_env),
-            patch("forge.review.engine.direct_model_env", return_value={"DIRECT_MODEL": "pinned"}),
+            patch(
+                "forge.review.engine.direct_model_env",
+                return_value={"DIRECT_MODEL": "pinned"},
+            ),
             patch("forge.review.engine.can_use_bare", return_value=False),
-            patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel", new=run_parallel),
+            patch(
+                "forge.review.engine.ClaudeHeadlessInvoker.run_parallel",
+                new=run_parallel,
+            ),
         ):
             run_multi_review(
                 "review prompt",
@@ -234,7 +215,14 @@ class TestRunMultiReview:
 
         assert captured == [
             HeadlessRequest(
-                argv=["claude", "-p", "--model", routes[0].model_ref, "--effort", "high"],
+                argv=[
+                    "claude",
+                    "-p",
+                    "--model",
+                    routes[0].model_ref,
+                    "--effort",
+                    "high",
+                ],
                 prompt="review prompt",
                 env={"ENV_KIND": "http://proxy-0:8096", "FORGE_COMMAND": "review"},
                 cwd="/worktree",
@@ -247,7 +235,14 @@ class TestRunMultiReview:
                 base_url="http://proxy-0:8096",
             ),
             HeadlessRequest(
-                argv=["claude", "-p", "--model", routes[1].model_ref, "--effort", "high"],
+                argv=[
+                    "claude",
+                    "-p",
+                    "--model",
+                    routes[1].model_ref,
+                    "--effort",
+                    "high",
+                ],
                 prompt="review prompt",
                 env={"ENV_KIND": "http://proxy-1:8096", "FORGE_COMMAND": "review"},
                 cwd="/worktree",
@@ -262,7 +257,11 @@ class TestRunMultiReview:
             HeadlessRequest(
                 argv=["claude", "-p", "--effort", "high"],
                 prompt="review prompt",
-                env={"ENV_KIND": "direct", "FORGE_COMMAND": "review", "DIRECT_MODEL": "pinned"},
+                env={
+                    "ENV_KIND": "direct",
+                    "FORGE_COMMAND": "review",
+                    "DIRECT_MODEL": "pinned",
+                },
                 cwd="/worktree",
                 timeout_seconds=321,
                 label=specs[2].effective_worker_id,
@@ -339,10 +338,18 @@ class TestRunMultiReview:
             CodexHeadlessInvoker,
             ClaudeHeadlessInvoker,
         ]
-        assert [request.label for _invoker, request in jobs] == ["claude-worker", "codex", "claude-worker-2"]
+        assert [request.label for _invoker, request in jobs] == [
+            "claude-worker",
+            "codex",
+            "claude-worker-2",
+        ]
         assert "--effort" in jobs[0][1].argv
         assert "--effort" not in jobs[1][1].argv
-        assert [result.model_name for result in output.results] == ["claude-worker", "codex", "claude-worker-2"]
+        assert [result.model_name for result in output.results] == [
+            "claude-worker",
+            "codex",
+            "claude-worker-2",
+        ]
 
     @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
     def test_codex_without_frozen_preflight_fails_without_spawn(self, mock_parallel):
@@ -388,14 +395,26 @@ class TestRunMultiReview:
             "subscription_quota",
         )
         assert (event.provider, event.model, event.proxy_id) == ("openai", None, None)
-        assert (event.input_tokens, event.output_tokens, event.cached_tokens) == (14936, 22, 10624)
+        assert (event.input_tokens, event.output_tokens, event.cached_tokens) == (
+            14936,
+            22,
+            10624,
+        )
         assert event.cost_micro_usd is None
 
         attempts = read_downstream_records(kind="attempt", forge_run_id=result.run_id)
         assert len(attempts) == 1
         attempt = attempts[0]
-        assert (attempt.source_kind, attempt.provider, attempt.backend_id) == ("provider", "openai", None)
-        assert (attempt.input_tokens, attempt.output_tokens, attempt.cached_tokens) == (14936, 22, 10624)
+        assert (attempt.source_kind, attempt.provider, attempt.backend_id) == (
+            "provider",
+            "openai",
+            None,
+        )
+        assert (attempt.input_tokens, attempt.output_tokens, attempt.cached_tokens) == (
+            14936,
+            22,
+            10624,
+        )
         assert attempt.cost_micros is None
         assert attempt.proxy_id is None
         assert attempt.request_id is None
@@ -403,7 +422,10 @@ class TestRunMultiReview:
         assert attempt.audit_record_type is None
 
         summary = _resolved_models_summary([spec], plan)["codex"]
-        assert (summary["provider"], summary["runtime"]) == (event.provider, event.runtime)
+        assert (summary["provider"], summary["runtime"]) == (
+            event.provider,
+            event.runtime,
+        )
 
     @patch("forge.review.engine.run_grouped_parallel")
     @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
@@ -415,7 +437,11 @@ class TestRunMultiReview:
         mock_grouped,
     ):
         specs = [_spec("claude-worker"), _codex_spec()]
-        plan = _plan(_routing_result(), _runtime_native_result(), codex_preflight=_codex_preflight())
+        plan = _plan(
+            _routing_result(),
+            _runtime_native_result(),
+            codex_preflight=_codex_preflight(),
+        )
 
         output = run_multi_review("review", models=specs, routing_plan=plan, resume_id="uuid-123")
 
@@ -479,7 +505,7 @@ class TestRunMultiReview:
         plan = _plan(direct_result)
         output = run_multi_review(
             "review",
-            models=[_spec(preferred_proxy=None, provider_refs=(("direct", "claude-opus-4-6"),))],
+            models=[_spec(direct=True)],
             routing_plan=plan,
         )
         assert output.successful == 1
@@ -525,12 +551,25 @@ class TestRunMultiReview:
         # NOTE: no clear=True -- that would wipe FORGE_HOME (the isolate_forge_home tmp dir),
         # sending the ledger write to the real ~/.forge while the read sees the tmp dir.
         with patch.dict("os.environ", {"FORGE_RUN_ID": "run_v", "FORGE_ROOT_RUN_ID": "run_v"}):
-            run_multi_review("review", models=[_spec()], routing_plan=plan, attribution=Attribution(command="panel"))
+            run_multi_review(
+                "review",
+                models=[_spec()],
+                routing_plan=plan,
+                attribution=Attribution(command="panel"),
+            )
         events = read_usage_events()
         assert len(events) == 1
         e = events[0]
-        assert (e.command, e.attribution_granularity, e.parent_run_id) == ("panel", "worker", "run_v")
-        assert (e.model, e.provider, e.proxy_id) == ("openai/gpt-5.5", "openrouter", "test-proxy")
+        assert (e.command, e.attribution_granularity, e.parent_run_id) == (
+            "panel",
+            "worker",
+            "run_v",
+        )
+        assert (e.model, e.provider, e.proxy_id) == (
+            "openai/gpt-5.5",
+            "openrouter",
+            "test-proxy",
+        )
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_bare_flag_when_api_key_present(self, mock_popen_cls):
@@ -585,8 +624,7 @@ class TestRunMultiReview:
                 _spec(
                     name="claude-opus-4.8",
                     family="anthropic",
-                    preferred_proxy=None,
-                    provider_refs=(("direct", "claude-opus-4-8"),),
+                    direct=True,
                 )
             ],
             routing_plan=plan,
@@ -749,8 +787,7 @@ class TestPreflightCheck:
         spec = _spec(
             name="claude-opus",
             family="anthropic",
-            preferred_proxy=None,
-            provider_refs=(("direct", "claude-opus-4-6"),),
+            direct=True,
         )
         direct_route = _route(
             provider="direct",
@@ -772,8 +809,7 @@ class TestPreflightCheck:
         spec = _spec(
             name="claude-opus",
             family="anthropic",
-            preferred_proxy=None,
-            provider_refs=(("direct", "claude-opus-4-6"),),
+            direct=True,
         )
         direct_route = _route(
             provider="direct",
@@ -800,7 +836,14 @@ class TestReviewResultMapping:
     @pytest.mark.parametrize(
         ("runtime", "argv", "stdout", "stderr", "returncode", "expected_error"),
         [
-            ("claude_code", ["claude", "-p"], "runtime failure", "", 0, "runtime failure"),
+            (
+                "claude_code",
+                ["claude", "-p"],
+                "runtime failure",
+                "",
+                0,
+                "runtime failure",
+            ),
             (
                 "codex",
                 ["codex", "exec", "--json", "--sandbox", "read-only"],
@@ -810,7 +853,14 @@ class TestReviewResultMapping:
                 "provider rejected request",
             ),
             ("codex", ["codex", "exec", "--json"], "", "", 0, "Runtime reported error"),
-            ("claude_code", ["claude", "-p"], "provider failure", "", 7, "provider failure"),
+            (
+                "claude_code",
+                ["claude", "-p"],
+                "provider failure",
+                "",
+                7,
+                "provider failure",
+            ),
             ("codex", ["codex", "exec", "--json"], "", "", 9, "Exit code 9"),
         ],
     )

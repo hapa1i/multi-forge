@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import click
 
@@ -23,10 +23,15 @@ from forge.cli.session_authority_options import (
     parse_creation_authority,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
+    _MODEL_TIER_HELP,
+    _plan_interactive_session_model_route,
     _post_exit_render,
     _print_branch_exists_tip,
+    _realize_interactive_session_model_route,
+    _render_model_route_payload,
     _render_sidecar_launch,
     _resume_tip_command,
+    _routing_from_model_route,
     _warn_before_claude_launch,
 )
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
@@ -55,6 +60,10 @@ from forge.core.ops.session_fork_preflight import (
     ForkPreflightRequest,
     plan_session_fork,
     validate_session_fork_routing,
+)
+from forge.core.ops.session_model_routing import (
+    ResolvedModelRoute,
+    SessionModelRoutingError,
 )
 from forge.core.paths import display_path
 from forge.install.project_compat import (
@@ -88,6 +97,9 @@ class _ClaudeForkCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
+
+    def on_routing_payload(self, payload: dict[str, Any]) -> None:
+        _render_model_route_payload(payload)
 
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
         _render_sidecar_launch(event)
@@ -230,7 +242,13 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this fork and future resumes (for example: claude-opus-5 or claude-opus-4-8)",
+    help="Select the model for this fork and future resumes (catalog id or alias)",
+)
+@click.option(
+    "--model-tier",
+    type=click.Choice(["haiku", "sonnet", "opus"]),
+    default=None,
+    help=_MODEL_TIER_HELP,
 )
 @click.option("--incognito", "-i", is_flag=True, help="Auto-delete fork on exit")
 @click.option("--worktree", "-w", is_flag=True, help="Create git worktree for fork isolation")
@@ -309,6 +327,7 @@ def fork(
     proxy_name: str | None,
     direct: bool,
     direct_model: str | None,
+    model_tier: str | None,
     incognito: bool,
     worktree: bool,
     branch: str | None,
@@ -375,6 +394,7 @@ def fork(
         proxy_name=proxy_name,
         direct=direct,
         direct_model=direct_model,
+        model_tier=model_tier,
         is_incognito=incognito,
         create_worktree=worktree,
         branch=branch,
@@ -465,7 +485,57 @@ def fork(
     # Runtime realization remains CLI-owned. The read-only plan runs first, so
     # deterministic refusals cannot start a proxy or supervisor process.
     preflight_routing: ResolvedRouting | None = None
-    if proxy_name:
+    model_route_selection: ResolvedModelRoute | None = None
+    route_model = direct_model
+    route_tier = model_tier
+    allow_route_replacement = True
+    parent_launch = preflight.parent.intent.launch
+    neutral_route = parent_launch.model_route if parent_launch is not None else None
+    if route_model is None and proxy_name is None and not direct and neutral_route is not None:
+        route_model = neutral_route.requested_model
+        route_tier = neutral_route.selected_tier
+        allow_route_replacement = False
+
+    if route_model is not None:
+        inherited_sidecar = preflight.parent.confirmed.is_sandboxed or (
+            parent_launch is not None and parent_launch.mode == "sidecar"
+        )
+        if direct_model is not None and inherited_sidecar and not direct:
+            print_error("--model cannot be combined with sidecar fork")
+            sys.exit(1)
+        try:
+            model_plan = _plan_interactive_session_model_route(
+                route_model,
+                model_tier=route_tier,
+                proxy_name=proxy_name,
+                direct=direct,
+                state=preflight.parent,
+                allow_replacement=allow_route_replacement,
+            )
+            if (
+                preflight.parent.intent.subprocess_proxy
+                and model_plan.kind == "proxy"
+                and model_plan.request.claude_tier is None
+            ):
+                raise SessionModelRoutingError(
+                    "a non-Claude main-session route cannot be combined with persisted subprocess-proxy intent"
+                )
+            model_route_selection = _realize_interactive_session_model_route(model_plan)
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
+        preflight_routing = _routing_from_model_route(model_route_selection)
+        try:
+            validate_session_fork_routing(
+                preflight,
+                proxy_id=model_route_selection.proxy_id,
+                base_url=model_route_selection.proxy_base_url,
+                context_limit=model_route_selection.context_limit,
+            )
+        except ForkPreflightError as e:
+            _render_fork_preflight_error(e)
+            sys.exit(1)
+    elif proxy_name:
         preflight_routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
         try:
             validate_session_fork_routing(
@@ -498,6 +568,7 @@ def fork(
             supervisor_proxy=supervisor_proxy,
             transfer_context_factory=_generate_parent_transfer_context,
             rewind_artifact_factory=_prepare_rewind_launch_artifacts,
+            model_route_selection=model_route_selection,
         )
     except ForkExecutionError as e:
         _render_fork_execution_error(e)

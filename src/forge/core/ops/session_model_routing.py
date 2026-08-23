@@ -21,6 +21,7 @@ from forge.session.models import (
     ModelRouteIntent,
     ProxyIntent,
     SessionIntent,
+    SessionState,
 )
 
 
@@ -201,6 +202,35 @@ def plan_session_model_route(
     )
 
 
+def plan_session_model_route_for_state(
+    model: str,
+    *,
+    model_tier: str | None = None,
+    proxy_name: str | None = None,
+    no_proxy: bool = False,
+    state: SessionState | None = None,
+    allow_replacement: bool = True,
+    candidate_inspector: CandidateInspector | None = None,
+) -> SessionModelRoutePlan:
+    """Build a route plan from CLI constraints and optional durable session state."""
+
+    explicit_proxy = inspect_proxy_reference(proxy_name) if proxy_name is not None else None
+    existing_kind: Literal["direct", "proxy", "custom"] | None = None
+    existing_proxy: ProxyRouteSnapshot | None = None
+    if state is not None:
+        existing_kind, existing_proxy = _inspect_state_route(state)
+    return plan_session_model_route(
+        model,
+        model_tier=model_tier,
+        explicit_proxy=explicit_proxy,
+        no_proxy=no_proxy,
+        existing_kind=existing_kind,
+        existing_proxy=existing_proxy,
+        allow_replacement=allow_replacement,
+        candidate_inspector=candidate_inspector,
+    )
+
+
 def inspect_proxy_reference(reference: str) -> ProxyRouteSnapshot:
     """Inspect an explicit proxy id/template without startup or health checks."""
 
@@ -254,6 +284,14 @@ def inspect_persisted_proxy_route(
 ) -> ProxyRouteSnapshot:
     """Inspect a persisted route without authorizing replacement or startup."""
 
+    if proxy_id is None:
+        from forge.proxy.proxies import ProxyRegistryStore, lookup_proxy_by_base_url
+
+        entry = lookup_proxy_by_base_url(ProxyRegistryStore().read(), base_url)
+        if entry is not None:
+            proxy_id = entry.proxy_id
+            template = entry.template
+
     if template is None:
         return ProxyRouteSnapshot(
             template=None,
@@ -281,7 +319,9 @@ def inspect_persisted_proxy_route(
     )
 
 
-def inspect_automatic_candidate(candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
+def inspect_automatic_candidate(
+    candidate: ModelRouteCandidate,
+) -> ProxyRouteSnapshot | None:
     """Return side-effect-free facts for one admissible automatic candidate."""
 
     if candidate.kind != "proxy" or candidate.source_id is None or candidate.template is None:
@@ -360,7 +400,10 @@ def realize_session_model_route(
 
     if healthcheck_fn is not None:
         if proxy_id is None:
-            raise SessionModelRoutingError("selected proxy route cannot be identity-checked without a proxy id")
+            raise SessionModelRoutingError(
+                "selected persisted proxy route cannot be identity-checked without a proxy id; "
+                "pass --proxy <proxy_id-or-template> to select it explicitly"
+            )
         try:
             healthcheck_fn(base_url, template, proxy_id)
         except Exception as exc:
@@ -385,6 +428,39 @@ def realize_session_model_route(
         context_limit=confirmed.context_limit,
         started_proxy=started,
     )
+
+
+def resolve_proxy_selected_model(
+    requested_model: str,
+    selected_tier: str,
+    *,
+    tier_mappings: Mapping[str, str],
+    model_alternatives: Mapping[str, Mapping[str, str]],
+    wire_shape: str,
+) -> str:
+    """Resolve one persisted proxy tier through the planner's compatibility rules."""
+
+    try:
+        request = normalize_model_route_request(requested_model)
+    except ModelRouteCatalogError as exc:
+        raise SessionModelRoutingError(str(exc)) from exc
+    proxy = ProxyRouteSnapshot(
+        template="<persisted-route>",
+        base_url=None,
+        proxy_id=None,
+        source_id=None,
+        default_tier=None,
+        tier_mappings=tier_mappings,
+        model_alternatives=model_alternatives,
+        wire_shape=wire_shape,
+    )
+    serving = _serving_proxy_tiers(request, proxy, candidate=None)
+    selected_model = serving.get(selected_tier)
+    if selected_model is None:
+        raise SessionModelRoutingError(
+            f"persisted proxy route no longer serves {request.requested_model!r} at tier {selected_tier!r}"
+        )
+    return selected_model
 
 
 def _plan_direct_route(request: ModelRouteRequest, *, model_tier: str | None) -> SessionModelRoutePlan:
@@ -554,6 +630,39 @@ def _snapshot_from_config(
     )
 
 
+def _inspect_state_route(
+    state: SessionState,
+) -> tuple[Literal["direct", "proxy", "custom"], ProxyRouteSnapshot | None]:
+    launch = state.intent.launch
+    neutral = launch.model_route if launch is not None else None
+    if neutral is not None and neutral.kind == "direct":
+        return "direct", None
+
+    if neutral is not None and neutral.kind == "proxy" and state.intent.proxy is not None:
+        template = state.intent.proxy.template or None
+        base_url = state.intent.proxy.base_url
+        snapshot = inspect_persisted_proxy_route(template=template, base_url=base_url, proxy_id=None)
+        return ("proxy" if snapshot.template is not None else "custom"), snapshot
+
+    confirmed = state.confirmed.started_with_proxy
+    if confirmed is not None:
+        snapshot = inspect_persisted_proxy_route(
+            template=confirmed.template,
+            base_url=confirmed.base_url,
+            proxy_id=confirmed.proxy_id,
+        )
+        return ("proxy" if snapshot.template is not None else "custom"), snapshot
+    if state.intent.proxy is not None:
+        template = state.intent.proxy.template or None
+        snapshot = inspect_persisted_proxy_route(
+            template=template,
+            base_url=state.intent.proxy.base_url,
+            proxy_id=None,
+        )
+        return ("proxy" if snapshot.template is not None else "custom"), snapshot
+    return "direct", None
+
+
 def _required_string_attr(value: object, name: str) -> str:
     result = getattr(value, name, None)
     if not isinstance(result, str) or not result:
@@ -626,6 +735,8 @@ __all__ = [
     "inspect_proxy_reference",
     "plan_model_route_transition",
     "plan_session_model_route",
+    "plan_session_model_route_for_state",
     "realize_session_model_route",
+    "resolve_proxy_selected_model",
     "validate_model_tier_option",
 ]

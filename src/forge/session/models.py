@@ -7,6 +7,7 @@ for runtime conversion.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -846,6 +847,7 @@ def create_session_state(
     sidecar_mounts: list[str] | None = None,
     sidecar_image: str | None = None,
     direct_model: str | None = None,
+    model_route: ModelRouteIntent | None = None,
     runtime: str = "claude_code",
     authority: AuthorityIntent | None = None,
 ) -> SessionState:
@@ -864,6 +866,7 @@ def create_session_state(
         sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
         sidecar_image: Optional sidecar image override to persist for relaunch.
         direct_model: Optional Claude Code env-ready direct model pin.
+        model_route: Optional normalized interactive model-route selection.
         runtime: Runtime registry id driving launcher dispatch ("claude_code" | "codex").
         authority: Optional human-assigned artifact authority.
 
@@ -879,7 +882,12 @@ def create_session_state(
     if proxy_template is not None and proxy_base_url is not None:
         proxy = ProxyIntent(template=proxy_template, base_url=proxy_base_url)
 
-    launch = LaunchIntent(mode=launch_mode, direct_model=direct_model, runtime=runtime)
+    launch = LaunchIntent(
+        mode=launch_mode,
+        direct_model=direct_model,
+        model_route=deepcopy(model_route),
+        runtime=runtime,
+    )
     if launch_mode == LAUNCH_MODE_SIDECAR or sidecar_mounts or sidecar_image is not None:
         launch.sidecar = SidecarLaunchIntent(
             mounts=list(sidecar_mounts or []),

@@ -33,7 +33,9 @@ def test_state_context_uses_durable_root_and_recorded_worktree(tmp_path: Path) -
     assert context.store.session_name == "worker"
 
 
-def test_state_context_uses_recorded_worktree_for_legacy_missing_root(tmp_path: Path) -> None:
+def test_state_context_uses_recorded_worktree_for_legacy_missing_root(
+    tmp_path: Path,
+) -> None:
     worktree = tmp_path / "legacy-checkout"
     state = create_session_state("legacy", worktree_path=str(worktree))
 
@@ -44,7 +46,9 @@ def test_state_context_uses_recorded_worktree_for_legacy_missing_root(tmp_path: 
     assert context.store.forge_root == worktree.resolve()
 
 
-def test_state_context_uses_explicit_cwd_only_when_no_durable_path_exists(tmp_path: Path) -> None:
+def test_state_context_uses_explicit_cwd_only_when_no_durable_path_exists(
+    tmp_path: Path,
+) -> None:
     shell = tmp_path / "legacy-shell"
     state = create_session_state("legacy")
 
@@ -55,7 +59,9 @@ def test_state_context_uses_explicit_cwd_only_when_no_durable_path_exists(tmp_pa
     assert context.store.forge_root == shell.resolve()
 
 
-def test_state_context_does_not_treat_a_missing_worktree_as_state_loss(tmp_path: Path) -> None:
+def test_state_context_does_not_treat_a_missing_worktree_as_state_loss(
+    tmp_path: Path,
+) -> None:
     forge_root = tmp_path / "project"
     missing = tmp_path / "missing-checkout"
     state = create_session_state("degraded", worktree_path=str(missing))
@@ -231,3 +237,46 @@ def test_launch_refuses_missing_recorded_worktree_before_callbacks(
     assert str(missing) in message
     assert "forge session delete degraded" in message
     assert callbacks == []
+
+
+def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = create_session_state("routed", worktree_path=str(tmp_path))
+    state.forge_root = str(tmp_path)
+    SessionStore(str(tmp_path), state.name).write(state)
+    payload = {"sentinel": "exact-route-object"}
+    observed: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(
+        claude_session_ops,
+        "build_claude_routing_payload",
+        lambda *_args, **_kwargs: payload,
+    )
+
+    def commit(**kwargs: object) -> None:
+        observed.append(("commit", kwargs["payload"]))
+
+    def invoke(**_kwargs: object) -> int:
+        observed.append(("child", payload))
+        return 0
+
+    monkeypatch.setattr(claude_session_ops, "commit_launch_routing", commit)
+
+    result = launch_claude_session(
+        manifest=state,
+        session_id="routed-uuid",
+        resume_id=None,
+        effective_template=None,
+        runtime_base_url=None,
+        context_limit=200_000,
+        use_sidecar=False,
+        on_routing_payload=lambda value: observed.append(("route_line", value)),
+        invoke=invoke,
+        run_active=lambda runner, **_kwargs: runner(),
+    )
+
+    assert result.exit_code == 0
+    assert [name for name, _value in observed] == ["route_line", "commit", "child"]
+    assert all(value is payload for _name, value in observed)

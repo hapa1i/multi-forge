@@ -50,8 +50,8 @@ HTTP use of the proxy does not include them.
 ### No-proxy mode
 
 When using Claude Code directly (without Forge proxy), proxies are not used. Sessions still function for workflow
-settings (worktrees, artifacts, policies, etc.), but tier/model routing and hyperparameter defaults do not apply — those
-require a proxy instance.
+settings (worktrees, artifacts, policies, etc.), and `--model` may select a direct Claude model. Proxy tier mappings and
+hyperparameter defaults apply only when a proxy route is selected.
 
 ---
 
@@ -241,6 +241,11 @@ separate `forge proxy create` needed -- and prints the proxy it started (stop it
 `forge proxy stop <proxy_id>`). A name that matches neither a running proxy nor a template fails with a hint to run
 `forge proxy template list`.
 
+An explicit non-Claude `forge session start|resume|fork|incognito --model <catalog-id>` can also select and start the
+first admissible packaged-catalog proxy. This is an explicit paid-routing boundary: Forge prints the resolved route
+before child launch, does not scan unrelated running proxies to reorder candidates, and does not fall through after a
+selected proxy fails. `--no-launch` may still start the proxy; session or incognito cleanup does not stop it.
+
 ---
 
 ## OpenRouter (direct, no LiteLLM)
@@ -351,8 +356,10 @@ The proxy resolves the alternative at request time -- Claude Code sends the mode
 (reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5 currently
 resolves to Opus 5 because the dated endpoint audit found no Fable-compatible ZDR route.
 
-`--model` is currently a Claude model pin. Other proxy templates may define `model_alternatives` for explicit proxy API
-requests that already send the matching model name, but those alternatives are not selected by `forge session --model`.
+For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
+exactly as before. The same flag now accepts any Forge catalog model: non-Claude requests resolve a compatible
+source/template from the packaged route catalog, then select a serving proxy tier. Use `--model-tier haiku|sonnet|opus`
+only when tier selection is ambiguous; proxy-owned tier mappings and hyperparameters are not mutated.
 
 To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 

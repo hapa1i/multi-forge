@@ -237,7 +237,11 @@ class TestReviewSubprocessProxy:
         monkeypatch.setattr("forge.review.engine.shutil.which", lambda name: "/usr/local/bin/claude")
         monkeypatch.setattr(
             "forge.core.reactive.proxy.check_proxy_reachable",
-            lambda proxy, timeout_s=1.0: (proxy == "openrouter", "", "http://localhost:8095"),
+            lambda proxy, timeout_s=1.0: (
+                proxy == "openrouter",
+                "",
+                "http://localhost:8095",
+            ),
         )
 
         errors = preflight_check(
@@ -246,7 +250,6 @@ class TestReviewSubprocessProxy:
                     name="claude-opus",
                     model_id="claude-opus",
                     family="anthropic",
-                    provider_refs=(("direct", "claude-opus-4-6"),),
                     description="direct worker",
                 )
             ]
@@ -269,7 +272,6 @@ class TestReviewSubprocessProxy:
                     name="claude-opus",
                     model_id="claude-opus",
                     family="anthropic",
-                    provider_refs=(("direct", "claude-opus-4-6"),),
                     description="direct worker",
                 )
             ]
@@ -293,7 +295,6 @@ class TestReviewSubprocessProxy:
                     name="claude-opus",
                     model_id="claude-opus",
                     family="anthropic",
-                    provider_refs=(("direct", "claude-opus-4-6"),),
                     description="direct worker",
                 )
             ]

@@ -19,6 +19,10 @@ from typing import Literal
 from dacite import DaciteError
 
 from forge.core.models.direct_model import DirectModelPin, resolve_direct_model_pin
+from forge.core.models.model_routes import (
+    ModelRouteCatalogError,
+    normalize_model_route_request,
+)
 from forge.core.naming import generate_unique_name
 from forge.core.paths import display_path
 from forge.install.project_compat import (
@@ -80,6 +84,7 @@ from forge.session.worktree import (
 
 from .context import find_forge_root
 from .session import ForgeOpError
+from .session_model_routing import SessionModelRoutingError, validate_model_tier_option
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +153,7 @@ class ForkPreflightRequest:
     proxy_name: str | None = None
     direct: bool = False
     direct_model: str | None = None
+    model_tier: str | None = None
     is_incognito: bool = False
     create_worktree: bool = False
     branch: str | None = None
@@ -242,11 +248,17 @@ def plan_session_fork(
 
     direct_model_pin: DirectModelPin | None = None
     normalized_direct_model: str | None = None
+    try:
+        validate_model_tier_option(request.direct_model, request.model_tier)
+    except SessionModelRoutingError as e:
+        raise ForkPreflightError(str(e)) from e
     if request.direct_model:
         try:
-            direct_model_pin = resolve_direct_model_pin(request.direct_model)
-            normalized_direct_model = direct_model_pin.env_model
-        except ValueError as e:
+            model_request = normalize_model_route_request(request.direct_model)
+            if model_request.claude_tier is not None:
+                direct_model_pin = resolve_direct_model_pin(request.direct_model)
+                normalized_direct_model = direct_model_pin.env_model
+        except (ModelRouteCatalogError, ValueError) as e:
             raise ForkPreflightError(str(e)) from e
 
     create_worktree = request.create_worktree or request.branch is not None
@@ -313,20 +325,17 @@ def plan_session_fork(
     )
 
     routing = _preview_routing(request, parent, context_limit_resolver=context_limit_resolver)
-    _validate_model_pin(
-        request,
-        parent=parent,
-        pin=direct_model_pin,
-        routing=routing,
+    neutral_route = parent_launch.model_route if parent_launch is not None else None
+    defer_route_budget = request.direct_model is not None or (
+        neutral_route is not None and request.proxy_name is None and not request.direct
     )
-
     transcript_token_estimate = _validate_budget(
         request,
         manager=manager,
         parent=parent,
         is_cross_dir=is_cross_dir,
         effective_resume_mode=effective_resume_mode,
-        context_limit=routing.context_limit,
+        context_limit=None if defer_route_budget else routing.context_limit,
         notices=notices,
     )
 
@@ -391,16 +400,6 @@ def validate_session_fork_routing(
 ) -> None:
     """Revalidate route-dependent facts after the CLI realizes a proxy."""
     request = plan.request
-    if plan.direct_model_pin is not None and not request.direct:
-        error = _validate_direct_model_pin_for_routing(
-            pin=plan.direct_model_pin,
-            proxy_id=proxy_id,
-            base_url=base_url,
-            surface="fork",
-        )
-        if error:
-            raise ForkPreflightError(error)
-
     if (
         plan.transcript_token_estimate is not None
         and context_limit is not None
@@ -831,7 +830,7 @@ def _validate_budget(
     parent: SessionState,
     is_cross_dir: bool,
     effective_resume_mode: EffectiveResumeMode,
-    context_limit: int,
+    context_limit: int | None,
     notices: list[ForkPreflightNotice],
 ) -> int | None:
     if not (
@@ -847,7 +846,7 @@ def _validate_budget(
     if transcript_path is None or not transcript_path.is_file():
         return None
     token_estimate = estimate_transcript_tokens(transcript_path)
-    if token_estimate > context_limit:
+    if context_limit is not None and token_estimate > context_limit:
         if request.force:
             notices.append(
                 ForkPreflightNotice(

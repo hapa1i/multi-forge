@@ -47,14 +47,12 @@ def _mock_store(registry: ProxyRegistry) -> MagicMock:
     return mock
 
 
-def _spec(name: str, proxy: str) -> ModelSpec:
+def _spec() -> ModelSpec:
     return ModelSpec(
-        name=name,
-        model_id=name,
+        name="gpt-5.6-sol",
+        model_id="gpt-5.6-sol",
         family="openai",
-        provider_refs=(("openrouter", f"openai/{name}"),),
         description="Test",
-        preferred_proxy=proxy,
     )
 
 
@@ -89,6 +87,6 @@ class TestStaleProxyNotReady:
 
     def test_model_unavailable_when_no_proxy_resolves(self):
         """check_model_availability reports unavailable when routing finds no proxy."""
-        result = check_model_availability([_spec("gpt-5.5", "litellm-openai")])
+        result = check_model_availability([_spec()])
 
         assert result[0].status == "unavailable"

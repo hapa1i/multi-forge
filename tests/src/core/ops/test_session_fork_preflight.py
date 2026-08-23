@@ -16,6 +16,7 @@ from forge.core.ops.session_fork_preflight import (
     ForkPreflightRequest,
     _validate_command_cwd,
     plan_session_fork,
+    validate_session_fork_routing,
 )
 from forge.session import SessionManager, SessionState, SessionStore
 from forge.session.active import ActiveSessionStore
@@ -99,7 +100,7 @@ def _request(repo: Path, **overrides: Any) -> ForkPreflightRequest:
         ({"direct": True, "proxy_name": "test-proxy"}, ForkPreflightError),
         ({"supervisor_proxy": "test-proxy"}, ForkPreflightError),
         ({"checker_model": "claude-opus-5", "supervise_target": True}, ForkPreflightError),
-        ({"direct_model": "gpt-5.6"}, ForkPreflightError),
+        ({"model_tier": "opus"}, ForkPreflightError),
         ({"create_worktree": True, "into_path": "/unused"}, ForkPreflightError),
         ({"drop_last": 1, "drop_last_explicit": True}, ForkPreflightError),
         ({"strategy": "rewind", "strategy_explicit": True}, ForkPreflightError),
@@ -167,23 +168,23 @@ def test_missing_parent_uuid_is_rejected_without_changing_state(
     assert _snapshot(repo, manager) == before
 
 
-def test_template_model_mismatch_is_rejected_before_proxy_start(
+def test_template_model_compatibility_is_deferred_to_route_planner(
     fork_preflight_repo: tuple[Path, SessionManager],
 ) -> None:
     repo, manager = fork_preflight_repo
     before = _snapshot(repo, manager)
 
-    with pytest.raises(ForkPreflightError, match="Proxy template 'openrouter-openai' does not configure"):
-        plan_session_fork(
-            _request(
-                repo,
-                proxy_name="openrouter-openai",
-                direct_model="claude-opus-4-8",
-                no_launch=True,
-            ),
-            manager=manager,
-        )
+    plan = plan_session_fork(
+        _request(
+            repo,
+            proxy_name="openrouter-openai",
+            direct_model="claude-opus-4-8",
+            no_launch=True,
+        ),
+        manager=manager,
+    )
 
+    assert plan.normalized_direct_model == "claude-opus-4-8"
     assert _snapshot(repo, manager) == before
 
 
@@ -320,6 +321,43 @@ def test_budget_rejection_leaves_state_unchanged(
         "Same-directory fork switched to transfer mode (--strategy/--inline-plan implies a transfer fork)."
     ]
     assert _snapshot(repo, manager) == before
+
+
+def test_selected_route_budget_rejection_leaves_intent_and_child_untouched(
+    fork_preflight_repo: tuple[Path, SessionManager],
+) -> None:
+    repo, manager = fork_preflight_repo
+    transcript = repo / "parent.jsonl"
+    transcript.write_text("x" * 100, encoding="utf-8")
+    SessionStore(str(repo), "parent").update(
+        timeout_s=5.0,
+        mutate=lambda state: setattr(state.confirmed, "transcript_path", str(transcript)),
+    )
+    before = _snapshot(repo, manager)
+    plan = plan_session_fork(
+        _request(
+            repo,
+            direct_model="gpt-5.6-sol",
+            strategy="full",
+            strategy_explicit=True,
+            no_launch=True,
+        ),
+        manager=manager,
+        context_limit_resolver=lambda _ref: 200_000,
+    )
+    assert plan.transcript_token_estimate is not None
+
+    with pytest.raises(ForkPreflightError, match="exceeds context limit"):
+        validate_session_fork_routing(
+            plan,
+            proxy_id="openrouter-openai-1",
+            base_url="http://localhost:8096",
+            context_limit=1,
+        )
+
+    assert _snapshot(repo, manager) == before
+    assert not SessionStore(str(repo), "child").exists()
+    assert not (repo / ".forge" / "artifacts" / "parent" / "routing" / "events.jsonl").exists()
 
 
 def test_inherited_budget_prefers_started_proxy_id_over_intent_template(

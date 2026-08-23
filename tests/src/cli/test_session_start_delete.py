@@ -16,11 +16,13 @@ from forge.session import IndexStore, SessionManager, SessionStore, create_sessi
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import DirtyWorktreeError, SessionNotFoundError
+from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session, remove_index_row_only
 from tests.src.cli.session_command_support import (
     _proxy_cfg,
     _proxy_routing,
     _seed_scoped_duplicate_sessions,
+    mocked_model_route_proxy,
     successful_claude_launch,
 )
 
@@ -320,6 +322,90 @@ class TestSessionStart:
         assert kwargs["env_vars"]["FORGE_SUBPROCESS_PROXY"] == "openrouter-anthropic"
         assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
 
+    def test_no_launch_non_claude_model_persists_route_without_child_or_event(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        tiers = {
+            "haiku": "openai/gpt-5.4-mini",
+            "sonnet": "openai/gpt-5.6-sol",
+            "opus": "openai/gpt-5.6-sol",
+        }
+        with (
+            mocked_model_route_proxy(
+                template="openrouter-openai",
+                proxy_id="openrouter-openai-1",
+                base_url="http://localhost:8096",
+                default_tier="sonnet",
+                tiers=tiers,
+                alternatives={},
+            ) as ensure_proxy,
+            successful_claude_launch() as mock_invoke,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "gpt-no-launch",
+                    "--model",
+                    "gpt-5.6-sol",
+                    "--no-launch",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        ensure_proxy.assert_called_once_with("openrouter-openai")
+        mock_invoke.assert_not_called()
+        assert "Route:" not in result.stderr
+        state = SessionStore(str(temp_env), "gpt-no-launch").read()
+        assert state.intent.proxy is not None
+        assert state.intent.proxy.template == "openrouter-openai"
+        assert state.intent.launch is not None
+        assert state.intent.launch.direct_model is None
+        assert state.intent.launch.model_route is not None
+        assert state.intent.launch.model_route.requested_model == "gpt-5.6-sol"
+        assert state.intent.launch.model_route.selected_tier == "sonnet"
+        assert state.intent.launch.model_route.source_id == "openrouter"
+        assert read_routing_events(temp_env, state) == []
+
+    def test_non_claude_model_rejects_subprocess_proxy_before_startup(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        with (
+            mocked_model_route_proxy(
+                template="openrouter-openai",
+                default_tier="opus",
+                tiers={
+                    "sonnet": "openai/gpt-5.6-sol",
+                    "opus": "openai/gpt-5.6-sol",
+                },
+                alternatives={},
+            ) as ensure_proxy,
+            successful_claude_launch() as mock_invoke,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "gpt-subprocess",
+                    "--model",
+                    "gpt-5.6-sol",
+                    "--subprocess-proxy",
+                    "worker-proxy",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert "non-Claude main-session proxy route" in result.output
+        ensure_proxy.assert_not_called()
+        mock_invoke.assert_not_called()
+        assert not SessionStore(str(temp_env), "gpt-subprocess").exists()
+
     @pytest.mark.parametrize("flag", ["--sidecar", "--host-proxy"])
     def test_start_with_model_rejects_sidecar_and_host_proxy(
         self,
@@ -338,35 +424,16 @@ class TestSessionStart:
         result = runner.invoke(main, ["session", "start", "bad-model", "--model", "claude-opus-4.8.1"])
 
         assert result.exit_code == 1
-        assert "Unknown direct Claude model" in result.output
+        assert "Unknown model or alias" in result.output
         assert not SessionStore(str(temp_env), "bad-model").exists()
 
     def test_start_with_model_and_proxy_validates_alternatives(self, runner: CliRunner, temp_env: Path) -> None:
         """--model + --proxy should validate that the proxy has model_alternatives for the model."""
-        from forge.config.schema import ProxyInstanceConfig, TierModels
-
-        proxy_cfg = ProxyInstanceConfig(
-            proxy_format=1,
-            template="openrouter-anthropic",
-            template_digest="abc",
-            provider="openrouter",
-            proxy_endpoint="http://localhost:8095",
-            port=8095,
-            upstream_base_url="https://openrouter.ai/api/v1",
-            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
-            model_alternatives={"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}},
-        )
-        routing = session_cli.ResolvedRouting(
-            template="openrouter-anthropic",
-            base_url="http://localhost:8095",
-            proxy_id="test-or-proxy",
-        )
         with (
-            patch(
-                "forge.cli.session_lifecycle._resolve_routing_from_cli",
-                return_value=routing,
+            mocked_model_route_proxy(
+                tiers={"haiku": "h", "sonnet": "s", "opus": "o"},
+                alternatives={"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}},
             ),
-            patch("forge.config.loader.load_proxy_instance_config", return_value=proxy_cfg),
             successful_claude_launch() as mock_invoke,
         ):
             result = runner.invoke(
@@ -390,29 +457,12 @@ class TestSessionStart:
         self, runner: CliRunner, temp_env: Path
     ) -> None:
         """--model + --proxy should error when the proxy has no matching alternative."""
-        from forge.config.schema import ProxyInstanceConfig, TierModels
-
-        proxy_cfg = ProxyInstanceConfig(
-            proxy_format=1,
+        with mocked_model_route_proxy(
             template="openrouter-openai",
-            template_digest="abc",
-            provider="openrouter",
-            proxy_endpoint="http://localhost:8096",
-            port=8096,
-            upstream_base_url="https://openrouter.ai/api/v1",
-            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
-        )
-        routing = session_cli.ResolvedRouting(
-            template="openrouter-openai",
-            base_url="http://localhost:8096",
             proxy_id="test-or-openai",
-        )
-        with (
-            patch(
-                "forge.cli.session_lifecycle._resolve_routing_from_cli",
-                return_value=routing,
-            ),
-            patch("forge.config.loader.load_proxy_instance_config", return_value=proxy_cfg),
+            base_url="http://localhost:8096",
+            tiers={"haiku": "h", "sonnet": "s", "opus": "o"},
+            alternatives={},
         ):
             result = runner.invoke(
                 main,
@@ -428,7 +478,7 @@ class TestSessionStart:
             )
 
         assert result.exit_code == 1
-        assert "does not configure model alternative" in result.output
+        assert "does not serve" in result.output
 
     def test_start_duplicate_fails(self, runner: CliRunner, temp_env: Path) -> None:
         """Should fail when session already exists."""
@@ -477,7 +527,8 @@ class TestSessionStart:
         assert result.exit_code == 0
         assert "[NAME]" in result.output
         assert "[1m]" not in result.output
-        assert "claude-sonnet-4-6)" in result.output
+        assert "Select a catalog model" in result.output
+        assert "--model-tier" in result.output
 
     def test_start_sidecar_persists_launch_preferences(self, runner: CliRunner, temp_env: Path) -> None:
         """Sidecar start should persist relaunch image/mount settings."""
@@ -1044,7 +1095,13 @@ class TestSessionIncognito:
         ):
             result = runner.invoke(
                 main,
-                ["session", "incognito", "incognito-worktree", "--worktree", "--no-proxy"],
+                [
+                    "session",
+                    "incognito",
+                    "incognito-worktree",
+                    "--worktree",
+                    "--no-proxy",
+                ],
             )
 
         assert result.exit_code == 0

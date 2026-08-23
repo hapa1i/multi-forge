@@ -20,6 +20,7 @@ from typing import Any, Protocol
 from forge.core.models.direct_model import (
     apply_direct_model_env,
     apply_proxy_context_model_defaults,
+    resolve_default_direct_model_pin,
     resolve_direct_model_pin,
 )
 from forge.core.reactive.env import (
@@ -76,12 +77,17 @@ from forge.session.launch_confirmation import (
 )
 from forge.session.launchability import require_session_worktree
 from forge.session.model_pin import _apply_direct_model_env_if_supported
-from forge.session.models import AuthorityIntent, session_runtime
+from forge.session.models import AuthorityIntent, ModelRouteIntent, session_runtime
 
 from .session import ForgeOpError
 from .session_authority_launch import (
     AuthorityLaunchAttempt,
     authority_launch_transaction,
+)
+from .session_model_routing import (
+    ResolvedModelRoute,
+    apply_model_route_transition,
+    plan_model_route_transition,
 )
 from .session_routing import build_claude_routing_payload, commit_launch_routing
 
@@ -205,6 +211,7 @@ class ClaudeStartPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
     def on_extensions(self, event: ClaudeStartExtensions) -> None: ...
     def on_no_launch(self) -> None: ...
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
 
@@ -277,6 +284,8 @@ class ResumeLaunchPlan:
     context_limit: int
     launch_preferences: ClaudeLaunchPreferences
     direct_model_override: str | None = None
+    model_route_selection: ResolvedModelRoute | None = None
+    render_model_route: bool = False
     parent_name: str | None = None
     prompt_warnings: tuple[str, ...] = ()
 
@@ -298,6 +307,8 @@ class ForkLaunchPlan:
     proxy_id: str | None
     incognito: bool
     render_post_exit: bool
+    model_route_selection: ResolvedModelRoute | None = None
+    render_model_route: bool = False
 
 
 @dataclass(frozen=True)
@@ -331,6 +342,7 @@ class ClaudeResumePresenter(Protocol):
     def on_warning(self, warning: ClaudeResumeWarning) -> None: ...
     def on_resume_prepared(self, event: ResumePrepared) -> None: ...
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
 
@@ -339,6 +351,7 @@ class ClaudeForkPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
     """Render hooks the CLI implements for fork launches."""
 
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
 
@@ -436,6 +449,7 @@ def launch_claude_session(
     proxy_id: str | None = None,
     authority_operation: str = "resume",
     before_launch: Callable[[Path], None] | None = None,
+    on_routing_payload: Callable[[dict[str, Any]], None] | None = None,
     on_sidecar_launch: Callable[[ClaudeSidecarLaunch], None] | None = None,
     invoke: Callable[..., int] | None = None,
     run_active: Callable[..., int] | None = None,
@@ -554,6 +568,7 @@ def launch_claude_session(
                 run_identity=root,
                 authority_attempt=authority_attempt,
                 routing_operation=authority_operation,
+                on_routing_payload=on_routing_payload,
             )
         else:
             result = _run_host_claude_session(
@@ -579,6 +594,7 @@ def launch_claude_session(
                 run_identity=root,
                 authority_attempt=authority_attempt,
                 routing_operation=authority_operation,
+                on_routing_payload=on_routing_payload,
             )
         if authority_attempt is not None:
             authority_attempt.complete(result.exit_code)
@@ -606,6 +622,7 @@ def start_claude_session(
     proxy_display: str | None,
     proxy_id: str | None,
     normalized_direct_model: str | None,
+    model_route: ModelRouteIntent | None = None,
     prompt_file: str | None,
     memory_flag: bool | None,
     subprocess_proxy: str | None,
@@ -641,6 +658,7 @@ def start_claude_session(
         mounts=mounts,
         image=image,
         normalized_direct_model=normalized_direct_model,
+        model_route=model_route,
         pre_seeded_uuid=pre_seeded_uuid,
         authority=authority,
         authority_explicit=authority_explicit,
@@ -726,6 +744,7 @@ def start_claude_session(
                 proxy_id=proxy_id,
                 authority_operation="incognito" if incognito else "start",
                 before_launch=presenter.before_launch,
+                on_routing_payload=(presenter.on_routing_payload if model_route is not None else None),
                 on_sidecar_launch=presenter.on_sidecar_launch,
                 invoke=invoke or invoke_claude,
                 run_active=run_active or run_with_active_session,
@@ -780,26 +799,36 @@ def resume_claude_session(
     store = state_context.store
 
     try:
-        persist_resume_routing_override(
-            forge_root=forge_root,
-            session_name=manifest.name,
-            routing=plan.routing,
-            direct=plan.direct,
-        )
-        apply_resume_routing_override_to_state(state=manifest, routing=plan.routing, direct=plan.direct)
+        if plan.model_route_selection is not None:
+            transition = plan_model_route_transition(plan.model_route_selection)
+
+            def _apply_selection(current: SessionState) -> None:
+                current.intent = apply_model_route_transition(current.intent, transition)
+
+            manifest = store.update(timeout_s=5.0, mutate=_apply_selection)
+            manifest.confirmed.started_with_proxy = None
+        else:
+            persist_resume_routing_override(
+                forge_root=forge_root,
+                session_name=manifest.name,
+                routing=plan.routing,
+                direct=plan.direct,
+            )
+            apply_resume_routing_override_to_state(state=manifest, routing=plan.routing, direct=plan.direct)
 
         effective_template, effective_url, effective_proxy_id = get_effective_proxy_for_resume(manifest)
         if plan.routing and plan.routing.proxy_id:
             effective_proxy_id = plan.routing.proxy_id
 
         preferences = plan.launch_preferences
-        _apply_resume_direct_model_override(
-            state=manifest,
-            direct_model=plan.direct_model_override,
-            forge_root=forge_root,
-            use_sidecar=preferences.use_sidecar,
-            presenter=presenter,
-        )
+        if plan.model_route_selection is None:
+            _apply_resume_direct_model_override(
+                state=manifest,
+                direct_model=plan.direct_model_override,
+                forge_root=forge_root,
+                use_sidecar=preferences.use_sidecar,
+                presenter=presenter,
+            )
         runtime_base_url = _get_runtime_base_url(
             use_sidecar=preferences.use_sidecar,
             effective_url=effective_url,
@@ -845,6 +874,7 @@ def resume_claude_session(
             proxy_id=effective_proxy_id,
             authority_operation="resume",
             before_launch=presenter.before_launch,
+            on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
             run_active=run_active or run_with_active_session,
@@ -908,6 +938,7 @@ def fork_claude_session(
             proxy_id=plan.proxy_id,
             authority_operation="incognito" if plan.incognito else "fork",
             before_launch=presenter.before_launch,
+            on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
             run_active=run_active or run_with_active_session,
@@ -970,6 +1001,7 @@ def apply_resume_routing_override_to_state(
         else:
             state.intent.launch.mode = LAUNCH_MODE_HOST
             state.intent.launch.sidecar = None
+        state.intent.launch.model_route = None
         return
 
     assert routing is not None
@@ -977,6 +1009,8 @@ def apply_resume_routing_override_to_state(
         template=routing.template or "",
         base_url=routing.base_url or "",
     )
+    if state.intent.launch is not None:
+        state.intent.launch.model_route = None
 
 
 def persist_resume_routing_override(
@@ -1002,11 +1036,14 @@ def persist_resume_routing_override(
             else:
                 manifest.intent.launch.mode = LAUNCH_MODE_HOST
                 manifest.intent.launch.sidecar = None
+            manifest.intent.launch.model_route = None
         elif routing is not None:
             manifest.intent.proxy = ProxyIntent(
                 template=routing.template or "",
                 base_url=routing.base_url or "",
             )
+            if manifest.intent.launch is not None:
+                manifest.intent.launch.model_route = None
 
     try:
         store.update(timeout_s=5.0, mutate=_mutate)
@@ -1122,6 +1159,7 @@ def _create_claude_session(
     mounts: tuple[str, ...],
     image: str | None,
     normalized_direct_model: str | None,
+    model_route: ModelRouteIntent | None,
     pre_seeded_uuid: str,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -1140,6 +1178,7 @@ def _create_claude_session(
             sidecar_mounts=list(mounts) if use_sidecar else None,
             sidecar_image=image if use_sidecar else None,
             direct_model=normalized_direct_model,
+            model_route=model_route,
             claude_session_id=pre_seeded_uuid,
             authority=authority,
             authority_explicit=authority_explicit,
@@ -1309,6 +1348,7 @@ def _run_sidecar_claude_session(
     run_identity: RunIdentity,
     authority_attempt: AuthorityLaunchAttempt | None,
     routing_operation: str,
+    on_routing_payload: Callable[[dict[str, Any]], None] | None,
 ) -> ClaudeSessionLaunchResult:
     if effective_template is None or runtime_base_url is None:
         raise ForgeOpError("Direct sessions are not supported with --sidecar")
@@ -1439,6 +1479,8 @@ def _run_sidecar_claude_session(
         runtime_base_url=runtime_base_url,
         proxy_id=routing_proxy_id,
     )
+    if on_routing_payload is not None:
+        on_routing_payload(routing_payload)
     commit_launch_routing(
         store=store,
         state=manifest,
@@ -1540,6 +1582,7 @@ def _run_host_claude_session(
     run_identity: RunIdentity,
     authority_attempt: AuthorityLaunchAttempt | None,
     routing_operation: str,
+    on_routing_payload: Callable[[dict[str, Any]], None] | None,
 ) -> ClaudeSessionLaunchResult:
     _update_manifest_best_effort(
         store,
@@ -1552,6 +1595,35 @@ def _run_host_claude_session(
 
         proxy_id = recover_proxy_id_from_base_url(runtime_base_url)
 
+    applied_direct_model = None
+    if runtime_base_url is None:
+        effective_direct_model = manifest.intent.launch.direct_model if manifest.intent.launch else None
+        if effective_direct_model:
+            error = apply_direct_model_env(env_vars, effective_direct_model)
+            if error:
+                raise ForgeOpError(error)
+            applied_direct_model = resolve_direct_model_pin(effective_direct_model)
+        else:
+            from forge.runtime_config import get_default_direct_model
+
+            try:
+                applied_direct_model = resolve_default_direct_model_pin(get_default_direct_model())
+            except ValueError as e:
+                raise ForgeOpError(str(e)) from e
+            if applied_direct_model is not None:
+                env_vars.update(applied_direct_model.env())
+    elif manifest.intent.launch and manifest.intent.launch.direct_model and proxy_id:
+        application = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
+        if application.error:
+            raise ForgeOpError(application.error)
+        applied_direct_model = application.pin
+    elif (
+        manifest.intent.launch
+        and manifest.intent.launch.model_route is not None
+        and manifest.intent.launch.model_route.kind == "proxy"
+    ):
+        env_vars["ANTHROPIC_MODEL"] = manifest.intent.launch.model_route.selected_tier
+
     routing_mode = _routing_mode_for(runtime_base_url, proxy_id)
     _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
     record_launch_confirmed(
@@ -1563,22 +1635,6 @@ def _run_host_claude_session(
         proxy_cost_baseline_micros=(_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None),
         proxy_cost_baseline_started_at=(_proxy_cost_baseline.started_at if _proxy_cost_baseline else None),
     )
-
-    applied_direct_model = None
-    if runtime_base_url is None:
-        from forge.runtime_config import get_default_direct_model
-
-        effective_direct_model = manifest.intent.launch.direct_model if manifest.intent.launch else None
-        effective_direct_model = effective_direct_model or get_default_direct_model()
-        error = apply_direct_model_env(env_vars, effective_direct_model)
-        if error:
-            raise ForgeOpError(error)
-        applied_direct_model = resolve_direct_model_pin(effective_direct_model) if effective_direct_model else None
-    elif manifest.intent.launch and manifest.intent.launch.direct_model and proxy_id:
-        application = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
-        if application.error:
-            raise ForgeOpError(application.error)
-        applied_direct_model = application.pin
 
     invoke_kwargs: dict[str, Any] = {
         "session_id": session_id,
@@ -1602,6 +1658,8 @@ def _run_host_claude_session(
         proxy_id=proxy_id,
         applied_direct_model=applied_direct_model,
     )
+    if on_routing_payload is not None:
+        on_routing_payload(routing_payload)
     commit_launch_routing(
         store=store,
         state=manifest,

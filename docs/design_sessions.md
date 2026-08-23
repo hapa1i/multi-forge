@@ -381,6 +381,17 @@ mode none; otherwise inherited proxy ID then template. For `full`, Forge **fails
 transcript exceeds that proxy's window, naming `structured`/`ai-curated` as fixes. Other strategies need no budget
 preflight.
 
+**Interactive model-route selection:** Claude-runtime `start`, `resume`, `fork`, and `incognito` accept catalog models
+through `--model`; `--model-tier` disambiguates proxy tiers. Unlike Claude's in-process `/model`, this is durable
+prelaunch intent. The shared planner applies explicit constraints, a compatible stored route, new-Claude direct routing,
+then catalog order without side effects; only its winner may start, and failure never falls through. The selected
+context window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written
+atomically. Bare resume reuses that route or fails.
+
+A non-Claude selection may start a paid proxy. `--no-launch` persists it without a route event or child;
+`--subprocess-proxy` is incompatible. Codex, adoption, `default_direct_model`, sidecar/host-proxy modes, and bare
+commands never initiate fresh selection.
+
 **Depth control:** `--depth N|all` traverses lineage beyond the immediate parent (default `1`), pulling context from
 earlier sessions in the ancestry chain.
 
@@ -440,8 +451,9 @@ UUID `<R>`, not the parent's UUID.
 2. Processed transfer: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
-**Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
-`--proxy <name>` overrides.
+**Proxy inheritance:** The child inherits the parent's proxy and neutral model-route intent by default, keeping routing
+stable across resumes; `--proxy <name>`, `--no-proxy`, or an explicit model that the inherited route cannot serve
+authorizes a complete replacement.
 
 **Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
 authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child
@@ -467,6 +479,10 @@ managed Claude host/sidecar and Codex headless/interactive attempt appends `laun
 projects its `{event_id, run_id}` into `confirmed.route_commit`, before invoking the child. Marked launches do this in
 the yielded authority transaction body, after `launch_preflight` and `run_started`; unmarked launches use the same
 serialized boundary without authority events. Both journals and the projection reuse the one root `RunIdentity`.
+
+For explicit model selection, one stderr route line and the journal share the immutable payload, including proven
+backend identity and `billing_mode=unknown` absent payer evidence. Later payload, projection, or child failure does not
+roll back persisted route intent.
 
 Routing construction, validation, or append failure compensates any authority journal already touched. Projection
 failure compensates in reverse touch order: the exact immutable route payload is appended as same-run

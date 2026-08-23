@@ -17,19 +17,12 @@ from forge.review.models import ModelSpec, MultiReviewOutput, StanceSpec
 from forge.review.routing import WorkerRoutingPlan
 
 
-def _spec(name: str = "test-model", preferred_proxy: str | None = "test-proxy") -> ModelSpec:
-    provider_refs: tuple[tuple[str, str], ...]
-    if preferred_proxy:
-        provider_refs = (("openrouter", f"openai/{name}"),)
-    else:
-        provider_refs = (("direct", name),)
+def _spec(name: str = "test-model") -> ModelSpec:
     return ModelSpec(
         name=name,
-        model_id=name,
+        model_id="gpt-5.6-sol",
         family="openai",
-        provider_refs=provider_refs,
         description="Test",
-        preferred_proxy=preferred_proxy,
     )
 
 
@@ -101,7 +94,6 @@ class TestRunAdversarial:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             description="Native Codex",
             runtime="codex",
         )

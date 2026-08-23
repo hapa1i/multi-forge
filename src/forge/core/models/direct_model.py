@@ -76,6 +76,16 @@ def resolve_direct_model_pin(value: str) -> DirectModelPin:
     return DirectModelPin(canonical_model=base_canonical, env_model=env_model, tier=tier)
 
 
+def resolve_default_direct_model_pin(value: str | None) -> DirectModelPin | None:
+    """Resolve ``default_direct_model`` with a field-specific configuration error."""
+    if value is None:
+        return None
+    try:
+        return resolve_direct_model_pin(value)
+    except ValueError as e:
+        raise ValueError(f"Invalid configuration field 'default_direct_model': {e}") from e
+
+
 def direct_model_env(value: str | None) -> dict[str, str]:
     """Return Claude Code direct-model environment variables for ``value``."""
     if not value:

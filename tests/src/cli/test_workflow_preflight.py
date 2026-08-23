@@ -17,9 +17,8 @@ from forge.review.routing import WorkerRoutingPlan
 def test_run_preflight_prints_routing_warnings() -> None:
     spec = ModelSpec(
         name="gpt-5.5",
-        model_id="gpt-5.5",
+        model_id="gpt-5.6-sol",
         family="openai",
-        provider_refs=(("openrouter", "openai/gpt-5.5"),),
         description="test",
     )
     route = ModelRoute(

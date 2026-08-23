@@ -27,6 +27,10 @@ from forge.session.store import SessionStore
 
 from .session import ForgeOpError
 from .session_authority_launch import AuthorityLaunchAttempt
+from .session_model_routing import (
+    SessionModelRoutingError,
+    resolve_proxy_selected_model,
+)
 
 
 def build_runtime_native_routing_payload() -> dict[str, Any]:
@@ -64,13 +68,28 @@ def build_claude_routing_payload(
 ) -> dict[str, Any]:
     """Build one immutable Claude route snapshot after argv and env preparation."""
     catalog = load_model_practices()
-    requested = state.intent.launch.direct_model if state.intent.launch is not None else None
+    launch = state.intent.launch
+    model_route = launch.model_route if launch is not None else None
+    requested = launch.direct_model if launch is not None else None
     requested_pin = resolve_direct_model_pin(requested) if requested else None
-    requested_model = requested_pin.canonical_model if requested_pin is not None else None
-
+    requested_model = (
+        model_route.requested_model
+        if model_route is not None
+        else requested_pin.canonical_model if requested_pin is not None else None
+    )
     if runtime_base_url is None:
         direct_model = applied_direct_model.canonical_model if applied_direct_model is not None else None
         selected_pin = applied_direct_model if requested_pin is not None else None
+        selected_tier = (
+            model_route.selected_tier
+            if model_route is not None
+            else selected_pin.tier if selected_pin is not None else None
+        )
+        selected_model = (
+            applied_direct_model.canonical_model
+            if model_route is not None and applied_direct_model is not None
+            else selected_pin.canonical_model if selected_pin is not None else None
+        )
         scope = ["route:direct", "runtime:claude_code"]
         snapshots = (
             [_marking_snapshot("direct", None, None, direct_model, scope, catalog)] if direct_model is not None else []
@@ -78,8 +97,8 @@ def build_claude_routing_payload(
         return _payload(
             kind="direct",
             requested_model=requested_model,
-            selected_tier=selected_pin.tier if selected_pin is not None else None,
-            selected_model=selected_pin.canonical_model if selected_pin is not None else None,
+            selected_tier=selected_tier,
+            selected_model=selected_model,
             direct_model=direct_model,
             route_scope_tags=scope,
             marking_snapshots=snapshots,
@@ -122,7 +141,23 @@ def build_claude_routing_payload(
         for request_model, route_model in alternatives.items()
     )
     selected_model = None
-    if applied_direct_model is not None:
+    selected_tier = (
+        model_route.selected_tier
+        if model_route is not None
+        else applied_direct_model.tier if applied_direct_model is not None else None
+    )
+    if model_route is not None:
+        try:
+            selected_model = resolve_proxy_selected_model(
+                model_route.requested_model,
+                model_route.selected_tier,
+                tier_mappings=tier_mappings,
+                model_alternatives=model_alternatives,
+                wire_shape=wire_shape,
+            )
+        except SessionModelRoutingError as exc:
+            raise ForgeOpError(str(exc)) from exc
+    elif applied_direct_model is not None:
         if wire_shape == ANTHROPIC_PASSTHROUGH:
             selected_model = applied_direct_model.canonical_model
         else:
@@ -137,7 +172,7 @@ def build_claude_routing_payload(
         template=template,
         wire_shape=wire_shape,
         requested_model=requested_model,
-        selected_tier=applied_direct_model.tier if applied_direct_model is not None else None,
+        selected_tier=selected_tier,
         selected_model=selected_model,
         default_tier=default_tier,
         tier_mappings=tier_mappings,

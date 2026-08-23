@@ -32,6 +32,43 @@ def _human_workflow_preflight_failure() -> None:
     _run_preflight([])
 
 
+@click.command()
+def _model_route_line() -> None:
+    from forge.cli.session_lifecycle import _render_model_route_payload
+
+    _render_model_route_payload(
+        {
+            "route": {
+                "backend_id": "openrouter",
+                "template": "openrouter-openai",
+                "proxy_id": "openrouter-openai-1",
+            },
+            "selected_tier": "opus",
+            "selected_model": "openai/gpt-5.6-sol",
+            "billing_mode": "unknown",
+        }
+    )
+
+
+@click.command()
+def _direct_model_route_line() -> None:
+    from forge.cli.session_lifecycle import _render_model_route_payload
+
+    _render_model_route_payload(
+        {
+            "route": {
+                "kind": "direct",
+                "backend_id": None,
+                "template": None,
+                "proxy_id": None,
+            },
+            "selected_tier": "opus",
+            "selected_model": "claude-opus-4-8",
+            "billing_mode": "unknown",
+        }
+    )
+
+
 # --json success paths that need no seeded data: empty logs still yield valid JSON.
 _JSON_STDOUT_LEAVES = [
     ["logs", "show", "--json"],
@@ -52,6 +89,28 @@ def test_json_payload_on_stdout_with_clean_stderr(args: list[str]) -> None:
     assert result.exit_code == 0, result.output
     json.loads(result.stdout)  # raises if stdout is not pure JSON
     assert result.stderr == ""
+
+
+def test_model_route_line_owns_stderr_and_preserves_payload_values() -> None:
+    result = CliRunner().invoke(_model_route_line)
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout == ""
+    assert result.stderr == (
+        "Route: provider=openrouter template=openrouter-openai "
+        "proxy=openrouter-openai-1 tier=opus model=openai/gpt-5.6-sol "
+        "billing_mode=unknown\n"
+    )
+
+
+def test_direct_model_route_line_names_direct_provider() -> None:
+    result = CliRunner().invoke(_direct_model_route_line)
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout == ""
+    assert result.stderr == (
+        "Route: provider=direct template=- proxy=- tier=opus " "model=claude-opus-4-8 billing_mode=unknown\n"
+    )
 
 
 def test_shadows_review_bare_json_keeps_stdout_jq_safe(

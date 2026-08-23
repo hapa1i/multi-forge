@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from forge.core.models.direct_model import resolve_default_direct_model_pin
 from forge.core.paths import get_forge_home
 from forge.runtime_config import (
     RuntimeConfig,
@@ -26,6 +27,7 @@ from forge.runtime_config import (
     RuntimeTelemetryConfig,
     StatusLineConfig,
     get_default_config_content,
+    get_default_direct_model,
     get_runtime_config,
     load_runtime_config,
     render_runtime_config_yaml,
@@ -211,6 +213,39 @@ class TestLoadRuntimeConfig:
         config_file.write_text('default_direct_model: "claude-sonnet-4-6"\n')
         rc = load_runtime_config(config_file)
         assert rc.default_direct_model == "claude-sonnet-4-6"
+
+    def test_default_direct_model_resolves_as_claude_pin(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        forge_home = tmp_path / "forge-home"
+        forge_home.mkdir()
+        (forge_home / "config.yaml").write_text("default_direct_model: claude-sonnet-4-6\n")
+        monkeypatch.setenv("FORGE_HOME", str(forge_home))
+        reset_runtime_config()
+
+        try:
+            pin = resolve_default_direct_model_pin(get_default_direct_model())
+        finally:
+            reset_runtime_config()
+
+        assert pin is not None
+        assert pin.canonical_model == "claude-sonnet-4-6"
+        assert pin.tier == "sonnet"
+
+    def test_non_claude_default_direct_model_names_configuration_field(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        forge_home = tmp_path / "forge-home"
+        forge_home.mkdir()
+        (forge_home / "config.yaml").write_text("default_direct_model: gpt-5.6-sol\n")
+        monkeypatch.setenv("FORGE_HOME", str(forge_home))
+        reset_runtime_config()
+
+        try:
+            with pytest.raises(ValueError, match="Invalid configuration field 'default_direct_model'"):
+                resolve_default_direct_model_pin(get_default_direct_model())
+        finally:
+            reset_runtime_config()
 
     def test_unknown_keys_warned_and_ignored(self, tmp_path: Path, caplog):
         config_file = tmp_path / "config.yaml"

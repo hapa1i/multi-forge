@@ -43,18 +43,11 @@ def _auto_plan(specs, **_kw):
 
 
 def _spec(name: str = "test-model", proxy: str | None = "test-proxy") -> ModelSpec:
-    provider_refs: tuple[tuple[str, str], ...]
-    if proxy:
-        provider_refs = (("openrouter", f"openai/{name}"),)
-    else:
-        provider_refs = (("direct", name),)
     return ModelSpec(
         name=name,
-        model_id=name,
-        family="openai",
-        provider_refs=provider_refs,
+        model_id="gpt-5.6-sol" if proxy else "claude-opus-4-6",
+        family="openai" if proxy else "anthropic",
         description="Test",
-        preferred_proxy=proxy,
     )
 
 
@@ -104,8 +97,20 @@ class TestRoleSpec:
 class TestBuildReconciliationBrief:
     def test_includes_all_positions(self):
         results = [
-            ReviewResult(model_name="m1-arch", stdout="Position A", stderr="", success=True, duration_seconds=1.0),
-            ReviewResult(model_name="m2-sec", stdout="Position B", stderr="", success=True, duration_seconds=1.0),
+            ReviewResult(
+                model_name="m1-arch",
+                stdout="Position A",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
+            ReviewResult(
+                model_name="m2-sec",
+                stdout="Position B",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
         ]
         role_map = {"m1-arch": "architecture", "m2-sec": "security"}
         brief = _build_reconciliation_brief(results, role_map)
@@ -116,7 +121,13 @@ class TestBuildReconciliationBrief:
 
     def test_labels_by_role_not_model(self):
         results = [
-            ReviewResult(model_name="gpt-5.5-security", stdout="test", stderr="", success=True, duration_seconds=1.0),
+            ReviewResult(
+                model_name="gpt-5.5-security",
+                stdout="test",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
         ]
         role_map = {"gpt-5.5-security": "security"}
         brief = _build_reconciliation_brief(results, role_map)
@@ -141,7 +152,13 @@ class TestBuildReconciliationBrief:
 
     def test_includes_reconciliation_task(self):
         results = [
-            ReviewResult(model_name="m1", stdout="test", stderr="", success=True, duration_seconds=1.0),
+            ReviewResult(
+                model_name="m1",
+                stdout="test",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
         ]
         role_map = {"m1": "architecture"}
         brief = _build_reconciliation_brief(results, role_map)
@@ -153,7 +170,13 @@ class TestBuildReconciliationBrief:
     def test_extracts_json_when_parseable(self):
         json_output = '```json\n{"position": "SUPPORT", "confidence": "HIGH"}\n```'
         results = [
-            ReviewResult(model_name="m1", stdout=json_output, stderr="", success=True, duration_seconds=1.0),
+            ReviewResult(
+                model_name="m1",
+                stdout=json_output,
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
         ]
         role_map = {"m1": "architecture"}
         brief = _build_reconciliation_brief(results, role_map)
@@ -165,7 +188,13 @@ class TestBuildReconciliationBrief:
 
         long_text = "A" * (_MAX_EXCERPT_LEN + 100)
         results = [
-            ReviewResult(model_name="m1", stdout=long_text, stderr="", success=True, duration_seconds=1.0),
+            ReviewResult(
+                model_name="m1",
+                stdout=long_text,
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            ),
         ]
         role_map = {"m1": "architecture"}
         brief = _build_reconciliation_brief(results, role_map)
@@ -185,7 +214,6 @@ class TestRunConsensus:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             description="Native Codex",
             runtime="codex",
         )
@@ -198,7 +226,13 @@ class TestRunConsensus:
 
         run_consensus(
             str(resource),
-            [RoleSpec(role="architecture", role_prompt="Focus on architecture", model=codex)],
+            [
+                RoleSpec(
+                    role="architecture",
+                    role_prompt="Focus on architecture",
+                    model=codex,
+                )
+            ],
         )
 
         mock_routing.assert_called_once()
@@ -372,7 +406,12 @@ class TestRunConsensus:
         mock_popen_cls.return_value = _mock_popen()
 
         roles = [
-            RoleSpec(role="custom", role_prompt="Focus on compliance", model=_spec("m1"), display_label="compliance"),
+            RoleSpec(
+                role="custom",
+                role_prompt="Focus on compliance",
+                model=_spec("m1"),
+                display_label="compliance",
+            ),
         ]
         output = run_consensus(str(resource), roles)
         assert output.roles == ["compliance"]

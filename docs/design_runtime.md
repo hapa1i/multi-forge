@@ -88,7 +88,7 @@ the input to session resume/fork budget preflight; intent mutation remains a lat
 | 1    | `explicit`         | Opaque base-URL override                                                                        |
 | 2    | `explicit`         | Named CLI/config proxy; strict registration, reachability, and route compatibility              |
 | 3    | `subprocess_proxy` | Ambient `FORGE_SUBPROCESS_PROXY`; strict, or host-injected sidecar URL/metadata                 |
-| 4    | `preferred_proxy`  | Catalog hint (`ModelSpec.preferred_proxy`); soft -- skip if not running                         |
+| 4    | `preferred_proxy`  | Leading proxy candidate from the shared route catalog; soft -- skip if not running              |
 | 5    | `route_scan`       | Find any running proxy compatible with a derived `ModelRoute`                                   |
 | 6    | `session_proxy`    | Inherited `ANTHROPIC_BASE_URL`; opaque URLs are accepted when the caller does not require route |
 | 7    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                                         |
@@ -618,18 +618,15 @@ normalization.
 **Workflow model specs** (`src/forge/review/models.py`):
 
 ```python
-ModelSpec(name, model_id, family, provider_refs, description,
-         preferred_proxy=None, prompt=None, prompt_mode="override", worker_id=None)
+ModelSpec(name, model_id, family, description,
+          prompt=None, prompt_mode="override", worker_id=None, runtime="claude_code")
 ```
 
-Key fields: `model_id` is Forge-canonical (e.g., `gpt-5.5`, not `openai/gpt-5.5`). `family` is the model's native family
-(e.g., `openai`, `anthropic`, `gemini`). `provider_refs` is ordered `(namespace, model_ref)` tuples declaring how to
-reach the model via each provider. `preferred_proxy` is a soft catalog hint, overridable by `--proxy` or route scan.
-
-During the staged workflow migration, `provider_refs` and `preferred_proxy` remain the runtime source. The parallel
-`derive_catalog_model_routes()` projection must be byte-for-byte equivalent in ordered
-`(provider, template_id, model_ref)` output for every non-runtime-native worker; tests enforce that parity before legacy
-metadata can be removed.
+`model_id` is Forge-canonical (for example, `gpt-5.6-sol`, not a provider slug), and `family` is the model's intrinsic
+family. A spec owns worker identity, description, prompt, and runtime only. `derive_model_routes()` normalizes
+`model_id`, reads the shared route catalog's already ordered candidates, and combines them with static template/source
+metadata to produce `ModelRoute` values. It does not scan or mutate the proxy registry. Runtime-native workers such as
+Codex bypass the catalog deliberately.
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 
@@ -829,10 +826,10 @@ def resolve_subprocess_routing(
     """
 
 def derive_model_routes(spec: RoutableSpec) -> tuple[ModelRoute, ...]:
-    """Expand compact model metadata into concrete routing options.
+    """Materialize the shared route catalog for one workflow worker.
 
-    Combines ModelSpec fields with template/auth metadata. Does not
-    inspect the proxy registry or check running state.
+    Candidate order comes from model_routes.yaml. Template metadata
+    contributes family/provider/credential facts without registry I/O.
     """
 
 def resolve_invocation_routing(
@@ -853,16 +850,14 @@ def resolve_model_flag(route: ModelRoute) -> str | None:
 
 ### G.4 Route derivation ranking
 
-`derive_model_routes()` produces routes in deterministic order:
-
-1. preferred_proxy match first (if it matches a derived route)
-2. provider_refs order (from `ModelSpec.provider_refs`)
-3. Native-family templates before OpenRouter passthrough cross-family templates
-4. Alphabetical template name tiebreaker
+`derive_model_routes()` preserves the exact candidate order in packaged `model_routes.yaml`; workflow code neither
+re-ranks candidates nor owns a parallel preferred-proxy/provider-ref list. The first proxy candidate is the soft
+`preferred_proxy` input to the shared resolver. The catalog's fixed-order tests guard preferred-template promotion,
+provider order, native-family-before-cross-family placement, and template tiebreakers.
 
 Registry scan then ranks matched proxies:
 
-1. Route preference order (from `derive_model_routes()` ranking above)
+1. Route preference order from the shared catalog
 2. Alphabetical proxy_id as tiebreaker
 
 ### G.5 Sidecar constraints

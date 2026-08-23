@@ -13,6 +13,7 @@ from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
 from forge.session import SessionStore, create_session_state
+from forge.session.models import ModelRouteIntent
 from forge.session.routing import (
     ROUTING_COMMIT_EVENT,
     new_routing_event,
@@ -140,6 +141,59 @@ def test_proxy_payload_captures_effective_zdr_defaults_and_alternatives(
         ("tier_default", "anthropic/claude-opus-5"),
         ("model_alternative", "qwen/qwen3.8-2.4t-a95b"),
     ]
+
+
+def test_proxy_payload_prefers_neutral_model_route_without_inventing_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="opus",
+        kind="proxy",
+        source_id="openrouter",
+    )
+    provider = SimpleNamespace(
+        tiers={
+            "sonnet": "openai/gpt-5.6-sol",
+            "opus": "openai/gpt-5.6-sol",
+        },
+        model_alternatives={},
+        allow_non_zdr=True,
+        zdr_fallbacks={},
+    )
+    proxy = SimpleNamespace(
+        preferred_provider="openrouter",
+        get_provider=lambda _provider: provider,
+        default_tier="sonnet",
+        active_template="openrouter-openai",
+        backend="",
+        wire_shape="openai_translated",
+    )
+    monkeypatch.setattr(ops, "load_config", lambda **_kwargs: SimpleNamespace(proxy=proxy))
+
+    payload = ops.build_claude_routing_payload(
+        state,
+        effective_template="openrouter-openai",
+        runtime_base_url="http://localhost:8096",
+        proxy_id="openrouter-openai-1",
+    )
+
+    assert payload["requested_model"] == "gpt-5.6-sol"
+    assert payload["selected_tier"] == "opus"
+    assert payload["selected_model"] == "openai/gpt-5.6-sol"
+    assert payload["direct_model"] is None
+    assert payload["route"]["backend_id"] is None
+    event = new_routing_event(
+        state,
+        event_type=ROUTING_COMMIT_EVENT,
+        run_id=new_root_run_identity().run_id,
+        operation="resume",
+        payload=payload,
+    )
+    assert event.payload == payload
 
 
 def test_proxy_payload_keeps_ignored_request_out_of_effective_selection(
