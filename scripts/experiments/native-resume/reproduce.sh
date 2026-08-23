@@ -4,7 +4,7 @@
 # Hypothesis: Claude Code finds a `--resume` target only in the CWD-encoded
 # project dir (~/.claude/projects/<encoded-cwd>/<uuid>.jsonl). The 2026-04-02
 # negative result (Claude Code 2.1.90: cross-CWD --resume fails "No conversation
-# found"; see ../../../src/forge/cli/session_fork.py and docs/design.md 3.9) only
+# found"; see ../../../src/forge/cli/session_fork.py and docs/design_sessions.md 3.9) only
 # tried resuming from a foreign CWD -- it never RELOCATED the JSONL. This script
 # tests whether COPYING the parent JSONL into the child CWD's encoded dir makes
 # the session resumable across the boundary, and whether the tool-use

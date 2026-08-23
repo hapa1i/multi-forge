@@ -554,9 +554,10 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 | Team event tagger (`emit_direct_llm_usage`, `team-tagger`)                | Partially       | `session=$FORGE_SESSION` best-effort, else ambient (the handler carries no Forge session)      |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
-`audit/`, `costs/`, and `telemetry/` (§7), so the in-container supervisor/verb events, downstream/upstream telemetry,
-and cap state survive the `--rm` container. Template-only sidecars (no proxy id) mount none of these, so their telemetry
-stays ephemeral — consistent with how they already drop audit/costs.
+`audit/`, `costs/`, and `telemetry/` ([runtime design §7](design_runtime.md#7-isolation-and-proxy-modes)), so the
+in-container supervisor/verb events, downstream/upstream telemetry, and cap state survive the `--rm` container.
+Template-only sidecars (no proxy id) mount none of these, so their telemetry stays ephemeral — consistent with how they
+already drop audit/costs.
 
 ### A.14 Provider lifecycle fields in downstream telemetry (§3.14)
 

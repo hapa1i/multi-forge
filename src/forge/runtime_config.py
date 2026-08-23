@@ -653,6 +653,40 @@ def load_runtime_config(path: Path | None = None) -> RuntimeConfig:
     return _apply_env_overrides(_dict_to_runtime_config(data, config_path))
 
 
+def load_stored_skill_invocation(path: Path | None = None) -> dict[str, str]:
+    """Load only the stored ``skills.invocation`` overrides.
+
+    This reader deliberately ignores unrelated runtime fields and environment
+    overrides.  Config mutation commands use it to decide whether installed
+    skill packages need synchronization even when another config field is
+    malformed.
+    """
+    config_path = path or get_config_path()
+    if not config_path.is_file():
+        return {}
+
+    try:
+        import yaml
+
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning("Failed to read %s: %s — using explicit-only skill defaults", config_path, e)
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+
+    try:
+        return dict(_coerce_skills_config(data.get("skills")).invocation)
+    except (ValueError, TypeError) as e:
+        logger.warning(
+            "Invalid skills config in %s: %s — using explicit-only skill defaults",
+            config_path,
+            e,
+        )
+        return {}
+
+
 def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig:
     """Convert a dict to RuntimeConfig, warning on unknown keys.
 

@@ -30,6 +30,7 @@ ACTIVE_INDEX_VERSION = 1
 ACTIVE_DIR = "sessions"
 ACTIVE_FILENAME = "active.json"
 CLI_LOCK_TIMEOUT_S = 5.0
+MAX_REPRESENTABLE_PID = (1 << 31) - 1
 
 
 @dataclass
@@ -106,11 +107,16 @@ class ActiveSessionStore:
             or not self._has_current_key_shape(data)
         ):
             raise ValueError("incompatible active-session registry")
-        return dacite.from_dict(
+        index = dacite.from_dict(
             data_class=ActiveSessionIndex,
             data=data,
             config=dacite.Config(strict=True),
         )
+        for entry in index.sessions.values():
+            pid = entry.launcher_pid
+            if pid is not None and (type(pid) is not int or not 0 < pid <= MAX_REPRESENTABLE_PID):
+                raise ValueError(f"launcher_pid is outside the supported PID range: {pid!r}")
+        return index
 
     def _has_current_key_shape(self, data: dict[str, object]) -> bool:
         """Return True when the registry uses scoped session keys."""

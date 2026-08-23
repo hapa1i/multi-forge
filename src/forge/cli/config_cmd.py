@@ -32,6 +32,7 @@ from forge.runtime_config import (
     ensure_config,
     get_config_path,
     load_runtime_config,
+    load_stored_skill_invocation,
     render_runtime_config_yaml,
     reset_runtime_config,
     write_runtime_config,
@@ -305,7 +306,7 @@ def edit_cmd() -> None:
     console = Console(width=200)
 
     config_path = ensure_config()
-    original_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
+    original_skill_invocation = load_stored_skill_invocation(config_path)
     editor_argv = resolve_editor_argv()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -428,7 +429,7 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
         console.print("[dim]No config file to reset (already using defaults).[/dim]")
         return
 
-    original_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
+    original_skill_invocation = load_stored_skill_invocation(config_path)
 
     if key is None:
         if not yes:
@@ -465,7 +466,7 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
 
     default_val = getattr(RuntimeConfig(), key)
     console.print(f"[green]Reset[/green] {key} (default: {default_val})")
-    updated_skill_invocation = dict(load_runtime_config(config_path).skills.invocation)
+    updated_skill_invocation = load_stored_skill_invocation(config_path)
     if updated_skill_invocation != original_skill_invocation:
         _print_skill_invocation_sync_tip(console)
 

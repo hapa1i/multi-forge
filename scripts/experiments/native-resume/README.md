@@ -13,9 +13,10 @@ absolute CWD with `/`, `.`, and `_` replaced by `-` (the underscore mapping is v
 
 The 2026-04-02 negative result (Claude Code 2.1.90 — see
 [`src/forge/cli/session_fork.py`](../../../src/forge/cli/session_fork.py) and
-[`docs/design.md` §3.9](../../../docs/design.md)) found that cross-CWD `--resume` fails with **"No conversation
-found."** But that test never *relocated* the JSONL — it resumed from a foreign CWD while the file stayed put. "No
-conversation found" is a **discovery** failure, not a signature/content failure.
+[`docs/design_sessions.md` §3.9](../../../docs/design_sessions.md#39-session-resume-context-management)) found that
+cross-CWD `--resume` fails with **"No conversation found."** But that test never *relocated* the JSONL — it resumed from
+a foreign CWD while the file stayed put. "No conversation found" is a **discovery** failure, not a signature/content
+failure.
 
 **native-relocate** asks: if you first **copy** the parent JSONL into the child CWD's encoded dir, does Claude find it —
 and does the tool-use *continuation* survive signed-thinking revalidation?
@@ -60,7 +61,7 @@ exercise the thing under test), not a negative — adjust the model / `MAX_THINK
 
 ## If it passes
 
-A `[PASS]` (with a signed parent block) is evidence the open question in `docs/design.md` §3.9 can be revisited for the
-current Claude Code version. The fork wiring (`forge session fork --resume-mode native-relocate`) shipped as Stage C v1;
-`resume --resume-mode native-relocate`, sidecar support, path rewriting, and the default flip remain deferred — this
-experiment and the contract test settle the *mechanism*.
+A `[PASS]` (with a signed parent block) is evidence the open question in `docs/design_sessions.md` §3.9 can be revisited
+for the current Claude Code version. The fork wiring (`forge session fork --resume-mode native-relocate`) shipped as
+Stage C v1; `resume --resume-mode native-relocate`, sidecar support, path rewriting, and the default flip remain
+deferred — this experiment and the contract test settle the *mechanism*.

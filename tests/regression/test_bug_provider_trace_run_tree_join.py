@@ -1,7 +1,7 @@
 """Regression: provider traces join by run tree, preserving claude -p semantics.
 
 One proxied ``claude -p`` runtime run produces MANY proxy requests (one per turn/tool hop).
-The design invariant (card §4, design.md §3.14) is that the telemetry planes stay physically
+The design invariant (card §4, design_telemetry.md §3.14) is that the telemetry planes stay physically
 separate and join by shared ``request_id`` + run-tree ids. The usage plane's complementary
 half — that ``claude -p`` usage events may leave ``source_refs`` null — is guarded separately
 by ``test_bug_usage_claude_p_null_source_refs.py``.

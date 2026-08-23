@@ -11,7 +11,7 @@ never rewrites or normalizes it: merge appends or replaces only the managed
 block, and the merged content is re-validated with tomllib before the atomic
 write. Registration alone is inert -- Codex hooks fire only after the user's
 one-time interactive trust ceremony, which the installer can neither perform
-nor verify (the ``trusted_hash`` is not computable; see design.md §3.9).
+nor verify (the ``trusted_hash`` is not computable; see design_sessions.md §3.9).
 
 Trust durability: Codex's ``trusted_hash`` covers the registration definition,
 so the rendered entry bytes (command strings, shape) must stay stable across

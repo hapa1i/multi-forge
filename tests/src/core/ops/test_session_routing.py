@@ -9,10 +9,15 @@ from typing import Any, cast
 import pytest
 
 import forge.core.ops.session_routing as ops
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
 from forge.session import SessionStore, create_session_state
-from forge.session.routing import read_routing_events
+from forge.session.routing import (
+    ROUTING_COMMIT_EVENT,
+    new_routing_event,
+    read_routing_events,
+)
 
 
 def _store(tmp_path: Path, *, runtime: str = "codex") -> tuple[SessionStore, Any]:
@@ -59,7 +64,7 @@ def test_direct_payload_uses_shared_catalog_normalization(tmp_path: Path) -> Non
         effective_template=None,
         runtime_base_url=None,
         proxy_id=None,
-        effective_direct_model="anthropic/claude-opus-5[1m]",
+        applied_direct_model=resolve_direct_model_pin("anthropic/claude-opus-5[1m]"),
     )
 
     assert payload["route"]["kind"] == "direct"
@@ -118,6 +123,7 @@ def test_proxy_payload_captures_effective_zdr_defaults_and_alternatives(
         "proxy_id": "qwen-1",
         "template": "openrouter-qwen",
         "custom_route_fingerprint": None,
+        "wire_shape": "openai_translated",
     }
     assert payload["tier_mappings"] == {
         "sonnet": "qwen/qwen3.8-27b",
@@ -134,6 +140,88 @@ def test_proxy_payload_captures_effective_zdr_defaults_and_alternatives(
         ("tier_default", "anthropic/claude-opus-5"),
         ("model_alternative", "qwen/qwen3.8-2.4t-a95b"),
     ]
+
+
+def test_proxy_payload_keeps_ignored_request_out_of_effective_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.direct_model = "claude-opus-5"
+    provider = SimpleNamespace(
+        tiers={"sonnet": "openai/gpt-5.4", "opus": "openai/gpt-5.5"},
+        model_alternatives={},
+        allow_non_zdr=False,
+        zdr_fallbacks={},
+    )
+    proxy = SimpleNamespace(
+        preferred_provider="litellm",
+        get_provider=lambda _provider: provider,
+        default_tier="sonnet",
+        active_template="litellm-openai",
+        backend="litellm",
+        wire_shape="openai_translated",
+    )
+    monkeypatch.setattr(ops, "load_config", lambda **_kwargs: SimpleNamespace(proxy=proxy))
+
+    payload = ops.build_claude_routing_payload(
+        state,
+        effective_template="litellm-openai",
+        runtime_base_url="http://localhost:8085",
+        proxy_id="openai-1",
+        applied_direct_model=None,
+    )
+
+    assert payload["requested_model"] == "claude-opus-5"
+    assert payload["selected_tier"] is None
+    assert payload["selected_model"] is None
+
+
+def test_anthropic_passthrough_records_applied_client_model_not_tier_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.direct_model = "claude-opus-4-6"
+    provider = SimpleNamespace(
+        tiers={"sonnet": "claude-sonnet-5", "opus": "claude-opus-5"},
+        model_alternatives={},
+        allow_non_zdr=False,
+        zdr_fallbacks={},
+    )
+    proxy = SimpleNamespace(
+        preferred_provider="anthropic",
+        get_provider=lambda _provider: provider,
+        default_tier="sonnet",
+        active_template="anthropic-passthrough",
+        backend="anthropic",
+        wire_shape="anthropic_passthrough",
+    )
+    monkeypatch.setattr(ops, "load_config", lambda **_kwargs: SimpleNamespace(proxy=proxy))
+
+    payload = ops.build_claude_routing_payload(
+        state,
+        effective_template="anthropic-passthrough",
+        runtime_base_url="http://localhost:8096",
+        proxy_id="anthropic-1",
+        applied_direct_model=resolve_direct_model_pin("claude-opus-4-6"),
+    )
+
+    assert payload["requested_model"] == "claude-opus-4-6"
+    assert payload["selected_tier"] == "opus"
+    assert payload["selected_model"] == "claude-opus-4-6"
+    assert payload["tier_mappings"]["opus"] == "claude-opus-5"
+    assert payload["route"]["wire_shape"] == "anthropic_passthrough"
+
+    event = new_routing_event(
+        state,
+        event_type=ROUTING_COMMIT_EVENT,
+        run_id=new_root_run_identity().run_id,
+        operation="start",
+        payload=payload,
+    )
+
+    assert event.payload == payload
 
 
 @pytest.mark.parametrize("launch_mode", ["host", "sidecar"])
@@ -185,6 +273,8 @@ def test_custom_payload_stores_only_a_secret_free_origin_fingerprint(
     tmp_path: Path,
 ) -> None:
     _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.direct_model = "claude-opus-5"
 
     payload = ops.build_claude_routing_payload(
         state,
@@ -195,6 +285,9 @@ def test_custom_payload_stores_only_a_secret_free_origin_fingerprint(
 
     assert payload["route"]["kind"] == "custom"
     assert payload["route"]["custom_route_fingerprint"] == ops.custom_route_fingerprint("https://example.com")
+    assert payload["requested_model"] == "claude-opus-5"
+    assert payload["selected_tier"] is None
+    assert payload["selected_model"] is None
     assert "secret" not in repr(payload)
     assert "private" not in repr(payload)
 

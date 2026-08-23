@@ -20,6 +20,7 @@ from typing import Any, Protocol
 from forge.core.models.direct_model import (
     apply_direct_model_env,
     apply_proxy_context_model_defaults,
+    resolve_direct_model_pin,
 )
 from forge.core.reactive.env import (
     FORGE_FORGE_ROOT_VAR,
@@ -1563,7 +1564,7 @@ def _run_host_claude_session(
         proxy_cost_baseline_started_at=(_proxy_cost_baseline.started_at if _proxy_cost_baseline else None),
     )
 
-    effective_direct_model: str | None = None
+    applied_direct_model = None
     if runtime_base_url is None:
         from forge.runtime_config import get_default_direct_model
 
@@ -1572,10 +1573,12 @@ def _run_host_claude_session(
         error = apply_direct_model_env(env_vars, effective_direct_model)
         if error:
             raise ForgeOpError(error)
+        applied_direct_model = resolve_direct_model_pin(effective_direct_model) if effective_direct_model else None
     elif manifest.intent.launch and manifest.intent.launch.direct_model and proxy_id:
-        error = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
-        if error:
-            raise ForgeOpError(error)
+        application = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
+        if application.error:
+            raise ForgeOpError(application.error)
+        applied_direct_model = application.pin
 
     invoke_kwargs: dict[str, Any] = {
         "session_id": session_id,
@@ -1597,7 +1600,7 @@ def _run_host_claude_session(
         effective_template=effective_template,
         runtime_base_url=runtime_base_url,
         proxy_id=proxy_id,
-        effective_direct_model=effective_direct_model,
+        applied_direct_model=applied_direct_model,
     )
     commit_launch_routing(
         store=store,

@@ -18,6 +18,7 @@ from forge.core.models.model_practices import (
     validate_route_scope_tags,
 )
 from forge.core.models.model_reference import normalize_model_reference
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, VALID_WIRE_SHAPES
 
 from .events import (
     SessionEvent,
@@ -51,7 +52,8 @@ ROUTING_PAYLOAD_FIELDS = frozenset(
         "marking_snapshots",
     }
 )
-ROUTE_FIELDS = frozenset({"kind", "backend_id", "proxy_id", "template", "custom_route_fingerprint"})
+ROUTE_FIELDS = frozenset({"kind", "backend_id", "proxy_id", "template", "custom_route_fingerprint", "wire_shape"})
+LEGACY_ROUTE_FIELDS = ROUTE_FIELDS - {"wire_shape"}
 MARKING_SNAPSHOT_FIELDS = frozenset({"slot", "tier", "request_model", "route_model", "canonical_model", "declaration"})
 BILLING_MODES = frozenset(
     {
@@ -180,12 +182,22 @@ def derive_routing_history(forge_root: str | Path, state: SessionState) -> Routi
 
 def validate_routing_payload(event_type: str, payload: dict[str, Any]) -> None:
     """Validate the exact route payload shared unchanged by commit and abort."""
-    _validate_routing_payload(event_type, payload, verify_catalog_normalization=True)
+    _validate_routing_payload(
+        event_type,
+        payload,
+        verify_catalog_normalization=True,
+        allow_legacy_wire_shape=False,
+    )
 
 
 def _validate_historical_routing_payload(event_type: str, payload: dict[str, Any]) -> None:
     """Validate immutable payload structure without reinterpreting the launch catalog."""
-    _validate_routing_payload(event_type, payload, verify_catalog_normalization=False)
+    _validate_routing_payload(
+        event_type,
+        payload,
+        verify_catalog_normalization=False,
+        allow_legacy_wire_shape=True,
+    )
 
 
 def _validate_routing_payload(
@@ -193,6 +205,7 @@ def _validate_routing_payload(
     payload: dict[str, Any],
     *,
     verify_catalog_normalization: bool,
+    allow_legacy_wire_shape: bool,
 ) -> None:
     if event_type not in ROUTING_EVENT_TYPES:
         raise ValueError(f"unknown routing event type {event_type!r}")
@@ -200,13 +213,17 @@ def _validate_routing_payload(
     route = payload["route"]
     if not isinstance(route, dict):
         raise ValueError("route must be an object")
-    _require_exact_fields(route, ROUTE_FIELDS, "route")
+    if not (allow_legacy_wire_shape and set(route) == LEGACY_ROUTE_FIELDS):
+        _require_exact_fields(route, ROUTE_FIELDS, "route")
     kind = route["kind"]
     if kind not in ROUTE_KINDS:
         raise ValueError(f"route.kind must be one of {sorted(ROUTE_KINDS)}")
 
     for field in ("backend_id", "proxy_id", "template", "custom_route_fingerprint"):
         _optional_string(route[field], f"route.{field}")
+    wire_shape = route.get("wire_shape")
+    if wire_shape is not None and wire_shape not in VALID_WIRE_SHAPES:
+        raise ValueError(f"route.wire_shape must be null or one of {sorted(VALID_WIRE_SHAPES)}")
     for field in ("requested_model", "selected_model", "default_tier", "direct_model"):
         _optional_string(payload[field], field)
     selected_tier = payload["selected_tier"]
@@ -237,15 +254,28 @@ def _validate_routing_payload(
 
 def validate_routing_event(event: SessionEvent) -> None:
     """Validate routing-specific envelope and route-kind/runtime invariants."""
-    _validate_routing_event(event, verify_catalog_normalization=True)
+    _validate_routing_event(
+        event,
+        verify_catalog_normalization=True,
+        allow_legacy_wire_shape=False,
+    )
 
 
 def _validate_historical_routing_event(event: SessionEvent) -> None:
     """Validate historical invariants without applying the current model catalog."""
-    _validate_routing_event(event, verify_catalog_normalization=False)
+    _validate_routing_event(
+        event,
+        verify_catalog_normalization=False,
+        allow_legacy_wire_shape=True,
+    )
 
 
-def _validate_routing_event(event: SessionEvent, *, verify_catalog_normalization: bool) -> None:
+def _validate_routing_event(
+    event: SessionEvent,
+    *,
+    verify_catalog_normalization: bool,
+    allow_legacy_wire_shape: bool,
+) -> None:
     if event.event_type not in ROUTING_EVENT_TYPES:
         raise SessionEventValidationError(f"unknown routing event type {event.event_type!r}", field="event_type")
     if event.origin_surface != "launcher":
@@ -269,7 +299,11 @@ def _validate_routing_event(event: SessionEvent, *, verify_catalog_normalization
     elif kind == "direct":
         _require_direct(event, verify_catalog_normalization=verify_catalog_normalization)
     elif kind == "proxy":
-        _require_proxy(event, verify_catalog_normalization=verify_catalog_normalization)
+        _require_proxy(
+            event,
+            verify_catalog_normalization=verify_catalog_normalization,
+            allow_legacy_wire_shape=allow_legacy_wire_shape,
+        )
     else:
         _require_custom(event, verify_catalog_normalization=verify_catalog_normalization)
 
@@ -349,6 +383,8 @@ def _require_direct(event: SessionEvent, *, verify_catalog_normalization: bool) 
     payload = event.payload
     route = payload["route"]
     _all_none(route, ("backend_id", "proxy_id", "template", "custom_route_fingerprint"))
+    if route.get("wire_shape") is not None:
+        raise SessionEventValidationError("direct route wire_shape must be null", field="payload")
     if payload["tier_mappings"] or payload["model_alternatives"]:
         raise SessionEventValidationError("direct route maps must be empty", field="payload")
     if payload["default_tier"] is not None:
@@ -377,9 +413,17 @@ def _require_direct(event: SessionEvent, *, verify_catalog_normalization: bool) 
         )
 
 
-def _require_proxy(event: SessionEvent, *, verify_catalog_normalization: bool) -> None:
+def _require_proxy(
+    event: SessionEvent,
+    *,
+    verify_catalog_normalization: bool,
+    allow_legacy_wire_shape: bool,
+) -> None:
     payload = event.payload
     route = payload["route"]
+    wire_shape = route.get("wire_shape")
+    if wire_shape is None and ("wire_shape" in route or not allow_legacy_wire_shape):
+        raise SessionEventValidationError("proxy route requires wire_shape", field="payload")
     if not route["template"] or not payload["default_tier"] or not payload["tier_mappings"]:
         raise SessionEventValidationError(
             "proxy route requires template, default tier, and tier mappings",
@@ -403,14 +447,21 @@ def _require_proxy(event: SessionEvent, *, verify_catalog_normalization: bool) -
     if requested is None:
         if selected_tier is not None or payload["selected_model"] is not None:
             raise SessionEventValidationError("proxy selection requires requested_model", field="payload")
+    elif selected_tier is None:
+        if payload["selected_model"] is not None:
+            raise SessionEventValidationError(
+                "ignored proxy request must not select a model",
+                field="payload",
+            )
     else:
-        if selected_tier is None:
-            raise SessionEventValidationError("proxy requested_model requires selected_tier", field="payload")
-        expected_model = payload["model_alternatives"].get(selected_tier, {}).get(requested)
-        expected_model = expected_model or payload["tier_mappings"].get(selected_tier)
+        if wire_shape == ANTHROPIC_PASSTHROUGH:
+            expected_model = requested
+        else:
+            expected_model = payload["model_alternatives"].get(selected_tier, {}).get(requested)
+            expected_model = expected_model or payload["tier_mappings"].get(selected_tier)
         if expected_model is None or payload["selected_model"] != expected_model:
             raise SessionEventValidationError(
-                "proxy selected_model does not match the effective mapping",
+                "proxy selected_model does not match the effective route",
                 field="payload",
             )
 
@@ -424,6 +475,8 @@ def _require_custom(event: SessionEvent, *, verify_catalog_normalization: bool) 
     ):
         raise SessionEventValidationError("custom route requires a fingerprint", field="payload")
     _all_none(route, ("backend_id", "proxy_id", "template"))
+    if route.get("wire_shape") is not None:
+        raise SessionEventValidationError("custom route wire_shape must be null", field="payload")
     if (
         payload["default_tier"] is not None
         or payload["direct_model"] is not None
@@ -438,11 +491,8 @@ def _require_custom(event: SessionEvent, *, verify_catalog_normalization: bool) 
     _require_canonical_field(payload, "requested_model", verify=verify_catalog_normalization)
     if payload["selected_model"] is not None:
         raise SessionEventValidationError("custom selected_model must be null", field="payload")
-    if (payload["requested_model"] is None) != (payload["selected_tier"] is None):
-        raise SessionEventValidationError(
-            "custom selected_tier must describe an explicit requested_model",
-            field="payload",
-        )
+    if payload["selected_tier"] is not None:
+        raise SessionEventValidationError("custom selected_tier must be null", field="payload")
 
 
 def _require_runtime_native(event: SessionEvent) -> None:
@@ -451,6 +501,8 @@ def _require_runtime_native(event: SessionEvent) -> None:
     if event.runtime != "codex":
         raise SessionEventValidationError("runtime_native route requires codex runtime", field="runtime")
     _all_none(route, ("backend_id", "proxy_id", "template", "custom_route_fingerprint"))
+    if route.get("wire_shape") is not None:
+        raise SessionEventValidationError("runtime_native wire_shape must be null", field="payload")
     for field in (
         "requested_model",
         "selected_tier",

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import forge.session.worktree as worktree_pkg
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.session_routing import build_claude_routing_payload
 from forge.core.reactive.env import new_root_run_identity
 from forge.session import IndexStore, SessionManager, SessionStore
@@ -52,7 +53,7 @@ def _start_marked(
             effective_template=None,
             runtime_base_url=None,
             proxy_id=None,
-            effective_direct_model="claude-opus-5",
+            applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
         ),
     )
     routing_journal = append_routing_event(root, routing)

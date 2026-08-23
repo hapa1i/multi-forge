@@ -37,13 +37,15 @@ resolve sessions by identity and never scan. Adoption also inverts transcript ow
 `delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
 session. Relocated transcripts use the same ownership scan; a cached owner remains conservatively protected, while a
 cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
-cleanup. Adoption resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root
-with a symlink is supported; a descendant destination that escapes the resolved root or aliases the native transcript is
-refused, and rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
-`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
-sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
-mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
-"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
+cleanup. The final negative scan and unlink share the global index-publication lock, so a sibling manifest cannot be
+published between the ownership decision and removal. Adoption resolves the `.forge/artifacts` root before enforcing
+destination containment, so relocating that root with a symlink is supported; a descendant destination that escapes the
+resolved root or aliases the native transcript is refused, and rollback only unlinks an artifact created by the current
+copy attempt. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to
+correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a
+non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start
+session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence
+(see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
@@ -263,8 +265,8 @@ exits 1 with ceremony/delete-and-retry guidance. Staging is one-shot: the staged
 resume turns defensively clear leftovers. The cross-runtime hop is `bridge_session_to_codex`
 (`core/ops/codex_bridge.py`): parent session -> ai-curated Codex-targeted transfer -> body prepended via
 `compose_codex_initial_message` (or staged via `compose_codex_handoff_context` in hook mode) ->
-`CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id` (§3.14) — a UI-agnostic command-core
-op.
+`CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id`
+([telemetry design §3.14](design_telemetry.md#314-cost-tracking-and-spend-caps)) — a UI-agnostic command-core op.
 
 **Codex session lifecycle.** The headless frontend over it is
 **`forge session start <name> --runtime codex --resume-from <parent> --task "…"`** (`core/ops/codex_session.py`): it
@@ -441,13 +443,17 @@ projects its `{event_id, run_id}` into `confirmed.route_commit`, before invoking
 the yielded authority transaction body, after `launch_preflight` and `run_started`; unmarked launches use the same
 serialized boundary without authority events. Both journals and the projection reuse the one root `RunIdentity`.
 
-Routing append failure compensates any authority journal already touched. Projection failure compensates in reverse
-touch order: the exact immutable route payload is appended as same-run `launch_aborted:route_projection_failed`, then
-authority receives its same-run abort. Every compensation is attempted and secondary failures are aggregated without
-invoking the child. A landed authority abort supersedes `run_started`, active-state clear is attempted, and no
-`run_ended` is appended for that pre-invocation failure. If both the authority abort and active-state clear fail,
-diagnostics disclose the remaining temporary ambiguity. Spawn or child failure after a successful projection retains the
-effective route; authority records its normal terminal outcome.
+Routing construction, validation, or append failure compensates any authority journal already touched. Projection
+failure compensates in reverse touch order: the exact immutable route payload is appended as same-run
+`launch_aborted:route_projection_failed`, then authority receives its same-run abort. Every compensation is attempted
+and secondary failures are aggregated without invoking the child. A landed authority abort supersedes `run_started`,
+active-state clear is attempted, and no `run_ended` is appended for that pre-invocation failure. If both the authority
+abort and active-state clear fail, diagnostics disclose the remaining temporary ambiguity. Spawn or child failure after
+a successful projection retains the effective route, session, transfer snapshot, worktree, and any completed child work;
+authority records its normal terminal outcome. Claude routing provenance records only an actually applied model pin as
+`selected_model`: an ignored request remains visible as `requested_model`, and Anthropic passthrough records the
+canonical unchanged client model rather than substituting a tier default. Proxy route payloads carry `wire_shape` as the
+durable discriminator for that validation; legacy events without the field retain translated-mapping validation.
 
 ### 3.10 Hook handlers
 
@@ -706,7 +712,7 @@ subsequent drain.
 
 ## H. Transfer Context Schema
 
-Extracted from [design.md §3.9](design_sessions.md#39-session-resume-context-management). The transfer document is a
+The transfer contract builds on [session design §3.9](#39-session-resume-context-management). The transfer document is a
 stable, frontmatter-backed Markdown contract produced by `assemble_transfer_context` (`src/forge/session/transfer.py`).
 
 ### H.1 Frontmatter (child-agnostic)
@@ -782,7 +788,7 @@ is planned. A future optional import/export bridge could use the existing schema
 
 ## I. Codex Runtime Reference
 
-Extracted from [design.md §3.9](design_sessions.md#39-session-resume-context-management) and
+This reference builds on [session design §3.9](#39-session-resume-context-management) and
 [design_workflows.md §3.5](design_workflows.md#35-workflow-runners). Lifecycle narrative (headless turns, interactive
 TUI sessions, delivery modes, post-exit reconciliation) remains in design.md.
 

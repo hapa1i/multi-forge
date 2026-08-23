@@ -78,9 +78,11 @@ def test_passthrough_env_application_populates_claude_vars(model: str, expected:
     env_vars: dict[str, str] = {}
 
     with patch("forge.config.loader.load_proxy_instance_config", return_value=_passthrough_cfg()):
-        error = _apply_direct_model_env_if_supported(env_vars, _PROXY_ID, model)
+        application = _apply_direct_model_env_if_supported(env_vars, _PROXY_ID, model)
 
-    assert error is None
+    assert application.error is None
+    assert application.pin is not None
+    assert application.pin.canonical_model == model
     assert env_vars == {
         "ANTHROPIC_MODEL": tier,
         f"ANTHROPIC_DEFAULT_{tier.upper()}_MODEL": env_model,

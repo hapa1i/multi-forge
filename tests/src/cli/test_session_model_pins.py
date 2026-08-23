@@ -133,11 +133,12 @@ def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> No
     )
 
     env_vars: dict[str, str] = {}
-    error = model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
+    application = model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
 
-    assert error is not None
-    assert "Could not load proxy config for 'legacy-gemini'" in error
-    assert "Unsupported proxy provider" in error
+    assert application.pin is None
+    assert application.error is not None
+    assert "Could not load proxy config for 'legacy-gemini'" in application.error
+    assert "Unsupported proxy provider" in application.error
     assert env_vars == {}  # No env applied for an unloadable proxy
 
 
@@ -165,10 +166,36 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
     )
 
     env_vars: dict[str, str] = {}
-    error = model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
+    application = model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
 
-    assert error is not None
-    assert "Malformed proxy configuration" in error
+    assert application.pin is None
+    assert application.error is not None
+    assert "Malformed proxy configuration" in application.error
+    assert env_vars == {}
+
+
+def test_apply_direct_model_env_reports_unsupported_proxy_pin_as_not_applied() -> None:
+    from forge.config.schema import ProxyInstanceConfig, TierModels
+    from forge.session import model_pin
+
+    config = ProxyInstanceConfig(
+        proxy_format=1,
+        template="litellm-openai",
+        template_digest="abc",
+        provider="litellm",
+        proxy_endpoint="http://localhost:8085",
+        port=8085,
+        upstream_base_url="https://api.openai.com/v1",
+        tiers=TierModels(haiku="openai/gpt-5.4-mini", sonnet="openai/gpt-5.4", opus="openai/gpt-5.5"),
+        model_alternatives={},
+    )
+    env_vars: dict[str, str] = {}
+
+    with patch("forge.config.loader.load_proxy_instance_config", return_value=config):
+        application = model_pin._apply_direct_model_env_if_supported(env_vars, "openai-1", "claude-opus-5")
+
+    assert application.error is None
+    assert application.pin is None
     assert env_vars == {}
 
 

@@ -42,8 +42,17 @@ from forge.session.exceptions import (
     UuidAlreadyBoundError,
 )
 from forge.session.index import IndexStore
-from forge.session.models import CodexConfirmed, SessionState
-from tests.fixtures.session_state import remove_index_row_only, seed_row_only_session
+from forge.session.models import (
+    CodexConfirmed,
+    Derivation,
+    SessionIndexEntry,
+    SessionState,
+)
+from tests.fixtures.session_state import (
+    publish_session,
+    remove_index_row_only,
+    seed_row_only_session,
+)
 
 pytestmark = pytest.mark.regression
 
@@ -709,6 +718,61 @@ class TestDeleteCreateCoordination:
             is True
         )
         assert blocked == ["blocked"], f"a concurrent create must not slip in, got {blocked}"
+
+    def test_resource_cleanup_blocks_publication_between_owner_scan_and_unlink(self, tmp_path: Path) -> None:
+        """Relocated-transcript ownership and unlink share publication authority.
+
+        A native-relocate sibling publishes its manifest before copying the
+        transcript. If deletion wins the lock, publication waits until after the
+        unlink and then recreates the copy; if publication wins, the owner is in
+        the supplied snapshot. There is no manifest-present/transcript-missing
+        outcome.
+        """
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("victim", worktree_path=str(project), direct=True)
+
+        transcript = project / "relocated-parent.jsonl"
+        transcript.write_text("old copy\n")
+        sibling = _state("sibling", project)
+        sibling.confirmed.derivation = Derivation(
+            parent_session="parent",
+            resume_mode="native-relocate",
+            relocated_parent_session_id=_UUID,
+        )
+        sibling_store = SessionStore(str(project), "sibling")
+        attempted = threading.Event()
+        published = threading.Event()
+        failures: list[BaseException] = []
+
+        def _publish_then_copy() -> None:
+            attempted.set()
+            try:
+                publish_session(index, sibling, project, forge_root=project)
+                transcript.write_text("new sibling copy\n")
+                published.set()
+            except BaseException as exc:  # noqa: BLE001 - surfaced below
+                failures.append(exc)
+
+        publisher = threading.Thread(target=_publish_then_copy)
+
+        def _scan_then_unlink(entries: list[tuple[str, SessionIndexEntry]]) -> None:
+            assert [name for name, _entry in entries] == ["victim"]
+            publisher.start()
+            assert attempted.wait(timeout=5)
+            publisher.join(timeout=0.25)
+            assert publisher.is_alive(), "publication must block until the unlink decision completes"
+            transcript.unlink()
+
+        index.run_session_entries_txn(_scan_then_unlink)
+        publisher.join(timeout=30)
+
+        assert not publisher.is_alive()
+        assert failures == []
+        assert published.is_set()
+        assert sibling_store.exists()
+        assert transcript.read_text() == "new sibling copy\n"
 
     def test_ordinary_delete_with_its_manifest_still_present_proceeds(self, tmp_path: Path) -> None:
         """Non-worktree deletion never opens the window, so the guard is inert."""

@@ -208,7 +208,7 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
 
     Side effect: creates the host audit/, costs/, usage/, and telemetry/ dirs (Docker bind sources
     must exist before `docker run`). Narrow mounts (NOT all of ~/.forge, preserving the
-    design.md §7 isolation rationale):
+    design_runtime.md §7 isolation rationale):
     - per-proxy config dir read-only, so the in-container server reads the proxy.yaml
       intercept/audit overlay.
     - host telemetry/ read-write, so the upstream/downstream ledgers and durable cap

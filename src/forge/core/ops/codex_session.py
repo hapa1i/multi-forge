@@ -209,8 +209,9 @@ def start_codex_session(
 
     A failed Codex *turn* keeps the session (its outcome is on ``result.codex``,
     mirroring the bridge stance). Explicit deletion during the turn remains terminal
-    and returns the completed result with a warning; any other unexpected raise after
-    creation rolls the session and this run's snapshot back, then re-raises.
+    and returns the completed result with a warning. Unexpected failures before route
+    projection compensate the created state; once projection succeeds, child and
+    post-child failures retain the session, snapshot, and worktree for inspection.
     """
     forge_root = ctx.forge_root
     if forge_root is None:
@@ -292,6 +293,12 @@ def start_codex_session(
         )
         raise
 
+    routing_projected = False
+
+    def _mark_routing_projected() -> None:
+        nonlocal routing_projected
+        routing_projected = True
+
     try:
         return _run_first_codex_turn(
             ctx=ctx,
@@ -311,8 +318,17 @@ def start_codex_session(
             output_root=output_root,
             warnings=warnings,
             context_delivery=context_delivery,
+            on_routing_projected=_mark_routing_projected,
         )
     except Exception:
+        if routing_projected:
+            # Hook delivery is one-shot even when the child boundary raises. Keep
+            # every durable launch artifact, but never let an undelivered start
+            # context leak into a later resume turn.
+            if context_delivery == "hook":
+                clear_pending_context(SessionStore(str(child_forge_root), name).session_dir)
+            raise
+
         # Past the guard, any snapshot at this key was written by this run.
         _rollback_created_session(
             manager,
@@ -344,6 +360,7 @@ def _run_first_codex_turn(
     output_root: Path | None,
     warnings: list[str],
     context_delivery: ContextDeliveryMode,
+    on_routing_projected: Callable[[], None],
 ) -> CodexSessionStartResult:
     """The post-creation half of ``start_codex_session`` (the caller owns rollback)."""
     store = manager.get_session_store(name, forge_root=str(child_forge_root))
@@ -370,6 +387,7 @@ def _run_first_codex_turn(
                 payload=routing_payload,
                 authority_attempt=authority_attempt,
             )
+            on_routing_projected()
 
         bridge = bridge_session_to_codex(
             ctx=ctx,

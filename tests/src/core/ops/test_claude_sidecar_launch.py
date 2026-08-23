@@ -92,6 +92,7 @@ def _proxy_routing_payload(*, proxy_id: str | None = None) -> dict[str, Any]:
             "proxy_id": proxy_id,
             "template": "litellm-openai",
             "custom_route_fingerprint": None,
+            "wire_shape": "openai_translated",
         },
         "requested_model": None,
         "selected_tier": None,

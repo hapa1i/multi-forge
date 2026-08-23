@@ -147,7 +147,7 @@ when no `.claude/` directory exists.
 - **Cross-project resume** (transfer mode only): allowed within the same logical repo
   (`parent_project_root == child.project_root`). Reads parent artifacts by absolute path via `parent_forge_root` in the
   derivation record. **Native resume** (`--resume-mode native`) requires the same `forge_root` -- Claude Code cannot
-  `--resume` across CWD boundaries (see §3.9).
+  `--resume` across CWD boundaries (see [session design §3.9](design_sessions.md#39-session-resume-context-management)).
 
 **Exception:** `forge claude start` (bare launcher) works without `.forge/`. It does not create session state, does not
 set `FORGE_SESSION`, and session-specific hooks/status behavior is a no-op. See §3.4.
@@ -166,7 +166,8 @@ at `<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to 
 `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. Transfer
 trades the full conversation for a runtime-neutral, **user-editable** view: it is the only substrate that crosses
 worktree, project, and (later) runtime boundaries, and the user can inspect and prune what propagates — something native
-`--resume` structurally cannot offer (see §3.9).
+`--resume` structurally cannot offer (see
+[session design §3.9](design_sessions.md#39-session-resume-context-management)).
 
 The `--strategy` knob controls fidelity: `minimal` (lineage pointer) → `structured` (conversation skeleton, default) →
 `full` (complete transcript) → `ai-curated` (LLM-selected highlights). `--inline-plan` embeds the approved plan content
@@ -392,7 +393,8 @@ To avoid writer conflicts:
     (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream (headless), receipt files, and
     filesystem discovery. Thread/rollout/auth/`last_run_at` refresh per turn; `context_delivery` is a start-turn
     delivery fact resume never rewrites. The `codex-session-start` hook's only writes are small receipt files under the
-    session directory — `context-receipt.json` (staged-handoff delivery, §3.9) or `observation-receipt.json`
+    session directory — `context-receipt.json` (staged-handoff delivery,
+    [session design §3.9](design_sessions.md#39-session-resume-context-management)) or `observation-receipt.json`
     (nothing-staged turns — interactive thread capture) — and the CLI reconciles them into `confirmed.codex` after the
     turn, so the manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC
     key posture of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes
@@ -570,8 +572,9 @@ multi-forge/
 - **Proxy mode**: Claude is configured to send requests to a proxy base URL (`ANTHROPIC_BASE_URL`).
   - The proxy (template ↔ base_url) is the **routing identity**.
   - Status/other tools may query the proxy (`GET /`) for tier→model mapping and context windows.
-  - The optional always-on audit/intercept chokepoint (observe or control outbound traffic, §7.x) is **proxy-mode only**
-    — direct mode has no wire to observe.
+  - The optional always-on audit/intercept chokepoint (observe or control outbound traffic,
+    [runtime design §7.x](design_runtime.md#7x-optional-always-on-proxy-audit-and-control)) is **proxy-mode only** —
+    direct mode has no wire to observe.
 - **No-proxy mode**: Claude talks to Anthropic directly.
   - Sessions, worktrees, hooks, and overrides still work (for session-owned fields).
   - `forge session start` and `forge session incognito` default to direct mode. Use `--proxy` for proxy routing.
@@ -592,7 +595,8 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Validates preconditions (proxy healthy, session file exists)
 - Records `confirmed.proxy` at session start when proxy mode is active
 
-**Codex-runtime sessions** (`forge session start --runtime codex`, see §3.9) use the same session-managed path, but
+**Codex-runtime sessions** (`forge session start --runtime codex`, see
+[session design §3.9](design_sessions.md#39-session-resume-context-management)) use the same session-managed path, but
 every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs `codex` turns
 direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`) — headless `codex exec` with `--task`, the foreground `codex` TUI
 without it — Claude-only flags are rejected rather than ignored, and `_launch_claude_for_session` refuses codex

@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Callable
 
 import pytest
 
-from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session import (
+    IndexStore,
+    SessionIndexEntry,
+    SessionManager,
+    SessionStore,
+    create_session_state,
+)
 from forge.session.claude import cleanup as cleanup_module
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import Derivation
@@ -89,9 +96,22 @@ def _spy_reference_scans(
     calls: list[tuple[str, tuple[str, ...]]] = []
     original = manager._find_shared_transcript_sessions
 
-    def _record(project_root: str, session_ids: list[str], **kwargs: str) -> dict[str, list[str]]:
+    def _record(
+        project_root: str,
+        session_ids: list[str],
+        *,
+        exclude_name: str,
+        exclude_forge_root: str,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
+    ) -> dict[str, list[str]]:
         calls.append((project_root, tuple(session_ids)))
-        return original(project_root, session_ids, **kwargs)
+        return original(
+            project_root,
+            session_ids,
+            exclude_name=exclude_name,
+            exclude_forge_root=exclude_forge_root,
+            sessions=sessions,
+        )
 
     monkeypatch.setattr(manager, "_find_shared_transcript_sessions", _record)
     return calls

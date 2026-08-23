@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -351,6 +352,30 @@ def test_malformed_active_registry_is_an_actionable_read_only_error(
         )
 
     assert (active_path.read_bytes(), active_path.stat().st_mtime_ns) == before
+
+
+def test_unrepresentable_active_pid_is_an_actionable_read_only_error(temp_env: Path) -> None:
+    _seed(temp_env)
+    active = ActiveSessionStore()
+    active.upsert_session(
+        "planner",
+        worktree_path=str(temp_env),
+        launch_mode="host",
+        launcher_pid=os.getpid(),
+        forge_root=str(temp_env),
+    )
+    data = json.loads(active.index_path.read_text())
+    next(iter(data["sessions"].values()))["launcher_pid"] = 10**100
+    active.index_path.write_text(json.dumps(data), encoding="utf-8")
+    before = (active.index_path.read_bytes(), active.index_path.stat().st_mtime_ns)
+
+    with pytest.raises(ForgeOpError, match="active-session registry.*forge session list"):
+        ops.get_session_authority_report(
+            ctx=ExecutionContext.from_cwd(),
+            session_name="planner",
+        )
+
+    assert (active.index_path.read_bytes(), active.index_path.stat().st_mtime_ns) == before
 
 
 def test_malformed_history_is_a_read_error(temp_env: Path) -> None:

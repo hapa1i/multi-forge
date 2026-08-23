@@ -92,18 +92,34 @@ def markdown_links(path: Path) -> list[tuple[int, str]]:
     return links
 
 
-def tracked_markdown(root: Path) -> list[Path]:
-    """List Markdown files tracked by Git."""
+def candidate_files(root: Path) -> set[Path]:
+    """Return the files present in Git's candidate index state."""
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--", "*.md"],
+        ["git", "ls-files", "-z"],
         cwd=root,
         check=True,
         capture_output=True,
     )
-    return [root / item.decode() for item in result.stdout.split(b"\0") if item and (root / item.decode()).is_file()]
+    return {(root / item.decode()).resolve() for item in result.stdout.split(b"\0") if item}
 
 
-def audit_paths(root: Path, sources: list[Path]) -> list[LinkFailure]:
+def markdown_sources(root: Path, candidates: set[Path], supplied: list[Path]) -> list[Path]:
+    """Combine candidate Markdown files with existing supplied sources."""
+    sources = {path for path in candidates if path.suffix.lower() == ".md" and path.is_file()}
+    for path in supplied:
+        resolved = (root / path).resolve() if not path.is_absolute() else path.resolve()
+        if resolved.suffix.lower() == ".md" and resolved.is_file():
+            sources.add(resolved)
+    return sorted(sources)
+
+
+def _target_in_candidate_state(target: Path, candidates: set[Path]) -> bool:
+    if target in candidates:
+        return True
+    return target.is_dir() and any(target in candidate.parents for candidate in candidates)
+
+
+def audit_paths(root: Path, sources: list[Path], candidates: set[Path]) -> list[LinkFailure]:
     """Validate local link targets and Markdown fragments for source files."""
     failures: list[LinkFailure] = []
     anchor_cache: dict[Path, set[str]] = {}
@@ -128,6 +144,9 @@ def audit_paths(root: Path, sources: list[Path]) -> list[LinkFailure]:
             if not target.exists():
                 failures.append(LinkFailure(source, line, raw_target, "target does not exist"))
                 continue
+            if not _target_in_candidate_state(target, candidates):
+                failures.append(LinkFailure(source, line, raw_target, "target is not in candidate Git state"))
+                continue
             if parsed.fragment and target.suffix.lower() == ".md":
                 anchors = anchor_cache.setdefault(target, markdown_anchors(target))
                 fragment = unquote(parsed.fragment)
@@ -151,8 +170,9 @@ def main(argv: list[str] | None = None) -> int:
         text=True,
     )
     root = Path(root_result.stdout.strip()).resolve()
-    sources = [(root / path).resolve() for path in args.paths] if args.paths else tracked_markdown(root)
-    failures = audit_paths(root, sources)
+    candidates = candidate_files(root)
+    sources = markdown_sources(root, candidates, args.paths)
+    failures = audit_paths(root, sources, candidates)
     for failure in failures:
         source = failure.source.relative_to(root)
         print(f"{source}:{failure.line}: {failure.reason}: {failure.target}")

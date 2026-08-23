@@ -24,6 +24,9 @@ class TestIsPidAlive:
         # PID 99999999 is almost certainly not running
         assert is_pid_alive(99999999) is False
 
+    def test_unrepresentable_pid_is_not_alive(self) -> None:
+        assert is_pid_alive(10**100) is False
+
 
 class TestFindPidByPort:
     def test_success_returns_pid(self) -> None:

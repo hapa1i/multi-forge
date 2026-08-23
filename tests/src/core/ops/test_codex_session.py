@@ -637,8 +637,7 @@ def _init_git_repo(repo: Path) -> None:
 
 
 class TestStartCodexSessionGC:
-    """Checklist row 4: the start op leaves no transfer orphans, owns its snapshot
-    under the child's indexed forge_root, and rolls back cleanly for retry."""
+    """The start op owns transfer artifacts and respects the route-projection boundary."""
 
     def test_start_leaves_zero_transfer_orphans(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from forge.core.ops.gc import collect_clean_report
@@ -652,32 +651,92 @@ class TestStartCodexSessionGC:
         assert transfer.count == 0
         assert transfer.items == []
 
-    def test_rollback_then_retry_assembles_fresh_snapshot(
+    def test_post_child_failure_retains_session_snapshot_and_dirty_worktree(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
+        _init_git_repo(proj)
         children = proj / ".forge" / "prev_sessions" / "planner" / "children"
 
-        with _codex_mocks():
+        def _write_child_output() -> None:
+            child = SessionManager().get_session("impl", forge_root=str(proj))
+            assert child.worktree is not None
+            (Path(child.worktree.path) / "completed-child-output.txt").write_text("completed\n")
+
+        with _codex_mocks(on_codex_spawn=_write_child_output):
             with patch(
                 "forge.core.ops.codex_session.find_rollout_path",
                 side_effect=RuntimeError("rollout scan failed"),
             ):
                 with pytest.raises(RuntimeError, match="rollout scan failed"):
-                    start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it")
+                    start_codex_session(
+                        ctx=ctx,
+                        name="impl",
+                        parent="planner",
+                        task="Build it",
+                        create_worktree=True,
+                    )
 
-            # Post-guard failure rolls back the session AND this run's snapshot.
-            assert not SessionStore(str(proj), "impl").exists()
-            assert not (children / "impl.md").exists()
-            assert not (children / "impl.notes.md").exists()
-
-            result = start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it")
-
-        assert result.codex.success
-        assert not any("stale" in w.lower() for w in result.warnings)
-        assert (children / "impl.md").is_file()
         state = SessionManager().get_session("impl", forge_root=str(proj))
-        assert state.confirmed.derivation is not None
+        assert state.confirmed.route_commit is not None
+        assert state.worktree is not None
+        assert Path(state.worktree.path).is_dir()
+        assert (Path(state.worktree.path) / "completed-child-output.txt").read_text() == "completed\n"
+        assert (children / "impl.md").is_file()
+
+    def test_pre_projection_failure_rolls_back_session_snapshot_and_worktree(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _init_git_repo(proj)
+        children = proj / ".forge" / "prev_sessions" / "planner" / "children"
+        worktree = proj.parent / "project-impl"
+
+        with _codex_mocks():
+            with patch(
+                "forge.core.ops.codex_session.commit_launch_routing",
+                side_effect=RuntimeError("route projection failed"),
+            ):
+                with pytest.raises(RuntimeError, match="route projection failed"):
+                    start_codex_session(
+                        ctx=ctx,
+                        name="impl",
+                        parent="planner",
+                        task="Build it",
+                        create_worktree=True,
+                    )
+
+        assert not SessionStore(str(proj), "impl").exists()
+        assert not (children / "impl.md").exists()
+        assert not (children / "impl.notes.md").exists()
+        assert not worktree.exists()
+
+    def test_spawn_failure_after_projection_retains_session_and_clears_staged_context(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        with (
+            _codex_mocks(),
+            patch(
+                "forge.core.ops.codex_bridge.CodexHeadlessInvoker.run",
+                side_effect=RuntimeError("codex spawn failed"),
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="codex spawn failed"):
+                start_codex_session(
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    task="Build it",
+                    context_delivery="hook",
+                )
+
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.route_commit is not None
+        assert state.confirmed.codex is None
+        assert (proj / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md").is_file()
+        assert not pending_context_path(_session_dir(proj)).exists()
 
     def test_worktree_snapshot_owned_by_child_forge_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from forge.core.ops.gc import _detect_orphan_transfer_files
@@ -762,10 +821,10 @@ class TestCrossProjectNameScoping:
 
         with _codex_mocks():
             with patch(
-                "forge.core.ops.codex_session.find_rollout_path",
-                side_effect=RuntimeError("rollout scan failed"),
+                "forge.core.ops.codex_session.commit_launch_routing",
+                side_effect=RuntimeError("projection failed"),
             ):
-                with pytest.raises(RuntimeError, match="rollout scan failed"):
+                with pytest.raises(RuntimeError, match="projection failed"):
                     start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it")
 
         # OUR session rolled back (manifest + index entry gone)...

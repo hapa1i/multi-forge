@@ -30,6 +30,8 @@ def is_pid_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True
+    except (OverflowError, ValueError):
+        return False
 
 
 def find_pid_by_port(port: int) -> int | None:

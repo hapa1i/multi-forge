@@ -95,7 +95,8 @@ def _has_authoritative_route_truth(runtime: dict[str, Any]) -> bool:
         not isinstance(tier_mappings, dict)
         or not tier_mappings
         or not set(tier_mappings).issubset(_TIER_KEYS)
-        or _string_map(tier_mappings) != tier_mappings
+        or not all(isinstance(model, str) for model in tier_mappings.values())
+        or not any(tier_mappings.values())
     ):
         return False
     alternatives = runtime["model_alternatives"]
