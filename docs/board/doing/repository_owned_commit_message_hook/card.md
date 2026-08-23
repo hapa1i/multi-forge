@@ -4,6 +4,9 @@
 
 **Epic**: [`epic_daily_review_remediation_2026_08_23`](../epic_daily_review_remediation_2026_08_23/card.md)
 
+**Delivery**: Implemented in `5585f0f0` for [PR #243](https://github.com/hapa1i/multi-forge/pull/243); terminal closeout
+waits for merge.
+
 ## Goal
 
 Revive the unmerged work from closed PR #238 so Multi-Forge owns its commit-message normalization instead of depending

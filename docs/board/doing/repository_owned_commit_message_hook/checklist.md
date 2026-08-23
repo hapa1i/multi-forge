@@ -2,7 +2,8 @@
 
 Activation base: `effff0b4` (`main`, 2026-08-23). Source material: closed PR #238 (`c30ee67f`).
 
-Current focus: integrated verification.
+Current focus: review and merge [PR #243](https://github.com/hapa1i/multi-forge/pull/243); implementation and integrated
+verification are complete.
 
 ## Port and Correction
 
@@ -15,5 +16,11 @@ Current focus: integrated verification.
 ## Verification
 
 - [x] Prove default installation creates both Git hooks in an isolated repository.
-- [ ] Run focused normalizer/configuration tests and the integrated pre-commit suite.
-- [ ] Record the new PR rather than presenting closed PR #238 as shipped.
+- [x] Run focused normalizer/configuration tests and the integrated pre-commit suite.
+- [x] Record the new PR rather than presenting closed PR #238 as shipped.
+
+## Verification Evidence
+
+- The 23 focused normalizer and Markdown-hook tests pass, including both adjacent-inline regressions.
+- An isolated temporary repository installs and runs the real `commit-msg` hook before commit creation.
+- `make pre-commit` passes with the repository-owned mapping, script, and hook registration on the integrated head.

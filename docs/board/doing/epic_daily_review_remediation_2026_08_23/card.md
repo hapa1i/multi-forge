@@ -11,6 +11,7 @@ repository-owned commit-message hook from closed PR #238 with its known normaliz
 
 - Branch: `fix/daily-review-remediation`
 - Base: `effff0b4` (`main`, 2026-08-23)
+- Pull request: [#243](https://github.com/hapa1i/multi-forge/pull/243)
 - Integration owner: the single implementer executing this batch
 - Execution: sequential; no parallel writers
 - Order:
