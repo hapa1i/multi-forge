@@ -62,6 +62,11 @@ The session file has three sections:
 Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
 new writes omit it.
 
+Session manifests currently write schema v2. `forge.session.models::SCHEMA_VERSION` owns the writer version and
+`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1 and v2 on read; unknown versions remain errors. After a
+strict v1 validation, the reader projects the manifest to v2 in memory by adding only `intent.launch.model_route=null`
+when `intent.launch` exists. A read never rewrites the file. The next ordinary write emits a complete v2 manifest.
+
 `intent` and `overrides` are required objects. Missing `confirmed` defaults empty; when present, it must be an object.
 Other values are corruption, surfaced without rewriting.
 
@@ -85,10 +90,30 @@ launch:
   sidecar:
     mounts: [/data:/mnt/data:ro]
     image: my-dev-image:latest
+  model_route: null
 ```
 
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
+
+In schema v2, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral route
+selection:
+
+```yaml
+model_route:
+  requested_model: gpt-5.6-sol # canonical model-catalog id
+  selected_tier: opus # haiku | sonnet | opus
+  kind: proxy # direct | proxy
+  source_id: openrouter # canonical backend source; null for direct or manually constrained proxy routes
+```
+
+`requested_model` records user intent independently of transport. `source_id` records an automatically selected proxy
+source only when Forge can prove one; direct routes require `null`. `intent.launch.direct_model` remains the Claude Code
+execution pin, including an optional `[1m]` transport modifier, and `intent.proxy` remains the concrete proxy
+template/base URL. `forge.core.ops.session_model_routing` owns the pure transition that replaces `intent.proxy`,
+`intent.launch.direct_model`, and `intent.launch.model_route` together for a resolved route. Clearing neutral route
+intent alone does not change the legacy proxy or Claude-pin fields. Legacy creation, adoption, `default_direct_model`,
+and Codex paths do not synthesize `model_route`.
 
 **`intent.authority`**: optional, session-owned artifact authority:
 

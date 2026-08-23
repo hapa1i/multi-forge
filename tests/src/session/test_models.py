@@ -23,6 +23,7 @@ from forge.session.models import (
     LaunchIntent,
     MemoryIntent,
     MemoryWriterConfig,
+    ModelRouteIntent,
     ProxyIntent,
     SessionConfirmed,
     SessionIndex,
@@ -63,6 +64,48 @@ class TestProxyIntent:
         proxy = ProxyIntent(template="litellm-gemini", base_url="http://localhost:8084")
         assert proxy.template == "litellm-gemini"
         assert proxy.base_url == "http://localhost:8084"
+
+
+class TestModelRouteIntent:
+    def test_accepts_direct_and_proxy_source_contracts(self) -> None:
+        direct = ModelRouteIntent(
+            requested_model="claude-opus-5",
+            selected_tier="opus",
+            kind="direct",
+            source_id=None,
+        )
+        proxy = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="sonnet",
+            kind="proxy",
+            source_id="openrouter",
+        )
+        manual_proxy = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="opus",
+            kind="proxy",
+            source_id=None,
+        )
+
+        assert direct.source_id is None
+        assert proxy.source_id == "openrouter"
+        assert manual_proxy.source_id is None
+
+    def test_rejects_alias_unknown_tier_kind_and_invalid_source(self) -> None:
+        with pytest.raises(ValueError, match="must be canonical"):
+            ModelRouteIntent("openai/gpt-5.6-sol", "opus", "proxy", "openrouter")
+        with pytest.raises(ValueError, match="requested_model is unknown"):
+            ModelRouteIntent("ghost-model", "opus", "proxy", "openrouter")
+        with pytest.raises(ValueError, match="selected_tier must be one of"):
+            ModelRouteIntent("gpt-5.6-sol", "invalid", "proxy", "openrouter")
+        with pytest.raises(ValueError, match="kind must be 'direct' or 'proxy'"):
+            ModelRouteIntent("gpt-5.6-sol", "opus", "other", None)  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="requires source_id=null"):
+            ModelRouteIntent("claude-opus-5", "opus", "direct", "openrouter")
+        with pytest.raises(ValueError, match="canonical model-source id"):
+            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", "openrouter-openai")
+        with pytest.raises(ValueError, match="canonical model-source id"):
+            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", "unknown-source")
 
 
 class TestSessionIntent:
@@ -893,8 +936,8 @@ class TestConstants:
     """Test module constants."""
 
     def test_schema_version(self) -> None:
-        """SCHEMA_VERSION should be 1 for the first OSS manifest format."""
-        assert SCHEMA_VERSION == 1
+        """SCHEMA_VERSION should be 2 for neutral model-route intent."""
+        assert SCHEMA_VERSION == 2
 
     def test_index_version(self) -> None:
         """INDEX_VERSION should be 1."""

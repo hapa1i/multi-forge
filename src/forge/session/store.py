@@ -2,14 +2,15 @@
 
 Path: <forge_root>/.forge/sessions/<session_name>/forge.session.json
 
-Schema: v1 only (no schema-version upgrade).
+Schema: v1/v2 reads; writes emit v2.
 
 Session manifests are treated as a strict contract:
 - Only explicitly retired fields are stripped from the in-memory read payload
 - No unknown field preservation
 - Invalid manifests fail fast on read
 
-Writes always produce schema v1.
+V1 is upgraded in memory with ``intent.launch.model_route=null``. Reads never
+rewrite a manifest; the next ordinary write emits the complete v2 shape.
 
 Invariant: session names are unique within one forge root (enforced by
 IndexStore.create_session_txn). The directory name IS the session name.
@@ -42,7 +43,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -128,6 +129,18 @@ def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "
         )
 
 
+def upgrade_v1_manifest_for_read(data: dict[str, Any]) -> None:
+    """Project a validated v1 manifest into the current in-memory v2 shape."""
+
+    if data.get("schema_version") != 1:
+        return
+    intent = data.get("intent")
+    launch = intent.get("launch") if isinstance(intent, dict) else None
+    if isinstance(launch, dict):
+        launch["model_route"] = None
+    data["schema_version"] = SCHEMA_VERSION
+
+
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
 
 
@@ -208,8 +221,9 @@ class SessionStore:
     def read(self) -> SessionState:
         """Read and parse the session manifest.
 
-        Schema v1 only. Explicitly retired fields are stripped in memory before
-        strict decoding; other unknown fields are not preserved.
+        Schema v1 and v2 are accepted. V1 is projected to v2 in memory after
+        validation. Explicitly retired fields are stripped before strict decoding;
+        other unknown fields are not preserved.
 
         Raises:
             SessionFileNotFoundError: If manifest doesn't exist.
@@ -240,6 +254,7 @@ class SessionStore:
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
+        upgrade_v1_manifest_for_read(data)
 
         try:
             manifest = dacite.from_dict(
@@ -453,7 +468,7 @@ class SessionStore:
             self._write_unlocked(manifest)
 
     def _validate_data(self, data: dict[str, Any]) -> None:
-        """Validate required fields for schema v1.
+        """Validate required fields for supported session schema versions.
 
         The manifest is treated as a strict contract:
         - schema_version must be supported
@@ -509,6 +524,17 @@ class SessionStore:
                 missing.append("intent.proxy.template")
             if "base_url" not in proxy:
                 missing.append("intent.proxy.base_url")
+
+        launch = intent.get("launch")
+        schema_version = data.get("schema_version")
+        if isinstance(launch, dict):
+            if schema_version == 1 and "model_route" in launch:
+                raise ManifestCorruptedError(
+                    str(self._manifest_path),
+                    "schema v1 intent.launch cannot contain model_route",
+                )
+            if schema_version == 2 and "model_route" not in launch:
+                missing.append("intent.launch.model_route")
 
         # Strict overrides schema: keys must be valid SessionIntent paths
         overrides = data.get("overrides")

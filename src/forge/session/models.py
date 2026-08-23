@@ -8,7 +8,7 @@ for runtime conversion.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from forge.core.effort import validate_claude_effort
 from forge.core.run_id import is_valid_run_id
@@ -19,7 +19,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 INDEX_VERSION = 1
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -73,6 +73,51 @@ class SidecarLaunchIntent:
     image: str | None = None  # Optional sidecar image override
 
 
+REQUIRED_MODEL_ROUTE_TIERS = frozenset({"haiku", "sonnet", "opus"})
+
+
+@dataclass
+class ModelRouteIntent:
+    """Canonical model request and the resolved route needed for relaunch."""
+
+    requested_model: str
+    selected_tier: str
+    kind: Literal["direct", "proxy"]
+    source_id: str | None
+
+    def __post_init__(self) -> None:
+        from forge.backend.sources import ModelSourceNotFoundError, get_model_source
+        from forge.core.models.catalog import ModelCatalogError, resolve_model_id
+
+        if not self.requested_model:
+            raise ValueError("model_route.requested_model cannot be empty")
+        try:
+            canonical = resolve_model_id(self.requested_model)
+        except ModelCatalogError as exc:
+            raise ValueError(f"model_route.requested_model is unknown: {self.requested_model!r}") from exc
+        if canonical != self.requested_model:
+            raise ValueError(
+                f"model_route.requested_model must be canonical, got alias {self.requested_model!r} for {canonical!r}"
+            )
+        if self.selected_tier not in REQUIRED_MODEL_ROUTE_TIERS:
+            raise ValueError(
+                f"model_route.selected_tier must be one of: {', '.join(sorted(REQUIRED_MODEL_ROUTE_TIERS))}"
+            )
+        if self.kind not in {"direct", "proxy"}:
+            raise ValueError("model_route.kind must be 'direct' or 'proxy'")
+        if self.kind == "direct" and self.source_id is not None:
+            raise ValueError("direct model_route intent requires source_id=null")
+        if self.source_id is not None:
+            if not self.source_id:
+                raise ValueError("model_route.source_id must be null or a non-empty canonical source id")
+            try:
+                get_model_source(self.source_id)
+            except ModelSourceNotFoundError as exc:
+                raise ValueError(
+                    f"model_route.source_id must be a canonical model-source id, got {self.source_id!r}"
+                ) from exc
+
+
 @dataclass
 class LaunchIntent:
     """How Forge should relaunch this session."""
@@ -80,6 +125,7 @@ class LaunchIntent:
     mode: str = LAUNCH_MODE_HOST  # "host" or "sidecar"
     sidecar: SidecarLaunchIntent | None = None
     direct_model: str | None = None  # Claude Code env-ready direct model pin (e.g. claude-opus-4-8[1m])
+    model_route: ModelRouteIntent | None = None
     # Runtime registry id ("claude_code" | "codex") driving launcher dispatch. Immutable
     # launch identity: `forge session set launch.runtime` is rejected (overrides.py) and
     # dispatch reads this raw intent field, never effective state.

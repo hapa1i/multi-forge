@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from forge.session import SessionManager, SessionStore
+from forge.session.models import ModelRouteIntent, SessionState
 
 
 def _init_forge_project(path: Path) -> None:
@@ -40,6 +41,15 @@ def _set_subprocess_proxy(project: Path, name: str, proxy_id: str) -> None:
     store.update(timeout_s=5.0, mutate=lambda m: setattr(m.intent, "subprocess_proxy", proxy_id))
 
 
+def _set_model_route(project: Path, name: str) -> None:
+    def mutate(manifest: SessionState) -> None:
+        launch = manifest.intent.launch
+        assert launch is not None
+        launch.model_route = ModelRouteIntent("claude-opus-4-8", "opus", "direct", None)
+
+    SessionStore(str(project), name).update(timeout_s=5.0, mutate=mutate)
+
+
 def test_resume_child_inherits_subprocess_proxy(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
@@ -65,14 +75,17 @@ def test_resume_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         direct=True,
         direct_model="claude-opus-4-8",
     )
+    _set_model_route(project, "parent")
 
     child, _handoff = manager.resume_session("parent", child_name="child")
 
     assert child.intent.launch is not None
     assert child.intent.launch.direct_model == "claude-opus-4-8"
+    assert child.intent.launch.model_route == ModelRouteIntent("claude-opus-4-8", "opus", "direct", None)
     persisted = SessionStore(str(project), "child").read()
     assert persisted.intent.launch is not None
     assert persisted.intent.launch.direct_model == "claude-opus-4-8"
+    assert persisted.intent.launch.model_route == child.intent.launch.model_route
 
 
 def test_fork_child_inherits_subprocess_proxy(tmp_path: Path) -> None:
@@ -100,14 +113,17 @@ def test_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         direct=True,
         direct_model="claude-opus-4-8",
     )
+    _set_model_route(project, "parent")
 
     _parent, fork = manager.fork_session("parent", "fork")
 
     assert fork.intent.launch is not None
     assert fork.intent.launch.direct_model == "claude-opus-4-8"
+    assert fork.intent.launch.model_route == ModelRouteIntent("claude-opus-4-8", "opus", "direct", None)
     persisted = SessionStore(str(project), "fork").read()
     assert persisted.intent.launch is not None
     assert persisted.intent.launch.direct_model == "claude-opus-4-8"
+    assert persisted.intent.launch.model_route == fork.intent.launch.model_route
 
 
 def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
@@ -122,6 +138,7 @@ def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         direct=True,
         direct_model="claude-opus-4-8",
     )
+    _set_model_route(project, "parent")
 
     _parent, fork = manager.fork_session("parent", "fork", create_worktree=True)
 
@@ -129,9 +146,11 @@ def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
     assert fork.worktree.is_worktree is True
     assert fork.intent.launch is not None
     assert fork.intent.launch.direct_model == "claude-opus-4-8"
+    assert fork.intent.launch.model_route == ModelRouteIntent("claude-opus-4-8", "opus", "direct", None)
     persisted = SessionStore(fork.forge_root or fork.worktree.path, "fork").read()
     assert persisted.intent.launch is not None
     assert persisted.intent.launch.direct_model == "claude-opus-4-8"
+    assert persisted.intent.launch.model_route == fork.intent.launch.model_route
 
 
 def test_relaunch_child_inherits_subprocess_proxy(tmp_path: Path) -> None:
@@ -159,11 +178,14 @@ def test_relaunch_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         direct=True,
         direct_model="claude-opus-4-8",
     )
+    _set_model_route(project, "parent")
 
     _parent, child = manager.relaunch_session("parent", child_name="child")
 
     assert child.intent.launch is not None
     assert child.intent.launch.direct_model == "claude-opus-4-8"
+    assert child.intent.launch.model_route == ModelRouteIntent("claude-opus-4-8", "opus", "direct", None)
     persisted = SessionStore(str(project), "child").read()
     assert persisted.intent.launch is not None
     assert persisted.intent.launch.direct_model == "claude-opus-4-8"
+    assert persisted.intent.launch.model_route == child.intent.launch.model_route

@@ -7,9 +7,9 @@ wins.
 
 ## Current focus
 
-Implement manifest v2 and neutral model-route intent next. The package-owned route catalog, normalization, integration
-validation, and workflow-order parity guard are complete; no lifecycle caller changes until the durable-state transition
-is independently tested.
+Implement the side-effect-free route planner next. The package-owned route catalog and strict manifest-v2 neutral route
+intent are complete; lifecycle callers remain unchanged until route precedence, admission, and tier selection are
+independently tested.
 
 ## Activation and review
 
@@ -84,24 +84,24 @@ semantics. Any alias unification is a separate behavior-changing card. **Blocker
 
 **Blockers:** None.
 
-- [ ] Add strict `ModelRouteIntent(requested_model, selected_tier, kind, source_id)` validation and optional
+- [x] Add strict `ModelRouteIntent(requested_model, selected_tier, kind, source_id)` validation and optional
   `LaunchIntent.model_route` storage.
-- [ ] Set `src/forge/session/models.py::SCHEMA_VERSION` to 2 and
+- [x] Set `src/forge/session/models.py::SCHEMA_VERSION` to 2 and
   `src/forge/session/store.py::_SUPPORTED_SCHEMA_VERSIONS` to `{1, 2}`. Make
   `src/forge/session/store.py::SessionStore._write_unlocked` emit v2, update the store's v1-only module/read docstrings,
   convert v1 with only the new null default, and keep unknown versions/fields strict and actionable.
-- [ ] Cover clean v1 reads, v1 ordinary-write upgrade, complete v2 round trips, missing/extra/invalid nested fields,
+- [x] Cover clean v1 reads, v1 ordinary-write upgrade, complete v2 round trips, missing/extra/invalid nested fields,
   direct `source_id=null`, automatic proxy source ids, and manually constrained proxy `source_id=null`. Update
   `tests/src/session/test_models.py::TestConstants::test_schema_version` plus store reader/writer tests so both version
   sites are guarded.
-- [ ] Define the pure transition planner in `forge.core.ops.session_model_routing` for direct Claude, proxied Claude,
+- [x] Define the pure transition planner in `forge.core.ops.session_model_routing` for direct Claude, proxied Claude,
   and proxied non-Claude requests. It must set or clear `ProxyIntent`, `direct_model`, and `model_route` as one complete
   result rather than mutating piecemeal.
-- [ ] Pin no-model transitions: explicit `--proxy`/`--no-proxy` clear neutral route intent while preserving existing
+- [x] Pin no-model transitions: explicit `--proxy`/`--no-proxy` clear neutral route intent while preserving existing
   Claude-pin behavior; fresh/fork/forced children inherit route intent unless explicitly overridden.
-- [ ] Keep `default_direct_model`, adoption, legacy direct pins, and Codex manifests on their existing paths without
+- [x] Keep `default_direct_model`, adoption, legacy direct pins, and Codex manifests on their existing paths without
   synthesizing `model_route`.
-- [ ] Update `docs/design_sessions.md` §3.3 in this phase when the manifest v2 reader/writer contract ships.
+- [x] Update `docs/design_sessions.md` §3.3 in this phase when the manifest v2 reader/writer contract ships.
 
 ## Phase 3 -- Side-effect-free route planning and tier resolution
 
@@ -226,6 +226,8 @@ Removal waits for that test to pass. **Blockers:** None.
   (2026-08-23).
 - Phase 1: catalog/model/workflow focus -- 92 passed; targeted Ruff, Black, mypy, and pyright completed with no errors
   (pyright retained its existing missing-source warning for PyYAML).
+- Phase 2: manifest/transition focus -- 180 passed; all non-integration `tests/src/session` tests -- 1,428 passed, 89
+  integration tests deselected.
 - Focused implementation tests: pending.
 - Required targeted integration: pending.
 - Aggregate unit/regression/pre-commit: pending.
