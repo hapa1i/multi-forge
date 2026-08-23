@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
+from forge.core.identifiers import is_lowercase_identifier
+
 _TIER_KEYS = frozenset({"haiku", "sonnet", "opus"})
-_SAFE_BACKEND_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
 
 class ProxyRuntimeTruth:
@@ -88,9 +88,7 @@ def _has_authoritative_route_truth(runtime: dict[str, Any]) -> bool:
     if not {"backend_id", "model_alternatives", "tier_mappings"}.issubset(runtime):
         return False
     backend_id = runtime["backend_id"]
-    if backend_id is not None and _optional_string(backend_id) is None:
-        return False
-    if isinstance(backend_id, str) and _SAFE_BACKEND_ID_RE.fullmatch(backend_id) is None:
+    if backend_id is not None and not is_lowercase_identifier(backend_id):
         return False
     tier_mappings = runtime["tier_mappings"]
     if (

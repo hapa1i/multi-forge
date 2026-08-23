@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from forge.core.backend_dependency import BackendDependency
 from forge.core.credential_registry import CREDENTIALS, Credential
+from forge.core.identifiers import is_lowercase_identifier
 from forge.core.provider_types import ProviderType
 from forge.core.runtime_vocab import LANE_RUNTIME_IDS
 
@@ -29,7 +30,6 @@ _VALID_ENDPOINT_KINDS = frozenset(get_args(EndpointKind))
 _VALID_PROVIDERS = frozenset(get_args(ProviderType))
 _VALID_BILLING_POSTURES = frozenset(get_args(BillingPosture))
 _ENV_VAR_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
-_SOURCE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
 
 class ModelSourceCatalogError(ValueError):
@@ -208,7 +208,7 @@ def _build_identifier_lookup(sources: Iterable[ModelSource]) -> dict[str, str]:
 
 
 def _validate_source(source: ModelSource) -> None:
-    if not _SOURCE_ID_RE.match(source.id):
+    if not is_lowercase_identifier(source.id):
         raise ModelSourceCatalogError(f"invalid model-source id: {source.id!r}")
     if source.kind not in _VALID_SOURCE_KINDS:
         raise ModelSourceCatalogError(f"invalid model-source kind for {source.id!r}: {source.kind!r}")
@@ -216,7 +216,7 @@ def _validate_source(source: ModelSource) -> None:
         raise ModelSourceCatalogError(f"invalid provider for {source.id!r}: {source.provider!r}")
     if source.billing_posture not in _VALID_BILLING_POSTURES:
         raise ModelSourceCatalogError(f"invalid billing_posture for {source.id!r}: {source.billing_posture!r}")
-    if source.backend_kind is not None and not _SOURCE_ID_RE.match(source.backend_kind):
+    if source.backend_kind is not None and not is_lowercase_identifier(source.backend_kind):
         raise ModelSourceCatalogError(f"source {source.id!r} has invalid backend_kind {source.backend_kind!r}")
 
     # Credential symmetry by endpoint family: a runtime_native source's auth is
@@ -240,7 +240,7 @@ def _validate_source(source: ModelSource) -> None:
         if runtime_id not in LANE_RUNTIME_IDS:
             raise ModelSourceCatalogError(f"source {source.id!r} has unknown reachable_via runtime {runtime_id!r}")
     for template_name in source.template_names:
-        if not _SOURCE_ID_RE.match(template_name):
+        if not is_lowercase_identifier(template_name):
             raise ModelSourceCatalogError(f"source {source.id!r} has invalid template name {template_name!r}")
 
     if source.kind == "local":

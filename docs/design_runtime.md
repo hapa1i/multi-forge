@@ -525,6 +525,11 @@ Anthropic passthrough templates no longer carry inline provider `base_url`. Remo
 `LITELLM_BASE_URL` through the same connection-value path used by credentials. OpenRouter templates resolve
 `OPENROUTER_BASE_URL` the same way, defaulting to `https://openrouter.ai/api/v1` when no override is configured.
 
+The copied runtime `proxy.yaml` remains user-owned and accepts unknown backend ids for forward compatibility when they
+use canonical identifier syntax. Canonical ids start with a lowercase letter or digit and contain only lowercase
+letters, digits, `.`, `_`, or `-`; malformed spellings fail schema validation with `proxy.backend` named. A canonical
+but unknown id remains readable, warns once at the running proxy boundary, and fails capability gates safely.
+
 `TEMPLATE_ENV_VARS` remains as a compatibility map for existing auth callers, but it is generated from
 `ModelSource.credential_ids` and backend endpoint connection values. Template `backend_dependency.required_env_vars`,
 `credentials_for_template()`, sidecar secrets, and proxy preflight therefore derive from the same catalog-backed source

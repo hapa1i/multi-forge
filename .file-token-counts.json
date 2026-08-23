@@ -45,10 +45,10 @@
       "tokens": 37015
     },
     "docs/design_runtime.md": {
-      "sha256": "42189144cd9dee1791af9e602e8163a4ea4b7e9cbe1528078544e2521428372b",
+      "sha256": "2201542d42fe397dc2e02174ebb86f65b01b12ea12334360e180b449196ba3f7",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 22134
+      "tokens": 22295
     },
     "docs/design_sessions.md": {
       "sha256": "bade241e5ee19dc10d7eba55c5b768cead46f7050ec9ecbdf668f114a0bcc2e9",
@@ -69,10 +69,10 @@
       "tokens": 22947
     },
     "docs/end-user/proxy.md": {
-      "sha256": "cb8bf028d9cc6801abe15c4eb8504d829572bd97186275fb99b5d738f042e2da",
+      "sha256": "5fecd3bce73a6c78eb7a0f17262d686defd782d9b0446a9eda83d6616714757a",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20916
+      "tokens": 21038
     },
     "docs/end-user/session.md": {
       "sha256": "c169930e21e46ab4756231bd764494afe58195c1c322944c9b4e0ab7355f2ac7",

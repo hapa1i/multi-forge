@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
+from forge.core.identifiers import is_lowercase_identifier
 from forge.core.wire_shapes import (
     ANTHROPIC_PASSTHROUGH,
     DEFAULT_WIRE_SHAPE,
@@ -820,6 +821,17 @@ def _validate_default_tier(default_tier: str) -> None:
         )
 
 
+def _validate_proxy_backend(backend: object) -> None:
+    """Require blank or canonical-form backend identity without catalog lookup."""
+    if not isinstance(backend, str):
+        raise ValueError("proxy.backend must be a string")
+    if backend and not is_lowercase_identifier(backend):
+        raise ValueError(
+            f"Invalid proxy.backend: {backend!r} (must start with a lowercase letter or digit and contain only "
+            "lowercase letters, digits, '.', '_', or '-')"
+        )
+
+
 @dataclass
 class ProxyConfig:
     """Proxy server configuration."""
@@ -849,6 +861,7 @@ class ProxyConfig:
         # Templates carry the shared per-proxy blocks plus default_tier/tier_overrides;
         # coerce + validate here so an invalid combo is rejected at 'forge proxy template
         # edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
+        _validate_proxy_backend(self.backend)
         _validate_tool_prefixes_to_ignore(self.tool_prefixes_to_ignore)
         _coerce_proxy_blocks(self)
         _validate_default_tier(self.default_tier)
@@ -958,8 +971,7 @@ class ProxyInstanceConfig:
 
         if not self.tiers.sonnet:
             raise ValueError("Tiers must define at least 'sonnet' model")
-        if not isinstance(self.backend, str):
-            raise ValueError("proxy.backend must be a string")
+        _validate_proxy_backend(self.backend)
 
         _validate_tool_prefixes_to_ignore(self.tool_prefixes_to_ignore)
         _validate_provider_direct_fields(self)

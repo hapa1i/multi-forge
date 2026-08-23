@@ -108,6 +108,8 @@ Review these as one coherent contract; changing one may require reopening downst
   behavior.
 - [x] Resolve conjunctive route scopes from proven runtime/route/backend/billing facts; never infer a missing backend or
   payer.
+- [x] Validate runtime `proxy.backend` lexical form at the config boundary, preserve unknown canonical-form ids, and
+  report malformed hand edits as an actionable `proxy.yaml` launch-preparation error before routing or child invocation.
 - [x] Keep direct Claude and Codex backend/billing unknown in M2; do not upgrade API-key availability into payer
   evidence.
 - [x] Compare complete normalized declarations for `changed_since_launch`; do not synthesize a marking entry when no
@@ -269,6 +271,7 @@ Review these as one coherent contract; changing one may require reopening downst
 | Exact routing abort payload              | Projection failure plus caller/catalog/config mutation          | Commit and abort payloads are equal; journal remains valid; compensation performs no reread    | `tests/src/session/test_routing.py`, `tests/src/core/ops/test_session_routing.py`                                                     |
 | Custom fingerprint                       | Credentials, paths, default ports, IPv6, invalid URLs           | Only canonical secret-free origin is hashed; same-origin collision is pinned                   | `tests/src/session/test_routing.py`                                                                                                   |
 | D1 preparation failure                   | Route/context/runtime preparation exception                     | No routing event or child; authority follows existing preflight semantics                      | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
+| D1 malformed proxy backend               | Hand-edited `proxy.backend: OpenRouter`                         | Error names `proxy.yaml` and `proxy.backend`; no routing event or child                        | `tests/src/config/test_loader.py`, `tests/src/core/ops/test_session_authority_launch.py`                                              |
 | D1 authority failure                     | Required authority append or activation exception               | No routing event or child; M1 compensation remains authoritative                               | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
 | D1 routing append failure                | Routing append exception after authority start                  | Authority-only abort; active state cleared; no child or `run_ended`                            | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
 | D1 projection failure                    | Atomic projection exception after route commit                  | Routing then authority abort; exact payload; no child or `run_ended`                           | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
@@ -354,6 +357,14 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
   tracked provider counts produced the clean full result above. The first follow-up pre-commit run normalized two files
   and exposed seven provenance-test typing defects; the fixes passed targeted mypy and 32 tests before the clean full
   gate.
+
+### Backend-identifier follow-up evidence (2026-08-23)
+
+- Focused schema, shared-identifier, routing, runtime-truth, and authority-launch coverage -- 289 passed.
+- Full unit: `make test-unit` -- 9,740 passed, 117 deselected.
+- Full regression: `make test-regression` -- 1,067 passed.
+- Managed-launch integration: the composed authority/routing lifecycle case -- 1 passed.
+- Repository gate: `make pre-commit` and `git diff --check` passed.
 
 ## Phase 8 -- Review and closeout
 

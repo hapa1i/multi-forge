@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from importlib import resources
@@ -11,6 +10,7 @@ from urllib.parse import urlsplit
 
 import yaml
 
+from forge.core.identifiers import is_lowercase_identifier
 from forge.core.models.catalog import load_model_catalog, resolve_model_id
 from forge.core.state import utc_today
 
@@ -28,7 +28,6 @@ BILLING_SCOPE_VALUES = frozenset(
         "unknown",
     }
 )
-_SAFE_SCOPE_VALUE_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 _DECLARATION_FIELDS = frozenset({"status", "basis", "source_url", "checked_at", "effective_from", "route_scope"})
 
 
@@ -86,7 +85,7 @@ def validate_route_scope_tags(tags: object, *, require_declaration: bool = False
         if ":" not in tag:
             raise ModelPracticesError(f"unknown route-scope tag {tag!r}")
         family, value = tag.split(":", 1)
-        if not value or _SAFE_SCOPE_VALUE_RE.fullmatch(value) is None:
+        if not is_lowercase_identifier(value):
             raise ModelPracticesError(f"invalid route-scope tag {tag!r}")
         if family == "runtime" and value not in RUNTIME_SCOPE_VALUES:
             raise ModelPracticesError(f"unknown runtime route-scope tag {tag!r}")

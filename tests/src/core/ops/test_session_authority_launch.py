@@ -190,6 +190,49 @@ def test_route_preparation_failure_writes_no_routing_history_or_invokes_child(
     assert authority[-1].reason_code == "launcher_exception"
 
 
+def test_invalid_proxy_backend_is_actionable_before_routing_or_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    active = _active_store(tmp_path)
+    invoked = False
+    monkeypatch.setattr(
+        routing_ops,
+        "load_config",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            ValueError(
+                "Invalid proxy.backend: 'OpenRouter' (must start with a lowercase letter or digit and contain only "
+                "lowercase letters, digits, '.', '_', or '-')"
+            )
+        ),
+    )
+
+    with pytest.raises(
+        ForgeOpError,
+        match=r"proxy\.yaml for proxy 'edited-proxy' is invalid: Invalid proxy\.backend: 'OpenRouter'",
+    ):
+        with launch.authority_launch_transaction(
+            store=store,
+            root=new_root_run_identity(),
+            operation="start",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            active_store=active,
+        ):
+            state = store.read()
+            routing_ops.build_claude_routing_payload(
+                state,
+                effective_template="openrouter-anthropic",
+                runtime_base_url="http://localhost:8085",
+                proxy_id="edited-proxy",
+            )
+            invoked = True
+
+    assert invoked is False
+    assert active.peek_session("planner", forge_root=str(tmp_path)) is None
+    assert not (tmp_path / ".forge" / "artifacts" / "planner" / "routing").exists()
+
+
 def test_routing_append_failure_compensates_marked_transaction_without_child(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

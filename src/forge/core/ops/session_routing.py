@@ -92,7 +92,13 @@ def build_claude_routing_payload(
             route_scope_tags=["route:custom", "runtime:claude_code"],
         )
 
-    config = load_config(proxy_id=proxy_id) if proxy_id is not None else load_config(template=effective_template)
+    try:
+        config = load_config(proxy_id=proxy_id) if proxy_id is not None else load_config(template=effective_template)
+    except ValueError as exc:
+        config_label = (
+            f"proxy.yaml for proxy {proxy_id!r}" if proxy_id is not None else f"proxy template {effective_template!r}"
+        )
+        raise ForgeOpError(f"{config_label} is invalid: {exc}") from exc
     tier_mappings, model_alternatives = effective_proxy_model_maps(config.proxy)
     default_tier = config.proxy.default_tier
     template = effective_template or config.proxy.active_template

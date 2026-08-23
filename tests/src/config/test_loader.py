@@ -938,7 +938,7 @@ class TestProxyFileIO:
             load_proxy_instance_config_from_dict(data)
 
     def test_from_dict_accepts_unknown_backend_for_runtime_boundary(self):
-        """Unknown proxy.backend is accepted here; the running proxy warns/degrades."""
+        """Unknown canonical-form proxy.backend is accepted; the running proxy warns/degrades."""
         from forge.config.loader import load_proxy_instance_config_from_dict
 
         data = {
@@ -954,6 +954,26 @@ class TestProxyFileIO:
         config = load_proxy_instance_config_from_dict(data)
 
         assert config.backend == "no-such-backend"
+
+    @pytest.mark.parametrize(
+        "backend", ["OpenRouter", "-openrouter", "openrouter/api", "openrouter:api", " openrouter"]
+    )
+    def test_from_dict_rejects_noncanonical_backend_spelling(self, backend: str) -> None:
+        """Malformed backend identity fails at the user-owned config boundary."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+            "backend": backend,
+        }
+
+        with pytest.raises(ValueError, match=r"Invalid proxy\.backend.*lowercase"):
+            load_proxy_instance_config_from_dict(data)
 
     def test_write_proxy_instance_config_atomic_and_permissions(self, tmp_path, monkeypatch):
         """write_proxy_instance_config uses atomic write and sets 0600 permissions."""
