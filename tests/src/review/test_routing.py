@@ -14,6 +14,7 @@ from forge.review.routing import (
     WorkflowRoutingError,
     _TemplateMeta,
     clear_template_cache,
+    derive_catalog_model_routes,
     derive_model_routes,
     resolve_invocation_routing,
     resolve_model_flag,
@@ -379,6 +380,40 @@ class TestDeriveModelRoutes:
         assert cross_route.model_ref == "openai/gpt-5.5"
 
 
+class TestCatalogMigrationParity:
+    def test_all_current_workflow_routes_match_complete_catalog_order(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path,
+    ) -> None:
+        from forge.review.models import available_model_specs
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+        clear_template_cache()
+
+        compared: list[str] = []
+        for spec in available_model_specs():
+            if spec.runtime == "codex":
+                continue
+            legacy = tuple((route.provider, route.template_id, route.model_ref) for route in derive_model_routes(spec))
+            catalog = tuple(
+                (route.provider, route.template_id, route.model_ref) for route in derive_catalog_model_routes(spec)
+            )
+            assert catalog == legacy, spec.name
+            compared.append(spec.name)
+
+        assert "gpt-5.6-sol" in compared
+        assert "gemini-3.1-pro-preview" in compared
+        assert "claude-opus-4.6-1m" in compared
+
+    def test_runtime_native_workflow_spec_bypasses_route_catalog(self) -> None:
+        from forge.review.models import AVAILABLE_MODELS
+
+        codex = AVAILABLE_MODELS["codex"]
+        assert codex.runtime == "codex"
+        assert codex.provider_refs == ()
+
+
 class TestResolveInvocationRouting:
 
     @pytest.fixture(autouse=True)
@@ -496,7 +531,11 @@ class TestResolveInvocationRouting:
         ):
             plan = resolve_invocation_routing([direct_spec, native_spec, native_spec])
 
-        assert [result.source for result in plan.routes] == ["direct", "runtime_native", "runtime_native"]
+        assert [result.source for result in plan.routes] == [
+            "direct",
+            "runtime_native",
+            "runtime_native",
+        ]
         assert plan.routes[0].route is not None
         assert plan.routes[1].route is None
         assert plan.routes[2].route is None

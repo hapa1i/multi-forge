@@ -200,7 +200,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ),
         "claude-opus-4.6-1m": ModelSpec(
             name="claude-opus-4.6-1m",
-            model_id="claude-opus-4.6-1m",
+            model_id="claude-opus-4-6-1m",
             family="anthropic",
             provider_refs=(("direct", "claude-opus-4-6[1m]"),),
             description="Stable Claude Opus 4.6 direct worker with 1M context pin",

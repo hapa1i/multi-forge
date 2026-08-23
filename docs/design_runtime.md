@@ -583,8 +583,29 @@ Status line should read live proxy truth when available; clearly label file fall
 The model catalog is **authoritative internal data**:
 
 - Location: `src/forge/core/data/model_catalog.yaml`
-- Defines: model capabilities, context windows, provider mappings
+- Defines: intrinsic model capabilities, context windows, aliases, and per-family defaults
 - **NOT a user edit surface**
+
+The model route catalog is separate **authoritative operational data**:
+
+- Location: `src/forge/core/data/model_routes.yaml`
+- Owner: `forge.core.models.model_routes`
+- Defines: ordered direct runtime or proxy source/template/provider-model references for every normalized intrinsic
+  model
+- Source credentials, endpoint/lifecycle facts, and template ownership remain in `forge.backend.sources`; proxy tier
+  maps remain in template/proxy configuration
+- **NOT a user edit surface**
+
+`load_model_route_catalog()` reads the packaged resource, enforces exact schema fields, canonical model coverage,
+candidate uniqueness, catalog-listed provider refs, and direct-first Claude compatibility, then validates
+source/template ownership through the model-source catalog. The frozen result is cached; tests use
+`clear_model_route_catalog_cache()` for explicit reloads. The loader does not import session lifecycle or workflow
+callers.
+
+`normalize_model_route_request()` returns the canonical request, base route key, Claude tier, and optional Claude Code
+`[1m]` transport modifier. Canonical `*-1m` models and `[1m]` spellings share the base candidate list. Catalog-listed
+OpenRouter dot-form Claude 4.6 aliases retain their existing 1M normalization; corresponding hyphen forms retain base
+normalization.
 
 **Workflow model specs** (`src/forge/review/models.py`):
 
@@ -596,6 +617,11 @@ ModelSpec(name, model_id, family, provider_refs, description,
 Key fields: `model_id` is Forge-canonical (e.g., `gpt-5.5`, not `openai/gpt-5.5`). `family` is the model's native family
 (e.g., `openai`, `anthropic`, `gemini`). `provider_refs` is ordered `(namespace, model_ref)` tuples declaring how to
 reach the model via each provider. `preferred_proxy` is a soft catalog hint, overridable by `--proxy` or route scan.
+
+During the staged workflow migration, `provider_refs` and `preferred_proxy` remain the runtime source. The parallel
+`derive_catalog_model_routes()` projection must be byte-for-byte equivalent in ordered
+`(provider, template_id, model_ref)` output for every non-runtime-native worker; tests enforce that parity before legacy
+metadata can be removed.
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 

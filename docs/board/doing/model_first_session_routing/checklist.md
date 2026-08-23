@@ -7,8 +7,9 @@ wins.
 
 ## Current focus
 
-Implement the package-owned route catalog and its strict loader first. No lifecycle caller should change until the
-catalog, model normalization, and side-effect-free resolution types are independently tested.
+Implement manifest v2 and neutral model-route intent next. The package-owned route catalog, normalization, integration
+validation, and workflow-order parity guard are complete; no lifecycle caller changes until the durable-state transition
+is independently tested.
 
 ## Activation and review
 
@@ -55,29 +56,29 @@ catalog, model normalization, and side-effect-free resolution types are independ
 **Decision/deferral:** Preserve the catalog's existing OpenRouter dot-form-to-1M and hyphen-form-to-base alias
 semantics. Any alias unification is a separate behavior-changing card. **Blockers:** None.
 
-- [ ] Add packaged `src/forge/core/data/model_routes.yaml` with schema version 1 and explicit ordered candidates for all
+- [x] Add packaged `src/forge/core/data/model_routes.yaml` with schema version 1 and explicit ordered candidates for all
   interactive and non-runtime-native workflow models in scope.
-- [ ] Add dependency-light frozen route-catalog types and one cached loader in `src/forge/core/models/model_routes.py`
+- [x] Add dependency-light frozen route-catalog types and one cached loader in `src/forge/core/models/model_routes.py`
   (`forge.core.models.model_routes`); use `importlib.resources`, a dedicated domain error, and an explicit cache reset
   for tests.
-- [ ] Keep YAML parsing, normalization, and schema/model invariants in `forge.core.models.model_routes`. Expose a pure
+- [x] Keep YAML parsing, normalization, and schema/model invariants in `forge.core.models.model_routes`. Expose a pure
   cross-catalog validator there that receives backend-source/template metadata through a narrow input instead of
   importing session lifecycle or workflow callers.
-- [ ] Strictly validate exact fields, supported schema version, canonical model keys, unique ordered candidates, route
+- [x] Strictly validate exact fields, supported schema version, canonical model keys, unique ordered candidates, route
   kinds, runtime ids, source ids, source/template ownership, source-specific model refs, and the direct-first invariant
   for every existing Claude direct pin.
-- [ ] Define one normalization result carrying canonical requested model, route lookup key, Claude tier, and the
+- [x] Define one normalization result carrying canonical requested model, route lookup key, Claude tier, and the
   optional 1M transport modifier. Reject unknown ids, non-Claude `[1m]`, and unsupported direct tiers contextually;
   preserve the catalog-listed OpenRouter dot/hyphen alias distinction explicitly.
-- [ ] Prove that every non-runtime-native workflow spec resolves to one catalog key, while runtime-native specs bypass
+- [x] Prove that every non-runtime-native workflow spec resolves to one catalog key, while runtime-native specs bypass
   catalog validation deliberately.
-- [ ] Before either metadata source is removed, compare the complete ordered `(provider, template_id, model_ref)`
+- [x] Before either metadata source is removed, compare the complete ordered `(provider, template_id, model_ref)`
   sequence from current `derive_model_routes(spec)` with the catalog-derived sequence for every non-runtime-native
   workflow spec, including the 1M worker. Cover preferred-proxy promotion, `provider_refs` order, native-family before
   OpenRouter cross-family routes, and the alphabetical template tiebreaker.
-- [ ] Add package-resource tests and fail-loud coverage for missing, malformed, newer-schema, unknown-field, duplicate,
+- [x] Add package-resource tests and fail-loud coverage for missing, malformed, newer-schema, unknown-field, duplicate,
   source/template mismatch, missing-workflow-model, and direct-order violations.
-- [ ] Update `docs/design_runtime.md` §A.5 in this phase when route-catalog ownership and its validation boundary ship.
+- [x] Update `docs/design_runtime.md` §A.5 in this phase when route-catalog ownership and its validation boundary ship.
 
 ## Phase 2 -- Manifest v2 and pure intent transitions
 
@@ -223,6 +224,8 @@ Removal waits for that test to pass. **Blockers:** None.
 
 - Activation documents: `git diff --check` clean; `make pre-commit-md` passed, including repository Markdown links
   (2026-08-23).
+- Phase 1: catalog/model/workflow focus -- 92 passed; targeted Ruff, Black, mypy, and pyright completed with no errors
+  (pyright retained its existing missing-source warning for PyYAML).
 - Focused implementation tests: pending.
 - Required targeted integration: pending.
 - Aggregate unit/regression/pre-commit: pending.

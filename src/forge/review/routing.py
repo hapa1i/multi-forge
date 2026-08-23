@@ -30,6 +30,8 @@ class RoutableSpec(Protocol):
     @property
     def name(self) -> str: ...
     @property
+    def model_id(self) -> str: ...
+    @property
     def family(self) -> str: ...
     @property
     def provider_refs(self) -> tuple[tuple[str, str], ...]: ...
@@ -221,6 +223,55 @@ def derive_model_routes(spec: RoutableSpec) -> tuple[ModelRoute, ...]:
                 routes.append(route)
 
     return tuple(preferred_routes + routes)
+
+
+def derive_catalog_model_routes(spec: RoutableSpec) -> tuple[ModelRoute, ...]:
+    """Materialize the shared catalog's ordered candidates for one workflow spec.
+
+    This coexists with ``derive_model_routes`` until workflow-owned route metadata
+    is removed. The temporary pair is an executable migration parity guard.
+    """
+
+    from forge.core.models.model_routes import (
+        get_model_route_candidates,
+        normalize_model_route_request,
+    )
+
+    request = normalize_model_route_request(spec.model_id)
+    candidates = get_model_route_candidates(spec.model_id)
+    routes: list[ModelRoute] = []
+    for candidate in candidates:
+        if candidate.kind == "direct":
+            routes.append(
+                ModelRoute(
+                    provider="direct",
+                    credential=_DIRECT_CREDENTIAL,
+                    family=spec.family,
+                    template_id=None,
+                    template_family=None,
+                    model_ref=request.direct_execution_ref(candidate.model_ref),
+                )
+            )
+            continue
+
+        assert candidate.template is not None
+        meta = _get_template_meta(candidate.template)
+        if meta is None:
+            raise WorkflowRoutingError(
+                f"Route catalog template {candidate.template!r} for model {spec.name!r} could not be loaded."
+            )
+        credential = meta.credentials[0] if meta.credentials else meta.preferred_provider
+        routes.append(
+            ModelRoute(
+                provider=meta.preferred_provider,
+                credential=credential,
+                family=spec.family,
+                template_id=candidate.template,
+                template_family=meta.family,
+                model_ref=candidate.model_ref,
+            )
+        )
+    return tuple(routes)
 
 
 def _find_matching_templates(
