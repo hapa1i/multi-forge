@@ -7,10 +7,10 @@ decisions on declared runtime-tool surfaces, launch preflight, disclosed runtime
 read. It does not add delegation, cross-runtime context transfer, Git-range attestation, textual-overlap analysis, or an
 admission gate. Forge adds no courier; the supported advisory-to-producer flow is human-only.
 
-**Epic**: M1 member of [Epic: Session Authority and Provenance](../../doing/epic_session_authority_provenance/card.md),
-which owns the shared journal envelope, run identity, absence-state vocabulary, and presentation boundary with
-[Session Route Provenance and Marking](../../doing/session_route_provenance/card.md). The cards remain independently
-shippable; authority mode does not require route history, model selection, or marking metadata.
+**Epic**: M1 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
+owns the shared journal envelope, run identity, absence-state vocabulary, and presentation boundary with
+[Session Route Provenance and Marking](../session_route_provenance/card.md). The cards remain independently shippable;
+authority mode does not require route history, model selection, or marking metadata.
 
 **References**: [design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (Codex session
 lifecycle), [design.md §3.10](../../../design_sessions.md#310-hook-handlers) (managed hook dispatch),
