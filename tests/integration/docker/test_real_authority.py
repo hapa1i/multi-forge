@@ -124,6 +124,29 @@ def _authority_events(workspace: ContainerLike, session: str) -> list[dict[str, 
     return [json.loads(line) for line in journal.splitlines()]
 
 
+def _assert_committed_route(
+    workspace: ContainerLike,
+    *,
+    session: str,
+    expected_kind: str,
+    expected_run_id: str,
+) -> None:
+    journal = workspace.read_file(f"/workspace/.forge/artifacts/{session}/routing/events.jsonl")
+    events = [json.loads(line) for line in journal.splitlines()]
+    assert len(events) == 1, events
+    event = events[0]
+    assert event["event_type"] == "launch_routing_committed"
+    assert event["operation"] == "start"
+    assert event["payload"]["route"]["kind"] == expected_kind
+    assert event["run_id"] == expected_run_id
+
+    manifest = json.loads(workspace.read_file(f"/workspace/.forge/sessions/{session}/forge.session.json"))
+    assert manifest["confirmed"]["route_commit"] == {
+        "event_id": event["event_id"],
+        "run_id": expected_run_id,
+    }
+
+
 def _event(events: list[dict[str, Any]], event_type: str) -> dict[str, Any]:
     matches = [event for event in events if event["event_type"] == event_type]
     assert len(matches) == 1, (event_type, events)
@@ -299,6 +322,12 @@ class TestRealClaudeAuthority:
         assert _event(events, "run_ended")["run_id"] == run_id
         assert all(event["run_id"] == run_id for event in denials)
         assert "Bash" in {event["payload"]["covered_tool"] for event in denials}
+        _assert_committed_route(
+            forge_workspace,
+            session=_ADVISORY_SESSION,
+            expected_kind="direct",
+            expected_run_id=run_id,
+        )
 
     def test_producer_launch_allows_real_bash_request(self, forge_workspace: ContainerLike) -> None:
         _enable_user_hooks(forge_workspace)
@@ -329,6 +358,12 @@ class TestRealClaudeAuthority:
         assert run_id is not None
         assert _event(events, "launch_preflight")["run_id"] == run_id
         assert _event(events, "run_ended")["run_id"] == run_id
+        _assert_committed_route(
+            forge_workspace,
+            session=_PRODUCER_SESSION,
+            expected_kind="direct",
+            expected_run_id=run_id,
+        )
 
 
 class TestRealCodexAuthority:
@@ -376,3 +411,9 @@ class TestRealCodexAuthority:
         assert _event(events, "run_ended")["run_id"] == run_id
         assert all(event["run_id"] == run_id for event in denials)
         assert "apply_patch" in {event["payload"]["covered_tool"] for event in denials}
+        _assert_committed_route(
+            forge_workspace,
+            session=_CODEX_SESSION,
+            expected_kind="runtime_native",
+            expected_run_id=run_id,
+        )

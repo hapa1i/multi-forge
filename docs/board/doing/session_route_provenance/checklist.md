@@ -271,7 +271,7 @@ Review these as one coherent contract; changing one may require reopening downst
 | Exact routing abort payload              | Projection failure plus caller/catalog/config mutation          | Commit and abort payloads are equal; journal remains valid; compensation performs no reread    | `tests/src/session/test_routing.py`, `tests/src/core/ops/test_session_routing.py`                                                     |
 | Custom fingerprint                       | Credentials, paths, default ports, IPv6, invalid URLs           | Only canonical secret-free origin is hashed; same-origin collision is pinned                   | `tests/src/session/test_routing.py`                                                                                                   |
 | D1 preparation failure                   | Route/context/runtime preparation exception                     | No routing event or child; authority follows existing preflight semantics                      | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
-| D1 malformed proxy backend               | Hand-edited `proxy.backend: OpenRouter`                         | Error names `proxy.yaml` and `proxy.backend`; no routing event or child                        | `tests/src/config/test_loader.py`, `tests/src/core/ops/test_session_authority_launch.py`                                              |
+| D1 malformed proxy backend               | Hand-edited `proxy.backend: OpenRouter`                         | Error names `proxy.yaml` and `proxy.backend`; no routing event or child                        | `tests/src/core/ops/test_session_authority_launch.py`, `tests/integration/docker/test_session_routing.py`                             |
 | D1 authority failure                     | Required authority append or activation exception               | No routing event or child; M1 compensation remains authoritative                               | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
 | D1 routing append failure                | Routing append exception after authority start                  | Authority-only abort; active state cleared; no child or `run_ended`                            | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
 | D1 projection failure                    | Atomic projection exception after route commit                  | Routing then authority abort; exact payload; no child or `run_ended`                           | `tests/src/core/ops/test_session_authority_launch.py`                                                                                 |
@@ -303,7 +303,7 @@ Review these as one coherent contract; changing one may require reopening downst
 | Marking statusline                       | Explicit/default/alternative/direct/old-proxy cases             | Exact `mark:yes/no/?`; direct makes no journal read; default order unchanged; exit zero        | `tests/src/cli/statusline/test_statusline_registry.py`                                                                                |
 | Sidecar route identity isolation         | Template resolves to a running sidecar proxy                    | Resolved id enters only route evidence; legacy launch/runner/presentation ids remain unchanged | `tests/src/core/ops/test_claude_sidecar_launch.py`                                                                                    |
 | Artifact retention parity                | Delete/clean/incognito, transcript flags, owning tree           | Authority and routing directories share one lifetime                                           | `tests/src/session/test_authority_retention.py`                                                                                       |
-| Managed launch composition               | Claude/Codex paths with authority absent/advisory/producer      | One root run id; required ordering; no route/authority dependency inversion                    | `tests/integration/docker/test_session_lifecycle.py`, `tests/integration/core/test_codex_session_start.py`                            |
+| Managed launch composition               | Claude/Codex paths with authority absent/advisory/producer      | One root run id; required ordering; no route/authority dependency inversion                    | `tests/integration/docker/test_session_lifecycle.py`, `tests/integration/docker/test_real_authority.py`                               |
 | Clean-wheel resource                     | Built wheel in isolated environment                             | Packaged empty catalog loads; read/statusline import paths work                                | `scripts/test-wheel-runtime.sh`                                                                                                       |
 
 ### Managed launch integration
@@ -316,6 +316,10 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
 - [x] Run supported Claude sidecar launcher coverage together with its Docker lifecycle boundary.
 - [x] Run Codex headless and interactive start/resume coverage with route-native payload assertions.
 - [x] Cover authority absent, advisory, and producer launches with one shared root run id.
+- [x] Assert the routing journal, manifest projection, route kind, and authority-shared run id across Dockerized real
+  Claude and Codex launches without adding model calls.
+- [x] Run a hand-edited malformed proxy backend through Docker registry/health/CLI boundaries and assert the routing
+  journal and child invocation both remain absent.
 - [x] Inject routing append failure and assert authority-only compensation plus no child invocation.
 - [x] Inject projection failure and assert routing+authority compensation plus no child invocation.
 - [x] Inject compensation failure and assert primary error, supplemental diagnostics, no child, and `unproven` history.
@@ -364,6 +368,8 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
 - Full unit: `make test-unit` -- 9,740 passed, 117 deselected.
 - Full regression: `make test-regression` -- 1,067 passed.
 - Managed-launch integration: the composed authority/routing lifecycle case -- 1 passed.
+- Docker E2E follow-up: malformed proxy config rejection -- 1 passed; existing real-runtime authority smokes with
+  explicit routing/projection/run-id assertions -- 3 passed (two Claude, one Codex).
 - Repository gate: `make pre-commit` and `git diff --check` passed.
 
 ## Phase 8 -- Review and closeout
