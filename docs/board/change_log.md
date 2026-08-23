@@ -5,6 +5,28 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-08-23
+
+### Record session route provenance and close its coordination epic
+
+**Goal/outcome**: Make each managed launch's committed route inspectable without turning route or provider-declaration
+evidence into authority, admission, authorship, or per-request attestation.
+
+**Key changes**:
+
+- Added a strict route journal and manifest projection that share the authority launch's root run identity, durable
+  event seam, compensation vocabulary, and abort-aware presentation while remaining independently readable.
+- Added `forge session model show|history`, the bounded `%session model show` summary, proxy runtime facts, and a
+  default-off marking status-line segment backed by an intentionally all-unknown packaged declaration catalog.
+- Validated proxy backend identifiers at their configuration boundary and preserved legacy launch-confirmation,
+  tier-mapping, and sidecar callback semantics while recording the new route facts.
+- Closed both independently shipped members and the Session Authority and Provenance epic after aggregate contract and
+  retention verification.
+
+**Verification**: 289 focused tests; 9,740 unit tests with 117 deselected; 1,067 regressions; targeted managed-launch,
+proxy, and sidecar integration; one malformed-config Docker case; three real-runtime Docker cases (two Claude and one
+Codex); clean-wheel and full pre-commit gates. PR #240 merged as `2a53397c` with all five GitHub checks passing.
+
 ## 2026-08-22
 
 ### Correct recent review regressions

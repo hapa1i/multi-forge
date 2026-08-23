@@ -4,7 +4,7 @@ Closeout: shipped in [PR #234](https://github.com/hapa1i/multi-forge/pull/234) (
 on 2026-08-22.
 
 **Card**: [card.md](card.md) -- the normative contract. **Epic**:
-[Session Authority and Provenance](../../doing/epic_session_authority_provenance/card.md). **Branch**:
+[Session Authority and Provenance](../epic_session_authority_provenance/card.md). **Branch**:
 `feat/artifact-authority-mode` (rebased onto `main` at `9ea043a4`).
 
 ## Current focus
@@ -390,8 +390,9 @@ Ratified decisions:
 
 ## Deferred and out of scope
 
-- M2 routing journal/projection, provider-declared marking, and any marking status-line segment remained unshipped at M1
-  closeout; current work is tracked by the [M2 card](../../doing/session_route_provenance/card.md).
+- M2 routing journal/projection, provider-declared marking, and its default-off marking status-line segment remained
+  unshipped at M1 closeout; the subsequent shipped work is recorded by the
+  [M2 card](../session_route_provenance/card.md).
 - `os_readonly`, OS/filesystem immutability, raw-runtime/editor/human enforcement, and protection against runtime hook
   timeout/non-delivery are not implemented; the residual fail-open seam is reported.
 - Delegation, automated handoff/return, a producer consumer lane, cross-runtime transfer, and prompt/model routing are

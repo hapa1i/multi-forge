@@ -1,12 +1,12 @@
 # Session Route Provenance and Marking
 
-**Status**: Doing (activated 2026-08-22). Planning and implementation are tracked in [checklist.md](checklist.md) on the
-per-card branch `feat/session-route-provenance`. The user ratified the contract and checklist after two review rounds;
-implementation is active through PR creation.
+**Status**: Done -- shipped via [PR #240](https://github.com/hapa1i/multi-forge/pull/240) (merge `2a53397c`, 2026-08-23
+UTC) and closed to `done/` on 2026-08-23. The reviewed contract and exact execution evidence are retained in
+[checklist.md](checklist.md).
 
 **Epic**: M2 member of [Epic: Session Authority and Provenance](../epic_session_authority_provenance/card.md), which
 owns the shared event envelope, run correlation, cross-journal compensation, and presentation boundaries with
-[Artifact Authority Mode](../../done/artifact_authority_mode/card.md), the epic's shipped M1 member.
+[Artifact Authority Mode](../artifact_authority_mode/card.md), the epic's shipped M1 member.
 
 **Relationship**: authority mode decides which managed session may mutate project artifacts. This card reports how a
 managed session was routed and the provider-declared text-marking posture of the selected or mapped model. It adds no

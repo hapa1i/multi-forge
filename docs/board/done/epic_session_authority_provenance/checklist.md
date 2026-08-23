@@ -5,15 +5,12 @@ not replace either member's execution checklist. The normative contract is [card
 
 ## Current focus
 
-The epic was activated on 2026-08-21 with C1-C5 accepted and frozen for M1. M2 ratified one evidence-conditional C3
-clarification at its human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped
-via PR #234 (merge `a1c54a05`) and closed to `done/` on 2026-08-22; its
-[execution checklist](../../done/artifact_authority_mode/checklist.md) retains the member evidence. M2
-[Session Route Provenance and Marking](../session_route_provenance/card.md) entered `doing/` on
-`feat/session-route-provenance` on 2026-08-22. Its contract and
-[execution checklist](../session_route_provenance/checklist.md) passed human review, including the cross-member abort
-reader correction, fixture-grounded acceptance matrix, CLI/documentation surfaces, and transaction-seam clarification;
-implementation is active on the member branch. No epic batch is authorized.
+The epic closed on 2026-08-23 after both members shipped independently. M1
+[Artifact Authority Mode](../artifact_authority_mode/card.md) shipped via PR #234 (merge `a1c54a05`); its
+[execution checklist](../artifact_authority_mode/checklist.md) retains the member evidence. M2
+[Session Route Provenance and Marking](../session_route_provenance/card.md) shipped via PR #240 (merge `2a53397c`); its
+[execution checklist](../session_route_provenance/checklist.md) retains the ratified contract, fixture-grounded matrix,
+review corrections, and final evidence. No epic batch was used.
 
 ## Activation bookkeeping
 
@@ -61,43 +58,43 @@ explicit future routing/projection insertion boundary. Strict absence/history re
 pinned by focused, full-unit, regression, and Docker acceptance tests; exact results live in the M1 checklist. PR #234
 merged as `a1c54a05`, and the member's lane/link closeout completed on 2026-08-22.
 
-M2 pre-merge evidence (2026-08-22): routing reuses the shared envelope, lock/path helper, root run identity, and marked
+M2 final evidence (2026-08-23): routing reuses the shared envelope, lock/path helper, root run identity, and marked
 launch transaction while remaining independently readable for unmarked sessions. Failure-injection tests pin
 same-payload compensation, abort precedence, active-state cleanup, and child suppression; integration tests compose
-authority, routing, proxy, sidecar, and both runtime launch boundaries. On the member branch, 9,718 unit tests and 1,067
-regression tests pass, targeted integration passes as 17 plus one exact host lifecycle case, and the isolated wheel
-smoke loads the packaged all-unknown catalog. The member remains `doing/` pending PR review and merge, so aggregate
-acceptance and epic closeout below remain open.
+authority, routing, proxy, sidecar, and both runtime launch boundaries. The final head passed 289 focused tests, 9,740
+unit tests with 117 deselected, 1,067 regressions, the composed managed-launch lifecycle, one malformed-config Docker
+case, and three real-runtime Docker cases (two Claude and one Codex), plus the wheel and full pre-commit gates. PR #240
+merged as `2a53397c` with all five GitHub checks passing.
 
 ## Member sequence
 
 - [x] **M1 -- Artifact Authority Mode (done):** checklist reviewed, implemented, verified, docs synchronized, merged via
   PR #234, and closed from `doing/` to `done/` with inbound links repointed.
-- [x] **M2 -- Session Route Provenance and Marking (doing):** accepted for detailed planning after M1 closeout; separate
-  branch/checklist created with mandatory reuse of M1's journal/run-correlation seam.
+- [x] **M2 -- Session Route Provenance and Marking (done):** reviewed, implemented, verified, documented, merged via PR
+  #240, and closed from `doing/` to `done/` with inbound links repointed.
 - [x] Review and ratify M2 D1-D8 before source implementation.
-- [ ] Implement, verify, document, and close M2 independently; do not fork the shared helper or vocabulary.
+- [x] Implement, verify, document, and close M2 independently; do not fork the shared helper or vocabulary.
 
-## Aggregate acceptance (deferred until both members ship)
+## Aggregate acceptance
 
-- [ ] One launch with both members active reuses one root run id across both journals and the route projection.
-- [ ] Each member still works alone; authority never depends on route/marking availability and routing never authorizes
+- [x] One launch with both members active reuses one root run id across both journals and the route projection.
+- [x] Each member still works alone; authority never depends on route/marking availability and routing never authorizes
   mutation.
-- [ ] Later-journal or projection failure attempts same-run compensation in every touched journal; a landed authority
+- [x] Later-journal or projection failure attempts same-run compensation in every touched journal; a landed authority
   abort reports `launch_support=aborted` even when active clear fails, while simultaneous abort/clear failure is
   diagnosed and never permits child invocation.
-- [ ] Malformed journal handling, forced-child advisory inheritance, and separate absence/live-state rendering pass the
+- [x] Malformed journal handling, forced-child advisory inheritance, and separate absence/live-state rendering pass the
   epic acceptance matrix.
-- [ ] Session deletion and cleanup make no selective journal purge regardless of `--keep-transcripts`: both directories
+- [x] Session deletion and cleanup make no selective journal purge regardless of `--keep-transcripts`: both directories
   survive with their containing Forge artifact tree and disappear together only when an owning-worktree delete removes
   that tree.
 
 ## Closeout
 
-- [ ] Every live member is `done/` or has an explicit terminal outcome; no proposed member is counted as shipped.
-- [ ] `docs/design.md`, the relevant session/runtime/telemetry design docs, `docs/cli_reference.md`, and end-user guides
+- [x] Every live member is `done/` or has an explicit terminal outcome; no proposed member is counted as shipped.
+- [x] `docs/design.md`, the relevant session/runtime/telemetry design docs, `docs/cli_reference.md`, and end-user guides
   describe only shipped behavior and preserve the no-attestation boundary.
-- [ ] Aggregate unit, regression, integration, pre-commit, and relative-link checks pass on the final integrated head.
-- [ ] Add the epic closeout to `docs/board/change_log.md`; promote only human-approved durable lessons to
+- [x] Aggregate unit, regression, integration, pre-commit, and relative-link checks pass on the final integrated head.
+- [x] Add the epic closeout to `docs/board/change_log.md`; promote only human-approved durable lessons to
   `docs/board/impl_notes.md`.
-- [ ] Move the epic `doing/ -> done/` after all shipped-member evidence is merged and repoint every inbound board link.
+- [x] Move the epic `doing/ -> done/` after all shipped-member evidence is merged and repoint every inbound board link.

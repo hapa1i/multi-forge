@@ -1,14 +1,16 @@
 # M2 execution checklist: Session Route Provenance and Marking
 
+Closeout: shipped in [PR #240](https://github.com/hapa1i/multi-forge/pull/240) (merge `2a53397c`) and moved to `done/`
+on 2026-08-23.
+
 **Card**: [card.md](card.md) -- the normative contract. **Epic**:
 [Session Authority and Provenance](../epic_session_authority_provenance/card.md). **Branch**:
 `feat/session-route-provenance`, created from `main` at `3e17f4a4` on 2026-08-22.
 
 ## Current state and stop boundary
 
-The card moved from `proposed/` to `doing/` after M1 shipped and the user accepted M2 for detailed planning. The
-document-review recommendations were incorporated, and the user authorized uninterrupted execution through PR creation
-on 2026-08-22.
+M2 shipped through its independent member PR and closed on 2026-08-23. This checklist retains the ratified decisions,
+fixture-grounded acceptance matrix, review corrections, and final verification evidence.
 
 - [x] Create a separate M2 branch from current `main`; do not reuse M1's branch or an epic batch.
 - [x] Move the complete card directory with `git mv` and repoint inbound board links.
@@ -379,8 +381,8 @@ the sidecar path combines launcher-unit assertions with real Docker lifecycle co
 - [x] Verify no route/marking read authorizes mutation or claims per-request use, authorship, detection, or admission.
 - [x] Verify authority can operate without route/marking reads and M2 does not fork M1 infrastructure.
 - [x] Update the epic checklist with aggregate M1+M2 evidence.
-- [ ] Add a proportionate completed-work entry to `docs/board/change_log.md`; promote only human-approved durable
+- [x] Add a proportionate completed-work entry to `docs/board/change_log.md`; promote only human-approved durable
   lessons to `docs/board/impl_notes.md`.
 - [x] Re-read the commit/PR description and remove filler, inventory, and process narration.
-- [ ] After merge, move M2 `doing/ -> done/`, repoint inbound links, and close the epic only when its aggregate
+- [x] After merge, move M2 `doing/ -> done/`, repoint inbound links, and close the epic only when its aggregate
   acceptance and closeout are complete.

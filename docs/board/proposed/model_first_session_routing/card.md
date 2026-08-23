@@ -1,9 +1,9 @@
 # Model-First Interactive Session Routing
 
 **Status**: Proposed (2026-08-20). Adjacent to, but not a member of,
-[Epic: Session Authority and Provenance](../../doing/epic_session_authority_provenance/card.md).
+[Epic: Session Authority and Provenance](../../done/epic_session_authority_provenance/card.md).
 
-**Relationship**: [Session Route Provenance and Marking](../../doing/session_route_provenance/card.md) reports launch
+**Relationship**: [Session Route Provenance and Marking](../../done/session_route_provenance/card.md) reports launch
 decisions without changing them. This card adds an explicit model-first route-selection command for interactive Claude
 sessions. It neither depends on authority mode nor changes authority inheritance.
 

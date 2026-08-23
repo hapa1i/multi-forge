@@ -1,18 +1,17 @@
 # Epic: Session Authority and Provenance
 
-**Epic** -- coordinating card for the independently shippable members below. Lane: `doing/` (activated 2026-08-21);
-shared contracts C1-C5 were accepted and frozen for M1. M2 ratified one evidence-conditional clarification to C3 at its
-human review gate. M1 [Artifact Authority Mode](../../done/artifact_authority_mode/card.md) shipped via PR #234 and is
-the epic's first done member. M2 [Session Route Provenance and Marking](../session_route_provenance/card.md) entered
-`doing/` on its separate member branch on 2026-08-22; its contract/checklist passed review and implementation is active.
-Coordination is tracked in [checklist.md](checklist.md), and no epic batch is authorized.
+**Epic** -- Done. Both independently shippable members completed on separate branches: M1
+[Artifact Authority Mode](../artifact_authority_mode/card.md) shipped via PR #234, and M2
+[Session Route Provenance and Marking](../session_route_provenance/card.md) shipped via PR #240. Shared contracts C1-C5,
+the M2 evidence-conditional clarification to C3, aggregate verification, and closeout are retained in
+[checklist.md](checklist.md). The epic closed to `done/` on 2026-08-23.
 
 **Purpose**: keep artifact authority and session route provenance semantically separate while preventing their journal,
 run-correlation, and presentation infrastructure from drifting.
 
 ## Problem
 
-[Artifact Authority Mode](../../done/artifact_authority_mode/card.md) and
+[Artifact Authority Mode](../artifact_authority_mode/card.md) and
 [Session Route Provenance and Marking](../session_route_provenance/card.md) answer different questions:
 
 - authority: which managed session is permitted to mutate project artifacts, and what enforcement posture supported a
@@ -30,10 +29,10 @@ behavior-changing proposal; it may emit richer routing facts when present but is
 
 ## Members
 
-| Id  | Card                                                                  | Delivers                                                        | Depends on |
-| --- | --------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| M1  | [artifact_authority_mode](../../done/artifact_authority_mode/card.md) | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
-| M2  | [session_route_provenance](../session_route_provenance/card.md)       | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
+| Id  | Card                                                            | Delivers                                                        | Depends on |
+| --- | --------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
+| M1  | [artifact_authority_mode](../artifact_authority_mode/card.md)   | Session roles, managed-tool enforcement, authority journal/read | Epic C1-C5 |
+| M2  | [session_route_provenance](../session_route_provenance/card.md) | Launch route journal/read and declared text-marking display     | Epic C1-C5 |
 
 The members remain independently shippable. M1 does not require model selection, marking metadata, or M2's read
 surfaces. M2 does not require authority roles or enforcement.
@@ -204,4 +203,10 @@ is kept authority-neutral. The second member must run the first member's journal
 
 ## Closeout
 
-(pending)
+M1 shipped through PR #234 (merge `a1c54a05`) and M2 through PR #240 (merge `2a53397c`). The integrated implementation
+reuses one event envelope, root run identity, strict journal seam, compensation vocabulary, and evidence language while
+keeping authority enforcement independent from route and marking reads. Aggregate unit, regression, targeted
+integration, real-runtime Docker, wheel, pre-commit, and link checks passed; the detailed commands and counts remain in
+the member and epic checklists. Design, CLI, and end-user documentation preserve the boundary that local provenance and
+provider declarations do not attest authorship, admission, or per-request model use. Both members and this epic closed
+to `done/` on 2026-08-23.
