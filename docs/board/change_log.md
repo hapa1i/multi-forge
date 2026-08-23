@@ -7,6 +7,26 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-08-23
 
+### Correct daily review findings
+
+**Goal/outcome**: Correct eight independently verified session, routing, recovery, design-reference, and repository-
+validation defects without weakening the surrounding rollback, state-ownership, or compatibility contracts.
+
+**Key changes**:
+
+- Preserved Codex session, worktree, transfer, and completed-child state after successful route projection while
+  retaining compensation before that boundary, and serialized the final relocated-transcript ownership decision with
+  unlink.
+- Recorded only Claude model pins actually applied to the child, added proxy wire shape to new route events while
+  retaining legacy journal reads, and accepted authoritative runtime truth with empty known optional tiers when a usable
+  mapping remains.
+- Decoupled skill-invocation comparisons from unrelated config validation, rejected unrepresentable active-registry
+  PIDs, validated Markdown links against the candidate Git tree, and repointed living references to their domain owners.
+
+**Verification**: 121 final routing/authority tests; 9,764 unit tests with 117 integration-marked tests deselected;
+1,068 regressions; required Codex start, direct Claude model-pin, Docker session-routing, and proxy runtime-truth
+integration slices; full pre-commit; 567-source Markdown audit; and diff checks. PR #243 merged as `79342e99`.
+
 ### Record session route provenance and close its coordination epic
 
 **Goal/outcome**: Make each managed launch's committed route inspectable without turning route or provider-declaration

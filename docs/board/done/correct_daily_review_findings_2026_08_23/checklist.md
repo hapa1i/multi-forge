@@ -2,8 +2,8 @@
 
 Activation base: `effff0b4` (`main`, 2026-08-23).
 
-Current focus: review and merge [PR #243](https://github.com/hapa1i/multi-forge/pull/243); the routing-provenance
-follow-up is implemented and verified.
+Closeout: shipped in [PR #243](https://github.com/hapa1i/multi-forge/pull/243) (merge `79342e99`) and moved to `done/`
+on 2026-08-23.
 
 ## Session Safety
 
@@ -40,6 +40,7 @@ follow-up is implemented and verified.
 
 - [x] Record verification evidence and design synchronization.
 - [x] Keep the remediation implementation distinct from the retired commit-hook work.
+- [x] Record the merged delivery, add the change-log entry, move the card to `done/`, and repoint inbound board links.
 
 ## Verification Evidence
 

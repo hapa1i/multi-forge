@@ -6,7 +6,7 @@
 the two-card batch before merge.
 
 **Replacement**: The current-main remediation continues as the standalone
-[`correct_daily_review_findings_2026_08_23`](../../doing/correct_daily_review_findings_2026_08_23/card.md) card in PR
+[`correct_daily_review_findings_2026_08_23`](../../done/correct_daily_review_findings_2026_08_23/card.md) card in PR
 #243. The rejected hook has no replacement.
 
 ## Original Goal
@@ -22,7 +22,7 @@ repository-owned commit-message hook from closed PR #238 with its known normaliz
 - Integration owner: the single implementer executing this batch
 - Execution: sequential; no parallel writers
 - Order:
-  1. [`correct_daily_review_findings_2026_08_23`](../../doing/correct_daily_review_findings_2026_08_23/card.md)
+  1. [`correct_daily_review_findings_2026_08_23`](../../done/correct_daily_review_findings_2026_08_23/card.md)
   2. [`repository_owned_commit_message_hook`](../repository_owned_commit_message_hook/card.md)
 
 The members share `.pre-commit-config.yaml`, repository guidance, board closeout, and aggregate validation. Each member

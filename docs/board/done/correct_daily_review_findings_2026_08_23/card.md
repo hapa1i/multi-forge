@@ -1,9 +1,9 @@
 # Correct Daily Review Findings 2026-08-23
 
-**Lane**: `doing/`
+**Lane**: `done/`
 
-**Delivery**: Implemented in `080eb4c0` for [PR #243](https://github.com/hapa1i/multi-forge/pull/243); terminal closeout
-waits for merge.
+**Delivery**: Shipped via [PR #243](https://github.com/hapa1i/multi-forge/pull/243) (merge `79342e99`, 2026-08-23) and
+closed to `done/` on 2026-08-23.
 
 ## Goal
 
