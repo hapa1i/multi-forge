@@ -15,10 +15,10 @@ Forge memory has three layers; this section covers **project memory** -- the des
 | ------------------- | ------------------------------------------------------- | ------------------------- |
 | **Raw memory**      | Transcripts, plans, artifacts, reports (§3.8)           | `.forge/artifacts/`       |
 | **Project memory**  | Passported docs (changelog, impl notes) -- this section | `docs/`, `.forge/memory/` |
-| **Transfer memory** | Curated context for fork/resume (§3.9)                  | `.forge/prev_sessions/`   |
+| **Transfer memory** | Curated context for fork/resume ([session design §3.9]) | `.forge/prev_sessions/`   |
 
-The Stop hook schedules the **memory writer**, which later curates project memory asynchronously; **transfer** (§3.9)
-assembles context for a child session.
+The Stop hook schedules the **memory writer**, which later curates project memory asynchronously; **transfer**
+([session design §3.9]) assembles context for a child session.
 
 The simplest memory system is:
 
@@ -362,3 +362,5 @@ read payload without rewriting the manifest. It never selected a runtime output 
 key outside `intent.memory` remains a strict schema error.
 
 ---
+
+[session design §3.9]: design_sessions.md#39-session-resume-context-management

@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 from forge.config.schema import TierModels
 from forge.proxy import server
+from forge.proxy.runtime_truth import ProxyRuntimeTruth
 
 _UNKNOWN_MARKER = "not a known backend instance"
 
@@ -155,3 +156,10 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
     }
     assert response["tiers"]["haiku"] == {"model": "", "context_window": 200_000}
     assert response["runtime"]["model_alternatives"] == {"opus": {"opus": "qwen/qwen3.8-2.4t-a95b"}}
+
+    parsed = ProxyRuntimeTruth(response)
+    assert parsed.has_authoritative_route_truth is True
+    assert parsed.tier_mappings == {
+        "sonnet": "qwen/qwen3.8-27b",
+        "opus": "anthropic/claude-opus-5",
+    }

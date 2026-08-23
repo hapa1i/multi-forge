@@ -11,6 +11,7 @@ import pytest
 
 import forge.core.ops.session_authority_launch as launch
 import forge.core.ops.session_routing as routing_ops
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.ops.session import ForgeOpError
@@ -174,7 +175,7 @@ def test_route_preparation_failure_writes_no_routing_history_or_invokes_child(
                 effective_template=None,
                 runtime_base_url=None,
                 proxy_id=None,
-                effective_direct_model="claude-opus-5",
+                applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
             )
             invoked = True
 
@@ -265,7 +266,7 @@ def test_routing_append_failure_compensates_marked_transaction_without_child(
                     effective_template=None,
                     runtime_base_url=None,
                     proxy_id=None,
-                    effective_direct_model="claude-opus-5",
+                    applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
                 ),
                 authority_attempt=attempt,
             )
@@ -324,7 +325,7 @@ def test_projection_failure_compensates_routing_then_authority_without_run_ended
                     effective_template=None,
                     runtime_base_url=None,
                     proxy_id=None,
-                    effective_direct_model="claude-sonnet-5",
+                    applied_direct_model=resolve_direct_model_pin("claude-sonnet-5"),
                 ),
                 authority_attempt=attempt,
             )
@@ -391,7 +392,7 @@ def test_projection_compensation_failures_are_aggregated_and_child_is_suppressed
                     effective_template=None,
                     runtime_base_url=None,
                     proxy_id=None,
-                    effective_direct_model="claude-opus-5",
+                    applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
                 ),
                 authority_attempt=attempt,
             )
@@ -438,7 +439,7 @@ def test_spawn_failure_after_projection_retains_route_with_same_root_run_id(
                     effective_template=None,
                     runtime_base_url=None,
                     proxy_id=None,
-                    effective_direct_model="claude-opus-5",
+                    applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
                 ),
                 authority_attempt=attempt,
             )

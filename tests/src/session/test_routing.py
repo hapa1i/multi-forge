@@ -79,6 +79,42 @@ def _payload(*, kind: str = "direct") -> dict[str, Any]:
     return base
 
 
+def _proxy_payload() -> dict[str, Any]:
+    payload = _payload(kind="proxy")
+    payload["route"] = {
+        "kind": "proxy",
+        "backend_id": "openrouter",
+        "proxy_id": "or-1",
+        "template": "openrouter-anthropic",
+        "custom_route_fingerprint": None,
+    }
+    payload["default_tier"] = "sonnet"
+    payload["tier_mappings"] = {"sonnet": "anthropic/claude-sonnet-5"}
+    payload["route_scope_tags"] = [
+        "backend:openrouter",
+        "route:proxy",
+        "runtime:claude_code",
+    ]
+    payload["marking_snapshots"] = [
+        {
+            "slot": "tier_default",
+            "tier": "sonnet",
+            "request_model": None,
+            "route_model": "anthropic/claude-sonnet-5",
+            "canonical_model": "claude-sonnet-5",
+            "declaration": {
+                "status": "unknown",
+                "basis": None,
+                "source_url": None,
+                "checked_at": None,
+                "effective_from": None,
+                "route_scope": [],
+            },
+        }
+    ]
+    return payload
+
+
 def _commit(state: SessionState, run: str, payload: dict[str, Any] | None = None):
     return new_routing_event(
         state,
@@ -111,44 +147,35 @@ def test_route_payload_kinds_validate_exactly(tmp_path: Path) -> None:
     direct = _commit(_state(), "run_000000000001")
     assert direct.payload["route"]["kind"] == "direct"
 
-    proxy = _payload(kind="proxy")
-    proxy["route"] = {
-        "kind": "proxy",
-        "backend_id": "openrouter",
-        "proxy_id": "or-1",
-        "template": "openrouter-anthropic",
-        "custom_route_fingerprint": None,
-    }
-    proxy["default_tier"] = "sonnet"
-    proxy["tier_mappings"] = {"sonnet": "anthropic/claude-sonnet-5"}
-    proxy["route_scope_tags"] = [
-        "backend:openrouter",
-        "route:proxy",
-        "runtime:claude_code",
-    ]
-    proxy["marking_snapshots"] = [
-        {
-            "slot": "tier_default",
-            "tier": "sonnet",
-            "request_model": None,
-            "route_model": "anthropic/claude-sonnet-5",
-            "canonical_model": "claude-sonnet-5",
-            "declaration": {
-                "status": "unknown",
-                "basis": None,
-                "source_url": None,
-                "checked_at": None,
-                "effective_from": None,
-                "route_scope": [],
-            },
-        }
-    ]
+    proxy = _proxy_payload()
     append_routing_event(tmp_path, _commit(_state(), "run_000000000002", proxy))
 
     native = _payload(kind="runtime_native")
     native["direct_model"] = None
     native["route_scope_tags"] = ["route:runtime_native", "runtime:codex"]
     append_routing_event(tmp_path, _commit(_state(runtime="codex"), "run_000000000003", native))
+
+
+def test_requested_model_can_remain_when_proxy_or_custom_route_ignores_it(tmp_path: Path) -> None:
+    proxy = _proxy_payload()
+    proxy["requested_model"] = "claude-opus-5"
+    append_routing_event(tmp_path, _commit(_state(), "run_000000000001", proxy))
+
+    custom = _payload(kind="custom")
+    custom["direct_model"] = None
+    custom["route"]["custom_route_fingerprint"] = custom_route_fingerprint("https://example.com")
+    custom["requested_model"] = "claude-opus-5"
+    custom["route_scope_tags"] = ["route:custom", "runtime:claude_code"]
+    append_routing_event(tmp_path, _commit(_state(), "run_000000000002", custom))
+
+
+def test_ignored_proxy_request_cannot_claim_an_effective_model(tmp_path: Path) -> None:
+    payload = _proxy_payload()
+    payload["requested_model"] = "claude-opus-5"
+    payload["selected_model"] = "anthropic/claude-sonnet-5"
+
+    with pytest.raises(SessionEventValidationError, match="ignored proxy request"):
+        append_routing_event(tmp_path, _commit(_state(), "run_000000000001", payload))
 
 
 def test_exact_abort_payload_is_enforced(tmp_path: Path) -> None:

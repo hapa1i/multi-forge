@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import forge.core.ops.session_model as ops
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session_routing import (
     build_claude_routing_payload,
@@ -203,7 +204,7 @@ def test_supported_projection_exposes_journal_owned_scope_and_launch_marking(
         effective_template=None,
         runtime_base_url=None,
         proxy_id=None,
-        effective_direct_model="claude-opus-5",
+        applied_direct_model=resolve_direct_model_pin("claude-opus-5"),
     )
     projection = commit_launch_routing(
         store=store,
@@ -572,7 +573,7 @@ def test_history_wrapper_returns_full_events_in_append_order(project: Path) -> N
             effective_template=None,
             runtime_base_url=None,
             proxy_id=None,
-            effective_direct_model="claude-sonnet-5",
+            applied_direct_model=resolve_direct_model_pin("claude-sonnet-5"),
         ),
         authority_attempt=None,
     )

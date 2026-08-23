@@ -137,6 +137,29 @@ class TestActiveSessionStore:
 
         assert store.index_path.read_bytes() == original
 
+    def test_unrepresentable_pid_is_rejected_strictly_and_repaired_on_read(
+        self,
+        store: ActiveSessionStore,
+    ) -> None:
+        store.upsert_session(
+            "huge-pid",
+            worktree_path="/tmp/project",
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+        )
+        data = json.loads(store.index_path.read_text())
+        only_entry = next(iter(data["sessions"].values()))
+        only_entry["launcher_pid"] = 10**100
+        store.index_path.write_text(json.dumps(data))
+        original = store.index_path.read_bytes()
+
+        with pytest.raises(ValueError, match="launcher_pid"):
+            store.peek_session("huge-pid", forge_root="/tmp/project")
+
+        assert store.index_path.read_bytes() == original
+        assert store.read().sessions == {}
+        assert json.loads(store.index_path.read_text()) == {"version": 1, "sessions": {}}
+
     def test_get_session_prunes_stale_host_entry(
         self, store: ActiveSessionStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -133,7 +133,7 @@ class TestRenderBlock:
         """Trust-byte stability: Codex's trusted_hash covers these definitions.
 
         If this golden changes, every existing enrollment silently breaks.
-        Do not update it casually -- see design.md §3.9.
+        Do not update it casually -- see design_sessions.md §3.9.
         """
         expected = (
             "# >>> forge hooks >>>\n"

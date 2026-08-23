@@ -442,13 +442,13 @@ Repo-specific zones — this codebase's load-bearing discipline. Read the refere
   atomic temp+rename writes, explicit reset/migration paths. What looks like ceremony is the durable-state contract.
 - **Fail-open policy composition** (`docs/design_workflows.md` §1.2): policy/supervisor paths that deliberately degrade
   to "aligned" rather than block the coding session. The asymmetric error handling is the design.
-- **Wire translation and passthrough** (`docs/design.md` §7.x): signature-safety, thinking-block preservation,
+- **Wire translation and passthrough** (`docs/design_runtime.md` §7.x): signature-safety, thinking-block preservation,
   redaction-before-persistence ordering. Byte-level care here is a contract, not paranoia.
-- **Telemetry separation** (`docs/design.md` §3.14, `docs/board/impl_notes.md`): telemetry responsibilities stay
-  deliberately separated (downstream model-call evidence, upstream operation outcomes, usage attribution — joined by run
-  tree), while provider-trace evidence deliberately lives as fields on downstream records, not a standalone plane. Both
-  "merge the similar-looking JSONL writers" and "re-extract provider-trace into its own plane" are documented
-  anti-goals.
+- **Telemetry separation** (`docs/design_telemetry.md` §3.14, `docs/board/impl_notes.md`): telemetry responsibilities
+  stay deliberately separated (downstream model-call evidence, upstream operation outcomes, usage attribution — joined
+  by run tree), while provider-trace evidence deliberately lives as fields on downstream records, not a standalone
+  plane. Both "merge the similar-looking JSONL writers" and "re-extract provider-trace into its own plane" are
+  documented anti-goals.
 
 Simplification in these zones is still possible, but the evidence bar is higher.
 

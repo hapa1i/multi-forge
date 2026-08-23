@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypeVar
 
 import dacite
 
@@ -54,6 +54,8 @@ INDEX_DIR = "sessions"
 INDEX_FILENAME = "index.json"
 
 CLI_LOCK_TIMEOUT_S = 5.0
+
+_T = TypeVar("_T")
 
 
 def get_index_path() -> Path:
@@ -235,6 +237,27 @@ class IndexStore:
         # Sort by last_accessed_at DESC, then name ASC for determinism
         sessions.sort(key=lambda x: (-iso_to_timestamp(x[1].last_accessed_at), x[0]))
         return sessions
+
+    def run_session_entries_txn(
+        self,
+        callback: Callable[[list[tuple[str, SessionIndexEntry]]], _T],
+    ) -> _T:
+        """Run a bounded session-snapshot action under publication authority.
+
+        This is the resource-cleanup peer of ``create_session_txn``: callers that
+        must make a final ownership decision and perform the destructive action as
+        one publication-atomic step receive the current non-pruning index snapshot.
+
+        The callback runs while the global index lock is held. It may inspect
+        manifests and perform its one bounded resource action, following the
+        established index -> manifest lock order, but it must not call another
+        locking ``IndexStore`` method because ``file_lock_for_target`` is not
+        reentrant.
+        """
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            sessions = [(session_name_from_key(key), entry) for key, entry in index.sessions.items()]
+            return callback(sessions)
 
     def get_session(self, name: str, forge_root: str | None = None) -> SessionIndexEntry:
         """Get a session entry by name, optionally scoped to a forge_root.

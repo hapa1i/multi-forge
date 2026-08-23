@@ -59,6 +59,22 @@ def test_complete_route_fields_are_authoritative() -> None:
     assert runtime.has_authoritative_route_truth is True
 
 
+def test_known_empty_optional_tier_is_authoritative_but_not_exposed() -> None:
+    runtime = ProxyRuntimeTruth(
+        {
+            "is_proxy": True,
+            "runtime": {
+                "backend_id": "openrouter",
+                "tier_mappings": {"haiku": "", "sonnet": "openai/gpt-5"},
+                "model_alternatives": {},
+            },
+        }
+    )
+
+    assert runtime.has_authoritative_route_truth is True
+    assert runtime.tier_mappings == {"sonnet": "openai/gpt-5"}
+
+
 def test_route_truth_rejects_unknown_tiers_and_unsafe_backend_ids() -> None:
     unknown_tier = ProxyRuntimeTruth(
         {

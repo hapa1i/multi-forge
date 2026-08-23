@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from forge.config.schema import ProxyInstanceConfig, TierModels
 from forge.core.models.direct_model import (
     DirectModelPin,
@@ -9,6 +11,14 @@ from forge.core.models.direct_model import (
     resolve_direct_model_pin,
 )
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
+
+
+@dataclass(frozen=True)
+class ModelPinApplication:
+    """Result of attempting to apply an explicit Claude model pin."""
+
+    pin: DirectModelPin | None = None
+    error: str | None = None
 
 
 def _routing_supports_model_pin(
@@ -82,12 +92,12 @@ def _apply_direct_model_env_if_supported(
     env_vars: dict[str, str],
     proxy_id: str,
     direct_model: str,
-) -> str | None:
+) -> ModelPinApplication:
     """Apply --model env vars when the proxy can honor the pin.
 
-    No-op (returns None) when the proxy is missing or cannot honor the pin.
-    Returns an error message when the proxy config cannot be loaded (e.g. a
-    legacy 'provider: gemini' file) or when env application itself fails.
+    A result with no pin and no error is an intentional no-op when the proxy is
+    missing or cannot honor the selection. Load or env-application failures are
+    returned in ``error`` so callers can preserve their contextual diagnostics.
     """
     from forge.config.loader import load_proxy_instance_config
     from forge.core.state.exceptions import StateCorruptedError
@@ -99,12 +109,17 @@ def _apply_direct_model_env_if_supported(
         # ProxyInstanceConfig.__post_init__. Surface it as a contextual error
         # (mirrors _validate_proxy_model_pin) instead of an unhandled traceback,
         # since resume/fork can reach this apply without the validation gate.
-        return f"Could not load proxy config for '{proxy_id}': {e}"
+        return ModelPinApplication(error=f"Could not load proxy config for '{proxy_id}': {e}")
     if proxy_cfg is None:
-        return None
-    if not _proxy_supports_model_pin(proxy_cfg, resolve_direct_model_pin(direct_model)):
-        return None
-    return apply_direct_model_env(env_vars, direct_model)
+        return ModelPinApplication()
+    try:
+        pin = resolve_direct_model_pin(direct_model)
+    except ValueError as e:
+        return ModelPinApplication(error=str(e))
+    if not _proxy_supports_model_pin(proxy_cfg, pin):
+        return ModelPinApplication()
+    error = apply_direct_model_env(env_vars, direct_model)
+    return ModelPinApplication(pin=pin if error is None else None, error=error)
 
 
 def _validate_proxy_model_pin(proxy_id: str, pin: DirectModelPin) -> str | None:

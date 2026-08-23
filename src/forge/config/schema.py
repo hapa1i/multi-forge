@@ -628,7 +628,7 @@ class RequestLogConfig:
     """Per-proxy bounded request/response diagnostics (proxy_log_hygiene).
 
     Controls the redacted request JSONL under ``~/.forge/logs/requests/``. There is NO
-    plaintext/full body mode -- bodies are always redacted (audit policy, design §7.x).
+    plaintext/full body mode -- bodies are always redacted (audit policy, design_runtime.md §7.x).
 
     - ``enabled='auto'`` preserves the historical coupling to ``log_level=debug``; ``'on'``
       decouples bounded capture from full debug logging; ``'off'`` disables it.
@@ -660,7 +660,7 @@ class RequestLogConfig:
                 if val == "full":
                     hint = (
                         " There is no plaintext/full body mode -- request logging follows the audit "
-                        "redacted-body policy (design §7.x). Use 'redacted' for sanitized structure."
+                        "redacted-body policy (design_runtime.md §7.x). Use 'redacted' for sanitized structure."
                     )
                 raise ValueError(
                     f"logging.requests.{fname} must be one of {', '.join(_VALID_REQUEST_LOG_CAPTURE)} "

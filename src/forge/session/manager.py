@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections.abc import Iterable
 from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
@@ -1979,6 +1980,7 @@ class SessionManager:
         *,
         exclude_name: str,
         exclude_forge_root: str,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
     ) -> dict[str, list[str]]:
         """Find other sessions that still reference the raw transcript UUIDs.
 
@@ -1995,7 +1997,8 @@ class SessionManager:
         normalized_exclude_root = str(Path(exclude_forge_root).resolve())
         shared: dict[str, list[str]] = {session_id: [] for session_id in target_paths}
 
-        for other_name, other_entry in self.index_store.list_sessions():
+        session_entries = sessions if sessions is not None else self.index_store.list_sessions()
+        for other_name, other_entry in session_entries:
             other_forge_root = other_entry.forge_root or other_entry.worktree_path
             if other_name == exclude_name and str(Path(other_forge_root).resolve()) == normalized_exclude_root:
                 continue
@@ -2264,31 +2267,44 @@ class SessionManager:
                 if _relocated_parent_session_id in _shared_transcript_ids:
                     # A cached positive can only make cleanup conservative if its owner disappears.
                     _reloc_shared = {_relocated_parent_session_id: _shared_transcript_ids[_relocated_parent_session_id]}
-                else:
-                    # Another process can publish a sibling while ordinary transcript cleanup
-                    # runs. That owner must be visible here; a cached absence is not authority
-                    # to destroy the relocated transcript.
-                    _reloc_shared = self._find_shared_transcript_sessions(
-                        _transcript_project_root,
-                        [_relocated_parent_session_id],
-                        exclude_name=name,
-                        exclude_forge_root=entry_forge_root,
-                    )
-                if _reloc_shared:
                     logger.info(
                         "Skipping relocated-transcript cleanup: %s still referenced by %s",
                         _reloc_path,
                         ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
                     )
                 else:
-                    try:
-                        _reloc_path.unlink(missing_ok=True)
-                    except OSError as exc:
-                        logger.warning(
-                            "Failed to remove relocated parent transcript %s: %s",
-                            _reloc_path,
-                            exc,
+                    # A cached absence is not destruction authority. Hold the same
+                    # publication lock used by every session creator across the final
+                    # owner scan and unlink, so a sibling can land entirely before the
+                    # decision or only after the old copy is gone (and then recreate it
+                    # during native-relocate preparation).
+                    def _unlink_if_unreferenced(
+                        sessions: list[tuple[str, SessionIndexEntry]],
+                    ) -> None:
+                        _reloc_shared = self._find_shared_transcript_sessions(
+                            _transcript_project_root,
+                            [_relocated_parent_session_id],
+                            exclude_name=name,
+                            exclude_forge_root=entry_forge_root,
+                            sessions=sessions,
                         )
+                        if _reloc_shared:
+                            logger.info(
+                                "Skipping relocated-transcript cleanup: %s still referenced by %s",
+                                _reloc_path,
+                                ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
+                            )
+                            return
+                        try:
+                            _reloc_path.unlink(missing_ok=True)
+                        except OSError as exc:
+                            logger.warning(
+                                "Failed to remove relocated parent transcript %s: %s",
+                                _reloc_path,
+                                exc,
+                            )
+
+                    self.index_store.run_session_entries_txn(_unlink_if_unreferenced)
 
             if _deriv is not None and _deriv.rewind_relocated_session_id:
                 _rewind_root = _transcript_cleanup_project_root(

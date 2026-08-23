@@ -357,6 +357,17 @@ class TestConfigReset:
         assert result.exit_code == 0
         assert "forge extension sync" in result.output
 
+    def test_reset_all_reads_skill_invocation_despite_invalid_unrelated_field(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text(
+            "proxy_mode: broken\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = CliRunner().invoke(config, ["reset", "--yes"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" in result.output
+
     def test_reset_single_key(self):
         home = get_forge_home()
         (home / "config.yaml").write_text("proxy_mode: sidecar\nstatus_timeout: 0.5\n")
@@ -391,6 +402,28 @@ class TestConfigReset:
 
         assert result.exit_code == 0
         assert "forge extension sync" not in result.output
+
+    def test_reset_invalid_unrelated_key_preserves_skill_comparison(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text(
+            "proxy_mode: broken\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = CliRunner().invoke(config, ["reset", "proxy_mode"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" not in result.output
+
+    def test_reset_skills_reads_override_despite_invalid_unrelated_field(self):
+        home = get_forge_home()
+        (home / "config.yaml").write_text(
+            "proxy_mode: broken\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = CliRunner().invoke(config, ["reset", "skills"])
+
+        assert result.exit_code == 0
+        assert "forge extension sync" in result.output
 
     def test_reset_no_file(self):
         runner = CliRunner()
@@ -812,6 +845,19 @@ class TestConfigEdit:
 
         result = self._run_edit_with(
             "proxy_mode: sidecar\nskills:\n  invocation:\n    review: model\n",
+            monkeypatch,
+        )
+
+        assert result.exit_code == 0
+        assert "forge extension sync" not in result.output
+
+    def test_edit_compares_stored_skills_despite_invalid_unrelated_field(self, monkeypatch):
+        (get_forge_home() / "config.yaml").write_text(
+            "proxy_mode: broken\nskills:\n  invocation:\n    review: model\n",
+        )
+
+        result = self._run_edit_with(
+            "proxy_mode: host\nskills:\n  invocation:\n    review: model\n",
             monkeypatch,
         )
 

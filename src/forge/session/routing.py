@@ -403,9 +403,13 @@ def _require_proxy(event: SessionEvent, *, verify_catalog_normalization: bool) -
     if requested is None:
         if selected_tier is not None or payload["selected_model"] is not None:
             raise SessionEventValidationError("proxy selection requires requested_model", field="payload")
+    elif selected_tier is None:
+        if payload["selected_model"] is not None:
+            raise SessionEventValidationError(
+                "ignored proxy request must not select a model",
+                field="payload",
+            )
     else:
-        if selected_tier is None:
-            raise SessionEventValidationError("proxy requested_model requires selected_tier", field="payload")
         expected_model = payload["model_alternatives"].get(selected_tier, {}).get(requested)
         expected_model = expected_model or payload["tier_mappings"].get(selected_tier)
         if expected_model is None or payload["selected_model"] != expected_model:
@@ -438,11 +442,8 @@ def _require_custom(event: SessionEvent, *, verify_catalog_normalization: bool) 
     _require_canonical_field(payload, "requested_model", verify=verify_catalog_normalization)
     if payload["selected_model"] is not None:
         raise SessionEventValidationError("custom selected_model must be null", field="payload")
-    if (payload["requested_model"] is None) != (payload["selected_tier"] is None):
-        raise SessionEventValidationError(
-            "custom selected_tier must describe an explicit requested_model",
-            field="payload",
-        )
+    if payload["selected_tier"] is not None:
+        raise SessionEventValidationError("custom selected_tier must be null", field="payload")
 
 
 def _require_runtime_native(event: SessionEvent) -> None:

@@ -12,7 +12,7 @@ A bare non-zero exit with no recognizable marker is UNCATEGORIZED -- never
 silently treated as a signature failure.
 
 The 2026-04-02 negative result (Claude Code 2.1.90, cross-CWD resume fails "No
-conversation found"; docs/design.md 3.9) is the prior art this test revisits:
+conversation found"; docs/design_sessions.md 3.9) is the prior art this test revisits:
 that test never relocated the JSONL. Host Claude is now far newer, so both the
 relocation hypothesis and the version bump are reasons to re-measure.
 

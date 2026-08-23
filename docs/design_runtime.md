@@ -170,6 +170,9 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   routing facts. The exposed tier and alternative targets include the same active ZDR substitutions used for dispatch.
   Older responses that omit the additive fields remain readable, but callers label config or launch-commit recovery as
   fallback rather than live runtime evidence.
+- Known optional tier keys may be present with an empty string when that tier has no route. Runtime-truth readers omit
+  those empty entries from the exposed mapping without rejecting the otherwise authoritative response; unknown keys,
+  non-string values, or a map with no nonempty route remain non-authoritative.
 - Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
   `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
   identity fields available; the nested `downstream_retention` object carries the recovery detail.

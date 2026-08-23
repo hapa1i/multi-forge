@@ -1,6 +1,6 @@
 """Empirical Codex hook-enrollment verification (residual-risk slice).
 
-The Codex trust ceremony (design.md section 3.9) is **unverifiable pre-turn**: the
+The Codex trust ceremony (design_sessions.md section 3.9) is **unverifiable pre-turn**: the
 ``[hooks.state]`` ``trusted_hash`` is not black-box computable, so Forge can neither
 perform nor validate enrollment from a config read. Enrollment can only be confirmed by
 its *effect* -- an enrolled ``codex-session-start`` hook fires on a managed turn and

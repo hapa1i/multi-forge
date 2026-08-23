@@ -42,10 +42,10 @@ Operating instincts:
 - **Must-stay-identical vs allowed-to-diverge.** The central duplication question: if one copy changed without the
   other, would that be a bug? Yes → drift hazard, hoist it. No → possibly deliberate independence — this repo
   *documents* such cases (the walkthrough/QA state scripts each own their copy "so checklist/state behavior can change
-  independently," `testing_guidelines.md`; telemetry responsibilities stay separated by design, `design.md` §3.14 —
-  though provider-trace evidence was deliberately *folded onto* downstream records rather than kept as a standalone
-  plane, `docs/board/impl_notes.md`). Flagging documented independence as duplication is this audit's signature false
-  positive — and so is re-proposing a separation the repo deliberately folded.
+  independently," `testing_guidelines.md`; telemetry responsibilities stay separated by design,
+  `docs/design_telemetry.md` §3.14 — though provider-trace evidence was deliberately *folded onto* downstream records
+  rather than kept as a standalone plane, `docs/board/impl_notes.md`). Flagging documented independence as duplication
+  is this audit's signature false positive — and so is re-proposing a separation the repo deliberately folded.
 - **Count the blast radius before proposing a move.** Tests in this repo patch through string paths — the
   `session_op_layer_extraction` seam carried **255** `patch("forge.cli.session.<name>")` sites across 13 files, which is
   why its shim existed and why its unwind needed a dedicated five-slice card. A symbol move's cost is measured in patch
@@ -223,7 +223,8 @@ Every finding names its category; each category has shipped repo precedent.
 ## Caution Zones
 
 - **Documented intentional duplication and separation** — the state scripts and telemetry separation above. Check
-  `testing_guidelines.md` and `design.md` §3.14 before flagging any copy pair or "similar-looking writers."
+  `testing_guidelines.md` and `docs/design_telemetry.md` §3.14 before flagging any copy pair or "similar-looking
+  writers."
 - **Patch-target blast radius** — moving or renaming symbols breaks string-based `patch(...)` targets silently. Count
   them first; a move with hundreds of patch sites is a staged card with a compatibility plan, never a drive-by. The
   255-site precedent is the calibration point.
