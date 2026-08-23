@@ -7,9 +7,8 @@ wins.
 
 ## Current focus
 
-Integrate the independently tested route plan with lifecycle callers next. Catalog ordering, manifest-v2 neutral intent,
-read-only precedence/admission/tier selection, and the single-candidate realization boundary are complete; lifecycle
-integration must consume the plan's exact selected-tier context limit before intent mutation.
+Completed 2026-08-24. Implementation, documentation, integration coverage, release proof, and closeout evidence are
+recorded below.
 
 ## Activation and review
 
@@ -123,7 +122,7 @@ provenance preparation and commit. **Blockers:** None.
   serving tier; otherwise an ambiguity error naming candidates and a usable `--model-tier` command.
 - [x] Reject `--model-tier` without `--model`, direct-tier mismatch, non-serving explicit tiers, uncatalogued provider
   refs, non-Claude direct/no-proxy requests, and unsupported custom routes before intent mutation or child invocation.
-- [ ] Resolve the selected tier's effective context window and run resume/fork context-budget preflight before
+- [x] Resolve the selected tier's effective context window and run resume/fork context-budget preflight before
   committing intent. A failure leaves prior session intent byte-equivalent; any already-started proxy follows ordinary
   lifecycle.
 - [x] Update `docs/design.md` §3.4 and `docs/design_runtime.md` §3.6.12 in this phase when planner ownership,
@@ -134,23 +133,23 @@ provenance preparation and commit. **Blockers:** None.
 **Deferral:** This card does not add a billing resolver. Without separately shipped evidence, the immutable payload and
 prelaunch line continue to report `billing_mode=unknown`. **Blockers:** None.
 
-- [ ] Widen `session start|resume|fork|incognito --model` and add `--model-tier` with shared help text and contextual
+- [x] Widen `session start|resume|fork|incognito --model` and add `--model-tier` with shared help text and contextual
   recovery errors; keep `session adopt --model` unchanged and preserve the existing authority flag vocabulary.
-- [ ] Route all Claude host-mode lifecycle paths through the same planner without duplicating precedence or transition
+- [x] Route all Claude host-mode lifecycle paths through the same planner without duplicating precedence or transition
   logic. Preserve Codex and explicit `--sidecar`/`--host-proxy` guards.
-- [ ] Preserve all currently successful Claude direct/proxy model-pin cases, aliases, `[1m]`, explicit proxy/no-proxy,
+- [x] Preserve all currently successful Claude direct/proxy model-pin cases, aliases, `[1m]`, explicit proxy/no-proxy,
   active-session refusal, forced-child inheritance, and incognito cleanup.
-- [ ] Reject a non-Claude main-session route combined with `--subprocess-proxy` before either proxy or child startup;
+- [x] Reject a non-Claude main-session route combined with `--subprocess-proxy` before either proxy or child startup;
   preserve direct Claude plus subprocess-proxy behavior.
-- [ ] Make `--no-launch --model` resolve/start and persist coherent intent without invoking a child or appending a route
+- [x] Make `--no-launch --model` resolve/start and persist coherent intent without invoking a child or appending a route
   event. Keep an auto-started proxy independently managed.
-- [ ] Build the immutable routing payload from updated intent, including the canonical request and selected tier, while
+- [x] Build the immutable routing payload from updated intent, including the canonical request and selected tier, while
   preserving route-provenance event schema, backend proof rules, marking snapshots, and legacy `direct_model` fallback.
-- [ ] Render one stderr prelaunch route line from that exact payload whenever explicit `--model` selects or changes a
+- [x] Render one stderr prelaunch route line from that exact payload whenever explicit `--model` selects or changes a
   route. Keep result streams and child stdout unchanged.
-- [ ] Verify required route-journal commitment remains after payload construction and before child invocation; later
+- [x] Verify required route-journal commitment remains after payload construction and before child invocation; later
   payload/projection/spawn/child failure retains the successfully persisted explicit route choice per the card.
-- [ ] Update CLI help, `docs/design_sessions.md` §3.9, `docs/cli_reference.md`, `docs/end-user/session.md`,
+- [x] Update CLI help, `docs/design_sessions.md` §3.9, `docs/cli_reference.md`, `docs/end-user/session.md`,
   `docs/end-user/model_selection.md`, and `docs/end-user/proxy.md` in this phase when the interactive CLI and lifecycle
   behavior ship.
 
@@ -159,39 +158,39 @@ prelaunch line continue to report `billing_mode=unknown`. **Blockers:** None.
 **Migration guard:** The temporary dual metadata source is allowed only behind Phase 1's exact ordered parity test.
 Removal waits for that test to pass. **Blockers:** None.
 
-- [ ] Remove workflow-owned `provider_refs` and `preferred_proxy` ordering only after shared catalog lookup is available
+- [x] Remove workflow-owned `provider_refs` and `preferred_proxy` ordering only after shared catalog lookup is available
   and the Phase 1 legacy-versus-catalog order guard passes; retain worker names, aliases, descriptions, prompts, prompt
   modes, worker ids, families, and runtimes.
-- [ ] Derive workflow `ModelRoute` values from catalog candidates plus template/source metadata without inspecting or
+- [x] Derive workflow `ModelRoute` values from catalog candidates plus template/source metadata without inspecting or
   mutating the proxy registry.
-- [ ] Preserve explicit workflow `--proxy`, preferred automatic ordering, route scanning, direct-only Claude behavior,
+- [x] Preserve explicit workflow `--proxy`, preferred automatic ordering, route scanning, direct-only Claude behavior,
   availability reporting, sidecar constraints, and fail-closed no-route diagnostics.
-- [ ] Preserve `claude-opus-4.6-1m` as a direct worker with `[1m]` execution ref and preserve Codex as
+- [x] Preserve `claude-opus-4.6-1m` as a direct worker with `[1m]` execution ref and preserve Codex as
   `source=runtime_native`, `route=None`, with no catalog entry.
-- [ ] Update all reconstructed/specialized `ModelSpec` callers and tests atomically; no compatibility adapter or second
+- [x] Update all reconstructed/specialized `ModelSpec` callers and tests atomically; no compatibility adapter or second
   metadata source remains.
-- [ ] Replace the temporary legacy-versus-catalog comparison with fixed expected catalog-order assertions for every
+- [x] Replace the temporary legacy-versus-catalog comparison with fixed expected catalog-order assertions for every
   migrated workflow spec so preferred promotion, provider ordering, native/cross-family ranking, and template
   tiebreakers remain guarded after `provider_refs` and `preferred_proxy` are removed.
-- [ ] Update `docs/design_runtime.md` §G.4 in this phase when shared catalog ordering becomes authoritative for workflow
+- [x] Update `docs/design_runtime.md` §G.4 in this phase when shared catalog ordering becomes authoritative for workflow
   route derivation.
 
 ## Phase 6 -- Documentation, release proof, and closeout
 
 **Blockers:** None.
 
-- [ ] Reconcile the Phase 1-5 design, CLI, and end-user documentation against the integrated head. Record any remaining
+- [x] Reconcile the Phase 1-5 design, CLI, and end-user documentation against the integrated head. Record any remaining
   mismatch as explicit checklist debt under the phase that owns the shipped behavior; do not batch an unrecorded design
   update into closeout.
-- [ ] Run focused catalog, manifest, session-model, lifecycle, routing, output-stream, workflow, and regression suites.
-- [ ] Run the required targeted Docker/integration coverage for session, proxy, and workflow changes before closeout.
-- [ ] Run `make test-unit`, `make test-regression`, `make pre-commit`, board/link checks, and `uv build` on the
+- [x] Run focused catalog, manifest, session-model, lifecycle, routing, output-stream, workflow, and regression suites.
+- [x] Run the required targeted Docker/integration coverage for session, proxy, and workflow changes before closeout.
+- [x] Run `make test-unit`, `make test-regression`, `make pre-commit`, board/link checks, and `uv build` on the
   integrated branch head; record any skips or non-passing results.
-- [ ] Install the built wheel in a clean environment and prove `model_routes.yaml` loads plus one direct and one proxy
+- [x] Install the built wheel in a clean environment and prove `model_routes.yaml` loads plus one direct and one proxy
   route resolve from packaged resources.
-- [ ] Review the complete diff for architecture consistency and update durable implementation notes only for genuinely
+- [x] Review the complete diff for architecture consistency and update durable implementation notes only for genuinely
   reusable invariants.
-- [ ] Add the compact completed-work change-log entry, mark verification evidence below, move the card to `done/`,
+- [x] Add the compact completed-work change-log entry, mark verification evidence below, move the card to `done/`,
   repoint inbound links, and commit the closeout only after the implementation is shipped.
 
 ## Acceptance test matrix
@@ -229,7 +228,16 @@ Removal waits for that test to pass. **Blockers:** None.
 - Phase 2: manifest/transition focus -- 180 passed; all non-integration `tests/src/session` tests -- 1,428 passed, 89
   integration tests deselected.
 - Phase 3 planner/catalog/manifest focus -- 198 passed; targeted Ruff, Black, mypy, and pyright passed.
-- Focused implementation tests: pending.
-- Required targeted integration: pending.
-- Aggregate unit/regression/pre-commit: pending.
-- Build and clean-wheel smoke: pending.
+- Integrated focused acceptance slice: 883 passed (2026-08-24).
+- Final targeted integration: six session, package-resource, workflow, and proxy-backed panel cases passed in 28.78s
+  (2026-08-24).
+- Aggregate gates: 9,832 unit tests passed with 117 integration-marked tests deselected; 1,068 regressions passed;
+  `make pre-commit` passed every hook, including mypy, pyright, file-size limits, and repository Markdown links
+  (2026-08-24).
+- Packaging: `uv build` produced the wheel and sdist; the exact wheel installed with dependencies into a clean venv and
+  loaded direct `claude-opus-4-8` plus proxied `gpt-5.6-sol` routes from site-packages (2026-08-24).
+- Closeout: `make pre-commit-md` passed after the lane move, and the explicit Markdown audit passed for 574 sources with
+  no stale `doing/model_first_session_routing` link (2026-08-24).
+- Documentation: all shipped design/CLI/end-user surfaces were reconciled; `docs/design_sessions.md` is 24,900 Opus
+  tokens, below the living-document target. No separate implementation note was added because the stable ownership and
+  transaction contracts are already canonical in the design documents.

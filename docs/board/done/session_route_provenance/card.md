@@ -11,8 +11,8 @@ owns the shared event envelope, run correlation, cross-journal compensation, and
 **Relationship**: authority mode decides which managed session may mutate project artifacts. This card reports how a
 managed session was routed and the provider-declared text-marking posture of the selected or mapped model. It adds no
 authority, enforcement, authorship attestation, admission decision, or content guarantee. Generic model-to-route
-selection is separate in [Model-First Interactive Session Routing](../../doing/model_first_session_routing/card.md);
-this card does not depend on it.
+selection is separate in [Model-First Interactive Session Routing](../../done/model_first_session_routing/card.md); this
+card does not depend on it.
 
 **References**: [design.md §3](../../../design.md#3-shared-contracts-file-based-state-system) (session state),
 [design.md §3.4](../../../design.md#34-proxy-vs-no-proxy-mode) (routing ownership),
