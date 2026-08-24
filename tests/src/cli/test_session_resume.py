@@ -338,6 +338,77 @@ class TestModelRouteResume:
         assert state.intent.launch.model_route.requested_model == "gpt-5.6-sol"
         assert state.intent.launch.model_route.selected_tier == "sonnet"
 
+    def test_bare_resume_preserves_direct_1m_execution_projection(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "stored-one-m-route",
+                "--model",
+                "claude-opus-4-6[1m]",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+
+        with successful_claude_launch() as mock_invoke:
+            result = runner.invoke(main, ["session", "resume", "stored-one-m-route"])
+
+        assert result.exit_code == 0, result.output
+        env_vars = mock_invoke.call_args.kwargs["env_vars"]
+        assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6[1m]"
+        state = SessionStore(str(temp_env), "stored-one-m-route").read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.direct_model == "claude-opus-4-6[1m]"
+
+    def test_bare_resume_preserves_proxied_1m_execution_projection(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        proxy_kwargs: _ModelRouteProxyOptions = {
+            "template": "openrouter-anthropic",
+            "proxy_id": "openrouter-anthropic-1",
+            "base_url": "http://localhost:8095",
+            "default_tier": "opus",
+            "tiers": {
+                "sonnet": "anthropic/claude-sonnet-5",
+                "opus": "anthropic/claude-opus-4.6",
+            },
+            "alternatives": {},
+        }
+        with mocked_model_route_proxy(**proxy_kwargs):
+            created = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "stored-proxy-one-m-route",
+                    "--model",
+                    "claude-opus-4-6[1m]",
+                    "--proxy",
+                    "openrouter-anthropic",
+                    "--no-launch",
+                ],
+            )
+        assert created.exit_code == 0, created.output
+
+        with mocked_model_route_proxy(**proxy_kwargs), successful_claude_launch() as mock_invoke:
+            result = runner.invoke(main, ["session", "resume", "stored-proxy-one-m-route"])
+
+        assert result.exit_code == 0, result.output
+        env_vars = mock_invoke.call_args.kwargs["env_vars"]
+        assert env_vars["ANTHROPIC_MODEL"] == "opus"
+        assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6[1m]"
+        state = SessionStore(str(temp_env), "stored-proxy-one-m-route").read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.direct_model == "claude-opus-4-6[1m]"
+
     def test_bare_unavailable_neutral_route_fails_without_replacement(
         self,
         runner: CliRunner,
@@ -426,6 +497,38 @@ class TestModelRouteResume:
         assert "--model claude-sonnet-5" in result.output
         assert store.manifest_path.read_bytes() == before
         mock_invoke.assert_not_called()
+
+        with (
+            mocked_model_route_proxy(
+                template="openrouter-anthropic",
+                proxy_id="openrouter-anthropic-1",
+                base_url="http://localhost:8095",
+                default_tier="sonnet",
+                tiers={"sonnet": "anthropic/claude-sonnet-5"},
+                alternatives={},
+            ),
+            successful_claude_launch() as recovery_invoke,
+        ):
+            recovered = runner.invoke(
+                main,
+                [
+                    "session",
+                    "resume",
+                    "incoherent-proxy-route",
+                    "--model",
+                    "claude-sonnet-5",
+                    "--proxy",
+                    "openrouter-anthropic",
+                ],
+            )
+
+        assert recovered.exit_code == 0, recovered.output
+        repaired = store.read()
+        assert repaired.intent.proxy == ProxyIntent(
+            template="openrouter-anthropic",
+            base_url="http://localhost:8095",
+        )
+        assert recovery_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_MODEL"] == "sonnet"
 
     def test_explicit_model_rejects_opaque_custom_route_but_bare_resume_keeps_it(
         self,

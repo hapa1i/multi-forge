@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Literal
 
@@ -193,9 +193,6 @@ def plan_session_model_route(
         proxy = inspect_candidate(candidate)
         if proxy is None:
             continue
-        serving = _serving_proxy_tiers(request, proxy, candidate=candidate)
-        if not serving or (model_tier is not None and model_tier not in serving):
-            continue
         return _plan_proxy_route(request, proxy, model_tier=model_tier, candidate=candidate)
     raise SessionModelRoutingError(
         f"no admissible model route can serve {request.requested_model!r}; "
@@ -218,10 +215,12 @@ def plan_session_model_route_for_state(
     explicit_proxy = inspect_proxy_reference(proxy_name) if proxy_name is not None else None
     existing_kind: Literal["direct", "proxy", "custom"] | None = None
     existing_proxy: ProxyRouteSnapshot | None = None
-    if state is not None:
-        if not allow_replacement and proxy_name is None and not no_proxy:
+    if state is not None and explicit_proxy is None and not no_proxy:
+        if not allow_replacement:
             _validate_preserved_route_source(state)
         existing_kind, existing_proxy = _inspect_state_route(state)
+        if existing_proxy is not None:
+            existing_proxy = _validate_preserved_route_identity(state, existing_proxy)
     return plan_session_model_route(
         model,
         model_tier=model_tier,
@@ -292,8 +291,15 @@ def inspect_persisted_proxy_route(
 
         entry = lookup_proxy_by_base_url(ProxyRegistryStore().read(), base_url)
         if entry is not None:
+            if template is not None and entry.template != template:
+                raise SessionModelRoutingError(
+                    f"stored proxy route changed template identity at {base_url!r}: "
+                    f"expected {template!r}, found {entry.template!r}; "
+                    "pass --model with --proxy <proxy_id-or-template> to select a replacement"
+                )
             proxy_id = entry.proxy_id
-            template = entry.template
+            if template is None:
+                template = entry.template
 
     if template is None:
         return ProxyRouteSnapshot(
@@ -413,6 +419,11 @@ def realize_session_model_route(
             raise SessionModelRoutingError(f"selected proxy route failed identity/health validation: {exc}") from exc
 
     concrete = inspect_persisted_proxy_route(template=template, base_url=base_url, proxy_id=proxy_id)
+    if plan.source_id is not None and concrete.source_id != plan.source_id:
+        raise SessionModelRoutingError(
+            f"selected proxy route no longer proves source {plan.source_id!r}; "
+            "pass --model with --proxy <proxy_id-or-template> to select a replacement"
+        )
     confirmed = _plan_proxy_route(
         plan.request,
         concrete,
@@ -698,6 +709,64 @@ def _validate_preserved_route_source(state: SessionState) -> None:
         ) from exc
 
 
+def _validate_preserved_route_identity(
+    state: SessionState,
+    snapshot: ProxyRouteSnapshot,
+) -> ProxyRouteSnapshot:
+    """Keep replay bound to the template and source identity stored by the session."""
+
+    launch = state.intent.launch
+    neutral = launch.model_route if launch is not None else None
+    if neutral is None or neutral.kind != "proxy":
+        return snapshot
+
+    stored_proxy = state.intent.proxy
+    stored_template = (stored_proxy.template or None) if stored_proxy is not None else None
+    if stored_template is not None and snapshot.template != stored_template:
+        raise SessionModelRoutingError(
+            f"stored proxy route changed template identity: expected {stored_template!r}, got {snapshot.template!r}; "
+            f"pass --model {neutral.requested_model} with --proxy <proxy_id-or-template> to select a replacement"
+        )
+
+    if neutral.source_id is not None and snapshot.source_id != neutral.source_id:
+        raise SessionModelRoutingError(
+            f"stored proxy route for {neutral.requested_model!r} no longer proves stored source "
+            f"{neutral.source_id!r}; pass --model {neutral.requested_model} with "
+            "--proxy <proxy_id-or-template> to select a replacement"
+        )
+    if neutral.source_id is None and snapshot.source_id is not None:
+        return replace(snapshot, source_id=None)
+    return snapshot
+
+
+def preserved_model_route_request(state: SessionState) -> str:
+    """Restore a validated execution-only ``[1m]`` projection for route replay."""
+
+    launch = state.intent.launch
+    neutral = launch.model_route if launch is not None else None
+    if neutral is None:
+        raise SessionModelRoutingError("session has no stored model route to replay")
+    assert launch is not None
+
+    direct_model = launch.direct_model
+    if direct_model is None or not direct_model.endswith(ONE_M_SUFFIX):
+        return neutral.requested_model
+
+    try:
+        neutral_request = normalize_model_route_request(neutral.requested_model)
+        direct_request = normalize_model_route_request(direct_model)
+    except ModelRouteCatalogError as exc:
+        raise SessionModelRoutingError(f"stored direct model projection is invalid: {exc}") from exc
+    if direct_request.route_key != neutral_request.route_key:
+        raise SessionModelRoutingError(
+            f"stored direct model projection {direct_model!r} does not match stored model route "
+            f"{neutral.requested_model!r}; pass --model with --proxy or --no-proxy to select a replacement"
+        )
+    if neutral_request.transport_1m:
+        return neutral.requested_model
+    return f"{neutral_request.route_key}{ONE_M_SUFFIX}"
+
+
 def _required_string_attr(value: object, name: str) -> str:
     result = getattr(value, name, None)
     if not isinstance(result, str) or not result:
@@ -771,6 +840,7 @@ __all__ = [
     "plan_model_route_transition",
     "plan_session_model_route",
     "plan_session_model_route_for_state",
+    "preserved_model_route_request",
     "realize_session_model_route",
     "resolve_proxy_selected_model",
     "validate_model_tier_option",

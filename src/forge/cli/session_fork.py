@@ -64,6 +64,7 @@ from forge.core.ops.session_fork_preflight import (
 from forge.core.ops.session_model_routing import (
     ResolvedModelRoute,
     SessionModelRoutingError,
+    preserved_model_route_request,
 )
 from forge.core.paths import display_path
 from forge.install.project_compat import (
@@ -492,9 +493,13 @@ def fork(
     parent_launch = preflight.parent.intent.launch
     neutral_route = parent_launch.model_route if parent_launch is not None else None
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
-        route_model = neutral_route.requested_model
-        route_tier = neutral_route.selected_tier
-        allow_route_replacement = False
+        try:
+            route_model = preserved_model_route_request(preflight.parent)
+            route_tier = neutral_route.selected_tier
+            allow_route_replacement = False
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
 
     if route_model is not None:
         inherited_sidecar = preflight.parent.confirmed.is_sandboxed or (

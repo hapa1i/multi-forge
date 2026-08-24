@@ -102,6 +102,23 @@ def test_accepts_staged_addition_and_rejects_restored_staged_deletion(tmp_path):
     assert [failure.reason for failure in failures] == ["target is not in candidate Git state"]
 
 
+def test_rejects_staged_deleted_symlink_when_tracked_referent_remains(tmp_path):
+    _git(tmp_path, "init", "-q")
+    source = _write(tmp_path / "source.md", "[alias](alias.md)\n")
+    referent = _write(tmp_path / "target.md", "# Target\n")
+    alias = tmp_path / "alias.md"
+    alias.symlink_to(referent.name)
+    _git(tmp_path, "add", "source.md", "target.md", "alias.md")
+    _git(tmp_path, "update-index", "--force-remove", "alias.md")
+
+    candidates = mod.candidate_files(tmp_path)
+    failures = mod.audit_paths(tmp_path, [source], candidates)
+
+    assert alias not in candidates
+    assert referent in candidates
+    assert [failure.reason for failure in failures] == ["target is not in candidate Git state"]
+
+
 def test_supplied_sources_are_added_to_candidate_markdown_sources(tmp_path):
     _git(tmp_path, "init", "-q")
     tracked = _write(tmp_path / "tracked.md", "# Tracked\n")

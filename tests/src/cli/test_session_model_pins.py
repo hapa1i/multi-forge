@@ -321,6 +321,39 @@ def test_fork_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_e
     assert state.intent.launch.direct_model == "claude-opus-4-6"
 
 
+def test_fork_inherits_direct_1m_execution_projection(runner: CliRunner, temp_env: Path) -> None:
+    created = runner.invoke(
+        main,
+        [
+            "session",
+            "start",
+            "one-m-planner",
+            "--model",
+            "claude-opus-4-6[1m]",
+            "--no-launch",
+        ],
+    )
+    assert created.exit_code == 0, created.output
+    store = SessionStore(str(temp_env), "one-m-planner")
+    store.update(
+        timeout_s=5.0,
+        mutate=lambda state: setattr(state.confirmed, "claude_session_id", "parent-uuid"),
+    )
+
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
+        result = runner.invoke(
+            main,
+            ["session", "fork", "one-m-planner", "--name", "one-m-executor"],
+        )
+
+    assert result.exit_code == 0, result.output
+    env_vars = mock_invoke.call_args.kwargs["env_vars"]
+    assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6[1m]"
+    child = SessionStore(str(temp_env), "one-m-executor").read()
+    assert child.intent.launch is not None
+    assert child.intent.launch.direct_model == "claude-opus-4-6[1m]"
+
+
 def test_fork_non_claude_model_persists_neutral_route(
     runner: CliRunner,
     temp_env: Path,
@@ -421,6 +454,50 @@ def test_fork_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp
     state = SessionStore(str(temp_env), "proxy-executor").read()
     assert state.intent.launch is not None
     assert state.intent.launch.direct_model == "claude-opus-4-6"
+
+
+def test_proxy_model_tier_overrides_intrinsic_claude_tier_in_child_env(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    tiers = {
+        "sonnet": "anthropic/claude-opus-5",
+        "opus": "anthropic/claude-opus-5",
+    }
+    with (
+        mocked_model_route_proxy(
+            template="openrouter-anthropic",
+            proxy_id="openrouter-anthropic-1",
+            base_url="http://localhost:8095",
+            default_tier="opus",
+            tiers=tiers,
+            alternatives={},
+        ),
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "retiered-claude",
+                "--model",
+                "claude-opus-5",
+                "--model-tier",
+                "sonnet",
+                "--proxy",
+                "openrouter-anthropic",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    state = SessionStore(str(temp_env), "retiered-claude").read()
+    assert state.intent.launch is not None
+    assert state.intent.launch.model_route is not None
+    assert state.intent.launch.model_route.selected_tier == "sonnet"
+    env_vars = mock_invoke.call_args.kwargs["env_vars"]
+    assert env_vars["ANTHROPIC_MODEL"] == "sonnet"
+    assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-5"
 
 
 def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(

@@ -2233,8 +2233,20 @@ class SessionManager:
                     name,
                 )
 
-            _filtered_claude_session_id = None if _claude_session_id in _protected_ids else _claude_session_id
-            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in _protected_ids]
+            # native-relocate reuses the parent's UUID, so the current and relocated
+            # transcript can be the same path. That UUID must not pass through this
+            # unlocked bulk cleanup: the relocated branch below owns its final
+            # publication-locked scan and unlink.
+            _filtered_claude_session_id = (
+                None
+                if _claude_session_id in _protected_ids or _claude_session_id == _relocated_parent_session_id
+                else _claude_session_id
+            )
+            _filtered_artifact_ids = [
+                session_id
+                for session_id in _artifact_ids
+                if session_id not in _protected_ids and session_id != _relocated_parent_session_id
+            ]
 
             if shared_ids:
                 logger.info(

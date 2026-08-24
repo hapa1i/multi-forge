@@ -1000,13 +1000,18 @@ normalizes the request and chooses a launch route before starting Claude Code:
 
 If more than one proxy tier serves the request and no default decides it, add `--model-tier haiku|sonnet|opus`. It
 requires `--model`; it does not select a second model. Direct Claude requests must use their intrinsic tier. Claude
-`[1m]` aliases keep their existing transport behavior; non-Claude `[1m]` is invalid.
+`[1m]` aliases keep their transport behavior on bare resume and inherited fork; non-Claude `[1m]` is invalid. For a
+proxied Claude route, the selected tier is what Claude sends to the proxy even when that tier differs from the model's
+intrinsic family.
 
 Forge stores the canonical request and resolved source/template/tier alongside the legacy Claude execution pin. A bare
 resume reuses that route; if it is unavailable, Forge fails with recovery guidance rather than silently choosing another
-provider. An explicit `--model` authorizes replacement when the inherited route cannot serve it. Before an explicit
-selection launches, one stderr line reports provider, template/proxy, tier, effective model, and known billing posture.
-The billing value remains `unknown` when Forge has no payer evidence.
+provider. Replay also refuses a same-URL template substitution or a changed proven source. Use the reported
+`--model ... --proxy ...` or `--model ... --no-proxy` command to replace malformed stored routing; explicit replacement
+does not depend on reading that broken route first. An explicit `--model` authorizes replacement when an otherwise valid
+inherited route cannot serve it. Before an explicit selection launches, one stderr line reports provider,
+template/proxy, tier, effective model, and known billing posture. The billing value remains `unknown` when Forge has no
+payer evidence.
 
 Selecting a non-Claude model can create or start a paid proxy. `--no-launch --model ...` still resolves/starts the route
 and persists intent, but invokes no child and writes no route event; the proxy remains independently managed. A
