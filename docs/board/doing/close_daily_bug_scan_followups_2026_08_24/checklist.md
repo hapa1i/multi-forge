@@ -2,7 +2,7 @@
 
 Activation base: `3820b32d` (`main`, 2026-08-24).
 
-Current focus: integrated verification and pull-request delivery.
+Current focus: PR #246 review and CI.
 
 ## Transcript Cleanup
 
@@ -32,7 +32,7 @@ Current focus: integrated verification and pull-request delivery.
 ## Delivery
 
 - [x] Review the integrated diff for scope and architecture conformance.
-- [ ] Commit, push, and open the pull request with verification evidence.
+- [x] Commit, push, and open [PR #246](https://github.com/hapa1i/multi-forge/pull/246) with verification evidence.
 
 ## Acceptance Tests
 
@@ -55,3 +55,4 @@ Evidence:
   passed.
 - Integrated review found and closed a nested-log symlink escape before final verification; both UUID-directory and
   `subagents`-directory escape regressions pass.
+- PR #246 opened from `fix/daily-bug-scan-followups-2026-08-24` against `main` with the `bug` label.
