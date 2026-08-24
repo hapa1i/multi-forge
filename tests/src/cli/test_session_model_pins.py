@@ -92,6 +92,30 @@ def test_model_route_rejects_configured_sidecar_before_realization(
 
     assert result.exit_code == 1
     assert "--model cannot be combined with configured sidecar mode" in result.output
+    assert "pass --host-proxy or run 'forge config set proxy_mode=host'" in result.output
+    plan_route.assert_not_called()
+    ensure_proxy.assert_not_called()
+    assert not SessionStore(str(temp_env), name).exists()
+
+
+@pytest.mark.parametrize("leaf", ["start", "incognito"])
+def test_explicit_sidecar_flag_keeps_flag_specific_refusal(
+    runner: CliRunner,
+    temp_env: Path,
+    leaf: str,
+) -> None:
+    """The explicit-flag guard owns its case; config-mode recovery must not leak into it."""
+    name = f"{leaf}-explicit-sidecar"
+    with (
+        patch("forge.cli.session_lifecycle._plan_interactive_session_model_route") as plan_route,
+        patch("forge.proxy.proxy_orchestrator.ensure_proxy") as ensure_proxy,
+    ):
+        result = runner.invoke(main, ["session", leaf, name, "--model", "gpt-5.6-sol", "--sidecar"])
+
+    assert result.exit_code == 1
+    assert "--model cannot be combined with --sidecar" in result.output
+    assert "configured sidecar mode" not in result.output
+    assert "proxy_mode=host" not in result.output, "config recovery does not apply to an explicit --sidecar flag"
     plan_route.assert_not_called()
     ensure_proxy.assert_not_called()
     assert not SessionStore(str(temp_env), name).exists()
@@ -150,6 +174,8 @@ def test_persisted_model_route_rejects_configured_sidecar_before_mutation(
 
     assert result.exit_code == 1
     assert f"stored model route cannot be replayed with sidecar {leaf}" in result.output
+    assert "--proxy <proxy_id-or-template>" in result.output
+    assert "--no-proxy" in result.output
     plan_route.assert_not_called()
     ensure_proxy.assert_not_called()
     invoke_claude.assert_not_called()

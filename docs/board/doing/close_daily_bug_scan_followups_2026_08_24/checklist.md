@@ -34,6 +34,12 @@ Current focus: PR #246 review and CI.
 - [x] Review the integrated diff for scope and architecture conformance.
 - [x] Commit, push, and open [PR #246](https://github.com/hapa1i/multi-forge/pull/246) with verification evidence.
 
+## Review Follow-ups
+
+- [x] Require the exact canonical lowercase spelling in nested sidechain discovery and raw-alias recovery.
+- [x] Pin flag-vs-config sidecar refusal routing and add the `--host-proxy` recovery to the configured-mode message.
+- [x] Name the explicit `--proxy` replacement alongside `--no-proxy` in sidecar replay refusals.
+
 ## Acceptance Tests
 
 | Test                      | Fixture                                                | Assertion                                              | Test File                                                           |
@@ -56,3 +62,7 @@ Evidence:
 - Integrated review found and closed a nested-log symlink escape before final verification; both UUID-directory and
   `subagents`-directory escape regressions pass.
 - PR #246 opened from `fix/daily-bug-scan-followups-2026-08-24` against `main` with the `bug` label.
+- Review follow-ups closed fail-first: a case-variant raw alias could reclaim the canonical spelling's sidechain logs
+  past the exact-string ownership scans; nested discovery and raw-alias recovery now require canonical form. 97 focused
+  cleanup/routing/CLI tests; `make test-unit` 9,901 passed (117 deselected); `make test-regression` 1,073 passed; full
+  pre-commit passed.

@@ -2181,14 +2181,17 @@ class SessionManager:
             if isinstance(_raw_deriv, dict):
                 _raw_relocated_session_id = _raw_deriv.get("relocated_parent_session_id")
                 # A schema-invalid manifest is untrusted. Recover only the exact,
-                # canonical alias needed to avoid unlocked deletion; a mismatched
-                # pointer must not gain authority to delete a second transcript.
+                # canonical lowercase alias needed to avoid unlocked deletion: a
+                # mismatched or case-variant pointer must not gain authority over
+                # another spelling's transcript or sidechain logs, and the
+                # ownership scans compare exact strings.
                 if (
                     _raw_deriv.get("resume_mode") == "native-relocate"
                     and isinstance(_raw_current_session_id, str)
                     and isinstance(_raw_relocated_session_id, str)
                     and _raw_current_session_id == _raw_relocated_session_id
                     and _UUID_RE.fullmatch(_raw_relocated_session_id) is not None
+                    and _raw_relocated_session_id == _raw_relocated_session_id.lower()
                 ):
                     _raw_aliased_relocated_session_id = _raw_relocated_session_id
         _relocated_parent_session_id = (

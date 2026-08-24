@@ -130,6 +130,9 @@ def find_agent_logs(project_root: str, session_id: str) -> list[Path]:
 
     # Raw manifests can reach cleanup under --force, so validate the directory
     # component before deriving a path from the caller-supplied session id.
+    # Require the exact canonical spelling: ownership scans compare exact
+    # strings, so a case-variant id would enumerate a canonical directory
+    # whose references those scans cannot see.
     canonical_session_id: str | None = None
     if isinstance(session_id, str):
         try:
@@ -137,8 +140,8 @@ def find_agent_logs(project_root: str, session_id: str) -> list[Path]:
         except (AttributeError, TypeError, ValueError):
             pass
         else:
-            if str(parsed_session_id) == session_id.lower():
-                canonical_session_id = str(parsed_session_id)
+            if str(parsed_session_id) == session_id:
+                canonical_session_id = session_id
 
     if canonical_session_id is not None:
         session_dir = project_dir / canonical_session_id

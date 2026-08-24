@@ -28,6 +28,7 @@ pytestmark = pytest.mark.regression
 CHILD_ID = "11111111-1111-1111-1111-111111111111"
 ARTIFACT_ID = "22222222-2222-2222-2222-222222222222"
 RELOCATED_PARENT_ID = "33333333-3333-3333-3333-333333333333"
+CASE_VARIANT_CANONICAL_ID = "abcabcab-3333-4333-8333-abcabcabcabc"
 
 
 @pytest.fixture
@@ -335,6 +336,46 @@ def test_force_delete_raw_aliased_uuid_reclaims_after_locked_scan(project: Path)
 
     assert not relocated.exists()
     assert not agent_log.exists(), "the raw alias must reach the locked sidechain cleanup"
+
+
+def test_force_delete_case_variant_raw_alias_never_arms_locked_cleanup(project: Path) -> None:
+    """A non-canonical alias spelling must not reclaim the canonical UUID's sidechain logs.
+
+    The ownership scans compare exact strings, so a case-variant alias could
+    never see a sibling's canonical references; recovery must therefore refuse
+    it rather than let it enumerate the canonical spelling's directory.
+    """
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=CASE_VARIANT_CANONICAL_ID,
+        relocated_parent_id=CASE_VARIANT_CANONICAL_ID,
+    )
+    _publish(
+        manager,
+        project,
+        "sibling",
+        session_id=None,
+        relocated_parent_id=CASE_VARIANT_CANONICAL_ID,
+    )
+    child_store = SessionStore(str(project), "child")
+    raw_manifest = json.loads(child_store.manifest_path.read_text(encoding="utf-8"))
+    raw_manifest["unexpected_top_level"] = True
+    uppercase_alias = CASE_VARIANT_CANONICAL_ID.upper()
+    raw_manifest["confirmed"]["claude_session_id"] = uppercase_alias
+    raw_manifest["confirmed"]["derivation"]["relocated_parent_session_id"] = uppercase_alias
+    child_store.manifest_path.write_text(json.dumps(raw_manifest), encoding="utf-8")
+    with pytest.raises(ManifestCorruptedError):
+        child_store.read()
+
+    agent_log = _write_agent_log(project, CASE_VARIANT_CANONICAL_ID)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert SessionStore(str(project), "sibling").exists()
+    assert agent_log.exists(), "a case-variant alias must not gain authority over the canonical spelling's logs"
 
 
 def test_aliased_current_and_relocated_uuid_reclaims_agent_logs_after_locked_scan(

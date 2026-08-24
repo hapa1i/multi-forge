@@ -1159,7 +1159,7 @@ def start(
         if launch_mode == LAUNCH_MODE_SIDECAR:
             print_error(
                 "--model cannot be combined with configured sidecar mode; "
-                "run 'forge config set proxy_mode=host' before selecting a model"
+                "pass --host-proxy or run 'forge config set proxy_mode=host' before selecting a model"
             )
             sys.exit(1)
 
@@ -1541,7 +1541,8 @@ def resume(
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
         if uses_sidecar:
             print_error(
-                "stored model route cannot be replayed with sidecar resume; pass --no-proxy to resume on the host"
+                "stored model route cannot be replayed with sidecar resume; pass --proxy "
+                "<proxy_id-or-template> to route the sidecar explicitly, or --no-proxy to resume on the host"
             )
             sys.exit(1)
         try:
@@ -2280,7 +2281,7 @@ def incognito(
         if launch_mode == LAUNCH_MODE_SIDECAR:
             print_error(
                 "--model cannot be combined with configured sidecar mode; "
-                "run 'forge config set proxy_mode=host' before selecting a model"
+                "pass --host-proxy or run 'forge config set proxy_mode=host' before selecting a model"
             )
             sys.exit(1)
 

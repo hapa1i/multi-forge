@@ -496,7 +496,10 @@ def fork(
     uses_sidecar = _uses_persisted_sidecar_launch(preflight.parent, direct=direct)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
         if uses_sidecar:
-            print_error("stored model route cannot be replayed with sidecar fork; pass --no-proxy to fork on the host")
+            print_error(
+                "stored model route cannot be replayed with sidecar fork; pass --proxy "
+                "<proxy_id-or-template> to route the sidecar explicitly, or --no-proxy to fork on the host"
+            )
             sys.exit(1)
         try:
             route_model = preserved_model_route_request(preflight.parent)

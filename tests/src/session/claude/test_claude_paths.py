@@ -321,6 +321,41 @@ class TestFindAgentLogs:
         assert find_agent_logs("/test/project", session_id) == []
         assert outside_log.exists()
 
+    @pytest.mark.parametrize(
+        "spelling",
+        [
+            "ABCABCAB-1111-1111-1111-ABCABCABCABC",
+            "abcabcab111111111111abcabcabcabc",
+        ],
+    )
+    def test_nested_subagent_logs_require_exact_canonical_uuid(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        spelling: str,
+    ) -> None:
+        """A case-variant or re-spelled UUID must not enumerate the canonical directory.
+
+        Ownership scans compare exact strings, so a non-canonical spelling
+        cannot be matched against another session's canonical references and
+        must never map onto the canonical spelling's logs.
+        """
+        session_id = "abcabcab-1111-1111-1111-abcabcabcabc"
+        monkeypatch.setattr(
+            "forge.session.claude.paths.get_claude_projects_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "forge.session.claude.paths.encode_project_path",
+            lambda _: "-test-project",
+        )
+
+        nested_log = tmp_path / "-test-project" / session_id / "subagents" / "agent-real.jsonl"
+        nested_log.parent.mkdir(parents=True)
+        nested_log.write_text('{"agentId": "real"}', encoding="utf-8")
+
+        assert find_agent_logs("/test/project", spelling) == []
+
     def test_ignores_unreadable_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should skip files that can't be read."""
         # Set up mock Claude projects directory
