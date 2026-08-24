@@ -45,6 +45,9 @@ class _Presenter:
     def before_launch(self, forge_root: Path) -> None:
         pass
 
+    def on_routing_payload(self, payload: dict[str, Any]) -> None:
+        pass
+
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
         self.sidecar_launch = event
 

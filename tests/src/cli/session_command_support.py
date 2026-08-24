@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import subprocess
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, Iterator
 from unittest.mock import Mock, _patch, patch
 
 from forge.session import IndexStore, SessionStore, create_session_state
@@ -20,6 +22,118 @@ def successful_claude_launch() -> _patch[Mock]:
     return patch("forge.core.ops.claude_session.invoke_claude", return_value=0)
 
 
+@contextmanager
+def mocked_model_route_proxy(
+    *,
+    template: str = "openrouter-anthropic",
+    proxy_id: str = "test-or-proxy",
+    base_url: str = "http://localhost:8095",
+    default_tier: str = "opus",
+    tiers: dict[str, str] | None = None,
+    alternatives: dict[str, dict[str, str]] | None = None,
+) -> Iterator[Mock]:
+    """Expose one coherent inspected/realized proxy to session CLI tests."""
+    from forge.config.schema import (
+        ForgeConfig,
+        ProviderConfig,
+        ProxyConfig,
+        ProxyInstanceConfig,
+        TierModels,
+    )
+    from forge.core.ops.session_model_routing import ProxyRouteSnapshot
+
+    tier_models = (
+        {
+            "haiku": "h",
+            "sonnet": "s",
+            "opus": "anthropic/claude-opus-4.6",
+        }
+        if tiers is None
+        else tiers
+    )
+    model_alternatives = (
+        {"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}} if alternatives is None else alternatives
+    )
+    tier_config = TierModels(**tier_models)
+    snapshot = ProxyRouteSnapshot(
+        template=template,
+        base_url=base_url,
+        proxy_id=proxy_id,
+        source_id="openrouter",
+        default_tier=default_tier,
+        tier_mappings=tier_models,
+        model_alternatives=model_alternatives,
+        wire_shape="openai_translated",
+    )
+    automatic_snapshot = ProxyRouteSnapshot(
+        template=template,
+        base_url=None,
+        proxy_id=None,
+        source_id="openrouter",
+        default_tier=default_tier,
+        tier_mappings=tier_models,
+        model_alternatives=model_alternatives,
+        wire_shape="openai_translated",
+        ensure_reference=template,
+    )
+    entry = SimpleNamespace(proxy_id=proxy_id, template=template, base_url=base_url)
+    provider = ProviderConfig(
+        tiers=tier_config,
+        model_alternatives=model_alternatives,
+        allow_non_zdr=True,
+    )
+    forge_config = ForgeConfig(
+        proxy=ProxyConfig(
+            openrouter=provider,
+            family="anthropic",
+            preferred_provider="openrouter",
+            backend="openrouter",
+            active_template=template,
+            default_tier=default_tier,
+            wire_shape="openai_translated",
+        )
+    )
+    instance_config = ProxyInstanceConfig(
+        proxy_format=1,
+        template=template,
+        template_digest="abc",
+        provider="openrouter",
+        proxy_endpoint=base_url,
+        port=8095,
+        upstream_base_url="https://openrouter.ai/api/v1",
+        tiers=tier_config,
+        model_alternatives=model_alternatives,
+        default_tier=default_tier,
+        backend="openrouter",
+        wire_shape="openai_translated",
+    )
+    with (
+        patch(
+            "forge.core.ops.session_model_routing.inspect_proxy_reference",
+            return_value=snapshot,
+        ),
+        patch(
+            "forge.core.ops.session_model_routing.inspect_persisted_proxy_route",
+            return_value=snapshot,
+        ),
+        patch(
+            "forge.core.ops.session_model_routing.inspect_automatic_candidate",
+            side_effect=lambda candidate: (automatic_snapshot if candidate.template == template else None),
+        ),
+        patch(
+            "forge.proxy.proxy_orchestrator.ensure_proxy",
+            return_value=(entry, True),
+        ) as ensure_proxy,
+        patch("forge.core.ops.session_routing.load_config", return_value=forge_config),
+        patch(
+            "forge.config.loader.load_proxy_instance_config",
+            return_value=instance_config,
+        ),
+        patch("forge.cli.claude._healthcheck_proxy"),
+    ):
+        yield ensure_proxy
+
+
 def _publish_fork_parent(parent: Any, project_root: Path) -> IndexStore:
     """Publish a fork parent through the concrete stores used by preflight."""
     if (
@@ -32,7 +146,11 @@ def _publish_fork_parent(parent: Any, project_root: Path) -> IndexStore:
         != 0
     ):
         subprocess.run(["git", "init"], cwd=project_root, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=project_root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=project_root,
+            check=True,
+        )
         subprocess.run(["git", "config", "user.name", "Test"], cwd=project_root, check=True)
         readme = project_root / "README.md"
         readme.write_text("# test\n", encoding="utf-8")

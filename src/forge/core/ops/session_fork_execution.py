@@ -52,6 +52,11 @@ from .claude_session import (
 )
 from .session import ForgeOpError
 from .session_fork_preflight import ForkPreflightPlan
+from .session_model_routing import (
+    ResolvedModelRoute,
+    apply_model_route_transition,
+    plan_model_route_transition,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +228,7 @@ def execute_session_fork(
     supervisor_proxy: str | None,
     transfer_context_factory: TransferContextFactory,
     rewind_artifact_factory: RewindArtifactFactory,
+    model_route_selection: ResolvedModelRoute | None = None,
 ) -> ForkExecutionResult:
     """Create and prepare one fork from a validated read-only plan.
 
@@ -273,6 +279,7 @@ def execute_session_fork(
             supervisor_proxy=supervisor_proxy,
             transfer_context_factory=transfer_context_factory,
             rewind_artifact_factory=rewind_artifact_factory,
+            model_route_selection=model_route_selection,
             events=events,
             compensation=compensation,
         )
@@ -309,6 +316,7 @@ def _prepare_created_fork(
     supervisor_proxy: str | None,
     transfer_context_factory: TransferContextFactory,
     rewind_artifact_factory: RewindArtifactFactory,
+    model_route_selection: ResolvedModelRoute | None,
     events: list[ForkExecutionEvent],
     compensation: _ForkCompensation,
 ) -> ForkExecutionResult:
@@ -316,13 +324,26 @@ def _prepare_created_fork(
     operation_cwd = request.cwd
     state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
 
-    persist_resume_routing_override(
-        forge_root=state_context.forge_root,
-        session_name=manifest.name,
-        routing=routing,
-        direct=request.direct,
-    )
-    apply_resume_routing_override_to_state(state=manifest, routing=routing, direct=request.direct)
+    if model_route_selection is not None:
+        transition = plan_model_route_transition(model_route_selection)
+        store = state_context.store
+
+        def _apply_selection(state: SessionState) -> None:
+            state.intent = apply_model_route_transition(state.intent, transition)
+            # A fork owns a new child manifest; inherited parent confirmation is
+            # not evidence for that child and must be cleared with its new intent.
+            state.confirmed.started_with_proxy = None
+
+        manifest = store.update(timeout_s=5.0, mutate=_apply_selection)
+        state_context = resolve_claude_session_state_context(manifest, cwd=operation_cwd)
+    else:
+        persist_resume_routing_override(
+            forge_root=state_context.forge_root,
+            session_name=manifest.name,
+            routing=routing,
+            direct=request.direct,
+        )
+        apply_resume_routing_override_to_state(state=manifest, routing=routing, direct=request.direct)
 
     if request.supervise_target:
         manifest = apply_supervisor_wiring(
@@ -351,7 +372,11 @@ def _prepare_created_fork(
         effective_proxy_id = routing.proxy_id
     else:
         effective_template, effective_url, effective_proxy_id = get_effective_proxy_for_resume(manifest)
-    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(effective_proxy_id or effective_template)
+    )
 
     is_worktree = bool(manifest.worktree and manifest.worktree.is_worktree)
     events.append(
@@ -369,13 +394,14 @@ def _prepare_created_fork(
 
     parent_session_id = plan.parent_session_id or parent.confirmed.claude_session_id
     use_sidecar, mounts, image = get_launch_preferences(manifest)
-    _apply_direct_model_override(
-        manifest=manifest,
-        direct_model=plan.normalized_direct_model,
-        forge_root=state_context.forge_root,
-        use_sidecar=use_sidecar,
-        events=events,
-    )
+    if model_route_selection is None:
+        _apply_direct_model_override(
+            manifest=manifest,
+            direct_model=plan.normalized_direct_model,
+            forge_root=state_context.forge_root,
+            use_sidecar=use_sidecar,
+            events=events,
+        )
 
     rewind_active = plan.rewind_requested and request.drop_last is not None and request.drop_last > 0
     native_relocate = is_worktree and plan.manager_resume_mode == "native-relocate" and not rewind_active
@@ -550,6 +576,8 @@ def _prepare_created_fork(
         proxy_id=effective_proxy_id,
         incognito=request.is_incognito,
         render_post_exit=(not request.is_incognito or use_sidecar),
+        model_route_selection=model_route_selection,
+        render_model_route=request.direct_model is not None,
     )
     return ForkExecutionResult(
         parent=parent,

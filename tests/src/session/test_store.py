@@ -22,6 +22,7 @@ from forge.session.exceptions import (
 )
 from forge.session.models import (
     MemoryIntent,
+    ModelRouteIntent,
     SessionState,
     create_session_state,
 )
@@ -30,6 +31,7 @@ from forge.session.store import (
     MANIFEST_DIR,
     MANIFEST_FILENAME,
     SessionStore,
+    upgrade_v1_manifest_for_read,
 )
 
 
@@ -100,7 +102,8 @@ class TestSessionStoreWrite:
         with open(store.manifest_path) as f:
             data = json.load(f)
         assert data["name"] == "test-session"
-        assert data["schema_version"] == 1  # Always writes current version
+        assert data["schema_version"] == 2  # Always writes current version
+        assert data["intent"]["launch"]["model_route"] is None
 
     def test_write_validates_name(self, store: SessionStore) -> None:
         """write() should reject invalid session names."""
@@ -610,6 +613,183 @@ class TestSessionStoreRead:
         assert loaded.intent.proxy.base_url == "http://localhost:8084"
         assert loaded.intent.launch is not None
         assert loaded.intent.launch.mode == "host"
+        assert loaded.intent.launch.model_route is None
+
+    def test_read_v1_projects_to_v2_without_rewriting(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        data["schema_version"] = 1
+        del data["intent"]["launch"]["model_route"]
+        store.manifest_path.write_text(json.dumps(data, indent=2))
+        before = store.manifest_path.read_bytes()
+
+        loaded = store.read()
+
+        assert loaded.schema_version == 2
+        assert loaded.intent.launch is not None
+        assert loaded.intent.launch.model_route is None
+        assert store.manifest_path.read_bytes() == before
+
+    def test_v1_projection_is_pinned_to_v2_shape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import forge.session.store as store_module
+
+        data: dict[str, Any] = {"schema_version": 1, "intent": {"launch": {}}}
+        monkeypatch.setattr(store_module, "SCHEMA_VERSION", 3)
+
+        upgrade_v1_manifest_for_read(data)
+
+        assert data == {
+            "schema_version": 2,
+            "intent": {"launch": {"model_route": None}},
+        }
+
+    def test_first_ordinary_v1_write_emits_complete_v2(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        data["schema_version"] = 1
+        del data["intent"]["launch"]["model_route"]
+        store.manifest_path.write_text(json.dumps(data))
+
+        updated = store.update_last_accessed()
+        persisted = json.loads(store.manifest_path.read_text())
+
+        assert updated.schema_version == 2
+        assert persisted["schema_version"] == 2
+        assert persisted["intent"]["launch"]["model_route"] is None
+
+    def test_read_roundtrip_with_complete_model_route(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+    ) -> None:
+        assert sample_manifest.intent.launch is not None
+        sample_manifest.intent.launch.model_route = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="opus",
+            kind="proxy",
+            source_id="openrouter",
+        )
+
+        store.write(sample_manifest)
+        loaded = store.read()
+
+        assert loaded.intent.launch is not None
+        assert loaded.intent.launch.model_route == sample_manifest.intent.launch.model_route
+
+    def test_model_route_read_does_not_consult_mutable_catalogs(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        assert sample_manifest.intent.launch is not None
+        sample_manifest.intent.launch.model_route = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="opus",
+            kind="proxy",
+            source_id="openrouter",
+        )
+        store.write(sample_manifest)
+
+        def unexpected_catalog_lookup(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("manifest decode must not consult mutable catalogs")
+
+        monkeypatch.setattr("forge.core.models.catalog.resolve_model_id", unexpected_catalog_lookup)
+        monkeypatch.setattr("forge.backend.sources.get_model_source", unexpected_catalog_lookup)
+
+        loaded = store.read()
+
+        assert loaded.intent.launch is not None
+        assert loaded.intent.launch.model_route == sample_manifest.intent.launch.model_route
+
+    def test_v2_launch_requires_model_route_field(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        del data["intent"]["launch"]["model_route"]
+        store.manifest_path.write_text(json.dumps(data))
+
+        with pytest.raises(ManifestValidationError, match="intent.launch.model_route"):
+            store.read()
+
+    def test_v1_rejects_model_route_field(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        data["schema_version"] = 1
+        store.manifest_path.write_text(json.dumps(data))
+
+        with pytest.raises(
+            ManifestCorruptedError,
+            match="schema v1 intent.launch cannot contain model_route",
+        ):
+            store.read()
+
+    @pytest.mark.parametrize(
+        "model_route",
+        [
+            pytest.param(
+                {
+                    "requested_model": "gpt-5.6-sol",
+                    "kind": "proxy",
+                    "source_id": "openrouter",
+                },
+                id="missing-selected-tier",
+            ),
+            pytest.param(
+                {
+                    "requested_model": "gpt-5.6-sol",
+                    "selected_tier": "opus",
+                    "kind": "proxy",
+                    "source_id": "openrouter",
+                    "extra": True,
+                },
+                id="extra-field",
+            ),
+            pytest.param(
+                {
+                    "requested_model": "",
+                    "selected_tier": "opus",
+                    "kind": "proxy",
+                    "source_id": "openrouter",
+                },
+                id="empty-request",
+            ),
+            pytest.param(
+                {
+                    "requested_model": "claude-opus-5",
+                    "selected_tier": "opus",
+                    "kind": "direct",
+                    "source_id": "openrouter",
+                },
+                id="direct-source",
+            ),
+            pytest.param(
+                {
+                    "requested_model": "gpt-5.6-sol",
+                    "selected_tier": "opus",
+                    "kind": "proxy",
+                    "source_id": "",
+                },
+                id="empty-source",
+            ),
+        ],
+    )
+    def test_v2_rejects_malformed_model_route(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        model_route: dict[str, object],
+    ) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        data["intent"]["launch"]["model_route"] = model_route
+        store.manifest_path.write_text(json.dumps(data))
+
+        with pytest.raises(ManifestCorruptedError, match="deserialization error"):
+            store.read()
 
     def test_read_roundtrip_with_sidecar_launch_preferences(self, store: SessionStore) -> None:
         """Sidecar launch preferences should persist through manifest storage."""
@@ -725,8 +905,8 @@ class TestSessionStoreRead:
         assert manifest.confirmed.started_with_proxy.template == "litellm-openai"
         assert manifest.confirmed.started_with_proxy.port == 8084
 
-    def test_read_missing_proxy_allowed_in_v3(self, store: SessionStore) -> None:
-        """read() should allow missing intent.proxy in v3 (no-proxy mode)."""
+    def test_read_missing_proxy_allowed(self, store: SessionStore) -> None:
+        """read() should allow missing intent.proxy in no-proxy mode."""
         store.manifest_path.parent.mkdir(parents=True)
         data = {
             "schema_version": 1,
@@ -870,7 +1050,7 @@ class TestDictOverrideValidation:
 
 
 class TestSchemaStrictness:
-    """Test schema strictness for v3 manifests."""
+    """Test strict session-manifest decoding."""
 
     def test_rejects_unknown_top_level_field(self, store: SessionStore) -> None:
         store.manifest_path.parent.mkdir(parents=True)

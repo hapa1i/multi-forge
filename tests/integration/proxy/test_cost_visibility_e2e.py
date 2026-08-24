@@ -335,9 +335,8 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
         "e2e-haiku-subprocess",
         ModelSpec(
             name="e2e-haiku-subprocess",
-            model_id="e2e-haiku-subprocess",
-            family="anthropic",
-            provider_refs=(("openrouter", "claude-3-5-haiku-20241022"),),
+            model_id="gpt-5.6-sol",
+            family="openai",
             description="e2e subprocess-proxy panel canary",
         ),
     )
@@ -395,7 +394,10 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     assert request_records, f"No cost records for proxy_id={proxy.proxy_id}"
     assert any(r.get("cost_micros", 0) > 0 for r in request_records)
 
-    costs = CliRunner().invoke(main, ["telemetry", "costs", "show", proxy.proxy_id, "--period", "today", "--json"])
+    costs = CliRunner().invoke(
+        main,
+        ["telemetry", "costs", "show", proxy.proxy_id, "--period", "today", "--json"],
+    )
     assert costs.exit_code == 0, costs.output
     summary = json.loads(costs.output)
     assert summary["by_verb"]["panel"]["cost_micros"] > 0

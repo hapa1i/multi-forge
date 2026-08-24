@@ -20,11 +20,9 @@ from forge.review.worker_preparation import (
 def _model(*, prompt_mode: PromptMode = "override") -> ModelSpec:
     return ModelSpec(
         name="reviewer",
-        model_id="reviewer-id",
+        model_id="gpt-5.6-sol",
         family="openai",
-        provider_refs=(("openrouter", "openai/reviewer"),),
         description="Catalog description",
-        preferred_proxy="openrouter-openai",
         prompt="Catalog prompt",
         prompt_mode=prompt_mode,
     )
@@ -63,15 +61,18 @@ def test_prepare_review_workers_fills_prompts_and_deduplicates_worker_ids() -> N
         assignment_kind="role",
     )
 
-    assert [spec.effective_worker_id for spec in prepared.specs] == ["reviewer-security", "reviewer-security-1"]
+    assert [spec.effective_worker_id for spec in prepared.specs] == [
+        "reviewer-security",
+        "reviewer-security-1",
+    ]
     assert prepared.label_map == {
         "reviewer-security": "security",
         "reviewer-security-1": "security",
     }
     assert prepared.specs[0].prompt == "Before Inspect auth [guardrail]; after Inspect auth [guardrail]"
     assert prepared.specs[1].description == "security role via reviewer"
-    assert prepared.specs[0].provider_refs == model.provider_refs
-    assert prepared.specs[0].preferred_proxy == model.preferred_proxy
+    assert prepared.specs[0].model_id == model.model_id
+    assert prepared.specs[0].family == model.family
     # Specialized prompts remain full overrides even when the catalog model carries a prefix hint.
     assert prepared.specs[0].prompt_mode == "override"
 
@@ -82,14 +83,21 @@ def test_parse_review_worker_assignments_preserves_common_syntax(
 ) -> None:
     model = _model()
     parsed = parse_review_worker_assignments(
-        [" reviewer : named ", 'reviewer:"A custom prompt longer than thirty characters"'],
+        [
+            " reviewer : named ",
+            'reviewer:"A custom prompt longer than thirty characters"',
+        ],
         assignment_kind=assignment_kind,
         named_prompts={"named": "Named prompt"},
         available_models={"reviewer": model},
     )
 
     assert parsed[0].model is model
-    assert (parsed[0].assignment, parsed[0].prompt, parsed[0].display_label) == ("named", "Named prompt", None)
+    assert (parsed[0].assignment, parsed[0].prompt, parsed[0].display_label) == (
+        "named",
+        "Named prompt",
+        None,
+    )
     custom_prompt = "A custom prompt longer than thirty characters"
     assert parsed[1].assignment == "custom"
     assert parsed[1].prompt == custom_prompt
@@ -99,7 +107,11 @@ def test_parse_review_worker_assignments_preserves_common_syntax(
 @pytest.mark.parametrize(
     ("assignment_kind", "arg", "message"),
     [
-        ("role", "reviewer", "Invalid --worker 'reviewer'. Expected model:role or model:custom prompt."),
+        (
+            "role",
+            "reviewer",
+            "Invalid --worker 'reviewer'. Expected model:role or model:custom prompt.",
+        ),
         ("stance", "reviewer:", "Empty stance/prompt for model 'reviewer'."),
         ("role", "missing:named", "Unknown model 'missing'. Available: ['reviewer']"),
     ],

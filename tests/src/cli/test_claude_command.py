@@ -345,6 +345,33 @@ def test_direct_launch_honors_default_direct_model(tmp_path, monkeypatch):
     assert captured["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6"
 
 
+def test_direct_launch_rejects_non_claude_default_before_child(tmp_path, monkeypatch):
+    """A bad default_direct_model is a field-specific pre-launch error."""
+    from forge.runtime_config import reset_runtime_config
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    monkeypatch.chdir(project_root)
+
+    forge_home = tmp_path / "forge_home"
+    forge_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FORGE_HOME", str(forge_home))
+    (forge_home / "config.yaml").write_text("default_direct_model: gpt-5.6-sol\n")
+    reset_runtime_config()
+
+    try:
+        with patch(_INVOKE) as mock_invoke:
+            runner = CliRunner()
+            result = runner.invoke(main, ["claude", "start", "--no-proxy"])
+    finally:
+        reset_runtime_config()
+
+    assert result.exit_code == 1
+    assert "Invalid configuration field 'default_direct_model'" in result.output
+    assert "only supports Claude models" in result.output
+    mock_invoke.assert_not_called()
+
+
 def test_direct_launch_no_model_when_unconfigured(tmp_path, monkeypatch):
     """Direct mode passes model=None when no default_direct_model configured."""
     from forge.runtime_config import reset_runtime_config

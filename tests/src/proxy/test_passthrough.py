@@ -453,15 +453,15 @@ def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, proxy_runtime
     assert resp.json()["error"]["type"] == "invalid_request_error"
 
 
-def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch, proxy_runtime_ready):
-    """A non-passthrough proxy must fall through the middleware to the normal route —
-    the passthrough handler is never reached, so default routing is untouched."""
+@pytest.mark.parametrize("wire_shape", ["openai_translated", "openai_responses_passthrough"])
+def test_non_anthropic_passthrough_proxy_uses_translated_messages_route(monkeypatch, proxy_runtime_ready, wire_shape):
+    """Both OpenAI wire shapes use translation for the separate Messages ingress."""
     from fastapi.testclient import TestClient
 
     from forge.proxy.server import app
 
     server = proxy_runtime_ready
-    monkeypatch.setattr(server.config, "proxy", SimpleNamespace(wire_shape="openai_translated"))
+    monkeypatch.setattr(server.config, "proxy", SimpleNamespace(wire_shape=wire_shape))
 
     reached = {"passthrough": False}
 

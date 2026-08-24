@@ -118,10 +118,14 @@ def preflight_check(
             continue
         if avail.spec.runtime == "codex":
             hint = ""
-        elif avail.spec.preferred_proxy:
-            hint = f" Run 'forge proxy create {avail.spec.preferred_proxy}' to set it up."
         else:
-            hint = " Run 'forge auth login -c anthropic-api' or use --models to select only proxy-backed models."
+            from .routing import derive_model_routes, preferred_proxy_for_routes
+
+            preferred_proxy = preferred_proxy_for_routes(derive_model_routes(avail.spec))
+            if preferred_proxy:
+                hint = f" Run 'forge proxy create {preferred_proxy}' to set it up."
+            else:
+                hint = " Run 'forge auth login -c anthropic-api' or use --models to select only proxy-backed models."
         errors.append(f"{avail.spec.name}: {avail.reason}.{hint}")
     return errors
 

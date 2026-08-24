@@ -52,6 +52,16 @@ from forge.core.models.model_reference import (
     normalize_model_reference,
     strip_transport_model_suffix,
 )
+from forge.core.models.model_routes import (
+    ModelRouteCandidate,
+    ModelRouteCatalog,
+    ModelRouteCatalogError,
+    ModelRouteRequest,
+    clear_model_route_catalog_cache,
+    get_model_route_candidates,
+    load_model_route_catalog,
+    normalize_model_route_request,
+)
 from forge.core.models.types import (
     ModelCatalog,
     ModelSpec,
@@ -81,6 +91,14 @@ __all__ = [
     "ModelCatalog",
     "ModelSpec",
     "TemperatureSpec",
+    "ModelRouteCandidate",
+    "ModelRouteCatalog",
+    "ModelRouteCatalogError",
+    "ModelRouteRequest",
+    "load_model_route_catalog",
+    "clear_model_route_catalog_cache",
+    "get_model_route_candidates",
+    "normalize_model_route_request",
     "normalize_model_reference",
     "strip_transport_model_suffix",
 ]

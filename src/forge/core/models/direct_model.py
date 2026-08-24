@@ -63,7 +63,7 @@ def resolve_direct_model_pin(value: str) -> DirectModelPin:
     if not base_canonical.startswith("claude-"):
         raise ValueError(f"--model only supports Claude models for direct sessions, got {value!r}")
 
-    tier = _claude_tier(base_canonical)
+    tier = claude_model_tier(base_canonical)
     if tier is None:
         raise ValueError(f"Unsupported Claude model tier for direct sessions: {value!r}")
 
@@ -74,6 +74,16 @@ def resolve_direct_model_pin(value: str) -> DirectModelPin:
 
     env_model = f"{base_canonical}{ONE_M_SUFFIX}" if normalized_1m else base_canonical
     return DirectModelPin(canonical_model=base_canonical, env_model=env_model, tier=tier)
+
+
+def resolve_default_direct_model_pin(value: str | None) -> DirectModelPin | None:
+    """Resolve ``default_direct_model`` with a field-specific configuration error."""
+    if value is None:
+        return None
+    try:
+        return resolve_direct_model_pin(value)
+    except ValueError as e:
+        raise ValueError(f"Invalid configuration field 'default_direct_model': {e}") from e
 
 
 def direct_model_env(value: str | None) -> dict[str, str]:
@@ -118,7 +128,8 @@ def token_estimate_multiplier_for_direct_model(value: str | None) -> float:
     return get_model_spec(pin.canonical_model).token_estimate_multiplier
 
 
-def _claude_tier(canonical_model: str) -> str | None:
+def claude_model_tier(canonical_model: str) -> str | None:
+    """Return the Claude Code tier for a canonical direct-model id."""
     # Fable has no per-tier name of its own; it is the most-capable model and
     # rides the opus tier (matching the OpenRouter opus-tier default).
     if canonical_model.startswith("claude-fable-"):

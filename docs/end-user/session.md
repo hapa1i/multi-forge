@@ -947,9 +947,10 @@ The planner session stays intact throughout — it can be forked multiple times 
 
 ## Using sessions with proxies (proxy endpoints)
 
-Sessions can record which proxy they started with, but they do **not** control routing.
+Sessions can select and remember a launch route, but they do **not** own proxy tier maps or hyperparameters.
 
-**Key principle:** Proxies own routing. Sessions own workflow. See [proxy.md](proxy.md) for routing configuration.
+**Key principle:** Session intent owns the chosen model/source/template/tier; the selected proxy owns how that tier is
+served. See [proxy.md](proxy.md) for proxy configuration.
 
 ### Launch Claude with a proxy
 
@@ -975,37 +976,46 @@ For proxy context windows above Claude's 200K baseline, Forge also sets Claude C
 aliases to 1M Claude variants. This keeps Claude Code's local context estimator from stopping early while the proxy
 still routes requests to the configured backend tier, such as Gemini or OpenAI.
 
-### Pin a Claude model (`--model`)
+### Select a model and route (`--model`)
 
 ```bash
 forge session start review-pass --model claude-opus-4-8
 forge session start long-sonnet --model claude-sonnet-5[1m]
-forge session start review-pass --proxy openrouter-anthropic --model claude-opus-4-8
-forge session resume review-pass --model claude-opus-4.6
-forge session fork planner --name executor --model claude-opus-4.6
+forge session start analyst --model gpt-5.6-sol
+forge session resume analyst --model gemini-3.1-pro-preview
+forge session fork planner --name executor --model gpt-5.6-sol --model-tier opus
+forge session incognito --model gpt-5.6-sol
 ```
 
-`--model` behavior depends on the session routing mode:
+On Claude-runtime `start`, `resume`, `fork`, and `incognito`, `--model` accepts a Forge catalog model id or alias. Forge
+normalizes the request and chooses a launch route before starting Claude Code:
 
-| Mode                                    | What `--model` does                                                | `[1m]` support                 |
-| --------------------------------------- | ------------------------------------------------------------------ | ------------------------------ |
-| Direct (no `--proxy`)                   | Pins Claude Code's `ANTHROPIC_MODEL` directly                      | Yes                            |
-| Proxy + tier default or alternative     | Selects a tier or `model_alternatives` entry; proxy routes it      | Yes (stripped at proxy lookup) |
-| Proxy + no matching default/alternative | Errors: "does not configure model alternative or tier default ..." | N/A                            |
-| Subprocess proxy (`--subprocess-proxy`) | Pins Claude Code env vars (main is direct; subprocesses inherit)   | Yes                            |
+| Situation                                         | Result                                                               |
+| ------------------------------------------------- | -------------------------------------------------------------------- |
+| Explicit `--proxy <id-or-template>`               | That proxy is required; incompatibility is an error                  |
+| Explicit `--no-proxy`                             | Direct Claude only; non-Claude models are rejected                   |
+| Compatible persisted/inherited route              | The route is preserved                                               |
+| New session with a Claude model and no route flag | Direct Claude, regardless of running proxies                         |
+| New session with a non-Claude model               | First admissible packaged-catalog proxy; no fallback after selection |
 
-Rejected for sidecar or host-proxy launches.
+If more than one proxy tier serves the request and no default decides it, add `--model-tier haiku|sonnet|opus`. It
+requires `--model`; it does not select a second model. Direct Claude requests must use their intrinsic tier. Claude
+`[1m]` aliases keep their existing transport behavior; non-Claude `[1m]` is invalid.
 
-Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
-`ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. `forge session resume --model ...` updates the
-current session's stored pin; `forge session fork --model ...` writes the pin to the child session. This is useful when
-moving a planner between Opus 5 execution and Opus 4.6 final review. The `claude-opus`/`opus` aliases point at Claude
-Opus 5; pin `claude-opus-4-8` or `claude-opus-4-6` explicitly for the displaced versions.
+Forge stores the canonical request and resolved source/template/tier alongside the legacy Claude execution pin. A bare
+resume reuses that route; if it is unavailable, Forge fails with recovery guidance rather than silently choosing another
+provider. An explicit `--model` authorizes replacement when the inherited route cannot serve it. Before an explicit
+selection launches, one stderr line reports provider, template/proxy, tier, effective model, and known billing posture.
+The billing value remains `unknown` when Forge has no payer evidence.
 
-For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
-a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.
+Selecting a non-Claude model can create or start a paid proxy. `--no-launch --model ...` still resolves/starts the route
+and persists intent, but invokes no child and writes no route event; the proxy remains independently managed. A
+non-Claude main-session route cannot combine with `--subprocess-proxy`. Explicit sidecar/host-proxy modes and Codex
+sessions reject this model-route surface, while `session adopt --model` remains a Claude-only native-conversation pin.
 
-For proxy-mode `model_alternatives` configuration, see [proxy.md](proxy.md#model-alternatives).
+Forge `--model` is distinct from Claude Code's `/model`. The CLI flag decides durable routing before process launch;
+`/model` changes Claude-native state inside the running conversation. For proxy-mode alternatives and tier ownership,
+see [proxy.md](proxy.md#model-alternatives).
 
 ### Resume with a routing override
 
@@ -1053,6 +1063,10 @@ Launch runtime is immutable session identity. `session set` rejects `launch.runt
 contains `runtime`, and `launch.*`; create a new session with `--runtime` instead. Whole-launch and nullable sibling
 null clears remain supported, while `session reset launch.runtime` and `session reset launch` can remove stale illegal
 overrides written by an older Forge.
+
+The resolved `launch.model_route` is also not a mid-session override surface. Choose or replace it with `--model` on
+`session start`, `resume`, `fork`, or `incognito`; `session set` rejects the route object, its leaves, and a parent
+`launch` object carrying it. Keyed reset remains available to remove a stale route override written by an older Forge.
 
 Artifact authority is intent, not an override. `session set` rejects `authority`, `authority.*`, and concrete authority
 leaves; keyed `session reset` rejects the same paths. `session reset --all` only clears overrides and cannot remove
@@ -1157,8 +1171,9 @@ may be proceeding without frontier review). The two are scoped differently, so t
 
 ### “I tried to change the model tier / LLM settings”
 
-Sessions do not control routing or LLM defaults. Choose a different proxy or specify a tier explicitly in the request
-model name.
+Use `--model <catalog-id>` and, only for an ambiguous proxy match, `--model-tier <haiku|sonnet|opus>` to select the
+session's launch route. Sessions do not edit the chosen proxy's tier models or hyperparameter defaults; change those in
+the proxy overlay or select a different proxy.
 
 ### "I want multi-model A/B/C workflows without worktrees"
 

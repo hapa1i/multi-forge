@@ -301,7 +301,7 @@ def resolve_subprocess_routing(
             ``config.base_url``). Opaque -- no compatibility check.
         explicit_proxy: User-chosen proxy (``--proxy``, ``--supervisor-proxy``).
             Strict: hard error if missing, unreachable, or incompatible.
-        preferred_proxy: Catalog hint (``ModelSpec.preferred_proxy``).
+        preferred_proxy: Catalog-leading compatible proxy template hint.
             Soft: warn and continue if missing.
         routes: Derived model routes for compatibility and route scan.
         require_route: When True (workflows), opaque session proxy without

@@ -219,6 +219,9 @@ def validate_key(key: str) -> list[str]:
     if key == "launch.runtime":
         _reject_launch_runtime_override(key)
 
+    if _is_launch_model_route_path(key):
+        _reject_launch_model_route_override(key)
+
     if first_part == "consumer_lanes":
         # Consumer-lane bindings are set only through resolving commands
         # (--supervisor-runtime at start/fork, 'forge policy supervisor set <target> --runtime'), which expand a
@@ -319,8 +322,11 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
         return
 
     parts = validate_key(key)
-    if key == "launch" and isinstance(value, dict) and "runtime" in value:
-        _reject_launch_runtime_override(key)
+    if key == "launch" and isinstance(value, dict):
+        if "runtime" in value:
+            _reject_launch_runtime_override(key)
+        if "model_route" in value:
+            _reject_launch_model_route_override(key)
     _set_path(overrides, parts, value)
 
 
@@ -358,10 +364,12 @@ def delete_override(overrides: dict[str, Any], key: str) -> bool:
                 any_deleted = True
         return any_deleted
 
-    # Runtime is immutable for writes, but reset must remain a recovery path for
-    # an illegal override persisted by an older Forge.
+    # Runtime and resolved route state reject writes, but reset remains a
+    # recovery path for an illegal override persisted by an older Forge.
     if key == "launch.runtime":
         parts: list[str] = ["launch", "runtime"]
+    elif _is_launch_model_route_path(key):
+        parts = key.split(".")
     else:
         parts = validate_key(key)
     return _delete_path(overrides, parts)
@@ -392,4 +400,18 @@ def _reject_launch_runtime_override(key: str) -> None:
         key,
         "runtime is immutable launch identity",
         hint="start a new session with --runtime instead",
+    )
+
+
+def _is_launch_model_route_path(key: str) -> bool:
+    """Return whether ``key`` is the resolved model-route subtree or a valid leaf."""
+    return key == "launch.model_route" or (key.startswith("launch.model_route.") and key in get_valid_intent_paths())
+
+
+def _reject_launch_model_route_override(key: str) -> None:
+    """Reject writes that would only appear to replace resolved route state."""
+    raise InvalidOverrideKeyError(
+        key,
+        "model_route is resolved launch state, not an override surface",
+        hint="choose a route with --model on session start, resume, fork, or incognito",
     )

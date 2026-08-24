@@ -311,6 +311,33 @@ class TestSessionSetOverride:
         assert "start a new session with --runtime" in result.output
         assert store.manifest_path.read_bytes() == before
 
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("launch.model_route", "null"),
+            ("launch.model_route.selected_tier", "haiku"),
+            ("launch", '{"model_route":null}'),
+        ],
+    )
+    def test_set_rejects_resolved_model_route_writes_without_mutation(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        value: str,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "resolved-route", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "resolved-route")
+        before = store.manifest_path.read_bytes()
+
+        result = runner.invoke(main, ["session", "set", "--session", "resolved-route", key, value])
+
+        assert result.exit_code == 1
+        assert "model_route is resolved launch state" in result.output
+        assert "--model" in result.output
+        assert store.manifest_path.read_bytes() == before
+
     def test_set_parent_launch_sibling_and_nullable_clear_remain_supported(
         self,
         runner: CliRunner,
@@ -515,6 +542,38 @@ class TestSessionReset:
         assert result.exit_code == 0, result.output
         launch = store.read().overrides.get("launch")
         assert launch == expected_launch
+
+    @pytest.mark.parametrize(
+        ("key", "expected_route"),
+        [
+            ("launch.model_route.selected_tier", {"kind": "proxy"}),
+            ("launch.model_route", None),
+        ],
+    )
+    def test_reset_removes_persisted_illegal_model_route_override(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        expected_route: dict[str, str] | None,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "legacy-route-override", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "legacy-route-override")
+        state = store.read()
+        state.overrides["launch"] = {
+            "model_route": {
+                "selected_tier": "haiku",
+                "kind": "proxy",
+            }
+        }
+        store.write(state)
+
+        result = runner.invoke(main, ["session", "reset", "--session", "legacy-route-override", key])
+
+        assert result.exit_code == 0, result.output
+        launch = store.read().overrides.get("launch", {})
+        assert launch.get("model_route") == expected_route
 
 
 class TestInspectShowsOverrides:

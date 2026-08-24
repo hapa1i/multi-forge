@@ -24,7 +24,7 @@ entry points, JSONL mechanics, origin/outcome vocabulary, local-evidence caveats
 Implementing those seams independently would create two subtly incompatible evidence systems.
 
 Generic model selection is not part of this epic.
-[Model-First Interactive Session Routing](../../proposed/model_first_session_routing/card.md) is an adjacent
+[Model-First Interactive Session Routing](../../done/model_first_session_routing/card.md) is an adjacent
 behavior-changing proposal; it may emit richer routing facts when present but is not required by either member.
 
 ## Members

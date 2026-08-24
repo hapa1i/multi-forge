@@ -73,6 +73,14 @@ Forge subprocesses (workflow workers, semantic and team supervisors, memory writ
 when they need Forge-owned transport selection. This replaced ad-hoc resolution paths that implemented different
 fallback chains with different semantics. Intentional direct and runtime-native arms bypass the resolver.
 
+Interactive main-session model selection does **not** use this ambient subprocess chain.
+`forge.core.ops.session_model_routing` owns its read-only plan: explicit proxy/no-proxy, compatible persisted route,
+new-Claude direct, then ordered package-catalog candidates. It inspects template/instance tier maps and backend-source
+credentials without scanning unrelated running proxies or starting a process. `realize_session_model_route()` realizes
+only the selected plan, calls `ensure_proxy()` once when startup/reuse is required, revalidates concrete identity and
+compatibility, and treats every post-selection failure as terminal. The plan's exact selected-model context window is
+the input to session resume/fork budget preflight; intent mutation remains a later lifecycle transaction.
+
 **Resolution chain** (sources not supplied by a caller are skipped):
 
 | Step | Source             | Behavior                                                                                        |
@@ -80,7 +88,7 @@ fallback chains with different semantics. Intentional direct and runtime-native 
 | 1    | `explicit`         | Opaque base-URL override                                                                        |
 | 2    | `explicit`         | Named CLI/config proxy; strict registration, reachability, and route compatibility              |
 | 3    | `subprocess_proxy` | Ambient `FORGE_SUBPROCESS_PROXY`; strict, or host-injected sidecar URL/metadata                 |
-| 4    | `preferred_proxy`  | Catalog hint (`ModelSpec.preferred_proxy`); soft -- skip if not running                         |
+| 4    | `preferred_proxy`  | Leading proxy candidate from the shared route catalog; soft -- skip if not running              |
 | 5    | `route_scan`       | Find any running proxy compatible with a derived `ModelRoute`                                   |
 | 6    | `session_proxy`    | Inherited `ANTHROPIC_BASE_URL`; opaque URLs are accepted when the caller does not require route |
 | 7    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                                         |
@@ -166,21 +174,28 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 **Key points:**
 
 - Proxy and session state remain independent; status tools read both (see §3.6.2).
+
 - `runtime.backend_id`, `runtime.tier_mappings`, and `runtime.model_alternatives` are secret-free effective loaded
   routing facts. The exposed tier and alternative targets include the same active ZDR substitutions used for dispatch.
   Older responses that omit the additive fields remain readable, but callers label config or launch-commit recovery as
   fallback rather than live runtime evidence.
+
 - Known optional tier keys may be present with an empty string when that tier has no route. Runtime-truth readers omit
   those empty entries from the exposed mapping without rejecting the otherwise authoritative response; unknown keys,
   non-string values, or a map with no nonempty route remain non-authoritative.
+
 - Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
   `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
   identity fields available; the nested `downstream_retention` object carries the recovery detail.
+
 - Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
+
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
+
 - `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
   only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
   active (lossy)" before launch (§7.x)
+
 - `wire_shape: openai_responses_passthrough` is the **Codex-facing** raw OpenAI **Responses** shape on `/v1/responses*`
   (create + retrieve/cancel/input_items/delete/compact/input_tokens). It forwards traffic byte-for-byte (signature-safe;
   `can_inspect.*=false`, like `anthropic_passthrough`). Routing requires that wire shape plus backend
@@ -188,6 +203,10 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is token-telemetry-only. The
   launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental data/JSON framer serves
   both raw passthrough usage taps; accumulators own protocol event merging and lifecycle semantics.
+
+  The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
+  `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the
+  ordinary Anthropic-to-OpenAI translation path applies. Messages callers receive no raw-Responses signature guarantee.
 
 **Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The
 package-owned `core/data/model_practices.yaml` separately records dated, source-linked provider declarations under
@@ -414,7 +433,7 @@ unchanged `starting` row, preserving concurrent replacements.
 | `litellm-openai-local`       | Local LiteLLM + OpenAI API key                                 |
 | `litellm-openai-codex-local` | OpenAI Codex models via local LiteLLM + OpenAI API key         |
 | `anthropic-passthrough`      | Raw Anthropic passthrough; signature-safe; inspect enabled     |
-| `codex-responses-local`      | Raw Responses passthrough for `forge codex start --proxy`      |
+| `codex-responses-local`      | Raw Codex Responses plus translated Claude Messages ingress    |
 | `litellm-gemini-test`        | Internal integration-test dependency; hidden from normal lists |
 
 Twenty-one templates ship; `litellm-gemini-test` is test infrastructure, so twenty are user-facing.
@@ -508,7 +527,7 @@ The shipped v1 catalog includes:
 | `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                                       |
 | `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                                       |
 | `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                                                     |
-| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace                           |
+| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Raw Codex Responses plus translated Claude Messages; responses-ingress + provider-trace         |
 | `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                                            |
 
 Catalog validation rejects duplicate backend instance ids or aliases, unknown `kind`/`provider`/`billing_posture`
@@ -583,19 +602,46 @@ Status line should read live proxy truth when available; clearly label file fall
 The model catalog is **authoritative internal data**:
 
 - Location: `src/forge/core/data/model_catalog.yaml`
-- Defines: model capabilities, context windows, provider mappings
+- Defines: intrinsic model capabilities, context windows, aliases, and per-family defaults
 - **NOT a user edit surface**
+
+The model route catalog is separate **authoritative operational data**:
+
+- Location: `src/forge/core/data/model_routes.yaml`
+- Owner: `forge.core.models.model_routes`
+- Defines: ordered direct runtime or proxy source/template/provider-model references for every normalized intrinsic
+  model
+- Source credentials, endpoint/lifecycle facts, and template ownership remain in `forge.backend.sources`; proxy tier
+  maps remain in template/proxy configuration
+- **NOT a user edit surface**
+
+The `codex-responses-local` GPT candidate is intentional shared-route compatibility. It preserves the pre-catalog
+workflow order and supplies an OpenAI-key local route for interactive Claude selection. Route evidence records the
+configured Responses capability while the Claude request itself uses the translated Messages ingress.
+
+`load_model_route_catalog()` reads the packaged resource, enforces exact schema fields, canonical model coverage,
+candidate uniqueness, catalog-listed provider refs, and direct-first Claude compatibility, then validates
+source/template ownership through the model-source catalog. The frozen result is cached; tests use
+`clear_model_route_catalog_cache()` for explicit reloads. The loader does not import session lifecycle or workflow
+callers.
+
+`normalize_model_route_request()` returns the canonical request, base route key, Claude tier, and optional Claude Code
+`[1m]` transport modifier. Canonical `*-1m` models and `[1m]` spellings share the base candidate list. Catalog-listed
+OpenRouter dot-form Claude 4.6 aliases retain their existing 1M normalization; corresponding hyphen forms retain base
+normalization.
 
 **Workflow model specs** (`src/forge/review/models.py`):
 
 ```python
-ModelSpec(name, model_id, family, provider_refs, description,
-         preferred_proxy=None, prompt=None, prompt_mode="override", worker_id=None)
+ModelSpec(name, model_id, family, description,
+          prompt=None, prompt_mode="override", worker_id=None, runtime="claude_code")
 ```
 
-Key fields: `model_id` is Forge-canonical (e.g., `gpt-5.5`, not `openai/gpt-5.5`). `family` is the model's native family
-(e.g., `openai`, `anthropic`, `gemini`). `provider_refs` is ordered `(namespace, model_ref)` tuples declaring how to
-reach the model via each provider. `preferred_proxy` is a soft catalog hint, overridable by `--proxy` or route scan.
+`model_id` is Forge-canonical (for example, `gpt-5.6-sol`, not a provider slug), and `family` is the model's intrinsic
+family. A spec owns worker identity, description, prompt, and runtime only. `derive_model_routes()` normalizes
+`model_id`, reads the shared route catalog's already ordered candidates, and combines them with static template/source
+metadata to produce `ModelRoute` values. It does not scan or mutate the proxy registry. Runtime-native workers such as
+Codex bypass the catalog deliberately.
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 
@@ -795,10 +841,10 @@ def resolve_subprocess_routing(
     """
 
 def derive_model_routes(spec: RoutableSpec) -> tuple[ModelRoute, ...]:
-    """Expand compact model metadata into concrete routing options.
+    """Materialize the shared route catalog for one workflow worker.
 
-    Combines ModelSpec fields with template/auth metadata. Does not
-    inspect the proxy registry or check running state.
+    Candidate order comes from model_routes.yaml. Template metadata
+    contributes family/provider/credential facts without registry I/O.
     """
 
 def resolve_invocation_routing(
@@ -819,16 +865,14 @@ def resolve_model_flag(route: ModelRoute) -> str | None:
 
 ### G.4 Route derivation ranking
 
-`derive_model_routes()` produces routes in deterministic order:
-
-1. preferred_proxy match first (if it matches a derived route)
-2. provider_refs order (from `ModelSpec.provider_refs`)
-3. Native-family templates before OpenRouter passthrough cross-family templates
-4. Alphabetical template name tiebreaker
+`derive_model_routes()` preserves the exact candidate order in packaged `model_routes.yaml`; workflow code neither
+re-ranks candidates nor owns a parallel preferred-proxy/provider-ref list. The first proxy candidate is the soft
+`preferred_proxy` input to the shared resolver. The catalog's fixed-order tests guard preferred-template promotion,
+provider order, native-family-before-cross-family placement, and template tiebreakers.
 
 Registry scan then ranks matched proxies:
 
-1. Route preference order (from `derive_model_routes()` ranking above)
+1. Route preference order from the shared catalog
 2. Alphabetical proxy_id as tiebreaker
 
 ### G.5 Sidecar constraints

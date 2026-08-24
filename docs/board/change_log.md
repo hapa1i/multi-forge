@@ -5,6 +5,27 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-08-24
+
+### Route interactive sessions by model
+
+**Goal/outcome**: Let Claude-runtime sessions select any supported catalog model through one durable `--model` contract
+without weakening explicit routes, bare resumes, or workflow routing determinism.
+
+**Key changes**:
+
+- Added one packaged, strictly validated route catalog shared by interactive sessions and non-runtime-native workflow
+  workers; removed workflow-owned provider/template ordering after executable parity proof.
+- Added strict manifest-v2 neutral route intent and a side-effect-free planner with explicit precedence, credential
+  admission, tier resolution, selected-context preflight, single-candidate realization, and atomic intent transitions.
+- Integrated model-first routing across start, resume, fork, and incognito, with exact-payload stderr evidence,
+  fail-closed replay, no-launch persistence, and preserved Claude, Codex, adoption, and config-default boundaries.
+- Synchronized the session/runtime designs, CLI reference, and end-user model, proxy, and session guides.
+
+**Verification**: 883 focused acceptance tests; 9,832 unit tests with 117 integration-marked tests deselected; 1,068
+regressions; six final session, package-resource, workflow, and proxy integration cases; full pre-commit; wheel/sdist
+build; and exact-wheel clean-environment resource smoke pass.
+
 ## 2026-08-23
 
 ### Correct daily review findings

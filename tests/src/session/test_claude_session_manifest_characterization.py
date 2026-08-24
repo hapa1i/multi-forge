@@ -102,7 +102,7 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     assert state.confirmed.route_commit is None
     assert not (temp_env / ".forge" / "artifacts" / "char-start" / "routing").exists()
     assert _manifest_json(state, project=temp_env) == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-start",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -123,6 +123,7 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,
@@ -182,7 +183,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
 
     assert result.exit_code == 0, result.output
     assert captured["json"] == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-incognito",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -203,6 +204,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,
@@ -273,7 +275,7 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
     state = SessionStore(str(temp_env), "char-child").read()
     _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-child",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -294,6 +296,7 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,
@@ -369,7 +372,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
     state = SessionStore(str(temp_env), "char-reconnect").read()
     _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-reconnect",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -390,6 +393,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,
@@ -467,7 +471,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     state = SessionStore(str(temp_env), "char-active-child").read()
     _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-active-child",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -488,6 +492,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,
@@ -558,7 +563,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
     state = SessionStore(str(temp_env), "char-native-child").read()
     _assert_route_commit(temp_env, state, operation="resume")
     assert _manifest_json(state, project=temp_env) == """{
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "char-native-child",
   "created_at": "<timestamp>",
   "last_accessed_at": "<timestamp>",
@@ -579,6 +584,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
       "mode": "host",
       "sidecar": null,
       "direct_model": null,
+      "model_route": null,
       "runtime": "claude_code"
     },
     "authority": null,

@@ -22,19 +22,15 @@ class RoutableSpec(Protocol):
     """Structural protocol for model specs that can be routed.
 
     Decouples routing from the concrete ``ModelSpec`` dataclass so
-    Phase 2 is type-check clean before Phase 3 adds these fields.
-    Once ``ModelSpec`` gains these fields, it satisfies this protocol
-    implicitly (structural subtyping).
+    Concrete ``ModelSpec`` instances satisfy this protocol implicitly.
     """
 
     @property
     def name(self) -> str: ...
     @property
+    def model_id(self) -> str: ...
+    @property
     def family(self) -> str: ...
-    @property
-    def provider_refs(self) -> tuple[tuple[str, str], ...]: ...
-    @property
-    def preferred_proxy(self) -> str | None: ...
     @property
     def runtime(self) -> str: ...
 
@@ -43,10 +39,6 @@ _log = logging.getLogger(__name__)
 
 # Direct workers run claude -p --bare which needs ANTHROPIC_API_KEY
 _DIRECT_CREDENTIAL = "anthropic-api"
-
-# Providers that pass model IDs through to the upstream (OpenRouter routes
-# by explicit model ref regardless of the template's native family).
-_PASSTHROUGH_PROVIDERS = frozenset({"openrouter"})
 
 
 class WorkflowRoutingError(RuntimeError):
@@ -150,18 +142,6 @@ def _get_template_meta(template_name: str) -> _TemplateMeta | None:
         return None
 
 
-def _all_template_metas() -> list[_TemplateMeta]:
-    """Load metadata for all available templates."""
-    from forge.config.loader import list_template_names
-
-    result: list[_TemplateMeta] = []
-    for name in list_template_names(include_internal=False):
-        meta = _get_template_meta(name)
-        if meta:
-            result.append(meta)
-    return result
-
-
 def clear_template_cache() -> None:
     """Clear the template metadata cache (for testing)."""
     _template_cache.clear()
@@ -171,84 +151,62 @@ def clear_template_cache() -> None:
 
 
 def derive_model_routes(spec: RoutableSpec) -> tuple[ModelRoute, ...]:
-    """Expand compact model metadata into concrete routing options.
+    """Materialize the shared route catalog for one workflow worker.
 
-    For each provider ref on the model, inspect known proxy templates
-    and credential metadata to build route records. Does not inspect
-    the proxy registry or check running state.
-
-    Ranking (deterministic):
-    1. preferred_proxy match first (if it matches a derived route)
-    2. provider_refs order
-    3. Native-family templates before cross-family passthrough
-    4. Alphabetical template name tiebreaker
+    Candidate order is already authoritative in ``model_routes.yaml``. Template
+    metadata contributes family/provider/credential facts without consulting the
+    runtime proxy registry or re-ranking candidates.
     """
-    all_metas = _all_template_metas()
+
+    from forge.core.models.model_routes import (
+        get_model_route_candidates,
+        normalize_model_route_request,
+    )
+
+    request = normalize_model_route_request(spec.model_id)
+    candidates = get_model_route_candidates(spec.model_id)
     routes: list[ModelRoute] = []
-    preferred_routes: list[ModelRoute] = []
-
-    for provider_ns, model_ref in spec.provider_refs:
-        if provider_ns == "direct":
-            route = ModelRoute(
-                provider="direct",
-                credential=_DIRECT_CREDENTIAL,
-                family=spec.family,
-                template_id=None,
-                template_family=None,
-                model_ref=model_ref,
+    for candidate in candidates:
+        if candidate.kind == "direct":
+            routes.append(
+                ModelRoute(
+                    provider="direct",
+                    credential=_DIRECT_CREDENTIAL,
+                    family=spec.family,
+                    template_id=None,
+                    template_family=None,
+                    model_ref=request.direct_execution_ref(candidate.model_ref),
+                )
             )
-            if spec.preferred_proxy is None:
-                preferred_routes.append(route)
-            else:
-                routes.append(route)
             continue
 
-        matching = _find_matching_templates(provider_ns, spec.family, all_metas)
-
-        for meta in matching:
-            cred = meta.credentials[0] if meta.credentials else provider_ns
-            route = ModelRoute(
-                provider=provider_ns,
-                credential=cred,
+        assert candidate.template is not None
+        meta = _get_template_meta(candidate.template)
+        if meta is None:
+            raise WorkflowRoutingError(
+                f"Route catalog template {candidate.template!r} for model {spec.name!r} could not be loaded."
+            )
+        credential = meta.credentials[0] if meta.credentials else meta.preferred_provider
+        routes.append(
+            ModelRoute(
+                provider=meta.preferred_provider,
+                credential=credential,
                 family=spec.family,
-                template_id=meta.name,
+                template_id=candidate.template,
                 template_family=meta.family,
-                model_ref=model_ref,
+                model_ref=candidate.model_ref,
             )
-            if spec.preferred_proxy and meta.name == spec.preferred_proxy:
-                preferred_routes.append(route)
-            else:
-                routes.append(route)
-
-    return tuple(preferred_routes + routes)
+        )
+    return tuple(routes)
 
 
-def _find_matching_templates(
-    provider_ns: str,
-    model_family: str,
-    all_metas: list[_TemplateMeta],
-) -> list[_TemplateMeta]:
-    """Find templates compatible with a provider namespace.
+def preferred_proxy_for_routes(routes: Sequence[ModelRoute]) -> str | None:
+    """Return the catalog-leading proxy template, if the worker is proxied."""
 
-    Returns native-family templates first, then cross-family passthrough
-    templates (for passthrough providers like OpenRouter), sorted
-    alphabetically within each group.
-    """
-    native: list[_TemplateMeta] = []
-    cross_family: list[_TemplateMeta] = []
-
-    for meta in all_metas:
-        if meta.preferred_provider != provider_ns:
-            continue
-
-        if meta.family == model_family:
-            native.append(meta)
-        elif provider_ns in _PASSTHROUGH_PROVIDERS:
-            cross_family.append(meta)
-
-    native.sort(key=lambda m: m.name)
-    cross_family.sort(key=lambda m: m.name)
-    return native + cross_family
+    for route in routes:
+        if route.provider != "direct" and route.template_id is not None:
+            return route.template_id
+    return None
 
 
 # ── Invocation routing ───────────────────────────────────────────
@@ -288,7 +246,7 @@ def resolve_invocation_routing(
             else:
                 result = resolve_subprocess_routing(
                     explicit_proxy=via,
-                    preferred_proxy=spec.preferred_proxy,
+                    preferred_proxy=preferred_proxy_for_routes(routes),
                     routes=routes,
                     require_route=True,
                     advisory_check=True,

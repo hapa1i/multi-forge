@@ -12,9 +12,9 @@ from forge.core.reactive.routing import ModelRoute, RoutingResult, RoutingSource
 from forge.review.routing import (
     WorkerRoutingPlan,
     WorkflowRoutingError,
-    _TemplateMeta,
     clear_template_cache,
     derive_model_routes,
+    preferred_proxy_for_routes,
     resolve_invocation_routing,
     resolve_model_flag,
 )
@@ -70,7 +70,7 @@ class TestWorkerRoutingPlan:
                 family="openai",
                 template_id="openrouter-openai",
                 template_family="openai",
-                model_ref="openai/gpt-5.5",
+                model_ref="openai/gpt-5.6-sol",
             ),
             credential="openrouter",
         )
@@ -124,259 +124,157 @@ class _StubModelSpec:
     name: str
     model_id: str
     family: str
-    provider_refs: tuple[tuple[str, str], ...]
     description: str = ""
-    preferred_proxy: str | None = None
     prompt: str | None = None
     prompt_mode: str = "override"
     worker_id: str | None = None
     runtime: str = "claude_code"
 
 
-_OPENROUTER_OPENAI_META = _TemplateMeta(
-    name="openrouter-openai",
-    family="openai",
-    preferred_provider="openrouter",
-    credentials=("openrouter",),
-)
-_OPENROUTER_ANTHROPIC_META = _TemplateMeta(
-    name="openrouter-anthropic",
-    family="anthropic",
-    preferred_provider="openrouter",
-    credentials=("openrouter",),
-)
-_OPENROUTER_GEMINI_META = _TemplateMeta(
-    name="openrouter-gemini",
-    family="gemini",
-    preferred_provider="openrouter",
-    credentials=("openrouter",),
-)
-_LITELLM_OPENAI_META = _TemplateMeta(
-    name="litellm-openai",
-    family="openai",
-    preferred_provider="litellm",
-    credentials=("litellm-remote",),
-)
-_LITELLM_OPENAI_LOCAL_META = _TemplateMeta(
-    name="litellm-openai-local",
-    family="openai",
-    preferred_provider="litellm",
-    credentials=("openai-api",),
-)
-
-_ALL_METAS = [
-    _OPENROUTER_ANTHROPIC_META,
-    _OPENROUTER_GEMINI_META,
-    _OPENROUTER_OPENAI_META,
-    _LITELLM_OPENAI_META,
-    _LITELLM_OPENAI_LOCAL_META,
-]
+_EXPECTED_WORKFLOW_ROUTES = {
+    "gpt-5.6-sol": (
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-qwen",
+        "codex-responses-local",
+        "litellm-openai",
+        "litellm-openai-codex-local",
+        "litellm-openai-local",
+    ),
+    "gemini-3.1-pro-preview": (
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-qwen",
+        "litellm-gemini",
+        "litellm-gemini-flash-local",
+        "litellm-gemini-local",
+    ),
+    "deepseek-v4-pro": (
+        "openrouter-deepseek",
+        "openrouter-anthropic",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-qwen",
+    ),
+    "minimax-m3": (
+        "openrouter-minimax",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-qwen",
+    ),
+    "qwen3.8-max": (
+        "openrouter-qwen",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+    ),
+    "glm-5.3": (
+        "openrouter-glm",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-qwen",
+    ),
+    "kimi-k3": (
+        "openrouter-kimi",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-minimax",
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-qwen",
+    ),
+}
 
 
 class TestDeriveModelRoutes:
-
     @pytest.fixture(autouse=True)
     def _clear_cache(self):
         clear_template_cache()
         yield
         clear_template_cache()
 
-    def _patch_metas(self, metas=None):
-        return patch(
-            "forge.review.routing._all_template_metas",
-            return_value=metas if metas is not None else _ALL_METAS,
-        )
+    def test_fixed_catalog_order_for_every_proxy_worker(self) -> None:
+        from forge.review.models import AVAILABLE_MODELS
 
-    def test_openrouter_model_produces_native_and_cross_family_routes(self):
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
+        assert set(_EXPECTED_WORKFLOW_ROUTES) == {
+            spec.name for spec in AVAILABLE_MODELS.values() if spec.runtime != "codex" and spec.family != "anthropic"
+        }
+        for name, expected_templates in _EXPECTED_WORKFLOW_ROUTES.items():
+            routes = derive_model_routes(AVAILABLE_MODELS[name])
+            assert tuple(route.template_id for route in routes) == expected_templates
+            assert preferred_proxy_for_routes(routes) == expected_templates[0]
 
-        assert len(routes) >= 2
-        assert routes[0].template_id == "openrouter-openai"
-        assert routes[0].template_family == "openai"
+    @pytest.mark.parametrize(
+        ("name", "model_ref"),
+        [
+            ("claude-opus", "claude-opus-5"),
+            ("claude-opus-4.6", "claude-opus-4-6"),
+            ("claude-opus-4.6-1m", "claude-opus-4-6[1m]"),
+            ("claude-opus-4.8", "claude-opus-4-8"),
+            ("claude-fable", "claude-fable-5"),
+        ],
+    )
+    def test_fixed_direct_worker_routes(self, name: str, model_ref: str) -> None:
+        from forge.review.models import AVAILABLE_MODELS
 
-        cross = [r for r in routes if r.template_family != "openai"]
-        assert len(cross) >= 1
-        assert all(r.provider == "openrouter" for r in cross)
+        routes = derive_model_routes(AVAILABLE_MODELS[name])
+        assert [(route.provider, route.template_id, route.model_ref) for route in routes] == [
+            ("direct", None, model_ref)
+        ]
+        assert preferred_proxy_for_routes(routes) is None
 
-    def test_preferred_proxy_ranked_first(self):
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
+    def test_catalog_order_is_deterministic(self) -> None:
+        spec = _StubModelSpec(name="gpt-5.6-sol", model_id="gpt-5.6-sol", family="openai")
+        assert derive_model_routes(spec) == derive_model_routes(spec)
 
-        assert routes[0].template_id == "openrouter-openai"
+    def test_runtime_native_worker_has_no_catalog_lookup(self) -> None:
+        from forge.review.models import AVAILABLE_MODELS
 
-    def test_native_family_before_cross_family(self):
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        native_indices = [i for i, r in enumerate(routes) if r.template_family == "openai"]
-        cross_indices = [i for i, r in enumerate(routes) if r.template_family != "openai"]
-        if native_indices and cross_indices:
-            assert max(native_indices) < min(cross_indices)
-
-    def test_direct_model_produces_single_route(self):
-        spec = _StubModelSpec(
-            name="claude-opus",
-            model_id="claude-opus",
-            family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        assert len(routes) == 1
-        assert routes[0].provider == "direct"
-        assert routes[0].credential == "anthropic-api"
-        assert routes[0].model_ref == "claude-opus-4-6"
-        assert routes[0].template_id is None
-
-    def test_multi_provider_refs(self):
-        """Model with both openrouter and litellm refs produces routes for both."""
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(
-                ("openrouter", "openai/gpt-5.5"),
-                ("litellm", "openai/gpt-5.5"),
-            ),
-            preferred_proxy="openrouter-openai",
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        providers = {r.provider for r in routes}
-        assert "openrouter" in providers
-        assert "litellm" in providers
-
-    def test_litellm_routes_include_local_and_remote(self):
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("litellm", "openai/gpt-5.5"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        template_ids = {r.template_id for r in routes}
-        assert "litellm-openai" in template_ids
-        assert "litellm-openai-local" in template_ids
-
-    def test_litellm_routes_have_correct_credentials(self):
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("litellm", "openai/gpt-5.5"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        for r in routes:
-            if r.template_id == "litellm-openai":
-                assert r.credential == "litellm-remote"
-            elif r.template_id == "litellm-openai-local":
-                assert r.credential == "openai-api"
-
-    def test_no_matching_templates_returns_empty(self):
-        spec = _StubModelSpec(
-            name="custom",
-            model_id="custom",
-            family="custom",
-            provider_refs=(("nonexistent-provider", "custom/model"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        assert len(routes) == 0
-
-    def test_oss_model_provider_ref(self):
-        """OSS models use provider-specific refs from their templates."""
-        kimi_meta = _TemplateMeta(
-            name="openrouter-kimi",
-            family="kimi",
-            preferred_provider="openrouter",
-            credentials=("openrouter",),
-        )
-        spec = _StubModelSpec(
-            name="kimi-k2.6",
-            model_id="kimi-k2.6",
-            family="kimi",
-            provider_refs=(("openrouter", "moonshotai/kimi-k2.6"),),
-            preferred_proxy="openrouter-kimi",
-        )
-        with self._patch_metas(_ALL_METAS + [kimi_meta]):
-            routes = derive_model_routes(spec)
-
-        assert routes[0].template_id == "openrouter-kimi"
-        assert routes[0].model_ref == "moonshotai/kimi-k2.6"
-        assert routes[0].credential == "openrouter"
-
-    def test_deterministic_ordering(self):
-        """Same input produces same output across calls."""
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
-        )
-        with self._patch_metas():
-            routes1 = derive_model_routes(spec)
-        with self._patch_metas():
-            routes2 = derive_model_routes(spec)
-
-        assert routes1 == routes2
-
-    def test_all_model_refs_preserved(self):
-        """model_ref on each route matches what was in provider_refs."""
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-        )
-        with self._patch_metas():
-            routes = derive_model_routes(spec)
-
-        for r in routes:
-            assert r.model_ref == "openai/gpt-5.5"
-
-    def test_real_cross_family_openrouter_route_preserves_requested_ref(self):
-        """Real template tier defaults must not overwrite the requested provider ref."""
-        spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
-            family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-        )
-
-        routes = derive_model_routes(spec)
-        cross_route = next(r for r in routes if r.template_id == "openrouter-anthropic")
-
-        assert cross_route.template_family == "anthropic"
-        assert cross_route.model_ref == "openai/gpt-5.5"
+        codex = AVAILABLE_MODELS["codex"]
+        assert codex.runtime == "codex"
+        with patch("forge.review.routing.derive_model_routes") as derive:
+            resolve_invocation_routing([codex])
+        derive.assert_not_called()
 
 
 class TestResolveInvocationRouting:
@@ -386,12 +284,6 @@ class TestResolveInvocationRouting:
         clear_template_cache()
         yield
         clear_template_cache()
-
-    def _patch_metas(self, metas=None):
-        return patch(
-            "forge.review.routing._all_template_metas",
-            return_value=metas if metas is not None else _ALL_METAS,
-        )
 
     def _patch_resolver(self, result):
         return patch(
@@ -405,9 +297,8 @@ class TestResolveInvocationRouting:
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
         )
-        with self._patch_metas(), self._patch_resolver(None) as mock_resolver:
+        with self._patch_resolver(None) as mock_resolver:
             plan = resolve_invocation_routing([spec])
 
         mock_resolver.assert_not_called()
@@ -423,7 +314,6 @@ class TestResolveInvocationRouting:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             runtime="codex",
         )
 
@@ -457,7 +347,6 @@ class TestResolveInvocationRouting:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             runtime="codex",
         )
 
@@ -477,18 +366,15 @@ class TestResolveInvocationRouting:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             runtime="codex",
         )
         direct_spec = _StubModelSpec(
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
         )
 
         with (
-            self._patch_metas(),
             patch(
                 "forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight",
                 return_value=sentinel.preflight,
@@ -496,7 +382,11 @@ class TestResolveInvocationRouting:
         ):
             plan = resolve_invocation_routing([direct_spec, native_spec, native_spec])
 
-        assert [result.source for result in plan.routes] == ["direct", "runtime_native", "runtime_native"]
+        assert [result.source for result in plan.routes] == [
+            "direct",
+            "runtime_native",
+            "runtime_native",
+        ]
         assert plan.routes[0].route is not None
         assert plan.routes[1].route is None
         assert plan.routes[2].route is None
@@ -507,10 +397,8 @@ class TestResolveInvocationRouting:
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
         )
-        with self._patch_metas():
-            plan = resolve_invocation_routing([spec], via="openrouter-openai")
+        plan = resolve_invocation_routing([spec], via="openrouter-openai")
 
         assert plan.routes[0].warning is not None
         assert "--proxy ignored" in plan.routes[0].warning
@@ -519,11 +407,9 @@ class TestResolveInvocationRouting:
     def test_proxy_spec_calls_resolver(self):
         """Proxy-capable specs go through the full resolver."""
         spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
         )
         mock_result = RoutingResult(
             base_url="http://localhost:8096",
@@ -536,11 +422,11 @@ class TestResolveInvocationRouting:
                 family="openai",
                 template_id="openrouter-openai",
                 template_family="openai",
-                model_ref="openai/gpt-5.5",
+                model_ref="openai/gpt-5.6-sol",
             ),
             credential="openrouter",
         )
-        with self._patch_metas(), self._patch_resolver(mock_result):
+        with self._patch_resolver(mock_result):
             plan = resolve_invocation_routing([spec])
 
         assert len(plan.routes) == 1
@@ -549,11 +435,9 @@ class TestResolveInvocationRouting:
     def test_proxy_spec_logs_routing_decision(self, caplog):
         """Plan resolution emits a consolidated routing decision line."""
         spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
         )
         mock_result = RoutingResult(
             base_url="http://localhost:8096",
@@ -566,13 +450,12 @@ class TestResolveInvocationRouting:
                 family="openai",
                 template_id="openrouter-openai",
                 template_family="openai",
-                model_ref="openai/gpt-5.5",
+                model_ref="openai/gpt-5.6-sol",
             ),
             credential="openrouter",
         )
 
         with (
-            self._patch_metas(),
             self._patch_resolver(mock_result),
             caplog.at_level(
                 logging.INFO,
@@ -581,19 +464,18 @@ class TestResolveInvocationRouting:
         ):
             resolve_invocation_routing([spec])
 
-        assert "Routing decision: model=gpt-5.5 source=preferred_proxy" in caplog.text
+        assert "Routing decision: model=gpt-5.6-sol source=preferred_proxy" in caplog.text
         assert "proxy=openrouter-openai" in caplog.text
         assert "template=openrouter-openai" in caplog.text
-        assert "model_ref=openai/gpt-5.5" in caplog.text
+        assert "model_ref=openai/gpt-5.6-sol" in caplog.text
 
     def test_fail_closed_on_unresolved(self, monkeypatch):
         """Workflow raises when a spec has no route."""
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
         spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
         )
         unresolved = RoutingResult(
             base_url=None,
@@ -603,7 +485,7 @@ class TestResolveInvocationRouting:
             route=None,
             credential=None,
         )
-        with self._patch_metas(), self._patch_resolver(unresolved):
+        with self._patch_resolver(unresolved):
             with pytest.raises(WorkflowRoutingError, match="No running proxy") as excinfo:
                 resolve_invocation_routing([spec])
         assert "Tip:" not in str(excinfo.value)
@@ -616,10 +498,9 @@ class TestResolveInvocationRouting:
         """Error mentions credential when the key is not configured."""
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
         )
         unresolved = RoutingResult(
             base_url=None,
@@ -630,7 +511,7 @@ class TestResolveInvocationRouting:
             credential=None,
         )
 
-        with self._patch_metas(), self._patch_resolver(unresolved):
+        with self._patch_resolver(unresolved):
             with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
                 resolve_invocation_routing([spec])
 
@@ -640,14 +521,11 @@ class TestResolveInvocationRouting:
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
         )
         proxy_spec = _StubModelSpec(
-            name="gpt-5.5",
-            model_id="gpt-5.5",
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"),),
-            preferred_proxy="openrouter-openai",
         )
         mock_result = RoutingResult(
             base_url="http://localhost:8096",
@@ -660,11 +538,11 @@ class TestResolveInvocationRouting:
                 family="openai",
                 template_id="openrouter-openai",
                 template_family="openai",
-                model_ref="openai/gpt-5.5",
+                model_ref="openai/gpt-5.6-sol",
             ),
             credential="openrouter",
         )
-        with self._patch_metas(), self._patch_resolver(mock_result):
+        with self._patch_resolver(mock_result):
             plan = resolve_invocation_routing([direct_spec, proxy_spec])
 
         assert len(plan.routes) == 2
@@ -676,10 +554,8 @@ class TestResolveInvocationRouting:
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
         )
-        with self._patch_metas():
-            plan = resolve_invocation_routing([spec])
+        plan = resolve_invocation_routing([spec])
 
         assert plan.resolved_at
         assert "T" in plan.resolved_at

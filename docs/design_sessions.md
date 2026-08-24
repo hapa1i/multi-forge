@@ -62,6 +62,11 @@ The session file has three sections:
 Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
 new writes omit it.
 
+Session manifests currently write schema v2. `forge.session.models::SCHEMA_VERSION` owns the writer version and
+`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1 and v2 on read; unknown versions remain errors. After a
+strict v1 validation, the reader projects the manifest to v2 in memory by adding only `intent.launch.model_route=null`
+when `intent.launch` exists. A read never rewrites the file. The next ordinary write emits a complete v2 manifest.
+
 `intent` and `overrides` are required objects. Missing `confirmed` defaults empty; when present, it must be an object.
 Other values are corruption, surfaced without rewriting.
 
@@ -85,10 +90,33 @@ launch:
   sidecar:
     mounts: [/data:/mnt/data:ro]
     image: my-dev-image:latest
+  model_route: null
 ```
 
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
+
+In schema v2, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral route
+selection:
+
+```yaml
+model_route:
+  requested_model: gpt-5.6-sol # canonical model-catalog id when written
+  selected_tier: opus # haiku | sonnet | opus
+  kind: proxy # direct | proxy
+  source_id: openrouter # proven backend source; null for direct or unproven proxy routes
+```
+
+`requested_model` records user intent independently of transport. Forge writes the then-canonical model id. `source_id`
+records an automatic, explicit, or preserved proxy source only when Forge can prove its then-canonical identity; direct
+routes require `null`. Catalog membership is a writer- and relaunch-time invariant, not a manifest-decode dependency. A
+later model- or source-catalog removal therefore leaves the durable session record readable while relaunch reports the
+unavailable route contextually. `intent.launch.direct_model` remains the Claude Code execution pin, including an
+optional `[1m]` transport modifier, and `intent.proxy` remains the concrete proxy template/base URL.
+`forge.core.ops.session_model_routing` owns the pure transition that replaces `intent.proxy`,
+`intent.launch.direct_model`, and `intent.launch.model_route` together for a resolved route. Clearing neutral route
+intent alone does not change the legacy proxy or Claude-pin fields. Legacy creation, adoption, `default_direct_model`,
+and Codex paths do not synthesize `model_route`.
 
 **`intent.authority`**: optional, session-owned artifact authority:
 
@@ -143,6 +171,8 @@ started_with_proxy:
 - `intent.launch.runtime` is immutable dispatch identity: set rejects the direct key, a parent `launch` object carrying
   `runtime`, and `launch.*` before mutation. A whole-launch null clear remains valid because the section is optional and
   dispatch reads raw intent; reset accepts `launch` or `launch.runtime` so stale illegal overrides remain recoverable.
+- Resolved `intent.launch.model_route` is lifecycle-owned: set rejects its subtree and enclosing `launch` objects; reset
+  accepts stale paths.
 - `intent.authority` is not overrideable: set and keyed reset reject the parent, wildcard, and concrete leaves.
   `reset --all` clears only overrides and cannot alter authority intent.
 
@@ -356,6 +386,17 @@ mode none; otherwise inherited proxy ID then template. For `full`, Forge **fails
 transcript exceeds that proxy's window, naming `structured`/`ai-curated` as fixes. Other strategies need no budget
 preflight.
 
+**Interactive model-route selection:** Claude-runtime `start`, `resume`, `fork`, and `incognito` accept catalog models
+through `--model`; `--model-tier` disambiguates proxy tiers. Unlike Claude's in-process `/model`, this is durable
+prelaunch intent. The shared planner applies explicit constraints, a compatible stored route, new-Claude direct routing,
+then catalog order without side effects; only its winner may start, and failure never falls through. The selected
+context window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written
+atomically. Bare resume reuses that route or fails.
+
+A non-Claude selection may start a paid proxy. `--no-launch` persists it without a route event or child;
+`--subprocess-proxy` is incompatible. Codex, adoption, `default_direct_model`, sidecar/host-proxy modes, and bare
+commands never initiate fresh selection.
+
 **Depth control:** `--depth N|all` traverses lineage beyond the immediate parent (default `1`), pulling context from
 earlier sessions in the ancestry chain.
 
@@ -415,8 +456,9 @@ UUID `<R>`, not the parent's UUID.
 2. Processed transfer: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
-**Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
-`--proxy <name>` overrides.
+**Proxy inheritance:** The child inherits the parent's proxy and neutral model-route intent by default, keeping routing
+stable across resumes; `--proxy <name>`, `--no-proxy`, or an explicit model that the inherited route cannot serve
+authorizes a complete replacement.
 
 **Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
 authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child
@@ -442,6 +484,10 @@ managed Claude host/sidecar and Codex headless/interactive attempt appends `laun
 projects its `{event_id, run_id}` into `confirmed.route_commit`, before invoking the child. Marked launches do this in
 the yielded authority transaction body, after `launch_preflight` and `run_started`; unmarked launches use the same
 serialized boundary without authority events. Both journals and the projection reuse the one root `RunIdentity`.
+
+For explicit model selection, one stderr route line and the journal share the immutable payload, including proven
+backend identity and `billing_mode=unknown` absent payer evidence. Later payload, projection, or child failure does not
+roll back persisted route intent.
 
 Routing construction, validation, or append failure compensates any authority journal already touched. Projection
 failure compensates in reverse touch order: the exact immutable route payload is appended as same-run

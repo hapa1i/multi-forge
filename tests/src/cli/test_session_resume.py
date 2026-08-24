@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TypedDict
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -11,10 +12,14 @@ from click.testing import CliRunner
 import forge.cli.session as session_cli
 from forge.cli.main import main
 from forge.config.loader import write_proxy_instance_config
+from forge.core.ops.session import ForgeOpError
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.models import (
     LaneRecord,
+    ModelRouteIntent,
+    ProxyIntent,
+    SessionState,
     StartedWithProxy,
     SystemPromptIntent,
 )
@@ -22,8 +27,18 @@ from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     _proxy_cfg,
     _proxy_routing,
+    mocked_model_route_proxy,
     successful_claude_launch,
 )
+
+
+class _ModelRouteProxyOptions(TypedDict):
+    template: str
+    proxy_id: str
+    base_url: str
+    default_tier: str
+    tiers: dict[str, str]
+    alternatives: dict[str, dict[str, str]]
 
 
 class TestSessionResumeExtended:
@@ -93,7 +108,7 @@ class TestSessionResumeExtended:
                     "--no-launch",
                 ],
             )
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 0
 
         store = SessionStore(str(temp_env), "reconnect-addendum")
 
@@ -189,7 +204,7 @@ class TestSessionResume:
         ):
             result = runner.invoke(main, ["session", "resume", "resume-direct", "--fresh"])
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
         assert mock_invoke.call_args is not None
         kwargs = mock_invoke.call_args.kwargs
         assert kwargs["model"] is None
@@ -202,6 +217,253 @@ class TestSessionResume:
 
         assert result.exit_code == 1
         assert "not found" in result.output
+
+
+class TestModelRouteResume:
+    def test_explicit_incompatible_model_replaces_route_and_survives_commit_failure(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "replace-route",
+                "--model",
+                "claude-opus-5",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+
+        with (
+            mocked_model_route_proxy(
+                template="openrouter-openai",
+                proxy_id="openrouter-openai-1",
+                base_url="http://localhost:8096",
+                default_tier="opus",
+                tiers={
+                    "sonnet": "openai/gpt-5.6-sol",
+                    "opus": "openai/gpt-5.6-sol",
+                },
+                alternatives={},
+            ) as ensure_proxy,
+            patch(
+                "forge.core.ops.claude_session.commit_launch_routing",
+                side_effect=ForgeOpError("required route journal unavailable"),
+            ) as commit_route,
+            successful_claude_launch() as mock_invoke,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "resume",
+                    "replace-route",
+                    "--model",
+                    "gpt-5.6-sol",
+                ],
+            )
+
+        assert result.exit_code == 1
+        ensure_proxy.assert_called_once_with("openrouter-openai")
+        mock_invoke.assert_not_called()
+        payload = commit_route.call_args.kwargs["payload"]
+        route = payload["route"]
+        assert result.stderr.count("Route:") == 1
+        assert (
+            f"Route: provider={route['backend_id']} template={route['template']} "
+            f"proxy={route['proxy_id']} tier={payload['selected_tier']} "
+            f"model={payload['selected_model']} billing_mode={payload['billing_mode']}" in result.stderr
+        )
+        state = SessionStore(str(temp_env), "replace-route").read()
+        assert state.intent.proxy is not None
+        assert state.intent.proxy.template == "openrouter-openai"
+        assert state.intent.launch is not None
+        assert state.intent.launch.direct_model is None
+        assert state.intent.launch.model_route is not None
+        assert state.intent.launch.model_route.requested_model == "gpt-5.6-sol"
+        assert state.intent.launch.model_route.kind == "proxy"
+
+    def test_bare_resume_reuses_neutral_proxy_route_without_catalog_scan(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        proxy_kwargs: _ModelRouteProxyOptions = {
+            "template": "openrouter-openai",
+            "proxy_id": "openrouter-openai-1",
+            "base_url": "http://localhost:8096",
+            "default_tier": "sonnet",
+            "tiers": {
+                "haiku": "openai/gpt-5.4-mini",
+                "sonnet": "openai/gpt-5.6-sol",
+                "opus": "openai/gpt-5.6-sol",
+            },
+            "alternatives": {},
+        }
+        with mocked_model_route_proxy(**proxy_kwargs):
+            created = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "stored-gpt-route",
+                    "--model",
+                    "gpt-5.6-sol",
+                    "--no-launch",
+                ],
+            )
+        assert created.exit_code == 0, created.output
+
+        with (
+            mocked_model_route_proxy(**proxy_kwargs) as ensure_proxy,
+            patch(
+                "forge.core.ops.session_model_routing.inspect_automatic_candidate",
+                side_effect=AssertionError("bare resume must not scan catalog routes"),
+            ),
+            successful_claude_launch() as mock_invoke,
+        ):
+            result = runner.invoke(main, ["session", "resume", "stored-gpt-route"])
+
+        assert result.exit_code == 0, result.output
+        ensure_proxy.assert_not_called()
+        assert "Route:" not in result.stderr
+        assert mock_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_MODEL"] == "sonnet"
+        state = SessionStore(str(temp_env), "stored-gpt-route").read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.model_route is not None
+        assert state.intent.launch.model_route.requested_model == "gpt-5.6-sol"
+        assert state.intent.launch.model_route.selected_tier == "sonnet"
+
+    def test_bare_unavailable_neutral_route_fails_without_replacement(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        proxy_kwargs: _ModelRouteProxyOptions = {
+            "template": "openrouter-openai",
+            "proxy_id": "openrouter-openai-1",
+            "base_url": "http://localhost:8096",
+            "default_tier": "sonnet",
+            "tiers": {
+                "sonnet": "openai/gpt-5.6-sol",
+                "opus": "openai/gpt-5.6-sol",
+            },
+            "alternatives": {},
+        }
+        with mocked_model_route_proxy(**proxy_kwargs):
+            created = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "unavailable-gpt-route",
+                    "--model",
+                    "gpt-5.6-sol",
+                    "--no-launch",
+                ],
+            )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), "unavailable-gpt-route")
+        before = store.manifest_path.read_bytes()
+
+        with (
+            patch(
+                "forge.core.ops.session_model_routing.inspect_automatic_candidate",
+                side_effect=AssertionError("bare resume must not scan catalog routes"),
+            ),
+            successful_claude_launch() as mock_invoke,
+        ):
+            result = runner.invoke(main, ["session", "resume", "unavailable-gpt-route"])
+
+        assert result.exit_code == 1
+        assert "cannot be identity-checked without a proxy id" in result.output
+        assert "pass --proxy <proxy_id-or-template>" in result.output
+        assert store.manifest_path.read_bytes() == before
+        mock_invoke.assert_not_called()
+
+    def test_bare_resume_rejects_proxy_model_route_without_proxy_intent(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "incoherent-proxy-route",
+                "--model",
+                "claude-sonnet-5",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), "incoherent-proxy-route")
+
+        def _make_route_incoherent(state: SessionState) -> None:
+            assert state.intent.launch is not None
+            state.intent.proxy = None
+            state.intent.launch.model_route = ModelRouteIntent(
+                requested_model="claude-sonnet-5",
+                selected_tier="sonnet",
+                kind="proxy",
+                source_id="openrouter",
+            )
+
+        store.update(timeout_s=5.0, mutate=_make_route_incoherent)
+        before = store.manifest_path.read_bytes()
+
+        with successful_claude_launch() as mock_invoke:
+            result = runner.invoke(main, ["session", "resume", "incoherent-proxy-route"])
+
+        assert result.exit_code == 1
+        assert "stored proxy model route" in result.output
+        assert "missing intent.proxy" in result.output
+        assert "--model claude-sonnet-5" in result.output
+        assert store.manifest_path.read_bytes() == before
+        mock_invoke.assert_not_called()
+
+    def test_explicit_model_rejects_opaque_custom_route_but_bare_resume_keeps_it(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        created = runner.invoke(
+            main,
+            ["session", "start", "custom-route", "--no-proxy", "--no-launch"],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), "custom-route")
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda state: setattr(
+                state.intent,
+                "proxy",
+                ProxyIntent(template="", base_url="https://custom.example.test"),
+            ),
+        )
+        before = store.manifest_path.read_bytes()
+
+        with successful_claude_launch() as mock_invoke:
+            rejected = runner.invoke(
+                main,
+                ["session", "resume", "custom-route", "--model", "gpt-5.6-sol"],
+            )
+
+        assert rejected.exit_code == 1
+        assert "custom proxy route" in rejected.output
+        assert store.manifest_path.read_bytes() == before
+        mock_invoke.assert_not_called()
+
+        with successful_claude_launch() as mock_invoke:
+            resumed = runner.invoke(main, ["session", "resume", "custom-route"])
+
+        assert resumed.exit_code == 0, resumed.output
+        assert mock_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_BASE_URL"] == "https://custom.example.test"
 
 
 class TestResumeNativeMode:

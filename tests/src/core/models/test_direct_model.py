@@ -7,6 +7,7 @@ import pytest
 from forge.core.models.direct_model import (
     apply_direct_model_env,
     apply_proxy_context_model_defaults,
+    claude_model_tier,
     direct_model_env,
     resolve_direct_model_pin,
 )
@@ -43,6 +44,23 @@ def test_resolves_fable_alias_to_opus_tier_pin() -> None:
 
     assert pin.canonical_model == "claude-fable-5"
     assert pin.tier == "opus"
+
+
+@pytest.mark.parametrize(
+    ("model", "tier"),
+    [
+        ("claude-fable-5", "opus"),
+        ("claude-opus-5", "opus"),
+        ("claude-sonnet-5", "sonnet"),
+        ("claude-haiku-4-5", "haiku"),
+        ("gpt-5.6-sol", None),
+    ],
+)
+def test_claude_model_tier_classifies_supported_families(
+    model: str,
+    tier: str | None,
+) -> None:
+    assert claude_model_tier(model) == tier
 
 
 def test_preserves_claude_code_1m_suffix() -> None:

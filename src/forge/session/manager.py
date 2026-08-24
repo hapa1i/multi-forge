@@ -58,6 +58,7 @@ from .models import (
     CodexConfirmed,
     Derivation,
     LaunchIntent,
+    ModelRouteIntent,
     SessionIndexEntry,
     SessionState,
     SidecarLaunchIntent,
@@ -601,6 +602,7 @@ class SessionManager:
         sidecar_mounts: list[str] | None = None,
         sidecar_image: str | None = None,
         direct_model: str | None = None,
+        model_route: ModelRouteIntent | None = None,
         claude_session_id: str | None = None,
         codex_confirmed: CodexConfirmed | None = None,
         adoption: AdoptionConfirmed | None = None,
@@ -630,6 +632,7 @@ class SessionManager:
             sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
             sidecar_image: Optional sidecar image override to persist for relaunch.
             direct_model: Optional Claude Code env-ready direct model pin.
+            model_route: Optional normalized interactive model-route selection.
             claude_session_id: Pre-seed the bound Claude conversation.
             codex_confirmed: Pre-seed `confirmed.codex`. Codex adoption passes it here
                 rather than writing it afterwards so the thread id is committed by the
@@ -848,6 +851,7 @@ class SessionManager:
             sidecar_mounts=sidecar_mounts,
             sidecar_image=sidecar_image,
             direct_model=direct_model,
+            model_route=deepcopy(model_route),
             runtime=runtime,
             authority=deepcopy(authority),
         )

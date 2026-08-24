@@ -20,8 +20,8 @@ from rich.console import Console
 from forge.cli.editor import resolve_editor_argv
 from forge.cli.output import err_console, print_error, print_error_with_tip
 from forge.core.models.direct_model import (
-    apply_direct_model_env,
     apply_proxy_context_model_defaults,
+    resolve_default_direct_model_pin,
 )
 from forge.core.paths import display_path
 from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
@@ -226,11 +226,13 @@ def start_cmd(
     if direct:
         from forge.runtime_config import get_default_direct_model
 
-        direct_model = get_default_direct_model()
-        error = apply_direct_model_env(env_vars, direct_model)
-        if error:
-            print_error(error, console=err_console)
+        try:
+            direct_model_pin = resolve_default_direct_model_pin(get_default_direct_model())
+        except ValueError as e:
+            print_error(str(e), console=err_console)
             sys.exit(1)
+        if direct_model_pin is not None:
+            env_vars.update(direct_model_pin.env())
 
     if proxy_display:
         console.print(f"Starting Claude with proxy [green]{proxy_display}[/green] ({template})")

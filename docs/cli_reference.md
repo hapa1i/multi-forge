@@ -146,9 +146,9 @@ update of an already tracked package can be repaired by sync.
 
 | Command                                 | Purpose                                                                                                                                                                                                                 |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `forge session start [name]`            | Create and start a new session (auto-named if omitted); new sessions accept `--authority advisory\|producer` and advisory `--authority-tier`                                                                            |
-| `forge session resume [name]`           | Reattach to an existing session (default), or derive a fresh child with `--fresh`; authority flags apply only with `--fresh`                                                                                            |
-| `forge session fork <parent> [--name]`  | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context); accepts authority flags                                                                    |
+| `forge session start [name]`            | Create and start a new session (auto-named if omitted); accepts catalog `--model`, optional `--model-tier`, and creation authority flags                                                                                |
+| `forge session resume [name]`           | Reattach or derive a fresh child with `--fresh`; accepts catalog `--model`/`--model-tier`; authority flags apply only with `--fresh`                                                                                    |
+| `forge session fork <parent> [--name]`  | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context); accepts model and authority flags                                                          |
 | `forge session adopt [conversation-id]` | Bind an unmarked Forge session to an existing native Claude conversation or Codex thread (`--name`, `--model`, `--yes`); the runtime is detected from on-disk evidence. Bare lists unbound Claude candidates (`--json`) |
 | `forge session show [session]`          | Show session details and derived launchability (`--json`, `--field`); accepts name or UUID                                                                                                                              |
 | `forge session list`                    | List sessions with derived launchability (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                                                                                             |
@@ -162,7 +162,7 @@ update of an already tracked package can be repaired by sync.
 | `forge session delete <name>...`        | Delete one or more sessions (`--all` for bulk deletion)                                                                                                                                                                 |
 | `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                   |
 | `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                        |
-| `forge session incognito [name]`        | Start an ephemeral session (auto-delete on exit)                                                                                                                                                                        |
+| `forge session incognito [name]`        | Start an ephemeral session (auto-delete on exit); accepts catalog `--model`/`--model-tier`                                                                                                                              |
 | `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                         |
 
 `session list --json` and `session show --json` include an additive `launchability` field: `launchable`,
@@ -187,6 +187,17 @@ Note: `session resume --fresh --review` opens the per-child user-notes overlay (
 `$EDITOR` before launching Claude; the AI snapshot stays read-only. Session-scoped memory activation lives under
 `forge session memory` (enable/disable/status/report); top-level `forge memory` keeps the project-doc passport verbs.
 Session transfer context lives under `forge session transfer`.
+
+On Claude-runtime `start`, `resume`, `fork`, and `incognito`, `--model <catalog-id-or-alias>` selects the desired model
+and launch route; `--model-tier haiku|sonnet|opus` is an optional tier disambiguator and requires `--model`. Explicit
+`--proxy` is a strict route constraint, `--no-proxy` permits only direct Claude models, compatible inherited routing
+wins, and a new Claude request without an explicit proxy stays direct. A non-Claude request may start the first
+admissible packaged-catalog proxy and prints the resolved route on stderr before launch. `--no-launch` may still start
+that proxy and persist route intent. Bare resume reuses stored neutral route intent rather than selecting again.
+`session adopt --model` remains Claude-only, and Codex rejects these Claude-runtime route flags.
+
+Forge `--model` is not Claude Code's in-conversation `/model`: the former resolves durable session launch routing before
+the child starts; the latter changes runtime-native state inside an active Claude conversation.
 
 Rewind resume is available on Claude sessions with `--strategy rewind --drop-last N`.
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` may create a same-directory child: Forge writes

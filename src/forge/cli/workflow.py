@@ -266,14 +266,24 @@ def list_models(as_json: bool, available_only: bool) -> None:
         availabilities = [a for a in availabilities if a.status == "ready"]
 
     if as_json:
+        from forge.review.routing import derive_model_routes, preferred_proxy_for_routes
+
+        route_metadata = {
+            availability.spec.name: (
+                derive_model_routes(availability.spec) if availability.spec.runtime != "codex" else ()
+            )
+            for availability in availabilities
+        }
         items = [
             {
                 "name": a.spec.name,
                 "model_id": a.spec.model_id,
                 "family": a.spec.family,
                 "runtime": a.spec.runtime,
-                "provider_refs": list(a.spec.provider_refs),
-                "preferred_proxy": a.spec.preferred_proxy,
+                "provider_refs": list(
+                    dict.fromkeys((route.provider, route.model_ref) for route in route_metadata[a.spec.name])
+                ),
+                "preferred_proxy": preferred_proxy_for_routes(route_metadata[a.spec.name]),
                 "description": a.spec.description,
                 "status": a.status,
                 "reason": a.reason,

@@ -97,6 +97,18 @@ and local validation result whenever you change a proxy default.
 
 ## Forge-Specific Patterns
 
+### Select The Session Model Before Launch
+
+Claude-runtime `forge session start|resume|fork|incognito --model <catalog-id-or-alias>` selects the requested model and
+its durable launch route. A new Claude request stays direct unless you constrain it with `--proxy`; a non-Claude request
+uses the first admissible packaged-catalog proxy. `--model-tier haiku|sonnet|opus` resolves a multi-tier proxy match and
+requires `--model`. The selected route is printed before launch and reused by a later bare resume.
+
+This may start a paid proxy, including with `--no-launch`. An explicit `--proxy` is strict, `--no-proxy` is Claude-only,
+and Forge never falls through to a second provider after selecting a route. Forge `--model` is separate from Claude
+Code's in-conversation `/model`: the Forge flag owns prelaunch session routing; `/model` changes the already running
+Claude conversation.
+
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
 The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5 and the `sonnet` tier to Sonnet 5, and
@@ -136,10 +148,10 @@ This is the side-channel architecture pattern: executor and supervisor use diffe
 `apply_supervisor_routing()` auto-seeds the supervisor proxy from the planner's `confirmed.started_with_proxy` when you
 do not pass `--supervisor-proxy`, so override only when you want non-default routing.
 
-### Model-Pin Scope
+### Model-Route Scope
 
-Model pins are intentionally session-local for proxied supervisors. If you pin `--model claude-opus-4-8` on the
-executor, the supervisor does not reuse that pin; it requests the configured supervisor proxy's `opus` tier.
+Model-route intent is session-local for proxied supervisors. If you select `--model claude-opus-4-8` on the executor,
+the supervisor does not reuse that selection; it requests the configured supervisor proxy's `opus` tier.
 
 For same-worktree final review, you can move the planner itself to a different model before resuming it:
 
@@ -147,8 +159,8 @@ For same-worktree final review, you can move the planner itself to a different m
 forge session resume planner --model claude-opus-4-6
 ```
 
-`resume --model` updates the session's stored model pin, so later resumes keep using the selected Claude version until
-you change it again.
+`resume --model` updates the session's stored model route and Claude execution pin, so later resumes keep using the
+selected Claude version until you change it again.
 
 When forking into the reviewer/executor role instead, pin the child directly:
 

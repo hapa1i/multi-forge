@@ -27,7 +27,6 @@ def test_bug_via_flag_warns_about_direct_workers() -> None:
             name="claude-opus",
             model_id="claude-opus-4-6",
             family="anthropic",
-            provider_refs=(),
             description="Direct Claude",
         ),
     ]
@@ -55,7 +54,15 @@ def _make_output():
 
     return MultiReviewOutput(
         prompt="test",
-        results=[ReviewResult(model_name="test", stdout="ok", stderr="", success=True, duration_seconds=1.0)],
+        results=[
+            ReviewResult(
+                model_name="test",
+                stdout="ok",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            )
+        ],
     )
 
 
@@ -81,7 +88,15 @@ def _make_adversarial_output():
     return AdversarialOutput(
         resource_path="(generated)",
         stances=["for"],
-        results=[ReviewResult(model_name="test", stdout="ok", stderr="", success=True, duration_seconds=1.0)],
+        results=[
+            ReviewResult(
+                model_name="test",
+                stdout="ok",
+                stderr="",
+                success=True,
+                duration_seconds=1.0,
+            )
+        ],
         stance_map={"test": "for"},
     )
 
@@ -90,7 +105,12 @@ def _make_consensus_output():
     from forge.review.models import ConsensusOutput, ReviewResult
 
     r = ReviewResult(model_name="test", stdout="ok", stderr="", success=True, duration_seconds=1.0)
-    return ConsensusOutput(subject="test", round1_results=[r], round2_results=[r], role_map={"test": "analyst"})
+    return ConsensusOutput(
+        subject="test",
+        round1_results=[r],
+        round2_results=[r],
+        role_map={"test": "analyst"},
+    )
 
 
 def test_bug_build_adversarial_json_includes_warnings() -> None:

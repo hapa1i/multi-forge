@@ -11,6 +11,7 @@ from click.testing import CliRunner
 import forge.cli.session as session_cli
 from forge.cli.main import main
 from forge.session import SessionStore, create_session_state
+from tests.src.cli.session_command_support import mocked_model_route_proxy
 
 
 @pytest.fixture
@@ -36,28 +37,69 @@ def temp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return project
 
 
-def _anthropic_proxy_cfg():
-    from forge.config.schema import ProxyInstanceConfig, TierModels
-
-    return ProxyInstanceConfig(
-        proxy_format=1,
-        template="openrouter-anthropic",
-        template_digest="abc",
-        provider="openrouter",
-        proxy_endpoint="http://localhost:8095",
-        port=8095,
-        upstream_base_url="https://openrouter.ai/api/v1",
-        tiers=TierModels(haiku="h", sonnet="s", opus="anthropic/claude-opus-4.6"),
-        model_alternatives={"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}},
-    )
-
-
 def _anthropic_routing() -> session_cli.ResolvedRouting:
     return session_cli.ResolvedRouting(
         template="openrouter-anthropic",
         base_url="http://localhost:8095",
         proxy_id="test-or-proxy",
     )
+
+
+@pytest.mark.parametrize("leaf", ["start", "resume", "fork", "incognito"])
+def test_interactive_model_leaves_share_model_tier_help(
+    runner: CliRunner,
+    leaf: str,
+) -> None:
+    result = runner.invoke(main, ["session", leaf, "--help"], terminal_width=500)
+
+    assert result.exit_code == 0, result.output
+    assert "--model TEXT" in result.output
+    assert "--model-tier [haiku|sonnet|opus]" in result.output
+    assert "Select the proxy tier for --model when more than one tier can serve it" in result.output
+
+
+@pytest.mark.parametrize("leaf", ["start", "incognito"])
+def test_model_tier_requires_model_before_session_creation(
+    runner: CliRunner,
+    temp_env: Path,
+    leaf: str,
+) -> None:
+    result = runner.invoke(
+        main,
+        ["session", leaf, "tier-without-model", "--model-tier", "opus"],
+    )
+
+    assert result.exit_code == 1
+    assert "--model-tier requires --model" in result.output
+    assert not SessionStore(str(temp_env), "tier-without-model").exists()
+
+
+def test_default_direct_model_rejects_non_claude_before_proxy_or_child(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    """A bare managed launch keeps the Claude-only config boundary."""
+    from forge.core.paths import get_forge_home
+    from forge.runtime_config import reset_runtime_config
+
+    get_forge_home().mkdir(parents=True, exist_ok=True)
+    (get_forge_home() / "config.yaml").write_text("default_direct_model: gpt-5.6-sol\n")
+    reset_runtime_config()
+
+    try:
+        with (
+            patch("forge.proxy.proxy_orchestrator.ensure_proxy") as mock_ensure_proxy,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
+        ):
+            result = runner.invoke(main, ["session", "start", "invalid-default"])
+    finally:
+        reset_runtime_config()
+
+    assert result.exit_code == 1
+    assert "Invalid configuration field 'default_direct_model'" in result.output
+    assert "only supports Claude models" in result.output
+    mock_ensure_proxy.assert_not_called()
+    mock_invoke.assert_not_called()
 
 
 def test_fork_model_override_lock_failure_returns_styled_warning(
@@ -211,16 +253,61 @@ def test_incognito_with_model(runner: CliRunner, temp_env: Path) -> None:
     assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-4-6"
 
 
+def test_incognito_non_claude_model_uses_shared_route_and_cleans_session(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    with (
+        mocked_model_route_proxy(
+            template="openrouter-openai",
+            proxy_id="openrouter-openai-1",
+            base_url="http://localhost:8096",
+            default_tier="opus",
+            tiers={
+                "sonnet": "openai/gpt-5.6-sol",
+                "opus": "openai/gpt-5.6-sol",
+            },
+            alternatives={},
+        ) as ensure_proxy,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            ["session", "incognito", "incog-gpt", "--model", "gpt-5.6-sol"],
+        )
+
+    assert result.exit_code == 0, result.output
+    ensure_proxy.assert_called_once_with("openrouter-openai")
+    assert mock_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_MODEL"] == "opus"
+    assert result.stderr.count("Route:") == 1
+    assert "Cleaning up incognito session" in result.output
+    assert not SessionStore(str(temp_env), "incog-gpt").exists()
+
+
 def test_fork_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_env: Path) -> None:
     """--model on fork should let a child switch Claude versions immediately."""
-    runner.invoke(main, ["session", "start", "planner", "--model", "claude-opus-4.8", "--no-launch"])
+    runner.invoke(
+        main,
+        ["session", "start", "planner", "--model", "claude-opus-4.8", "--no-launch"],
+    )
     store = SessionStore(str(temp_env), "planner")
-    store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
+    store.update(
+        timeout_s=5.0,
+        mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"),
+    )
 
     with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(
             main,
-            ["session", "fork", "planner", "--name", "executor", "--model", "claude-opus-4.6"],
+            [
+                "session",
+                "fork",
+                "planner",
+                "--name",
+                "executor",
+                "--model",
+                "claude-opus-4.6",
+            ],
         )
 
     assert result.exit_code == 0, result.output
@@ -234,15 +321,80 @@ def test_fork_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_e
     assert state.intent.launch.direct_model == "claude-opus-4-6"
 
 
-def test_fork_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp_env: Path) -> None:
-    """--model on proxy fork should support the proxy tier default, not only alternatives."""
-    runner.invoke(main, ["session", "start", "proxy-planner", "--model", "claude-opus-4.8", "--no-launch"])
-    store = SessionStore(str(temp_env), "proxy-planner")
-    store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
+def test_fork_non_claude_model_persists_neutral_route(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    runner.invoke(
+        main,
+        ["session", "start", "gpt-parent", "--model", "claude-opus-5", "--no-launch"],
+    )
+    parent_store = SessionStore(str(temp_env), "gpt-parent")
+    parent_store.update(
+        timeout_s=5.0,
+        mutate=lambda state: setattr(state.confirmed, "claude_session_id", "parent-uuid"),
+    )
 
     with (
-        patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_anthropic_routing()),
-        patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
+        mocked_model_route_proxy(
+            template="openrouter-openai",
+            proxy_id="openrouter-openai-1",
+            base_url="http://localhost:8096",
+            default_tier="opus",
+            tiers={
+                "sonnet": "openai/gpt-5.6-sol",
+                "opus": "openai/gpt-5.6-sol",
+            },
+            alternatives={},
+        ) as ensure_proxy,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "fork",
+                "gpt-parent",
+                "--name",
+                "gpt-child",
+                "--model",
+                "gpt-5.6-sol",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    ensure_proxy.assert_called_once_with("openrouter-openai")
+    assert mock_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_MODEL"] == "opus"
+    assert result.stderr.count("Route:") == 1
+    child = SessionStore(str(temp_env), "gpt-child").read()
+    assert child.intent.launch is not None
+    assert child.intent.launch.direct_model is None
+    assert child.intent.launch.model_route is not None
+    assert child.intent.launch.model_route.requested_model == "gpt-5.6-sol"
+    assert child.intent.launch.model_route.selected_tier == "opus"
+
+
+def test_fork_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp_env: Path) -> None:
+    """--model on proxy fork should support the proxy tier default, not only alternatives."""
+    runner.invoke(
+        main,
+        [
+            "session",
+            "start",
+            "proxy-planner",
+            "--model",
+            "claude-opus-4.8",
+            "--no-launch",
+        ],
+    )
+    store = SessionStore(str(temp_env), "proxy-planner")
+    store.update(
+        timeout_s=5.0,
+        mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"),
+    )
+
+    with (
+        mocked_model_route_proxy(),
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
@@ -276,10 +428,20 @@ def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Fork matches resume: inherited proxy base_url needs explicit --proxy for --model validation."""
-    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch(
+        "forge.cli.session_lifecycle._resolve_routing_from_cli",
+        return_value=_anthropic_routing(),
+    ):
         start_result = runner.invoke(
             main,
-            ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],
+            [
+                "session",
+                "start",
+                "proxy-planner",
+                "--proxy",
+                "test-or-proxy",
+                "--no-launch",
+            ],
         )
 
     assert start_result.exit_code == 0, start_result.output
@@ -287,19 +449,30 @@ def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(
     with patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke:
         result = runner.invoke(
             main,
-            ["session", "fork", "proxy-planner", "--name", "proxy-executor", "--model", "claude-opus-4.6"],
+            [
+                "session",
+                "fork",
+                "proxy-planner",
+                "--name",
+                "proxy-executor",
+                "--model",
+                "claude-opus-4.6",
+            ],
         )
 
     assert result.exit_code == 1
-    assert "requires an active proxy id for fork" in result.output
-    assert "Pass --proxy <proxy_id>" in result.output
+    assert "cannot be identity-checked without a proxy id" in result.output
+    assert "pass --proxy <proxy_id-or-template>" in result.output
     assert not SessionStore(str(temp_env), "proxy-executor").exists()
     mock_invoke.assert_not_called()
 
 
 def test_resume_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_env: Path) -> None:
     """--model on resume should let a session move between Claude versions."""
-    runner.invoke(main, ["session", "start", "planner", "--model", "claude-opus-4.8", "--no-launch"])
+    runner.invoke(
+        main,
+        ["session", "start", "planner", "--model", "claude-opus-4.8", "--no-launch"],
+    )
 
     with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(main, ["session", "resume", "planner", "--model", "claude-opus-4.6"])
@@ -317,11 +490,20 @@ def test_resume_with_model_overrides_persisted_model_pin(runner: CliRunner, temp
 
 def test_resume_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp_env: Path) -> None:
     """--model on proxy resume should support the proxy tier default, not only alternatives."""
-    runner.invoke(main, ["session", "start", "proxy-planner", "--model", "claude-opus-4.8", "--no-launch"])
+    runner.invoke(
+        main,
+        [
+            "session",
+            "start",
+            "proxy-planner",
+            "--model",
+            "claude-opus-4.8",
+            "--no-launch",
+        ],
+    )
 
     with (
-        patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()),
-        patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
+        mocked_model_route_proxy(),
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
@@ -353,10 +535,20 @@ def test_resume_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Inherited proxy base_url without a proxy_id cannot validate a --model override."""
-    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch(
+        "forge.cli.session_lifecycle._resolve_routing_from_cli",
+        return_value=_anthropic_routing(),
+    ):
         start_result = runner.invoke(
             main,
-            ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],
+            [
+                "session",
+                "start",
+                "proxy-planner",
+                "--proxy",
+                "test-or-proxy",
+                "--no-launch",
+            ],
         )
 
     assert start_result.exit_code == 0, start_result.output
@@ -368,6 +560,6 @@ def test_resume_with_model_requires_proxy_id_for_inherited_proxy_routing(
         )
 
     assert result.exit_code == 1
-    assert "requires an active proxy id for resume" in result.output
-    assert "Pass --proxy <proxy_id>" in result.output
+    assert "cannot be identity-checked without a proxy id" in result.output
+    assert "pass --proxy <proxy_id-or-template>" in result.output
     mock_invoke.assert_not_called()

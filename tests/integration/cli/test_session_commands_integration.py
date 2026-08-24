@@ -93,6 +93,26 @@ class TestSessionInspect:
 class TestSessionStart:
     """Tests for 'forge session start' command."""
 
+    def test_installed_wheel_loads_direct_and_proxy_model_routes(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        """The installed package includes the shared route catalog resource."""
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            from forge.core.models.model_routes import get_model_route_candidates
+
+            direct = get_model_route_candidates("claude-opus-4-8")
+            proxy = get_model_route_candidates("gpt-5.6-sol")
+            assert direct[0].kind == "direct"
+            assert direct[0].model_ref == "claude-opus-4-8"
+            assert proxy[0].kind == "proxy"
+            assert proxy[0].template == "openrouter-openai"
+            assert proxy[0].model_ref == "openai/gpt-5.6-sol"
+            """,
+        )
+
     def test_start_creates_session(self, mock_claude_workspace: ContainerLike) -> None:
         """Should create a new session."""
         result = mock_claude_workspace.exec("cd /workspace && forge session start new-session")

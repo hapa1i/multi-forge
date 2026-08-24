@@ -7,8 +7,9 @@ for runtime conversion.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from forge.core.effort import validate_claude_effort
 from forge.core.run_id import is_valid_run_id
@@ -19,7 +20,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 INDEX_VERSION = 1
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -73,6 +74,38 @@ class SidecarLaunchIntent:
     image: str | None = None  # Optional sidecar image override
 
 
+REQUIRED_MODEL_ROUTE_TIERS = frozenset({"haiku", "sonnet", "opus"})
+
+
+@dataclass
+class ModelRouteIntent:
+    """Stored model request and resolved route needed for relaunch.
+
+    This durable DTO validates only its own structural invariants. Catalog
+    membership is checked when Forge authors or executes the route so removing a
+    model or source cannot turn an otherwise readable manifest into corruption.
+    """
+
+    requested_model: str
+    selected_tier: str
+    kind: Literal["direct", "proxy"]
+    source_id: str | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.requested_model, str) or not self.requested_model:
+            raise ValueError("model_route.requested_model must be a non-empty string")
+        if self.selected_tier not in REQUIRED_MODEL_ROUTE_TIERS:
+            raise ValueError(
+                f"model_route.selected_tier must be one of: {', '.join(sorted(REQUIRED_MODEL_ROUTE_TIERS))}"
+            )
+        if self.kind not in {"direct", "proxy"}:
+            raise ValueError("model_route.kind must be 'direct' or 'proxy'")
+        if self.kind == "direct" and self.source_id is not None:
+            raise ValueError("direct model_route intent requires source_id=null")
+        if self.source_id is not None and (not isinstance(self.source_id, str) or not self.source_id):
+            raise ValueError("model_route.source_id must be null or a non-empty string")
+
+
 @dataclass
 class LaunchIntent:
     """How Forge should relaunch this session."""
@@ -80,6 +113,7 @@ class LaunchIntent:
     mode: str = LAUNCH_MODE_HOST  # "host" or "sidecar"
     sidecar: SidecarLaunchIntent | None = None
     direct_model: str | None = None  # Claude Code env-ready direct model pin (e.g. claude-opus-4-8[1m])
+    model_route: ModelRouteIntent | None = None
     # Runtime registry id ("claude_code" | "codex") driving launcher dispatch. Immutable
     # launch identity: `forge session set launch.runtime` is rejected (overrides.py) and
     # dispatch reads this raw intent field, never effective state.
@@ -800,6 +834,7 @@ def create_session_state(
     sidecar_mounts: list[str] | None = None,
     sidecar_image: str | None = None,
     direct_model: str | None = None,
+    model_route: ModelRouteIntent | None = None,
     runtime: str = "claude_code",
     authority: AuthorityIntent | None = None,
 ) -> SessionState:
@@ -818,6 +853,7 @@ def create_session_state(
         sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
         sidecar_image: Optional sidecar image override to persist for relaunch.
         direct_model: Optional Claude Code env-ready direct model pin.
+        model_route: Optional normalized interactive model-route selection.
         runtime: Runtime registry id driving launcher dispatch ("claude_code" | "codex").
         authority: Optional human-assigned artifact authority.
 
@@ -833,7 +869,12 @@ def create_session_state(
     if proxy_template is not None and proxy_base_url is not None:
         proxy = ProxyIntent(template=proxy_template, base_url=proxy_base_url)
 
-    launch = LaunchIntent(mode=launch_mode, direct_model=direct_model, runtime=runtime)
+    launch = LaunchIntent(
+        mode=launch_mode,
+        direct_model=direct_model,
+        model_route=deepcopy(model_route),
+        runtime=runtime,
+    )
     if launch_mode == LAUNCH_MODE_SIDECAR or sidecar_mounts or sidecar_image is not None:
         launch.sidecar = SidecarLaunchIntent(
             mounts=list(sidecar_mounts or []),

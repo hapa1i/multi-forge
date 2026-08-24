@@ -149,18 +149,11 @@ class TestRunHelp:
 
 
 def _make_spec(name: str = "test", preferred_proxy: str | None = "p") -> ModelSpec:
-    provider_refs: tuple[tuple[str, str], ...]
-    if preferred_proxy:
-        provider_refs = (("openrouter", f"openai/{name}"),)
-    else:
-        provider_refs = (("direct", name),)
     return ModelSpec(
         name=name,
-        model_id=name,
-        family="openai",
-        provider_refs=provider_refs,
+        model_id="gpt-5.6-sol" if preferred_proxy else "claude-opus-4-6",
+        family="openai" if preferred_proxy else "anthropic",
         description="Test model",
-        preferred_proxy=preferred_proxy,
     )
 
 
@@ -211,7 +204,6 @@ class TestListModels:
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             description="Native Codex",
             runtime="codex",
         )
@@ -348,7 +340,10 @@ class TestRunPanel:
     def test_json_includes_resolved_model_routing(self, mock_run):
         mock_run.return_value = _mock_output([ReviewResult("claude-opus", "ok", "", True, 1.0)])
         runner = CliRunner()
-        result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--models", "claude-opus", "--json"])
+        result = runner.invoke(
+            main,
+            ["workflow", "panel", "-p", "Review", "--models", "claude-opus", "--json"],
+        )
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["resolved_models"]["claude-opus"]["requested_model"] == "claude-opus"
@@ -356,7 +351,10 @@ class TestRunPanel:
         assert data["resolved_models"]["claude-opus"]["proxy"] == "openrouter-openai"
         assert data["resolved_models"]["claude-opus"]["runtime"] == "claude_code"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_runtime_native_plan,
+    )
     @patch("forge.review.engine.run_multi_review")
     def test_codex_json_reports_runtime_default_truthfully(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
@@ -377,7 +375,10 @@ class TestRunPanel:
             "model_selection": "runtime_default",
         }
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_runtime_native_plan,
+    )
     @patch("forge.review.engine.run_multi_review")
     def test_codex_text_reports_runtime_default_truthfully(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
@@ -389,7 +390,10 @@ class TestRunPanel:
         assert "provider=openai" in result.output
         assert "runtime=codex" in result.output
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_runtime_native_plan,
+    )
     @patch("forge.review.engine.run_multi_review")
     def test_codex_proxy_override_warns_and_is_ignored(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
@@ -531,7 +535,10 @@ class TestEffortFlag:
         assert result.exit_code == 0
         assert mock_run.call_args[1]["reasoning_effort"] == "max"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_forwards_effort(self, mock_run, _mock_routing):
         """--effort threads through run_adversarial into its fan-out."""
@@ -541,7 +548,10 @@ class TestEffortFlag:
         assert result.exit_code == 0
         assert mock_run.call_args[1]["reasoning_effort"] == "low"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.consensus.run_multi_review")
     def test_consensus_forwards_effort(self, mock_run, _mock_routing):
         """--effort threads through run_consensus into both rounds' fan-out."""
@@ -582,7 +592,10 @@ class TestProxyFlag:
         mock_run.return_value = _mock_output()
         runner = CliRunner()
 
-        with patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan) as mock_routing:
+        with patch(
+            "forge.review.routing.resolve_invocation_routing",
+            side_effect=_auto_routing_plan,
+        ) as mock_routing:
             result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--proxy", "my-proxy"])
 
         assert result.exit_code == 0
@@ -593,7 +606,10 @@ class TestProxyFlag:
         mock_run.return_value = _mock_output()
         runner = CliRunner()
 
-        with patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan) as mock_routing:
+        with patch(
+            "forge.review.routing.resolve_invocation_routing",
+            side_effect=_auto_routing_plan,
+        ) as mock_routing:
             result = runner.invoke(main, ["workflow", "analyze", "topic", "--proxy", "my-proxy"])
 
         assert result.exit_code == 0
@@ -652,7 +668,18 @@ class TestProxyFlag:
                 tip_lines=("Run 'forge proxy create openrouter-openai' to create one.",),
             ),
         ):
-            result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--proxy", "dead-proxy", "--json"])
+            result = runner.invoke(
+                main,
+                [
+                    "workflow",
+                    "panel",
+                    "-p",
+                    "Review",
+                    "--proxy",
+                    "dead-proxy",
+                    "--json",
+                ],
+            )
         assert result.exit_code == 1
         data = json.loads(result.output)
         assert "routing_error" in data
@@ -675,7 +702,10 @@ class TestProxyFlag:
 
         runner = CliRunner()
         with (
-            patch("forge.review.routing.resolve_invocation_routing", side_effect=record_routing),
+            patch(
+                "forge.review.routing.resolve_invocation_routing",
+                side_effect=record_routing,
+            ),
             patch("forge.review.engine.run_multi_review", return_value=_mock_output()),
         ):
             result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--proxy", "my-proxy"])
@@ -699,7 +729,10 @@ class TestProxyFlag:
         """Debate does not re-resolve after the CLI has built a routing plan."""
         mock_run.return_value = _mock_output()
         runner = CliRunner()
-        with patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan) as mock_routing:
+        with patch(
+            "forge.review.routing.resolve_invocation_routing",
+            side_effect=_auto_routing_plan,
+        ) as mock_routing:
             result = runner.invoke(main, ["workflow", "debate", "proposal", "--proxy", "my-proxy"])
 
         assert result.exit_code == 0
@@ -721,7 +754,10 @@ class TestProxyFlag:
         """Consensus cost tracking plan matches both executed rounds."""
         mock_run.return_value = _mock_output()
         runner = CliRunner()
-        with patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan) as mock_routing:
+        with patch(
+            "forge.review.routing.resolve_invocation_routing",
+            side_effect=_auto_routing_plan,
+        ) as mock_routing:
             result = runner.invoke(main, ["workflow", "consensus", "subject", "--proxy", "my-proxy"])
 
         assert result.exit_code == 0
@@ -814,7 +850,7 @@ class TestApplyPanelRoles:
         spec = _make_spec("gpt-5.5", "litellm-openai")
         result = _apply_panel_roles([spec], ["correctness"], "prompt")
         assert result[0].name == "gpt-5.5"
-        assert result[0].preferred_proxy == "litellm-openai"
+        assert result[0].model_id == spec.model_id
         assert result[0].family == "openai"
 
     def test_no_collision_same_model_different_roles(self):
@@ -852,7 +888,10 @@ class TestPanelRolesCli:
     def test_roles_sets_worker_ids(self, mock_run):
         mock_run.return_value = _mock_output()
         runner = CliRunner()
-        result = runner.invoke(main, ["workflow", "panel", "src/", "--code", "--roles", "security,architecture"])
+        result = runner.invoke(
+            main,
+            ["workflow", "panel", "src/", "--code", "--roles", "security,architecture"],
+        )
         assert result.exit_code == 0
         specs = mock_run.call_args[1]["models"]
         ids = [s.effective_worker_id for s in specs]
@@ -956,7 +995,17 @@ class TestReviewTypeCli:
         """-p overrides --review-type; security without --code is allowed when -p is set."""
         mock_run.return_value = _mock_output()
         runner = CliRunner()
-        result = runner.invoke(main, ["workflow", "panel", "-p", "My custom review", "--review-type", "security"])
+        result = runner.invoke(
+            main,
+            [
+                "workflow",
+                "panel",
+                "-p",
+                "My custom review",
+                "--review-type",
+                "security",
+            ],
+        )
         assert result.exit_code == 0
         prompt_arg = mock_run.call_args[0][0]
         assert "My custom review" in prompt_arg
@@ -1003,7 +1052,16 @@ class TestSeverityCli:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["workflow", "panel", "src/", "--code", "--severity", "high", "--roles", "security"],
+            [
+                "workflow",
+                "panel",
+                "src/",
+                "--code",
+                "--severity",
+                "high",
+                "--roles",
+                "security",
+            ],
         )
         assert result.exit_code == 0
         specs = mock_run.call_args[1]["models"]
@@ -1192,7 +1250,10 @@ class TestRunDebate:
         assert result.exit_code == 2
         assert "No subject" in result.output
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_runtime_native_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_codex_selection_preserves_runtime(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output([ReviewResult("codex-for", "analysis", "", True, 1.0)])
@@ -1208,7 +1269,10 @@ class TestRunDebate:
         assert routed["runtime"] == "codex"
         assert routed["model_selection"] == "runtime_default"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_invokes_adversarial(self, mock_run, _mock_routing):
         """Debate subcommand delegates to adversarial runner."""
@@ -1223,7 +1287,10 @@ class TestRunDebate:
         # Verify blinding: resume_id must be None
         assert mock_run.call_args[1]["resume_id"] is None
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_check_pass(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
@@ -1247,7 +1314,10 @@ class TestRunDebate:
         assert data["passed"] is True
         assert data["check_mode"] == "verdict"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_check_reject(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
@@ -1270,7 +1340,10 @@ class TestRunDebate:
         data = json.loads(result.output)
         assert data["passed"] is False
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_json_includes_stance_per_result(self, mock_run, _mock_routing):
         """Each result record should include its stance for JSON consumers."""
@@ -1288,7 +1361,10 @@ class TestRunDebate:
         data = json.loads(result.output)
         assert data["results"]["gpt-5.6-sol-for"]["stance"] == "for"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_json_includes_resolved_model_routing(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
@@ -1299,7 +1375,14 @@ class TestRunDebate:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["workflow", "debate", "Test proposal", "--models", "claude-opus", "--json"],
+            [
+                "workflow",
+                "debate",
+                "Test proposal",
+                "--models",
+                "claude-opus",
+                "--json",
+            ],
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -1309,7 +1392,10 @@ class TestRunDebate:
         assert routed["proxy"] == "openrouter-openai"
         assert routed["stance"] == "for"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_json_resource_path_is_generated(self, mock_run, _mock_routing):
         """Debate JSON should emit '(generated)' not a dangling temp path."""
@@ -1327,7 +1413,10 @@ class TestRunDebate:
         data = json.loads(result.output)
         assert data["resource_path"] == "(generated)"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_fail_closed_on_missing_verdict(self, mock_run, _mock_routing):
         """Debate fails when a successful worker doesn't emit a verdict."""
@@ -1345,7 +1434,10 @@ class TestRunDebate:
         data = json.loads(result.output)
         assert data["passed"] is False
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_accept_with_conditions(self, mock_run, _mock_routing):
         """ACCEPT_WITH_CONDITIONS is treated as a pass in debate."""
@@ -1373,7 +1465,10 @@ class TestRunDebate:
 class TestRunDebateCode:
     """Tests for debate --code mode, mirroring TestRunPanel code-mode coverage."""
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_subject_loads_proposal_framework(self, mock_run, _mock_routing):
         """Positional subject without --code loads generic evaluation template."""
@@ -1388,7 +1483,10 @@ class TestRunDebateCode:
         assert "Feasibility" in prompt_arg
         assert "event sourcing" in prompt_arg
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_subject_with_code_flag_loads_code_framework(self, mock_run, _mock_routing):
         """Positional subject with --code loads code evaluation template."""
@@ -1411,7 +1509,10 @@ class TestRunDebateCode:
         assert result.exit_code == 2
         assert "No target" in result.output
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_code_mode_check_pass(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
@@ -1434,7 +1535,10 @@ class TestRunDebateCode:
         data = json.loads(result.output)
         assert data["passed"] is True
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_code_mode_json_output(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
@@ -1452,7 +1556,10 @@ class TestRunDebateCode:
         assert data["results"]["gpt-5.6-sol-for"]["stance"] == "for"
         assert data["resource_path"] == "(generated)"
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_code_mode_default_models_all(self, mock_run, _mock_routing):
         """Default for debate --code is all models (N=all adversarial)."""
@@ -1462,7 +1569,10 @@ class TestRunDebateCode:
         specs = mock_run.call_args[1]["models"]
         assert len(specs) >= 3
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_without_code_flag_unchanged(self, mock_run, _mock_routing):
         """Proposal mode still uses generic evaluation template (regression guard)."""
@@ -1643,33 +1753,61 @@ class TestDebateWorkerCli:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["workflow", "debate", "test", "--worker", "claude-opus:for", "--models", "claude-opus"],
+            [
+                "workflow",
+                "debate",
+                "test",
+                "--worker",
+                "claude-opus:for",
+                "--models",
+                "claude-opus",
+            ],
         )
         assert result.exit_code == 2
         assert "mutually exclusive" in result.output
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_worker_flag_routes_to_parse(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output()
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["workflow", "debate", "test proposal", "--worker", "claude-opus:for", "--json"],
+            [
+                "workflow",
+                "debate",
+                "test proposal",
+                "--worker",
+                "claude-opus:for",
+                "--json",
+            ],
         )
         assert result.exit_code == 0
         specs = mock_run.call_args[1]["models"]
         # Worker should have "for" stance prompt injected
         assert any("SUPPORTER" in (s.prompt or "") for s in specs)
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_auto_routing_plan,
+    )
     @patch("forge.review.adversarial.run_multi_review")
     def test_custom_worker_prompt_injected(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output()
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["workflow", "debate", "test proposal", "--worker", 'claude-opus:"Focus on security"', "--json"],
+            [
+                "workflow",
+                "debate",
+                "test proposal",
+                "--worker",
+                'claude-opus:"Focus on security"',
+                "--json",
+            ],
         )
         assert result.exit_code == 0
         specs = mock_run.call_args[1]["models"]
@@ -1781,7 +1919,10 @@ class TestRunAnalyze:
 class TestUsageEmission:
     """Workflow fan-out keeps the proxy aggregate separate from worker evidence."""
 
-    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch(
+        "forge.review.routing.resolve_invocation_routing",
+        side_effect=_runtime_native_plan,
+    )
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_codex_tokens_stay_on_worker_and_downstream_not_verb_aggregate(
         self,
@@ -1821,9 +1962,18 @@ class TestUsageEmission:
             "codex_exec",
             "subscription_quota",
         )
-        assert (worker.input_tokens, worker.output_tokens, worker.cached_tokens) == (14936, 22, 10624)
+        assert (worker.input_tokens, worker.output_tokens, worker.cached_tokens) == (
+            14936,
+            22,
+            10624,
+        )
         assert worker.cost_micro_usd is None
-        assert (verb.input_tokens, verb.output_tokens, verb.cached_tokens, verb.cost_micro_usd) == (
+        assert (
+            verb.input_tokens,
+            verb.output_tokens,
+            verb.cached_tokens,
+            verb.cost_micro_usd,
+        ) == (
             None,
             None,
             None,
@@ -1831,7 +1981,11 @@ class TestUsageEmission:
         )
         attempts = read_downstream_records(kind="attempt", forge_run_id=worker.run_id)
         assert len(attempts) == 1
-        assert (attempts[0].input_tokens, attempts[0].output_tokens, attempts[0].cached_tokens) == (
+        assert (
+            attempts[0].input_tokens,
+            attempts[0].output_tokens,
+            attempts[0].cached_tokens,
+        ) == (
             14936,
             22,
             10624,
@@ -1849,7 +2003,10 @@ class TestUsageEmission:
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel")
         monkeypatch.setenv("FORGE_SESSION", "planner")
         # No live proxy in tests: skip snapshot fetches so the holder is unmeasured.
-        monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
+        monkeypatch.setattr(
+            "forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan",
+            lambda _plan: [],
+        )
         monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _RuntimeConfig())
         mock_run.return_value = _mock_output()
 
@@ -1890,7 +2047,10 @@ class TestUsageEmission:
         from forge.core.usage.ledger import read_usage_events
 
         monkeypatch.delenv("FORGE_RUN_ID", raising=False)
-        monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
+        monkeypatch.setattr(
+            "forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan",
+            lambda _plan: [],
+        )
         mock_run.return_value = _mock_output()
 
         result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review this"])

@@ -1,8 +1,8 @@
 """Data models for multi-model review.
 
-Defines model specifications, review results, and the default
-model catalog. Models declare identity and provider refs; concrete
-routing is derived at runtime by ``forge.review.routing``.
+Defines model specifications, review results, and the default model catalog.
+Models declare worker identity; shared catalog routes are materialized at
+runtime by ``forge.review.routing``.
 """
 
 from __future__ import annotations
@@ -21,12 +21,7 @@ class ModelSpec:
         name: Human-readable identifier (e.g., "gpt-5.5").
         model_id: Forge-canonical model ID (e.g., "gpt-5.5").
         family: Model family (e.g., "openai", "anthropic", "gemini").
-        provider_refs: Ordered provider preference as (namespace, model_ref)
-            pairs. ``("direct", "claude-opus-4-6")`` means direct Anthropic;
-            ``("openrouter", "openai/gpt-5.5")`` means OpenRouter routing.
         description: What this model is good at.
-        preferred_proxy: Catalog recommendation for proxy routing (soft,
-            overridable). None for direct-only models.
         prompt: Per-worker prompt override. When set, this worker receives
             this prompt according to prompt_mode.
         prompt_mode: "override" means prompt replaces the global prompt.
@@ -38,9 +33,7 @@ class ModelSpec:
     name: str
     model_id: str
     family: str
-    provider_refs: tuple[tuple[str, str], ...]
     description: str
-    preferred_proxy: str | None = None
     prompt: str | None = None
     prompt_mode: PromptMode = "override"
     worker_id: str | None = None
@@ -107,14 +100,13 @@ def _build_available_models() -> dict[str, ModelSpec]:
     """Build available review models from the model catalog.
 
     Model names derive from model_catalog.yaml so updating defaults is
-    a single YAML change. Provider refs either derive from that same
-    canonical name or use the provider-specific slug required by the proxy.
+    a single YAML change. Routing metadata lives in the shared model route
+    catalog and is materialized by ``forge.review.routing``.
     """
     from forge.core.models.catalog import get_default_model
 
     openai_opus = get_default_model("openai", "opus")
     gemini_opus = get_default_model("gemini", "opus")
-    anthropic_opus = get_default_model("anthropic", "opus")
     deepseek_opus = get_default_model("deepseek", "opus")
     minimax_opus = get_default_model("minimax", "opus")
     qwen_opus = get_default_model("qwen", "opus")
@@ -126,90 +118,66 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=openai_opus,
             model_id=openai_opus,
             family="openai",
-            provider_refs=(
-                ("openrouter", f"openai/{openai_opus}"),
-                ("litellm", f"openai/{openai_opus}"),
-            ),
-            preferred_proxy="openrouter-openai",
             description="Logical problems, systematic code review",
         ),
         gemini_opus: ModelSpec(
             name=gemini_opus,
             model_id=gemini_opus,
             family="gemini",
-            provider_refs=(
-                ("openrouter", "google/gemini-3.1-pro-preview"),
-                ("litellm", "google/gemini-3.1-pro-preview"),
-            ),
-            preferred_proxy="openrouter-gemini",
             description="Balanced analysis, pragmatic suggestions, large context",
         ),
         deepseek_opus: ModelSpec(
             name=deepseek_opus,
             model_id=deepseek_opus,
             family="deepseek",
-            provider_refs=(("openrouter", "deepseek/deepseek-v4-pro"),),
-            preferred_proxy="openrouter-deepseek",
             description="Cost-efficient reasoning, strong code analysis",
         ),
         minimax_opus: ModelSpec(
             name=minimax_opus,
             model_id=minimax_opus,
             family="minimax",
-            provider_refs=(("openrouter", "minimax/minimax-m3"),),
-            preferred_proxy="openrouter-minimax",
             description="Frontier agentic coding analysis, 1M context",
         ),
         qwen_opus: ModelSpec(
             name=qwen_opus,
             model_id=qwen_opus,
             family="qwen",
-            provider_refs=(("openrouter", "qwen/qwen3.8-max"),),
-            preferred_proxy="openrouter-qwen",
             description="Large context multilingual analysis",
         ),
         glm_opus: ModelSpec(
             name=glm_opus,
             model_id=glm_opus,
             family="glm",
-            provider_refs=(("openrouter", "z-ai/glm-5.3"),),
-            preferred_proxy="openrouter-glm",
             description="Cost-efficient general analysis",
         ),
         kimi_opus: ModelSpec(
             name=kimi_opus,
             model_id=kimi_opus,
             family="kimi",
-            provider_refs=(("openrouter", "moonshotai/kimi-k3"),),
-            preferred_proxy="openrouter-kimi",
             description="Agentic code generation and analysis",
         ),
         "claude-opus": ModelSpec(
             name="claude-opus",
             model_id="claude-opus",
             family="anthropic",
-            provider_refs=(("direct", anthropic_opus),),
             description="Deep architectural analysis, complex reasoning",
         ),
         "claude-opus-4.6": ModelSpec(
             name="claude-opus-4.6",
             model_id="claude-opus-4.6",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6"),),
             description="Stable Claude Opus 4.6 direct worker",
         ),
         "claude-opus-4.6-1m": ModelSpec(
             name="claude-opus-4.6-1m",
-            model_id="claude-opus-4.6-1m",
+            model_id="claude-opus-4-6-1m",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-6[1m]"),),
             description="Stable Claude Opus 4.6 direct worker with 1M context pin",
         ),
         "claude-opus-4.8": ModelSpec(
             name="claude-opus-4.8",
             model_id="claude-opus-4.8",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-8"),),
             description="Bounded single-shot review and quorum dissent",
             prompt=_CLAUDE_48_BOUNDED_REVIEW_PROMPT,
             prompt_mode="prefix",
@@ -218,14 +186,12 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name="claude-fable",
             model_id="claude-fable",
             family="anthropic",
-            provider_refs=(("direct", "claude-fable-5"),),
             description="Most capable Claude; direct single-shot review and quorum dissent",
         ),
         "codex": ModelSpec(
             name="codex",
             model_id="codex-default",
             family="openai",
-            provider_refs=(),
             description="Native Codex review using the runtime-selected model",
             runtime="codex",
         ),
@@ -372,8 +338,10 @@ def check_model_availability(
                     )
                 continue
 
+            from forge.review.routing import preferred_proxy_for_routes
+
             result = resolve_subprocess_routing(
-                preferred_proxy=spec.preferred_proxy,
+                preferred_proxy=preferred_proxy_for_routes(routes),
                 routes=routes,
                 require_route=True,
             )

@@ -11,7 +11,7 @@ import sys
 import uuid as _uuid
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import click
 
@@ -37,7 +37,6 @@ from forge.cli.session import (  # noqa: E402
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
 from forge.core.models.direct_model import (
-    DirectModelPin,
     resolve_direct_model_pin,
     token_estimate_multiplier_for_direct_model,
 )
@@ -62,6 +61,15 @@ from forge.core.ops.claude_session import (
 )
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
+from forge.core.ops.session_model_routing import (
+    ResolvedModelRoute,
+    SessionModelRoutePlan,
+    SessionModelRoutingError,
+    plan_model_route_transition,
+    plan_session_model_route_for_state,
+    realize_session_model_route,
+    validate_model_tier_option,
+)
 from forge.core.paths import display_path
 from forge.policy.semantic.supervisor import validate_checker_model
 from forge.session import (
@@ -84,10 +92,7 @@ from forge.session.launch import (
     get_launch_preferences,
     resolve_manifest_prompt_file,
 )
-from forge.session.model_pin import (
-    _validate_direct_model_pin_for_routing,
-    _validate_proxy_model_pin,
-)
+from forge.session.model_pin import _validate_proxy_model_pin
 from forge.session.models import AuthorityIntent, session_runtime
 from forge.session.prev_sessions import (
     ensure_notes_overlay,
@@ -118,6 +123,8 @@ from forge.cli.session_supervisor_options import (  # noqa: E402
     supervisor_options,
 )
 
+_MODEL_TIER_HELP = "Select the proxy tier for --model when more than one tier can serve it"
+
 
 def _has_confirmed_claude_session(state: SessionState) -> bool:
     """Whether this session has durable evidence of a resumable Claude conversation."""
@@ -126,6 +133,76 @@ def _has_confirmed_claude_session(state: SessionState) -> bool:
     if state.confirmed.confirmed_by is not None:
         return True
     return _has_resumable_transcript(state)
+
+
+def _plan_interactive_session_model_route(
+    model: str,
+    *,
+    model_tier: str | None,
+    proxy_name: str | None,
+    direct: bool,
+    state: SessionState | None = None,
+    allow_replacement: bool = True,
+) -> SessionModelRoutePlan:
+    """Build the shared read-only route plan for a lifecycle leaf."""
+
+    return plan_session_model_route_for_state(
+        model,
+        model_tier=model_tier,
+        proxy_name=proxy_name,
+        no_proxy=direct,
+        state=state,
+        allow_replacement=allow_replacement,
+    )
+
+
+def _realize_interactive_session_model_route(
+    plan: SessionModelRoutePlan,
+) -> ResolvedModelRoute:
+    """Realize one selected route and render only proxy-start status."""
+
+    from forge.cli.claude import _healthcheck_proxy
+
+    resolved = realize_session_model_route(
+        plan,
+        healthcheck_fn=lambda base_url, template, proxy_id: _healthcheck_proxy(
+            base_url=base_url,
+            expected_template=template,
+            expected_proxy_id=proxy_id,
+        ),
+    )
+    if resolved.started_proxy:
+        console.print(f"[dim]Started proxy '{resolved.proxy_id}' from template '{resolved.proxy_template}'.[/dim]")
+    return resolved
+
+
+def _routing_from_model_route(resolved: ResolvedModelRoute) -> ResolvedRouting | None:
+    if resolved.kind == "direct":
+        return None
+    return ResolvedRouting(
+        template=resolved.proxy_template,
+        base_url=resolved.proxy_base_url,
+        proxy_id=resolved.proxy_id,
+        context_limit=resolved.context_limit,
+    )
+
+
+def _render_model_route_payload(payload: dict[str, Any]) -> None:
+    """Render the explicit model route directly from the journal payload."""
+
+    route = payload["route"]
+    assert isinstance(route, dict)
+    provider = route.get("backend_id") or ("direct" if route.get("kind") == "direct" else "unknown")
+    template = route.get("template") or "-"
+    proxy_id = route.get("proxy_id") or "-"
+    tier = payload.get("selected_tier") or "-"
+    model = payload.get("selected_model") or "-"
+    billing_mode = payload.get("billing_mode") or "unknown"
+    err_console.print(
+        f"Route: provider={provider} template={template} proxy={proxy_id} "
+        f"tier={tier} model={model} billing_mode={billing_mode}",
+        markup=False,
+    )
 
 
 def _is_resumable_session(state: SessionState) -> bool:
@@ -507,6 +584,9 @@ class _ClaudeStartCliPresenter:
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
 
+    def on_routing_payload(self, payload: dict[str, Any]) -> None:
+        _render_model_route_payload(payload)
+
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
         _render_sidecar_launch(event)
 
@@ -575,6 +655,9 @@ class _ClaudeResumeCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
+
+    def on_routing_payload(self, payload: dict[str, Any]) -> None:
+        _render_model_route_payload(payload)
 
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
         _render_sidecar_launch(event)
@@ -682,6 +765,7 @@ def launch_new_session(
     supervisor_runtime: str | None = None,
     subprocess_proxy: str | None = None,
     direct_model: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -728,8 +812,19 @@ def launch_new_session(
     manager = SessionManager()
 
     normalized_direct_model: str | None = None
+    model_route_intent = None
     direct_model_pin = None
-    if direct_model:
+    if model_route_selection is not None:
+        transition = plan_model_route_transition(model_route_selection)
+        normalized_direct_model = transition.direct_model
+        model_route_intent = transition.model_route
+        direct = model_route_selection.kind == "direct"
+        template = transition.proxy.template if transition.proxy is not None else None
+        base_url = transition.proxy.base_url if transition.proxy is not None else None
+        proxy_id = model_route_selection.proxy_id
+        proxy_display = proxy_id
+        context_limit_override = model_route_selection.context_limit
+    elif direct_model:
         try:
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
@@ -811,6 +906,7 @@ def launch_new_session(
             proxy_display=proxy_display,
             proxy_id=proxy_id,
             normalized_direct_model=normalized_direct_model,
+            model_route=model_route_intent,
             prompt_file=prompt_file,
             memory_flag=memory_flag,
             subprocess_proxy=subprocess_proxy,
@@ -868,7 +964,13 @@ def launch_new_session(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for direct sessions (for example: claude-opus-5 or claude-sonnet-4-6)",
+    help="Select a catalog model for this interactive session",
+)
+@click.option(
+    "--model-tier",
+    type=click.Choice(["haiku", "sonnet", "opus"]),
+    default=None,
+    help=_MODEL_TIER_HELP,
 )
 @click.option("--sidecar", is_flag=True, help="Run with bundled proxy in Docker container")
 @click.option("--host-proxy", is_flag=True, help="Use host proxy (overrides config)")
@@ -918,6 +1020,7 @@ def start(
     worktree: bool,
     branch: str | None,
     direct_model: str | None,
+    model_tier: str | None,
     sidecar: bool,
     host_proxy: bool,
     mounts: tuple[str, ...],
@@ -986,6 +1089,17 @@ def start(
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
+    try:
+        validate_model_tier_option(direct_model, model_tier)
+    except SessionModelRoutingError as e:
+        print_error(str(e))
+        sys.exit(1)
+    if direct_model and sidecar:
+        print_error("--model cannot be combined with --sidecar")
+        sys.exit(1)
+    if direct_model and host_proxy:
+        print_error("--model cannot be combined with --host-proxy")
+        sys.exit(1)
     supervisor_error = supervisor_option_error(
         supervise_target=supervise_target,
         supervisor_proxy=supervisor_proxy,
@@ -1013,7 +1127,7 @@ def start(
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,
     # unless --sidecar or --host-proxy is specified (both imply proxy mode).
-    if not proxy_name and not direct and not sidecar and not host_proxy:
+    if direct_model is None and not proxy_name and not direct and not sidecar and not host_proxy:
         direct = True
 
     # CWD validation: must be at repo root; --worktree requires main repo
@@ -1025,7 +1139,26 @@ def start(
         require_repo_root()
 
     routing: ResolvedRouting | None = None
-    if proxy_name:
+    model_route_selection: ResolvedModelRoute | None = None
+    if direct_model is not None:
+        try:
+            model_plan = _plan_interactive_session_model_route(
+                direct_model,
+                model_tier=model_tier,
+                proxy_name=proxy_name,
+                direct=direct,
+            )
+            if subprocess_proxy and model_plan.kind == "proxy":
+                raise SessionModelRoutingError(
+                    "--subprocess-proxy cannot be combined with a non-Claude main-session proxy route"
+                )
+            model_route_selection = _realize_interactive_session_model_route(model_plan)
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
+        routing = _routing_from_model_route(model_route_selection)
+        direct = model_route_selection.kind == "direct"
+    elif proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if name is None:
@@ -1065,6 +1198,7 @@ def start(
             supervisor_runtime=supervisor_runtime,
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
+            model_route_selection=model_route_selection,
             memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             authority=authority,
             authority_explicit=authority_explicit,
@@ -1093,7 +1227,13 @@ def start(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this and future resumes (for example: claude-opus-5 or claude-opus-4-8)",
+    help="Select a catalog model for this and future resumes",
+)
+@click.option(
+    "--model-tier",
+    type=click.Choice(["haiku", "sonnet", "opus"]),
+    default=None,
+    help=_MODEL_TIER_HELP,
 )
 @click.option(
     "--fresh",
@@ -1165,6 +1305,7 @@ def resume(
     proxy_name: str | None,
     direct: bool,
     direct_model: str | None,
+    model_tier: str | None,
     fresh: bool,
     child_name: str | None,
     strategy: str,
@@ -1225,16 +1366,6 @@ def resume(
             sys.exit(1)
         if review:
             print_error("--review is only supported for transfer-mode fresh resumes, not --strategy rewind")
-            sys.exit(1)
-
-    normalized_direct_model: str | None = None
-    direct_model_pin: DirectModelPin | None = None
-    if direct_model:
-        try:
-            direct_model_pin = resolve_direct_model_pin(direct_model)
-            normalized_direct_model = direct_model_pin.env_model
-        except ValueError as e:
-            print_error(f"{e}")
             sys.exit(1)
 
     if resume_mode and not fresh:
@@ -1367,27 +1498,58 @@ def resume(
 
     enforce_target_project_compatibility(Path(target_forge_root))
 
-    routing: ResolvedRouting | None = None
-    if proxy_name:
-        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+    try:
+        validate_model_tier_option(direct_model, model_tier)
+    except SessionModelRoutingError as e:
+        print_error(str(e))
+        sys.exit(1)
 
-    _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
-    if routing:
-        validation_base_url = routing.base_url
-        validation_proxy_id = routing.proxy_id
-    elif direct:
-        validation_base_url = None
-        validation_proxy_id = None
-    if direct_model_pin:
-        error = _validate_direct_model_pin_for_routing(
-            pin=direct_model_pin,
-            proxy_id=validation_proxy_id,
-            base_url=validation_base_url,
-            surface="resume",
+    routing: ResolvedRouting | None = None
+    model_route_selection: ResolvedModelRoute | None = None
+    render_model_route = direct_model is not None
+    normalized_direct_model: str | None = None
+    route_model = direct_model
+    route_tier = model_tier
+    allow_route_replacement = True
+    neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
+    if route_model is None and proxy_name is None and not direct and neutral_route is not None:
+        route_model = neutral_route.requested_model
+        route_tier = neutral_route.selected_tier
+        allow_route_replacement = False
+
+    if route_model is not None:
+        inherited_sidecar = manifest.confirmed.is_sandboxed or (
+            manifest.intent.launch is not None and manifest.intent.launch.mode == LAUNCH_MODE_SIDECAR
         )
-        if error:
-            print_error(f"{error}")
+        if direct_model is not None and inherited_sidecar and not direct:
+            print_error("--model cannot be combined with sidecar resume")
             sys.exit(1)
+        try:
+            model_plan = _plan_interactive_session_model_route(
+                route_model,
+                model_tier=route_tier,
+                proxy_name=proxy_name,
+                direct=direct,
+                state=manifest,
+                allow_replacement=allow_route_replacement,
+            )
+            if (
+                manifest.intent.subprocess_proxy
+                and model_plan.kind == "proxy"
+                and model_plan.request.claude_tier is None
+            ):
+                raise SessionModelRoutingError(
+                    "a non-Claude main-session route cannot be combined with persisted subprocess-proxy intent"
+                )
+            model_route_selection = _realize_interactive_session_model_route(model_plan)
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
+        routing = _routing_from_model_route(model_route_selection)
+        direct = model_route_selection.kind == "direct"
+        normalized_direct_model = plan_model_route_transition(model_route_selection).direct_model
+    elif proxy_name:
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if fresh:
         effective_resume_mode = ResumeStrategy.REWIND.value if rewind_requested else resume_mode or "transfer"
@@ -1444,6 +1606,8 @@ def resume(
                     routing=routing,
                     direct=direct,
                     direct_model_override=normalized_direct_model,
+                    model_route_selection=model_route_selection,
+                    render_model_route=render_model_route,
                     memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                     authority=authority,
                     authority_explicit=authority_explicit,
@@ -1459,6 +1623,8 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
@@ -1481,6 +1647,8 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
@@ -1502,6 +1670,8 @@ def resume(
                 direct=direct,
                 review=review,
                 direct_model_override=normalized_direct_model,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
@@ -1514,6 +1684,8 @@ def resume(
             routing=routing,
             direct=direct,
             direct_model_override=normalized_direct_model,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
         )
     elif _is_resumable_session(manifest):
         active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
@@ -1545,6 +1717,8 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
             )
         else:
             _reconnect_in_place(
@@ -1554,6 +1728,8 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
             )
     else:
         _launch_as_child(
@@ -1563,6 +1739,8 @@ def resume(
             routing=routing,
             direct=direct,
             direct_model_override=normalized_direct_model,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
         )
 
 
@@ -1574,12 +1752,18 @@ def _launch_in_place(
     routing: ResolvedRouting | None = None,
     direct: bool = False,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
 ) -> None:
     """Launch a never-used session in place under its existing Forge identity."""
     manager.switch_session(name, forge_root=manifest.forge_root)
 
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    context_limit = _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    )
     use_sidecar, mounts, image = _get_resume_launch_preferences(manifest, direct=direct)
     prompt_files: list[Path] = []
 
@@ -1634,6 +1818,8 @@ def _launch_in_place(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
             prompt_warnings=tuple(prompt_warnings),
         ),
     )
@@ -1647,6 +1833,8 @@ def _reconnect_in_place(
     routing: ResolvedRouting | None = None,
     direct: bool = False,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
 ) -> None:
     """Reconnect to the same Claude conversation without creating a child.
 
@@ -1669,7 +1857,11 @@ def _reconnect_in_place(
 
     manager.switch_session(name, forge_root=manifest.forge_root)
 
-    context_limit = _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    )
     use_sidecar, mounts, image = _get_resume_launch_preferences(manifest, direct=direct)
 
     _execute_resume_launch_plan(
@@ -1686,6 +1878,8 @@ def _reconnect_in_place(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
         ),
     )
 
@@ -1698,6 +1892,8 @@ def _launch_as_child(
     routing: ResolvedRouting | None = None,
     direct: bool = False,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
 ) -> None:
     """Create a child session and resume the parent's Claude conversation.
 
@@ -1710,7 +1906,11 @@ def _launch_as_child(
         handle_session_error(e)
         return
 
-    context_limit = _resolve_context_limit(_resume_context_ref(state=child, routing=routing, direct=direct))
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(_resume_context_ref(state=child, routing=routing, direct=direct))
+    )
     use_sidecar, mounts, image = _get_resume_launch_preferences(child, direct=direct)
 
     # Child is a same-dir fork: use --resume --fork-session with parent's UUID
@@ -1728,6 +1928,8 @@ def _launch_as_child(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
             parent_name=parent_name,
         ),
     )
@@ -1815,6 +2017,8 @@ def _resume_fresh(
     direct: bool,
     review: bool = False,
     direct_model_override: str | None = None,
+    model_route_selection: ResolvedModelRoute | None = None,
+    render_model_route: bool = False,
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -1827,7 +2031,11 @@ def _resume_fresh(
     before launching (user can curate the context).
     """
     effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
-    context_limit = _resolve_context_limit(effective_proxy_ref)
+    context_limit = (
+        model_route_selection.context_limit
+        if model_route_selection is not None and model_route_selection.context_limit is not None
+        else _resolve_context_limit(effective_proxy_ref)
+    )
     token_multiplier = _resume_token_estimate_multiplier(
         parent_state=parent_state,
         effective_proxy_ref=effective_proxy_ref,
@@ -1919,6 +2127,8 @@ def _resume_fresh(
             context_limit=context_limit,
             launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
             direct_model_override=direct_model_override,
+            model_route_selection=model_route_selection,
+            render_model_route=render_model_route,
             parent_name=parent,
         ),
     )
@@ -1944,7 +2154,13 @@ def _resume_fresh(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this incognito session (for example: claude-opus-5 or claude-opus-4-8)",
+    help="Select a catalog model for this incognito session",
+)
+@click.option(
+    "--model-tier",
+    type=click.Choice(["haiku", "sonnet", "opus"]),
+    default=None,
+    help=_MODEL_TIER_HELP,
 )
 @click.option("--system-prompt", "-s", help="Append system prompt text")
 @click.option(
@@ -1970,6 +2186,7 @@ def incognito(
     proxy_name: str | None,
     direct: bool,
     direct_model: str | None,
+    model_tier: str | None,
     system_prompt: str | None,
     system_prompt_file: str | None,
     worktree: bool,
@@ -1996,6 +2213,17 @@ def incognito(
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
+    try:
+        validate_model_tier_option(direct_model, model_tier)
+    except SessionModelRoutingError as e:
+        print_error(str(e))
+        sys.exit(1)
+    if direct_model and sidecar:
+        print_error("--model cannot be combined with --sidecar")
+        sys.exit(1)
+    if direct_model and host_proxy:
+        print_error("--model cannot be combined with --host-proxy")
+        sys.exit(1)
 
     try:
         authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
@@ -2005,7 +2233,7 @@ def incognito(
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,
     # unless --sidecar or --host-proxy is specified (both imply proxy mode).
-    if not proxy_name and not direct and not sidecar and not host_proxy:
+    if direct_model is None and not proxy_name and not direct and not sidecar and not host_proxy:
         direct = True
 
     from forge.cli.guards import require_main_repo_root, require_repo_root
@@ -2016,7 +2244,22 @@ def incognito(
         require_repo_root()
 
     routing: ResolvedRouting | None = None
-    if proxy_name:
+    model_route_selection: ResolvedModelRoute | None = None
+    if direct_model is not None:
+        try:
+            model_plan = _plan_interactive_session_model_route(
+                direct_model,
+                model_tier=model_tier,
+                proxy_name=proxy_name,
+                direct=direct,
+            )
+            model_route_selection = _realize_interactive_session_model_route(model_plan)
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
+        routing = _routing_from_model_route(model_route_selection)
+        direct = model_route_selection.kind == "direct"
+    elif proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if name is None:
@@ -2048,6 +2291,7 @@ def incognito(
             proxy_display=routing.proxy_id if routing else None,
             context_limit_override=routing.context_limit if routing else None,
             direct_model=direct_model,
+            model_route_selection=model_route_selection,
             authority=authority,
             authority_explicit=authority_explicit,
         )
