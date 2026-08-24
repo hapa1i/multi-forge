@@ -17,7 +17,9 @@ from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.models import (
     LaneRecord,
+    ModelRouteIntent,
     ProxyIntent,
+    SessionState,
     StartedWithProxy,
     SystemPromptIntent,
 )
@@ -380,6 +382,48 @@ class TestModelRouteResume:
         assert result.exit_code == 1
         assert "cannot be identity-checked without a proxy id" in result.output
         assert "pass --proxy <proxy_id-or-template>" in result.output
+        assert store.manifest_path.read_bytes() == before
+        mock_invoke.assert_not_called()
+
+    def test_bare_resume_rejects_proxy_model_route_without_proxy_intent(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "incoherent-proxy-route",
+                "--model",
+                "claude-sonnet-5",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), "incoherent-proxy-route")
+
+        def _make_route_incoherent(state: SessionState) -> None:
+            assert state.intent.launch is not None
+            state.intent.proxy = None
+            state.intent.launch.model_route = ModelRouteIntent(
+                requested_model="claude-sonnet-5",
+                selected_tier="sonnet",
+                kind="proxy",
+                source_id="openrouter",
+            )
+
+        store.update(timeout_s=5.0, mutate=_make_route_incoherent)
+        before = store.manifest_path.read_bytes()
+
+        with successful_claude_launch() as mock_invoke:
+            result = runner.invoke(main, ["session", "resume", "incoherent-proxy-route"])
+
+        assert result.exit_code == 1
+        assert "stored proxy model route" in result.output
+        assert "missing intent.proxy" in result.output
+        assert "--model claude-sonnet-5" in result.output
         assert store.manifest_path.read_bytes() == before
         mock_invoke.assert_not_called()
 

@@ -203,10 +203,12 @@ Removal waits for that test to pass. **Blockers:** None.
 | Provider-slug alias preservation                   | OpenRouter dot/hyphen aliases for Claude Opus/Sonnet 4.6               | dot forms retain 1M normalization; hyphen forms retain base normalization          | `tests/src/core/models/test_model_catalog_resolution.py`                              |
 | Manifest v1 compatibility                          | v1 direct/proxy/empty launch intents                                   | strict read succeeds with `model_route=None`; no selection occurs                  | `tests/src/session/test_store.py`                                                     |
 | Manifest v2 strictness                             | both schema constants plus valid/malformed `ModelRouteIntent` objects  | writer emits v2; v1/v2 read; invalid/extra fields fail contextually                | `tests/src/session/test_models.py` / `tests/src/session/test_store.py`                |
+| Resolved-route override rejection                  | parent/object/leaf writes plus stale keyed resets                      | writes fail without mutation; reset remains a recovery path                        | `tests/src/session/test_overrides.py` / `tests/src/cli/test_session_overrides.py`     |
 | Automatic deterministic selection                  | two admissible catalog proxy routes plus unrelated running proxies     | first catalog candidate selected; registry state does not reorder it               | `tests/src/core/ops/test_session_model_routing.py`                                    |
 | No post-selection fallback                         | first candidate selected, then startup/health fails                    | hard error; second candidate and child never invoked                               | `tests/src/core/ops/test_session_model_routing.py`                                    |
 | Running persisted proxy without launch credentials | compatible healthy persisted proxy, credential absent in current shell | route preserved and reused; no automatic reselection                               | `tests/src/cli/test_session_resume.py`                                                |
 | Bare unavailable persisted route                   | v2 intent names stopped/unavailable route                              | actionable failure; no catalog scan or replacement                                 | `tests/src/cli/test_session_resume.py`                                                |
+| Incoherent persisted proxy route                   | proxy-kind `model_route` without `intent.proxy`                        | actionable failure; no direct-provider fallback                                    | `tests/src/cli/test_session_resume.py`                                                |
 | Explicit incompatible model on resume              | persisted Gemini route plus explicit GPT model                         | catalog replacement occurs only after compatibility rejection                      | `tests/src/cli/test_session_resume.py`                                                |
 | Tier ambiguity                                     | requested model served by multiple non-default tiers                   | error names candidate tiers and exact `--model-tier` recovery                      | `tests/src/core/ops/test_session_model_routing.py`                                    |
 | Context preflight atomicity                        | target tier below current context budget                               | prior intent unchanged; child and route journal untouched                          | `tests/src/core/ops/test_session_fork_preflight.py`                                   |
@@ -238,6 +240,10 @@ Removal waits for that test to pass. **Blockers:** None.
   loaded direct `claude-opus-4-8` plus proxied `gpt-5.6-sol` routes from site-packages (2026-08-24).
 - Closeout: `make pre-commit-md` passed after the lane move, and the explicit Markdown audit passed for 574 sources with
   no stale `doing/model_first_session_routing` link (2026-08-24).
-- Documentation: all shipped design/CLI/end-user surfaces were reconciled; `docs/design_sessions.md` is 24,900 Opus
+- Documentation: all shipped design/CLI/end-user surfaces were reconciled; `docs/design_sessions.md` is 24,959 Opus
   tokens, below the living-document target. No separate implementation note was added because the stable ownership and
   transaction contracts are already canonical in the design documents.
+- Post-closeout review: rejected recorded-but-ignored `launch.model_route` overrides while preserving reset recovery,
+  pinned v1 projection to v2, rejected incoherent persisted proxy routes, and single-sourced Claude tier and `[1m]`
+  semantics. The 307-test focused slice, 9,854 unit tests (117 integration-marked tests deselected), two Docker session-
+  routing integrations, and `make pre-commit` all passed (2026-08-24).

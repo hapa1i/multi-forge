@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
+from forge.core.models.direct_model import ONE_M_SUFFIX
 from forge.core.models.model_routes import (
     ModelRouteCandidate,
     ModelRouteCatalogError,
@@ -520,6 +521,8 @@ def _serving_proxy_tiers(
 ) -> dict[str, str]:
     from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
 
+    if candidate is not None and _route_key(candidate.model_ref) != request.route_key:
+        return {}
     if proxy.wire_shape == ANTHROPIC_PASSTHROUGH and request.claude_tier is not None:
         return {request.claude_tier: request.direct_execution_ref(request.route_key)}
 
@@ -530,8 +533,6 @@ def _serving_proxy_tiers(
         if selected_model is None:
             continue
         if alternative is None and _route_key(selected_model) != request.route_key:
-            continue
-        if candidate is not None and _route_key(candidate.model_ref) != request.route_key:
             continue
         serving[tier] = selected_model
     return serving
@@ -583,7 +584,7 @@ def _selected_context_limit(request: ModelRouteRequest, selected_model: str) -> 
         one_m_model = f"{request.route_key}-1m"
         if model_exists(one_m_model):
             return get_context_window_tokens(one_m_model)
-    return get_context_window_tokens(resolve_model_id(selected_model.removesuffix("[1m]")))
+    return get_context_window_tokens(resolve_model_id(selected_model.removesuffix(ONE_M_SUFFIX)))
 
 
 def _route_key(model_ref: str) -> str:
@@ -638,7 +639,12 @@ def _inspect_state_route(
     if neutral is not None and neutral.kind == "direct":
         return "direct", None
 
-    if neutral is not None and neutral.kind == "proxy" and state.intent.proxy is not None:
+    if neutral is not None and neutral.kind == "proxy":
+        if state.intent.proxy is None:
+            raise SessionModelRoutingError(
+                f"stored proxy model route for {neutral.requested_model!r} is missing intent.proxy; "
+                f"pass --model {neutral.requested_model} with --proxy <proxy_id-or-template> to select a replacement"
+            )
         template = state.intent.proxy.template or None
         base_url = state.intent.proxy.base_url
         snapshot = inspect_persisted_proxy_route(template=template, base_url=base_url, proxy_id=None)

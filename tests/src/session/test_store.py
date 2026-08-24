@@ -31,6 +31,7 @@ from forge.session.store import (
     MANIFEST_DIR,
     MANIFEST_FILENAME,
     SessionStore,
+    upgrade_v1_manifest_for_read,
 )
 
 
@@ -629,6 +630,19 @@ class TestSessionStoreRead:
         assert loaded.intent.launch.model_route is None
         assert store.manifest_path.read_bytes() == before
 
+    def test_v1_projection_is_pinned_to_v2_shape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import forge.session.store as store_module
+
+        data: dict[str, Any] = {"schema_version": 1, "intent": {"launch": {}}}
+        monkeypatch.setattr(store_module, "SCHEMA_VERSION", 3)
+
+        upgrade_v1_manifest_for_read(data)
+
+        assert data == {
+            "schema_version": 2,
+            "intent": {"launch": {"model_route": None}},
+        }
+
     def test_first_ordinary_v1_write_emits_complete_v2(
         self,
         store: SessionStore,
@@ -681,7 +695,10 @@ class TestSessionStoreRead:
         data["schema_version"] = 1
         store.manifest_path.write_text(json.dumps(data))
 
-        with pytest.raises(ManifestCorruptedError, match="schema v1 intent.launch cannot contain model_route"):
+        with pytest.raises(
+            ManifestCorruptedError,
+            match="schema v1 intent.launch cannot contain model_route",
+        ):
             store.read()
 
     @pytest.mark.parametrize(

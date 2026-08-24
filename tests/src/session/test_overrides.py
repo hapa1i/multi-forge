@@ -141,8 +141,25 @@ class TestValidateKey:
         assert "immutable launch identity" in str(exc_info.value)
         assert "--runtime" in str(exc_info.value)
 
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "launch.model_route",
+            "launch.model_route.requested_model",
+            "launch.model_route.selected_tier",
+            "launch.model_route.kind",
+            "launch.model_route.source_id",
+        ],
+    )
+    def test_launch_model_route_rejected_as_resolved_state(self, key: str) -> None:
+        with pytest.raises(InvalidOverrideKeyError) as exc_info:
+            validate_key(key)
+
+        assert "resolved launch state" in str(exc_info.value)
+        assert "--model" in str(exc_info.value)
+
     def test_other_launch_keys_still_valid(self) -> None:
-        """Only launch.runtime is blocked; sibling launch keys keep working."""
+        """Mutable launch siblings remain overrideable."""
         assert validate_key("launch") == ["launch"]
         assert validate_key("launch.mode") == ["launch", "mode"]
 
@@ -377,6 +394,29 @@ class TestSetOverride:
 
         assert overrides == {}
 
+    def test_set_rejects_model_route_inside_parent_launch_object(self) -> None:
+        overrides: dict = {}
+
+        with pytest.raises(InvalidOverrideKeyError, match="model_route is resolved launch state"):
+            set_override(overrides, "launch", {"model_route": None})
+
+        assert overrides == {}
+
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("launch.model_route", None),
+            ("launch.model_route.selected_tier", "haiku"),
+        ],
+    )
+    def test_set_rejects_model_route_subtree(self, key: str, value: object) -> None:
+        overrides: dict = {}
+
+        with pytest.raises(InvalidOverrideKeyError, match="model_route is resolved launch state"):
+            set_override(overrides, key, value)
+
+        assert overrides == {}
+
     def test_set_rejects_launch_wildcard_before_mutation(self) -> None:
         overrides: dict = {"launch": {"mode": "host"}}
 
@@ -459,6 +499,31 @@ class TestDeleteOverride:
 
         assert result is True
         assert overrides == {"launch": {"mode": "sidecar"}}
+
+    @pytest.mark.parametrize(
+        ("key", "expected"),
+        [
+            (
+                "launch.model_route.selected_tier",
+                {"launch": {"model_route": {"kind": "proxy"}}},
+            ),
+            ("launch.model_route", {"launch": {}}),
+        ],
+    )
+    def test_delete_launch_model_route_remains_a_recovery_path(self, key: str, expected: dict) -> None:
+        overrides: dict = {
+            "launch": {
+                "model_route": {
+                    "selected_tier": "haiku",
+                    "kind": "proxy",
+                }
+            }
+        }
+
+        result = delete_override(overrides, key)
+
+        assert result is True
+        assert overrides == expected
 
     def test_delete_parent_launch_removes_persisted_illegal_shape(self) -> None:
         overrides: dict = {"launch": {"runtime": "codex", "mode": "sidecar"}}

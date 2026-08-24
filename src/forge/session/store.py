@@ -138,7 +138,7 @@ def upgrade_v1_manifest_for_read(data: dict[str, Any]) -> None:
     launch = intent.get("launch") if isinstance(intent, dict) else None
     if isinstance(launch, dict):
         launch["model_route"] = None
-    data["schema_version"] = SCHEMA_VERSION
+    data["schema_version"] = 2
 
 
 # --- Free functions — use these for path construction everywhere (avoid drift) ---

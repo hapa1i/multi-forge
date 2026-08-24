@@ -63,7 +63,7 @@ def resolve_direct_model_pin(value: str) -> DirectModelPin:
     if not base_canonical.startswith("claude-"):
         raise ValueError(f"--model only supports Claude models for direct sessions, got {value!r}")
 
-    tier = _claude_tier(base_canonical)
+    tier = claude_model_tier(base_canonical)
     if tier is None:
         raise ValueError(f"Unsupported Claude model tier for direct sessions: {value!r}")
 
@@ -128,7 +128,8 @@ def token_estimate_multiplier_for_direct_model(value: str | None) -> float:
     return get_model_spec(pin.canonical_model).token_estimate_multiplier
 
 
-def _claude_tier(canonical_model: str) -> str | None:
+def claude_model_tier(canonical_model: str) -> str | None:
+    """Return the Claude Code tier for a canonical direct-model id."""
     # Fable has no per-tier name of its own; it is the most-capable model and
     # rides the opus tier (matching the OpenRouter opus-tier default).
     if canonical_model.startswith("claude-fable-"):

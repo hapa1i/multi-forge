@@ -168,6 +168,8 @@ started_with_proxy:
 - `intent.launch.runtime` is immutable dispatch identity: set rejects the direct key, a parent `launch` object carrying
   `runtime`, and `launch.*` before mutation. A whole-launch null clear remains valid because the section is optional and
   dispatch reads raw intent; reset accepts `launch` or `launch.runtime` so stale illegal overrides remain recoverable.
+- Resolved `intent.launch.model_route` is lifecycle-owned: set rejects its subtree and enclosing `launch` objects; reset
+  accepts stale paths.
 - `intent.authority` is not overrideable: set and keyed reset reject the parent, wildcard, and concrete leaves.
   `reset --all` clears only overrides and cannot alter authority intent.
 

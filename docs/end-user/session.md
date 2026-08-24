@@ -1064,6 +1064,10 @@ contains `runtime`, and `launch.*`; create a new session with `--runtime` instea
 null clears remain supported, while `session reset launch.runtime` and `session reset launch` can remove stale illegal
 overrides written by an older Forge.
 
+The resolved `launch.model_route` is also not a mid-session override surface. Choose or replace it with `--model` on
+`session start`, `resume`, `fork`, or `incognito`; `session set` rejects the route object, its leaves, and a parent
+`launch` object carrying it. Keyed reset remains available to remove a stale route override written by an older Forge.
+
 Artifact authority is intent, not an override. `session set` rejects `authority`, `authority.*`, and concrete authority
 leaves; keyed `session reset` rejects the same paths. `session reset --all` only clears overrides and cannot remove
 authority intent. Use `forge session authority set|clear` from outside a managed session while the target is inactive.

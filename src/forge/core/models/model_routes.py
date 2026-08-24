@@ -15,7 +15,11 @@ from forge.core.models.catalog import (
     load_model_catalog,
     resolve_model_id,
 )
-from forge.core.models.direct_model import ONE_M_SUFFIX, resolve_direct_model_pin
+from forge.core.models.direct_model import (
+    ONE_M_SUFFIX,
+    claude_model_tier,
+    resolve_direct_model_pin,
+)
 
 RouteKind = Literal["direct", "proxy"]
 
@@ -114,7 +118,7 @@ def normalize_model_route_request(value: str) -> ModelRouteRequest:
     canonical_1m = requested_model.endswith("-1m")
     route_key = requested_model.removesuffix("-1m") if canonical_1m else requested_model
     transport_1m = requested_transport_1m or canonical_1m
-    claude_tier = _claude_tier(route_key)
+    claude_tier = claude_model_tier(route_key)
 
     if requested_transport_1m and claude_tier is None:
         raise ModelRouteCatalogError(f"[1m] is only supported for Claude model requests, got {value!r}")
@@ -355,16 +359,6 @@ def _require_nonempty_string(value: Any, context: str) -> str:
     if not isinstance(value, str) or not value:
         raise ModelRouteCatalogError(f"{context} must be a non-empty string")
     return value
-
-
-def _claude_tier(canonical_model: str) -> str | None:
-    if canonical_model.startswith(("claude-opus-", "claude-fable-")):
-        return "opus"
-    if canonical_model.startswith("claude-sonnet-"):
-        return "sonnet"
-    if canonical_model.startswith("claude-haiku-"):
-        return "haiku"
-    return None
 
 
 def _builtin_model_sources() -> tuple[Any, ...]:

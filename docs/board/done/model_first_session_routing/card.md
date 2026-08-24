@@ -288,6 +288,8 @@ Transition rules:
 
 - Explicit interactive `--model` replaces the complete prior `model_route` atomically after resolution and context
   preflight succeed.
+- Generic session overrides cannot replace `model_route`: it is resolved state owned by lifecycle `--model` selection.
+  Keyed reset still accepts stale route-override paths so state written by an older Forge remains recoverable.
 - A selected non-Claude proxy route sets `intent.proxy`, clears a stale `launch.direct_model` pin, and records neutral
   `model_route` intent. Claude Code receives the resolved tier word, never the raw OpenAI/Gemini provider model ref.
 - A selected Claude proxy route sets `intent.proxy`, retains the normalized `launch.direct_model` execution pin needed
@@ -365,8 +367,8 @@ line never has an independent inference path.
     command.
 09. Neutral `model_route`, `direct_model`, and proxy intent follow the transition matrix. Manifest v2 owns the new
     field; v1 reads preserve legacy behavior and upgrade only on an ordinary write. A bare resume reproduces the stored
-    route rather than rerunning selection. A manually configured explicit proxy with no proven backend source remains
-    reproducible with `source_id=null`.
+    route rather than rerunning selection, and generic overrides cannot replace resolved route state. A manually
+    configured explicit proxy with no proven backend source remains reproducible with `source_id=null`.
 10. Route provenance reports the explicit canonical request and resolved route without changing its event schema,
     historical-read contract, or no-attestation boundary.
 11. Tier-specific context-budget preflight evaluates the target route before intent is committed or a child process is
