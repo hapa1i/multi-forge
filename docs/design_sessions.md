@@ -39,14 +39,14 @@ session. Relocated transcripts use the same ownership scan; a cached owner remai
 cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
 cleanup. The final negative scan and unlink share the global index-publication lock, so a sibling manifest cannot be
 published between the ownership decision and removal. When the current and relocated UUIDs alias, ordinary cleanup
-excludes that UUID entirely; only the locked final scan may unlink it. Adoption resolves the `.forge/artifacts` root
-before enforcing destination containment, so relocating that root with a symlink is supported; a descendant destination
-that escapes the resolved root or aliases the native transcript is refused, and rollback only unlinks an artifact
-created by the current copy attempt. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from
-their hook payloads to correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start
-path pre-seeds, a non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or
-not-yet-launched start session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or
-transcript-backed evidence (see Default resume behavior).
+excludes that UUID; the locked final scan owns removal of its transcript and preidentified agent logs. Adoption resolves
+the `.forge/artifacts` root before enforcing destination containment, so relocating that root with a symlink is
+supported; a descendant destination that escapes the resolved root or aliases the native transcript is refused, and
+rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
+`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
+sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
+mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
+"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently

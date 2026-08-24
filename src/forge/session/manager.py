@@ -30,6 +30,7 @@ from .artifacts import (
     latest_transcript_artifact_path,
 )
 from .claude.paths import (
+    find_agent_logs,
     get_transcript_path,
     resolve_claude_project_root,
 )
@@ -2235,8 +2236,8 @@ class SessionManager:
 
             # native-relocate reuses the parent's UUID, so the current and relocated
             # transcript can be the same path. That UUID must not pass through this
-            # unlocked bulk cleanup: the relocated branch below owns its final
-            # publication-locked scan and unlink.
+            # unlocked bulk cleanup: the relocated branch below owns the transcript
+            # and agent logs after its final publication-locked ownership scan.
             _filtered_claude_session_id = (
                 None
                 if _claude_session_id in _protected_ids or _claude_session_id == _relocated_parent_session_id
@@ -2289,6 +2290,14 @@ class SessionManager:
                         ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
                     )
                 else:
+                    # Content discovery can stay outside the publication lock. The
+                    # preidentified sidechain paths share the transcript's final owner
+                    # decision below, so a late sibling protects the complete UUID data.
+                    _reloc_agent_logs = find_agent_logs(
+                        _transcript_project_root,
+                        _relocated_parent_session_id,
+                    )
+
                     # A cached absence is not destruction authority. Hold the same
                     # publication lock used by every session creator across the final
                     # owner scan and unlink, so a sibling can land entirely before the
@@ -2321,6 +2330,15 @@ class SessionManager:
                                 _reloc_path,
                                 exc,
                             )
+                        for _reloc_agent_log in _reloc_agent_logs:
+                            try:
+                                _reloc_agent_log.unlink(missing_ok=True)
+                            except OSError as exc:
+                                logger.warning(
+                                    "Failed to remove relocated parent agent log %s: %s",
+                                    _reloc_agent_log,
+                                    exc,
+                                )
 
                     self.index_store.run_session_entries_txn(_unlink_if_unreferenced)
 

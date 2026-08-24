@@ -281,7 +281,10 @@ class TestSessionModelRoutePlanning:
                 )
             return _proxy_snapshot(template=template, ensure_reference=template)
 
-        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+        with pytest.raises(
+            SessionModelRoutingError,
+            match="pass --proxy <proxy_id-or-template>",
+        ):
             plan_session_model_route("gpt-5.6-sol", candidate_inspector=inspect)
 
         assert inspected == [first.template]

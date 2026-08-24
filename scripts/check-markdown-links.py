@@ -4,6 +4,8 @@
 The check scans every tracked Markdown file so deleting or moving a target is
 visible even when the referring document was not part of the current change.
 Remote URLs and fragments on non-Markdown files are outside this check's scope.
+Candidate membership follows lexical Git identity, so a target spelled through
+a tracked symlinked directory is rejected unless Git tracks that exact path.
 """
 
 from __future__ import annotations
@@ -113,10 +115,15 @@ def _lexical_path(path: Path) -> Path:
 def markdown_sources(root: Path, candidates: set[Path], supplied: list[Path]) -> list[Path]:
     """Combine candidate Markdown files with existing supplied sources."""
     sources = {path for path in candidates if path.suffix.lower() == ".md" and path.is_file()}
+    resolved_root = root.resolve()
     for path in supplied:
         lexical = _lexical_path(root / path) if not path.is_absolute() else _lexical_path(path)
-        if lexical.suffix.lower() == ".md" and lexical.is_file():
-            sources.add(lexical)
+        # Preserve in-repository symlink spelling for candidate-state checks, but
+        # canonicalize an external spelling of the repository itself (for example
+        # macOS /tmp or a symlinked workspace prefix).
+        source = lexical if lexical.is_relative_to(resolved_root) else lexical.resolve()
+        if source.suffix.lower() == ".md" and source.is_file():
+            sources.add(source)
     return sorted(sources)
 
 
@@ -182,7 +189,10 @@ def main(argv: list[str] | None = None) -> int:
     sources = markdown_sources(root, candidates, args.paths)
     failures = audit_paths(root, sources, candidates)
     for failure in failures:
-        source = failure.source.relative_to(root)
+        try:
+            source = failure.source.relative_to(root)
+        except ValueError:
+            source = failure.source
         print(f"{source}:{failure.line}: {failure.reason}: {failure.target}")
     if failures:
         print(f"Markdown link audit failed with {len(failures)} error(s).", file=sys.stderr)

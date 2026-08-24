@@ -4,6 +4,7 @@ import importlib
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -133,6 +134,57 @@ def test_supplied_sources_are_added_to_candidate_markdown_sources(tmp_path):
     assert [(failure.source, failure.reason) for failure in failures] == [
         (supplied.resolve(), "target does not exist"),
     ]
+
+
+def test_supplied_source_through_repository_symlink_uses_canonical_identity(tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git(root, "init", "-q")
+    source = _write(root / "source.md", "[target](target.md)\n")
+    target = _write(root / "target.md", "# Target\n")
+    _git(root, "add", "source.md", "target.md")
+    alias = tmp_path / "alias"
+    alias.symlink_to(root, target_is_directory=True)
+
+    candidates = mod.candidate_files(root)
+    sources = mod.markdown_sources(root.resolve(), candidates, [alias / "source.md"])
+
+    assert sources == sorted([source.resolve(), target.resolve()])
+    assert mod.audit_paths(root.resolve(), sources, candidates) == []
+
+
+def test_main_prints_absolute_source_when_failure_is_outside_root(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "repo"
+    root.mkdir()
+    foreign = tmp_path / "alias" / "source.md"
+    failure = mod.LinkFailure(foreign, 7, "missing.md", "target does not exist")
+    monkeypatch.setattr(mod, "parse_args", lambda _argv: SimpleNamespace(paths=[]))
+    monkeypatch.setattr(
+        mod.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout=f"{root}\n"),
+    )
+    monkeypatch.setattr(mod, "candidate_files", lambda _root: set())
+    monkeypatch.setattr(mod, "markdown_sources", lambda _root, _candidates, _paths: [])
+    monkeypatch.setattr(mod, "audit_paths", lambda _root, _sources, _candidates: [failure])
+
+    assert mod.main([]) == 1
+
+    captured = capsys.readouterr()
+    assert f"{foreign}:7: target does not exist: missing.md" in captured.out
+
+
+def test_rejects_link_through_tracked_symlinked_directory(tmp_path):
+    _git(tmp_path, "init", "-q")
+    source = _write(tmp_path / "source.md", "[target](linkdir/target.md)\n")
+    target = _write(tmp_path / "realdir" / "target.md", "# Target\n")
+    linkdir = tmp_path / "linkdir"
+    linkdir.symlink_to(target.parent.name, target_is_directory=True)
+    _git(tmp_path, "add", "source.md", "realdir/target.md", "linkdir")
+
+    failures = mod.audit_paths(tmp_path, [source], mod.candidate_files(tmp_path))
+
+    assert [failure.reason for failure in failures] == ["target is not in candidate Git state"]
 
 
 def test_accepts_directory_target_with_candidate_descendant(tmp_path):

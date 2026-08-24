@@ -193,7 +193,12 @@ def plan_session_model_route(
         proxy = inspect_candidate(candidate)
         if proxy is None:
             continue
-        return _plan_proxy_route(request, proxy, model_tier=model_tier, candidate=candidate)
+        try:
+            return _plan_proxy_route(request, proxy, model_tier=model_tier, candidate=candidate)
+        except SessionModelRoutingError as exc:
+            raise SessionModelRoutingError(
+                f"{exc}; pass --proxy <proxy_id-or-template> to choose a different route explicitly"
+            ) from exc
     raise SessionModelRoutingError(
         f"no admissible model route can serve {request.requested_model!r}; "
         "configure credentials for a compatible catalog route or pass --proxy explicitly"
@@ -722,6 +727,9 @@ def _validate_preserved_route_identity(
 
     stored_proxy = state.intent.proxy
     stored_template = (stored_proxy.template or None) if stored_proxy is not None else None
+    # The concrete inspector normally rejects this mismatch first. Keep the
+    # planner-boundary check so an alternate or future inspection seam cannot
+    # weaken exact replay identity.
     if stored_template is not None and snapshot.template != stored_template:
         raise SessionModelRoutingError(
             f"stored proxy route changed template identity: expected {stored_template!r}, got {snapshot.template!r}; "

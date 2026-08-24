@@ -89,6 +89,14 @@ def _write_transcript(project: Path, session_id: str) -> Path:
     return path
 
 
+def _write_agent_log(project: Path, session_id: str) -> Path:
+    transcript = get_transcript_path(str(project), session_id)
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    path = transcript.parent / f"agent-{session_id[:8]}.jsonl"
+    path.write_text(f'{{"session_id": "{session_id}"}}\n', encoding="utf-8")
+    return path
+
+
 def _spy_reference_scans(
     manager: SessionManager,
     monkeypatch: pytest.MonkeyPatch,
@@ -224,6 +232,7 @@ def test_aliased_current_and_relocated_uuid_is_not_unlinked_by_ordinary_cleanup(
         relocated_parent_id=RELOCATED_PARENT_ID,
     )
     relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
     artifact = _write_transcript(project, ARTIFACT_ID)
     original_cleanup = cleanup_module.cleanup_session
 
@@ -247,4 +256,25 @@ def test_aliased_current_and_relocated_uuid_is_not_unlinked_by_ordinary_cleanup(
 
     assert SessionStore(str(project), "late-sibling").exists()
     assert relocated.exists(), "the sibling's relocated transcript must survive ordinary cleanup"
+    assert agent_log.exists(), "the sibling's sidechain log has the same ownership as its transcript"
     assert not artifact.exists(), "unrelated Forge-owned artifacts should still be reclaimed"
+
+
+def test_aliased_current_and_relocated_uuid_reclaims_agent_logs_after_locked_scan(
+    project: Path,
+) -> None:
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=RELOCATED_PARENT_ID,
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert not relocated.exists()
+    assert not agent_log.exists(), "the final ownership decision must reclaim the UUID's sidechain logs"

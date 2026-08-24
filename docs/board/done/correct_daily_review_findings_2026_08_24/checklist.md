@@ -32,10 +32,11 @@ Activation base: `d1fccd21` (`main`, 2026-08-24).
 
 Evidence:
 
-- Focused transcript, route-planning, resume/fork, Claude launch, catalog, and Markdown candidate-state tests passed.
+- Focused transcript, route-planning, resume/fork, Claude launch, catalog, and Markdown candidate-state tests passed;
+  the final review-follow-up slice passed 68 tests.
 - `./scripts/test-integration.sh tests/integration/docker/test_session_routing.py`: 2 passed.
-- `make test-unit`: 9,882 passed, 117 deselected.
-- `make test-regression`: 1,069 passed.
+- `make test-unit`: 9,885 passed, 117 deselected.
+- `make test-regression`: 1,070 passed.
 - `make pre-commit`: all hooks passed; Markdown, board-link, and diff checks passed at closeout.
 
 ## Closeout
@@ -43,6 +44,14 @@ Evidence:
 - [x] Synchronize normative design wording where the corrected invariant needs clarification.
 - [x] Record verification evidence and a compact change-log entry.
 - [x] Move the completed card to `done/` and repoint inbound links.
+
+## Review Follow-up
+
+- [x] Reclaim preidentified aliased-UUID agent logs under the locked final ownership decision.
+- [x] Canonicalize supplied Markdown sources spelled through an external repository symlink and harden diagnostics.
+- [x] Document tracked symlink-directory semantics and add explicit first-candidate recovery guidance.
+- [x] Queue the over-target sessions-design partition as a separate parked card.
+- [x] Rerun the full pre-commit, Markdown-link, board-link, and diff gates on the follow-up patch.
 
 ## Acceptance Tests
 
@@ -56,3 +65,5 @@ Evidence:
 | Automatic first candidate      | first admitted config is incompatible, second is compatible  | first compatibility error propagates               | `tests/src/core/ops/test_session_model_routing.py`                    |
 | Deleted symlink                | symlink removed from index, referent remains tracked         | link target is absent from candidate state         | `tests/src/scripts/test_check_markdown_links.py`                      |
 | Strict route catalog           | non-Claude direct candidate and invalid schema-version types | contextual catalog error                           | `tests/src/core/models/test_model_routes.py`                          |
+| Aliased UUID sidechain logs    | no sibling owns the relocated transcript                     | transcript and matching agent logs are reclaimed   | `tests/regression/test_bug_o085_reuse_transcript_reference_scan.py`   |
+| Symlink-spelled manual source  | supplied source uses an external repository alias            | canonical audit and non-crashing diagnostics       | `tests/src/scripts/test_check_markdown_links.py`                      |

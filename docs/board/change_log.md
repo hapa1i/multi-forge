@@ -14,14 +14,14 @@ merges without weakening publication locking, deterministic routing, or candidat
 
 **Key changes**:
 
-- Serialized aliased relocated-transcript deletion with its final owner scan, and preserved validated Claude `[1m]`
-  transport state across bare resume and inherited fork.
+- Serialized aliased relocated-transcript and agent-log deletion with its final owner scan, and preserved validated
+  Claude `[1m]` transport state across bare resume and inherited fork.
 - Made stored proxy replay exact, applied the selected Claude tier, stopped at the first admitted automatic candidate,
   and let explicit replacement recover from malformed stored route state.
-- Kept lexical Git identity separate from resolved Markdown containment, and tightened route-catalog schema and direct
-  Claude candidate validation.
+- Kept lexical Git identity separate from resolved Markdown containment, hardened manually supplied symlink spellings,
+  and tightened route-catalog schema and direct Claude candidate validation.
 
-**Verification**: 9,882 unit tests with 117 integration-marked tests deselected; 1,069 regressions; focused fail-first
+**Verification**: 9,885 unit tests with 117 integration-marked tests deselected; 1,070 regressions; focused fail-first
 coverage for all nine findings; two targeted Docker session-routing integrations; full pre-commit, Markdown, board-link,
 and diff checks.
 

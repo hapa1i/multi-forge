@@ -16,6 +16,7 @@ candidate-state validation, and the shared route-catalog boundary.
 - Apply the selected proxy tier to Claude, and stop automatic selection at the first admissible candidate.
 - Keep lexical Git identity distinct from resolved filesystem identity in Markdown validation.
 - Reject non-Claude direct route candidates and non-integer route-catalog schema versions with contextual errors.
+- Preserve aliased-UUID agent-log cleanup, symlink-spelled manual link checks, and actionable first-candidate failures.
 
 ## Constraints
 
@@ -35,3 +36,5 @@ candidate-state validation, and the shared route-catalog boundary.
 5. Automatic selection propagates compatibility failure from the first candidate that passes admission.
 6. A staged-deleted symlink target fails Markdown candidate-state validation even when its referent remains tracked.
 7. Route-catalog validation rejects non-Claude direct candidates, booleans, floats, and container schema versions.
+8. Locked aliased-UUID cleanup reclaims sidechain logs only when no sibling owns the transcript.
+9. Manual Markdown checks canonicalize a repository symlink prefix and never crash while printing a foreign source.
