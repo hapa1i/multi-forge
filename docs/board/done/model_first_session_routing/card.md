@@ -1,6 +1,7 @@
 # Model-First Interactive Session Routing
 
-**Status**: Active (accepted and moved to `doing/` on 2026-08-23 after documentation review). **Branch**:
+**Status**: Done -- shipped via [PR #244](https://github.com/hapa1i/multi-forge/pull/244) (merge `aff52243`, 2026-08-24
+UTC) and closed to `done/` on 2026-08-24. Execution evidence is retained in [checklist.md](checklist.md). **Branch**:
 `feat/model-first-session-routing`, based on `main` at `46bb9e4b`. Adjacent to, but not a member of,
 [Epic: Session Authority and Provenance](../../done/epic_session_authority_provenance/card.md).
 

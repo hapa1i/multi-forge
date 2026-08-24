@@ -22,9 +22,10 @@ without weakening explicit routes, bare resumes, or workflow routing determinism
   fail-closed replay, no-launch persistence, and preserved Claude, Codex, adoption, and config-default boundaries.
 - Synchronized the session/runtime designs, CLI reference, and end-user model, proxy, and session guides.
 
-**Verification**: 883 focused acceptance tests; 9,832 unit tests with 117 integration-marked tests deselected; 1,068
-regressions; six final session, package-resource, workflow, and proxy integration cases; full pre-commit; wheel/sdist
-build; and exact-wheel clean-environment resource smoke pass.
+**Verification**: 399 final focused session/CLI tests plus two dual-ingress middleware cases; 9,865 unit tests with 117
+integration-marked tests deselected; 1,068 regressions; targeted session, package-resource, workflow, proxy, and both
+Docker routing integrations; full pre-commit; wheel/sdist build; and a current-head installed-package resource smoke
+pass. PR #244 merged as `aff52243` with all five GitHub checks passing.
 
 ## 2026-08-23
 

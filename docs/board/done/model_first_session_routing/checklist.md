@@ -7,8 +7,8 @@ wins.
 
 ## Current focus
 
-Completed 2026-08-24. Implementation, documentation, integration coverage, release proof, and closeout evidence are
-recorded below.
+Shipped via [PR #244](https://github.com/hapa1i/multi-forge/pull/244), merged to `main` as `aff52243` on 2026-08-24.
+Implementation, documentation, integration coverage, release proof, and post-merge closeout evidence are recorded below.
 
 ## Activation and review
 
@@ -195,8 +195,10 @@ Removal waits for that test to pass. **Blockers:** None.
   route resolve from packaged resources.
 - [x] Review the complete diff for architecture consistency and update durable implementation notes only for genuinely
   reusable invariants.
-- [x] Add the compact completed-work change-log entry, mark verification evidence below, move the card to `done/`,
-  repoint inbound links, and commit the closeout only after the implementation is shipped.
+- [x] Add the compact completed-work change-log entry, mark verification evidence below, carry the card at its terminal
+  `done/` path, and repoint inbound links in the implementation PR.
+- [x] After merge, record the PR/merge/check evidence, replace the card's active status, refresh the change-log
+  verification, and validate final `done/` links on `main`.
 
 ## Acceptance test matrix
 
@@ -255,3 +257,20 @@ Removal waits for that test to pass. **Blockers:** None.
 - Follow-up routing audit: 399 focused session/CLI tests plus two dual-ingress middleware cases passed; both Docker
   routing integrations passed; 9,865 unit tests passed with 117 integration-marked tests deselected; 1,068 regressions
   passed; `make pre-commit` passed after design-token evidence was refreshed (2026-08-24).
+
+## Post-merge closeout
+
+PR #244 merged to `main` on 2026-08-24 as `aff52243`. The implementation merge already contained the lane move; this
+post-merge closeout records the missing terminal status and final merge evidence rather than manufacturing a second
+move.
+
+- [x] All implementation, documentation, packaging, and risk-required verification assertions above are complete.
+- [x] Design, CLI, and end-user documents describe the shipped behavior; no separate implementation-note promotion is
+  owed because the durable ownership and transaction contracts are already normative there.
+- [x] Card status and `docs/board/change_log.md` name PR #244, merge `aff52243`, and the final verification totals.
+- [x] Inbound links resolve to `done/model_first_session_routing`, with no stale live-lane reference; the explicit audit
+  passed for all 574 Markdown sources.
+- [x] Post-merge Markdown, board-link, and diff checks pass on `main`; record the result here before committing.
+
+Post-merge verification: `make pre-commit-md` passed, the explicit Markdown audit passed for 574 sources,
+`git diff --check` was clean, and all five PR #244 GitHub checks passed (2026-08-24).
