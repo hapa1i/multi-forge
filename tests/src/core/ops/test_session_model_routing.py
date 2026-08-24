@@ -395,6 +395,65 @@ def test_persisted_route_rejects_same_url_registry_template_replacement(
         )
 
 
+def test_preserved_route_rejects_blank_template_before_same_url_inference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import forge.core.ops.session_model_routing as routing_module
+
+    state = create_session_state("blank-template", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.proxy = ProxyIntent(template="", base_url="http://localhost:8096")
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id=None,
+    )
+
+    def unexpected_inspection(**_kwargs: object) -> ProxyRouteSnapshot:
+        raise AssertionError("blank stored template must fail before same-URL registry inference")
+
+    monkeypatch.setattr(routing_module, "inspect_persisted_proxy_route", unexpected_inspection)
+
+    with pytest.raises(SessionModelRoutingError, match="missing template identity"):
+        plan_session_model_route_for_state(
+            "gpt-5.6-sol",
+            state=state,
+            allow_replacement=False,
+        )
+
+
+def test_explicit_proxy_replacement_bypasses_blank_stored_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import forge.core.ops.session_model_routing as routing_module
+
+    state = create_session_state("blank-template", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.proxy = ProxyIntent(template="", base_url="http://localhost:8096")
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id=None,
+    )
+    replacement = _proxy_snapshot(base_url="http://localhost:8097", proxy_id="replacement")
+    monkeypatch.setattr(routing_module, "inspect_proxy_reference", lambda _reference: replacement)
+
+    def unexpected_inspection(**_kwargs: object) -> ProxyRouteSnapshot:
+        raise AssertionError("explicit replacement must bypass malformed stored routing")
+
+    monkeypatch.setattr(routing_module, "inspect_persisted_proxy_route", unexpected_inspection)
+
+    plan = plan_session_model_route_for_state(
+        "gpt-5.6-sol",
+        proxy_name="replacement",
+        state=state,
+    )
+
+    assert plan.proxy is replacement
+
+
 def test_preserved_route_rejects_proven_source_drift(monkeypatch: pytest.MonkeyPatch) -> None:
     import forge.core.ops.session_model_routing as routing_module
 

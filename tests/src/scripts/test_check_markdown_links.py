@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -153,6 +155,30 @@ def test_supplied_source_through_repository_symlink_uses_canonical_identity(tmp_
     assert mod.audit_paths(root.resolve(), sources, candidates) == []
 
 
+def test_external_repository_alias_preserves_internal_symlink_spelling(tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git(root, "init", "-q")
+    realdir = root / "realdir"
+    source = _write(realdir / "source.md", "[target](target.md)\n")
+    target = _write(realdir / "target.md", "# Target\n")
+    linkdir = root / "linkdir"
+    linkdir.symlink_to(realdir.name, target_is_directory=True)
+    _git(root, "add", "realdir/source.md", "realdir/target.md", "linkdir")
+    alias = tmp_path / "alias"
+    alias.symlink_to(root, target_is_directory=True)
+
+    candidates = mod.candidate_files(root)
+    sources = mod.markdown_sources(root.resolve(), candidates, [alias / "linkdir" / "source.md"])
+    lexical_source = root.resolve() / "linkdir" / "source.md"
+    failures = mod.audit_paths(root.resolve(), sources, candidates)
+
+    assert sources == sorted([lexical_source, source.resolve(), target.resolve()])
+    assert [(failure.source, failure.reason) for failure in failures] == [
+        (lexical_source, "target is not in candidate Git state"),
+    ]
+
+
 def test_main_prints_absolute_source_when_failure_is_outside_root(tmp_path, monkeypatch, capsys):
     root = tmp_path / "repo"
     root.mkdir()
@@ -172,6 +198,44 @@ def test_main_prints_absolute_source_when_failure_is_outside_root(tmp_path, monk
 
     captured = capsys.readouterr()
     assert f"{foreign}:7: target does not exist: missing.md" in captured.out
+
+
+def test_markdown_link_hook_runs_without_present_markdown_paths(tmp_path):
+    raw_config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    markdown_hooks = [
+        hook
+        for repository in raw_config["repos"]
+        if repository["repo"] == "local"
+        for hook in repository["hooks"]
+        if hook["id"] == "markdown-links"
+    ]
+    assert len(markdown_hooks) == 1
+    isolated_config = _write(
+        tmp_path / ".pre-commit-config.yaml",
+        yaml.safe_dump({"repos": [{"repo": "local", "hooks": markdown_hooks}]}),
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pre_commit",
+            "run",
+            "--config",
+            str(isolated_config),
+            "markdown-links",
+            "--files",
+            "deleted-only-target.md",
+            "--verbose",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    assert "Markdown link audit passed" in output
+    assert "(no files to check)Skipped" not in output
 
 
 def test_rejects_link_through_tracked_symlinked_directory(tmp_path):

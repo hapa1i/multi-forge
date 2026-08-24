@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
@@ -18,6 +19,7 @@ from forge.session import (
 )
 from forge.session.claude import cleanup as cleanup_module
 from forge.session.claude.paths import get_transcript_path
+from forge.session.exceptions import ManifestCorruptedError
 from forge.session.models import Derivation
 from tests.fixtures.session_state import publish_session
 
@@ -91,9 +93,9 @@ def _write_transcript(project: Path, session_id: str) -> Path:
 
 def _write_agent_log(project: Path, session_id: str) -> Path:
     transcript = get_transcript_path(str(project), session_id)
-    transcript.parent.mkdir(parents=True, exist_ok=True)
-    path = transcript.parent / f"agent-{session_id[:8]}.jsonl"
-    path.write_text(f'{{"session_id": "{session_id}"}}\n', encoding="utf-8")
+    path = transcript.parent / session_id / "subagents" / f"agent-{session_id[:8]}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'{{"sessionId": "{session_id}"}}\n', encoding="utf-8")
     return path
 
 
@@ -258,6 +260,81 @@ def test_aliased_current_and_relocated_uuid_is_not_unlinked_by_ordinary_cleanup(
     assert relocated.exists(), "the sibling's relocated transcript must survive ordinary cleanup"
     assert agent_log.exists(), "the sibling's sidechain log has the same ownership as its transcript"
     assert not artifact.exists(), "unrelated Forge-owned artifacts should still be reclaimed"
+
+
+def test_force_delete_raw_aliased_uuid_uses_locked_final_owner_decision(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A schema-invalid target still routes its exact raw UUID alias through the lock."""
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=RELOCATED_PARENT_ID,
+        artifact_ids=(ARTIFACT_ID,),
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    child_store = SessionStore(str(project), "child")
+    raw_manifest = json.loads(child_store.manifest_path.read_text(encoding="utf-8"))
+    raw_manifest["unexpected_top_level"] = True
+    child_store.manifest_path.write_text(json.dumps(raw_manifest), encoding="utf-8")
+    with pytest.raises(ManifestCorruptedError):
+        child_store.read()
+
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
+    artifact = _write_transcript(project, ARTIFACT_ID)
+    original_cleanup = cleanup_module.cleanup_session
+
+    def _publish_sibling_then_cleanup(
+        project_root: str,
+        claude_session_id: str | None,
+        artifact_session_ids: list[str] | None = None,
+    ) -> None:
+        _publish(
+            manager,
+            project,
+            "late-sibling",
+            session_id=None,
+            relocated_parent_id=RELOCATED_PARENT_ID,
+        )
+        original_cleanup(project_root, claude_session_id, artifact_session_ids)
+
+    monkeypatch.setattr(cleanup_module, "cleanup_session", _publish_sibling_then_cleanup)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert SessionStore(str(project), "late-sibling").exists()
+    assert relocated.exists(), "the late sibling still owns the raw aliased transcript"
+    assert agent_log.exists(), "the late sibling still owns the raw alias's sidechain log"
+    assert not artifact.exists(), "unrelated Forge-owned artifacts should still be reclaimed"
+
+
+def test_force_delete_raw_aliased_uuid_reclaims_after_locked_scan(project: Path) -> None:
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=RELOCATED_PARENT_ID,
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    child_store = SessionStore(str(project), "child")
+    raw_manifest = json.loads(child_store.manifest_path.read_text(encoding="utf-8"))
+    raw_manifest["unexpected_top_level"] = True
+    child_store.manifest_path.write_text(json.dumps(raw_manifest), encoding="utf-8")
+    with pytest.raises(ManifestCorruptedError):
+        child_store.read()
+
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert not relocated.exists()
+    assert not agent_log.exists(), "the raw alias must reach the locked sidechain cleanup"
 
 
 def test_aliased_current_and_relocated_uuid_reclaims_agent_logs_after_locked_scan(

@@ -32,6 +32,7 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _render_sidecar_launch,
     _resume_tip_command,
     _routing_from_model_route,
+    _uses_persisted_sidecar_launch,
     _warn_before_claude_launch,
 )
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
@@ -492,7 +493,11 @@ def fork(
     allow_route_replacement = True
     parent_launch = preflight.parent.intent.launch
     neutral_route = parent_launch.model_route if parent_launch is not None else None
+    uses_sidecar = _uses_persisted_sidecar_launch(preflight.parent, direct=direct)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
+        if uses_sidecar:
+            print_error("stored model route cannot be replayed with sidecar fork; pass --no-proxy to fork on the host")
+            sys.exit(1)
         try:
             route_model = preserved_model_route_request(preflight.parent)
             route_tier = neutral_route.selected_tier
@@ -502,10 +507,7 @@ def fork(
             sys.exit(1)
 
     if route_model is not None:
-        inherited_sidecar = preflight.parent.confirmed.is_sandboxed or (
-            parent_launch is not None and parent_launch.mode == "sidecar"
-        )
-        if direct_model is not None and inherited_sidecar and not direct:
+        if direct_model is not None and uses_sidecar:
             print_error("--model cannot be combined with sidecar fork")
             sys.exit(1)
         try:

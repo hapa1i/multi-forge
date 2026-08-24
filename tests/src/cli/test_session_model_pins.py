@@ -10,7 +10,9 @@ from click.testing import CliRunner
 
 import forge.cli.session as session_cli
 from forge.cli.main import main
-from forge.session import SessionStore, create_session_state
+from forge.runtime_config import RuntimeConfig
+from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
+from forge.session.models import ModelRouteIntent
 from tests.src.cli.session_command_support import mocked_model_route_proxy
 
 
@@ -72,6 +74,88 @@ def test_model_tier_requires_model_before_session_creation(
     assert result.exit_code == 1
     assert "--model-tier requires --model" in result.output
     assert not SessionStore(str(temp_env), "tier-without-model").exists()
+
+
+@pytest.mark.parametrize("leaf", ["start", "incognito"])
+def test_model_route_rejects_configured_sidecar_before_realization(
+    runner: CliRunner,
+    temp_env: Path,
+    leaf: str,
+) -> None:
+    name = f"{leaf}-configured-sidecar"
+    with (
+        patch("forge.runtime_config.get_runtime_config", return_value=RuntimeConfig(proxy_mode="sidecar")),
+        patch("forge.cli.session_lifecycle._plan_interactive_session_model_route") as plan_route,
+        patch("forge.proxy.proxy_orchestrator.ensure_proxy") as ensure_proxy,
+    ):
+        result = runner.invoke(main, ["session", leaf, name, "--model", "gpt-5.6-sol"])
+
+    assert result.exit_code == 1
+    assert "--model cannot be combined with configured sidecar mode" in result.output
+    plan_route.assert_not_called()
+    ensure_proxy.assert_not_called()
+    assert not SessionStore(str(temp_env), name).exists()
+
+
+@pytest.mark.parametrize(
+    ("leaf", "plan_target"),
+    [
+        ("resume", "forge.cli.session_lifecycle._plan_interactive_session_model_route"),
+        ("fork", "forge.cli.session_fork._plan_interactive_session_model_route"),
+    ],
+)
+def test_persisted_model_route_rejects_configured_sidecar_before_mutation(
+    runner: CliRunner,
+    temp_env: Path,
+    leaf: str,
+    plan_target: str,
+) -> None:
+    parent_name = f"configured-sidecar-{leaf}"
+    with (
+        patch("forge.runtime_config.get_runtime_config", return_value=RuntimeConfig(proxy_mode="sidecar")),
+        patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()),
+    ):
+        created = runner.invoke(
+            main,
+            ["session", "start", parent_name, "--proxy", "test-or-proxy", "--no-launch"],
+        )
+    assert created.exit_code == 0, created.output
+
+    store = SessionStore(str(temp_env), parent_name)
+
+    def persist_model_route(state) -> None:
+        assert state.intent.launch is not None
+        assert state.intent.launch.mode == LAUNCH_MODE_SIDECAR
+        state.intent.launch.model_route = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="sonnet",
+            kind="proxy",
+            source_id=None,
+        )
+        state.confirmed.claude_session_id = "parent-uuid"
+
+    store.update(timeout_s=5.0, mutate=persist_model_route)
+    before = store.manifest_path.read_bytes()
+    command = ["session", leaf, parent_name]
+    child_name = f"{parent_name}-child"
+    if leaf == "fork":
+        command.extend(["--name", child_name])
+
+    with (
+        patch(plan_target) as plan_route,
+        patch("forge.proxy.proxy_orchestrator.ensure_proxy") as ensure_proxy,
+        patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+    ):
+        result = runner.invoke(main, command)
+
+    assert result.exit_code == 1
+    assert f"stored model route cannot be replayed with sidecar {leaf}" in result.output
+    plan_route.assert_not_called()
+    ensure_proxy.assert_not_called()
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+    if leaf == "fork":
+        assert not SessionStore(str(temp_env), child_name).exists()
 
 
 def test_default_direct_model_rejects_non_claude_before_proxy_or_child(

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from uuid import UUID
 
 from forge.core.paths import find_git_root
 from forge.session.models import SessionState
@@ -98,8 +99,10 @@ def get_transcript_path(project_root: str, session_id: str) -> Path:
 def find_agent_logs(project_root: str, session_id: str) -> list[Path]:
     """Find agent log files containing a specific session ID.
 
-    Agent logs don't use session UUID in filename, only in content.
-    This function searches log file contents to find matching logs.
+    Current Claude layouts put sidechain logs under
+    ``<session-uuid>/subagents/agent-*.jsonl``. Legacy layouts stored logs at
+    the project-directory root without the session UUID in the filename, so
+    those files still require a content scan.
 
     Args:
         project_root: Absolute path to project root.
@@ -124,6 +127,34 @@ def find_agent_logs(project_root: str, session_id: str) -> list[Path]:
                 matching_logs.append(log_file)
         except (OSError, UnicodeDecodeError):
             continue
+
+    # Raw manifests can reach cleanup under --force, so validate the directory
+    # component before deriving a path from the caller-supplied session id.
+    canonical_session_id: str | None = None
+    if isinstance(session_id, str):
+        try:
+            parsed_session_id = UUID(session_id)
+        except (AttributeError, TypeError, ValueError):
+            pass
+        else:
+            if str(parsed_session_id) == session_id.lower():
+                canonical_session_id = str(parsed_session_id)
+
+    if canonical_session_id is not None:
+        session_dir = project_dir / canonical_session_id
+        subagents_dir = session_dir / "subagents"
+        # Intermediate symlinks would make unlinking a returned path escape the
+        # encoded Claude project. Resolve only after rejecting those components,
+        # then enumerate from the contained resolved directory.
+        if not session_dir.is_symlink() and not subagents_dir.is_symlink():
+            try:
+                resolved_project_dir = project_dir.resolve(strict=True)
+                resolved_subagents_dir = subagents_dir.resolve(strict=True)
+                resolved_subagents_dir.relative_to(resolved_project_dir)
+            except (OSError, RuntimeError, ValueError):
+                pass
+            else:
+                matching_logs.extend(resolved_subagents_dir.glob("agent-*.jsonl"))
 
     return matching_logs
 

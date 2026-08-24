@@ -236,6 +236,91 @@ class TestFindAgentLogs:
         assert len(result) == 1
         assert result[0] == matching_log
 
+    def test_finds_nested_subagent_logs_for_valid_session_uuid(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Current Claude sidechains are owned by their UUID-named directory."""
+        session_id = "11111111-1111-1111-1111-111111111111"
+        other_session_id = "22222222-2222-2222-2222-222222222222"
+        monkeypatch.setattr(
+            "forge.session.claude.paths.get_claude_projects_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "forge.session.claude.paths.encode_project_path",
+            lambda _: "-test-project",
+        )
+
+        encoded_dir = tmp_path / "-test-project"
+        matching_log = encoded_dir / session_id / "subagents" / "agent-match.jsonl"
+        matching_log.parent.mkdir(parents=True)
+        matching_log.write_text('{"agentId": "match"}', encoding="utf-8")
+        other_log = encoded_dir / other_session_id / "subagents" / "agent-other.jsonl"
+        other_log.parent.mkdir(parents=True)
+        other_log.write_text('{"agentId": "other"}', encoding="utf-8")
+
+        assert find_agent_logs("/test/project", session_id) == [matching_log]
+
+    def test_does_not_derive_nested_log_path_from_unvalidated_session_id(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A force-delete raw value cannot traverse out of the encoded project dir."""
+        monkeypatch.setattr(
+            "forge.session.claude.paths.get_claude_projects_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "forge.session.claude.paths.encode_project_path",
+            lambda _: "-test-project",
+        )
+
+        (tmp_path / "-test-project").mkdir()
+        outside_log = tmp_path / "outside" / "subagents" / "agent-outside.jsonl"
+        outside_log.parent.mkdir(parents=True)
+        outside_log.write_text('{"agentId": "outside"}', encoding="utf-8")
+
+        assert find_agent_logs("/test/project", "../outside") == []
+
+    @pytest.mark.parametrize("link_component", ["session", "subagents"])
+    def test_nested_subagent_logs_reject_symlink_escape(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        link_component: str,
+    ) -> None:
+        """Nested discovery must not return logs reached through symlinked components."""
+        session_id = "11111111-1111-1111-1111-111111111111"
+        monkeypatch.setattr(
+            "forge.session.claude.paths.get_claude_projects_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "forge.session.claude.paths.encode_project_path",
+            lambda _: "-test-project",
+        )
+
+        encoded_dir = tmp_path / "-test-project"
+        encoded_dir.mkdir()
+        outside_dir = tmp_path / "outside"
+        outside_subagents = outside_dir / "subagents"
+        outside_subagents.mkdir(parents=True)
+        outside_log = outside_subagents / "agent-outside.jsonl"
+        outside_log.write_text('{"agentId": "outside"}', encoding="utf-8")
+
+        session_dir = encoded_dir / session_id
+        if link_component == "session":
+            session_dir.symlink_to(outside_dir, target_is_directory=True)
+        else:
+            session_dir.mkdir()
+            (session_dir / "subagents").symlink_to(outside_subagents, target_is_directory=True)
+
+        assert find_agent_logs("/test/project", session_id) == []
+        assert outside_log.exists()
+
     def test_ignores_unreadable_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should skip files that can't be read."""
         # Set up mock Claude projects directory

@@ -188,6 +188,21 @@ def _routing_from_model_route(resolved: ResolvedModelRoute) -> ResolvedRouting |
     )
 
 
+def _resolve_effective_launch_mode(*, direct: bool, sidecar: bool, host_proxy: bool) -> str:
+    """Resolve the launch boundary before any model route is realized."""
+
+    return LAUNCH_MODE_HOST if direct else _resolve_launch_mode(sidecar=sidecar, host_proxy=host_proxy)
+
+
+def _uses_persisted_sidecar_launch(state: SessionState, *, direct: bool) -> bool:
+    """Whether a resumed or forked session would launch through the sidecar."""
+
+    if direct:
+        return False
+    use_sidecar, _, _ = get_launch_preferences(state)
+    return use_sidecar or state.confirmed.is_sandboxed
+
+
 def _render_model_route_payload(payload: dict[str, Any]) -> None:
     """Render the explicit model route directly from the journal payload."""
 
@@ -808,7 +823,7 @@ def launch_new_session(
         print_error("--system-prompt is launch-only and lost with --no-launch")
         return 1
 
-    launch_mode = LAUNCH_MODE_HOST if direct else _resolve_launch_mode(sidecar=sidecar, host_proxy=host_proxy)
+    launch_mode = _resolve_effective_launch_mode(direct=direct, sidecar=sidecar, host_proxy=host_proxy)
     use_sidecar = launch_mode == LAUNCH_MODE_SIDECAR
     manager = SessionManager()
 
@@ -1138,6 +1153,15 @@ def start(
         require_main_repo_root()
     else:
         require_repo_root()
+
+    if direct_model is not None:
+        launch_mode = _resolve_effective_launch_mode(direct=direct, sidecar=sidecar, host_proxy=host_proxy)
+        if launch_mode == LAUNCH_MODE_SIDECAR:
+            print_error(
+                "--model cannot be combined with configured sidecar mode; "
+                "run 'forge config set proxy_mode=host' before selecting a model"
+            )
+            sys.exit(1)
 
     routing: ResolvedRouting | None = None
     model_route_selection: ResolvedModelRoute | None = None
@@ -1513,7 +1537,13 @@ def resume(
     route_tier = model_tier
     allow_route_replacement = True
     neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
+    uses_sidecar = _uses_persisted_sidecar_launch(manifest, direct=direct)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
+        if uses_sidecar:
+            print_error(
+                "stored model route cannot be replayed with sidecar resume; pass --no-proxy to resume on the host"
+            )
+            sys.exit(1)
         try:
             route_model = preserved_model_route_request(manifest)
             route_tier = neutral_route.selected_tier
@@ -1523,10 +1553,7 @@ def resume(
             sys.exit(1)
 
     if route_model is not None:
-        inherited_sidecar = manifest.confirmed.is_sandboxed or (
-            manifest.intent.launch is not None and manifest.intent.launch.mode == LAUNCH_MODE_SIDECAR
-        )
-        if direct_model is not None and inherited_sidecar and not direct:
+        if direct_model is not None and uses_sidecar:
             print_error("--model cannot be combined with sidecar resume")
             sys.exit(1)
         try:
@@ -2247,6 +2274,15 @@ def incognito(
         require_main_repo_root()
     else:
         require_repo_root()
+
+    if direct_model is not None:
+        launch_mode = _resolve_effective_launch_mode(direct=direct, sidecar=sidecar, host_proxy=host_proxy)
+        if launch_mode == LAUNCH_MODE_SIDECAR:
+            print_error(
+                "--model cannot be combined with configured sidecar mode; "
+                "run 'forge config set proxy_mode=host' before selecting a model"
+            )
+            sys.exit(1)
 
     routing: ResolvedRouting | None = None
     model_route_selection: ResolvedModelRoute | None = None
