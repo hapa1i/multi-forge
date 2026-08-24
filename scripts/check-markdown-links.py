@@ -4,11 +4,14 @@
 The check scans every tracked Markdown file so deleting or moving a target is
 visible even when the referring document was not part of the current change.
 Remote URLs and fragments on non-Markdown files are outside this check's scope.
+Candidate membership follows lexical Git identity, so a target spelled through
+a tracked symlinked directory is rejected unless Git tracks that exact path.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -100,16 +103,27 @@ def candidate_files(root: Path) -> set[Path]:
         check=True,
         capture_output=True,
     )
-    return {(root / item.decode()).resolve() for item in result.stdout.split(b"\0") if item}
+    return {_lexical_path(root / item.decode()) for item in result.stdout.split(b"\0") if item}
+
+
+def _lexical_path(path: Path) -> Path:
+    """Normalize dot segments without resolving symlink identity."""
+
+    return Path(os.path.abspath(path))
 
 
 def markdown_sources(root: Path, candidates: set[Path], supplied: list[Path]) -> list[Path]:
     """Combine candidate Markdown files with existing supplied sources."""
     sources = {path for path in candidates if path.suffix.lower() == ".md" and path.is_file()}
+    resolved_root = root.resolve()
     for path in supplied:
-        resolved = (root / path).resolve() if not path.is_absolute() else path.resolve()
-        if resolved.suffix.lower() == ".md" and resolved.is_file():
-            sources.add(resolved)
+        lexical = _lexical_path(root / path) if not path.is_absolute() else _lexical_path(path)
+        # Preserve in-repository symlink spelling for candidate-state checks, but
+        # canonicalize an external spelling of the repository itself (for example
+        # macOS /tmp or a symlinked workspace prefix).
+        source = lexical if lexical.is_relative_to(resolved_root) else lexical.resolve()
+        if source.suffix.lower() == ".md" and source.is_file():
+            sources.add(source)
     return sorted(sources)
 
 
@@ -135,20 +149,21 @@ def audit_paths(root: Path, sources: list[Path], candidates: set[Path]) -> list[
                     target = source.parent / target
             else:
                 target = source
-            target = target.resolve()
+            lexical_target = _lexical_path(target)
+            resolved_target = lexical_target.resolve()
             try:
-                target.relative_to(root.resolve())
+                resolved_target.relative_to(root.resolve())
             except ValueError:
                 failures.append(LinkFailure(source, line, raw_target, "target escapes repository"))
                 continue
-            if not target.exists():
+            if not resolved_target.exists():
                 failures.append(LinkFailure(source, line, raw_target, "target does not exist"))
                 continue
-            if not _target_in_candidate_state(target, candidates):
+            if not _target_in_candidate_state(lexical_target, candidates):
                 failures.append(LinkFailure(source, line, raw_target, "target is not in candidate Git state"))
                 continue
-            if parsed.fragment and target.suffix.lower() == ".md":
-                anchors = anchor_cache.setdefault(target, markdown_anchors(target))
+            if parsed.fragment and resolved_target.suffix.lower() == ".md":
+                anchors = anchor_cache.setdefault(resolved_target, markdown_anchors(resolved_target))
                 fragment = unquote(parsed.fragment)
                 if fragment not in anchors:
                     failures.append(LinkFailure(source, line, raw_target, "Markdown fragment does not exist"))
@@ -174,7 +189,10 @@ def main(argv: list[str] | None = None) -> int:
     sources = markdown_sources(root, candidates, args.paths)
     failures = audit_paths(root, sources, candidates)
     for failure in failures:
-        source = failure.source.relative_to(root)
+        try:
+            source = failure.source.relative_to(root)
+        except ValueError:
+            source = failure.source
         print(f"{source}:{failure.line}: {failure.reason}: {failure.target}")
     if failures:
         print(f"Markdown link audit failed with {len(failures)} error(s).", file=sys.stderr)

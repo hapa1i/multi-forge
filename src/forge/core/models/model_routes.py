@@ -217,6 +217,10 @@ def _validate_and_build_route_catalog(raw: dict[str, Any]) -> ModelRouteCatalog:
 
     _require_exact_fields(raw, {"schema_version", "models"}, "route catalog")
     schema_version = raw["schema_version"]
+    if type(schema_version) is not int:
+        raise ModelRouteCatalogError(
+            f"route catalog schema_version must be an integer, got {type(schema_version).__name__}"
+        )
     if schema_version not in SUPPORTED_ROUTE_CATALOG_SCHEMA_VERSIONS:
         raise ModelRouteCatalogError(
             f"Unsupported model route catalog schema_version: {schema_version!r} "
@@ -306,6 +310,8 @@ def _parse_candidate(model_id: str, index: int, raw: Any) -> ModelRouteCandidate
             f"{context}.model_ref {candidate.model_ref!r} resolves to {candidate_request.route_key!r}, "
             f"not model key {model_id!r}"
         )
+    if candidate.kind == "direct" and candidate.runtime == "claude_code" and candidate_request.claude_tier is None:
+        raise ModelRouteCatalogError(f"{context} direct claude_code candidate must resolve to a Claude model")
     return candidate
 
 

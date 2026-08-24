@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from forge.core.models.model_routes import (
@@ -15,10 +17,12 @@ from forge.core.ops.session_model_routing import (
     SessionModelRoutingError,
     apply_model_route_transition,
     inspect_automatic_candidate,
+    inspect_persisted_proxy_route,
     inspect_proxy_reference,
     plan_model_route_transition,
     plan_session_model_route,
     plan_session_model_route_for_state,
+    preserved_model_route_request,
     realize_session_model_route,
     validate_model_tier_option,
 )
@@ -256,6 +260,35 @@ class TestSessionModelRoutePlanning:
 
         assert inspected == ["openrouter-openai"]
 
+    def test_automatic_compatibility_failure_does_not_fall_through_after_admission(
+        self,
+    ) -> None:
+        candidates = tuple(
+            candidate for candidate in get_model_route_candidates("gpt-5.6-sol") if candidate.kind == "proxy"
+        )
+        first, second = candidates[:2]
+        inspected: list[str] = []
+
+        def inspect(candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
+            template = candidate.template
+            assert template is not None
+            inspected.append(template)
+            if candidate == first:
+                return _proxy_snapshot(
+                    template=template,
+                    tiers={"sonnet": "google/gemini-3.1-pro-preview"},
+                    ensure_reference=template,
+                )
+            return _proxy_snapshot(template=template, ensure_reference=template)
+
+        with pytest.raises(
+            SessionModelRoutingError,
+            match="pass --proxy <proxy_id-or-template>",
+        ):
+            plan_session_model_route("gpt-5.6-sol", candidate_inspector=inspect)
+
+        assert inspected == [first.template]
+
     def test_model_tier_requires_model_and_custom_routes_fail_closed(self) -> None:
         with pytest.raises(SessionModelRoutingError, match="--model-tier requires --model"):
             validate_model_tier_option(None, "opus")
@@ -343,6 +376,114 @@ def test_retired_stored_source_fails_when_preserved_route_is_replayed() -> None:
         )
 
 
+def test_persisted_route_rejects_same_url_registry_template_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.config import loader
+    from forge.proxy import proxies
+
+    replacement = SimpleNamespace(proxy_id="replacement-id", template="replacement-template")
+    monkeypatch.setattr(proxies.ProxyRegistryStore, "read", lambda _self: {})
+    monkeypatch.setattr(proxies, "lookup_proxy_by_base_url", lambda _registry, _url: replacement)
+    monkeypatch.setattr(loader, "load_config", lambda **_kwargs: SimpleNamespace(proxy=object()))
+
+    with pytest.raises(SessionModelRoutingError, match="changed template identity"):
+        inspect_persisted_proxy_route(
+            template="stored-template",
+            base_url="http://localhost:8096",
+            proxy_id=None,
+        )
+
+
+def test_preserved_route_rejects_proven_source_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    import forge.core.ops.session_model_routing as routing_module
+
+    state = create_session_state("source-drift", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.proxy = ProxyIntent(template="openrouter-openai", base_url="http://localhost:8096")
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id="openrouter",
+    )
+    drifted = _proxy_snapshot(source_id=None, base_url="http://localhost:8096", proxy_id="proxy-1")
+    monkeypatch.setattr(routing_module, "inspect_persisted_proxy_route", lambda **_kwargs: drifted)
+
+    with pytest.raises(SessionModelRoutingError, match="no longer proves stored source 'openrouter'"):
+        plan_session_model_route_for_state(
+            "gpt-5.6-sol",
+            model_tier="sonnet",
+            state=state,
+            allow_replacement=False,
+        )
+
+
+def test_preserved_route_does_not_enrich_unproven_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    import forge.core.ops.session_model_routing as routing_module
+
+    state = create_session_state("unproven-source", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.proxy = ProxyIntent(template="openrouter-openai", base_url="http://localhost:8096")
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id=None,
+    )
+    proven_now = _proxy_snapshot(source_id="openrouter", base_url="http://localhost:8096", proxy_id="proxy-1")
+    monkeypatch.setattr(routing_module, "inspect_persisted_proxy_route", lambda **_kwargs: proven_now)
+
+    plan = plan_session_model_route_for_state(
+        "gpt-5.6-sol",
+        model_tier="sonnet",
+        state=state,
+        allow_replacement=False,
+    )
+
+    assert plan.source_id is None
+
+
+def test_preserved_model_route_request_restores_matching_1m_projection() -> None:
+    state = create_session_state("one-m", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.direct_model = "claude-opus-4-6[1m]"
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="claude-opus-4-6",
+        selected_tier="opus",
+        kind="direct",
+        source_id=None,
+    )
+
+    request = preserved_model_route_request(state)
+    plan = plan_session_model_route_for_state(
+        request,
+        model_tier="opus",
+        state=state,
+        allow_replacement=False,
+    )
+    resolved = realize_session_model_route(plan)
+
+    assert request == "claude-opus-4-6[1m]"
+    assert plan.context_limit == 1_000_000
+    assert plan_model_route_transition(resolved).direct_model == "claude-opus-4-6[1m]"
+
+
+def test_preserved_model_route_request_rejects_mismatched_1m_projection() -> None:
+    state = create_session_state("bad-one-m", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.direct_model = "claude-sonnet-4-6[1m]"
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="claude-opus-4-6",
+        selected_tier="opus",
+        kind="direct",
+        source_id=None,
+    )
+
+    with pytest.raises(SessionModelRoutingError, match="does not match stored model route"):
+        preserved_model_route_request(state)
+
+
 def test_codex_responses_template_is_deliberately_dual_ingress(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -404,6 +545,30 @@ def test_realization_revalidates_the_selected_proxy_without_reselection(
     assert resolved.selected_tier == "opus"
     assert resolved.started_proxy is True
     assert healthchecks == [("http://localhost:8096", "openrouter-openai", "proxy-1")]
+
+
+def test_realization_rejects_selected_source_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    import forge.core.ops.session_model_routing as routing_module
+
+    snapshot = _proxy_snapshot(ensure_reference="openrouter-openai")
+    plan = plan_session_model_route("gpt-5.6-sol", explicit_proxy=snapshot, model_tier="opus")
+    entry = SimpleNamespace(
+        proxy_id="proxy-1",
+        template="openrouter-openai",
+        base_url="http://localhost:8096",
+    )
+    monkeypatch.setattr(
+        routing_module,
+        "inspect_persisted_proxy_route",
+        lambda **_kwargs: _proxy_snapshot(
+            source_id=None,
+            base_url="http://localhost:8096",
+            proxy_id="proxy-1",
+        ),
+    )
+
+    with pytest.raises(SessionModelRoutingError, match="no longer proves source 'openrouter'"):
+        realize_session_model_route(plan, ensure_proxy_fn=lambda _reference: (entry, False))
 
 
 def test_direct_claude_transition_clears_proxy_and_preserves_transport_modifier() -> None:

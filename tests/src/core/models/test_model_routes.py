@@ -140,6 +140,14 @@ class TestSchemaValidation:
         with pytest.raises(ModelRouteCatalogError, match="Could not load packaged model route catalog"):
             _load_route_catalog_yaml()
 
+    @pytest.mark.parametrize("schema_version", [True, 1.0, [], {}])
+    def test_rejects_non_integer_schema_versions_contextually(self, schema_version: object) -> None:
+        raw = _valid_raw()
+        raw["schema_version"] = schema_version
+
+        with pytest.raises(ModelRouteCatalogError, match="schema_version must be an integer"):
+            _validate_and_build_route_catalog(raw)
+
     def test_rejects_missing_packaged_resource(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def missing(_: str):
             raise FileNotFoundError("missing model_routes.yaml")
@@ -194,6 +202,20 @@ class TestSchemaValidation:
         raw = _valid_raw()
         raw["models"]["claude-opus-5"]["routes"][0]["runtime"] = "unknown"
         with pytest.raises(ModelRouteCatalogError, match="runtime is unsupported"):
+            _validate_and_build_route_catalog(raw)
+
+    def test_rejects_non_claude_direct_claude_code_candidate(self) -> None:
+        raw = _valid_raw()
+        raw["models"]["gpt-5.6-sol"]["routes"].insert(
+            0,
+            {
+                "kind": "direct",
+                "runtime": "claude_code",
+                "model_ref": "gpt-5.6-sol",
+            },
+        )
+
+        with pytest.raises(ModelRouteCatalogError, match="direct claude_code candidate must resolve to a Claude model"):
             _validate_and_build_route_catalog(raw)
 
 

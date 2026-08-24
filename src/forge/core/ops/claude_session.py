@@ -1619,11 +1619,14 @@ def _run_host_claude_session(
         if application.error:
             raise ForgeOpError(application.error)
         applied_direct_model = application.pin
-    elif (
-        manifest.intent.launch
+    if (
+        runtime_base_url is not None
+        and manifest.intent.launch
         and manifest.intent.launch.model_route is not None
         and manifest.intent.launch.model_route.kind == "proxy"
     ):
+        # The route tier controls Claude Code's proxy-facing model selector. A
+        # direct-model pin may still populate the per-tier provider mappings.
         env_vars["ANTHROPIC_MODEL"] = manifest.intent.launch.model_route.selected_tier
 
     routing_mode = _routing_mode_for(runtime_base_url, proxy_id)

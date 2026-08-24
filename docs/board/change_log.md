@@ -7,6 +7,24 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-08-24
 
+### Correct post-merge session routing and cleanup defects
+
+**Goal/outcome**: Close nine independently reproduced invariant gaps left by the transcript-safety and model-routing
+merges without weakening publication locking, deterministic routing, or candidate-tree validation.
+
+**Key changes**:
+
+- Serialized aliased relocated-transcript and agent-log deletion with its final owner scan, and preserved validated
+  Claude `[1m]` transport state across bare resume and inherited fork.
+- Made stored proxy replay exact, applied the selected Claude tier, stopped at the first admitted automatic candidate,
+  and let explicit replacement recover from malformed stored route state.
+- Kept lexical Git identity separate from resolved Markdown containment, hardened manually supplied symlink spellings,
+  and tightened route-catalog schema and direct Claude candidate validation.
+
+**Verification**: 9,885 unit tests with 117 integration-marked tests deselected; 1,070 regressions; focused fail-first
+coverage for all nine findings; two targeted Docker session-routing integrations; full pre-commit, Markdown, board-link,
+and diff checks.
+
 ### Route interactive sessions by model
 
 **Goal/outcome**: Let Claude-runtime sessions select any supported catalog model through one durable `--model` contract

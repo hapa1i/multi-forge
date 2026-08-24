@@ -89,6 +89,14 @@ def _write_transcript(project: Path, session_id: str) -> Path:
     return path
 
 
+def _write_agent_log(project: Path, session_id: str) -> Path:
+    transcript = get_transcript_path(str(project), session_id)
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    path = transcript.parent / f"agent-{session_id[:8]}.jsonl"
+    path.write_text(f'{{"session_id": "{session_id}"}}\n', encoding="utf-8")
+    return path
+
+
 def _spy_reference_scans(
     manager: SessionManager,
     monkeypatch: pytest.MonkeyPatch,
@@ -207,3 +215,66 @@ def test_relocated_transcript_rechecks_ownership_after_ordinary_cleanup(
 
     assert SessionStore(str(project), "late-sibling").exists()
     assert relocated.exists(), "the sibling published during cleanup still owns the relocated transcript"
+
+
+def test_aliased_current_and_relocated_uuid_is_not_unlinked_by_ordinary_cleanup(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An aliased relocated UUID must reach only the locked final owner decision."""
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=RELOCATED_PARENT_ID,
+        artifact_ids=(ARTIFACT_ID,),
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
+    artifact = _write_transcript(project, ARTIFACT_ID)
+    original_cleanup = cleanup_module.cleanup_session
+
+    def _publish_sibling_then_cleanup(
+        project_root: str,
+        claude_session_id: str | None,
+        artifact_session_ids: list[str] | None = None,
+    ) -> None:
+        _publish(
+            manager,
+            project,
+            "late-sibling",
+            session_id=None,
+            relocated_parent_id=RELOCATED_PARENT_ID,
+        )
+        original_cleanup(project_root, claude_session_id, artifact_session_ids)
+
+    monkeypatch.setattr(cleanup_module, "cleanup_session", _publish_sibling_then_cleanup)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert SessionStore(str(project), "late-sibling").exists()
+    assert relocated.exists(), "the sibling's relocated transcript must survive ordinary cleanup"
+    assert agent_log.exists(), "the sibling's sidechain log has the same ownership as its transcript"
+    assert not artifact.exists(), "unrelated Forge-owned artifacts should still be reclaimed"
+
+
+def test_aliased_current_and_relocated_uuid_reclaims_agent_logs_after_locked_scan(
+    project: Path,
+) -> None:
+    manager = SessionManager(index_store=IndexStore())
+    _publish(
+        manager,
+        project,
+        "child",
+        session_id=RELOCATED_PARENT_ID,
+        relocated_parent_id=RELOCATED_PARENT_ID,
+    )
+    relocated = _write_transcript(project, RELOCATED_PARENT_ID)
+    agent_log = _write_agent_log(project, RELOCATED_PARENT_ID)
+
+    manager.delete_session("child", forge_root=str(project), delete_worktree=False, force=True)
+
+    assert not relocated.exists()
+    assert not agent_log.exists(), "the final ownership decision must reclaim the UUID's sidechain logs"

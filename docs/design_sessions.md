@@ -38,14 +38,15 @@ resolve sessions by identity and never scan. Adoption also inverts transcript ow
 session. Relocated transcripts use the same ownership scan; a cached owner remains conservatively protected, while a
 cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
 cleanup. The final negative scan and unlink share the global index-publication lock, so a sibling manifest cannot be
-published between the ownership decision and removal. Adoption resolves the `.forge/artifacts` root before enforcing
-destination containment, so relocating that root with a symlink is supported; a descendant destination that escapes the
-resolved root or aliases the native transcript is refused, and rollback only unlinks an artifact created by the current
-copy attempt. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to
-correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a
-non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start
-session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence
-(see Default resume behavior).
+published between the ownership decision and removal. When the current and relocated UUIDs alias, ordinary cleanup
+excludes that UUID; the locked final scan owns removal of its transcript and preidentified agent logs. Adoption resolves
+the `.forge/artifacts` root before enforcing destination containment, so relocating that root with a symlink is
+supported; a descendant destination that escapes the resolved root or aliases the native transcript is refused, and
+rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
+`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
+sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
+mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
+"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
@@ -117,6 +118,13 @@ optional `[1m]` transport modifier, and `intent.proxy` remains the concrete prox
 `intent.launch.direct_model`, and `intent.launch.model_route` together for a resolved route. Clearing neutral route
 intent alone does not change the legacy proxy or Claude-pin fields. Legacy creation, adoption, `default_direct_model`,
 and Codex paths do not synthesize `model_route`.
+
+Bare replay treats `model_route` as the model, tier, kind, and source authority. It may restore `[1m]` only from a
+matching Claude `direct_model` execution projection; a mismatched projection fails instead of changing the neutral
+model. Proxy replay requires the stored template and any proven `source_id` to remain exact. Same-URL registry entries
+cannot substitute another template, and later source inference cannot enrich an originally unproven route. Explicit
+`--model` plus `--proxy` or `--no-proxy` is a replacement constraint and therefore does not inspect malformed stored
+routing first.
 
 **`intent.authority`**: optional, session-owned artifact authority:
 
@@ -389,9 +397,11 @@ preflight.
 **Interactive model-route selection:** Claude-runtime `start`, `resume`, `fork`, and `incognito` accept catalog models
 through `--model`; `--model-tier` disambiguates proxy tiers. Unlike Claude's in-process `/model`, this is durable
 prelaunch intent. The shared planner applies explicit constraints, a compatible stored route, new-Claude direct routing,
-then catalog order without side effects; only its winner may start, and failure never falls through. The selected
-context window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written
-atomically. Bare resume reuses that route or fails.
+then catalog order without side effects. The first candidate whose prerequisites pass admission is the winner;
+compatibility, startup, identity, and health failures from that winner never fall through. After Claude proxy-pin
+validation, the launch environment applies the neutral route's selected tier as `ANTHROPIC_MODEL`. The selected context
+window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written atomically.
+Bare resume reuses that route or fails.
 
 A non-Claude selection may start a paid proxy. `--no-launch` persists it without a route event or child;
 `--subprocess-proxy` is incompatible. Codex, adoption, `default_direct_model`, sidecar/host-proxy modes, and bare
@@ -457,8 +467,8 @@ UUID `<R>`, not the parent's UUID.
 3. Lineage reference: pointer to raw artifacts for deep reads
 
 **Proxy inheritance:** The child inherits the parent's proxy and neutral model-route intent by default, keeping routing
-stable across resumes; `--proxy <name>`, `--no-proxy`, or an explicit model that the inherited route cannot serve
-authorizes a complete replacement.
+stable across resumes. A matching `[1m]` execution projection is inherited with that intent. `--proxy <name>`,
+`--no-proxy`, or an explicit model that the inherited route cannot serve authorizes a complete replacement.
 
 **Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
 authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child

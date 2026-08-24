@@ -67,6 +67,7 @@ from forge.core.ops.session_model_routing import (
     SessionModelRoutingError,
     plan_model_route_transition,
     plan_session_model_route_for_state,
+    preserved_model_route_request,
     realize_session_model_route,
     validate_model_tier_option,
 )
@@ -1513,9 +1514,13 @@ def resume(
     allow_route_replacement = True
     neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
-        route_model = neutral_route.requested_model
-        route_tier = neutral_route.selected_tier
-        allow_route_replacement = False
+        try:
+            route_model = preserved_model_route_request(manifest)
+            route_tier = neutral_route.selected_tier
+            allow_route_replacement = False
+        except SessionModelRoutingError as e:
+            print_error(str(e))
+            sys.exit(1)
 
     if route_model is not None:
         inherited_sidecar = manifest.confirmed.is_sandboxed or (
