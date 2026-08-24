@@ -80,6 +80,7 @@ repos:
     language: system
     entry: ./scripts/check-markdown-links.py
     files: \.md$
+    always_run: true
     require_serial: true
 - repo: https://github.com/hukkin/mdformat
   rev: 1.0.0

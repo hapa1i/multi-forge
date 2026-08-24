@@ -112,16 +112,27 @@ def _lexical_path(path: Path) -> Path:
     return Path(os.path.abspath(path))
 
 
+def _canonical_source_path(root: Path, lexical: Path) -> Path:
+    """Canonicalize an external repository prefix while preserving its lexical suffix."""
+
+    resolved_root = root.resolve()
+    if lexical.is_relative_to(resolved_root):
+        return lexical
+
+    # Find the outermost prefix that names this repository. Appending the
+    # untouched suffix preserves any symlink spelling inside the repository.
+    for prefix in reversed(lexical.parents):
+        if prefix.resolve() == resolved_root:
+            return _lexical_path(resolved_root / lexical.relative_to(prefix))
+    return lexical.resolve()
+
+
 def markdown_sources(root: Path, candidates: set[Path], supplied: list[Path]) -> list[Path]:
     """Combine candidate Markdown files with existing supplied sources."""
     sources = {path for path in candidates if path.suffix.lower() == ".md" and path.is_file()}
-    resolved_root = root.resolve()
     for path in supplied:
         lexical = _lexical_path(root / path) if not path.is_absolute() else _lexical_path(path)
-        # Preserve in-repository symlink spelling for candidate-state checks, but
-        # canonicalize an external spelling of the repository itself (for example
-        # macOS /tmp or a symlinked workspace prefix).
-        source = lexical if lexical.is_relative_to(resolved_root) else lexical.resolve()
+        source = _canonical_source_path(root, lexical)
         if source.suffix.lower() == ".md" and source.is_file():
             sources.add(source)
     return sorted(sources)
@@ -172,7 +183,12 @@ def audit_paths(root: Path, sources: list[Path], candidates: set[Path]) -> list[
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="*", type=Path, help="Markdown sources to audit (default: all tracked files)")
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        help="Markdown sources to audit (default: all tracked files)",
+    )
     return parser.parse_args(argv)
 
 
@@ -195,7 +211,10 @@ def main(argv: list[str] | None = None) -> int:
             source = failure.source
         print(f"{source}:{failure.line}: {failure.reason}: {failure.target}")
     if failures:
-        print(f"Markdown link audit failed with {len(failures)} error(s).", file=sys.stderr)
+        print(
+            f"Markdown link audit failed with {len(failures)} error(s).",
+            file=sys.stderr,
+        )
         return 1
     print(f"Markdown link audit passed for {len(sources)} source file(s).")
     return 0

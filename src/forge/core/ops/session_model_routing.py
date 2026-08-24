@@ -672,6 +672,11 @@ def _inspect_state_route(
                 f"pass --model {neutral.requested_model} with --proxy <proxy_id-or-template> to select a replacement"
             )
         template = state.intent.proxy.template or None
+        if template is None:
+            raise SessionModelRoutingError(
+                f"stored proxy model route for {neutral.requested_model!r} is missing template identity; "
+                f"pass --model {neutral.requested_model} with --proxy <proxy_id-or-template> to select a replacement"
+            )
         base_url = state.intent.proxy.base_url
         snapshot = inspect_persisted_proxy_route(template=template, base_url=base_url, proxy_id=None)
         return ("proxy" if snapshot.template is not None else "custom"), snapshot

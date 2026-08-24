@@ -2174,10 +2174,30 @@ class SessionManager:
                 raise ForgeSessionError(cleanup_result.errors[0])
 
         _deriv = state.confirmed.derivation if delete_transcripts and state is not None else None
+        _raw_aliased_relocated_session_id: str | None = None
+        if delete_transcripts and state is None:
+            _raw_deriv = _raw_confirmed_value(_raw_data, "derivation")
+            _raw_current_session_id = _raw_confirmed_value(_raw_data, "claude_session_id")
+            if isinstance(_raw_deriv, dict):
+                _raw_relocated_session_id = _raw_deriv.get("relocated_parent_session_id")
+                # A schema-invalid manifest is untrusted. Recover only the exact,
+                # canonical lowercase alias needed to avoid unlocked deletion: a
+                # mismatched or case-variant pointer must not gain authority over
+                # another spelling's transcript or sidechain logs, and the
+                # ownership scans compare exact strings.
+                if (
+                    _raw_deriv.get("resume_mode") == "native-relocate"
+                    and isinstance(_raw_current_session_id, str)
+                    and isinstance(_raw_relocated_session_id, str)
+                    and _raw_current_session_id == _raw_relocated_session_id
+                    and _UUID_RE.fullmatch(_raw_relocated_session_id) is not None
+                    and _raw_relocated_session_id == _raw_relocated_session_id.lower()
+                ):
+                    _raw_aliased_relocated_session_id = _raw_relocated_session_id
         _relocated_parent_session_id = (
             _deriv.relocated_parent_session_id
             if _deriv is not None and _deriv.resume_mode == "native-relocate"
-            else None
+            else _raw_aliased_relocated_session_id
         )
         _artifact_ids: list[str] = []
         _cleanup_ids: list[str] = []
@@ -2267,7 +2287,7 @@ class SessionManager:
         # native-relocate forks copy the parent transcript into the child's encoded dir.
         # Remove that copy independently of the child's own UUID (which may be unset on a
         # failed/partial launch) -- but never when another session still needs it.
-        if delete_transcripts and state is not None:
+        if delete_transcripts:
             if _relocated_parent_session_id:
                 assert _transcript_project_root is not None
                 _reloc_path = get_transcript_path(_transcript_project_root, _relocated_parent_session_id)
@@ -2342,7 +2362,7 @@ class SessionManager:
 
                     self.index_store.run_session_entries_txn(_unlink_if_unreferenced)
 
-            if _deriv is not None and _deriv.rewind_relocated_session_id:
+            if state is not None and _deriv is not None and _deriv.rewind_relocated_session_id:
                 _rewind_root = _transcript_cleanup_project_root(
                     state,
                     entry.forge_root or entry.worktree_path,
