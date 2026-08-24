@@ -174,21 +174,28 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 **Key points:**
 
 - Proxy and session state remain independent; status tools read both (see §3.6.2).
+
 - `runtime.backend_id`, `runtime.tier_mappings`, and `runtime.model_alternatives` are secret-free effective loaded
   routing facts. The exposed tier and alternative targets include the same active ZDR substitutions used for dispatch.
   Older responses that omit the additive fields remain readable, but callers label config or launch-commit recovery as
   fallback rather than live runtime evidence.
+
 - Known optional tier keys may be present with an empty string when that tier has no route. Runtime-truth readers omit
   those empty entries from the exposed mapping without rejecting the otherwise authoritative response; unknown keys,
   non-string values, or a map with no nonempty route remain non-authoritative.
+
 - Top-level `status` is `running` when downstream retention resolves and completes without an enforcement error; it is
   `degraded` when retention resolution or pruning fails. Degraded retention remains reachable and keeps the proxy
   identity fields available; the nested `downstream_retention` object carries the recovery detail.
+
 - Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
+
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
+
 - `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
   only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
   active (lossy)" before launch (§7.x)
+
 - `wire_shape: openai_responses_passthrough` is the **Codex-facing** raw OpenAI **Responses** shape on `/v1/responses*`
   (create + retrieve/cancel/input_items/delete/compact/input_tokens). It forwards traffic byte-for-byte (signature-safe;
   `can_inspect.*=false`, like `anthropic_passthrough`). Routing requires that wire shape plus backend
@@ -196,6 +203,10 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is token-telemetry-only. The
   launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental data/JSON framer serves
   both raw passthrough usage taps; accumulators own protocol event merging and lifecycle semantics.
+
+  The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
+  `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the
+  ordinary Anthropic-to-OpenAI translation path applies. Messages callers receive no raw-Responses signature guarantee.
 
 **Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The
 package-owned `core/data/model_practices.yaml` separately records dated, source-linked provider declarations under
@@ -422,7 +433,7 @@ unchanged `starting` row, preserving concurrent replacements.
 | `litellm-openai-local`       | Local LiteLLM + OpenAI API key                                 |
 | `litellm-openai-codex-local` | OpenAI Codex models via local LiteLLM + OpenAI API key         |
 | `anthropic-passthrough`      | Raw Anthropic passthrough; signature-safe; inspect enabled     |
-| `codex-responses-local`      | Raw Responses passthrough for `forge codex start --proxy`      |
+| `codex-responses-local`      | Raw Codex Responses plus translated Claude Messages ingress    |
 | `litellm-gemini-test`        | Internal integration-test dependency; hidden from normal lists |
 
 Twenty-one templates ship; `litellm-gemini-test` is test infrastructure, so twenty are user-facing.
@@ -516,7 +527,7 @@ The shipped v1 catalog includes:
 | `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                                       |
 | `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                                       |
 | `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                                                     |
-| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace                           |
+| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Raw Codex Responses plus translated Claude Messages; responses-ingress + provider-trace         |
 | `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                                            |
 
 Catalog validation rejects duplicate backend instance ids or aliases, unknown `kind`/`provider`/`billing_posture`
@@ -603,6 +614,10 @@ The model route catalog is separate **authoritative operational data**:
 - Source credentials, endpoint/lifecycle facts, and template ownership remain in `forge.backend.sources`; proxy tier
   maps remain in template/proxy configuration
 - **NOT a user edit surface**
+
+The `codex-responses-local` GPT candidate is intentional shared-route compatibility. It preserves the pre-catalog
+workflow order and supplies an OpenAI-key local route for interactive Claude selection. Route evidence records the
+configured Responses capability while the Claude request itself uses the translated Messages ingress.
 
 `load_model_route_catalog()` reads the packaged resource, enforces exact schema fields, canonical model coverage,
 candidate uniqueness, catalog-listed provider refs, and direct-first Claude compatibility, then validates

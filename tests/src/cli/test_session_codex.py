@@ -151,6 +151,7 @@ class TestStartFlagMatrix:
             (["--system-prompt", "x"], "--system-prompt"),
             (["--incognito"], "--incognito"),
             (["--model", "claude-opus-4-8"], "--model"),
+            (["--model-tier", "opus"], "--model-tier"),
             (["--no-launch"], "--no-launch"),
             (["--extensions"], "--extensions/--no-extensions"),
             (["--supervise", "watcher"], "--supervise"),
@@ -434,7 +435,10 @@ class TestResumeCodexDispatch:
             (project_root / ".forge").mkdir()
 
         state = create_session_state(
-            "impl", parent_session="planner", worktree_path=str(codex_project), runtime="codex"
+            "impl",
+            parent_session="planner",
+            worktree_path=str(codex_project),
+            runtime="codex",
         )
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
@@ -521,7 +525,10 @@ class TestResumeCodexDispatch:
             (project_root / ".forge").mkdir()
 
         state = create_session_state(
-            "impl", parent_session="planner", worktree_path=str(codex_project), runtime="codex"
+            "impl",
+            parent_session="planner",
+            worktree_path=str(codex_project),
+            runtime="codex",
         )
         state.forge_root = str(codex_project)
         state.confirmed.codex = CodexConfirmed(thread_id=_TID)
@@ -612,7 +619,10 @@ class TestResumeCodexDispatch:
         monkeypatch.chdir(caller_project)
         with (
             patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
-            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+            patch(
+                "forge.cli.session_codex.reattach_interactive_codex_session",
+                return_value=0,
+            ) as reattach,
         ):
             result = runner.invoke(main, ["session", "resume", "impl"])
 
@@ -653,6 +663,7 @@ class TestResumeCodexDispatch:
     @pytest.mark.parametrize(
         ("extra_args", "flag_label"),
         [
+            (["--model-tier", "opus"], "--model-tier"),
             (["--fresh"], "--fresh"),
             (["--force"], "--force"),
         ],

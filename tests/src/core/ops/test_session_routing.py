@@ -196,6 +196,49 @@ def test_proxy_payload_prefers_neutral_model_route_without_inventing_backend(
     assert event.payload == payload
 
 
+def test_codex_responses_proxy_reports_translated_claude_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id="codex-responses-local",
+    )
+    provider = SimpleNamespace(
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        model_alternatives={},
+        allow_non_zdr=False,
+        zdr_fallbacks={},
+    )
+    proxy = SimpleNamespace(
+        preferred_provider="litellm",
+        get_provider=lambda _provider: provider,
+        default_tier="sonnet",
+        active_template="codex-responses-local",
+        backend="codex-responses-local",
+        wire_shape="openai_responses_passthrough",
+    )
+    monkeypatch.setattr(ops, "load_config", lambda **_kwargs: SimpleNamespace(proxy=proxy))
+
+    payload = ops.build_claude_routing_payload(
+        state,
+        effective_template="codex-responses-local",
+        runtime_base_url="http://localhost:8105",
+        proxy_id="codex-responses-local-1",
+    )
+
+    assert payload["route"]["wire_shape"] == "openai_responses_passthrough"
+    assert payload["route"]["backend_id"] == "codex-responses-local"
+    assert payload["selected_model"] == "openai/gpt-5.6-sol"
+    assert [(item["slot"], item["route_model"], item["canonical_model"]) for item in payload["marking_snapshots"]] == [
+        ("tier_default", "openai/gpt-5.6-sol", "gpt-5.6-sol")
+    ]
+
+
 def test_proxy_payload_keeps_ignored_request_out_of_effective_selection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -219,6 +219,8 @@ def plan_session_model_route_for_state(
     existing_kind: Literal["direct", "proxy", "custom"] | None = None
     existing_proxy: ProxyRouteSnapshot | None = None
     if state is not None:
+        if not allow_replacement and proxy_name is None and not no_proxy:
+            _validate_preserved_route_source(state)
         existing_kind, existing_proxy = _inspect_state_route(state)
     return plan_session_model_route(
         model,
@@ -575,6 +577,7 @@ def _select_proxy_tier(
 
 def _selected_context_limit(request: ModelRouteRequest, selected_model: str) -> int:
     from forge.core.models.catalog import (
+        ModelCatalogError,
         get_context_window_tokens,
         model_exists,
         resolve_model_id,
@@ -584,7 +587,14 @@ def _selected_context_limit(request: ModelRouteRequest, selected_model: str) -> 
         one_m_model = f"{request.route_key}-1m"
         if model_exists(one_m_model):
             return get_context_window_tokens(one_m_model)
-    return get_context_window_tokens(resolve_model_id(selected_model.removesuffix(ONE_M_SUFFIX)))
+    try:
+        return get_context_window_tokens(resolve_model_id(selected_model.removesuffix(ONE_M_SUFFIX)))
+    except ModelCatalogError as exc:
+        raise SessionModelRoutingError(
+            f"selected provider model {selected_model!r} for {request.requested_model!r} is not in the Forge model "
+            "catalog, so its context window cannot be determined; update the proxy tier mapping or "
+            "model_alternatives to use a catalog model"
+        ) from exc
 
 
 def _route_key(model_ref: str) -> str:
@@ -669,6 +679,25 @@ def _inspect_state_route(
     return "direct", None
 
 
+def _validate_preserved_route_source(state: SessionState) -> None:
+    """Revalidate mutable source membership only when replaying stored intent."""
+
+    launch = state.intent.launch
+    neutral = launch.model_route if launch is not None else None
+    if neutral is None or neutral.source_id is None:
+        return
+
+    from forge.backend.sources import ModelSourceNotFoundError, get_model_source
+
+    try:
+        get_model_source(neutral.source_id)
+    except ModelSourceNotFoundError as exc:
+        raise SessionModelRoutingError(
+            f"stored proxy source {neutral.source_id!r} for {neutral.requested_model!r} is no longer in the "
+            "backend-source catalog; pass --model with --proxy <proxy_id-or-template> to select a replacement"
+        ) from exc
+
+
 def _required_string_attr(value: object, name: str) -> str:
     result = getattr(value, name, None)
     if not isinstance(result, str) or not result:
@@ -687,6 +716,16 @@ class ModelRouteTransition:
 
 def plan_model_route_transition(selection: ResolvedModelRoute) -> ModelRouteTransition:
     """Build the complete proxy/direct/neutral intent transition for a selection."""
+
+    if selection.source_id is not None:
+        from forge.backend.sources import ModelSourceNotFoundError, get_model_source
+
+        try:
+            get_model_source(selection.source_id)
+        except ModelSourceNotFoundError as exc:
+            raise SessionModelRoutingError(
+                f"resolved proxy source {selection.source_id!r} is no longer in the backend-source catalog"
+            ) from exc
 
     proxy = None
     if selection.kind == "proxy":
@@ -719,15 +758,6 @@ def apply_model_route_transition(intent: SessionIntent, transition: ModelRouteTr
     return updated
 
 
-def clear_model_route_intent(intent: SessionIntent) -> SessionIntent:
-    """Return a copied intent with only neutral model-route intent cleared."""
-
-    updated = deepcopy(intent)
-    if updated.launch is not None:
-        updated.launch.model_route = None
-    return updated
-
-
 __all__ = [
     "ModelRouteTransition",
     "ProxyRouteSnapshot",
@@ -735,7 +765,6 @@ __all__ = [
     "SessionModelRoutePlan",
     "SessionModelRoutingError",
     "apply_model_route_transition",
-    "clear_model_route_intent",
     "inspect_automatic_candidate",
     "inspect_persisted_proxy_route",
     "inspect_proxy_reference",

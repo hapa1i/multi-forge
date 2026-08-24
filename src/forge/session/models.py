@@ -79,7 +79,12 @@ REQUIRED_MODEL_ROUTE_TIERS = frozenset({"haiku", "sonnet", "opus"})
 
 @dataclass
 class ModelRouteIntent:
-    """Canonical model request and the resolved route needed for relaunch."""
+    """Stored model request and resolved route needed for relaunch.
+
+    This durable DTO validates only its own structural invariants. Catalog
+    membership is checked when Forge authors or executes the route so removing a
+    model or source cannot turn an otherwise readable manifest into corruption.
+    """
 
     requested_model: str
     selected_tier: str
@@ -87,19 +92,8 @@ class ModelRouteIntent:
     source_id: str | None
 
     def __post_init__(self) -> None:
-        from forge.backend.sources import ModelSourceNotFoundError, get_model_source
-        from forge.core.models.catalog import ModelCatalogError, resolve_model_id
-
-        if not self.requested_model:
-            raise ValueError("model_route.requested_model cannot be empty")
-        try:
-            canonical = resolve_model_id(self.requested_model)
-        except ModelCatalogError as exc:
-            raise ValueError(f"model_route.requested_model is unknown: {self.requested_model!r}") from exc
-        if canonical != self.requested_model:
-            raise ValueError(
-                f"model_route.requested_model must be canonical, got alias {self.requested_model!r} for {canonical!r}"
-            )
+        if not isinstance(self.requested_model, str) or not self.requested_model:
+            raise ValueError("model_route.requested_model must be a non-empty string")
         if self.selected_tier not in REQUIRED_MODEL_ROUTE_TIERS:
             raise ValueError(
                 f"model_route.selected_tier must be one of: {', '.join(sorted(REQUIRED_MODEL_ROUTE_TIERS))}"
@@ -108,15 +102,8 @@ class ModelRouteIntent:
             raise ValueError("model_route.kind must be 'direct' or 'proxy'")
         if self.kind == "direct" and self.source_id is not None:
             raise ValueError("direct model_route intent requires source_id=null")
-        if self.source_id is not None:
-            if not self.source_id:
-                raise ValueError("model_route.source_id must be null or a non-empty canonical source id")
-            try:
-                get_model_source(self.source_id)
-            except ModelSourceNotFoundError as exc:
-                raise ValueError(
-                    f"model_route.source_id must be a canonical model-source id, got {self.source_id!r}"
-                ) from exc
+        if self.source_id is not None and (not isinstance(self.source_id, str) or not self.source_id):
+            raise ValueError("model_route.source_id must be null or a non-empty string")
 
 
 @dataclass

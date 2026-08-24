@@ -14,13 +14,15 @@ from forge.core.ops.session_model_routing import (
     ResolvedModelRoute,
     SessionModelRoutingError,
     apply_model_route_transition,
-    clear_model_route_intent,
     inspect_automatic_candidate,
+    inspect_proxy_reference,
     plan_model_route_transition,
     plan_session_model_route,
+    plan_session_model_route_for_state,
     realize_session_model_route,
     validate_model_tier_option,
 )
+from forge.session import create_session_state
 from forge.session.models import (
     LaunchIntent,
     ModelRouteIntent,
@@ -38,6 +40,7 @@ def _proxy_snapshot(
     default_tier: str | None = "sonnet",
     tiers: dict[str, str] | None = None,
     alternatives: dict[str, dict[str, str]] | None = None,
+    wire_shape: str = "openai_translated",
     ensure_reference: str | None = None,
 ) -> ProxyRouteSnapshot:
     return ProxyRouteSnapshot(
@@ -52,7 +55,7 @@ def _proxy_snapshot(
             "opus": "openai/gpt-5.6-sol",
         },
         model_alternatives=alternatives or {},
-        wire_shape="anthropic_messages",
+        wire_shape=wire_shape,
         ensure_reference=ensure_reference,
     )
 
@@ -89,10 +92,14 @@ class TestSessionModelRoutePlanning:
         with pytest.raises(SessionModelRoutingError, match="requires --model-tier sonnet"):
             plan_session_model_route("claude-sonnet-5", no_proxy=True, model_tier="opus")
 
-    def test_compatible_existing_route_is_preserved_without_candidate_scan(self) -> None:
+    def test_compatible_existing_route_is_preserved_without_candidate_scan(
+        self,
+    ) -> None:
         existing = _proxy_snapshot(base_url="http://localhost:8096", proxy_id="existing")
 
-        def unexpected_candidate(_candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
+        def unexpected_candidate(
+            _candidate: ModelRouteCandidate,
+        ) -> ProxyRouteSnapshot | None:
             raise AssertionError("catalog scan must not run for a compatible persisted route")
 
         plan = plan_session_model_route(
@@ -106,7 +113,9 @@ class TestSessionModelRoutePlanning:
         assert plan.proxy is not None
         assert plan.proxy.ensure_reference is None
 
-    def test_explicit_incompatible_existing_route_uses_first_admissible_catalog_candidate(self) -> None:
+    def test_explicit_incompatible_existing_route_uses_first_admissible_catalog_candidate(
+        self,
+    ) -> None:
         existing = _proxy_snapshot(
             template="openrouter-gemini",
             tiers={"sonnet": "google/gemini-3.1-pro-preview"},
@@ -146,8 +155,12 @@ class TestSessionModelRoutePlanning:
                 allow_replacement=False,
             )
 
-    def test_new_claude_request_remains_direct_without_scanning_runtime_state(self) -> None:
-        def unexpected_candidate(_candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
+    def test_new_claude_request_remains_direct_without_scanning_runtime_state(
+        self,
+    ) -> None:
+        def unexpected_candidate(
+            _candidate: ModelRouteCandidate,
+        ) -> ProxyRouteSnapshot | None:
             raise AssertionError("Claude direct selection must not scan proxy candidates")
 
         plan = plan_session_model_route(
@@ -162,7 +175,10 @@ class TestSessionModelRoutePlanning:
         claude = _proxy_snapshot(
             template="openrouter-anthropic",
             default_tier="sonnet",
-            tiers={"opus": "anthropic/claude-opus-5", "sonnet": "anthropic/claude-opus-5"},
+            tiers={
+                "opus": "anthropic/claude-opus-5",
+                "sonnet": "anthropic/claude-opus-5",
+            },
         )
         assert plan_session_model_route("claude-opus-5", explicit_proxy=claude).selected_tier == "opus"
 
@@ -172,7 +188,9 @@ class TestSessionModelRoutePlanning:
         unique = _proxy_snapshot(default_tier="haiku", tiers={"opus": "openai/gpt-5.6-sol"})
         assert plan_session_model_route("gpt-5.6-sol", explicit_proxy=unique).selected_tier == "opus"
 
-    def test_model_alternative_remains_compatible_when_transport_policy_changes_selected_model(self) -> None:
+    def test_model_alternative_remains_compatible_when_transport_policy_changes_selected_model(
+        self,
+    ) -> None:
         proxy = _proxy_snapshot(
             template="openrouter-anthropic",
             tiers={"sonnet": "anthropic/claude-sonnet-5"},
@@ -184,16 +202,47 @@ class TestSessionModelRoutePlanning:
         assert plan.selected_tier == "opus"
         assert plan.selected_model == "anthropic/claude-opus-5"
 
+    @pytest.mark.parametrize(
+        ("model_tier", "default_tier", "tiers"),
+        [
+            pytest.param("opus", "sonnet", None, id="explicit-tier"),
+            pytest.param(None, "opus", None, id="default-tier"),
+            pytest.param(None, None, {"haiku": "openai/gpt-5.4"}, id="single-serving-tier"),
+        ],
+    )
+    def test_uncatalogued_selected_provider_model_is_a_contextual_routing_error(
+        self,
+        model_tier: str | None,
+        default_tier: str | None,
+        tiers: dict[str, str] | None,
+    ) -> None:
+        proxy = _proxy_snapshot(
+            default_tier=default_tier,
+            tiers=tiers,
+            alternatives={"opus": {"gpt-5.6-sol": "openai/custom-finetune-x"}},
+        )
+
+        with pytest.raises(
+            SessionModelRoutingError,
+            match=r"selected provider model 'openai/custom-finetune-x'.+context window cannot be determined",
+        ):
+            plan_session_model_route("gpt-5.6-sol", explicit_proxy=proxy, model_tier=model_tier)
+
     def test_tier_ambiguity_names_choices_and_model_tier_recovery(self) -> None:
         proxy = _proxy_snapshot(default_tier=None)
 
-        with pytest.raises(SessionModelRoutingError, match=r"multiple tiers \(opus, sonnet\).+--model-tier"):
+        with pytest.raises(
+            SessionModelRoutingError,
+            match=r"multiple tiers \(opus, sonnet\).+--model-tier",
+        ):
             plan_session_model_route("gpt-5.6-sol", explicit_proxy=proxy)
 
         plan = plan_session_model_route("gpt-5.6-sol", explicit_proxy=proxy, model_tier="opus")
         assert plan.selected_tier == "opus"
 
-    def test_automatic_tier_ambiguity_does_not_fall_through_after_candidate_selection(self) -> None:
+    def test_automatic_tier_ambiguity_does_not_fall_through_after_candidate_selection(
+        self,
+    ) -> None:
         inspected: list[str] = []
 
         def inspect(candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
@@ -250,7 +299,9 @@ def test_realization_calls_only_selected_proxy_and_never_falls_back() -> None:
     assert calls == ["openrouter-openai"]
 
 
-def test_automatic_candidate_admission_uses_backend_source_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_automatic_candidate_admission_uses_backend_source_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from forge.core.auth import template_secrets
 
     candidate = get_model_route_candidates("gpt-5.6-sol")[0]
@@ -265,7 +316,60 @@ def test_automatic_candidate_admission_uses_backend_source_credentials(monkeypat
     assert snapshot.ensure_reference == "openrouter-openai"
 
 
-def test_realization_revalidates_the_selected_proxy_without_reselection(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_explicit_proxy_records_a_proven_backend_source() -> None:
+    snapshot = inspect_proxy_reference("openrouter-openai")
+
+    assert snapshot.source_id == "openrouter"
+
+
+def test_retired_stored_source_fails_when_preserved_route_is_replayed() -> None:
+    state = create_session_state("retired-route", worktree_path="/tmp", runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="sonnet",
+        kind="proxy",
+        source_id="retired-source",
+    )
+
+    with pytest.raises(
+        SessionModelRoutingError,
+        match="stored proxy source 'retired-source'.+select a replacement",
+    ):
+        plan_session_model_route_for_state(
+            "gpt-5.6-sol",
+            state=state,
+            allow_replacement=False,
+        )
+
+
+def test_codex_responses_template_is_deliberately_dual_ingress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.core.auth import template_secrets
+    from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
+
+    candidate = next(
+        candidate
+        for candidate in get_model_route_candidates("gpt-5.6-sol")
+        if candidate.template == "codex-responses-local"
+    )
+    monkeypatch.setattr(template_secrets, "resolve_env_or_credential", lambda _name: "configured")
+    snapshot = inspect_automatic_candidate(candidate)
+
+    assert snapshot is not None
+    assert snapshot.wire_shape == OPENAI_RESPONSES_PASSTHROUGH
+    plan = plan_session_model_route(
+        "gpt-5.6-sol",
+        candidate_inspector=lambda inspected: (snapshot if inspected == candidate else None),
+    )
+    assert plan.candidate == candidate
+    assert plan.selected_model == "openai/gpt-5.6-sol"
+
+
+def test_realization_revalidates_the_selected_proxy_without_reselection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import forge.core.ops.session_model_routing as routing_module
 
     snapshot = _proxy_snapshot(ensure_reference="openrouter-openai")
@@ -390,30 +494,6 @@ def test_apply_transition_preserves_unowned_intent_fields() -> None:
     assert updated.launch.runtime == "claude_code"
 
 
-def test_clear_model_route_preserves_proxy_and_legacy_pin() -> None:
-    intent = SessionIntent(
-        proxy=ProxyIntent(template="openrouter-anthropic", base_url="http://localhost:8095"),
-        launch=LaunchIntent(
-            direct_model="claude-opus-5",
-            model_route=ModelRouteIntent(
-                requested_model="claude-opus-5",
-                selected_tier="opus",
-                kind="proxy",
-                source_id="openrouter",
-            ),
-        ),
-    )
-
-    updated = clear_model_route_intent(intent)
-
-    assert updated.proxy == intent.proxy
-    assert updated.launch is not None
-    assert updated.launch.direct_model == "claude-opus-5"
-    assert updated.launch.model_route is None
-    assert intent.launch is not None
-    assert intent.launch.model_route is not None
-
-
 def test_rejects_invalid_direct_and_proxy_selections() -> None:
     with pytest.raises(SessionModelRoutingError, match="direct routing only supports Claude"):
         ResolvedModelRoute(
@@ -434,4 +514,16 @@ def test_rejects_invalid_direct_and_proxy_selections() -> None:
             request=normalize_model_route_request("gpt-5.6-sol"),
             kind="proxy",
             selected_tier="opus",
+        )
+
+    with pytest.raises(SessionModelRoutingError, match="no longer in the backend-source catalog"):
+        plan_model_route_transition(
+            ResolvedModelRoute(
+                request=normalize_model_route_request("gpt-5.6-sol"),
+                kind="proxy",
+                selected_tier="opus",
+                source_id="retired-source",
+                proxy_template="retired-template",
+                proxy_base_url="http://localhost:8096",
+            )
         )

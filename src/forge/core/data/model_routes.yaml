@@ -46,6 +46,7 @@ models:
         source_id: openrouter
         template: openrouter-qwen
         model_ref: openai/gpt-5.6-sol
+      # Dual ingress: raw Responses for Codex; translated Messages for Claude.
       - kind: proxy
         source_id: codex-responses-local
         template: codex-responses-local

@@ -1,11 +1,13 @@
 # Template: codex-responses-local
-# OpenAI Responses API passthrough for Codex (forge codex start --proxy).
+# Dual-ingress OpenAI route: Responses passthrough for Codex and translated
+# Anthropic Messages for Claude-backed sessions and workflow workers.
 #
 # Forwards Codex's raw Responses traffic (/v1/responses*) to a local LiteLLM that
 # serves the Responses API, WITHOUT translation, so reasoning items survive
 # byte-for-byte (signature-safe) and the x-litellm-response-cost header yields
 # real cost. `wire_shape: openai_responses_passthrough` is the authoritative wire
-# truth (GET / reports it); the client's model is forwarded unchanged.
+# truth for /v1/responses* (GET / reports it); the client's model is forwarded
+# unchanged. /v1/messages uses the ordinary translated handler.
 #
 # Requires:
 #   - OPENAI_API_KEY in .env (LiteLLM uses it to reach OpenAI)

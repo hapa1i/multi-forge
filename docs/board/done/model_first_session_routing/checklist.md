@@ -23,7 +23,7 @@ recorded below.
 - [x] Validate the activation-only document diff with `git diff --check`, Markdown link checks, and
   `make pre-commit-md`; record the clean commit before implementation starts.
 
-## Ratified decisions (2026-08-23)
+## Ratified decisions (2026-08-23; D10 clarified 2026-08-24)
 
 - **D1 -- One model selector.** Widen the existing interactive `--model`; do not add `--route-model`. Name its optional
   tier modifier `--model-tier`, preserving bare `--tier` for `session authority set` and `--authority-tier` on session
@@ -49,6 +49,9 @@ recorded below.
 - **D9 -- Transaction boundary.** Resolve, start any selected proxy, run target-context preflight, and persist the
   complete intent transition before the existing route-journal/child transaction. A selected proxy remains independently
   managed even if a later preflight or launch step fails.
+- **D10 -- Responses dual ingress.** `codex-responses-local` remains in the shared GPT route order. Codex uses raw
+  `/v1/responses*`; Claude-backed sessions and workers use translated `/v1/messages`. The configured wire shape records
+  the proxy's Responses capability without claiming that Messages traffic was raw passthrough.
 
 ## Phase 1 -- Shared route catalog and normalization
 
@@ -83,14 +86,16 @@ semantics. Any alias unification is a separate behavior-changing card. **Blocker
 
 **Blockers:** None.
 
-- [x] Add strict `ModelRouteIntent(requested_model, selected_tier, kind, source_id)` validation and optional
-  `LaunchIntent.model_route` storage.
+- [x] Add structurally strict `ModelRouteIntent(requested_model, selected_tier, kind, source_id)` validation and
+  optional `LaunchIntent.model_route` storage. Validate mutable model/source catalog membership when Forge authors or
+  executes a route, not while decoding durable state.
 - [x] Set `src/forge/session/models.py::SCHEMA_VERSION` to 2 and
   `src/forge/session/store.py::_SUPPORTED_SCHEMA_VERSIONS` to `{1, 2}`. Make
   `src/forge/session/store.py::SessionStore._write_unlocked` emit v2, update the store's v1-only module/read docstrings,
   convert v1 with only the new null default, and keep unknown versions/fields strict and actionable.
 - [x] Cover clean v1 reads, v1 ordinary-write upgrade, complete v2 round trips, missing/extra/invalid nested fields,
-  direct `source_id=null`, automatic proxy source ids, and manually constrained proxy `source_id=null`. Update
+  catalog-independent reads, direct `source_id=null`, automatic and proven explicit proxy source ids, and unproven
+  manually constrained proxy `source_id=null`. Update
   `tests/src/session/test_models.py::TestConstants::test_schema_version` plus store reader/writer tests so both version
   sites are guarded.
 - [x] Define the pure transition planner in `forge.core.ops.session_model_routing` for direct Claude, proxied Claude,
@@ -202,7 +207,7 @@ Removal waits for that test to pass. **Blockers:** None.
 | 1M route normalization                             | `[1m]`, canonical `-1m`, workflow 1M selector                          | one base route list; direct execution ref restores `[1m]`                          | `tests/src/core/models/test_model_routes.py` / `tests/src/review/test_models.py`      |
 | Provider-slug alias preservation                   | OpenRouter dot/hyphen aliases for Claude Opus/Sonnet 4.6               | dot forms retain 1M normalization; hyphen forms retain base normalization          | `tests/src/core/models/test_model_catalog_resolution.py`                              |
 | Manifest v1 compatibility                          | v1 direct/proxy/empty launch intents                                   | strict read succeeds with `model_route=None`; no selection occurs                  | `tests/src/session/test_store.py`                                                     |
-| Manifest v2 strictness                             | both schema constants plus valid/malformed `ModelRouteIntent` objects  | writer emits v2; v1/v2 read; invalid/extra fields fail contextually                | `tests/src/session/test_models.py` / `tests/src/session/test_store.py`                |
+| Manifest v2 strictness                             | both schema constants plus valid/malformed/catalog-retired route DTOs  | writer emits v2; v1/v2 read; structural errors fail; catalog drift stays readable  | `tests/src/session/test_models.py` / `tests/src/session/test_store.py`                |
 | Resolved-route override rejection                  | parent/object/leaf writes plus stale keyed resets                      | writes fail without mutation; reset remains a recovery path                        | `tests/src/session/test_overrides.py` / `tests/src/cli/test_session_overrides.py`     |
 | Automatic deterministic selection                  | two admissible catalog proxy routes plus unrelated running proxies     | first catalog candidate selected; registry state does not reorder it               | `tests/src/core/ops/test_session_model_routing.py`                                    |
 | No post-selection fallback                         | first candidate selected, then startup/health fails                    | hard error; second candidate and child never invoked                               | `tests/src/core/ops/test_session_model_routing.py`                                    |
@@ -240,10 +245,13 @@ Removal waits for that test to pass. **Blockers:** None.
   loaded direct `claude-opus-4-8` plus proxied `gpt-5.6-sol` routes from site-packages (2026-08-24).
 - Closeout: `make pre-commit-md` passed after the lane move, and the explicit Markdown audit passed for 574 sources with
   no stale `doing/model_first_session_routing` link (2026-08-24).
-- Documentation: all shipped design/CLI/end-user surfaces were reconciled; `docs/design_sessions.md` is 24,959 Opus
+- Documentation: all shipped design/CLI/end-user surfaces were reconciled; `docs/design_sessions.md` is 25,065 Opus
   tokens, below the living-document target. No separate implementation note was added because the stable ownership and
   transaction contracts are already canonical in the design documents.
 - Post-closeout review: rejected recorded-but-ignored `launch.model_route` overrides while preserving reset recovery,
   pinned v1 projection to v2, rejected incoherent persisted proxy routes, and single-sourced Claude tier and `[1m]`
   semantics. The 307-test focused slice, 9,854 unit tests (117 integration-marked tests deselected), two Docker session-
   routing integrations, and `make pre-commit` all passed (2026-08-24).
+- Follow-up routing audit: 399 focused session/CLI tests plus two dual-ingress middleware cases passed; both Docker
+  routing integrations passed; 9,865 unit tests passed with 117 integration-marked tests deselected; 1,068 regressions
+  passed; `make pre-commit` passed after design-token evidence was refreshed (2026-08-24).

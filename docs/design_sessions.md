@@ -101,16 +101,19 @@ selection:
 
 ```yaml
 model_route:
-  requested_model: gpt-5.6-sol # canonical model-catalog id
+  requested_model: gpt-5.6-sol # canonical model-catalog id when written
   selected_tier: opus # haiku | sonnet | opus
   kind: proxy # direct | proxy
-  source_id: openrouter # canonical backend source; null for direct or manually constrained proxy routes
+  source_id: openrouter # proven backend source; null for direct or unproven proxy routes
 ```
 
-`requested_model` records user intent independently of transport. `source_id` records an automatically selected proxy
-source only when Forge can prove one; direct routes require `null`. `intent.launch.direct_model` remains the Claude Code
-execution pin, including an optional `[1m]` transport modifier, and `intent.proxy` remains the concrete proxy
-template/base URL. `forge.core.ops.session_model_routing` owns the pure transition that replaces `intent.proxy`,
+`requested_model` records user intent independently of transport. Forge writes the then-canonical model id. `source_id`
+records an automatic, explicit, or preserved proxy source only when Forge can prove its then-canonical identity; direct
+routes require `null`. Catalog membership is a writer- and relaunch-time invariant, not a manifest-decode dependency. A
+later model- or source-catalog removal therefore leaves the durable session record readable while relaunch reports the
+unavailable route contextually. `intent.launch.direct_model` remains the Claude Code execution pin, including an
+optional `[1m]` transport modifier, and `intent.proxy` remains the concrete proxy template/base URL.
+`forge.core.ops.session_model_routing` owns the pure transition that replaces `intent.proxy`,
 `intent.launch.direct_model`, and `intent.launch.model_route` together for a resolved route. Clearing neutral route
 intent alone does not change the legacy proxy or Claude-pin fields. Legacy creation, adoption, `default_direct_model`,
 and Codex paths do not synthesize `model_route`.

@@ -427,8 +427,10 @@ class TestSessionStart:
         assert "Unknown model or alias" in result.output
         assert not SessionStore(str(temp_env), "bad-model").exists()
 
-    def test_start_with_model_and_proxy_validates_alternatives(self, runner: CliRunner, temp_env: Path) -> None:
-        """--model + --proxy should validate that the proxy has model_alternatives for the model."""
+    def test_start_with_model_and_proxy_validates_alternatives_and_persists_source(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        """--model + --proxy validates alternatives and persists a proven source."""
         with (
             mocked_model_route_proxy(
                 tiers={"haiku": "h", "sonnet": "s", "opus": "o"},
@@ -452,6 +454,10 @@ class TestSessionStart:
         assert result.exit_code == 0, result.output
         env_vars = mock_invoke.call_args.kwargs["env_vars"]
         assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
+        state = SessionStore(str(temp_env), "model-proxy-ok").read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.model_route is not None
+        assert state.intent.launch.model_route.source_id == "openrouter"
 
     def test_start_with_model_and_proxy_rejects_unconfigured_alternative(
         self, runner: CliRunner, temp_env: Path

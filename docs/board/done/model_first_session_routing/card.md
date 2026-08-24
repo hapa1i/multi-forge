@@ -250,6 +250,10 @@ Resolution is deterministic and fail-closed:
    current `billing_mode` evidence using the provenance domain's existing enum; it does not infer payer identity from
    model family alone.
 
+`codex-responses-local` is deliberately dual-ingress. Codex uses its raw `/v1/responses*` path, while Claude-backed
+sessions and workflow workers use its translated `/v1/messages` path. Its position in the shared GPT route order is
+therefore intentional, not an accidental Codex-only candidate leak.
+
 "Running-proxy reuse" means reuse within an explicit, preserved, or already selected template. Forge never scans
 unrelated running proxies and lets ambient process state choose a source.
 
@@ -278,6 +282,10 @@ session intent. The strict object contains exactly canonical `requested_model`, 
 requires its catalog source id; an explicit or preserved proxy records a canonical source only when that identity is
 proven, otherwise null. The selected proxy template and base URL remain single-sourced in `ProxyIntent`, so a manually
 configured proxy with unknown backend identity can still be reproduced without inventing provenance.
+
+Canonical model and source membership is enforced when Forge authors or relaunches the route, not while decoding the
+durable DTO. Catalog removal must not corrupt an otherwise structurally valid manifest: list/show remain available and
+relaunch reports that the stored route is unavailable so the user can choose a replacement.
 
 This is a session-manifest schema change, not an unversioned additive field. Bump `SCHEMA_VERSION` to 2, accept both v1
 and v2 on read, and write only v2. The v1-to-v2 conversion supplies `model_route=null`; it performs no route selection

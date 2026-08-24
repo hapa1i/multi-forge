@@ -330,6 +330,8 @@ def _prepare_created_fork(
 
         def _apply_selection(state: SessionState) -> None:
             state.intent = apply_model_route_transition(state.intent, transition)
+            # A fork owns a new child manifest; inherited parent confirmation is
+            # not evidence for that child and must be cleared with its new intent.
             state.confirmed.started_with_proxy = None
 
         manifest = store.update(timeout_s=5.0, mutate=_apply_selection)

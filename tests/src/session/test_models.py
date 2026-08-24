@@ -91,21 +91,27 @@ class TestModelRouteIntent:
         assert proxy.source_id == "openrouter"
         assert manual_proxy.source_id is None
 
-    def test_rejects_alias_unknown_tier_kind_and_invalid_source(self) -> None:
-        with pytest.raises(ValueError, match="must be canonical"):
-            ModelRouteIntent("openai/gpt-5.6-sol", "opus", "proxy", "openrouter")
-        with pytest.raises(ValueError, match="requested_model is unknown"):
-            ModelRouteIntent("ghost-model", "opus", "proxy", "openrouter")
+    def test_catalog_references_are_inert_durable_values(self) -> None:
+        route = ModelRouteIntent("retired-model", "opus", "proxy", "retired-source")
+
+        assert route.requested_model == "retired-model"
+        assert route.source_id == "retired-source"
+
+    def test_rejects_invalid_structure(self) -> None:
+        with pytest.raises(ValueError, match="requested_model must be a non-empty string"):
+            ModelRouteIntent("", "opus", "proxy", "openrouter")
+        with pytest.raises(ValueError, match="requested_model must be a non-empty string"):
+            ModelRouteIntent(1, "opus", "proxy", "openrouter")  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="selected_tier must be one of"):
             ModelRouteIntent("gpt-5.6-sol", "invalid", "proxy", "openrouter")
         with pytest.raises(ValueError, match="kind must be 'direct' or 'proxy'"):
             ModelRouteIntent("gpt-5.6-sol", "opus", "other", None)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="requires source_id=null"):
             ModelRouteIntent("claude-opus-5", "opus", "direct", "openrouter")
-        with pytest.raises(ValueError, match="canonical model-source id"):
-            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", "openrouter-openai")
-        with pytest.raises(ValueError, match="canonical model-source id"):
-            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", "unknown-source")
+        with pytest.raises(ValueError, match="source_id must be null or a non-empty string"):
+            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", "")
+        with pytest.raises(ValueError, match="source_id must be null or a non-empty string"):
+            ModelRouteIntent("gpt-5.6-sol", "opus", "proxy", 1)  # type: ignore[arg-type]
 
 
 class TestSessionIntent:

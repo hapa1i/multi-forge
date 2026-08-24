@@ -806,6 +806,8 @@ def resume_claude_session(
                 current.intent = apply_model_route_transition(current.intent, transition)
 
             manifest = store.update(timeout_s=5.0, mutate=_apply_selection)
+            # Confirmation is hook-owned on resume, so preserve it on disk until
+            # launch succeeds; only hide the stale route from this launch view.
             manifest.confirmed.started_with_proxy = None
         else:
             persist_resume_routing_override(

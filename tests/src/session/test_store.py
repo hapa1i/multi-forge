@@ -680,6 +680,32 @@ class TestSessionStoreRead:
         assert loaded.intent.launch is not None
         assert loaded.intent.launch.model_route == sample_manifest.intent.launch.model_route
 
+    def test_model_route_read_does_not_consult_mutable_catalogs(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        assert sample_manifest.intent.launch is not None
+        sample_manifest.intent.launch.model_route = ModelRouteIntent(
+            requested_model="gpt-5.6-sol",
+            selected_tier="opus",
+            kind="proxy",
+            source_id="openrouter",
+        )
+        store.write(sample_manifest)
+
+        def unexpected_catalog_lookup(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("manifest decode must not consult mutable catalogs")
+
+        monkeypatch.setattr("forge.core.models.catalog.resolve_model_id", unexpected_catalog_lookup)
+        monkeypatch.setattr("forge.backend.sources.get_model_source", unexpected_catalog_lookup)
+
+        loaded = store.read()
+
+        assert loaded.intent.launch is not None
+        assert loaded.intent.launch.model_route == sample_manifest.intent.launch.model_route
+
     def test_v2_launch_requires_model_route_field(self, store: SessionStore, sample_manifest: SessionState) -> None:
         store.write(sample_manifest)
         data = json.loads(store.manifest_path.read_text())
@@ -724,12 +750,12 @@ class TestSessionStoreRead:
             ),
             pytest.param(
                 {
-                    "requested_model": "openai/gpt-5.6-sol",
+                    "requested_model": "",
                     "selected_tier": "opus",
                     "kind": "proxy",
                     "source_id": "openrouter",
                 },
-                id="non-canonical-request",
+                id="empty-request",
             ),
             pytest.param(
                 {
@@ -745,9 +771,9 @@ class TestSessionStoreRead:
                     "requested_model": "gpt-5.6-sol",
                     "selected_tier": "opus",
                     "kind": "proxy",
-                    "source_id": "openrouter-openai",
+                    "source_id": "",
                 },
-                id="non-canonical-source",
+                id="empty-source",
             ),
         ],
     )

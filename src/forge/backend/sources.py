@@ -503,9 +503,9 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         ),
         template_names=("litellm-anthropic-local",),
     ),
-    # Codex-facing OpenAI Responses passthrough (forge codex start --proxy). A
-    # local LiteLLM serves /v1/responses upstream, so reasoning is preserved
-    # byte-for-byte and the x-litellm-response-cost header yields real cost.
+    # Dual-ingress OpenAI route: Codex gets raw Responses passthrough while
+    # Claude-backed consumers use the translated Messages handler. A local
+    # LiteLLM preserves Responses reasoning byte-for-byte and reports real cost.
     ModelSource(
         id="codex-responses-local",
         kind="local",
