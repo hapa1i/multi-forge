@@ -1,8 +1,9 @@
 # Refresh release QA for v1.0.0
 
-**Lane**: `proposed/` -- candidate release-blocking work for v1.0.0. Accept and execute this card before
-[`refresh_walkthrough_for_1_0`](../refresh_walkthrough_for_1_0/card.md), so the walkthrough consumes the release
-coverage boundaries instead of growing another product-contract suite.
+**Lane**: `doing/` -- accepted and activated directly from `proposed/` on 2026-08-25 on branch
+`test/refresh-release-qa-for-1-0`. Execute this card before
+[`refresh_walkthrough_for_1_0`](../../proposed/refresh_walkthrough_for_1_0/card.md), so the walkthrough consumes the
+release coverage boundaries instead of growing another product-contract suite.
 
 **References**:
 
@@ -30,6 +31,10 @@ Rechecked on `main` at `000cfc9c` on 2026-08-25:
   `uv sync`, so QA exercises the editable `/forge/.venv`, not the wheel that will be published.
 - The image tag derives Claude and Codex versions from the host and falls back to `latest`, so the blocking runtime
   matrix is not reproducible.
+- No repository-owned Claude/Codex validation pair exists. Claude has a `2.1.78` minimum plus several test-local probe
+  markers, while Codex currently has a `0.139.0` general-probe ceiling and a `0.141.0` proxy-contract floor. A valid
+  release pin therefore requires fresh probes and a reconciled Codex ceiling; it cannot be inferred from current
+  constants.
 - The QA frontend is deliberately Claude-specific. Legacy skill sources default to Claude-only, and its checkpoint flow
   depends on `AskUserQuestion`. The Docker subject already includes both Claude and Codex CLIs.
 - The two packaged `walkthrough-state.py` files are self-contained physical copies whose executable bodies may differ
@@ -59,13 +64,23 @@ The refresh must resolve at least these verified inconsistencies before adding c
 3. **Exact artifact first.** Build once, install that exact wheel into an isolated environment that cannot import the
    checkout, and record its version and digest. Source-container QA remains useful for development but cannot be the
    distribution gate.
-4. **Bound the default run.** Target at most 12 human checkpoints, 6-8 paid runtime/model operations, and 45 minutes for
-   the blocking lane. Measure the resulting run rather than declaring success from annotation counts alone.
-5. **Reproducible runtime matrix.** Block on one pinned, probe-validated Claude/Codex pair. Exercise `latest` in a
-   separately labelled compatibility lane whose failure does not rewrite the result of the pinned gate.
+4. **Bound deterministic work.** Hard-cap the blocking lane at 12 included human checkpoints and 8 paid model
+   completions. Count each worker/round, prompted managed-session turn, enrollment probe turn, and AI-curation call
+   separately; exclude the Claude-hosted checklist driver and report it separately. Record end-to-end duration, with 45
+   minutes as a review threshold rather than a correctness gate.
+5. **Repository-owned runtime matrix.** Store the pinned Claude/Codex pair and probe evidence in
+   `src/skills/qa/resources/runtime-matrix.json`. Establish both pins with fresh release probes; choose Codex at or
+   above the proxy floor and raise the general-probe ceiling to the validated version in the same change. Exercise
+   `latest` in a separately labelled compatibility lane whose failure does not rewrite the pinned verdict.
 6. **Preserve deterministic bookkeeping.** Prefer checklist/resource changes that do not alter the state-machine
    contract. If the selection model requires a state-script change, update both copies and their parity/behavior tests
    in the same commit.
+7. **Make Codex delivery evidence deterministic.** The blocking live journey uses the default `initial-message`
+   delivery. Real enrolled hook firing and staged hook-delivery assertions remain required automated-suite evidence. An
+   optional enrolled extended run may test `hook` delivery only when success is the expected result; trust-recovery
+   output is negative evidence, never an alternative pass.
+8. **Preserve section addressing.** Add v1.0.0 probes only by appending steps to their related sections 0-20. Do not
+   insert, renumber, or create section 21+, so category and `--from`/`--to` meanings remain stable.
 
 ## Scope
 
@@ -93,7 +108,7 @@ Trim these areas:
 - Keep one rendered status-line review. Assert raw ANSI, breadcrumb, config variants, fixture costs, and lazy-source
   behavior automatically.
 - Replace synthetic hook and direct-command matrices with their existing unit/integration owners. Keep one real Claude
-  lifecycle hook and one real Codex hook/preflight seam.
+  lifecycle hook, one live Codex preflight/`initial-message` seam, and the positive automated real-Codex hook owner.
 - Automate editor, cap, header, logging, and confirmation checks that have deterministic process/file/output evidence;
   retain one representative interaction for each distinct UX mechanism.
 - Move the three-session planner -> supervisor -> executor demonstration to the extended lane. The blocking gate uses
@@ -111,7 +126,7 @@ Trim these areas:
 | Artifact authority                   | existing real-runtime enforcement test plus a clean-wheel set/show/deny smoke         |
 | Native adoption and store repair     | targeted integration plus clean-wheel preview/apply CLI round trips                   |
 | Rewind and ancestry depth            | existing native-contract Docker coverage; no repeated manual launches                 |
-| Consumer lanes                       | CLI set/show/clear round trip plus existing freeze/inheritance regressions            |
+| Consumer lanes                       | live CLI set/show/clear and API/unknown/proxied evidence; automated keyless billing   |
 | Policy single-source modes           | installed `--file` and piped `--diff` checks plus zero/two-source rejection           |
 | Backend lifecycle and provider trace | backend/provider integrations plus installed list/show/explain surfaces               |
 | Extension lifecycle                  | exact-wheel enable/status/sync/runtime-disable/cleanup/uninstall preservation         |
@@ -127,10 +142,13 @@ The coverage map must include direct test references, not only feature names. Ex
 - `tests/integration/docker/test_rewind_native_contract.py`
 - `tests/integration/backend/test_backend_cli.py`
 - `tests/integration/proxy/test_provider_trace_e2e.py`
+- `tests/src/core/usage/test_billing.py`
 
 ### 4. Add an exact-wheel QA lane
 
 - Accept a specific prebuilt wheel or produce one once and pass its resolved path and digest into the QA environment.
+- Give release QA a distinct `forge-qa-release` image identity. Keep editable integration shell/Python runners aligned
+  with each other, but never let the wheel-backed QA image reuse their full tag or revision-only cache identity.
 - Install it into a clean venv/tool environment outside `/forge`; run from `/workspace` with no checkout entry on
   `sys.path`.
 - Assert the installed version, distribution metadata, `importlib.resources` extension inventory, CLI entry point, and
@@ -156,7 +174,7 @@ The blocking lane should need human judgment only for these distinct seams:
 4. one managed Claude lifecycle with real hook output;
 5. one same-directory native continuation;
 6. one cross-worktree transfer continuation;
-7. one managed Codex turn;
+7. one managed Codex `initial-message` turn;
 8. one portable skill plus one representative multi-worker workflow; and
 9. final preservation-aware uninstall/cleanup review.
 
@@ -184,19 +202,22 @@ inspect a file or JSON record that the CLI can validate directly.
 
 ## Acceptance Tests
 
-| Test                             | Fixture                                                          | Assertion                                                                                   | Test File                                                                        |
-| -------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Checklist metadata truth         | all QA section fragments                                         | parsed assertion total equals the index count; every step has one supported execution class | `tests/src/skills/test_qa_checklist_contract.py` (new)                           |
-| State-script parity              | QA and walkthrough packaged copies                               | only the two approved identity lines differ; both execute the full behavior matrix          | `tests/src/skills/test_walkthrough_state.py`, `test_walkthrough_state_parity.py` |
-| Exact wheel isolation            | prebuilt RC wheel, checkout also present                         | imported Forge and extension resources resolve from the wheel environment, never `/forge`   | `tests/integration/docker/test_installer.py` or a new sibling                    |
-| Managed Claude hook              | clean-wheel project and real Claude                              | session confirmation and transcript artifact are written by real lifecycle hooks            | `tests/integration/docker/test_real_claude_hooks.py`                             |
-| Managed Codex turn               | authenticated Codex and clean Forge project                      | preflight passes; start/resume records the thread and completes without Claude-only flags   | `tests/integration/core/test_codex_session_start.py`                             |
-| Model route evidence             | direct and proxy-capable catalog fixtures                        | explicit model selects the expected route; show/history report the committed event          | `tests/integration/docker/test_session_routing.py`                               |
-| Authority enforcement            | advisory and producer sessions on both runtimes                  | covered mutation is denied or allowed according to role and journaled truthfully            | `tests/integration/docker/test_real_authority.py`                                |
-| Session continuity matrix        | native, transfer, rewind, adoption, and repair fixtures          | each mechanism keeps its distinct state/artifact contract without repeated human launches   | existing targeted session Docker/integration tests                               |
-| Backend and trace operator paths | authenticated backend plus one traced request                    | lifecycle commands succeed and trace list/show/explain join the request                     | existing backend/provider-trace integrations                                     |
-| Runtime budget                   | complete blocking QA report                                      | elapsed time, checkpoint count, and paid operations stay within the ratified budget         | checklist/report contract test plus one recorded RC run                          |
-| Clean uninstall                  | wheel-installed Claude/Codex ownership plus unrelated user bytes | selected Forge ownership is removed and unrelated content remains byte-identical            | `tests/integration/docker/test_installer.py`                                     |
+| Test                             | Fixture                                                          | Assertion                                                                                    | Test File                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Checklist metadata truth         | all QA section fragments                                         | parsed assertion total equals the index count; every step has one supported execution class  | `tests/src/skills/test_qa_checklist_contract.py` (new)                                             |
+| State-script parity              | QA and walkthrough packaged copies                               | only the two approved identity lines differ; both execute the full behavior matrix           | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`  |
+| Runtime matrix                   | repository matrix plus runtime preflight fixtures                | both pins have fresh evidence; Codex meets its proxy floor and general validated ceiling     | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py` |
+| Exact wheel isolation            | prebuilt RC wheel, checkout also present                         | imported Forge and extension resources resolve from the wheel environment, never `/forge`    | `tests/integration/docker/test_qa_release_artifact.py` (new)                                       |
+| Managed Claude hook              | clean-wheel project and real Claude                              | session confirmation and transcript artifact are written by real lifecycle hooks             | `tests/integration/docker/test_real_claude_hooks.py`                                               |
+| Managed Codex turn               | authenticated Codex and clean Forge project                      | preflight passes; default initial-message start/resume records the thread                    | `tests/integration/core/test_codex_session_start.py`                                               |
+| Codex hook delivery              | enrolled real runtime plus staged receipt                        | real hook firing and staged delivery pass positively; recovery output is not a pass          | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py` |
+| Model route evidence             | direct and proxy-capable catalog fixtures                        | explicit model selects the expected route; show/history report the committed event           | `tests/integration/docker/test_session_routing.py`                                                 |
+| Authority enforcement            | advisory and producer sessions on both runtimes                  | covered mutation is denied or allowed according to role and journaled truthfully             | `tests/integration/docker/test_real_authority.py`                                                  |
+| Session continuity matrix        | native, transfer, rewind, adoption, and repair fixtures          | each mechanism keeps its distinct state/artifact contract without repeated human launches    | existing targeted session Docker/integration tests                                                 |
+| Backend and trace operator paths | authenticated backend plus one traced request                    | lifecycle commands succeed and trace list/show/explain join the request                      | existing backend/provider-trace integrations                                                       |
+| Runtime budget                   | selected blocking steps plus complete QA report                  | human checkpoints are at most 12 and paid model completions are at most 8                    | `tests/src/skills/test_qa_checklist_contract.py` (new)                                             |
+| Duration evidence                | complete blocking QA report                                      | end-to-end elapsed time is recorded; over 45 minutes requires explicit review, not test fail | `tests/src/skills/test_qa_checklist_contract.py` (new) plus recorded RC evidence                   |
+| Clean uninstall                  | wheel-installed Claude/Codex ownership plus unrelated user bytes | selected Forge ownership is removed and unrelated content remains byte-identical             | `tests/integration/docker/test_installer.py`                                                       |
 
 ## Verification Requirements
 
@@ -214,5 +235,6 @@ inspect a file or JSON record that the CLI can validate directly.
   documented category invocations? Choose one explicit contract before editing the state machine.
 - Should the exact-wheel container consume an externally built artifact or build once in a dedicated release stage?
   Either outcome must record the digest and prevent checkout shadowing.
-- Which Claude and Codex versions form the pinned v1.0.0 matrix? Use versions already covered by repository runtime
-  preflight contracts rather than choosing from the maintainer's current host.
+- Which freshly probed Claude and Codex versions form the pinned v1.0.0 matrix? Phase 0 must record a new Claude probe,
+  choose Codex at or above `0.141.0`, rerun the general probe at that version, and update its validated ceiling before
+  the pair is accepted.
