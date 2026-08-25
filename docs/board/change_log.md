@@ -7,6 +7,26 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-08-24
 
+### Close daily bug scan follow-ups
+
+**Goal/outcome**: Close the six reproducible cleanup, model-route, and Markdown-enforcement gaps left after PR #245
+without weakening locked transcript ownership, deterministic route replay, or resolved-containment link validation.
+
+**Key changes**:
+
+- Preserved a late sibling's shared native-relocate transcript while force-deleting a schema-invalid manifest, and
+  reclaimed nested `<uuid>/subagents/` Claude agent logs through the same locked owner scan; nested discovery and
+  raw-alias recovery require the exact canonical UUID spelling.
+- Rejected model-route selection under flag- or config-derived sidecar mode before route side effects, and made bare
+  replay reject blank stored proxy templates instead of acquiring same-URL registry identity, with `--host-proxy` and
+  explicit `--proxy`/`--no-proxy` recoveries named in the refusals.
+- Kept external repository aliases from erasing internal symlink spellings in manual Markdown validation, and made the
+  repository-wide Markdown audit run for deletion-only commits.
+
+**Verification**: 235 integrated focused cleanup/routing/Markdown tests plus 97 review-follow-up tests; 9,901 unit tests
+with 117 integration-marked tests deselected; 1,073 regressions; two targeted Docker session-routing integrations; full
+pre-commit including the 579-source Markdown audit. PR #246 merged as `6a4e7057` with all five GitHub checks passing.
+
 ### Correct post-merge session routing and cleanup defects
 
 **Goal/outcome**: Close nine independently reproduced invariant gaps left by the transcript-safety and model-routing

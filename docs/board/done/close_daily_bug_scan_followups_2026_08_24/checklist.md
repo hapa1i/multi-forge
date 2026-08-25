@@ -2,7 +2,7 @@
 
 Activation base: `3820b32d` (`main`, 2026-08-24).
 
-Current focus: PR #246 review and CI.
+Current focus: closed 2026-08-25; PR #246 merged as `6a4e7057`.
 
 ## Transcript Cleanup
 
@@ -66,3 +66,9 @@ Evidence:
   past the exact-string ownership scans; nested discovery and raw-alias recovery now require canonical form. 97 focused
   cleanup/routing/CLI tests; `make test-unit` 9,901 passed (117 deselected); `make test-regression` 1,073 passed; full
   pre-commit passed.
+- PR #246 merged as `6a4e7057` with all five GitHub checks passing.
+
+## Closeout
+
+- [x] Record the completed-work entry in `docs/board/change_log.md`.
+- [x] Move the completed card to `done/`; no inbound board links needed repointing.

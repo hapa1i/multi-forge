@@ -1,6 +1,6 @@
 # Close Daily Bug Scan Follow-ups 2026-08-24
 
-**Lane**: `doing/`
+**Lane**: `done/`
 
 ## Goal
 
