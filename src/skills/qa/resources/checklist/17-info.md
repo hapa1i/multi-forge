@@ -17,7 +17,7 @@ forge info
 
 ### 17.2 Debug Logging and `forge logs`
 
-<!-- human:confirm -->
+<!-- auto -->
 
 Run a Forge command with debug logging enabled, then use `forge logs show` to inspect and clean up log files.
 

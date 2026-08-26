@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "blocking": {
+    "max_human_checkpoints": 12,
+    "max_paid_operations": 8,
+    "duration_review_seconds": 2700
+  },
+  "expected_blocking": {
+    "steps": 163,
+    "assertions": 551,
+    "human_checkpoints": 9,
+    "paid_operations": 8
+  },
+  "counting": {
+    "human_checkpoint": "One selected human:guided or human:confirm checklist step.",
+    "paid_operation": "One intentionally requested subject-under-test model completion named by a paid-operations annotation.",
+    "panel": "Count every worker completion and every prompted managed-session turn.",
+    "multi_round": "Count every worker completion in every round.",
+    "managed_session": "Count every prompted turn; launch and exit without a prompt counts zero.",
+    "codex_verify_enrollment": "Count one only when the empirical probe turn runs.",
+    "ai_curated_transfer": "Count one when external curation runs; deterministic fallback counts zero.",
+    "driver": "Exclude the Claude-hosted checklist driver's orchestration and report it separately."
+  },
+  "duration": {
+    "starts_at": "artifact validation",
+    "ends_at": "final report save",
+    "over_threshold": "Set budget_review_required=true and require maintainer disposition; do not alter correctness."
+  }
+}

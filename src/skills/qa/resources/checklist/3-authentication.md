@@ -31,15 +31,11 @@ forge auth login -c anthropic-api
 
 ### 3.2 Login — Named Profiles
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, store credentials under a named profile. Enter a different test key (e.g.,
-`sk-ant-work-key-99999`).
-
-```
+```bash
 # Store credentials in a named profile
-forge auth login -c anthropic-api --profile work
-# Enter a different key, e.g.: sk-ant-work-key-99999
+printf 'sk-ant-work-key-99999\n' | forge auth login -c anthropic-api --profile work
 
 # Verify both profiles exist
 forge auth profiles
@@ -51,14 +47,11 @@ forge auth profiles
 
 ### 3.3 Login — Keep Existing Values
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, re-run login for the same credential. The existing value appears as a masked default (e.g.,
-`ANTHROPIC_API_KEY [sk-a…5678]`). Press Enter to keep it.
-
-```
+```bash
 # Re-run login for same credential — existing value shown as masked default
-forge auth login -c anthropic-api
+printf '\n' | forge auth login -c anthropic-api
 
 # Expected: shows existing value like "ANTHROPIC_API_KEY [sk-a…5678]"
 # Press Enter to keep existing value
@@ -93,7 +86,7 @@ forge auth status
   `LITELLM_BASE_URL`) are shown in full, not masked
 - [ ] When `OPENROUTER_BASE_URL` is unset, Credential details shows
   `OPENROUTER_BASE_URL = https://openrouter.ai/api/v1  (default)` (non-secret default shown in full)
-- [ ] All 5 credentials displayed (openrouter, anthropic-api, openai-api, gemini-api, litellm-remote)
+- [ ] All 6 credentials displayed (openrouter, anthropic-api, openai-api, codex-api, gemini-api, litellm-remote)
 - [ ] Unconfigured credentials show "not configured" (not "MISSING")
 
 ### 3.5 Status — Env Overrides File

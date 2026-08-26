@@ -11,8 +11,13 @@ creation happened in the same decision.
 
 ## Current Focus
 
-Awaiting checklist review. No QA implementation has started. Phase 0 freezes the evidence, artifact, runtime, budget,
-section-placement, and Codex-delivery contracts before checklist content or state-machine behavior changes.
+Implementation is complete through Phase 6 and is ready for maintainer review. The default blocking selection now
+contains 163 steps, 551 assertions, 9 human checkpoints, and 8 paid operations. The exact-wheel Docker isolation gate,
+the independent wheel-runtime smoke, the full unit/regression suites, and repository-wide pre-commit hooks pass.
+
+Phase 7 still needs the broad named integration-owner run, one human-driven pinned release-candidate QA pass, and the
+separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; do not turn
+the implementation branch's development wheel smoke into the v1.0.0 release verdict.
 
 ## Execution Guardrails
 
@@ -37,154 +42,153 @@ section-placement, and Codex-delivery contracts before checklist content or stat
 
 ## Phase 0 -- Freeze the Runner Contracts
 
-- [ ] Produce `docs/board/doing/refresh_release_qa_for_1_0/baseline-inventory.json` with a versioned JSON schema and one
+- [x] Produce `docs/board/doing/refresh_release_qa_for_1_0/baseline-inventory.json` with a versioned JSON schema and one
   record for each of the 188 current steps. **Assertion**: every record includes section/step id, execution class,
   prerequisites, paid/live-runtime use, current assertion count, proposed keep/merge/move/remove outcome, target
   section, evidence lane, and automated owner where applicable; the inventory reconciles 150 `auto`, 32 `human:guided`,
   6 `human:confirm`, and 636 parsed assertions without omissions.
-- [ ] Ratify the evidence/selection contract before changing annotations. **Proposed contract for review**:
+- [x] Ratify the evidence/selection contract before changing annotations. **Accepted contract**:
   `resources/coverage-map.md` classifies contracts as `automated-suite`, `clean-wheel-smoke`, `human-acceptance`, or
   `extended-exploratory`; `/forge:qa` runs the blocking clean-wheel/human set by default, while one `--extended` switch
   includes exploratory steps. Do not expose four runner modes or overload category names with evidence semantics.
   **Assertion**: default, category, range, resume, and extended selection have deterministic, regression-tested
   inclusion rules.
-- [ ] Ratify the artifact-input contract. **Proposed contract for review**: default developer QA builds one wheel once;
+- [x] Ratify the artifact-input contract. **Accepted contract**: default developer QA builds one wheel once;
   `--wheel <path>` consumes a prebuilt release-candidate wheel; release sign-off requires the explicit prebuilt path. A
   legacy source/editable run, if retained, is labelled development-only and cannot emit a release-pass verdict.
   **Assertion**: the report identifies exactly one wheel by canonical path, filename, version, and SHA-256, and its
   `forge-qa-release` image identity cannot collide with the editable integration image even when revision and runtime
   versions match.
-- [ ] Ratify the runtime identity contract whose repository authority will be
-  `src/skills/qa/resources/runtime-matrix.json`. **Proposed contract for review**: the resource owns a schema version,
-  pinned Claude/Codex versions, probe commands/results/dates, runtime track, and the Forge revision that accepted the
-  pair; `--runtime-track latest` remains a separately labelled compatibility run. Do not derive the Claude pin from
+- [x] Ratify the runtime identity contract whose repository authority will be
+  `src/skills/qa/resources/runtime-matrix.json`. **Accepted contract**: the resource owns a schema version, pinned
+  Claude/Codex versions, probe commands/results/dates, runtime track, and the Forge revision that accepted the pair;
+  `--runtime-track latest` remains a separately labelled compatibility run. Do not derive the Claude pin from
   `MIN_CLAUDE_CODE_VERSION` or test-local evidence markers. Select Codex at or above
   `CODEX_PROXY_CONTRACT_VALIDATED = 0.141.0` and run the general preflight/probe suite at that version; Phase 1 records
   the pair and raises `CODEX_VERSION_VALIDATED` from `0.139.0` in one test-backed slice. **Assertion**: both clients
   have fresh release-probe evidence, and an absent pin, `latest`, or version mismatch cannot masquerade as the pinned
   blocking run.
-- [ ] Ratify the blocking-budget counting units. **Proposed contract for review**: one included `human:guided` or
-  `human:confirm` step is one human checkpoint; one intentionally requested subject-under-test model completion is one
-  paid operation. A panel counts each worker, consensus/debate count every worker in every round, every prompted
-  managed-session turn counts separately, `runtime preflight codex --verify-enrollment` counts one only when it runs its
-  real probe turn, and AI-curated transfer generation counts one when curation runs. Static status/preflight that
-  short-circuits without a turn counts zero. Exclude the Claude-hosted checklist driver's own orchestration and report
-  it separately. **Assertion**: the same fixtures produce the same counts before execution and in the saved report; the
-  hard limits are 12 human checkpoints and 8 paid operations, with no minimum.
-- [ ] Ratify duration semantics. **Proposed contract for review**: record wall-clock time for the complete `/forge:qa`
-  invocation from artifact validation through final report save. A run over 45 minutes sets
-  `budget_review_required: true` and needs explicit maintainer disposition before sign-off, but duration alone does not
-  fail an otherwise correct run. **Assertion**: reports cannot omit duration or silently treat the review threshold as a
-  product-test failure.
-- [ ] Ratify the append-only landing map. **Proposed contract for review**: append extension lifecycle probes to section
-  2; backend/provider trace to 4; managed runtimes, routing, adoption/repair, and consumer lanes to 5; runtime hook
+- [x] Ratify the blocking-budget counting units. **Accepted contract**: one included `human:guided` or `human:confirm`
+  step is one human checkpoint; one intentionally requested subject-under-test model completion is one paid operation. A
+  panel counts each worker, consensus/debate count every worker in every round, every prompted managed-session turn
+  counts separately, `runtime preflight codex --verify-enrollment` counts one only when it runs its real probe turn, and
+  AI-curated transfer generation counts one when curation runs. Static status/preflight that short-circuits without a
+  turn counts zero. Exclude the Claude-hosted checklist driver's own orchestration and report it separately.
+  **Assertion**: the same fixtures produce the same counts before execution and in the saved report; the hard limits are
+  12 human checkpoints and 8 paid operations, with no minimum.
+- [x] Ratify duration semantics. **Accepted contract**: record wall-clock time for the complete `/forge:qa` invocation
+  from artifact validation through final report save. A run over 45 minutes sets `budget_review_required: true` and
+  needs explicit maintainer disposition before sign-off, but duration alone does not fail an otherwise correct run.
+  **Assertion**: reports cannot omit duration or silently treat the review threshold as a product-test failure.
+- [x] Ratify the append-only landing map. **Accepted contract**: append extension lifecycle probes to section 2;
+  backend/provider trace to 4; managed runtimes, routing, adoption/repair, and consumer lanes to 5; runtime hook
   readiness to 6; billing/telemetry to 7; direct commands to 9; transfer/rewind/ancestry to 10; and authority/policy
   source modes to 13. Record the final target and future step id in `baseline-inventory.json` before editing fragments.
   **Assertion**: no existing step id or section address moves, no section 21+ appears, and report categories remain
   stable.
-- [ ] Ratify Codex context-delivery ownership. **Proposed contract for review**: blocking live QA proves
-  `initial-message`; enrolled hook firing is owned by `tests/integration/docker/test_real_authority.py`, while staged
-  hook receipt/delivery remains owned by `tests/integration/docker/test_policy_hooks.py`. An optional `--extended`
-  enrolled hook probe must require `--verify-enrollment` success and recorded `session_start_hook` evidence. A trust
-  recovery diagnostic is a failed/negative probe, not a passing branch. **Assertion**: each selected environment has one
-  known expected outcome and no either/or assertion can pass forever on recovery output.
-- [ ] Reconcile the accepted decisions into `card.md`, `SKILL.md` argument semantics, the container interface, and the
+- [x] Ratify Codex context-delivery ownership. **Accepted contract**: blocking live QA proves `initial-message`;
+  enrolled hook firing is owned by `tests/integration/docker/test_real_authority.py`, while staged hook receipt/delivery
+  remains owned by `tests/integration/docker/test_policy_hooks.py`. An optional `--extended` enrolled hook probe must
+  require `--verify-enrollment` success and recorded `session_start_hook` evidence. A trust recovery diagnostic is a
+  failed/negative probe, not a passing branch. **Assertion**: each selected environment has one known expected outcome
+  and no either/or assertion can pass forever on recovery output.
+- [x] Reconcile the accepted decisions into `card.md`, `SKILL.md` argument semantics, the container interface, and the
   test plan before implementation proceeds. Record any rejected alternative and why it would weaken reproducibility or
   add state-machine complexity.
 
 ## Phase 1 -- Lock Checklist and Harness Contracts with Tests
 
-- [ ] Repair the two current structural inputs and add `tests/src/skills/test_qa_checklist_contract.py` in the same
+- [x] Repair the two current structural inputs and add `tests/src/skills/test_qa_checklist_contract.py` in the same
   green slice. **Assertion**: update the current declared count from 632 to the parsed 636 and add the missing Costs row
   before enabling assertions that the index metadata parses, its declared `test-count` equals all 21 fragments, section
   and step ids are unique, every step has exactly one supported execution class, referenced section files exist, and
   report categories match the index. Every later checklist-content slice recomputes the count in that same slice.
-- [ ] Create the accepted runtime matrix and its schema/invariant contract alongside the Codex ceiling update.
+- [x] Create the accepted runtime matrix and its schema/invariant contract alongside the Codex ceiling update.
   **Assertion**: the matrix contains one pinned pair with fresh probe provenance, the Codex pin is at or above the proxy
   floor and no higher than `CODEX_VERSION_VALIDATED`, and tests that intentionally asserted the old ceiling/floor split
   are updated in the same green slice.
-- [ ] Replace the host-derived-version assumptions in `tests/regression/test_bug_qa_runtime_image_tag_parity.py` with
+- [x] Replace the host-derived-version assumptions in `tests/regression/test_bug_qa_runtime_image_tag_parity.py` with
   the ratified pinned/latest identity contract. **Assertion**: the integration shell runner and Python fixture retain
   one editable-image tag identity, but wheel-backed QA deliberately uses the distinct `forge-qa-release` namespace and
   cannot share their full tag or revision-only reuse key. Runtime-version serialization/build-argument shape remains
   aligned where useful, while runtime versions, artifact digests, and tracks prevent release-QA collisions.
-- [ ] Add focused shell/container contract coverage for `start-container.sh`. **Assertion**: missing/invalid wheel
+- [x] Add focused shell/container contract coverage for `start-container.sh`. **Assertion**: missing/invalid wheel
   paths, ambiguous wheel sets, version/digest mismatch, stale container reuse, provider-profile mismatch, runtime-track
   mismatch, and unknown flags fail before a container is reused or started.
-- [ ] If Phase 0 requires parser support, update both parity-locked state scripts test-first. **Assertion**: index,
+- [x] If Phase 0 requires parser support, update both parity-locked state scripts test-first. **Assertion**: index,
   step, init, record, report, prerequisite resolution, `--from` validation, and checklist hashing behave identically in
   both copies; otherwise leave both scripts byte-unchanged.
 
 ## Phase 2 -- Make the Exact Wheel the QA Subject
 
-- [ ] Implement one build-or-consume artifact preparation path owned by the QA harness. **Assertion**: it resolves one
+- [x] Implement one build-or-consume artifact preparation path owned by the QA harness. **Assertion**: it resolves one
   wheel, verifies the filename/version metadata, computes SHA-256 once, and passes immutable identity into image and
   container startup; rebuild/reuse never silently selects another artifact.
-- [ ] Install the wheel and its resolved dependencies into a clean environment outside `/forge`. **Assertion**:
+- [x] Install the wheel and its resolved dependencies into a clean environment outside `/forge`. **Assertion**:
   `command -v forge`, `forge --version`, `import forge`, distribution metadata, and `importlib.resources` all resolve
   from the wheel environment while the working directory is `/workspace` and the checkout is absent from `sys.path`.
-- [ ] Preserve checkout access only for explicit fixtures and test commands. **Assertion**: temporarily making the
+- [x] Preserve checkout access only for explicit fixtures and test commands. **Assertion**: temporarily making the
   checkout's Forge package unavailable does not break installed CLI or extension-resource discovery, and deliberately
   substituting checkout-only content cannot satisfy the provenance preflight.
-- [ ] Make container identity and reuse artifact-aware. **Assertion**: the distinct release-QA tag and labels/status
+- [x] Make container identity and reuse artifact-aware. **Assertion**: the distinct release-QA tag and labels/status
   include Forge revision, wheel digest/version, provider profile, Claude version, Codex version, and runtime track; it
   cannot reuse the editable integration image, and any same-lane mismatch yields an actionable reset/restart refusal
   before tests run.
-- [ ] Add isolated Codex readiness/auth ingress without copying unrelated host state. **Assertion**: `CODEX_API_KEY` or
+- [x] Add isolated Codex readiness/auth ingress without copying unrelated host state. **Assertion**: `CODEX_API_KEY` or
   an explicitly selected isolated Codex credential source reaches only the container, secret values never enter logs or
   reports, `forge codex status` and `forge runtime preflight codex` explain missing readiness, and the blocking run
   cannot count a skipped managed-Codex turn as a pass.
-- [ ] Keep `scripts/test-wheel-runtime.sh` as the independent dependency-resolution/LiteLLM smoke and preserve the
+- [x] Keep `scripts/test-wheel-runtime.sh` as the independent dependency-resolution/LiteLLM smoke and preserve the
   editable Docker target used by automated integration tests. **Assertion**: adding the QA artifact lane does not turn
   the general integration fixture into a wheel-only environment or duplicate the existing LiteLLM smoke logic.
 
 ## Phase 3 -- Restore Checklist Truth
 
-- [ ] Fix authentication step 3.4. **Assertion**: human and JSON views account for all six registered credentials,
+- [x] Fix authentication step 3.4. **Assertion**: human and JSON views account for all six registered credentials,
   including `codex-api`, with secret and connection-value masking still distinguished.
-- [ ] Fix telemetry vocabulary in steps 7.11 and 7.14. **Assertion**: paths and output assertions consistently use
+- [x] Fix telemetry vocabulary in steps 7.11 and 7.14. **Assertion**: paths and output assertions consistently use
   `downstream`; no live QA text calls that store `requests`.
-- [ ] Replace or correct hook step 6.11. **Assertion**: the command actually exercises the claimed Claude WorktreeCreate
+- [x] Replace or correct hook step 6.11. **Assertion**: the command actually exercises the claimed Claude WorktreeCreate
   behavior, or the step is reclassified to its real Forge-owned worktree contract; it does not expect a project/local
   runtime-hook block when runtime hooks are user-scoped.
-- [ ] Correct incremental-disable assertions in sections 18 and 19. **Assertion**: runtime-scoped removal checks only
+- [x] Correct incremental-disable assertions in sections 18 and 19. **Assertion**: runtime-scoped removal checks only
   the selected ownership, preserves omitted runtimes and unrelated bytes, and describes user/project/local ownership
   exactly as `extension status --json` reports it.
-- [ ] Retag only `src/skills/qa/resources/checklist.md` for v1.0.0, recompute `test-count` mechanically, and replace the
+- [x] Retag only `src/skills/qa/resources/checklist.md` for v1.0.0, recompute `test-count` mechanically, and replace the
   historical update diary with concise current-contract metadata. Keep `test-count` synchronized in every slice that
   changes assertions; the walkthrough card retains sole ownership of the walkthrough header.
-- [ ] Remove historical phase labels from current user-facing section/step titles. **Assertion**: titles describe the
+- [x] Remove historical phase labels from current user-facing section/step titles. **Assertion**: titles describe the
   shipped command or behavior and do not imply obsolete implementation phases.
-- [ ] Complete an assertion-to-command audit across sections 0-20. **Assertion**: every invoked command exists in
+- [x] Complete an assertion-to-command audit across sections 0-20. **Assertion**: every invoked command exists in
   current CLI help, every output claim is observable from that command, destructive and infrastructure annotations are
   accurate, and partial-run prerequisites still resolve all required fixture state.
 
 ## Phase 4 -- Publish Coverage Ownership and Cut Human Noise
 
-- [ ] Add `src/skills/qa/resources/coverage-map.md` using the ratified four-lane vocabulary. **Assertion**: every v1.0.0
+- [x] Add `src/skills/qa/resources/coverage-map.md` using the ratified four-lane vocabulary. **Assertion**: every v1.0.0
   surface in the card names its authoritative command/test path, clean-wheel seam when needed, human seam only when
   judgment is irreducible, and an explicit reason for any exploratory-only status.
-- [ ] Replace live resume steps 10.2-10.5 with a transfer-regeneration matrix over `minimal`, `structured`, `full`, and
+- [x] Replace live resume steps 10.2-10.5 with a transfer-regeneration matrix over `minimal`, `structured`, `full`, and
   `ai-curated`. **Assertion**: generated frontmatter/body, warnings/fallback, child-snapshot preservation, and target
   runtime are checked without four child launches; retain one real delivery and one editor interaction.
-- [ ] Reduce fork handoffs to one same-directory native continuation and one cross-worktree transfer continuation.
+- [x] Reduce fork handoffs to one same-directory native continuation and one cross-worktree transfer continuation.
   **Assertion**: both distinct mechanisms remain covered, while repeated "where were we?" launches and already-owned
   generated-file variants leave the blocking lane.
-- [ ] Reduce live skill/workflow coverage to one portable skill invocation and one representative multi-worker frontend.
+- [x] Reduce live skill/workflow coverage to one portable skill invocation and one representative multi-worker frontend.
   **Assertion**: package compilation/invocation and real fan-out remain visible, while review, understand, panel,
   consensus, debate, and analyzer permutations rely on their CLI/compiler/integration owners.
-- [ ] Keep one rendered status-line review and automate raw ANSI, breadcrumb, config, fixture-cost, and lazy-source
+- [x] Keep one rendered status-line review and automate raw ANSI, breadcrumb, config, fixture-cost, and lazy-source
   assertions. **Assertion**: palette/layout judgment remains human; deterministic content checks do not prompt.
-- [ ] Replace synthetic hook matrices with unit/integration owners and retain one real Claude lifecycle, one live Codex
+- [x] Replace synthetic hook matrices with unit/integration owners and retain one real Claude lifecycle, one live Codex
   preflight/`initial-message` seam, and the positive automated real-Codex hook owner. **Assertion**: removal references
   the owning tests and does not erase the clean-runtime failure class that manual QA is meant to catch.
-- [ ] Convert deterministic editor, cap, header, logging, and confirmation checks to automatic evidence. **Assertion**:
+- [x] Convert deterministic editor, cap, header, logging, and confirmation checks to automatic evidence. **Assertion**:
   `EDITOR=true`, exit status, JSON, filesystem, and grep checks replace prompts wherever they fully decide the claim;
   one representative editor and destructive confirmation remain.
-- [ ] Move the planner -> supervisor -> executor demonstration and redundant catalog matrices to the extended lane.
+- [x] Move the planner -> supervisor -> executor demonstration and redundant catalog matrices to the extended lane.
   **Assertion**: the blocking gate retains deterministic supervisor, compiler, installer, and package-health owners;
   default `/forge:qa` does not launch the three-session demonstration.
-- [ ] Recount the resulting gate and extend `tests/src/skills/test_qa_checklist_contract.py` for evidence selection and
+- [x] Recount the resulting gate and extend `tests/src/skills/test_qa_checklist_contract.py` for evidence selection and
   budgets in the same green slice as the final blocking metadata. **Assertion**: every retained contract has one lane
   and an existing owner path; default and extended steps remain distinguishable without changing section ids; computed
   human checkpoints are at most 12 and paid operations are at most 8 under the ratified units; every removed assertion
@@ -193,70 +197,70 @@ section-placement, and Codex-delivery contracts before checklist content or stat
 
 ## Phase 5 -- Cover the Missing v1.0.0 Surfaces
 
-- [ ] Add installed managed-Claude lifecycle evidence. **Assertion**: one clean-wheel session produces real
+- [x] Add installed managed-Claude lifecycle evidence. **Assertion**: one clean-wheel session produces real
   SessionStart/Stop confirmation and a transcript artifact; synthetic hook calls remain automated-suite evidence.
-- [ ] Add installed managed-Codex evidence. **Assertion**: static status and preflight pass, one bounded managed
+- [x] Add installed managed-Codex evidence. **Assertion**: static status and preflight pass, one bounded managed
   start/resume turn records the thread, and default `initial-message` delivery works. Do not claim that this live step
   proves hook delivery.
-- [ ] Preserve deterministic Codex hook coverage through its automated owners. **Assertion**:
+- [x] Preserve deterministic Codex hook coverage through its automated owners. **Assertion**:
   `tests/integration/docker/test_real_authority.py` positively demonstrates enrolled real-runtime hook firing and
   `tests/integration/docker/test_policy_hooks.py` demonstrates staged hook receipt/delivery. If the optional enrolled
   extended lane is selected, `runtime preflight codex --verify-enrollment` must report enrolled and the managed turn
   must record `session_start_hook`; documented recovery output fails that step and remains diagnostic evidence only.
-- [ ] Add model-first routing evidence. **Assertion**: `--model` resolves the expected direct/proxy route and
+- [x] Add model-first routing evidence. **Assertion**: `--model` resolves the expected direct/proxy route and
   `forge session model show`, `history`, and `%session model show` report the committed event rather than only intent.
-- [ ] Add authority evidence without duplicating the real-runtime matrix. **Assertion**: installed set/show plus one
+- [x] Add authority evidence without duplicating the real-runtime matrix. **Assertion**: installed set/show plus one
   allowed/denied mutation agree with the journal; exhaustive Claude/Codex advisory/producer combinations remain owned by
   `tests/integration/docker/test_real_authority.py`.
-- [ ] Add native-adoption and session-repair CLI round trips. **Assertion**: adoption preview/id binding and ambiguous
+- [x] Add native-adoption and session-repair CLI round trips. **Assertion**: adoption preview/id binding and ambiguous
   evidence fail-closed; repair preview/apply is root-scoped, degraded records remain visible, and neither flow destroys
   native transcripts or recreates worktrees.
-- [ ] Add rewind and ancestry-depth installed probes. **Assertion**: resume and fork accept valid rewind/drop-last and
+- [x] Add rewind and ancestry-depth installed probes. **Assertion**: resume and fork accept valid rewind/drop-last and
   fresh/depth forms, reject invalid flag combinations, and leave the full native continuity matrix to the existing
   Docker integration owner.
-- [ ] Add consumer-lane evidence. **Assertion**: lane set/show/clear covers each supported consumer, supervisor status
+- [x] Add consumer-lane evidence. **Assertion**: lane set/show/clear covers each supported consumer, supervisor status
   reflects the effective lane, and the keyed QA container verifies live `api` plus available unknown/proxied evidence.
   The keyless direct `claude-max` -> `subscription_quota` branch remains explicitly owned by
   `tests/src/core/usage/test_billing.py`; injected `ANTHROPIC_API_KEY` must not be removed merely to synthesize that
   branch in live QA.
-- [ ] Complete backend and provider-trace operator paths. **Assertion**: backend list/show/test-auth/start/stop/delete
+- [x] Complete backend and provider-trace operator paths. **Assertion**: backend list/show/test-auth/start/stop/delete
   and reconcile use correct source/adapter/runtime ids; trace list/show/explain joins one real request and emits stable
   JSON/human output.
-- [ ] Add both policy single-source modes. **Assertion**: an installed
+- [x] Add both policy single-source modes. **Assertion**: an installed
   `forge policy check --bundle coding_standards --file <path>` and piped `--diff` succeed, while zero sources and
   `--file` plus `--diff` fail atomically with actionable diagnostics.
-- [ ] Reconcile extension and transfer coverage against the exact wheel. **Assertion**: enable/status/sync,
+- [x] Reconcile extension and transfer coverage against the exact wheel. **Assertion**: enable/status/sync,
   runtime-scoped disable, unmanaged cleanup, uninstall preservation, transfer strategy generation, and one human-visible
   delivery all execute from packaged resources without checkout fallback.
 
 ## Phase 6 -- Orchestration, Reporting, and Documentation
 
-- [ ] Update `src/skills/qa/SKILL.md` for the ratified artifact, runtime-track, and extended-selection arguments.
+- [x] Update `src/skills/qa/SKILL.md` for the ratified artifact, runtime-track, and extended-selection arguments.
   **Assertion**: parsing rejects unknown/conflicting values before Docker mutation; category and range examples remain
   accurate; the execution loop runs only checklist commands and always saves artifacts after partial or failed runs.
-- [ ] Update `report-template.md` and report assembly. **Assertion**: the report records artifact path/digest/install
+- [x] Update `report-template.md` and report assembly. **Assertion**: the report records artifact path/digest/install
   method, Forge/checklist versions, runtime pins/observed versions/track, provider profile, evidence lane, duration,
   `budget_review_required`, human checkpoint count, paid-operation count, separately reported driver orchestration,
   per-section results, gaps, and preserved debug/transcript artifacts.
-- [ ] Keep state and report semantics honest for automated-suite owners. **Assertion**: referenced automated tests are
+- [x] Keep state and report semantics honest for automated-suite owners. **Assertion**: referenced automated tests are
   not counted as commands executed by the manual run; skipped prerequisites and non-blocking latest failures cannot
   inflate the blocking pass total.
-- [ ] Update `docs/design_installation.md` and `docs/developer/testing_guidelines.md` with the settled evidence lanes,
+- [x] Update `docs/design_installation.md` and `docs/developer/testing_guidelines.md` with the settled evidence lanes,
   exact-artifact boundary, runtime identity, budgets, and state-script rule. Update `docs/end-user/manual_testing.md`
   only for public invocation/recovery changes.
-- [ ] Verify packaged-resource/compiler ownership. **Assertion**: the wheel contains the QA checklist fragments,
+- [x] Verify packaged-resource/compiler ownership. **Assertion**: the wheel contains the QA checklist fragments,
   coverage map, runtime matrix, report template, scripts, and updated `SKILL.md`; Claude installation exposes QA, Codex
   installation still omits it, and no new cross-skill runtime dependency is introduced.
 
 ## Phase 7 -- Verification and Release-Candidate Evidence
 
-- [ ] Run focused skill/checklist tests, including the new contract tests and both state-script behavior/parity suites.
-- [ ] Run the updated QA image-identity regression and focused installer/compiler/profile tests.
+- [x] Run focused skill/checklist tests, including the new contract tests and both state-script behavior/parity suites.
+- [x] Run the updated QA image-identity regression and focused installer/compiler/profile tests.
 - [ ] Run the targeted Docker/integration owners named in the acceptance table for Claude hooks, Codex sessions, model
   routing, authority, adoption/repair, rewind, backend lifecycle, provider trace, policy source modes, and installer
   lifecycle.
-- [ ] Run `make test-unit`, `make test-regression`, and `make pre-commit` with no unexplained failures or new skips.
-- [ ] Run `uv build`, `scripts/test-wheel-runtime.sh`, and the exact-wheel isolation/lifecycle integration gate against
+- [x] Run `make test-unit`, `make test-regression`, and `make pre-commit` with no unexplained failures or new skips.
+- [x] Run `uv build`, `scripts/test-wheel-runtime.sh`, and the exact-wheel isolation/lifecycle integration gate against
   the same candidate artifact.
 - [ ] Run one complete pinned-runtime blocking QA pass from a prebuilt release-candidate wheel. **Assertion**: report
   and artifacts are saved, all blocking sections pass, runtime and artifact identities match, human checkpoints are at
@@ -265,8 +269,21 @@ section-placement, and Codex-delivery contracts before checklist content or stat
   bytes.
 - [ ] Run one separately labelled `latest` compatibility pass when runtime/network availability permits. Record a skip
   or failure as compatibility evidence without changing the pinned verdict.
-- [ ] Run Markdown links, repository file-size checks, and `git diff --check`; review the final diff for accidental
+- [x] Run Markdown links, repository file-size checks, and `git diff --check`; review the final diff for accidental
   walkthrough changes, secret material, stale paths, and checklist claims not backed by executed evidence.
+
+### Verification Snapshot -- 2026-08-26
+
+- `make test-unit`: 9,950 passed, 117 deselected.
+- `make test-regression`: 1,074 passed.
+- QA selection/state/runtime/image regressions: 301 passed; installer/compiler/profile focus: 274 passed.
+- `make pre-commit` and the final Markdown-only rerun passed, including type checks, secret detection, file-size limits,
+  and link checks.
+- `uv build`, `scripts/test-wheel-runtime.sh`, and
+  `./scripts/test-integration.sh tests/integration/docker/test_qa_release_artifact.py` passed.
+- A prebuilt-wheel pinned launcher lifecycle (`--reset`, `--status`, `--stop`) passed with the recorded wheel SHA-256,
+  Claude `2.1.245`, and Codex `0.149.1`. It was an infrastructure smoke only; it did not run the paid or human QA steps
+  and is not release-candidate evidence.
 
 ## Acceptance Tests
 

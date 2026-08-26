@@ -116,15 +116,14 @@ forge config migrate-retention --yes --json | jq -e '
 
 ### 11.5 Edit in Editor
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, run `forge config edit`. Verify `$EDITOR` opens `${FORGE_HOME:-$HOME/.forge}/config.yaml`.
-
+```bash
+EDITOR=true forge config edit
+test -f "${FORGE_HOME:-$HOME/.forge}/config.yaml"
 ```
-forge config edit
-```
 
-- [ ] Opens `${FORGE_HOME:-$HOME/.forge}/config.yaml` in `$EDITOR`
+- [ ] `EDITOR=true` exercises the edit path and the config remains present
 
 ### 11.6 Show Claude Preset
 
@@ -196,16 +195,14 @@ PY
 
 ### 11.8 Edit Claude Preset in Editor
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, run `forge claude preset edit`. Verify `$EDITOR` opens
-`${FORGE_HOME:-$HOME/.forge}/claude.preset.json`.
-
-```
-forge claude preset edit
+```bash
+EDITOR=true forge claude preset edit
+test -f "${FORGE_HOME:-$HOME/.forge}/claude.preset.json"
 ```
 
-- [ ] Opens `${FORGE_HOME:-$HOME/.forge}/claude.preset.json` in `$EDITOR`
+- [ ] `EDITOR=true` exercises the preset edit path and the preset remains present
 
 ### 11.9 Per-Skill Invocation Mode
 

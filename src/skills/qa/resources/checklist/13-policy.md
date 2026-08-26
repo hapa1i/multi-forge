@@ -76,12 +76,34 @@ git diff HEAD~1 | forge policy check --bundle tdd --bundle coding_standards --di
 
 # Check with JSON output
 git diff HEAD~1 | forge policy check --bundle tdd --diff --json
+
+# Check the independent single-file source mode from the installed wheel.
+forge policy check --bundle coding_standards --file src/main.py --json \
+  | jq -e 'has("passed") and has("clean")'
+
+# Exactly one content source is required.
+set +e
+forge policy check --bundle coding_standards \
+  >/tmp/qa-policy-no-source.stdout 2>/tmp/qa-policy-no-source.stderr
+NO_SOURCE_RC=$?
+git diff HEAD~1 | forge policy check --bundle coding_standards --file src/main.py --diff \
+  >/tmp/qa-policy-two-sources.stdout 2>/tmp/qa-policy-two-sources.stderr
+TWO_SOURCES_RC=$?
+set -e
+test "$NO_SOURCE_RC" -ne 0
+test "$TWO_SOURCES_RC" -ne 0
+rg 'Provide --file or --diff' /tmp/qa-policy-no-source.stderr
+rg 'cannot be used together' /tmp/qa-policy-two-sources.stderr
+rm -f /tmp/qa-policy-no-source.stdout /tmp/qa-policy-no-source.stderr \
+  /tmp/qa-policy-two-sources.stdout /tmp/qa-policy-two-sources.stderr
 ```
 
 - [ ] Evaluates diff against specified bundles
 - [ ] `--json` produces structured output with `passed` and `clean` fields
+- [ ] `--file` independently evaluates one installed source path
+- [ ] Zero sources and `--file` plus `--diff` both fail before evaluation with actionable diagnostics
 
-### 13.6 Supervisor CLI Surface (Phase 19)
+### 13.6 Supervisor CLI Surface
 
 <!-- auto -->
 
@@ -104,6 +126,10 @@ echo "exit: $?"
 <!-- requires: api_key -->
 
 <!-- human:guided -->
+
+<!-- evidence: extended-exploratory -->
+
+<!-- paid-operations: 5 -->
 
 This is a hands-on live-Claude smoke test. Do the phases in order. The terminal commands are copy/paste blocks for the
 container shell; the prompt blocks are for the Claude session that opens after each `forge session ...` command. If live

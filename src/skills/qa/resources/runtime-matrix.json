@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "blocking_track": "pinned",
+  "validated_forge_revision": "1322e9f5b65869b5a49a3a082e37086db3cc63bb",
+  "validated_on": "2026-08-26",
+  "tracks": {
+    "pinned": {
+      "blocking": true,
+      "claude": {
+        "package": "@anthropic-ai/claude-code",
+        "version": "2.1.245",
+        "minimum_supported": "2.1.78",
+        "probe": {
+          "kind": "isolated_forge_lifecycle",
+          "command": "claude --print with isolated Claude/Forge homes and FORGE_DEV bound to the validated checkout",
+          "completed_model_turns": 1,
+          "observed": {
+            "expected_reply": true,
+            "session_start_id_recorded": true,
+            "stop_transcript_captured": true
+          }
+        }
+      },
+      "codex": {
+        "package": "@openai/codex",
+        "version": "0.149.1",
+        "general_probe_ceiling": "0.149.1",
+        "proxy_contract_floor": "0.141.0",
+        "probe": {
+          "kind": "preflight_and_codex_hooks_stages_00_10",
+          "command": "forge runtime preflight codex --json; scripts/experiments/codex-hooks/reproduce.sh 00 10",
+          "completed_model_turns": 2,
+          "observed": {
+            "version_matched": true,
+            "preflight_ready": true,
+            "within_validated_ceiling": true,
+            "hook_seam_enrollment_gated": true,
+            "isolated_auth": true,
+            "hooks_enabled": true,
+            "plain_exec_completed": true,
+            "trust_bypass_exec_completed": true,
+            "verdict": "FIRES-HEADLESS-TRUST-GATED",
+            "user_hooks_fired": true
+          }
+        }
+      }
+    },
+    "latest": {
+      "blocking": false,
+      "claude": {
+        "version": "latest"
+      },
+      "codex": {
+        "version": "latest"
+      }
+    }
+  }
+}

@@ -310,7 +310,7 @@ printf '#!/bin/sh\nprintf "%%s\\n" "2.1.78 (Claude Code)"\n' > "$QA_CLAUDE_ONLY_
 chmod +x "$QA_CLAUDE_ONLY_BIN/claude"
 PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v claude >/dev/null
 ! PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v codex >/dev/null 2>&1
-PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable \
   --scope user --symlink --profile full --force
 USER_SKILLS_AFTER_AUTO=$(jq -c \
   '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
@@ -319,7 +319,7 @@ find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
   | diff -u /tmp/forge-portable-skills.expected -
 
 # Explicit runtime narrowing reports preservation and also leaves omitted tracked packages owned.
-PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable \
   --scope user --symlink --profile full --runtime claude --force \
   | tee /tmp/forge-explicit-runtime-preservation.txt
 rg -q 'managed_runtime_preservation' /tmp/forge-explicit-runtime-preservation.txt
@@ -401,7 +401,7 @@ rg -q 'forge_managed_scope_duplicate' /tmp/forge-codex-cross-scope.txt
 ! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
 
 # Runtime selection is persisted: sync still owns Codex with a PATH that cannot find the fake binary.
-PATH="/usr/bin:/bin" "$HOME/.local/bin/forge" extension sync --scope project
+PATH="/usr/bin:/bin" /opt/forge-qa/bin/forge extension sync --scope project
 jq -e --arg root "$(pwd -P)" \
   '[.installations["project:" + $root].skill_packages[] | select(.runtime == "codex")] | length == 9' \
   "$FORGE_HOME/installed.json"

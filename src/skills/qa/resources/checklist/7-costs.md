@@ -6,7 +6,7 @@
 
 <!-- auto -->
 
-```bash
+````bash
 # Use a guaranteed-empty proxy_id for empty-state tests.
 # Other sections (e.g., section 4 guided sessions) may have created real cost logs,
 # so we cannot assume global cost logs are empty.
@@ -15,7 +15,7 @@ echo "---"
 forge telemetry costs show qa-no-such-proxy --period all 2>&1
 echo "---"
 forge telemetry costs show qa-no-such-proxy --json
-```
+```bash
 
 - [ ] `forge telemetry costs show qa-no-such-proxy` shows `No cost data for today (qa-no-such-proxy).`
 - [ ] `--period all` shows `No cost data for all (qa-no-such-proxy).`
@@ -36,7 +36,7 @@ print(f'MISSING={missing}' if missing else 'ALL_FIELDS_PRESENT')
 print(f'period={d[\"period\"]}')
 print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_requests\"]}')
 "
-```
+````
 
 - [ ] JSON contains all required fields: `period`, `proxy_id`, `total_cost_micros`, `total_cost_usd`, `total_requests`,
   `interactive_cost_micros`, `by_verb`, `by_model`, `reported_requests`, `unavailable_requests`
@@ -148,13 +148,13 @@ forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=invalid 2>&1; echo "EX
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- auto -->
 
 Seed a current-timestamp cost log so the proxy's cost tracker bootstraps above the cap, then make a request to verify
 rejection. This avoids depending on a real request landing above a tiny cap (which is non-deterministic for cheap
 models).
 
-```
+```bash
 # Set a low daily cap on the working QA OpenAI proxy in the container
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
@@ -171,16 +171,26 @@ echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\"
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
 forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
-# Make a request -- should be rejected immediately
-forge claude start --proxy "$FORGE_QA_OPENAI_PROXY"
-# Say "hello" -- expect rejection or error about spend cap, then exit (/exit)
+# Make a request -- it must be rejected before any upstream model completion.
+BASE_URL=$(jq -r --arg id "$FORGE_QA_OPENAI_PROXY" '.proxies[$id].base_url' ~/.forge/proxies/index.json)
+HTTP_CODE=$(curl -sS -D /tmp/qa-spend-reject.headers -o /tmp/qa-spend-reject.body \
+  -w '%{http_code}' \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: test' \
+  -H 'user-agent: claude-code/qa-spend-reject' \
+  "$BASE_URL/v1/messages" \
+  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"messages":[{"role":"user","content":"This request must never reach a model."}]}')
+test "$HTTP_CODE" = 429
+rg -i '^x-spend-warning:' /tmp/qa-spend-reject.headers
+rg 'spend_cap_exceeded' /tmp/qa-spend-reject.body
 
 # Clean up seeded log
-rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
+rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl \
+  /tmp/qa-spend-reject.headers /tmp/qa-spend-reject.body
 ```
 
 - [ ] After proxy restart, the seeded cost triggers the daily cap
-- [ ] Proxy returns HTTP 429 or Claude reports a `spend_cap_exceeded` error
+- [ ] Proxy returns HTTP 429 without forwarding a model completion
 - [ ] Error message includes current spend and limit amounts
 - [ ] Error message suggests `forge proxy set <id> costs.caps.per_day=<amount>` to adjust
 
@@ -190,12 +200,16 @@ rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- evidence: extended-exploratory -->
+
+<!-- paid-operations: 1 -->
+
+<!-- auto -->
 
 Switch to warn mode and verify requests succeed with a warning header instead of being blocked. Uses the same seeded
 cost log approach for deterministic cap triggering.
 
-```
+```bash
 # Use the same deterministic cap settings as 7.9, then switch to warn mode.
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=warn
@@ -213,33 +227,30 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
 # Make a direct request and capture response headers.
 BASE_URL=$(jq -r --arg id "$FORGE_QA_OPENAI_PROXY" '.proxies[$id].base_url' ~/.forge/proxies/index.json)
-curl -sS -D /tmp/qa-spend-warn.headers -o /tmp/qa-spend-warn.body \
-  -w 'HTTP=%{http_code}\n' \
+HTTP_CODE=$(curl -sS -D /tmp/qa-spend-warn.headers -o /tmp/qa-spend-warn.body \
+  -w '%{http_code}' \
   -H 'content-type: application/json' \
   -H 'x-api-key: test' \
   -H 'user-agent: claude-code/qa-spend-warn' \
   "$BASE_URL/v1/messages" \
-  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"temperature":0,"messages":[{"role":"user","content":"Reply with exactly one word: ok"}]}'
+  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"temperature":0,"messages":[{"role":"user","content":"Reply with exactly one word: ok"}]}')
 
 # Verify the response was allowed and included the warn-mode header.
-grep -i '^x-spend-warning:' /tmp/qa-spend-warn.headers
-cat /tmp/qa-spend-warn.body | jq -r '._request_id // empty'
+test "$HTTP_CODE" = 200
+rg -i '^x-spend-warning:' /tmp/qa-spend-warn.headers
+jq -e '.type == "message" and (.content | type == "array")' /tmp/qa-spend-warn.body
 # If curl did not report HTTP=200, inspect the proxy error details:
 # cat /tmp/qa-spend-warn.body | jq .
 # forge logs --tail proxy
-
-# Optional Claude smoke: run with debug output, say "hello", then exit (/exit).
-# The deterministic header check above is the source of truth for this step.
-forge claude start --proxy "$FORGE_QA_OPENAI_PROXY" -- --debug
 
 # Clean up seeded log
 rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl /tmp/qa-spend-warn.headers /tmp/qa-spend-warn.body
 ```
 
 - [ ] Request succeeds (not blocked) in warn mode
-- [ ] `curl` reports `HTTP=200`
-- [ ] `grep -i '^x-spend-warning:' /tmp/qa-spend-warn.headers` prints the spend-cap warning header
-- [ ] Optional Claude debug run also succeeds (no `spend_cap_exceeded` block)
+- [ ] The captured HTTP status is `200`
+- [ ] The response includes the `x-spend-warning` header
+- [ ] Response body is a valid provider response rather than a `spend_cap_exceeded` error
 
 ### 7.11 Cleanup Fixture Cost Logs
 
@@ -269,7 +280,7 @@ forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
 forge proxy start "$FORGE_QA_OPENAI_PROXY"
 ```
 
-- [ ] QA fixture request logs removed (no `qa-fixture_*.jsonl` in `requests/`)
+- [ ] QA fixture request logs removed (no `qa-fixture_*.jsonl` in `telemetry/downstream/`)
 - [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `telemetry/downstream/`)
 - [ ] Spend caps reset on QA OpenAI and Gemini test proxies
 
@@ -428,7 +439,7 @@ rm -f ~/.forge/audit/qa-reset-sentinel.jsonl ~/.forge/cache/statusline/qaresetdi
   `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
 - [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 3) followed by the `Tip:` restart guidance
   naming `forge proxy stop <id>` / `forge proxy start <id>`
-- [ ] After the real reset: `requests=0 events=0 fcost=0` (planes + derived cost cache cleared) while `cache_hit=1`
+- [ ] After the real reset: `downstream=0 events=0 fcost=0` (planes + derived cost cache cleared) while `cache_hit=1`
   (transcript cache-hit untouched) and `audit_sentinel=1` (audit plane untouched)
 - [ ] The second `reset --yes` with nothing left prints `No cost or usage telemetry to reset.` (clean no-op, no error)
 - [ ] Audit sentinel + cache-hit entry removed at the end

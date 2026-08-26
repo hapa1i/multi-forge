@@ -16,9 +16,11 @@ Affected: src/skills/qa/scripts/start-container.sh
 
 from __future__ import annotations
 
+import hashlib
 import os
 import stat
 import subprocess
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -37,22 +39,23 @@ def _write_exec(path: Path, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _make_stubs(bin_dir: Path, image_rev: str) -> None:
+def _make_wheel(tmp_path: Path) -> Path:
+    wheel = tmp_path / "multi_forge-0.9.4-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr(
+            "multi_forge-0.9.4.dist-info/METADATA",
+            "Name: multi-forge\nVersion: 0.9.4\n",
+        )
+    return wheel
+
+
+def _make_stubs(bin_dir: Path, image_rev: str, wheel: Path) -> None:
     """Stub git/docker/claude so the script reaches the reuse staleness guard.
 
     git reports a clean work tree at HEAD_REV; docker reports a *running*
     forge-qa container whose image revision label is ``image_rev``.
     """
     bin_dir.mkdir(parents=True, exist_ok=True)
-
-    _write_exec(
-        bin_dir / "claude",
-        'echo "9.9.9 (stub)"\n',
-    )
-    _write_exec(
-        bin_dir / "codex",
-        'echo "codex-cli 8.8.8"\n',
-    )
 
     _write_exec(
         bin_dir / "git",
@@ -65,17 +68,37 @@ def _make_stubs(bin_dir: Path, image_rev: str) -> None:
         "esac\n",
     )
 
-    # Running container; image revision == image_rev. The exec branch answers the
-    # profile/workflow/credential probes so a *fresh* container can fully reuse.
+    wheel_sha = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    release_image = f"forge-qa-release:0.9.4-sha-{wheel_sha[:12]}-pinned-claude-2.1.245-codex-0.149.1"
+    wheel_path = str(wheel.resolve())
+
+    # Running container. The inspect branch supplies the complete release-QA
+    # identity; the exec branch answers profile/workflow/credential probes.
     _write_exec(
         bin_dir / "docker",
         'sub="$1"; args="$*"\n'
         'case "$sub" in\n'
         "  info) exit 0 ;;\n"
         '  ps) echo "deadbeefcafe" ;;\n'
-        f'  inspect) echo "{image_rev}" ;;\n'
+        "  inspect)\n"
+        '    case "$args" in\n'
+        f'      *org.opencontainers.image.revision*) printf "{image_rev}" ;;\n'
+        f'      *io.multi-forge.qa.wheel-sha256*) printf "{wheel_sha}" ;;\n'
+        '      *io.multi-forge.qa.forge-version*) printf "0.9.4" ;;\n'
+        '      *io.multi-forge.qa.runtime-track*) printf "pinned" ;;\n'
+        '      *io.multi-forge.qa.claude-version*) printf "2.1.245" ;;\n'
+        '      *io.multi-forge.qa.codex-version*) printf "0.149.1" ;;\n'
+        '      *io.multi-forge.qa.provider-profile*) printf "openrouter" ;;\n'
+        '      *io.multi-forge.qa.artifact-mode*) printf "prebuilt" ;;\n'
+        f'      *io.multi-forge.qa.wheel-path*) printf "%s" {wheel_path!r} ;;\n'
+        '      *io.multi-forge.qa.codex-auth-mode*) printf "api-key" ;;\n'
+        f'      *Config.Image*) printf "%s" {release_image!r} ;;\n'
+        "      *) : ;;\n"
+        "    esac ;;\n"
         "  exec)\n"
         '    case "$args" in\n'
+        '      *"claude --version"*) printf "2.1.245 (Claude Code)\\n" ;;\n'
+        '      *"codex --version"*) printf "codex-cli 0.149.1\\n" ;;\n'
         '      *FORGE_QA_PROVIDER_PROFILE*) printf "openrouter" ;;\n'
         '      *FORGE_QA_WORKFLOW_MODEL_A*) printf "wfa" ;;\n'
         '      *FORGE_QA_WORKFLOW_MODEL_B*) printf "wfb" ;;\n'
@@ -88,12 +111,14 @@ def _make_stubs(bin_dir: Path, image_rev: str) -> None:
 
 
 def _run(tmp_path: Path, image_rev: str) -> subprocess.CompletedProcess[str]:
+    wheel = _make_wheel(tmp_path)
     bin_dir = tmp_path / "bin"
-    _make_stubs(bin_dir, image_rev)
+    _make_stubs(bin_dir, image_rev, wheel)
 
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["OPENROUTER_API_KEY"] = "test-key"
+    env["CODEX_API_KEY"] = "test-codex-key"
     # Pin workflow vars (provider block uses :=) so the reuse equality checks are
     # decoupled from the real default model names.
     env["FORGE_QA_WORKFLOW_MODELS"] = "wfm"
@@ -101,7 +126,7 @@ def _run(tmp_path: Path, image_rev: str) -> subprocess.CompletedProcess[str]:
     env["FORGE_QA_WORKFLOW_MODEL_B"] = "wfb"
 
     return subprocess.run(
-        ["bash", str(SCRIPT)],
+        ["bash", str(SCRIPT), "--wheel", str(wheel)],
         capture_output=True,
         text=True,
         env=env,

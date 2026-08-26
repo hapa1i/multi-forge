@@ -4,7 +4,7 @@
 
 ### 8.1 Direct Invocation
 
-<!-- human:confirm -->
+<!-- auto -->
 
 This is a rendered status-line smoke test. It does not call Claude or an LLM; it feeds a synthetic Claude Code
 `statusLine` JSON payload into `forge status-line` and asks you to review the terminal-facing output.
@@ -71,7 +71,7 @@ echo "$STATUS_INPUT" \
 
 ### 8.2 Verify Display Elements
 
-<!-- human:confirm -->
+<!-- auto -->
 
 The status line uses a category-based layout with 5 categories: Where, Who, What, Metrics, State. This step
 intentionally pipes the output through `cat -v`, so the output will look ugly on purpose:
@@ -134,7 +134,7 @@ echo "$STATUS_INPUT" \
 
 ### 8.3 Breadcrumb Display (for resumed sessions)
 
-<!-- human:confirm -->
+<!-- auto -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -281,7 +281,7 @@ forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
 
 ### 8.6 Segment-lazy proxy/session sources
 
-<!-- human:guided -->
+<!-- auto -->
 
 A status line configured with only `path` and `branch` does not consume proxy or Forge-session facts. This packaged-CLI
 smoke supplies deliberately unavailable source addresses and confirms the selected fields still render alone. The

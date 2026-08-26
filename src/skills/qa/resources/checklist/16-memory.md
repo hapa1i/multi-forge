@@ -63,6 +63,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 cd $FORGE_TEST_REPO
 
@@ -104,6 +106,8 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -165,6 +169,8 @@ test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO

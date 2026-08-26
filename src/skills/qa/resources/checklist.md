@@ -2,62 +2,25 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.43 -->
+<!-- version: 1.1.0 -->
 
-<!-- test-count: 632 -->
+<!-- test-count: 676 -->
 
-<!-- last-updated: 2026-08-21 -->
+<!-- last-updated: 2026-08-26 -->
 
-<!-- aligned-with: v0.1.0 -->
+<!-- aligned-with: v1.0.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-08-21 (OpenRouter QA covers the Qwen3.8, Gemini 3.7 Flash, GLM 5.3, and Kimi K2.7 Code refresh,
-plus the direct-OpenRouter-only ZDR boundary and Qwen Max fallback). Earlier 2026-08-13: workflow QA captures preflight
-failure JSON from stderr while preserving the nonzero exit checks. Earlier 2026-08-09: status-line QA verifies that a
-`path,branch` layout stays independent of unavailable proxy/session inputs. Earlier 2026-08-09: proxy QA added safe
-Anthropic passthrough response metadata and translated requests with an explicit Claude Code User-Agent. Earlier
-2026-08-08: search QA added consistent corrupt query/status failures in human/JSON modes with empty stdout and
-actionable stderr. Earlier 2026-08-08: proxy QA added one-result create/smoke JSON and refused adopted-kill ownership
-preservation. Earlier 2026-08-08: proxy/config QA added fail-closed degraded downstream-retention runtime truth,
-preview/apply migration, exact global ownership, legacy-key removal, and rerun safety. Earlier 2026-08-03: session QA
-verifies the Git-derived workspace worktree view, session occupancy, missing/prunable state, JSON shape, and the non-Git
-fallback. Earlier 2026-07-31: extension QA removes one project runtime, proves sync does not resurrect it, and restores
-the dual-runtime package set. Earlier 2026-07-30: extension QA now asserts schema-v3 runtime/module ownership, the
-merged `hooks` module, and runtime-wide selection. Earlier 2026-07-26: model refresh: section 4 tier assertions now
-expect Opus 5 on openrouter-anthropic, Kimi K3 on openrouter-kimi, Qwen3.7 Plus/Max on openrouter-qwen, and Gemini 3.6
-Flash on the gemini/gemini-flash templates. Earlier 2026-07-23: runtime skill inventory assertions now cover all nine
-portable Codex packages across enable, status, sync, cleanup, and disable. Earlier 2026-07-22: extension status probes
-now enforce the schema-v2 object, runtime-package QA verifies the always-copied provenance sentinel, and a disposable
-project exercises tracking-loss plus compiled-cache-reset cleanup and re-enable. Earlier 2026-07-17: runtime-aware skill
-QA also covers Codex-host-authoritative `openai` family selection, dangling leaf health, strict package/file-ledger
-failure, and tracking-row discovery help; its existing lifecycle covers absent-binary automatic re-enable, explicit
-runtime preservation, user/project Codex targets, scope rejection, out-of-CWD tracked-project duplicate prevention,
-package-root symlink refusal, persisted sync, compiled inventories, smoke invocation, cleanup, and restoration after the
-hooks-only probe). Earlier 2026-07-14: memory §16 checks the generated `type`/`title`/`description` + `forge_memory`
-envelope, verifies no generated `resource`/`tags`/`timestamp`, and exercises idempotent legacy-passport upgrade. Earlier
-2026-07-13: hooks-only recipes now retain both Claude and Codex runtime registrations. Earlier 2026-07-10: section 2.12
-now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups, and independent doctor cleanup/double-fire
-state. Earlier 2026-07-08: runtime hook QA moved to tracked user-scope
-`forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
-same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
-auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:
-registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex binary (2.11). Earlier
-2026-06-06: clean-break tombstone purge: removed the `forge usage`->`forge telemetry activity` rename probe (old §7.14)
-along with the CLI tombstone commands themselves; `forge telemetry costs reset` telemetry-wipe coverage renumbered to
-7.14. Earlier: cost CLI is now a group: `forge telemetry costs` -> `forge telemetry costs show`; metric-evidence
-cost-honesty coverage: `forge telemetry activity` cost footnotes/`~` marker (7.12), cost provenance
-reported-vs-`unavailable` split (7.13), the `forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5),
-session-end `~` marker (5.21), and the §3.4 secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full);
-earlier: renamed the per-session command to `forge telemetry activity` (7.12/5.21), status-line customization checks
-(§8.4), the workflow worker/verb double-count assertion (7.12), non-interactive docker-exec fixes, policy `--session`
-targeting, memory 16.4 re-track)
+**Release contract**: v1.0.0 blocking QA runs from one identified wheel on the pinned runtime track. Exhaustive
+automated-suite ownership and optional exploratory journeys are documented in `coverage-map.md`; they are not repeated
+by the default human gate.
 
 ---
 
 ## Sections
 
-- [0. Enable Forge (New User Flow)](checklist/0-enable.md)
+- [0. Verify Release Artifact (New User Flow)](checklist/0-enable.md)
 
 <!-- section: 0 checklist/0-enable.md -->
 
@@ -97,7 +60,7 @@ targeting, memory 16.4 re-track)
 
 <!-- section: 9 checklist/9-direct-commands.md -->
 
-- [10. Session Resume (Phase 10 Feature)](checklist/10-resume.md)
+- [10. Session Resume](checklist/10-resume.md)
 
 <!-- section: 10 checklist/10-resume.md -->
 
@@ -129,11 +92,11 @@ targeting, memory 16.4 re-track)
 
 <!-- section: 17 checklist/17-info.md -->
 
-- [18. Uninstallation (Incremental)](checklist/18-disable.md)
+- [18. Incremental Extension Disable](checklist/18-disable.md)
 
 <!-- section: 18 checklist/18-disable.md -->
 
-- [19. Complete Uninstallation (setup.sh --uninstall)](checklist/19-uninstall.md)
+- [19. Complete Extension Removal](checklist/19-uninstall.md)
 
 <!-- section: 19 checklist/19-uninstall.md -->
 

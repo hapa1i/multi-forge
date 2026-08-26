@@ -1,0 +1,3944 @@
+{
+  "schema_version": 1,
+  "generated_from": {
+    "path": "src/skills/qa/resources/checklist.md",
+    "checklist_version": "1.0.43",
+    "sha256": "e404f7dc5640f2500524986527f1da21f5948ecb4be1411cb6ef76488f3aee59",
+    "generated_on": "2026-08-25"
+  },
+  "baseline_counts": {
+    "steps": 188,
+    "assertions": 636,
+    "execution_classes": {
+      "auto": 150,
+      "human:guided": 32,
+      "human:confirm": 6
+    }
+  },
+  "blocking_budget": {
+    "max_human_checkpoints": 12,
+    "max_paid_operations": 8,
+    "duration_review_seconds": 2700,
+    "final_selected_human_checkpoints": 9,
+    "final_selected_paid_operations": 8
+  },
+  "counting_contract": {
+    "human_checkpoint": "One included human:guided or human:confirm step.",
+    "paid_operation": "One intentionally requested subject-under-test model completion.",
+    "panel": "Count each worker completion and any separately prompted managed-session turn.",
+    "multi_round": "Count every worker completion in every round.",
+    "managed_session": "Count every prompted turn; launching and exiting without a prompt counts zero.",
+    "codex_verify_enrollment": "Count one only when the command runs its empirical Codex turn.",
+    "ai_curated_transfer": "Count one when external curation runs; deterministic fallback counts zero.",
+    "driver": "Exclude the Claude-hosted checklist driver and report it separately."
+  },
+  "append_only_landing_map": {
+    "2": [
+      "extension lifecycle (existing steps 2.1-2.13)"
+    ],
+    "4": [
+      "backend lifecycle -> 4.27",
+      "provider trace -> 4.28"
+    ],
+    "5": [
+      "managed Codex runtime -> 5.24",
+      "model routing and artifact authority -> 5.25",
+      "native adoption and store repair -> 5.26",
+      "consumer lanes and keyed billing -> 5.27"
+    ],
+    "6": [
+      "runtime hook readiness -> 6.12"
+    ],
+    "7": [
+      "billing and telemetry (existing 7.x plus 5.27)"
+    ],
+    "9": [
+      "model and plan direct commands -> 9.11"
+    ],
+    "10": [
+      "transfer matrix -> 10.2-10.7",
+      "rewind and ancestry -> 10.8"
+    ],
+    "13": [
+      "authority -> 5.25",
+      "policy single-source modes -> 13.5"
+    ]
+  },
+  "steps": [
+    {
+      "id": "0.1",
+      "section_id": "0",
+      "title": "Pre-requisites Check",
+      "execution_class": "auto",
+      "prerequisites": [],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "0",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "0.2",
+      "section_id": "0",
+      "title": "Verify Clean State",
+      "execution_class": "auto",
+      "prerequisites": [],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "0",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "0.3",
+      "section_id": "0",
+      "title": "Install via setup.sh",
+      "execution_class": "auto",
+      "prerequisites": [],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "0",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "0.4",
+      "section_id": "0",
+      "title": "Verify Installation",
+      "execution_class": "auto",
+      "prerequisites": [],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "0",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "1.1",
+      "section_id": "1",
+      "title": "Pre-Flight Checks",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "1",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.1",
+      "section_id": "2",
+      "title": "Basic Installation (User Scope)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.2",
+      "section_id": "2",
+      "title": "Verify Installed Content",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.3",
+      "section_id": "2",
+      "title": "Verify Pre-Existing Settings Preserved",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.4",
+      "section_id": "2",
+      "title": "Install Local Scope",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.5",
+      "section_id": "2",
+      "title": "Verify Both Installations Tracked",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.6",
+      "section_id": "2",
+      "title": "Test Double-Install Prevention",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.7",
+      "section_id": "2",
+      "title": "Check Install Status (Nearest Scope)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.8",
+      "section_id": "2",
+      "title": "Check Install Status (All Scopes)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.9",
+      "section_id": "2",
+      "title": "Update Installation (Idempotent)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.10",
+      "section_id": "2",
+      "title": "Codex Hook Registration (`hooks`, Codex Runtime)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.11",
+      "section_id": "2",
+      "title": "Codex Hooks Skipped Without Binary",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.12",
+      "section_id": "2",
+      "title": "Migrate a Pre-User-Scope Hook Fixture",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "2.13",
+      "section_id": "2",
+      "title": "Runtime-Aware Skill Packages",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "1.1",
+        "2.1",
+        "2.4"
+      ],
+      "assertion_count": 19,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "merge",
+      "target_section": "2",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": "2.13",
+      "automated_owners": [
+        "tests/src/install/test_cross_runtime_skills.py",
+        "tests/src/install/test_skill_compiler.py"
+      ]
+    },
+    {
+      "id": "3.1",
+      "section_id": "3",
+      "title": "Login — Store Credentials",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.2",
+      "section_id": "3",
+      "title": "Login — Named Profiles",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.3",
+      "section_id": "3",
+      "title": "Login — Keep Existing Values",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.4",
+      "section_id": "3",
+      "title": "Status — Dual-View Output",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 7,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.5",
+      "section_id": "3",
+      "title": "Status — Env Overrides File",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.6",
+      "section_id": "3",
+      "title": "Status — Named Profile",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.7",
+      "section_id": "3",
+      "title": "Profiles — List and Active Marker",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.8",
+      "section_id": "3",
+      "title": "Logout — Remove Profile",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.9",
+      "section_id": "3",
+      "title": "Credential File Security",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.10",
+      "section_id": "3",
+      "title": "Credential Resolution in CredentialManager",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "3.11",
+      "section_id": "3",
+      "title": "Retired Credential Names",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "3",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.1",
+      "section_id": "4",
+      "title": "List Proxies and Templates",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.2",
+      "section_id": "4",
+      "title": "Create a Proxy",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.3",
+      "section_id": "4",
+      "title": "Show Proxy Details",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.4",
+      "section_id": "4",
+      "title": "Proxy Edit and Validate",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.5",
+      "section_id": "4",
+      "title": "Stale Proxy Pruning",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.6",
+      "section_id": "4",
+      "title": "Launch Session with Host Proxy",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "4",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/integration/docker/test_session_routing.py",
+        "tests/src/core/ops/test_session_routing.py"
+      ]
+    },
+    {
+      "id": "4.7",
+      "section_id": "4",
+      "title": "Live % Commands in Proxy Session",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "4",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_user_prompt_dispatcher.py",
+        "tests/integration/cli/test_user_prompt_dispatcher_integration.py"
+      ]
+    },
+    {
+      "id": "4.8",
+      "section_id": "4",
+      "title": "Proxy Delete UX (Confirmation + Smart-Pointer Semantics)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "4.2",
+        "4.6"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.9",
+      "section_id": "4",
+      "title": "Template Management",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.10",
+      "section_id": "4",
+      "title": "Show Raw YAML for a Proxy Instance",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.11",
+      "section_id": "4",
+      "title": "Set and Validate Proxy Config (No Editor)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.12",
+      "section_id": "4",
+      "title": "Stop a Non-Running Proxy (Shared-Port Semantics)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.13",
+      "section_id": "4",
+      "title": "Proxy Metrics (Running Proxy)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.14",
+      "section_id": "4",
+      "title": "Proxy Metrics (Not Found / Shared-Port)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.15",
+      "section_id": "4",
+      "title": "Backend List (Proxy Dependency)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.16",
+      "section_id": "4",
+      "title": "Backend Create (LiteLLM Config)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.17",
+      "section_id": "4",
+      "title": "OpenRouter Templates",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 15,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "4",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/core/models/test_model_routes.py",
+        "tests/src/core/auth/test_template_secrets.py"
+      ]
+    },
+    {
+      "id": "4.18",
+      "section_id": "4",
+      "title": "OpenRouter Proxy Create",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.18.1",
+      "section_id": "4",
+      "title": "OpenRouter ZDR Boundary",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.18"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.19",
+      "section_id": "4",
+      "title": "Model Alternatives",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.18"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.20",
+      "section_id": "4",
+      "title": "Proxy Audit (Read-Only Metadata)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.21",
+      "section_id": "4",
+      "title": "Intercept / Audit Config and Passthrough Template",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.22",
+      "section_id": "4",
+      "title": "Degraded Downstream Retention Status",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.23",
+      "section_id": "4",
+      "title": "Stop Failure Retains Proxy Ownership",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.24",
+      "section_id": "4",
+      "title": "Create Smoke Failure Is One JSON Result",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.25",
+      "section_id": "4",
+      "title": "Translated User-Agent Relay",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 1,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "4.26",
+      "section_id": "4",
+      "title": "Anthropic Passthrough Response Metadata",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "4",
+      "target_execution_class": "auto",
+      "evidence_lane": "extended-exploratory",
+      "proposed_paid_operations": 1,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.1",
+      "section_id": "5",
+      "title": "Start a Session",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.2",
+      "section_id": "5",
+      "title": "List Sessions",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.3",
+      "section_id": "5",
+      "title": "Show Session Details",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.4",
+      "section_id": "5",
+      "title": "Set Session Overrides",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.5",
+      "section_id": "5",
+      "title": "Reset Overrides",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.6",
+      "section_id": "5",
+      "title": "Fork a Session (default, same directory)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 7,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 2,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.7",
+      "section_id": "5",
+      "title": "Fork a Session with Worktree (`--worktree`)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 9,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_session_fork.py",
+        "tests/src/session/worktree/test_create.py"
+      ]
+    },
+    {
+      "id": "5.8",
+      "section_id": "5",
+      "title": "Incognito Session",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.9",
+      "section_id": "5",
+      "title": "Delete a Session",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.10",
+      "section_id": "5",
+      "title": "Worktree Session (Isolation)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.11",
+      "section_id": "5",
+      "title": "System Prompt Generation",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.12",
+      "section_id": "5",
+      "title": "Session Show",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.13",
+      "section_id": "5",
+      "title": "Fork with `--strategy` (Context Assembly)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.14",
+      "section_id": "5",
+      "title": "Fork with `--inline-plan`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.15",
+      "section_id": "5",
+      "title": "Fork `--into` (Existing Worktree)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2",
+        "5.6"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "move",
+      "target_section": "5",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/integration/docker/test_session_lifecycle.py"
+      ]
+    },
+    {
+      "id": "5.16",
+      "section_id": "5",
+      "title": "Subprocess Proxy (Direct + Proxied Subprocesses)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.17",
+      "section_id": "5",
+      "title": "Subprocess Proxy Mutual Exclusivity",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.18",
+      "section_id": "5",
+      "title": "Subprocess Proxy Inheritance (Fork)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.16"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.19",
+      "section_id": "5",
+      "title": "Native-Relocate Fork Preflight Rejections",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.20",
+      "section_id": "5",
+      "title": "Native-Relocate `--into` Same-Dir Data-Loss Guard",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.21",
+      "section_id": "5",
+      "title": "Session-End Activity Summary",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.22",
+      "section_id": "5",
+      "title": "Same-Directory Transfer Fork (`--resume-mode transfer` + auto-switch)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 7,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "5.23",
+      "section_id": "5",
+      "title": "Workspace Worktree View",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "5",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "6.1",
+      "section_id": "6",
+      "title": "Verify Hook Configuration",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "6",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "6.2",
+      "section_id": "6",
+      "title": "Install Hooks Only (Optional)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "6",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "6.3",
+      "section_id": "6",
+      "title": "Test Hook Manually",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_hooks.py"
+      ]
+    },
+    {
+      "id": "6.4",
+      "section_id": "6",
+      "title": "Smoke Test SessionStart Hook",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/session/hooks/test_session_start.py"
+      ]
+    },
+    {
+      "id": "6.5",
+      "section_id": "6",
+      "title": "Smoke Test plan-write Hook (Plan Path Recorded)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_artifact_hooks.py"
+      ]
+    },
+    {
+      "id": "6.6",
+      "section_id": "6",
+      "title": "Smoke Test exit-plan-mode Hook (Approved Snapshot)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_artifact_hooks.py"
+      ]
+    },
+    {
+      "id": "6.7",
+      "section_id": "6",
+      "title": "Smoke Test Stop Hook (Transcript Copy + Queue Markers)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_artifact_hooks.py"
+      ]
+    },
+    {
+      "id": "6.8",
+      "section_id": "6",
+      "title": "Smoke Test pre-compact Hook (Transcript Capture)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_artifact_hooks.py"
+      ]
+    },
+    {
+      "id": "6.9",
+      "section_id": "6",
+      "title": "Smoke Test policy-check Hook (Fail-Open)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/hooks/test_policy.py"
+      ]
+    },
+    {
+      "id": "6.10",
+      "section_id": "6",
+      "title": "End-to-End Stop Hook (Real Session Exit)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "4.2"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "6",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "6.11",
+      "section_id": "6",
+      "title": "WorktreeCreate Hook (Claude-Native Worktree)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "6",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/integration/hooks/test_worktree_create.py",
+        "tests/src/cli/hooks/test_new_hooks.py"
+      ]
+    },
+    {
+      "id": "7.1",
+      "section_id": "7",
+      "title": "Cost CLI (Empty State)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.2",
+      "section_id": "7",
+      "title": "Cost CLI (JSON Structure)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.3",
+      "section_id": "7",
+      "title": "Seed Fixture Request Logs",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.5",
+      "section_id": "7",
+      "title": "Cost CLI Breakdowns",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.6",
+      "section_id": "7",
+      "title": "Malformed Log Resilience",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.7",
+      "section_id": "7",
+      "title": "Spend Cap Configuration via CLI",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.8",
+      "section_id": "7",
+      "title": "Spend Cap Config Validation (Invalid Values)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.9",
+      "section_id": "7",
+      "title": "Spend Cap Enforcement (Reject Mode)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.10",
+      "section_id": "7",
+      "title": "Spend Cap Enforcement (Warn Mode)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "extended-exploratory",
+      "proposed_paid_operations": 1,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.11",
+      "section_id": "7",
+      "title": "Cleanup Fixture Cost Logs",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.12",
+      "section_id": "7",
+      "title": "Per-Session Activity (`forge telemetry activity`)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 8,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.13",
+      "section_id": "7",
+      "title": "Cost Provenance (reported vs `unavailable`)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "7.14",
+      "section_id": "7",
+      "title": "Reset Telemetry (`forge telemetry costs reset`)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "7",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.1",
+      "section_id": "8",
+      "title": "Direct Invocation",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.2",
+      "section_id": "8",
+      "title": "Verify Display Elements",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.3",
+      "section_id": "8",
+      "title": "Breadcrumb Display (for resumed sessions)",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.4",
+      "section_id": "8",
+      "title": "Customize fields, palette, and cost mode (`statusline:` config)",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "human:confirm",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.5",
+      "section_id": "8",
+      "title": "Forge-added cost segment (`forge_cost` / `forge +$Y`)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "8.6",
+      "section_id": "8",
+      "title": "Segment-lazy proxy/session sources",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "8",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.1",
+      "section_id": "9",
+      "title": "Test %help",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.2",
+      "section_id": "9",
+      "title": "Test %session list",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.3",
+      "section_id": "9",
+      "title": "Test %proxy list",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.4",
+      "section_id": "9",
+      "title": "Test %policy commands",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.5",
+      "section_id": "9",
+      "title": "Test %policy check (Phase 18)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.6",
+      "section_id": "9",
+      "title": "Test %config",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.7",
+      "section_id": "9",
+      "title": "Test %session list --no-incognito",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.8",
+      "section_id": "9",
+      "title": "Test %proxy show",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "4.2"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.9",
+      "section_id": "9",
+      "title": "Test %cancel-verification",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "9.10",
+      "section_id": "9",
+      "title": "Test %proxy audit",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "9",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.1",
+      "section_id": "10",
+      "title": "Create Parent Session Artifacts",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.2",
+      "section_id": "10",
+      "title": "Resume with Minimal Strategy",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.3",
+      "section_id": "10",
+      "title": "Resume with Structured Strategy",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.4",
+      "section_id": "10",
+      "title": "Resume with Full Strategy",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.5",
+      "section_id": "10",
+      "title": "Resume with AI-Curated Strategy",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "extended-exploratory",
+      "proposed_paid_operations": 1,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.6",
+      "section_id": "10",
+      "title": "`forge session transfer` (Inspect / Reshape Transfer Context)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "10.7",
+      "section_id": "10",
+      "title": "Resume `--fresh --review` (Edit Context Before Launch)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "10",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.1",
+      "section_id": "11",
+      "title": "Initialize Config",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.2",
+      "section_id": "11",
+      "title": "Show Effective Config",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.3",
+      "section_id": "11",
+      "title": "Set and Reset Values",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.4",
+      "section_id": "11",
+      "title": "Migrate Downstream Retention",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.5",
+      "section_id": "11",
+      "title": "Edit in Editor",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.6",
+      "section_id": "11",
+      "title": "Show Claude Preset",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.7",
+      "section_id": "11",
+      "title": "Reset Claude Preset",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.8",
+      "section_id": "11",
+      "title": "Edit Claude Preset in Editor",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "11.9",
+      "section_id": "11",
+      "title": "Per-Skill Invocation Mode",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "11",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "12.1",
+      "section_id": "12",
+      "title": "Check Index Status",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "10.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "12",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "12.2",
+      "section_id": "12",
+      "title": "Build/Rebuild Index",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "10.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "12",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "12.3",
+      "section_id": "12",
+      "title": "Search Transcripts",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "10.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "12",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "12.4",
+      "section_id": "12",
+      "title": "Clean Orphaned Entries",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "10.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "12",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "12.5",
+      "section_id": "12",
+      "title": "Corrupt Reads Fail Consistently",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "10.1",
+        "12.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "12",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.1",
+      "section_id": "13",
+      "title": "Policy Status",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.2",
+      "section_id": "13",
+      "title": "Enable TDD Enforcement",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.3",
+      "section_id": "13",
+      "title": "Enable with Permissive Mode",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.4",
+      "section_id": "13",
+      "title": "Enable Coding Standards",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.5",
+      "section_id": "13",
+      "title": "On-Demand Policy Check",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.6",
+      "section_id": "13",
+      "title": "Supervisor CLI Surface (Phase 19)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.7",
+      "section_id": "13",
+      "title": "Manual Supervisor Wiring (Planner -> Supervisor -> Executor)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "2.4",
+        "4.2"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "move",
+      "target_section": "13",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "extended-exploratory",
+      "proposed_paid_operations": 5,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "13.8",
+      "section_id": "13",
+      "title": "Disable Policies",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "13",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "14.1",
+      "section_id": "14",
+      "title": "List Available Workflow Models",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "14",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "14.2",
+      "section_id": "14",
+      "title": "`forge workflow panel`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_workflow.py",
+        "tests/integration/cli/test_workflow_integration.py"
+      ]
+    },
+    {
+      "id": "14.3",
+      "section_id": "14",
+      "title": "`forge workflow panel --check`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_workflow_verdicts.py"
+      ]
+    },
+    {
+      "id": "14.4",
+      "section_id": "14",
+      "title": "`forge workflow panel --code`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_workflow.py"
+      ]
+    },
+    {
+      "id": "14.5",
+      "section_id": "14",
+      "title": "`forge workflow analyze`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_engine.py"
+      ]
+    },
+    {
+      "id": "14.6",
+      "section_id": "14",
+      "title": "`forge workflow debate`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_adversarial.py"
+      ]
+    },
+    {
+      "id": "14.7",
+      "section_id": "14",
+      "title": "`forge workflow debate --code`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_adversarial.py"
+      ]
+    },
+    {
+      "id": "14.8",
+      "section_id": "14",
+      "title": "`forge workflow consensus`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_consensus.py",
+        "tests/src/cli/test_workflow_consensus.py"
+      ]
+    },
+    {
+      "id": "14.9",
+      "section_id": "14",
+      "title": "`forge workflow consensus --code`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_consensus.py",
+        "tests/src/cli/test_workflow_consensus.py"
+      ]
+    },
+    {
+      "id": "14.10",
+      "section_id": "14",
+      "title": "`/forge:debate` (Live Session)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 6,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/integration/cli/test_workflow_integration.py"
+      ]
+    },
+    {
+      "id": "14.11",
+      "section_id": "14",
+      "title": "Workflow `--models` Filter",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_workflow.py"
+      ]
+    },
+    {
+      "id": "14.12",
+      "section_id": "14",
+      "title": "Workflow Routing, `--proxy`, and Preflight",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2",
+        "14.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "14",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/review/test_routing.py",
+        "tests/src/cli/test_workflow_preflight.py"
+      ]
+    },
+    {
+      "id": "14.13",
+      "section_id": "14",
+      "title": "Runtime-Native Codex Worker Fail-Closed Boundary",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.1",
+        "4.2"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "14",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "15.1",
+      "section_id": "15",
+      "title": "`forge session show` CLI",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "15",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "15.2",
+      "section_id": "15",
+      "title": "`forge session show` with UUID",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 1,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "15",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "15.3",
+      "section_id": "15",
+      "title": "`/forge:review` (Live Session)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "merge",
+      "target_section": "15",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": "15.5",
+      "automated_owners": [
+        "tests/src/install/test_portable_skill_content.py"
+      ]
+    },
+    {
+      "id": "15.4",
+      "section_id": "15",
+      "title": "`/forge:understand` (Live Session)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "merge",
+      "target_section": "15",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": "15.5",
+      "automated_owners": [
+        "tests/src/install/test_portable_skill_content.py"
+      ]
+    },
+    {
+      "id": "15.5",
+      "section_id": "15",
+      "title": "`/forge:panel` (Live Session)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "keep",
+      "target_section": "15",
+      "target_execution_class": "human:guided",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 3,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "15.6",
+      "section_id": "15",
+      "title": "`/forge:consensus` (Live Session)",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "merge",
+      "target_section": "15",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": "15.5",
+      "automated_owners": [
+        "tests/src/review/test_consensus.py",
+        "tests/src/install/test_portable_skill_content.py"
+      ]
+    },
+    {
+      "id": "15.7",
+      "section_id": "15",
+      "title": "Compiled Runtime Package Inventory",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "merge",
+      "target_section": "15",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": "15.7",
+      "automated_owners": [
+        "tests/src/install/test_cross_runtime_skills.py",
+        "tests/src/install/test_skill_compiler.py"
+      ]
+    },
+    {
+      "id": "15.8",
+      "section_id": "15",
+      "title": "`/forge:smoke-test` Explicit Invocation",
+      "execution_class": "human:guided",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "4.2",
+        "5.1"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "merge",
+      "target_section": "15",
+      "target_execution_class": null,
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": "15.5",
+      "automated_owners": [
+        "tests/src/install/test_portable_skill_content.py"
+      ]
+    },
+    {
+      "id": "16.1",
+      "section_id": "16",
+      "title": "Configure Memory and Passports",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "10.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "16",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "16.2",
+      "section_id": "16",
+      "title": "Run Memory Writer Manually (Direct Update)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "10.1",
+        "16.1"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "16",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/session/test_memory_writer.py"
+      ]
+    },
+    {
+      "id": "16.3",
+      "section_id": "16",
+      "title": "Shadow Memory Writer (`--propose` + shadow mode)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "10.1",
+        "16.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "16",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/session/test_shadow_curation.py"
+      ]
+    },
+    {
+      "id": "16.4",
+      "section_id": "16",
+      "title": "Queued Memory Writer on Next CLI Startup",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "10.1",
+        "16.1"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": true,
+      "may_call_paid_model": true,
+      "proposed_outcome": "remove",
+      "target_section": "16",
+      "target_execution_class": null,
+      "evidence_lane": "automated-suite",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": [
+        "tests/src/cli/test_artifact_hooks.py",
+        "tests/src/session/test_memory_writer.py"
+      ]
+    },
+    {
+      "id": "16.5",
+      "section_id": "16",
+      "title": "Upgrade a Legacy Passport Envelope",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "5.1",
+        "10.1",
+        "16.1"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "16",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "17.1",
+      "section_id": "17",
+      "title": "`forge info`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "17",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "17.2",
+      "section_id": "17",
+      "title": "Debug Logging and `forge logs`",
+      "execution_class": "human:confirm",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "17",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "17.3",
+      "section_id": "17",
+      "title": "`forge runtime list`",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "17",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "17.4",
+      "section_id": "17",
+      "title": "Runtime Skill Package Health",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "17",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "18.1",
+      "section_id": "18",
+      "title": "Uninstall Local Scope Only",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "18",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "18.2",
+      "section_id": "18",
+      "title": "Verify Pre-Existing Settings Restored (Local)",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "18",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "18.3",
+      "section_id": "18",
+      "title": "Re-install Local for Complete Test",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13"
+      ],
+      "assertion_count": 2,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "18",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "18.4",
+      "section_id": "18",
+      "title": "Remove and Restore One Project Runtime",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "18",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "19.1",
+      "section_id": "19",
+      "title": "Pre-Uninstall State Verification",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "18.4"
+      ],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "19",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "19.2",
+      "section_id": "19",
+      "title": "Run Complete Uninstall",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "18.4"
+      ],
+      "assertion_count": 7,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "19",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "19.3",
+      "section_id": "19",
+      "title": "Verify Complete Removal",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "18.4"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "19",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "19.4",
+      "section_id": "19",
+      "title": "Verify Local Project Settings Preserved",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "18.4"
+      ],
+      "assertion_count": 4,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "19",
+      "target_execution_class": "human:confirm",
+      "evidence_lane": "human-acceptance",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "19.5",
+      "section_id": "19",
+      "title": "Verify Shell Profile Cleaned",
+      "execution_class": "auto",
+      "prerequisites": [
+        "0.3",
+        "2.13",
+        "18.4"
+      ],
+      "assertion_count": 3,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "19",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    },
+    {
+      "id": "20.1",
+      "section_id": "20",
+      "title": "Cleanup Test Artifacts",
+      "execution_class": "auto",
+      "prerequisites": [],
+      "assertion_count": 5,
+      "uses_live_runtime": false,
+      "may_call_paid_model": false,
+      "proposed_outcome": "keep",
+      "target_section": "20",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
+      "proposed_paid_operations": 0,
+      "merged_into": null,
+      "automated_owners": []
+    }
+  ]
+}

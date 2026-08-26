@@ -43,6 +43,8 @@ forge workflow list-models --available --json \
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODELS --json
 ```
@@ -58,6 +60,8 @@ forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODELS --json
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Policy gate mode (structured verdict + exit code)
 forge workflow panel -p "Check for security issues" --models $FORGE_QA_WORKFLOW_MODELS --check
@@ -72,6 +76,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Multi-model code review (uses bundled codereview resource)
@@ -91,6 +97,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Single-model deep analysis (N=1 fan-out with bundled thinkdeep resource)
@@ -112,6 +120,8 @@ echo "Exit code: $?"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Adversarial debate with positional proposal
 forge workflow debate "Should we rewrite the core in Rust?" --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -131,6 +141,8 @@ forge workflow debate "Should we adopt microservices?" --models $FORGE_QA_WORKFL
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Adversarial code evaluation (uses bundled code evaluation resource)
 forge workflow debate src/ --code --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -149,6 +161,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Two-round consensus with role-assigned workers (proposal mode)
@@ -172,6 +186,8 @@ echo "Exit code: $?"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Two-round code consensus (code mode uses architecture/security/maintainability)
 forge workflow consensus src/ --code --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -190,6 +206,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 <!-- requires: api_key -->
 
@@ -230,6 +248,8 @@ command was accepted but the nested workflow worker runtime is missing from Clau
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Single model filter -- should limit to that model only
 forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODEL_B --json 2>&1 | jq '.results | keys | length'
@@ -256,6 +276,8 @@ forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODEL_B --json 2>&1 | jq 
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Explicit proxy routing: one selected proxy handles this worker.

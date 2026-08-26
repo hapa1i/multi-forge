@@ -2,7 +2,7 @@
 name: forge:qa
 description: Full Forge QA checklist in Docker container. Use for release validation or comprehensive verification of all Forge features.
 disable-model-invocation: true
-argument-hint: '[--provider-profile openrouter|remote-litellm] [--from X.Y] [--to X.Y] [--reset] [--stop] [--keep] [categories...]'
+argument-hint: '[--wheel PATH] [--runtime-track pinned|latest] [--codex-auth PATH] [--provider-profile openrouter|remote-litellm] [--extended] [--from X.Y] [--to X.Y] [--reset] [--stop] [--keep] [categories...]'
 allowed-tools: Read, Bash, Glob  # AskUserQuestion deliberately omitted — listing it triggers CC auto-approve bug (github.com/anthropics/claude-code/issues/29547). The tool remains available; omitting it preserves the interactive dialog.
 ---
 
@@ -13,29 +13,39 @@ Full Forge QA checklist inside a Docker container. The container IS the sandbox 
 ## Usage
 
 ```
-/forge:qa                          Run full QA checklist
+/forge:qa                          Build one wheel and run development-only QA
+/forge:qa --wheel dist/multi_forge-1.0.0-py3-none-any.whl
+                                   Run the blocking release gate on one prebuilt wheel
 /forge:qa session proxy            Run specific categories only
 /forge:qa --from 4.1               Resume from section 4.1
 /forge:qa --from 4.1 --to 7        Run sections 4.1 through 6.x (excludes 7)
 /forge:qa --from 10 --to 13        Run sections 10 through 12 (13 is excluded)
 /forge:qa --provider-profile remote-litellm
                                    Use remote/shared LiteLLM instead of default OpenRouter
-/forge:qa --reset                Kill container, remove image, rebuild from scratch
+/forge:qa --runtime-track latest --extended
+                                   Run non-blocking client compatibility plus exploratory steps
+/forge:qa --codex-auth ~/.codex/auth.json
+                                   Copy only the selected Codex auth file into the container
+/forge:qa --reset                  Rebuild the wheel-backed image on the selected runtime base
 /forge:qa --stop                   Stop and remove the QA container
 /forge:qa --keep                   Keep container running after completion
 ```
 
 ## Arguments
 
-| Argument                                        | Description                                                                                                                                                                                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--from X.Y`                                    | Resume from section X subsection Y.                                                                                                                                                                                                         |
-| `--to X.Y`                                      | Stop before section X subsection Y (exclusive). Example: `--from 10 --to 13` runs sections 10-12 and stops before 13.                                                                                                                       |
-| `--provider-profile openrouter\|remote-litellm` | Select the proxy backend family used by provider-dependent QA steps. Defaults to `openrouter`; `remote-litellm` is for shared/internal LiteLLM infrastructure.                                                                              |
-| `--reset`                                       | Kill container, remove image, rebuild from scratch. Use when auto-staleness detection is insufficient: Dockerfile changes, Claude Code version upgrades, corrupt image layers, or persistent container state not cleared by workspace init. |
-| `--stop`                                        | Stop and remove the QA Docker container.                                                                                                                                                                                                    |
-| `--keep`                                        | Keep the container running after completion.                                                                                                                                                                                                |
-| `categories`                                    | One or more category names to run (see allowlist below).                                                                                                                                                                                    |
+| Argument                                        | Description                                                                                                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--wheel PATH`                                  | Consume exactly one prebuilt wheel. Required for a release-pass verdict; without it, QA builds one wheel once and labels the result development-only.                      |
+| `--runtime-track pinned\|latest`                | Select repository-pinned blocking clients (default) or non-blocking `latest` compatibility clients.                                                                        |
+| `--codex-auth PATH`                             | Copy one explicit Codex `auth.json` into the isolated home. The harness never copies the rest of host `CODEX_HOME`; `CODEX_API_KEY` is also accepted from the environment. |
+| `--provider-profile openrouter\|remote-litellm` | Select the proxy backend family used by provider-dependent QA steps. Defaults to `openrouter`; `remote-litellm` is for shared/internal LiteLLM infrastructure.             |
+| `--extended`                                    | Add `extended-exploratory` steps to the blocking `clean-wheel-smoke` and `human-acceptance` selection. Automated-suite owners are still references only.                   |
+| `--from X.Y`                                    | Resume from section X subsection Y.                                                                                                                                        |
+| `--to X.Y`                                      | Stop before section X subsection Y (exclusive). Example: `--from 10 --to 13` runs sections 10-12 and stops before 13.                                                      |
+| `--reset`                                       | Kill container, remove the selected release image, and rebuild. Use for corrupt image layers or persistent container state that a normal fresh workspace does not clear.   |
+| `--stop`                                        | Stop and remove the QA container. May not be combined with start-only arguments.                                                                                           |
+| `--keep`                                        | Keep the container running after completion.                                                                                                                               |
+| `categories`                                    | One or more category names to run (see allowlist below).                                                                                                                   |
 
 ## Execution
 
@@ -43,9 +53,21 @@ Follow these steps in order. Do not skip steps.
 
 ### Step 1: Parse Arguments and Route
 
-Parse `$ARGUMENTS` to extract flags: `--provider-profile <profile>`, `--from X.Y`, `--to X.Y`, `--reset`, `--stop`,
-`--keep`. Any remaining words after flags are category names. Default `--provider-profile` to `openrouter`. Valid
-provider profiles are `openrouter` and `remote-litellm`; reject any other value before starting the container.
+Parse `$ARGUMENTS` to extract flags: `--wheel <path>`, `--runtime-track <track>`, `--codex-auth <path>`,
+`--provider-profile <profile>`, `--extended`, `--from X.Y`, `--to X.Y`, `--reset`, `--stop`, and `--keep`. Any remaining
+words after flags are category names. Default the provider profile to `openrouter` and runtime track to `pinned`.
+
+Before any Docker mutation, reject unknown flags, missing flag values, duplicate single-value flags, a runtime track
+other than `pinned` or `latest`, a provider profile other than `openrouter` or `remote-litellm`, or `--stop` combined
+with any start-only argument. Resolve `--wheel` and `--codex-auth` as single paths; do not expand a directory or choose
+among multiple wheels. `start-container.sh` performs the authoritative wheel metadata/digest and auth-file validation.
+
+Verdict semantics are fixed before execution:
+
+- explicit `--wheel` plus the `pinned` track is release-capable;
+- an omitted `--wheel` is `development-build`, even though the harness still builds and installs one exact wheel;
+- `latest` is always non-blocking compatibility evidence; and
+- `--extended` adds evidence but never upgrades either non-release mode into a release-pass verdict.
 
 **Greet the user:**
 
@@ -67,19 +89,49 @@ execution deterministic.
 
 ```bash
 SCRIPTS="${CLAUDE_SKILL_DIR}/scripts"
+CHECKLIST="${CLAUDE_SKILL_DIR}/resources/checklist.md"
+BUDGET="${CLAUDE_SKILL_DIR}/resources/execution-budget.json"
+SELECTION_SCRIPT="$SCRIPTS/qa-selection.py"
 ```
 
-**If `--stop` was set**: Run `bash "$SCRIPTS/start-container.sh" --stop` and stop. No tests.
+The selection and runtime resources are also resolved from this skill package. Never substitute files from `/forge` or
+another checkout.
 
-**If `--reset` was set**: Pass `--reset` to `start-container.sh` in Phase 1 (it kills the container, removes the image,
-and rebuilds from scratch). Continue with the normal flow after that. The script's auto-staleness detection (comparing
-the image's git rev label to `HEAD`) handles most cases automatically; `--reset` is the manual escape hatch for
-situations where the label matches but the image is wrong (see the `--reset` argument description above).
+**If `--stop` was set**: Run `bash "$SCRIPTS/start-container.sh" --stop` and stop. No selection or tests run.
+
+Before Docker mutation, resolve the complete execution selection from the validated arguments:
+
+```bash
+SELECTION_ARGS=(
+  --checklist "$CHECKLIST"
+  --parser "$SCRIPTS/walkthrough-state.py"
+  --budget "$BUDGET"
+)
+for category in "${CATEGORIES[@]}"; do SELECTION_ARGS+=(--category "$category"); done
+if [ -n "$FROM_ID" ]; then SELECTION_ARGS+=(--from "$FROM_ID"); fi
+if [ -n "$TO_ID" ]; then SELECTION_ARGS+=(--to "$TO_ID"); fi
+if [ "$EXTENDED" = true ]; then SELECTION_ARGS+=(--extended); fi
+
+SELECTION_JSON=$(python3 "$SELECTION_SCRIPT" "${SELECTION_ARGS[@]}")
+printf '%s\n' "$SELECTION_JSON" | jq -e '.blocking_budget_ok == true' >/dev/null
+```
+
+Stop before starting Docker if selection resolution or the blocking budget check fails.
+
+**If `--reset` was set**: Pass `--reset` to `start-container.sh` in Phase 1 (it kills the container, removes the
+wheel-backed release image, and rebuilds that layer against the selected runtime base). Continue with the normal flow
+after that. The script's auto-staleness detection (comparing the image's git rev label to `HEAD`) handles most cases
+automatically; `--reset` is the manual escape hatch for situations where the label matches but the image is wrong (see
+the `--reset` argument description above).
 
 **Provider profile**: Pass the selected provider profile to `start-container.sh`. The script validates required
 credentials and exports the QA template/proxy variables into the container environment. If a running container was
 created with a different provider profile, `start-container.sh` fails with a reset/stop hint; surface that message and
 stop.
+
+**Artifact and runtime identity**: Pass `--wheel`, `--runtime-track`, and `--codex-auth` when supplied. The harness
+records the canonical wheel path, SHA-256, version, image, runtime pins and observed versions, provider profile, and
+artifact mode in the mounted `artifact.json`. A pinned observed-version mismatch stops before checklist execution.
 
 **Category name allowlist** (exact match only -- reject unknown names):
 
@@ -107,9 +159,15 @@ categories: enable, preflight, extensions, ..."
 Run `start-container.sh` to get a Docker container:
 
 ```bash
-# Pass --reset if the user requested a full image rebuild.
-# PROVIDER_PROFILE is the parsed --provider-profile value, defaulting to openrouter.
-CONTAINER=$(bash "$SCRIPTS/start-container.sh" --provider-profile "$PROVIDER_PROFILE" ${REBUILD:+--reset})
+# These values come from the validated argument parser.
+START_ARGS=(--provider-profile "$PROVIDER_PROFILE" --runtime-track "$RUNTIME_TRACK")
+if [ -n "$WHEEL_PATH" ]; then START_ARGS+=(--wheel "$WHEEL_PATH"); fi
+if [ -n "$CODEX_AUTH_PATH" ]; then START_ARGS+=(--codex-auth "$CODEX_AUTH_PATH"); fi
+if [ "$RESET" = true ]; then START_ARGS+=(--reset); fi
+
+# Duration starts before artifact validation/build and ends after report.md is saved.
+RUN_STARTED_EPOCH=$(date +%s)
+CONTAINER=$(bash "$SCRIPTS/start-container.sh" "${START_ARGS[@]}")
 
 # `start-container.sh` prints the container name on stdout
 if [ -z "$CONTAINER" ]; then
@@ -123,6 +181,26 @@ persists on the host at `${FORGE_HOME:-$HOME/.forge}/manual-testing/qa/`.
 
 If it fails, show the error and stop. The script handles image build, staleness detection, container reuse, workspace
 init, and jq preflight.
+
+Read and validate the recorded identity immediately:
+
+```bash
+STATE_DIR_RAW="${FORGE_HOME:-$HOME/.forge}/manual-testing/qa"
+STATE_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(os.path.expandvars(sys.argv[1]))))' "$STATE_DIR_RAW")
+ARTIFACT_FILE="$STATE_DIR/artifact.json"
+test -f "$ARTIFACT_FILE"
+jq -e '
+  .schema_version == 1
+  and (.artifact.path | type == "string" and length > 0)
+  and (.artifact.sha256 | test("^[0-9a-f]{64}$"))
+  and (.runtime.track == "pinned" or .runtime.track == "latest")
+  and (.runtime.claude.observed | length > 0)
+  and (.runtime.codex.observed | length > 0)
+' "$ARTIFACT_FILE"
+```
+
+If the requested artifact mode, track, or wheel path differs from this record, stop. Do not repair release identity
+after checklist execution begins.
 
 Tell the user: "Docker container ready: `<container>`. Starting QA run."
 
@@ -142,7 +220,7 @@ Phase 1 with the fresh container. Do **not** try to scrub the live container in 
 
 ```bash
 bash "$SCRIPTS/start-container.sh" --stop
-CONTAINER=$(bash "$SCRIPTS/start-container.sh" --provider-profile "$PROVIDER_PROFILE" ${REBUILD:+--reset})
+CONTAINER=$(bash "$SCRIPTS/start-container.sh" "${START_ARGS[@]}")
 
 if [ -z "$CONTAINER" ]; then
   echo "ERROR: start-container.sh returned empty container name after reset."
@@ -154,18 +232,14 @@ This is more reliable than ad-hoc `rm -rf` cleanup because `start-container.sh` 
 
 #### Phase 2: Initialize State + Infra Probes
 
-**Set the checklist index** from the skill's own location:
-
-```bash
-CHECKLIST="${CLAUDE_SKILL_DIR}/resources/checklist.md"
-```
-
 **Resolve the host-side state directory** (the mount makes host and container paths equivalent):
 
 ```bash
 STATE_DIR_RAW="${FORGE_HOME:-$HOME/.forge}/manual-testing/qa"
 STATE_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(os.path.expandvars(sys.argv[1]))))' "$STATE_DIR_RAW")
 STATE_FILE="$STATE_DIR/state.json"
+ARTIFACT_FILE="$STATE_DIR/artifact.json"
+SELECTION_FILE="$STATE_DIR/selection.json"
 ```
 
 **Prepare mounted artifact directories**. Raw step logs and pre-clean log snapshots live under the mounted QA state
@@ -175,24 +249,56 @@ directory; Forge's own debug logs live under `/root/.forge/logs` inside the cont
 docker exec "$CONTAINER" bash -lc 'mkdir -p "$FORGE_TEST_REPO/.forge/qa/logs" "$FORGE_TEST_REPO/.forge/qa/forge-logs-snapshots"'
 ```
 
-**Fresh run**: clear any previous run-local logs/snapshots, reset container debug logs, then initialize progress
-tracking via `walkthrough-state.py`:
+**Persist the preflighted evidence selection** before state mutation:
+
+```bash
+printf '%s\n' "$SELECTION_JSON" > "$SELECTION_FILE"
+```
+
+`selection.json` is the only execution allowlist: steps absent from `.steps[].id` must not run, including
+`automated-suite` references. `--extended` adds exploratory steps but does not alter the hard blocking counts in
+`.blocking_counts`.
+
+**Fresh run** (no `--from`): clear previous run-local logs/snapshots, reset container debug logs, then initialize
+progress tracking via `walkthrough-state.py`:
 
 ```bash
 rm -rf "$STATE_DIR/logs" "$STATE_DIR/forge-logs-snapshots"
 docker exec "$CONTAINER" bash -lc 'rm -rf /root/.forge/logs && mkdir -p "$FORGE_TEST_REPO/.forge/qa/logs" "$FORGE_TEST_REPO/.forge/qa/forge-logs-snapshots"'
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" init --force --mode full-qa "$STATE_FILE"
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set RUN_STARTED_EPOCH "$RUN_STARTED_EPOCH"
 ```
 
 This creates the state file with schema version, checklist hash, and empty step records. The script handles all
 bookkeeping -- the agent never constructs state JSON manually.
 
-**Run infrastructure probes.** These drive `<!-- requires: X -->` skip decisions for the entire run:
+**Resume** (`--from X.Y`): do not initialize or clear state/logs. Require the prior state file, read it directly from
+the host, and validate it against the chosen resume point:
 
-| Probe     | Command                                                                                                                                                                                                                           | Stored as       | Meaning                                       |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------- |
-| `docker`  | `docker exec $CONTAINER command -v docker`                                                                                                                                                                                        | `INFRA_DOCKER`  | Docker client in container (docker-in-docker) |
-| `api_key` | `docker exec $CONTAINER bash -lc 'case "${FORGE_QA_PROVIDER_PROFILE:-openrouter}" in openrouter) test -n "${OPENROUTER_API_KEY:-}" ;; remote-litellm) test -n "${LITELLM_API_KEY:-}" && test -n "${LITELLM_BASE_URL:-}" ;; esac'` | `INFRA_API_KEY` | Selected provider credentials are available   |
+```bash
+test -f "$STATE_FILE"
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" validate "$STATE_FILE" --from "$FROM_ID"
+RUN_STARTED_EPOCH=$(python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" \
+  var "$STATE_FILE" get RUN_STARTED_EPOCH | jq -er '.value | tonumber')
+```
+
+This clears stale future-step records and refreshes derived section status for the current run before execution resumes.
+The `record` command still validates checklist hash on each call, so hash drift is caught automatically. Show progress:
+"Previously: N sections, M passed, K failed. Resuming from X.Y." Preserve `$STATE_DIR/logs`,
+`$STATE_DIR/forge-logs-snapshots`, and `/root/.forge/logs` so earlier evidence remains available. The original start
+epoch is also preserved, so a resumed run reports wall time from its first artifact validation rather than only its last
+segment.
+
+**Run infrastructure probes.** These drive `<!-- requires: X -->` skip decisions:
+
+| Probe           | Command                                                                                                                                                                                                                           | Stored as             | Meaning                                                |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------ |
+| `docker`        | `docker exec $CONTAINER command -v docker`                                                                                                                                                                                        | `INFRA_DOCKER`        | Docker client in container (docker-in-docker)          |
+| `api_key`       | `docker exec $CONTAINER bash -lc 'case "${FORGE_QA_PROVIDER_PROFILE:-openrouter}" in openrouter) test -n "${OPENROUTER_API_KEY:-}" ;; remote-litellm) test -n "${LITELLM_API_KEY:-}" && test -n "${LITELLM_BASE_URL:-}" ;; esac'` | `INFRA_API_KEY`       | Selected provider credentials are available            |
+| `anthropic_api` | `docker exec $CONTAINER bash -lc 'test -n "${ANTHROPIC_API_KEY:-}"'`                                                                                                                                                              | `INFRA_ANTHROPIC_API` | Direct keyed Claude billing seam is available          |
+| `codex`         | `docker exec $CONTAINER bash -lc 'forge runtime preflight codex --json'` and require `.ready == true`                                                                                                                             | `INFRA_CODEX`         | Static Codex binary/auth prerequisites are ready       |
+| `openrouter`    | `docker exec $CONTAINER bash -lc 'test "${FORGE_QA_PROVIDER_PROFILE:-}" = openrouter && test -n "${OPENROUTER_API_KEY:-}"'`                                                                                                       | `INFRA_OPENROUTER`    | Provider trace and remote reconciliation are supported |
+| `proxy`         | Refreshed immediately before a requiring step from `forge proxy list --json`                                                                                                                                                      | `INFRA_PROXY`         | A required QA proxy is currently running and usable    |
 
 Store probe results in the state file:
 
@@ -201,6 +307,10 @@ CONTAINER_ID=$(docker inspect -f '{{.Id}}' "$CONTAINER")
 
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_DOCKER <true|false>
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_API_KEY <true|false>
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_ANTHROPIC_API <true|false>
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_CODEX <true|false>
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_OPENROUTER <true|false>
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_PROXY false
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set CONTAINER "$CONTAINER"
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set CONTAINER_ID "$CONTAINER_ID"
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set RUN_SCOPE "container:$CONTAINER_ID"
@@ -211,18 +321,11 @@ side-effect-dependent sections from an old run by accident.
 
 Tell the user which infrastructure is available and what will be skipped.
 
-**Resume** (`--from X.Y`): Read `$STATE_FILE` directly from the host, then validate it against the chosen resume point:
-
-```bash
-python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" validate "$STATE_FILE" --from <X.Y from --from>
-```
-
-This clears stale future-step records and refreshes derived section status for the current run before execution resumes.
-The `record` command still validates checklist hash on each call, so hash drift is caught automatically. Show progress:
-"Previously: N sections, M passed, K failed. Resuming from X.Y."
-
-On resume, preserve `$STATE_DIR/logs`, `$STATE_DIR/forge-logs-snapshots`, and `/root/.forge/logs` so evidence from the
-earlier part of the same QA run remains available.
+For a release-capable run, unavailable `api_key`, `anthropic_api`, `codex`, or `openrouter` infrastructure makes the
+final verdict incomplete even if affected assertions are recorded as skipped. OpenRouter is specifically required by the
+provider-trace/reconciliation seam; the `remote-litellm` profile remains useful for diagnostic compatibility runs but
+cannot alone produce a complete release verdict. Continue only when the user wants diagnostic evidence; never call the
+result a release pass.
 
 #### Phase 3: Build Section Index
 
@@ -232,15 +335,14 @@ Run the checklist parser to get the full structure:
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" index
 ```
 
-This returns JSON with all sections, subsections, annotations, and assertion counts. Store this as the checklist index.
-
-If category names were given, filter the index to matching sections only.
+This returns JSON with all sections, subsections, annotations, and assertion counts. Store this as the checklist index,
+then intersect it with the ordered ids in `selection.json`. Do not reimplement category, range, or evidence filtering in
+the model.
 
 #### Phase 4: Execute Sections (Main Loop)
 
-For each section in the index (or starting from `--from X.Y`). If `--to X.Y` was set, stop **before** reaching that step
-— do not execute it or anything after it. `--to` accepts both section-level (`--to 7` stops before section 7) and
-subsection-level (`--to 7.3` stops before step 7.3) IDs. When the stop point is reached, skip to Phase 5 (Summary).
+Execute only the ordered step ids in `selection.json`. The resolver has already applied category, `--from`, exclusive
+`--to`, and evidence-lane semantics; when the selected list ends, continue to Phase 5 (Summary).
 
 For each section/step in the filtered range:
 
@@ -272,18 +374,32 @@ For each section/step in the filtered range:
 
     **Handle by annotation type**:
 
-    | Annotation                | Action                                                                                                                                                                                                                                                                 |
-    | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | `<!-- auto -->`           | Run bash block via `docker exec`. Check assertions against output. Show results block.                                                                                                                                                                                 |
-    | `<!-- human:confirm -->`  | Run bash block via `docker exec`, show output to user. Use AskUserQuestion: "Does this look correct?" (Pass / Fail / Skip). Show results block.                                                                                                                        |
-    | `<!-- human:guided -->`   | Show instructions and bash snippet from the checklist. Do NOT run the bash block. Use AskUserQuestion with context-appropriate framing (see rule 9). After user confirms, verify artifacts via `docker exec` (rule 9). Show results block.                             |
-    | `<!-- requires: X -->`    | Split `X` on commas, uppercase each token to form `INFRA_<TOKEN>` (e.g., `docker,api_key` checks `INFRA_DOCKER` and `INFRA_API_KEY`). Look up each via `var get`. Skip if any is unavailable: show `[Skipped -- requires: X]`.                                         |
-    | `<!-- prereq: N, ... -->` | Section-level or subsection-level prerequisite. Lists section numbers (e.g., `0, 2, 4`) that must be satisfied in the current run before this section can run. On `--from` resume, check state file for each prereq and warn the user about any blockers. See rule 10. |
-    | `<!-- destructive -->`    | Safe inside Docker. Run the bash block, check assertions.                                                                                                                                                                                                              |
-    | No annotation             | Treat as `<!-- human:confirm -->`.                                                                                                                                                                                                                                     |
+    | Annotation                    | Action                                                                                                                                                                                                                                                                 |
+    | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `<!-- auto -->`               | Run bash block via `docker exec`. Check assertions against output. Show results block.                                                                                                                                                                                 |
+    | `<!-- human:confirm -->`      | Run bash block via `docker exec`, show output to user. Use AskUserQuestion: "Does this look correct?" (Pass / Fail / Skip). Show results block.                                                                                                                        |
+    | `<!-- human:guided -->`       | Show instructions and bash snippet from the checklist. Do NOT run the bash block. Use AskUserQuestion with context-appropriate framing (see rule 9). After user confirms, verify artifacts via `docker exec` (rule 9). Show results block.                             |
+    | `<!-- requires: X -->`        | Split `X` on commas, uppercase each token to form `INFRA_<TOKEN>` (e.g., `docker,api_key` checks `INFRA_DOCKER` and `INFRA_API_KEY`). Look up each via `var get`. Skip if any is unavailable: show `[Skipped -- requires: X]`.                                         |
+    | `<!-- prereq: N, ... -->`     | Section-level or subsection-level prerequisite. Lists section numbers (e.g., `0, 2, 4`) that must be satisfied in the current run before this section can run. On `--from` resume, check state file for each prereq and warn the user about any blockers. See rule 10. |
+    | `<!-- destructive -->`        | Safe inside Docker. Run the bash block, check assertions.                                                                                                                                                                                                              |
+    | `<!-- evidence: L -->`        | Informational after selection. Run the step only when its id is in `selection.json`; never execute an `automated-suite` owner as part of manual QA.                                                                                                                    |
+    | `<!-- paid-operations: N -->` | Deterministic maximum for the step. Record how many named subject-under-test completions actually occurred; never count the Claude-hosted driver.                                                                                                                      |
+    | No annotation                 | Treat as `<!-- human:confirm -->`.                                                                                                                                                                                                                                     |
 
     A subsection can have multiple annotations (e.g., `<!-- destructive -->` + `<!-- human: ... -->`). Apply all that
     match. `requires` is checked first (skip before attempting anything else). `prereq` is checked at section entry.
+
+    Before a step requiring `proxy`, refresh `INFRA_PROXY` from the live installed-product surface instead of using its
+    initial `false` value:
+
+    ```bash
+    docker exec "$CONTAINER" bash -lc \
+      'forge proxy list --json | jq -e '\''any(.[]; .status == "running")'\'' >/dev/null'
+    python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set INFRA_PROXY <true|false>
+    ```
+
+    When any requirement is unavailable, record one `s` per assertion so saved state remains complete. A skip for
+    release-required `api_key`, `anthropic_api`, or `codex` infrastructure also adds a release-verdict gap.
 
 04. **Execute bash blocks** from the checklist -- run ONLY what the checklist specifies:
 
@@ -326,6 +442,13 @@ For each section/step in the filtered range:
     Where `<results>` is comma-separated: `p` (pass), `f` (fail), `s` (skip) -- one per assertion. Example:
     `record "$STATE_FILE" 3.1 p,p,p,p` for a step where all 4 assertions passed. The output shows progress:
     `3.1: 4/4 pass | Section 3: 4/30 | Overall: 75/N`.
+
+    For a selected step with `paid-operations: N`, inspect the command evidence and store only completions that actually
+    occurred (from zero through N) in `PAID_OPERATIONS_<STEP_ID>`, replacing `.` with `_`. For example, step 5.24 writes
+    `PAID_OPERATIONS_5_24`. Use `walkthrough-state.py var ... set` and overwrite the value when retrying the step. A
+    failed launch before a model completion counts zero; a completion followed by a failed assertion still counts one.
+    Per-step values are counted only when that step has valid evidence in the current container scope, so resume cannot
+    double-count a cleared or stale record. Never exceed the step plan or count the Claude-hosted checklist driver.
 
 08. **Step presentation format**: Every subsection follows a visual pattern so progress is easy to scan.
 
@@ -466,11 +589,12 @@ For each section/step in the filtered range:
     - If `ok` is `false`: check the `resolvable` list in the response. `resolvable` contains step-level prereqs (e.g.,
       `4.2`) whose section prereqs are already satisfied -- meaning you can run that step immediately.
 
-      **Auto-resolve resolvable prereqs**: For each step in `resolvable`, fetch its details via
-      `walkthrough-state.py step <prereq_id>`. Only auto-run if the step's annotation is `auto` (not `human:guided` or
-      `human:confirm`) and it has no unmet `requires:` gates. For interactive prereqs, ask the user instead. Execute
-      auto steps normally (run bash blocks, check assertions, record results), then re-run `prereq-check` for the
-      original step. This avoids unnecessary skips when the missing prereq is cheap to run.
+      **Auto-resolve resolvable prereqs**: For each step in `resolvable`, first require its id to be present in
+      `selection.json`, then fetch its details via `walkthrough-state.py step <prereq_id>`. Only auto-run if the step's
+      annotation is `auto` (not `human:guided` or `human:confirm`) and it has no unmet `requires:` gates. For selected
+      interactive prereqs, ask the user instead. An excluded evidence owner is a selection-contract error; do not run it
+      implicitly. Execute eligible auto steps normally, record results, then re-run `prereq-check` for the original
+      step.
 
       **If blocking prereqs remain after auto-resolution** (section-level prereqs, or step-level prereqs whose own
       section prereqs aren't met): warn the user which prerequisites are blocking (show `blocking` and `statuses`).
@@ -485,10 +609,10 @@ For each section/step in the filtered range:
 
     | If section fails... | Then...                                                                    |
     | ------------------- | -------------------------------------------------------------------------- |
-    | 0 (Enable)          | Stop. Enable is broken.                                                    |
+    | 0 (Artifact)        | Stop feature execution. Artifact provenance is broken.                     |
     | 2 (Extensions)      | Skip Section 3 (can't verify auth without ext).                            |
     | 4 (Proxy)           | Skip Sections 7, 14-16 (no proxy for costs/workflow/skills/memory-writer). |
-    | Any section         | Section 20 (Cleanup) always runs.                                          |
+    | Any section         | Continue to artifact save. Run section 20 only when it is selected.        |
 
 12. **Context conservation**: After completing each `## N.` section, print a one-line summary using the progress numbers
     from the last `record` output. Do NOT carry raw command output forward -- the state file and logs inside the
@@ -514,24 +638,29 @@ python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" get PROXY
 
 #### Phase 5: Summary
 
-Get the final report from the state file:
+Save the parser-owned assertion detail first:
 
 ```bash
-python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" report "$STATE_FILE"
+python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" report "$STATE_FILE" > "$STATE_DIR/checklist-report.json"
 ```
 
-This returns JSON with per-section pass/fail/skip counts, failures list, gaps, and totals. The script provides all
-numbers -- do not count manually. Render the report JSON as a results table:
+This contains checklist-wide detail, including unselected ids as gaps. Do not use its `complete` field as the release
+verdict. `qa-run-metrics.py` joins the selected evidence with state and owns the release-capable scope, counts, duration
+review flag, and verdict.
+
+Render a concise terminal summary from the selected section rows in `run-metrics.json` after Phase 5b creates it:
 
 ```
 Full QA Results
 ====================================
   Container:       $CONTAINER
-  Checklist:       v1.0.0 (N items)
+  Artifact:        <wheel filename> (<short SHA-256>)
+  Runtime track:   pinned|latest
+  Selection:       blocking|extended (N steps)
 
   Section                  Pass  Fail  Skip
   ----------------------------------------
-  0. Install               17     0     0
+  0. Release Artifact      16     0     0
   1. Pre-Flight              2     0     0
   2. Extensions             26     0     0
   ...
@@ -543,7 +672,9 @@ Full QA Results
     6.4  Smoke Test SessionStart Hook: ...
 
   Skipped (infra missing):
-    3.1-3.11 (requires: api_key)
+    <selected ids only>
+
+  Verdict: pass|fail|incomplete|partial|development-only|compatibility-only|pass-review-required
 ====================================
 ```
 
@@ -551,9 +682,9 @@ Full QA Results
 
 After generating the report, save all artifacts to a timestamped run directory.
 
-This phase is required for every QA run, including partial `--from/--to` runs and runs with failures. Do not stop after
-printing the summary. A QA run is not complete until `report.md`, `state.json`, and `.pending-transcript` exist in the
-run directory / state dir.
+This phase is required for every QA run, including category/range runs and runs with failures. Do not stop after a
+feature failure. Once a container and state exist, a run is not complete until `report.md`, `state.json`,
+`artifact.json`, `selection.json`, `run-metrics.json`, and the `.pending-transcript` marker are preserved.
 
 After Phase 5 summary, continue directly into Phase 5b without asking the user whether to save artifacts.
 
@@ -562,18 +693,16 @@ RUN_DIR="$STATE_DIR/runs/$(date +%Y-%m-%d-%H%M%S)"
 mkdir -p "$RUN_DIR"
 ```
 
-1. Generate the report using `walkthrough-state.py`:
+1. Copy the immutable inputs and state before any container cleanup:
 
    ```bash
-   python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" report "$STATE_FILE"
+   cp "$ARTIFACT_FILE" "$RUN_DIR/artifact.json"
+   cp "$SELECTION_FILE" "$RUN_DIR/selection.json"
+   cp "$STATE_FILE" "$RUN_DIR/state.json"
+   cp "$STATE_DIR/checklist-report.json" "$RUN_DIR/checklist-report.json"
    ```
 
-   This returns JSON with per-section pass/fail/skip counts, failures, and gaps. Find the report template
-   (`${CLAUDE_SKILL_DIR}/resources/report-template.md`), fill it in, and write to `$RUN_DIR/report.md`.
-
-2. Copy the state file: `cp "$STATE_FILE" "$RUN_DIR/state.json"`
-
-3. Copy mounted raw step logs when present:
+2. Copy mounted raw step logs when present:
 
    ```bash
    if [ -d "$STATE_DIR/logs" ]; then
@@ -581,7 +710,7 @@ mkdir -p "$RUN_DIR"
    fi
    ```
 
-4. Copy any pre-clean Forge log snapshots when present:
+3. Copy any pre-clean Forge log snapshots when present:
 
    ```bash
    if [ -d "$STATE_DIR/forge-logs-snapshots" ]; then
@@ -589,7 +718,7 @@ mkdir -p "$RUN_DIR"
    fi
    ```
 
-5. Copy the container's current Forge debug logs when present:
+4. Copy the container's current Forge debug logs when present:
 
    ```bash
    if docker exec "$CONTAINER" bash -lc 'test -d /root/.forge/logs'; then
@@ -598,7 +727,98 @@ mkdir -p "$RUN_DIR"
    fi
    ```
 
-6. Generate a transcript claim token and write the marker so only this QA session can copy the transcript here when it
+5. Generate provisional scope, budget, duration, and verdict metadata. `RUN_STARTED_EPOCH` was captured immediately
+   before artifact validation and persisted across resume. This validates the saved evidence before report drafting; it
+   does not own the final duration:
+
+   ```bash
+   RUN_ENDED_EPOCH=$(date +%s)
+   python3 "$SCRIPTS/qa-run-metrics.py" \
+     --artifact "$RUN_DIR/artifact.json" \
+     --selection "$RUN_DIR/selection.json" \
+     --state "$RUN_DIR/state.json" \
+     --started-epoch "$RUN_STARTED_EPOCH" \
+     --ended-epoch "$RUN_ENDED_EPOCH" \
+     > "$RUN_DIR/run-metrics.json"
+   ```
+
+   Stop report assembly if metrics generation fails.
+
+6. Fill `${CLAUDE_SKILL_DIR}/resources/report-template.md` from `artifact.json`, `selection.json`,
+   `checklist-report.json`, and the provisional `run-metrics.json`, then write `$RUN_DIR/report.pending.md`. Use the
+   selected section rows and selected gaps from `run-metrics.json`; list `automated-suite` paths only as unexecuted
+   owners. Copy these exact placeholders into the four duration-sensitive value cells instead of provisional values:
+
+   - `__QA_DURATION_SECONDS__`
+   - `__QA_BUDGET_REVIEW_REQUIRED__`
+   - `__QA_DURATION_DISPOSITION__`
+   - `__QA_RELEASE_VERDICT__`
+
+   Populate the Human Checkpoints and Paid Operations rows from the blocking plan and blocking completed/observed
+   fields. If `--extended` selected additional work, append its selected totals explicitly rather than comparing the
+   extended total with the blocking cap.
+
+   Finish all issue descriptions, notes, and other report prose now. There must be no model-authored report work after
+   the final end timestamp.
+
+7. Capture `RUN_ENDED_EPOCH` only after the pending report is complete, then regenerate `run-metrics.json`. If the
+   resulting `.duration.budget_review_required` is true and no disposition has been supplied, ask the maintainer for an
+   explicit disposition. Leave it pending to retain `pass-review-required`, or capture the response and rerun this final
+   metrics command with a fresh end timestamp and `--duration-disposition`. Duration never changes a correct run to
+   `fail`.
+
+   ```bash
+   RUN_ENDED_EPOCH=$(date +%s)
+   FINAL_METRICS_ARGS=(
+     --artifact "$RUN_DIR/artifact.json"
+     --selection "$RUN_DIR/selection.json"
+     --state "$RUN_DIR/state.json"
+     --started-epoch "$RUN_STARTED_EPOCH"
+     --ended-epoch "$RUN_ENDED_EPOCH"
+   )
+   if [ -n "${DURATION_DISPOSITION:-}" ]; then
+     FINAL_METRICS_ARGS+=(--duration-disposition "$DURATION_DISPOSITION")
+   fi
+   python3 "$SCRIPTS/qa-run-metrics.py" "${FINAL_METRICS_ARGS[@]}" > "$RUN_DIR/run-metrics.json"
+   ```
+
+8. Immediately substitute the four final fields and atomically publish the report. This write is the duration boundary;
+   do no unrelated work between the final metrics command and this substitution. Copy the verdict exactly—never promote
+   `development-only`, `compatibility-only`, `partial`, `incomplete`, or `pass-review-required` to a release pass.
+   Extended-step failures are reported but do not rewrite the pinned blocking result.
+
+   ```bash
+   python3 - "$RUN_DIR/report.pending.md" "$RUN_DIR/report.md" "$RUN_DIR/run-metrics.json" <<'PY'
+   import json
+   import os
+   import sys
+   from pathlib import Path
+
+   pending_path, report_path, metrics_path = map(Path, sys.argv[1:])
+   metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+   duration = metrics["duration"]
+   replacements = {
+       "__QA_DURATION_SECONDS__": str(duration["seconds"]),
+       "__QA_BUDGET_REVIEW_REQUIRED__": str(duration["budget_review_required"]).lower(),
+       "__QA_DURATION_DISPOSITION__": (
+           duration["maintainer_disposition"]
+           or ("pending" if duration["budget_review_required"] else "not required")
+       ),
+       "__QA_RELEASE_VERDICT__": metrics["verdict"],
+   }
+   report = pending_path.read_text(encoding="utf-8")
+   for marker, value in replacements.items():
+       if report.count(marker) != 1:
+           raise SystemExit(f"report marker {marker} must occur exactly once")
+       report = report.replace(marker, value)
+   temporary = report_path.with_suffix(".tmp")
+   temporary.write_text(report, encoding="utf-8")
+   os.replace(temporary, report_path)
+   pending_path.unlink()
+   PY
+   ```
+
+9. Generate a transcript claim token and write the marker so only this QA session can copy the transcript here when it
    ends:
 
 ```bash
@@ -618,28 +838,30 @@ with open(marker_path, "w", encoding="utf-8") as handle:
 PY
 ```
 
-Tell the user: "Run artifacts saved to `$RUN_DIR`. Forge step logs and debug logs were copied when present. Transcript
-claim token: `$TRANSCRIPT_TOKEN`. Transcript will be added when this QA session ends."
+Tell the user: "Run artifacts saved to `$RUN_DIR`. Verdict: `<verdict>`. Forge step logs and debug logs were copied when
+present. Transcript claim token: `$TRANSCRIPT_TOKEN`. Transcript will be added when this QA session ends."
 
 #### Phase 6: Cleanup
 
-- If all passed and `--keep` was NOT set: stop and remove the container.
+- If the verdict is `pass` and `--keep` was NOT set: stop and remove the container.
 - If any failures: keep the container for inspection. Print: "Container kept for inspection. Run `/forge:qa --stop` to
   remove."
-- The last `record` call already updated `last_updated` in the state file.
+- For every other verdict, keep the container unless the user explicitly asks to remove it. The last `record` call
+  already updated `last_updated` in the state file.
 
 Tip: "Report and transcript saved to the run directory. Find previous reports in `~/.forge/manual-testing/qa/runs/`."
 
 ## Safety Model
 
-| Tier    | Scripts involved              | What can go wrong      | Mitigation                             |
-| ------- | ----------------------------- | ---------------------- | -------------------------------------- |
-| Full QA | `start-container.sh` + Docker | Nothing -- OS boundary | Container cannot reach host filesystem |
+| Tier    | Scripts involved                                       | Bounded risk                                                                 | Mitigation                                                                                |
+| ------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Full QA | container, selection, state, artifact, metrics scripts | QA state-dir writes, paid provider calls, and explicit credential forwarding | One mounted QA directory, narrow Codex auth ingress, fixed checklist commands, saved logs |
 
-All commands run inside the Docker container via `docker exec`. The container is the sandbox.
+Product commands run inside the Docker container via `docker exec`. The container can write only the mounted QA state
+directory on the host; do not add broader host mounts.
 
-`walkthrough-state.py` runs on the HOST for bookkeeping (state file is accessible via mount). It never executes commands
-inside the container.
+`walkthrough-state.py`, `qa-selection.py`, `qa-artifact.py`, and `qa-run-metrics.py` run on the host for deterministic
+bookkeeping. They do not execute product commands inside the container.
 
 ## Reference: Full QA Checklist
 
@@ -652,7 +874,7 @@ It covers 21 categories:
 
 | Category      | Section | Destructive? |
 | ------------- | ------- | ------------ |
-| enable        | 0       | Yes          |
+| enable        | 0       | No           |
 | preflight     | 1       | No           |
 | extensions    | 2       | No           |
 | auth          | 3       | No           |
@@ -684,6 +906,10 @@ Commands are deterministic (from checklist); interpretation is adaptive (agent j
   container have the details. This preserves context window for the full run.
 - **DON'T count assertions manually.** Use `walkthrough-state.py record` and `report` for all counting. LLMs get
   arithmetic wrong.
+- **DON'T select evidence manually.** `selection.json` is authoritative for categories, ranges, evidence lanes, and
+  planned budgets. Automated-suite owners are references, not hidden checklist work.
+- **DON'T invent a release verdict.** Copy it from `run-metrics.json`; a development build, latest track, partial run,
+  blocking gap, or pending duration review is not a release pass.
 - **DON'T combine multiple Bash commands in one call.** Run each `code_blocks` entry as a separate Bash call. Piped
   multi-command blocks fail silently in the Bash tool.
 - **DON'T put instructions after AskUserQuestion.** The user sees the question modal immediately -- anything you print
@@ -700,5 +926,6 @@ Commands are deterministic (from checklist); interpretation is adaptive (agent j
 
 - **Context window**: Full QA may be long-running -- use `--from X.Y` to resume after compaction.
 - **Run a range**: Use `--from 4.1 --to 7` to run sections 4 through 6 only (excludes the `--to` step).
-- **Resume after compaction**: If the conversation compacts during QA, use `/forge:qa --from X.Y`.
+- **Resume after compaction**: Use `/forge:qa --wheel <same-wheel> --from X.Y` with the same runtime track and provider
+  profile. Rebuilding an unnamed development wheel is not artifact-stable resume evidence.
 - **Quick check**: For a quick non-interactive health check, use `/forge:smoke-test`.

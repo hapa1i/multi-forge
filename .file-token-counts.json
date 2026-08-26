@@ -50,6 +50,12 @@
       "family": "anthropic",
       "tokens": 20001
     },
+    "docs/design_installation.md": {
+      "sha256": "d4afd1da2dd7556a9ed4416ede66b5db9623c57a58985f9abd6835dab7135ee5",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 21204
+    },
     "docs/design_runtime.md": {
       "sha256": "4f7f6e5598abf109236d57c77758c527470941b0206bdff2de1723434d6ff285",
       "method": "claude-opus-5",
@@ -85,6 +91,12 @@
       "method": "claude-opus-5",
       "family": "anthropic",
       "tokens": 23841
+    },
+    "src/skills/qa/resources/checklist/5-session.md": {
+      "sha256": "bbbe53c5c58ba382ed2f39847c0f28397f44e3a1c33e32a0ce3bc27898cab0a2",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 20982
     },
     "src/skills/review/references/skills-writing-guide.md": {
       "sha256": "9006083e31ef0f57ac4bbb3ebe9ec8044eb5309c6c91d25e283e8e40a779be97",

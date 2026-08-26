@@ -1,10 +1,10 @@
 <!-- prereq: 0.3, 2.13 -->
 
-## 18. Uninstallation (Incremental)
+## 18. Incremental Extension Disable
 
-Test uninstalling individual scopes before the complete uninstall.
+Test disabling individual scopes before removing every tracked installation.
 
-### 18.1 Uninstall Local Scope Only
+### 18.1 Disable Local Scope Only
 
 <!-- auto -->
 
@@ -18,7 +18,7 @@ forge extension disable --scope local -y
 
 # Verify local removal (extensions install skills/, not a commands/ dir)
 ls .claude/skills/   # Should be empty or removed
-cat .claude/settings.local.json | jq '.hooks'  # Should have no Forge hooks
+cat .claude/settings.local.json | jq '.statusLine'  # Should have no Forge status line
 
 # Verify user scope STILL installed
 ls ~/.claude/skills/  # Should still have Forge skills
@@ -30,7 +30,7 @@ cat ~/.forge/installed.json | jq '.installations | keys'
 ```
 
 - [ ] Local skills removed
-- [ ] Local hooks removed from settings.local.json
+- [ ] Local status line removed from settings.local.json; runtime hooks were never owned by local scope
 - [ ] User scope skills still present
 - [ ] User scope hooks still present
 - [ ] `local:$FORGE_TEST_REPO` removed from tracking; `user` key still present (other worktree-local keys may remain)
@@ -60,7 +60,7 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 - [ ] User-approved permissions (e.g., `Bash(forge workflow:*)`) may remain -- these are Claude Code auto-learned, not
   Forge-managed
 
-### 18.3 Re-install Local for Complete Test
+### 18.3 Re-enable Local Scope
 
 <!-- auto -->
 

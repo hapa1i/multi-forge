@@ -272,7 +272,11 @@ class TestCredentialStoreHydration:
     def test_credential_file_key_is_ready_and_not_leaked(self, monkeypatch) -> None:
         secret = "sk-codex-from-file"
         # Simulate a key present only in the Forge credential file (not env).
-        monkeypatch.setattr(cp, "resolve_env_or_credential_with_source", lambda _var: (secret, "credential_file"))
+        monkeypatch.setattr(
+            cp,
+            "resolve_env_or_credential_with_source",
+            lambda _var: (secret, "credential_file"),
+        )
         monkeypatch.setattr(cp, "resolve_env_or_credential", lambda _var: secret)
         _stub_probes(monkeypatch)
 
@@ -326,7 +330,13 @@ class TestTomlFlagTrue:
         assert cp._toml_flag_true({"allow_managed_hooks_only": True}, "allow_managed_hooks_only") is True
 
     def test_nested_one_table_deep_true(self) -> None:
-        assert cp._toml_flag_true({"hooks": {"allow_managed_hooks_only": True}}, "allow_managed_hooks_only") is True
+        assert (
+            cp._toml_flag_true(
+                {"hooks": {"allow_managed_hooks_only": True}},
+                "allow_managed_hooks_only",
+            )
+            is True
+        )
 
     def test_absent_is_false(self) -> None:
         assert cp._toml_flag_true({"hooks": {"other": 1}}, "allow_managed_hooks_only") is False
@@ -342,7 +352,12 @@ class TestHookSeamNeverActive:
         assert preflight_codex().hook_seam == "disabled"
 
     def test_known_old_version_is_disabled(self, monkeypatch) -> None:
-        _stub_probes(monkeypatch, version="0.130.0", features=True, doctor=_doctor(chatgpt="true"))
+        _stub_probes(
+            monkeypatch,
+            version="0.130.0",
+            features=True,
+            doctor=_doctor(chatgpt="true"),
+        )
         assert preflight_codex().hook_seam == "disabled"
 
     def test_unparseable_version_is_unknown_not_disabled(self, monkeypatch) -> None:
@@ -399,7 +414,11 @@ class TestResponsesPosture:
 
     def test_responses_passthrough_with_capable_source_is_supported(self, monkeypatch) -> None:
         # The full conjunction: responses wire shape AND a responses_ingress source.
-        _write_proxy_yaml("codex-responses", wire_shape="openai_responses_passthrough", backend="codex-responses-local")
+        _write_proxy_yaml(
+            "codex-responses",
+            wire_shape="openai_responses_passthrough",
+            backend="codex-responses-local",
+        )
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")
 
@@ -413,7 +432,9 @@ class TestResponsesPosture:
         # Right wire shape, but the source does not declare responses_ingress: the
         # conjunction fails, so preflight cannot green-light what the route would 501.
         _write_proxy_yaml(
-            "codex-responses-badsrc", wire_shape="openai_responses_passthrough", backend="litellm-gemini-test"
+            "codex-responses-badsrc",
+            wire_shape="openai_responses_passthrough",
+            backend="litellm-gemini-test",
         )
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")
@@ -439,7 +460,9 @@ class TestResponsesPosture:
         # Responses wire shape with a source id absent from the catalog -> fail closed
         # (ModelSourceNotFoundError is swallowed into proxy_unsupported, no traceback).
         _write_proxy_yaml(
-            "codex-responses-unknownsrc", wire_shape="openai_responses_passthrough", backend="no-such-source"
+            "codex-responses-unknownsrc",
+            wire_shape="openai_responses_passthrough",
+            backend="no-such-source",
         )
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")
@@ -515,7 +538,11 @@ class TestValidatedVersionGuard:
 
     def test_at_validated_ceiling_is_not_beyond(self, monkeypatch) -> None:
         # Exactly the validated version is proven, not ahead (strict greater-than).
-        _stub_probes(monkeypatch, version=cp.CODEX_VERSION_VALIDATED, doctor=_doctor(chatgpt="true"))
+        _stub_probes(
+            monkeypatch,
+            version=cp.CODEX_VERSION_VALIDATED,
+            doctor=_doctor(chatgpt="true"),
+        )
         result = preflight_codex()
         assert result.version_beyond_validated is False
         assert result.version_validated == cp.CODEX_VERSION_VALIDATED
@@ -570,10 +597,11 @@ class TestProxyContractBlocker:
         # "0.141" must meet the "0.141.0" floor (padding, not shorter-sorts-lower).
         assert cp.codex_proxy_contract_blocker("0.141") is None
 
-    def test_proxy_floor_is_above_general_ceiling(self) -> None:
-        # The proxy contract was proved later than the general probe ceiling; the two
-        # constants are intentionally distinct surfaces.
-        assert cp._version_lt(cp.CODEX_VERSION_VALIDATED, cp.CODEX_PROXY_CONTRACT_VALIDATED)
+    def test_general_ceiling_covers_proxy_floor(self) -> None:
+        # The release-pinned client must satisfy the hard proxy floor without running
+        # ahead of the general hook/preflight probe ceiling. The constants remain
+        # distinct because one warns on future drift and the other blocks old clients.
+        assert not cp._version_lt(cp.CODEX_VERSION_VALIDATED, cp.CODEX_PROXY_CONTRACT_VALIDATED)
 
 
 class TestHappyPathAndAssert:

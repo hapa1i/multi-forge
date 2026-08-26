@@ -6,7 +6,7 @@ Three skills verify that Forge is installed and working correctly, with escalati
 | ----------- | ------------------------------------------------- | --------------------------------------------------------- | ---------------- | ------------------- |
 | Smoke test  | Claude: `/forge:smoke-test`; Codex: `$smoke-test` | Read-only health check (no writes)                        | Claude and Codex | SKILLS module       |
 | Walkthrough | `/forge:walkthrough`                              | Install + assert in sandbox, verify real system untouched | Claude Code only | SKILLS module       |
-| Full QA     | `/forge:qa`                                       | Full checklist in Docker                                  | Claude Code only | `full` profile      |
+| Full QA     | `/forge:qa`                                       | Bounded exact-wheel checklist in Docker                   | Claude Code only | `full` profile      |
 
 - Canonical architecture:
   [`docs/design_installation.md` section D](../design_installation.md#d-interactive-manual-testing)
@@ -76,16 +76,41 @@ forge extension enable --profile full
 Then in Claude Code:
 
 ```
-/forge:qa                              # Run full checklist
+/forge:qa                              # Build one wheel; development-only verdict
+/forge:qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
+                                       # Run the pinned blocking release gate
 /forge:qa session proxy                # Run specific categories
-/forge:qa --from 4.1                   # Resume from section 4.1
+/forge:qa --wheel <same-wheel> --from 4.1
+                                       # Resume with the same artifact identity
 /forge:qa --from 10 --to 13            # Run sections 10-12; `--to` is exclusive
+/forge:qa --runtime-track latest --extended
+                                       # Non-blocking client compatibility/exploration
+/forge:qa --codex-auth ~/.codex/auth.json
+                                       # Copy only this Codex auth file into the container
 /forge:qa --stop                       # Stop and remove the QA container
 ```
 
 The agent reads the checklist section by section, runs commands inside the container via `docker exec`, and checks
 assertions. Auto-annotated sections run silently; human-annotated sections pause for your input. State is stored inside
-the container for resume via `--from X.Y`. `--to X.Y` always means "stop before X.Y" rather than "run through X.Y".
+the mounted host QA directory for resume via `--from X.Y`. `--to X.Y` always means "stop before X.Y" rather than "run
+through X.Y".
+
+The default selection runs clean-wheel and human-acceptance evidence and excludes exhaustive contracts already owned by
+automated tests. `--extended` adds provider-variance-prone exploratory journeys. The blocking plan is capped at 12 human
+checkpoints and 8 subject-under-test model completions. A run over 45 minutes needs explicit review but does not become
+a product failure solely because of duration.
+
+Release sign-off requires an explicit prebuilt wheel on the repository-pinned Claude/Codex runtime track. Omitting
+`--wheel` still exercises one exact locally built wheel, but its verdict is development-only. `latest`, category/range,
+missing blocking evidence, and pending duration-review runs cannot report a release pass. Run artifacts record the wheel
+path/version/SHA-256, observed runtime versions, provider profile, selection, counts, verdict, state, logs, and
+transcript claim under `~/.forge/manual-testing/qa/runs/`.
+
+The default `openrouter` profile is required for the blocking provider-trace and remote-reconciliation seam. The
+`remote-litellm` profile remains available for diagnostic compatibility coverage, but a full run on that profile records
+the unsupported OpenRouter-only step as an evidence gap instead of claiming a complete release verdict. The `latest`
+runtime track also rebuilds its client layers and requires a fresh QA container so a cached `latest` tag cannot
+masquerade as current compatibility evidence.
 
 The Docker QA is the only manual flow that exercises the Codex user target (`$HOME/.agents/skills`), because its home is
 container-isolated. It also verifies project targets, managed-runtime retention during automatic re-enable, explicit
@@ -149,6 +174,10 @@ Walkthrough:
 QA:
 
 ```
+/forge:qa --wheel <path>              # Release-capable pinned run
+/forge:qa --runtime-track latest      # Non-blocking compatibility run
+/forge:qa --extended                  # Include exploratory checklist steps
+/forge:qa --codex-auth <auth.json>    # Narrow Codex credential ingress
 /forge:qa --stop                       # Stop and remove the QA container
 /forge:qa --keep                       # Keep container running after completion
 ```
@@ -182,4 +211,4 @@ enforces six numbered isolation/structure gates before running any command. Your
 - **After installing Forge** -- run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
   `/forge:walkthrough` for the interactive tour
 - **After upgrading Forge** -- catch regressions with the walkthrough
-- **Before a release** -- run `/forge:qa` for the full checklist
+- **Before a release** -- build the candidate once and run `/forge:qa --wheel <candidate>` for the full pinned checklist

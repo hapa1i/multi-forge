@@ -1,6 +1,6 @@
-## 0. Install Forge (New User Flow)
+## 0. Verify Release Artifact (New User Flow)
 
-This simulates what a new user does to install Forge from scratch.
+This verifies the exact wheel installed by the release-QA harness before any Forge-owned user or project state exists.
 
 ### 0.1 Pre-requisites Check
 
@@ -22,9 +22,11 @@ git --version       # Need git
 <!-- auto -->
 
 ```bash
-# Ensure no previous Forge installation
-ls -la ~/.forge/           # Should not exist
-which forge                # Should not be on PATH (or points to dev venv)
+# Runtime preflight may create a cache, but no extension/proxy ownership may predate the run.
+test ! -f "$FORGE_HOME/installed.json"
+test ! -d "$FORGE_HOME/proxies"
+which forge                # Must be the isolated release-wheel entry point
+test "$(command -v forge)" = /opt/forge-qa/bin/forge
 test ! -d "$HOME/.agents/skills" || test -z "$(find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -print -quit)"
 
 # Check Claude settings have no Forge hooks
@@ -32,53 +34,81 @@ cat ~/.claude/settings.json | jq '.hooks' 2>/dev/null || true
 cat ~/.claude/settings.local.json | jq '.hooks' 2>/dev/null || true
 ```
 
-- [ ] `~/.forge/` does not exist
+- [ ] `$FORGE_HOME` has no pre-existing extension tracking or proxy state
+- [ ] `forge` resolves to `/opt/forge-qa/bin/forge`
 - [ ] `$HOME/.agents/skills` has no pre-existing Codex skill packages
-- [ ] No Forge hooks in `~/.claude/settings.json`
-- [ ] No Forge hooks in `~/.claude/settings.local.json`
+- [ ] No Forge hooks in user or project-local Claude settings
 
-### 0.3 Install via setup.sh
+### 0.3 Verify Exact Wheel Installation
 
 <!-- auto -->
 
 ```bash
-# Install Forge using the local copy (already in container at /forge/)
-cd /forge && /forge/scripts/setup.sh --local
+cd "$FORGE_TEST_REPO"
+test -n "$FORGE_QA_WHEEL_FILENAME"
+test -n "$FORGE_QA_WHEEL_SHA256"
+/opt/forge-qa/bin/python -I - <<'PY'
+import importlib.metadata as metadata
+import importlib.resources as resources
+import os
+from pathlib import Path
+
+import forge
+from forge.install.installer import get_extensions_root
+
+prefix = Path("/opt/forge-qa")
+assert metadata.version("multi-forge") == os.environ["FORGE_QA_FORGE_VERSION"]
+assert forge.__version__ == os.environ["FORGE_QA_FORGE_VERSION"]
+assert Path(forge.__file__).is_relative_to(prefix)
+assert Path(str(resources.files("forge"))).is_relative_to(prefix)
+extensions = get_extensions_root()
+assert extensions.is_relative_to(prefix)
+for relative in (
+    "skills/qa/SKILL.md",
+    "skills/qa/resources/checklist.md",
+    "skills/qa/resources/coverage-map.md",
+    "skills/qa/resources/execution-budget.json",
+    "skills/qa/resources/report-template.md",
+    "skills/qa/resources/runtime-matrix.json",
+    "skills/qa/scripts/qa-artifact.py",
+    "skills/qa/scripts/qa-run-metrics.py",
+    "skills/qa/scripts/qa-selection.py",
+    "skills/qa/scripts/start-container.sh",
+    "skills/qa/scripts/walkthrough-state.py",
+):
+    assert (extensions / relative).is_file(), relative
+assert len(list((extensions / "skills/qa/resources/checklist").glob("*.md"))) == 21
+PY
 ```
 
-- [ ] Prerequisites check passes
-- [ ] Repository linked at `~/.forge/repo/` (symlink to `/forge`)
-- [ ] `setup.sh --local` completes successfully
-- [ ] `forge` binary available (at `~/.local/bin/forge` for `--local` mode)
-- [ ] Success message displayed
+- [ ] Distribution metadata and `forge.__version__` match the recorded artifact version
+- [ ] Forge imports resolve under `/opt/forge-qa`, not the editable checkout
+- [ ] Packaged resources resolve under `/opt/forge-qa`
+- [ ] The index, all 21 fragments, report contract, identity resources, and runner scripts are present in the wheel
+- [ ] The harness supplied a wheel filename and SHA-256 identity
 
-> Note: `setup.sh` installs Forge but does not automatically install runtime extensions. After install, run:
->
-> - `forge extension enable --scope user --runtime claude` for the Claude-only QA baseline.
-> - `forge extension enable --scope user --runtime all` when verifying Claude and portable Codex packages together; the
->   Codex user target is exercised only inside this Docker QA home.
-
-### 0.4 Verify Installation
+### 0.4 Verify CLI and Release Identity
 
 <!-- auto -->
 
 ```bash
-# Source your profile (or restart terminal)
-source ~/.zshrc  # or ~/.bash_profile
-
-# Verify forge is on PATH
-which forge
+# Verify the installed entry point and extension surface
+command -v forge
 forge --version
 forge extension enable --help | rg -- '--runtime'
 
-# Check installation artifacts
-ls -la ~/.forge/
-ls -la ~/.forge/repo/
+# Print the immutable inputs that must appear in the report
+printf 'wheel=%s\nsha256=%s\nversion=%s\nmode=%s\ntrack=%s\n' \
+  "$FORGE_QA_WHEEL_FILENAME" \
+  "$FORGE_QA_WHEEL_SHA256" \
+  "$FORGE_QA_FORGE_VERSION" \
+  "$FORGE_QA_ARTIFACT_MODE" \
+  "$FORGE_QA_RUNTIME_TRACK"
 ```
 
-- [ ] `forge` command available on PATH
+- [ ] `forge` command is the isolated wheel entry point on `PATH`
+- [ ] `forge --version` matches the recorded wheel version
 - [ ] Extension help documents repeatable `--runtime` selection (`claude`, `codex`, or `all`)
-- [ ] `~/.forge/` directory created
-- [ ] `~/.forge/repo/` contains repo (symlink or clone)
+- [ ] Wheel filename, SHA-256, artifact mode, and runtime track are printable for the report
 
 ---

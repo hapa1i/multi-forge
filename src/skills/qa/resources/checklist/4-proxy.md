@@ -97,27 +97,19 @@ forge proxy show test-proxy-nostart
 
 <!-- prereq: 4.2 -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, run these commands to view, edit, validate, and delete a proxy. The `edit` command opens
-`$EDITOR` — verify it launches.
-
-```
-# View proxy config
-forge proxy show <proxy_id>
-
-# Edit proxy config (opens in $EDITOR)
-forge proxy edit <proxy_id>
-
-# Validate proxy config
-forge proxy validate <proxy_id>
-
-# Delete a proxy
-forge proxy delete <proxy_id>
+```bash
+forge proxy delete edit-test-proxy --yes 2>/dev/null || true
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --no-start --name edit-test-proxy
+forge proxy show edit-test-proxy
+EDITOR=true forge proxy edit edit-test-proxy
+forge proxy validate edit-test-proxy
+forge proxy delete edit-test-proxy --yes
 ```
 
 - [ ] `show` displays full proxy configuration
-- [ ] `edit` opens proxy.yaml in editor
+- [ ] `EDITOR=true` exercises the edit path non-interactively and leaves valid YAML
 - [ ] `validate` reports config health
 - [ ] `delete` removes proxy and cleans up registry
 
@@ -141,6 +133,8 @@ forge proxy list   # auto-prunes dead-PID entries as a side effect
 <!-- requires: api_key -->
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 In the **container shell**, create a session bound to a proxy, then launch Claude through the proxy.
 
@@ -181,6 +175,8 @@ forge claude start --proxy "$FORGE_QA_OPENAI_PROXY" -- --debug
 
 <!-- human:guided -->
 
+<!-- evidence: automated-suite -->
+
 Now launch Claude (or reuse the session from 4.6):
 
 ```
@@ -206,7 +202,7 @@ Exit the Claude session when done.
 
 ### 4.8 Proxy Delete UX (Confirmation + Smart-Pointer Semantics)
 
-<!-- prereq: 4.2, 4.6 -->
+<!-- prereq: 4.2 -->
 
 <!-- human:guided -->
 
@@ -218,6 +214,8 @@ In the **container shell**:
 ```
 # Clean up from previous runs
 forge proxy delete delete-test-proxy --yes 2>/dev/null || true
+forge session delete proxy-session --yes --force 2>/dev/null || true
+forge session start proxy-session --proxy "$FORGE_QA_OPENAI_PROXY" --no-launch
 
 # Create an alias on the same shared port as the QA OpenAI proxy
 forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --no-start --name delete-test-proxy
@@ -399,6 +397,8 @@ forge model backend show litellm-4000 --raw
 ### 4.17 OpenRouter Templates
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # List all templates -- should now include OpenRouter alongside LiteLLM
@@ -586,7 +586,7 @@ forge proxy delete passthrough-test --yes 2>/dev/null || true
 
 <!-- auto -->
 
-<!-- requires: proxy,api-key -->
+<!-- requires: proxy,api_key -->
 
 Use a disposable proxy with conflicting legacy retention inputs. The proxy must stay reachable while runtime truth
 reports that destructive maintenance was disabled.
@@ -701,6 +701,8 @@ forge proxy delete smoke-json-qa --yes
 
 <!-- requires: api_key -->
 
+<!-- paid-operations: 1 -->
+
 Send a small Anthropic-shaped request with an explicit Claude Code User-Agent through the selected translated proxy. The
 exact sanitized upstream header is pinned by integration tests; this operator smoke catches gateways that reject the
 OpenAI SDK default identity.
@@ -722,9 +724,13 @@ curl --fail --silent --show-error \
 
 <!-- prereq: 2.4 -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-<!-- requires: api_key -->
+<!-- requires: anthropic_api -->
+
+<!-- evidence: extended-exploratory -->
+
+<!-- paid-operations: 1 -->
 
 When a native Anthropic credential is available, send one small request through the signature-safe passthrough and
 inspect the downstream headers. Retry/error parity and the denylist are pinned by hermetic integration tests; this live
@@ -759,5 +765,71 @@ fi
 ```
 
 - [ ] Safe Anthropic rate-limit metadata reaches the downstream response
+
+### 4.27 Backend Lifecycle and Authentication
+
+<!-- prereq: 4.16 -->
+
+<!-- auto -->
+
+```bash
+case "$FORGE_QA_PROVIDER_PROFILE" in
+  openrouter) QA_BACKEND=openrouter ;;
+  remote-litellm) QA_BACKEND=litellm-remote ;;
+esac
+
+forge model backend list --json | jq -e --arg backend "$QA_BACKEND" 'any(.[]; .backend_instance_id == $backend)'
+forge model backend show "$QA_BACKEND" --json | jq -e '.backend_instance_id != null'
+forge model backend test-auth "$QA_BACKEND" --json | jq -e 'type == "object"'
+
+# Exercise the local managed-process object separately from source ids.
+forge model backend stop litellm-4199 --yes 2>/dev/null || true
+forge model backend start litellm --port 4199
+forge model backend show litellm-4199 --json \
+  | jq -e '.found == true and .managed_process.process_id == "litellm-4199"'
+forge model backend stop litellm-4199 --yes
+
+# Delete targets the adapter config, then restore it for later cleanup.
+forge model backend delete litellm --yes
+test ! -d "$FORGE_HOME/backends/litellm"
+forge model backend create litellm
+```
+
+- [ ] Backend list/show expose the selected configured source from the installed wheel
+- [ ] `test-auth` returns structured reachability/auth evidence without exposing credentials
+- [ ] `start` registers `litellm-4199`, and `stop` targets that runtime process id
+- [ ] `delete litellm` removes the adapter config and `create` restores it
+
+### 4.28 Provider Trace and Reconciliation
+
+<!-- prereq: 4.25 -->
+
+<!-- requires: openrouter -->
+
+<!-- auto -->
+
+```bash
+forge telemetry trace list --period all --json | tee /tmp/qa-provider-traces.json
+TRACE_ID=$(jq -r \
+  'map(select(.request_id != null and .backend_id == "openrouter")) | last | .request_id // empty' \
+  /tmp/qa-provider-traces.json)
+test -n "$TRACE_ID"
+
+forge telemetry trace show "$TRACE_ID" --json \
+  | jq -e --arg request_id "$TRACE_ID" '.request_id == $request_id'
+forge telemetry trace explain "$TRACE_ID" --json \
+  | jq -e --arg request_id "$TRACE_ID" '.request_id == $request_id and .remote_lookup_performed == false'
+
+TRACE_BACKEND=$(forge telemetry trace show "$TRACE_ID" --json | jq -r '.backend_id')
+test "$TRACE_BACKEND" = openrouter
+forge model backend reconcile "$TRACE_BACKEND" --request-id "$TRACE_ID" --json \
+  | jq -e '.entries | type == "array"'
+rm -f /tmp/qa-provider-traces.json
+```
+
+- [ ] Trace list returns a bare array containing a real request from this QA run
+- [ ] Trace show returns the matching metadata-only record
+- [ ] Trace explain is explicitly local-only (`remote_lookup_performed=false`)
+- [ ] Backend reconcile joins the request through exactly one `--request-id` selector and returns structured entries
 
 ---

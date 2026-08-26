@@ -49,6 +49,8 @@ fi
 
 <!-- human:guided -->
 
+<!-- evidence: automated-suite -->
+
 <!-- requires: api_key -->
 
 In Session B (or a live Claude session in the container), invoke the review skill to verify resource selection.
@@ -71,6 +73,8 @@ Expected:
 ### 15.4 `/forge:understand` (Live Session)
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 <!-- requires: api_key -->
 
@@ -98,18 +102,29 @@ Expected:
 
 <!-- requires: api_key -->
 
-In the same live Claude session, invoke the panel skill for a multi-model review.
+<!-- paid-operations: 3 -->
 
-1. Invoke the panel skill:
+Open one managed Claude session for the retained portable-skill smoke, invoke the panel skill, then exit.
+
+1. In the container shell, launch or resume the test session:
+
+```
+forge session resume test-session-1
+```
+
+2. In Claude, invoke the panel skill:
 
 ```
 /forge:panel src/ --code
 ```
 
-2. This fans out to multiple models. Verify that Claude:
+3. This fans out to multiple models. Verify that Claude:
+
    - Calls `forge workflow panel` under the hood
    - Collects results from multiple models
    - Synthesizes findings
+
+4. Exit Claude with `/exit`.
 
 Expected:
 
@@ -124,6 +139,8 @@ Claude-only panel, mark this step failed. That means 4.2 did not create the work
 ### 15.6 `/forge:consensus` (Live Session)
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 <!-- requires: api_key -->
 
@@ -192,6 +209,8 @@ done
 ### 15.8 `/forge:smoke-test` Explicit Invocation
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 In the live Claude session, explicitly invoke the portable smoke skill:
 

@@ -1,6 +1,6 @@
 <!-- prereq: 0.3, 2.1, 5.1 -->
 
-## 10. Session Resume (Phase 10 Feature)
+## 10. Session Resume
 
 ### 10.1 Create Parent Session Artifacts
 
@@ -50,95 +50,90 @@ jq \
 
 <!-- prereq: 10.1 -->
 
-<!-- requires: api_key -->
+<!-- auto -->
 
-<!-- human:guided -->
+```bash
+CHILD_DIR=.forge/prev_sessions/test-session-1/children
+mkdir -p "$CHILD_DIR"
+printf 'frozen child snapshot\n' > "$CHILD_DIR/matrix-sentinel.md"
+SENTINEL_SHA=$(sha256sum "$CHILD_DIR/matrix-sentinel.md" | cut -d' ' -f1)
 
-In the **container shell**, resume with `--strategy minimal`. Claude will launch — verify the new session was created,
-then exit.
-
+forge session transfer regenerate test-session-1 --strategy minimal --target-runtime claude
+forge session transfer show test-session-1 --json \
+  | jq -e '.frontmatter.strategy == "minimal" and .frontmatter.target_runtime == "claude"'
+test "$SENTINEL_SHA" = "$(sha256sum "$CHILD_DIR/matrix-sentinel.md" | cut -d' ' -f1)"
 ```
-# Resume with minimal strategy (just lineage pointer)
-forge session resume test-session-1 --fresh --strategy minimal --child-name test-resumed-minimal
 
-# Check derived session
-cat .forge/sessions/test-resumed-minimal/forge.session.json | jq '.confirmed.derivation'
-```
-
-- [ ] New session created
-- [ ] Derivation shows parent, strategy, and transcript artifact path
+- [ ] Minimal regeneration records `strategy=minimal` and `target_runtime=claude`
+- [ ] Existing child snapshots remain byte-identical
 
 ### 10.3 Resume with Structured Strategy
 
 <!-- prereq: 10.1 -->
 
-<!-- requires: api_key -->
+<!-- auto -->
 
-<!-- human:guided -->
-
-In the **container shell**, resume with `--strategy structured`. Claude will launch — verify the transfer file was
-created, then exit.
-
-```
-# Resume with structured strategy (conversation skeleton)
-forge session resume test-session-1 --fresh --strategy structured --child-name test-resumed-structured
-
-# Check processed transfer
-cat .forge/prev_sessions/test-session-1/generated.md
+```bash
+forge session transfer regenerate test-session-1 --strategy structured --target-runtime codex
+forge session transfer show test-session-1 --json \
+  | jq -e '.frontmatter.strategy == "structured"
+      and .frontmatter.target_runtime == "codex"
+      and any(.sections[]; .title == "Runtime Hints")'
+rg 'Target runtime: codex|codex exec|sandbox' .forge/prev_sessions/test-session-1/generated.md
 ```
 
-- [ ] Transfer file created at `.forge/prev_sessions/<parent>/children/<child>.md`
-- [ ] Contains conversation skeleton with truncated tool results
+- [ ] Structured regeneration writes the parent cache without launching a child
+- [ ] Codex target frontmatter and runtime hints are present
 
 ### 10.4 Resume with Full Strategy
 
 <!-- prereq: 10.1 -->
 
-<!-- requires: api_key -->
+<!-- auto -->
 
-<!-- human:guided -->
-
-In the **container shell**, resume with `--strategy full`. This includes the complete transcript — the budget check may
-fail if the transcript is too large for the proxy context window.
-
-```
-# Resume with full strategy (complete transcript)
-forge session resume test-session-1 --fresh --strategy full --child-name test-resumed-full
-
-# Check the transfer
-cat .forge/prev_sessions/test-session-1/generated.md
+```bash
+forge session transfer regenerate test-session-1 --strategy full --target-runtime claude
+forge session transfer show test-session-1 --json \
+  | jq -e '.frontmatter.strategy == "full" and .frontmatter.target_runtime == "claude"'
+for expected in 'Create a hello world function' 'File written successfully' 'Now add a test'; do
+  rg -F "$expected" .forge/prev_sessions/test-session-1/generated.md
+done
 ```
 
-- [ ] Full transcript included
-- [ ] Budget check passed (or error if too large)
+- [ ] Full regeneration records the full strategy and Claude target
+- [ ] Complete fixture turns and tool result text are retained
 
 ### 10.5 Resume with AI-Curated Strategy
 
 <!-- prereq: 10.1 -->
 
-<!-- requires: api_key -->
+<!-- requires: openrouter -->
 
-<!-- human:guided -->
+<!-- evidence: extended-exploratory -->
 
-In the **container shell**, resume with `--strategy ai-curated`. This uses OpenRouter directly to select highlights from
-the parent transcript, then launches the child session. Expect a security warning about external API access.
+<!-- paid-operations: 1 -->
 
-```
-# Resume with AI-curated strategy (LLM-selected highlights)
-# NOTE: Requires OPENROUTER_API_KEY in the default QA provider profile.
-forge session delete test-resumed-ai --yes --force 2>/dev/null || true
-forge session resume test-session-1 --fresh --strategy ai-curated --child-name test-resumed-ai
+<!-- auto -->
 
-# Check the curated output or fallback output
-cat .forge/prev_sessions/test-session-1/generated.md
+`ai-curated` is the matrix's one paid transfer operation. It calls the external curation provider but does not launch a
+child runtime.
+
+```bash
+forge session transfer regenerate test-session-1 --strategy ai-curated --target-runtime claude \
+  2>&1 | tee /tmp/qa-ai-curated-transfer.out
+forge session transfer show test-session-1 --json \
+  | jq -e '.frontmatter.strategy == "ai-curated" and .frontmatter.target_runtime == "claude"'
+rg -i 'external|OpenRouter|transcript content' /tmp/qa-ai-curated-transfer.out
+test -f .forge/prev_sessions/test-session-1/children/matrix-sentinel.md
+rm -f /tmp/qa-ai-curated-transfer.out
 ```
 
 - [ ] Parent transcript fixture from 10.1 exists
 - [ ] Security warning shown about sending transcript content to OpenRouter
-- [ ] Default OpenRouter QA profile: transfer shows `Strategy: ai-curated` and LLM-selected highlights
-- [ ] If OpenRouter auth is unavailable, fallback to structured is acceptable and the warning explains the auth failure
-- [ ] No warning about missing remote LiteLLM infrastructure in the default OpenRouter QA profile
+- [ ] Transfer frontmatter records `ai-curated` and the Claude target
+- [ ] With the required OpenRouter credential, curation produces LLM-selected highlights rather than an auth fallback
 - [ ] No `No transcript available; using minimal strategy` warning
+- [ ] Existing child snapshots remain byte-identical
 
 ### 10.6 `forge session transfer` (Inspect / Reshape Transfer Context)
 
@@ -200,5 +195,109 @@ forge session resume test-session-1 --fresh --review --child-name test-resumed-r
 - [ ] `$EDITOR` opens with the generated child transfer context before Claude launches
 - [ ] Saving and closing the editor proceeds to launch the child session
 - [ ] Editor edits are reflected in the launched child's context
+
+### 10.8 Rewind and Ancestry Depth
+
+<!-- prereq: 10.1 -->
+
+<!-- auto -->
+
+Use a no-op Claude launcher so valid resume/fork forms cross the installed CLI and write their derivation records
+without a model call. A separate plain-text transcript keeps rewind from invoking code-delta curation.
+
+```bash
+cd "$FORGE_TEST_REPO"
+forge session delete qa-rewind-parent qa-rewind-resume qa-rewind-fork qa-depth-parent qa-depth-all \
+  --yes --force 2>/dev/null || true
+git worktree remove "${FORGE_TEST_REPO}-qa-rewind-fork" --force 2>/dev/null || true
+git branch -D qa-rewind-fork 2>/dev/null || true
+
+mkdir -p /tmp/forge-qa-rewind-bin
+cat > /tmp/forge-qa-rewind-bin/claude <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then echo "2.1.245 (Forge QA fixture)"; fi
+exit 0
+EOF
+chmod +x /tmp/forge-qa-rewind-bin/claude
+
+forge session start qa-rewind-parent --no-launch
+REWIND_UUID=44444444-5555-4666-8777-888899990000
+REWIND_TRANSCRIPT=$(python3 -c \
+  "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$REWIND_UUID'))")
+mkdir -p "$(dirname "$REWIND_TRANSCRIPT")"
+cat > "$REWIND_TRANSCRIPT" <<'EOF'
+{"requestId":"rewind-1","message":{"role":"user","content":[{"type":"text","text":"remember alpha"}]}}
+{"requestId":"rewind-1","message":{"role":"assistant","content":[{"type":"text","text":"alpha"}]}}
+{"requestId":"rewind-2","message":{"role":"user","content":[{"type":"text","text":"remember beta"}]}}
+{"requestId":"rewind-2","message":{"role":"assistant","content":[{"type":"text","text":"beta"}]}}
+EOF
+jq --arg uuid "$REWIND_UUID" --arg transcript "$REWIND_TRANSCRIPT" '
+  .confirmed.claude_session_id = $uuid
+  | .confirmed.transcript_path = $transcript
+  | .confirmed.confirmed_by = "qa:fixture"
+' .forge/sessions/qa-rewind-parent/forge.session.json > /tmp/qa-rewind-parent.json
+mv /tmp/qa-rewind-parent.json .forge/sessions/qa-rewind-parent/forge.session.json
+
+PATH="/tmp/forge-qa-rewind-bin:$PATH" forge session resume qa-rewind-parent \
+  --fresh --child-name qa-rewind-resume --strategy rewind --drop-last 1
+jq -e '
+  .confirmed.derivation.resume_mode == "native-relocate"
+  and .confirmed.derivation.strategy == "rewind"
+  and .confirmed.derivation.dropped_turns >= 1
+  and (.confirmed.derivation.rewind_relocated_session_id | type == "string" and length > 0)
+' .forge/sessions/qa-rewind-resume/forge.session.json
+
+PATH="/tmp/forge-qa-rewind-bin:$PATH" forge session fork qa-rewind-parent \
+  --name qa-rewind-fork --worktree --strategy rewind --drop-last 1
+REWIND_FORK_MANIFEST="${FORGE_TEST_REPO}-qa-rewind-fork/.forge/sessions/qa-rewind-fork/forge.session.json"
+jq -e '
+  .confirmed.derivation.resume_mode == "native-relocate"
+  and .confirmed.derivation.strategy == "rewind"
+  and .confirmed.derivation.dropped_turns >= 1
+' "$REWIND_FORK_MANIFEST"
+
+forge session fork test-session-1 --name qa-depth-parent --resume-mode transfer --no-launch
+DEPTH_PARENT_UUID=55555555-6666-4777-8888-999900001111
+DEPTH_PARENT_TRANSCRIPT=$(python3 -c \
+  "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$DEPTH_PARENT_UUID'))")
+mkdir -p "$(dirname "$DEPTH_PARENT_TRANSCRIPT")"
+cat > "$DEPTH_PARENT_TRANSCRIPT" <<'EOF'
+{"requestId":"depth-1","message":{"role":"user","content":[{"type":"text","text":"continue the lineage"}]}}
+{"requestId":"depth-1","message":{"role":"assistant","content":[{"type":"text","text":"lineage continued"}]}}
+EOF
+jq --arg uuid "$DEPTH_PARENT_UUID" --arg transcript "$DEPTH_PARENT_TRANSCRIPT" '
+  .confirmed.claude_session_id = $uuid
+  | .confirmed.transcript_path = $transcript
+  | .confirmed.confirmed_by = "qa:fixture"
+' .forge/sessions/qa-depth-parent/forge.session.json > /tmp/qa-depth-parent.json
+mv /tmp/qa-depth-parent.json .forge/sessions/qa-depth-parent/forge.session.json
+PATH="/tmp/forge-qa-rewind-bin:$PATH" forge session resume qa-depth-parent \
+  --fresh --child-name qa-depth-all --depth all
+jq -e '
+  .confirmed.derivation.depth == 2
+  and .confirmed.derivation.lineage == ["qa-depth-parent", "test-session-1"]
+' .forge/sessions/qa-depth-all/forge.session.json
+
+set +e
+forge session resume qa-rewind-parent --depth 2 >/tmp/qa-depth-invalid.out 2>&1
+DEPTH_RC=$?
+forge session resume qa-rewind-parent --strategy rewind --drop-last 1 >/tmp/qa-rewind-invalid.out 2>&1
+REWIND_RC=$?
+set -e
+test "$DEPTH_RC" -ne 0
+test "$REWIND_RC" -ne 0
+rg -- '--depth requires --fresh' /tmp/qa-depth-invalid.out
+rg -- '--strategy rewind requires --fresh' /tmp/qa-rewind-invalid.out
+
+forge session delete qa-rewind-fork --yes --force
+test ! -e "${FORGE_TEST_REPO}-qa-rewind-fork"
+rm -f /tmp/qa-depth-invalid.out /tmp/qa-rewind-invalid.out
+```
+
+- [ ] Fresh resume records a rewind-native derivation and a truncated relocated id
+- [ ] Worktree fork accepts rewind/drop-last and records the same strategy
+- [ ] `--fresh --depth all` follows both ancestors and records depth two
+- [ ] Explicit depth without fresh and rewind without fresh both fail with actionable diagnostics
+- [ ] Rewind worktree cleanup removes the derived checkout without touching the parent transcript
 
 ---

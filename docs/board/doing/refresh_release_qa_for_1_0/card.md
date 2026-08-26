@@ -54,7 +54,7 @@ The refresh must resolve at least these verified inconsistencies before adding c
 7. `src/skills/qa/resources/checklist.md` still says `aligned-with: v0.1.0`; its phase labels and update prose mix
    historical implementation phases with current product language. The walkthrough card owns its own header metadata.
 
-## Proposed Decisions
+## Accepted Decisions
 
 1. **One QA frontend.** Keep `/forge:qa` Claude-hosted for v1.0.0. Codex is a subject under test, not a duplicated
    orchestration package. A successful managed Codex path is release evidence; a Codex-hosted copy of QA is not.
@@ -229,12 +229,11 @@ inspect a file or JSON record that the CLI can validate directly.
 - One separately labelled `latest` compatibility run when network/runtime availability permits.
 - `make pre-commit`, Markdown link checks, file-size checks, and `git diff --check`.
 
-## Open Questions
+## Resolved Implementation Choices
 
-- Should the non-blocking recipes use a new `--extended` mode, an annotation filtered by the existing state parser, or
-  documented category invocations? Choose one explicit contract before editing the state machine.
-- Should the exact-wheel container consume an externally built artifact or build once in a dedicated release stage?
-  Either outcome must record the digest and prevent checkout shadowing.
-- Which freshly probed Claude and Codex versions form the pinned v1.0.0 matrix? Phase 0 must record a new Claude probe,
-  choose Codex at or above `0.141.0`, rerun the general probe at that version, and update its validated ceiling before
-  the pair is accepted.
+- `--extended` is a QA-only selection layer over evidence annotations. The two parity-locked state scripts remain
+  byte-unchanged because selection does not alter their parser, state, resume, or report commands.
+- Release sign-off consumes an explicit `--wheel <path>`. Omitting the flag builds one development wheel for local QA,
+  records it as `development-build`, and cannot produce a release-pass verdict.
+- `src/skills/qa/resources/runtime-matrix.json` owns the pinned pair: Claude Code `2.1.245` and Codex CLI `0.149.1`.
+  Codex `0.149.1` resolves the former proxy-floor/probe-ceiling conflict; `latest` remains non-blocking.
