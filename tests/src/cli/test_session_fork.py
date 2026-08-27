@@ -777,7 +777,12 @@ class TestSessionFork:
         manager.fork_session produces when no worktree is created (the path is the shared parent
         checkout). Downstream code gates on is_worktree, never truthiness.
         """
-        parent = create_session_state("fork-parent", worktree_path=str(temp_env), worktree_branch="main")
+        parent = create_session_state(
+            "fork-parent",
+            worktree_path=str(temp_env),
+            worktree_branch="main",
+            launch_mode=fork_launch_mode,
+        )
         parent.confirmed.claude_session_id = "parent-uuid"
         fork_state = create_session_state(
             "fork-child",
@@ -1147,6 +1152,7 @@ class TestSessionFork:
                 "forge.session.claude.relocate_transcript",
                 side_effect=RelocateConflictError("dup"),
             ),
+            successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
             _configure_mock_fork_manager(mock_manager, parent, temp_env)
@@ -1181,6 +1187,7 @@ class TestSessionFork:
                 "forge.session.claude.relocate_transcript",
                 side_effect=PermissionError("denied"),
             ),
+            successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
             _configure_mock_fork_manager(mock_manager, parent, temp_env)
@@ -1218,6 +1225,7 @@ class TestSessionFork:
             proxy_base_url="http://localhost:8085",
             worktree_path=str(temp_env),
             worktree_branch="main",
+            launch_mode=LAUNCH_MODE_SIDECAR,
         )
         parent.confirmed.claude_session_id = "parent-uuid"
 
