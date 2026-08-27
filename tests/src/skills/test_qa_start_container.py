@@ -374,6 +374,69 @@ def test_status_reports_complete_release_identity(tmp_path: Path) -> None:
         assert field in result.stderr
 
 
+def test_final_runtime_verification_emits_matching_identity(tmp_path: Path) -> None:
+    wheel = _wheel(tmp_path)
+
+    result = _run(tmp_path, ["--verify-runtime"], _running_container_docker(wheel))
+
+    assert result.returncode == 0, result.stderr
+    identity = json.loads(result.stdout)
+    assert identity["track"] == "pinned"
+    assert identity["identity_preserved"] is True
+    assert identity["claude"] == {
+        "available": True,
+        "matches_pin": True,
+        "observed": "2.1.245 (Claude Code)",
+        "pin": "2.1.245",
+    }
+    assert identity["codex"]["matches_pin"] is True
+
+
+def test_final_runtime_verification_records_drift_and_fails(tmp_path: Path) -> None:
+    wheel = _wheel(tmp_path)
+    docker_body = _running_container_docker(wheel).replace(
+        '*"claude --version"*) printf "2.1.245 (Claude Code)\\n"',
+        '*"claude --version"*) printf "2.1.247 (Claude Code)\\n"',
+    )
+
+    result = _run(tmp_path, ["--verify-runtime"], docker_body)
+
+    assert result.returncode == 3
+    identity = json.loads(result.stdout)
+    assert identity["identity_preserved"] is False
+    assert identity["claude"]["matches_pin"] is False
+    assert identity["claude"]["observed"] == "2.1.247 (Claude Code)"
+    assert "runtime identity changed" in result.stderr
+
+
+def test_final_runtime_verification_records_missing_container_from_starting_identity(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "forge-home" / "manual-testing" / "qa" / "artifact.json"
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "track": "pinned",
+                    "blocking": True,
+                    "claude": {"pin": "2.1.245"},
+                    "codex": {"pin": "0.149.1"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    docker_body = 'case "$1" in info) exit 0 ;; ps) exit 0 ;; esac\n'
+
+    result = _run(tmp_path, ["--verify-runtime"], docker_body)
+
+    assert result.returncode == 3
+    identity = json.loads(result.stdout)
+    assert identity["identity_preserved"] is False
+    assert identity["claude"]["available"] is False
+    assert identity["claude"]["observed"] == "container not running"
+    assert identity["codex"]["available"] is False
+
+
 def test_duplicate_and_conflicting_start_flags_fail_before_docker_use(
     tmp_path: Path,
 ) -> None:

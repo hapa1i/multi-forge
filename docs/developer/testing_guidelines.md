@@ -716,13 +716,16 @@ When adding/changing a feature, update the QA checklist:
 
 Release-capable QA requires an explicit prebuilt wheel and the pinned runtime track. The release image is distinct from
 the editable integration image even when both share a runtime base, and its temporary Docker build context contains only
-the selected wheel rather than the wheel's parent directory. Reports must preserve `artifact.json`, `selection.json`,
-`run-metrics.json`, state, raw step logs, debug logs, and the transcript claim. `latest`, partial, development-build,
-missing blocking evidence, and undisposed over-threshold duration results remain visibly non-release verdicts. Paid
-observations are per-step and count only with current-scope structural-hash evidence, so resume cannot double-count
-cleared or stale records. Runtime pins and probe facts live in `resources/runtime-matrix.json`; `latest` resolves fresh
-client layers in a fresh container. The default OpenRouter profile is required for the blocking
-provider-trace/reconciliation seam; remote LiteLLM remains diagnostic compatibility coverage.
+the selected wheel rather than the wheel's parent directory. The image exposes the exact-wheel launcher through
+`/usr/local/bin/forge` for durable hook dispatch while imports remain isolated under `/opt/forge-qa`. Reports must
+preserve the starting `artifact.json`, ending `runtime-final.json`, `selection.json`, `run-metrics.json`, state, raw
+step logs, debug logs, and the transcript claim. A pinned runtime mismatch at either boundary is a failure. `latest`,
+partial, development-build, missing blocking evidence, and undisposed over-threshold duration results remain visibly
+non-release verdicts. Paid observations are per-step and count only with current-scope structural-hash evidence, so
+resume cannot double-count cleared or stale records. Runtime pins and probe facts live in
+`resources/runtime-matrix.json`; `latest` resolves fresh client layers in a fresh container. The default OpenRouter
+profile is required for the blocking provider-trace/reconciliation seam; remote LiteLLM remains diagnostic compatibility
+coverage.
 
 ---
 

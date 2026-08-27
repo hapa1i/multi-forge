@@ -9,9 +9,10 @@
 #   bash start-container.sh --reset                              # Remove this release image and rebuild
 #   bash start-container.sh --stop                               # Stop and remove container
 #   bash start-container.sh --status                             # Check container status
+#   bash start-container.sh --verify-runtime                     # Emit final runtime identity JSON
 #
 # Outputs container name to stdout on success.
-# Exit codes: 0=ready, 1=no docker, 2=build failed, 3=start failed
+# Exit codes: 0=ready, 1=no docker, 2=build failed, 3=readiness or runtime-identity failure
 
 set -euo pipefail
 
@@ -98,7 +99,7 @@ usage() {
 Usage: start-container.sh [--wheel PATH] [--runtime-track pinned|latest]
                           [--codex-auth PATH]
                           [--provider-profile openrouter|remote-litellm]
-                          [--reset|--stop|--status]
+                          [--reset|--stop|--status|--verify-runtime]
 
 Release sign-off requires --wheel with the exact prebuilt release-candidate wheel.
 Without --wheel, the script builds one development wheel and reports its path.
@@ -219,10 +220,19 @@ while [[ $# -gt 0 ]]; do
             ;;
         --status)
             if [[ "$ACTION_SEEN" == "true" ]]; then
-                error "--stop and --status are mutually exclusive and may be specified only once"
+                error "--stop, --status, and --verify-runtime are mutually exclusive and may be specified only once"
                 exit 1
             fi
             ACTION="status"
+            ACTION_SEEN=true
+            shift
+            ;;
+        --verify-runtime)
+            if [[ "$ACTION_SEEN" == "true" ]]; then
+                error "--stop, --status, and --verify-runtime are mutually exclusive and may be specified only once"
+                exit 1
+            fi
+            ACTION="verify-runtime"
             ACTION_SEEN=true
             shift
             ;;
@@ -347,7 +357,7 @@ validate_running_container_profile() {
 
 docker_env_args() {
     local args=(
-        -e "PATH=/opt/forge-qa/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        -e "PATH=/usr/local/bin:/opt/forge-qa/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
         -e "PYTHONNOUSERSITE=1"
         -e "FORGE_HOME=/root/.forge"
         -e "CLAUDE_HOME=/root/.claude"
@@ -563,10 +573,145 @@ payload = {
     "provider_profile": provider_profile,
     "container": container,
 }
+
 path = Path(output)
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
+}
+
+verify_runtime_identity() {
+    local container_running runtime_track claude_pin codex_pin
+    container_running=true
+    if ! docker ps -q -f "name=^${CONTAINER_NAME}$" | grep -q .; then
+        container_running=false
+    fi
+
+    if [[ "$container_running" == "true" ]]; then
+        runtime_track="$(docker inspect -f '{{ index .Config.Labels "io.multi-forge.qa.runtime-track" }}' "$CONTAINER_NAME" 2>/dev/null || true)"
+        claude_pin="$(docker inspect -f '{{ index .Config.Labels "io.multi-forge.qa.claude-version" }}' "$CONTAINER_NAME" 2>/dev/null || true)"
+        codex_pin="$(docker inspect -f '{{ index .Config.Labels "io.multi-forge.qa.codex-version" }}' "$CONTAINER_NAME" 2>/dev/null || true)"
+    else
+        local starting_runtime
+        if ! starting_runtime="$(python3 - "$HOST_STATE_DIR/artifact.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+artifact = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+runtime = artifact["runtime"]
+print("\t".join((runtime["track"], runtime["claude"]["pin"], runtime["codex"]["pin"])))
+PY
+        )"; then
+            error "No running container named $CONTAINER_NAME and no readable starting runtime identity."
+            return 3
+        fi
+        IFS=$'\t' read -r runtime_track claude_pin codex_pin <<< "$starting_runtime"
+    fi
+
+    local claude_observed codex_observed claude_available codex_available
+    if [[ "$container_running" != "true" ]]; then
+        claude_observed="container not running"
+        codex_observed="container not running"
+        claude_available=false
+        codex_available=false
+    elif claude_observed="$(docker exec "$CONTAINER_NAME" claude --version 2>&1 | head -n 1)"; then
+        claude_available=true
+    else
+        claude_available=false
+    fi
+    if [[ "$container_running" == "true" ]]; then
+        if codex_observed="$(docker exec "$CONTAINER_NAME" codex --version 2>&1 | head -n 1)"; then
+            codex_available=true
+        else
+            codex_available=false
+        fi
+    fi
+
+    local blocking claude_matches codex_matches identity_preserved
+    blocking=false
+    claude_matches=null
+    codex_matches=null
+    identity_preserved=false
+    if [[ "$runtime_track" == "pinned" ]]; then
+        blocking=true
+        claude_matches=false
+        codex_matches=false
+        if [[ "$claude_available" == "true" ]] && runtime_output_matches_pin "$claude_observed" "$claude_pin"; then
+            claude_matches=true
+        fi
+        if [[ "$codex_available" == "true" ]] && runtime_output_matches_pin "$codex_observed" "$codex_pin"; then
+            codex_matches=true
+        fi
+        if [[ "$claude_matches" == "true" && "$codex_matches" == "true" ]]; then
+            identity_preserved=true
+        fi
+    elif [[ -n "$runtime_track" && "$claude_available" == "true" && "$codex_available" == "true" ]]; then
+        identity_preserved=true
+    fi
+
+    python3 - \
+        "$runtime_track" "$blocking" "$identity_preserved" \
+        "$claude_pin" "$claude_observed" "$claude_available" "$claude_matches" \
+        "$codex_pin" "$codex_observed" "$codex_available" "$codex_matches" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+
+(
+    track,
+    blocking,
+    identity_preserved,
+    claude_pin,
+    claude_observed,
+    claude_available,
+    claude_matches,
+    codex_pin,
+    codex_observed,
+    codex_available,
+    codex_matches,
+) = sys.argv[1:]
+
+
+def boolean(value: str) -> bool:
+    return value == "true"
+
+
+def optional_boolean(value: str) -> bool | None:
+    return None if value == "null" else boolean(value)
+
+
+print(
+    json.dumps(
+        {
+            "schema_version": 1,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "track": track,
+            "blocking": boolean(blocking),
+            "identity_preserved": boolean(identity_preserved),
+            "claude": {
+                "pin": claude_pin,
+                "observed": claude_observed,
+                "available": boolean(claude_available),
+                "matches_pin": optional_boolean(claude_matches),
+            },
+            "codex": {
+                "pin": codex_pin,
+                "observed": codex_observed,
+                "available": boolean(codex_available),
+                "matches_pin": optional_boolean(codex_matches),
+            },
+        },
+        indent=2,
+        sort_keys=True,
+    )
+)
+PY
+
+    if [[ "$identity_preserved" != "true" ]]; then
+        error "QA runtime identity changed or became unavailable after preflight."
+        return 3
+    fi
 }
 
 install_codex_auth() {
@@ -596,6 +741,12 @@ fi
 if ! docker info &> /dev/null; then
     error "Docker daemon is not running. Start Docker Desktop and try again."
     exit 1
+fi
+
+if [[ "$ACTION" == "verify-runtime" ]]; then
+    runtime_status=0
+    verify_runtime_identity || runtime_status=$?
+    exit "$runtime_status"
 fi
 
 # Stop and remove the container.
@@ -860,7 +1011,7 @@ info "Running preflight checks..."
 # Set a profile for interactive debugging shells. Checklist execution relies on
 # docker run -e above so plain docker exec calls see the same values.
 {
-    echo 'export PATH="/opt/forge-qa/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+    echo 'export PATH="/usr/local/bin:/opt/forge-qa/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"'
     echo 'export PYTHONNOUSERSITE="1"'
     echo 'export FORGE_HOME="/root/.forge"'
     echo 'export CLAUDE_HOME="/root/.claude"'
@@ -911,8 +1062,9 @@ info "Running preflight checks..."
     exit 3
 }
 
-docker exec "$CONTAINER_NAME" bash -lc 'test "$(command -v forge)" = /opt/forge-qa/bin/forge' || {
-    error "forge does not resolve to the isolated wheel environment"
+docker exec "$CONTAINER_NAME" bash -lc \
+    'test "$(command -v forge)" = /usr/local/bin/forge && test "$(readlink /usr/local/bin/forge)" = /opt/forge-qa/bin/forge' || {
+    error "forge does not resolve through the durable exact-wheel launcher"
     exit 3
 }
 

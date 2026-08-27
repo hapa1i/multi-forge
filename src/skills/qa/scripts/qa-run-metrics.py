@@ -102,9 +102,53 @@ def _summarize_steps(steps: list[dict[str, Any]], state: dict[str, Any]) -> dict
     }
 
 
+def _final_runtime_identity_preserved(
+    *,
+    artifact: dict[str, Any],
+    runtime_final: dict[str, Any],
+) -> bool:
+    if runtime_final.get("schema_version") != 1:
+        raise MetricsError("unsupported final runtime identity schema")
+
+    initial = artifact.get("runtime", {})
+    expected_track = initial.get("track")
+    expected_blocking = initial.get("blocking")
+    if not isinstance(expected_track, str) or not isinstance(expected_blocking, bool):
+        raise MetricsError("artifact runtime track and blocking flag must be typed")
+    if runtime_final.get("track") != expected_track or runtime_final.get("blocking") is not expected_blocking:
+        raise MetricsError("final runtime track does not match artifact identity")
+
+    available: list[bool] = []
+    matches: list[bool] = []
+    for runtime_name in ("claude", "codex"):
+        initial_runtime = initial.get(runtime_name, {})
+        final_runtime = runtime_final.get(runtime_name, {})
+        if not isinstance(initial_runtime, dict) or not isinstance(final_runtime, dict):
+            raise MetricsError(f"{runtime_name} runtime identity must be an object")
+        if final_runtime.get("pin") != initial_runtime.get("pin"):
+            raise MetricsError(f"final {runtime_name} pin does not match artifact identity")
+        runtime_available = final_runtime.get("available")
+        if not isinstance(runtime_available, bool):
+            raise MetricsError(f"final {runtime_name} availability must be boolean")
+        available.append(runtime_available)
+        matches_pin = final_runtime.get("matches_pin")
+        if expected_blocking:
+            if not isinstance(matches_pin, bool):
+                raise MetricsError(f"final {runtime_name} pin match must be boolean on the pinned track")
+            matches.append(matches_pin)
+        elif matches_pin is not None:
+            raise MetricsError(f"final {runtime_name} pin match must be null on a compatibility track")
+
+    preserved = all(available) and (not expected_blocking or all(matches))
+    if runtime_final.get("identity_preserved") is not preserved:
+        raise MetricsError("final runtime preservation flag is inconsistent with its probes")
+    return preserved
+
+
 def compute_metrics(
     *,
     artifact: dict[str, Any],
+    runtime_final: dict[str, Any],
     selection: dict[str, Any],
     state: dict[str, Any],
     started_epoch: int,
@@ -116,6 +160,10 @@ def compute_metrics(
         raise MetricsError("ended epoch precedes started epoch")
     if artifact.get("schema_version") != 1 or selection.get("schema_version") != 1:
         raise MetricsError("unsupported artifact or selection schema")
+    runtime_identity_preserved = _final_runtime_identity_preserved(
+        artifact=artifact,
+        runtime_final=runtime_final,
+    )
 
     selected_steps = selection.get("steps", [])
     if not isinstance(selected_steps, list):
@@ -173,9 +221,10 @@ def compute_metrics(
         artifact_mode == "prebuilt"
         and artifact.get("runtime", {}).get("track") == "pinned"
         and artifact.get("runtime", {}).get("blocking") is True
+        and runtime_identity_preserved
     )
 
-    if blocking_summary["results"]["fail"]:
+    if not runtime_identity_preserved or blocking_summary["results"]["fail"]:
         verdict = "fail"
     elif blocking_summary["missing_steps"] or blocking_summary["results"]["skip"]:
         verdict = "incomplete"
@@ -229,6 +278,10 @@ def compute_metrics(
             "missing_selected_steps": selected_summary["missing_steps"],
             "missing_blocking_steps": blocking_summary["missing_steps"],
         },
+        "runtime_identity": {
+            "preserved": runtime_identity_preserved,
+            "final": runtime_final,
+        },
         "artifact_release_capable": artifact_release_capable,
         "verdict": verdict,
     }
@@ -237,6 +290,7 @@ def compute_metrics(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact", type=Path, required=True)
+    parser.add_argument("--runtime-final", type=Path, required=True)
     parser.add_argument("--selection", type=Path, required=True)
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--started-epoch", type=int, required=True)
@@ -250,6 +304,7 @@ def main() -> int:
     try:
         result = compute_metrics(
             artifact=_read_json(args.artifact, "artifact identity"),
+            runtime_final=_read_json(args.runtime_final, "final runtime identity"),
             selection=_read_json(args.selection, "selection"),
             state=_read_json(args.state, "state"),
             started_epoch=args.started_epoch,

@@ -131,7 +131,8 @@ stop.
 
 **Artifact and runtime identity**: Pass `--wheel`, `--runtime-track`, and `--codex-auth` when supplied. The harness
 records the canonical wheel path, SHA-256, version, image, runtime pins and observed versions, provider profile, and
-artifact mode in the mounted `artifact.json`. A pinned observed-version mismatch stops before checklist execution.
+artifact mode in the mounted `artifact.json`. A pinned observed-version mismatch stops before checklist execution, and
+the same runtime identity is probed again when the report artifacts are saved.
 
 **Category name allowlist** (exact match only -- reject unknown names):
 
@@ -200,7 +201,7 @@ jq -e '
 ```
 
 If the requested artifact mode, track, or wheel path differs from this record, stop. Do not repair release identity
-after checklist execution begins.
+after checklist execution begins; the final probe records drift separately and makes the verdict fail.
 
 Tell the user: "Docker container ready: `<container>`. Starting QA run."
 
@@ -684,7 +685,8 @@ After generating the report, save all artifacts to a timestamped run directory.
 
 This phase is required for every QA run, including category/range runs and runs with failures. Do not stop after a
 feature failure. Once a container and state exist, a run is not complete until `report.md`, `state.json`,
-`artifact.json`, `selection.json`, `run-metrics.json`, and the `.pending-transcript` marker are preserved.
+`artifact.json`, `runtime-final.json`, `selection.json`, `run-metrics.json`, and the `.pending-transcript` marker are
+preserved.
 
 After Phase 5 summary, continue directly into Phase 5b without asking the user whether to save artifacts.
 
@@ -693,9 +695,16 @@ RUN_DIR="$STATE_DIR/runs/$(date +%Y-%m-%d-%H%M%S)"
 mkdir -p "$RUN_DIR"
 ```
 
-1. Copy the immutable inputs and state before any container cleanup:
+1. Re-probe runtime identity, then copy the immutable inputs and state before any container cleanup. A mismatch exits
+   non-zero but still writes structured evidence; keep assembling the report so `qa-run-metrics.py` can issue the
+   failing verdict.
 
    ```bash
+   RUNTIME_FINAL_STATUS=0
+   bash "$SCRIPTS/start-container.sh" --verify-runtime > "$RUN_DIR/runtime-final.json" \
+     || RUNTIME_FINAL_STATUS=$?
+   jq -e '.schema_version == 1 and (.identity_preserved | type == "boolean")' \
+     "$RUN_DIR/runtime-final.json" >/dev/null
    cp "$ARTIFACT_FILE" "$RUN_DIR/artifact.json"
    cp "$SELECTION_FILE" "$RUN_DIR/selection.json"
    cp "$STATE_FILE" "$RUN_DIR/state.json"
@@ -735,6 +744,7 @@ mkdir -p "$RUN_DIR"
    RUN_ENDED_EPOCH=$(date +%s)
    python3 "$SCRIPTS/qa-run-metrics.py" \
      --artifact "$RUN_DIR/artifact.json" \
+     --runtime-final "$RUN_DIR/runtime-final.json" \
      --selection "$RUN_DIR/selection.json" \
      --state "$RUN_DIR/state.json" \
      --started-epoch "$RUN_STARTED_EPOCH" \
@@ -744,7 +754,7 @@ mkdir -p "$RUN_DIR"
 
    Stop report assembly if metrics generation fails.
 
-6. Fill `${CLAUDE_SKILL_DIR}/resources/report-template.md` from `artifact.json`, `selection.json`,
+6. Fill `${CLAUDE_SKILL_DIR}/resources/report-template.md` from `artifact.json`, `runtime-final.json`, `selection.json`,
    `checklist-report.json`, and the provisional `run-metrics.json`, then write `$RUN_DIR/report.pending.md`. Use the
    selected section rows and selected gaps from `run-metrics.json`; list `automated-suite` paths only as unexecuted
    owners. Copy these exact placeholders into the four duration-sensitive value cells instead of provisional values:
@@ -771,6 +781,7 @@ mkdir -p "$RUN_DIR"
    RUN_ENDED_EPOCH=$(date +%s)
    FINAL_METRICS_ARGS=(
      --artifact "$RUN_DIR/artifact.json"
+     --runtime-final "$RUN_DIR/runtime-final.json"
      --selection "$RUN_DIR/selection.json"
      --state "$RUN_DIR/state.json"
      --started-epoch "$RUN_STARTED_EPOCH"

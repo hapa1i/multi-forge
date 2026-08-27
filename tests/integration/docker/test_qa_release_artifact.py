@@ -107,6 +107,18 @@ print(json.dumps({
     "checklist_fragments": len(list((get_extensions_root() / "skills" / "qa" / "resources/checklist").glob("*.md"))),
 }))
 """
+    dispatcher_probe = """
+import json
+import pathlib
+
+metadata = json.loads(pathlib.Path("/root/.forge/runtime.json").read_text())
+doctor = json.loads(pathlib.Path("/tmp/forge-doctor.json").read_text())
+print(json.dumps({
+    "metadata_launcher": metadata["forge_binary_path"],
+    "doctor_launcher": doctor["hook_dispatcher"]["forge_binary_path"],
+    "dispatcher": metadata["dispatcher_path"],
+}))
+"""
     try:
         probe = subprocess.run(
             [
@@ -118,17 +130,25 @@ print(json.dumps({
                 image,
                 "bash",
                 "-c",
-                'set -euo pipefail; test "$(command -v forge)" = /opt/forge-qa/bin/forge '
+                'set -euo pipefail; test "$(command -v forge)" = /usr/local/bin/forge '
+                '&& test "$(readlink /usr/local/bin/forge)" = /opt/forge-qa/bin/forge '
+                '&& test "$DISABLE_AUTOUPDATER" = 1 '
                 "&& forge --version >/dev/null "
+                "&& forge extension enable --scope user --profile minimal --with hooks --without commands "
+                "> /tmp/forge-enable.log "
+                "&& forge extension doctor --json > /tmp/forge-doctor.json "
                 "&& mv /forge/src/forge /forge/src/forge.unavailable "
-                f"&& /opt/forge-qa/bin/python -I -c {shlex.quote(probe_code)}",
+                f"&& /opt/forge-qa/bin/python -I -c {shlex.quote(probe_code)} "
+                f"&& /opt/forge-qa/bin/python -I -c {shlex.quote(dispatcher_probe)} "
+                "&& (set +e; FORGE_AUTHORITY_MARKER='{}' /root/.forge/bin/forge-hook authority-check "
+                '> /tmp/forge-hook-probe.log 2>&1; status=$?; test "$status" -ne 127)',
             ],
             capture_output=True,
             text=True,
             timeout=120,
         )
         assert probe.returncode == 0, probe.stderr
-        evidence = json.loads(probe.stdout)
+        evidence, dispatcher = [json.loads(line) for line in probe.stdout.splitlines()]
         assert evidence["version"] == version
         assert evidence["forge_file"].startswith("/opt/forge-qa/")
         assert evidence["resource_root"].startswith("/opt/forge-qa/")
@@ -136,5 +156,8 @@ print(json.dumps({
         assert all(not str(path).startswith("/forge") for path in evidence["sys_path"])
         assert all(evidence["qa_resources"].values())
         assert evidence["checklist_fragments"] == 21
+        assert dispatcher["metadata_launcher"] == "/usr/local/bin/forge"
+        assert dispatcher["doctor_launcher"] == "/usr/local/bin/forge"
+        assert dispatcher["dispatcher"] == "/root/.forge/bin/forge-hook"
     finally:
         subprocess.run(["docker", "rmi", image], capture_output=True, text=True, timeout=120)

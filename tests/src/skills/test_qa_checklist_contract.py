@@ -247,6 +247,7 @@ def test_report_template_requires_release_identity_and_budget_evidence() -> None
         "Runtime Track",
         "Claude Pin / Observed",
         "Codex Pin / Observed",
+        "Runtime Preserved",
         "Codex Auth Mode",
         "Provider Profile",
         "Evidence Selection",
@@ -261,6 +262,7 @@ def test_report_template_requires_release_identity_and_budget_evidence() -> None
 
     for field in required_fields:
         assert f"**{field}**" in report
+    assert "runtime-final.json" in report
 
 
 def test_report_finalization_uses_one_atomic_duration_boundary() -> None:

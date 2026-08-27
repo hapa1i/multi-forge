@@ -22,10 +22,37 @@ METRICS = _load()
 
 
 def _artifact(*, mode: str = "prebuilt", blocking: bool = True) -> dict:
+    track = "pinned" if blocking else "latest"
     return {
         "schema_version": 1,
         "artifact": {"mode": mode},
-        "runtime": {"track": "pinned" if blocking else "latest", "blocking": blocking},
+        "runtime": {
+            "track": track,
+            "blocking": blocking,
+            "claude": {"pin": "2.1.245" if blocking else "latest", "observed": "start-claude"},
+            "codex": {"pin": "0.149.1" if blocking else "latest", "observed": "start-codex"},
+        },
+    }
+
+
+def _runtime_final(*, blocking: bool = True, preserved: bool = True) -> dict:
+    return {
+        "schema_version": 1,
+        "track": "pinned" if blocking else "latest",
+        "blocking": blocking,
+        "identity_preserved": preserved,
+        "claude": {
+            "pin": "2.1.245" if blocking else "latest",
+            "observed": "2.1.245" if preserved else "2.1.247",
+            "available": True,
+            "matches_pin": preserved if blocking else None,
+        },
+        "codex": {
+            "pin": "0.149.1" if blocking else "latest",
+            "observed": "0.149.1",
+            "available": True,
+            "matches_pin": True if blocking else None,
+        },
     }
 
 
@@ -103,6 +130,7 @@ def _state(*, second_result: str = "pass", include_second: bool = True) -> dict:
 def _compute(**kwargs):
     return METRICS.compute_metrics(
         artifact=kwargs.pop("artifact", _artifact()),
+        runtime_final=kwargs.pop("runtime_final", _runtime_final()),
         selection=kwargs.pop("selection", _selection()),
         state=kwargs.pop("state", _state()),
         started_epoch=100,
@@ -151,7 +179,27 @@ def test_full_pinned_prebuilt_pass_ignores_unrecorded_exploratory_step() -> None
     ],
 )
 def test_verdict_cannot_overstate_saved_evidence(artifact: dict, selection: dict, state: dict, expected: str) -> None:
-    assert _compute(artifact=artifact, selection=selection, state=state)["verdict"] == expected
+    final = _runtime_final(blocking=artifact["runtime"]["blocking"])
+    assert _compute(artifact=artifact, runtime_final=final, selection=selection, state=state)["verdict"] == expected
+
+
+def test_runtime_drift_forces_failure_and_revokes_release_capability() -> None:
+    result = _compute(runtime_final=_runtime_final(preserved=False))
+
+    assert result["verdict"] == "fail"
+    assert result["artifact_release_capable"] is False
+    assert result["runtime_identity"]["preserved"] is False
+
+
+def test_runtime_unavailability_forces_failure() -> None:
+    final = _runtime_final(preserved=False)
+    final["claude"]["available"] = False
+    final["claude"]["observed"] = "container not running"
+
+    result = _compute(runtime_final=final)
+
+    assert result["verdict"] == "fail"
+    assert result["artifact_release_capable"] is False
 
 
 def test_duration_requires_review_without_becoming_failure() -> None:
@@ -189,6 +237,7 @@ def test_invalid_time_or_budget_state_fails_closed() -> None:
     with pytest.raises(METRICS.MetricsError, match="precedes"):
         METRICS.compute_metrics(
             artifact=_artifact(),
+            runtime_final=_runtime_final(),
             selection=_selection(),
             state=_state(),
             started_epoch=200,

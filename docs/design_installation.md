@@ -709,7 +709,10 @@ verification.
 - `/forge:qa` tied to `full` install profile (Docker dependency)
 - `/forge:qa` remains Claude-hosted; Claude and Codex are independent subjects under test
 - Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
-- The repository-owned runtime matrix pins blocking Claude/Codex clients; `latest` is compatibility evidence only
+- The wheel environment exposes `/usr/local/bin/forge` as a stable symlink to its isolated launcher so runtime hooks
+  retain the durable-global-launcher contract without recording the venv path directly
+- The repository-owned runtime matrix pins blocking Claude/Codex clients; the image disables Claude self-update and a
+  final runtime probe must still match the starting pins; `latest` is compatibility evidence only
 - QA contracts use four lanes: `automated-suite`, `clean-wheel-smoke`, `human-acceptance`, and `extended-exploratory`;
   the default runner selects the middle two
 - Blocking selection is capped at 12 human checkpoints and 8 subject-under-test model completions. Duration above 45

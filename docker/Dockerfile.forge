@@ -57,6 +57,11 @@ RUN cert_count=$(find /forge/docker/certs/ -maxdepth 1 -type f \( -name '*.pem' 
 # Docker ENV applies the path during image builds and in running containers.
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
+# Runtime identity is part of QA evidence. Claude Code otherwise may replace
+# itself during a long-lived container run, invalidating the version observed
+# at preflight.
+ENV DISABLE_AUTOUPDATER=1
+
 # Install Claude Code before Forge source files to preserve toolchain cache layers.
 FROM base AS native-toolchain
 

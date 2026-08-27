@@ -11,8 +11,9 @@
 | **Container**              | container name and immutable image identity                                |
 | **Checklist Version**      | X.Y.Z from checklist header `<!-- version: ... -->`                        |
 | **Runtime Track**          | `pinned` (blocking) or `latest` (non-blocking compatibility)               |
-| **Claude Pin / Observed**  | matrix version / `claude --version` output                                 |
-| **Codex Pin / Observed**   | matrix version / `codex --version` output                                  |
+| **Claude Pin / Observed**  | matrix pin / initial observation / final observation and match             |
+| **Codex Pin / Observed**   | matrix pin / initial observation / final observation and match             |
+| **Runtime Preserved**      | final availability and pin-match verdict from `runtime-final.json`         |
 | **Codex Auth Mode**        | `api-key`, `explicit-file`, or `none`; never include credential material   |
 | **Provider Profile**       | `openrouter` or `remote-litellm`                                           |
 | **Evidence Selection**     | selected lanes plus category/range filters                                 |
@@ -80,6 +81,7 @@ If no issues: "No issues found."
 
 - **step-logs/**: raw command output per checklist step (copied from the mounted QA state dir)
 - **artifact.json**: wheel, image, provider, and observed runtime identity
+- **runtime-final.json**: end-of-run Claude/Codex availability and pin-match evidence
 - **selection.json**: selected step ids, evidence lanes, and planned deterministic budgets
 - **run-metrics.json**: selected results, actual counts, duration review state, scope, and verdict
 - **checklist-report.json**: parser-owned assertion detail; unselected ids are not release gaps
