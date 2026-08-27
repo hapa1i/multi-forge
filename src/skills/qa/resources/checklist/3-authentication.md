@@ -51,9 +51,10 @@ forge auth profiles
 
 ```bash
 # Re-run login for same credential — existing value shown as masked default
-printf '\n' | forge auth login -c anthropic-api
+printf '\n' | env -u ANTHROPIC_API_KEY forge auth login -c anthropic-api
 
-# Expected: shows existing value like "ANTHROPIC_API_KEY [sk-a…5678]"
+# Expected: shows the file-backed value even though QA normally injects ANTHROPIC_API_KEY.
+# Example: "ANTHROPIC_API_KEY [sk-a…5678]"
 # Press Enter to keep existing value
 ```
 

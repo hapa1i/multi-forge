@@ -220,7 +220,7 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 # Re-enable only the shared hooks module with codex absent from PATH while keeping
 # the installed Claude binary visible.
 export CODEX_HOME=$(mktemp -d)
-PATH="$HOME/.local/bin:/usr/bin:/bin" forge extension enable --scope user --profile minimal \
+PATH="$HOME/.local/bin:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable --scope user --profile minimal \
   --with hooks --without commands --runtime all --force
 test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
 
@@ -322,7 +322,7 @@ find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
 PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable \
   --scope user --symlink --profile full --runtime claude --force \
   | tee /tmp/forge-explicit-runtime-preservation.txt
-rg -q 'managed_runtime_preservation' /tmp/forge-explicit-runtime-preservation.txt
+rg -q 'managed_runtime_pres' /tmp/forge-explicit-runtime-preservation.txt
 USER_SKILLS_AFTER_EXPLICIT=$(jq -c \
   '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
 test "$USER_SKILLS_AFTER_EXPLICIT" = "$USER_SKILLS_BEFORE"
@@ -476,13 +476,15 @@ if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension status --scope project --
   echo "ERROR: status accepted an incoherent skill-package ledger" >&2
   exit 1
 fi
-rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-status.txt
+tr '\n' ' ' < /tmp/forge-invalid-skill-ledger-status.txt \
+  | rg -q 'file_paths[[:space:]]+must not be empty'
 if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension disable --scope project --yes \
   >/tmp/forge-invalid-skill-ledger-disable.txt 2>&1; then
   echo "ERROR: disable accepted an incoherent skill-package ledger" >&2
   exit 1
 fi
-rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-disable.txt
+tr '\n' ' ' < /tmp/forge-invalid-skill-ledger-disable.txt \
+  | rg -q 'file_paths[[:space:]]+must not be empty'
 PACKAGE_AFTER=$(shasum -a 256 .agents/skills/challenge/SKILL.md | cut -d' ' -f1)
 TRACKING_AFTER=$(shasum -a 256 "$QA_CORRUPT_FORGE_HOME/installed.json" | cut -d' ' -f1)
 test "$PACKAGE_AFTER" = "$PACKAGE_BEFORE"

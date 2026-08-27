@@ -23,11 +23,11 @@ forge proxy template list
 
 - [ ] `forge proxy list` shows "No proxies found." when none exist
 - [ ] `forge proxy list` shows tip to run `forge proxy template list`
-- [ ] `forge proxy template list` shows available templates (19 user-facing: anthropic-passthrough, litellm-anthropic,
-  litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local, litellm-gemini-local, litellm-openai,
-  litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic, openrouter-deepseek, openrouter-gemini,
-  openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax, openrouter-openai,
-  openrouter-openai-codex, openrouter-qwen)
+- [ ] `forge proxy template list` shows available templates (20 user-facing: anthropic-passthrough,
+  codex-responses-local, litellm-anthropic, litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local,
+  litellm-gemini-local, litellm-openai, litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic,
+  openrouter-deepseek, openrouter-gemini, openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax,
+  openrouter-openai, openrouter-openai-codex, openrouter-qwen)
 - [ ] Internal test-only templates (e.g., litellm-gemini-test) are hidden from the default list
 
 ### 4.2 Create a Proxy
@@ -417,8 +417,8 @@ forge proxy template show openrouter-minimax
 forge proxy template show openrouter-qwen
 ```
 
-- [ ] `forge proxy template list` shows 19 user-facing templates total (8 litellm + 10 openrouter + 1
-  anthropic-passthrough)
+- [ ] `forge proxy template list` shows 20 user-facing templates total (8 LiteLLM + 10 OpenRouter +
+  `anthropic-passthrough` + `codex-responses-local`)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
   opus=claude-opus-5)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)

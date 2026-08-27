@@ -934,6 +934,32 @@ tiers:
         registry = store.read()
         assert "delete-me" not in registry.proxies
 
+    def test_delete_configured_proxy_does_not_call_it_adopted(self, runner: CliRunner, temp_env: Path) -> None:
+        proxy_file = _create_proxy_file(
+            temp_env,
+            "never-started",
+            "template: litellm-openai\nport: 8085\n",
+        )
+        _create_proxy_registry_from_entries(
+            {
+                "never-started": ProxyEntry(
+                    proxy_id="never-started",
+                    template="litellm-openai",
+                    base_url="http://localhost:8085",
+                    port=8085,
+                    pid=None,
+                    status="configured",
+                )
+            }
+        )
+
+        result = runner.invoke(main, ["proxy", "delete", "never-started", "--yes"])
+
+        assert result.exit_code == 0, result.output
+        assert "No running process recorded" in result.output
+        assert "Adopted proxy" not in result.output
+        assert not proxy_file.exists()
+
     def test_delete_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
         """Delete prompts for confirmation when --yes not provided."""
         proxy_yaml = """\
