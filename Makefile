@@ -1,4 +1,4 @@
-.PHONY: help deps test-unit test-integration test-regression test pre-commit pre-commit-md clean clean-docker clean-all
+.PHONY: help deps build test-unit test-integration test-regression test pre-commit pre-commit-md clean clean-docker clean-all
 
 # uv includes the dev dependency group by default.
 deps:
@@ -6,6 +6,8 @@ deps:
 
 help:
 	@echo "Multi Forge - Available Make targets:"
+	@echo ""
+	@echo "  make build              - Build the source distribution and wheel"
 	@echo ""
 	@echo "  make test-unit          - Run unit tests (fast, no Docker required)"
 	@echo "  make test-integration   - Run integration tests (requires Docker)"
@@ -19,6 +21,10 @@ help:
 	@echo "  make clean-docker       - Remove forge Docker test images"
 	@echo "  make clean-all          - Remove caches + Docker images"
 	@echo ""
+
+build:
+	@echo "Building source distribution and wheel..."
+	uv build
 
 test-unit: deps
 	@echo "Running unit tests (excluding integration)..."
