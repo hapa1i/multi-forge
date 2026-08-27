@@ -28,6 +28,7 @@ WHEEL_PATH_SEEN=false
 CODEX_AUTH_SEEN=false
 RESET_SEEN=false
 ACTION_SEEN=false
+RELEASE_BUILD_CONTEXT=""
 
 # Resolve the repository root and image tag.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -40,6 +41,15 @@ BASE_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.forge"
 # Helpers
 error() { echo "ERROR: $*" >&2; }
 info()  { echo "INFO: $*" >&2; }
+
+cleanup_release_build_context() {
+    if [[ -n "$RELEASE_BUILD_CONTEXT" && -d "$RELEASE_BUILD_CONTEXT" ]]; then
+        rm -rf "$RELEASE_BUILD_CONTEXT"
+    fi
+    RELEASE_BUILD_CONTEXT=""
+}
+
+trap cleanup_release_build_context EXIT
 
 # Repo revision baked into built images (org.opencontainers.image.revision).
 # A trailing -dirty marks an uncommitted working tree so any local change forces
@@ -439,7 +449,6 @@ prepare_artifact() {
     fi
 
     WHEEL_PATH="$(json_field "$artifact_json" wheel_path)"
-    WHEEL_DIR="$(json_field "$artifact_json" wheel_dir)"
     WHEEL_FILENAME="$(json_field "$artifact_json" wheel_filename)"
     WHEEL_SHA256="$(json_field "$artifact_json" sha256)"
     FORGE_VERSION="$(json_field "$artifact_json" forge_version)"
@@ -655,6 +664,10 @@ require_container_label() {
     actual="$(docker inspect -f "{{ index .Config.Labels \"$label_key\" }}" "$CONTAINER_NAME" 2>/dev/null || true)"
     if [[ -z "$actual" || "$actual" != "$expected" ]]; then
         error "Running container '$CONTAINER_NAME' has stale $label_name (${actual:-<missing>}); expected $expected."
+        if [[ "$label_key" == "io.multi-forge.qa.artifact-mode" ]] && \
+            [[ "$actual" == "development-build" || "$expected" == "development-build" ]]; then
+            error "Development QA runs are single-invocation; only runs started with --wheel are resumable."
+        fi
         error "Rerun QA with --reset to rebuild, or 'bash start-container.sh --stop' to remove it."
         exit 3
     fi
@@ -786,6 +799,11 @@ else
 fi
 if [[ "$release_needs_build" == "true" ]]; then
     info "Installing exact wheel into release QA image: $IMAGE_NAME"
+    RELEASE_BUILD_CONTEXT="$(mktemp -d "$HOST_STATE_DIR/artifacts/docker-context.XXXXXX")"
+    if ! cp "$WHEEL_PATH" "$RELEASE_BUILD_CONTEXT/$WHEEL_FILENAME"; then
+        error "Could not stage the release wheel in its isolated Docker build context."
+        exit 2
+    fi
     release_build_args=(
         -f "$QA_DOCKERFILE"
         --build-arg "BASE_IMAGE=$BASE_IMAGE_NAME"
@@ -797,7 +815,7 @@ if [[ "$release_needs_build" == "true" ]]; then
         --build-arg "CLAUDE_VERSION=$CLAUDE_VERSION"
         --build-arg "CODEX_VERSION=$CODEX_VERSION"
         -t "$IMAGE_NAME"
-        "$WHEEL_DIR"
+        "$RELEASE_BUILD_CONTEXT"
     )
     if [[ "$RUNTIME_TRACK" == "latest" ]]; then
         release_build_args=(--no-cache "${release_build_args[@]}")
@@ -806,6 +824,7 @@ if [[ "$release_needs_build" == "true" ]]; then
         error "Release QA image build failed."
         exit 2
     fi
+    cleanup_release_build_context
 fi
 
 # Start the container.

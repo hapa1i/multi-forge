@@ -52,7 +52,7 @@ The comments below are machine-checked. Each step excluded from the blocking sel
 
 <!-- evidence-owner: 16.2,16.3,16.4 | tests/integration/docker/test_real_claude_memory.py -->
 
-The planner-to-supervisor-to-executor demonstration (13.7) declares five prompted turns/checks, live Anthropic
-passthrough metadata (4.26) declares one request, and live AI curation (10.5) declares one request. They remain
-exploratory because they are provider-variance-prone and add paid or multi-session work without owning the underlying
-contract. They are useful during a focused investigation, but they do not gate the pinned release verdict.
+The planner-to-supervisor-to-executor demonstration (13.7) declares five prompted turns/checks; live Anthropic
+passthrough metadata (4.26), the spend-cap warning probe (7.10), and live AI curation (10.5) each declare one request.
+They remain exploratory because they are provider-variance-prone and add paid or multi-session work without owning the
+underlying contract. They are useful during a focused investigation, but they do not gate the pinned release verdict.

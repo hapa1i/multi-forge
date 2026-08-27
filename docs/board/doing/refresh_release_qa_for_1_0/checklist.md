@@ -17,7 +17,8 @@ the independent wheel-runtime smoke, the full unit/regression suites, and reposi
 
 Phase 7 still needs the broad named integration-owner run, one human-driven pinned release-candidate QA pass, and the
 separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; do not turn
-the implementation branch's development wheel smoke into the v1.0.0 release verdict.
+the implementation branch's development wheel smoke into the v1.0.0 release verdict. The Codex integration owners must
+run against observed Codex CLI `0.149.1` before that pin's release validation is complete.
 
 ## Execution Guardrails
 
@@ -258,7 +259,8 @@ the implementation branch's development wheel smoke into the v1.0.0 release verd
 - [x] Run the updated QA image-identity regression and focused installer/compiler/profile tests.
 - [ ] Run the targeted Docker/integration owners named in the acceptance table for Claude hooks, Codex sessions, model
   routing, authority, adoption/repair, rewind, backend lifecycle, provider trace, policy source modes, and installer
-  lifecycle.
+  lifecycle. **Codex ceiling gate**: the real-runtime Codex owners must observe CLI `0.149.1`; a host-detected different
+  version does not close the Codex portion of this item.
 - [x] Run `make test-unit`, `make test-regression`, and `make pre-commit` with no unexplained failures or new skips.
 - [x] Run `uv build`, `scripts/test-wheel-runtime.sh`, and the exact-wheel isolation/lifecycle integration gate against
   the same candidate artifact.
@@ -285,6 +287,15 @@ the implementation branch's development wheel smoke into the v1.0.0 release verd
   Claude `2.1.245`, and Codex `0.149.1`. It was an infrastructure smoke only; it did not run the paid or human QA steps
   and is not release-candidate evidence.
 
+### Review Follow-up -- 2026-08-27
+
+- QA artifact/selection/metrics/launcher/contract and image-tag regressions: 57 passed, including both blocking and
+  extended prerequisite closure and all release-evidence reuse labels.
+- `uv build` and `./scripts/test-integration.sh tests/integration/docker/test_qa_release_artifact.py` passed for the
+  updated packaged resources. A real pinned launcher build sent only the selected wheel through its temporary Docker
+  context and removed that context afterward.
+- `make pre-commit` passed. The temporary launcher container and QA state were removed; cached test images remain.
+
 ## Acceptance Tests
 
 | Test                     | Fixture                                                                | Assertion                                                                                            | Test File                                                                                                                                                                                |
@@ -292,9 +303,9 @@ the implementation branch's development wheel smoke into the v1.0.0 release verd
 | Checklist metadata truth | 21 QA fragments and index                                              | declared count, ids, execution classes, categories, and parsed assertions agree                      | `tests/src/skills/test_qa_checklist_contract.py` (new)                                                                                                                                   |
 | Evidence selection       | blocking and extended fixtures with category/range/resume              | selection is deterministic and budgets count only included steps                                     | `tests/src/skills/test_qa_checklist_contract.py`; state tests if parser changes                                                                                                          |
 | State-script parity      | both packaged state scripts                                            | only the two approved identity lines differ and the full behavior matrix passes                      | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`                                                                                        |
-| Runtime matrix           | repository matrix plus Claude/Codex preflight fixtures                 | pins have fresh probe evidence; Codex pin meets the proxy floor and general ceiling                  | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py`                                                                                       |
+| Runtime matrix           | repository matrix plus Claude/Codex preflight fixtures                 | pins have release-baseline probe evidence; Codex pin meets the proxy floor and general ceiling       | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py`                                                                                       |
 | Artifact identity        | supplied RC wheel plus checkout with distinguishable content           | CLI, import, metadata, and resources resolve only from the recorded wheel                            | `tests/integration/docker/test_qa_release_artifact.py` (new)                                                                                                                             |
-| Container reuse identity | editable and release builds sharing revision/runtime versions          | full image identities differ; changed release digest/profile/track rejects stale reuse               | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                          |
+| Container reuse identity | editable and release builds sharing revision/runtime versions          | full identities differ; changed digest/profile/track/mode/path/auth rejects stale reuse              | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                          |
 | Managed Claude lifecycle | clean-wheel project and real Claude                                    | SessionStart/Stop confirmation and transcript artifact are produced                                  | `tests/integration/docker/test_real_claude_hooks.py`                                                                                                                                     |
 | Managed Codex lifecycle  | authenticated Codex and clean-wheel project                            | preflight plus one `initial-message` start/resume records a thread                                   | `tests/integration/core/test_codex_session_start.py`                                                                                                                                     |
 | Codex hook delivery      | enrolled real runtime plus staged hook receipt                         | real hook firing and staged delivery pass positively; recovery output is not a pass                  | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py`                                                                                       |

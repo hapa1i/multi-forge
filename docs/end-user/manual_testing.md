@@ -81,7 +81,7 @@ Then in Claude Code:
                                        # Run the pinned blocking release gate
 /forge:qa session proxy                # Run specific categories
 /forge:qa --wheel <same-wheel> --from 4.1
-                                       # Resume with the same artifact identity
+                                       # Resume a run that began with --wheel
 /forge:qa --from 10 --to 13            # Run sections 10-12; `--to` is exclusive
 /forge:qa --runtime-track latest --extended
                                        # Non-blocking client compatibility/exploration
@@ -105,6 +105,11 @@ Release sign-off requires an explicit prebuilt wheel on the repository-pinned Cl
 missing blocking evidence, and pending duration-review runs cannot report a release pass. Run artifacts record the wheel
 path/version/SHA-256, observed runtime versions, provider profile, selection, counts, verdict, state, logs, and
 transcript claim under `~/.forge/manual-testing/qa/runs/`.
+
+Only runs started with an explicit prebuilt `--wheel` can resume the same container. Development runs are
+single-invocation; start over with `--reset` if their container is still running. Their wheels remain under
+`~/.forge/manual-testing/qa/artifacts/build.*` because the evidence records their exact paths; remove an old build
+directory only after its development evidence is no longer needed.
 
 The default `openrouter` profile is required for the blocking provider-trace and remote-reconciliation seam. The
 `remote-litellm` profile remains available for diagnostic compatibility coverage, but a full run on that profile records

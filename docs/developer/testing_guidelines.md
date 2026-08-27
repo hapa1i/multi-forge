@@ -715,12 +715,13 @@ When adding/changing a feature, update the QA checklist:
    helper concerns and must not create a dependency from either self-contained `walkthrough-state.py` copy.
 
 Release-capable QA requires an explicit prebuilt wheel and the pinned runtime track. The release image is distinct from
-the editable integration image even when both share a runtime base. Reports must preserve `artifact.json`,
-`selection.json`, `run-metrics.json`, state, raw step logs, debug logs, and the transcript claim. `latest`, partial,
-development-build, missing blocking evidence, and undisposed over-threshold duration results remain visibly non-release
-verdicts. Paid observations are per-step and count only with current-scope structural-hash evidence, so resume cannot
-double-count cleared or stale records. Runtime pins and probe facts live in `resources/runtime-matrix.json`; `latest`
-resolves fresh client layers in a fresh container. The default OpenRouter profile is required for the blocking
+the editable integration image even when both share a runtime base, and its temporary Docker build context contains only
+the selected wheel rather than the wheel's parent directory. Reports must preserve `artifact.json`, `selection.json`,
+`run-metrics.json`, state, raw step logs, debug logs, and the transcript claim. `latest`, partial, development-build,
+missing blocking evidence, and undisposed over-threshold duration results remain visibly non-release verdicts. Paid
+observations are per-step and count only with current-scope structural-hash evidence, so resume cannot double-count
+cleared or stale records. Runtime pins and probe facts live in `resources/runtime-matrix.json`; `latest` resolves fresh
+client layers in a fresh container. The default OpenRouter profile is required for the blocking
 provider-trace/reconciliation seam; remote LiteLLM remains diagnostic compatibility coverage.
 
 ---

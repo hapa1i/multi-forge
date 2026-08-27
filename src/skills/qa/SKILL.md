@@ -927,5 +927,5 @@ Commands are deterministic (from checklist); interpretation is adaptive (agent j
 - **Context window**: Full QA may be long-running -- use `--from X.Y` to resume after compaction.
 - **Run a range**: Use `--from 4.1 --to 7` to run sections 4 through 6 only (excludes the `--to` step).
 - **Resume after compaction**: Use `/forge:qa --wheel <same-wheel> --from X.Y` with the same runtime track and provider
-  profile. Rebuilding an unnamed development wheel is not artifact-stable resume evidence.
+  profile. Only runs started with an explicit prebuilt `--wheel` are resumable; development runs are single-invocation.
 - **Quick check**: For a quick non-interactive health check, use `/forge:smoke-test`.

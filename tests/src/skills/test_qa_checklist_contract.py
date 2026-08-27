@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from packaging.version import Version
 
 from forge.core.runtime import codex_preflight
@@ -215,22 +216,24 @@ def test_blocking_selection_matches_ratified_budget() -> None:
     assert result["blocking_counts"]["paid_operations"] <= budget["blocking"]["max_paid_operations"]
 
 
-def test_blocking_selection_is_closed_over_declared_prerequisites() -> None:
+@pytest.mark.parametrize("extended", [False, True], ids=["blocking", "extended"])
+def test_selection_is_closed_over_explicit_step_prerequisites(extended: bool) -> None:
     parsed = _parsed_checklist()
     result = SELECTION.resolve_selection(
         checklist=CHECKLIST,
         parser_script=STATE_SCRIPT,
         budget_path=EXECUTION_BUDGET,
+        extended=extended,
     )
     selected = {step["id"] for step in result["steps"]}
-    final_step_by_section = {section["id"]: section["subsections"][-1]["id"] for section in parsed["sections"]}
 
     for step in parsed["_all_subs"]:
+        for prerequisite in step["prereqs"]:
+            assert "." in prerequisite, (step["id"], prerequisite)
         if step["id"] not in selected:
             continue
         for prerequisite in step["prereqs"]:
-            owner = prerequisite if "." in prerequisite else final_step_by_section[prerequisite]
-            assert owner in selected, (step["id"], prerequisite, owner)
+            assert prerequisite in selected, (step["id"], prerequisite)
 
 
 def test_report_template_requires_release_identity_and_budget_evidence() -> None:
@@ -276,7 +279,7 @@ def test_report_finalization_uses_one_atomic_duration_boundary() -> None:
     assert "This write is the duration boundary" in skill
 
 
-def test_runtime_matrix_is_pinned_to_fresh_supported_versions() -> None:
+def test_runtime_matrix_records_supported_pinned_versions() -> None:
     matrix = json.loads(RUNTIME_MATRIX.read_text(encoding="utf-8"))
     pinned = matrix["tracks"][matrix["blocking_track"]]
     claude = pinned["claude"]
@@ -284,6 +287,7 @@ def test_runtime_matrix_is_pinned_to_fresh_supported_versions() -> None:
 
     assert matrix["schema_version"] == 1
     assert re.fullmatch(r"[0-9a-f]{40}", matrix["validated_forge_revision"])
+    # This is release-baseline provenance, not a wall-clock freshness gate that would rot on main.
     assert date.fromisoformat(matrix["validated_on"]) >= date(2026, 8, 25)
     assert pinned["blocking"] is True
     assert matrix["tracks"]["latest"]["blocking"] is False

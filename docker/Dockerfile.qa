@@ -1,7 +1,7 @@
 # Install one validated Multi-Forge wheel over the shared Claude/Codex runtime image.
 #
-# The build context must be the directory containing FORGE_WHEEL_NAME. The base
-# image may contain an editable checkout for integration fixtures, but the
+# The harness stages only FORGE_WHEEL_NAME in a temporary build context. The
+# base image may contain an editable checkout for integration fixtures, but the
 # release-QA executable and imports come only from /opt/forge-qa.
 
 ARG BASE_IMAGE

@@ -8,6 +8,8 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "src" / "skills" / "qa" / "scripts" / "start-container.sh"
 HEAD_REV = "1111111111111111111111111111111111111111"
@@ -67,9 +69,18 @@ def _run(tmp_path: Path, args: list[str], docker_body: str = 'test "$1" = info\n
     )
 
 
-def _running_container_docker(wheel: Path, *, runtime_track: str = "pinned", profile: str = "openrouter") -> str:
+def _running_container_docker(
+    wheel: Path,
+    *,
+    runtime_track: str = "pinned",
+    profile: str = "openrouter",
+    artifact_mode: str = "prebuilt",
+    wheel_path: str | None = None,
+    codex_auth_mode: str = "api-key",
+) -> str:
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     image = f"forge-qa-release:0.9.4-sha-{digest[:12]}-pinned-claude-2.1.245-codex-0.149.1"
+    recorded_wheel_path = wheel_path or str(wheel.resolve())
     return (
         'sub="$1"; args="$*"\n'
         'case "$sub" in\n'
@@ -84,9 +95,9 @@ def _running_container_docker(wheel: Path, *, runtime_track: str = "pinned", pro
         '      *io.multi-forge.qa.claude-version*) printf "2.1.245" ;;\n'
         '      *io.multi-forge.qa.codex-version*) printf "0.149.1" ;;\n'
         f'      *io.multi-forge.qa.provider-profile*) printf "{profile}" ;;\n'
-        '      *io.multi-forge.qa.artifact-mode*) printf "prebuilt" ;;\n'
-        f'      *io.multi-forge.qa.wheel-path*) printf "%s" {str(wheel.resolve())!r} ;;\n'
-        '      *io.multi-forge.qa.codex-auth-mode*) printf "api-key" ;;\n'
+        f'      *io.multi-forge.qa.artifact-mode*) printf "{artifact_mode}" ;;\n'
+        f'      *io.multi-forge.qa.wheel-path*) printf "%s" {recorded_wheel_path!r} ;;\n'
+        f'      *io.multi-forge.qa.codex-auth-mode*) printf "{codex_auth_mode}" ;;\n'
         f'      *Config.Image*) printf "%s" {image!r} ;;\n'
         "      *) : ;;\n"
         "    esac ;;\n"
@@ -106,6 +117,7 @@ def _running_container_docker(wheel: Path, *, runtime_track: str = "pinned", pro
 
 
 def _fresh_container_docker(log_path: Path) -> str:
+    context_log = log_path.with_suffix(".context")
     return (
         f'printf "%s\\n" "$*" >> {str(log_path)!r}\n'
         'sub="$1"; args="$*"\n'
@@ -113,7 +125,16 @@ def _fresh_container_docker(log_path: Path) -> str:
         "  info) exit 0 ;;\n"
         "  ps) exit 0 ;;\n"
         '  image) test "${2:-}" != inspect ;;\n'
-        "  build|run|rm|rmi|stop) exit 0 ;;\n"
+        "  build)\n"
+        '    case "$args" in\n'
+        "      *Dockerfile.qa*)\n"
+        '        for context in "$@"; do :; done\n'
+        '        context_files=("$context"/*)\n'
+        f'        printf "%s\\n" "$context" "${{#context_files[@]}}" "${{context_files[0]##*/}}" > {str(context_log)!r} ;;\n'
+        "      *) : ;;\n"
+        "    esac\n"
+        "    exit 0 ;;\n"
+        "  run|rm|rmi|stop) exit 0 ;;\n"
         "  exec)\n"
         '    case " $args " in *" -i "*) cat >/dev/null ;; esac\n'
         '    case "$args" in\n'
@@ -190,6 +211,40 @@ def test_runtime_track_and_provider_profile_mismatches_block_reuse(
     assert "stale runtime track" in wrong_track.stderr
     assert wrong_profile.returncode == 3
     assert "stale provider profile" in wrong_profile.stderr
+
+
+@pytest.mark.parametrize(
+    ("artifact_mode", "wheel_path", "codex_auth_mode", "expected_error"),
+    [
+        ("development-build", None, "api-key", "stale artifact mode"),
+        ("prebuilt", "different.whl", "api-key", "stale wheel path"),
+        ("prebuilt", None, "explicit-file", "stale Codex auth mode"),
+    ],
+)
+def test_release_evidence_identity_mismatches_block_reuse(
+    tmp_path: Path,
+    artifact_mode: str,
+    wheel_path: str | None,
+    codex_auth_mode: str,
+    expected_error: str,
+) -> None:
+    wheel = _wheel(tmp_path)
+    recorded_wheel_path = str(tmp_path / wheel_path) if wheel_path else None
+    result = _run(
+        tmp_path,
+        ["--wheel", str(wheel)],
+        _running_container_docker(
+            wheel,
+            artifact_mode=artifact_mode,
+            wheel_path=recorded_wheel_path,
+            codex_auth_mode=codex_auth_mode,
+        ),
+    )
+
+    assert result.returncode == 3
+    assert expected_error in result.stderr
+    if artifact_mode == "development-build":
+        assert "Development QA runs are single-invocation" in result.stderr
 
 
 def test_pinned_runtime_observation_mismatch_blocks_reuse(tmp_path: Path) -> None:
@@ -290,6 +345,12 @@ def test_fresh_pinned_build_uses_nonempty_argument_lists_under_nounset(tmp_path:
     assert "Dockerfile.forge" in build_calls[0]
     assert "Dockerfile.qa" in build_calls[1]
     assert all("--no-cache" not in line and "--pull" not in line for line in build_calls)
+    context_path, file_count, filename = docker_log.with_suffix(".context").read_text(encoding="utf-8").splitlines()
+    release_context = Path(context_path)
+    assert release_context.parent == tmp_path / "forge-home" / "manual-testing" / "qa" / "artifacts"
+    assert release_context != wheel.parent
+    assert (file_count, filename) == ("1", wheel.name)
+    assert not release_context.exists()
 
 
 def test_status_reports_complete_release_identity(tmp_path: Path) -> None:

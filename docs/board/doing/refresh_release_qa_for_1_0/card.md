@@ -206,7 +206,7 @@ inspect a file or JSON record that the CLI can validate directly.
 | -------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | Checklist metadata truth         | all QA section fragments                                         | parsed assertion total equals the index count; every step has one supported execution class  | `tests/src/skills/test_qa_checklist_contract.py` (new)                                             |
 | State-script parity              | QA and walkthrough packaged copies                               | only the two approved identity lines differ; both execute the full behavior matrix           | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`  |
-| Runtime matrix                   | repository matrix plus runtime preflight fixtures                | both pins have fresh evidence; Codex meets its proxy floor and general validated ceiling     | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py` |
+| Runtime matrix                   | repository matrix plus runtime preflight fixtures                | both pins have release-baseline evidence; Codex meets its proxy floor and validated ceiling  | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py` |
 | Exact wheel isolation            | prebuilt RC wheel, checkout also present                         | imported Forge and extension resources resolve from the wheel environment, never `/forge`    | `tests/integration/docker/test_qa_release_artifact.py` (new)                                       |
 | Managed Claude hook              | clean-wheel project and real Claude                              | session confirmation and transcript artifact are written by real lifecycle hooks             | `tests/integration/docker/test_real_claude_hooks.py`                                               |
 | Managed Codex turn               | authenticated Codex and clean Forge project                      | preflight passes; default initial-message start/resume records the thread                    | `tests/integration/core/test_codex_session_start.py`                                               |
@@ -223,7 +223,8 @@ inspect a file or JSON record that the CLI can validate directly.
 
 - Focused checklist/state/compiler/profile tests.
 - `make test-unit` and `make test-regression`.
-- Targeted integration tests required by the session, hook, Codex, proxy, backend, installer, and authority changes.
+- Targeted integration tests required by the session, hook, Codex, proxy, backend, installer, and authority changes;
+  Codex real-runtime owners must observe CLI `0.149.1` before the pin is release-validated.
 - `uv build` followed by `scripts/test-wheel-runtime.sh` and the new exact-wheel QA lifecycle.
 - One complete pinned-runtime blocking QA run with saved report and artifacts.
 - One separately labelled `latest` compatibility run when network/runtime availability permits.
