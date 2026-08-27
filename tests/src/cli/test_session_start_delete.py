@@ -14,6 +14,7 @@ from forge.cli.main import main
 from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
+from forge.session.claude import ClaudeBinaryNotFoundError
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import DirtyWorktreeError, SessionNotFoundError
 from forge.session.routing import read_routing_events
@@ -94,6 +95,19 @@ class TestSessionStart:
         assert result.exit_code == 0
         assert "Created session" in result.output
         assert "new-session" in result.output
+
+    def test_start_without_claude_fails_before_session_creation(self, runner: CliRunner, temp_env: Path) -> None:
+        with patch(
+            "forge.core.ops.claude_session.require_claude_binary",
+            side_effect=ClaudeBinaryNotFoundError("Claude Code CLI not found on PATH. Install Claude Code."),
+        ):
+            result = runner.invoke(main, ["session", "start", "missing-claude"])
+
+        assert result.exit_code == 1
+        assert "Claude Code CLI not found on PATH" in result.output
+        assert "Traceback" not in result.output
+        assert not SessionStore(str(temp_env), "missing-claude").exists()
+        assert IndexStore().read().sessions == {}
 
     def test_start_refuses_incompatible_project_without_session_registry_writes(
         self,

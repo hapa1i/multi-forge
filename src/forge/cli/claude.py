@@ -168,7 +168,7 @@ def start_cmd(
         print_error("one of --proxy or --no-proxy is required", console=err_console)
         sys.exit(1)
 
-    from forge.session.claude.invoke import invoke_claude
+    from forge.session.claude.invoke import ClaudeBinaryNotFoundError, invoke_claude
 
     template: str | None = None
     base_url: str | None = None
@@ -250,15 +250,18 @@ def start_cmd(
         addendum_path = write_bare_addendum(addendum_content)
 
     try:
-        sys.exit(
-            invoke_claude(
+        try:
+            exit_code = invoke_claude(
                 model=None,
                 system_prompt_file=str(addendum_path) if addendum_path else None,
                 env_vars=env_vars,
                 unset_env_vars=unset_vars,
                 extra_args=list(claude_args) if claude_args else None,
             )
-        )
+        except ClaudeBinaryNotFoundError as e:
+            print_error(str(e), console=err_console)
+            sys.exit(1)
+        sys.exit(exit_code)
     finally:
         if addendum_path:
             addendum_path.unlink(missing_ok=True)
