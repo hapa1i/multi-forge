@@ -18,7 +18,12 @@ from forge.core.ops.session_routing import (
 from forge.core.reactive.env import new_root_run_identity
 from forge.proxy.runtime_truth import ProxyRuntimeTruth
 from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import LaunchConfirmed, ProxyIntent, RouteCommitConfirmed
+from forge.session.models import (
+    LaunchConfirmed,
+    ModelRouteIntent,
+    ProxyIntent,
+    RouteCommitConfirmed,
+)
 from tests.fixtures.session_state import publish_session
 
 
@@ -191,6 +196,33 @@ def test_no_route_evidence_uses_stable_null_and_empty_shapes(project: Path) -> N
     assert payload["live_proxy"]["evidence_source"] == "not_applicable"
     assert payload["marking"]["launch_entries"] == []
     assert payload["marking"]["provider_declared"] is True
+
+
+def test_model_first_route_reports_the_requested_model_from_launch_intent(project: Path) -> None:
+    store = _publish(project, proxy=True)
+    state = store.read()
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="gpt-5.6-sol",
+        selected_tier="opus",
+        kind="proxy",
+        source_id="openrouter",
+    )
+    state.intent.launch.direct_model = None
+    store.write(state)
+
+    payload = ops.get_session_model_report(
+        ctx=ExecutionContext.from_cwd(),
+        session_name="planner",
+    ).to_dict()
+
+    assert payload["route_intent"] == {
+        "kind": "proxy",
+        "template": "openrouter-anthropic",
+        "proxy_id": None,
+        "custom_route_fingerprint": None,
+        "requested_model": "gpt-5.6-sol",
+    }
 
 
 def test_supported_projection_exposes_journal_owned_scope_and_launch_marking(
