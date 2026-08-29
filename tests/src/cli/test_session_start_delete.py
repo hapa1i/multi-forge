@@ -669,6 +669,43 @@ class TestSessionDelete:
 
         assert "Cancelled" in result.output
 
+    def test_delete_preview_keeps_a_guest_session_shared_worktree(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        """The destructive preview must agree with ownership-aware deletion."""
+        worktree = temp_env.parent / "shared-delete-preview-worktree"
+        worktree.mkdir()
+        index = IndexStore()
+        for name, owns_worktree in (("preview-owner", True), ("preview-guest", False)):
+            state = create_session_state(name, worktree_path=str(worktree), worktree_branch="preview-branch")
+            assert state.worktree is not None
+            state.forge_root = str(temp_env)
+            state.worktree.is_worktree = True
+            state.worktree.owns_worktree = owns_worktree
+            publish_session(
+                index,
+                state,
+                temp_env,
+                checkout_root=worktree,
+                forge_root=temp_env,
+            )
+
+        result = runner.invoke(
+            main,
+            ["session", "delete", "preview-guest", "--delete-branch"],
+            input="n\n",
+        )
+
+        assert result.exit_code == 0
+        assert "Worktree will be kept (used by preview-owner)" in result.output
+        assert "Worktree will be removed" not in result.output
+        assert "Branch will be kept: preview-branch" in result.output
+        assert "Branch will be deleted" not in result.output
+        assert "Cancelled" in result.output
+        assert SessionStore(str(temp_env), "preview-guest").exists()
+
     def test_delete_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
         """A live session is blocked before the confirm prompt unless --force."""
         runner.invoke(main, ["session", "start", "active-delete", "--no-launch"])

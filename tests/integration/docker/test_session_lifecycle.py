@@ -808,6 +808,49 @@ print('keep_ok')
         """ % wt_path)
         assert "keep_ok" in check.stdout, f"Keep-worktree check failed: {check.stderr}"
 
+    def test_delete_guest_preview_agrees_with_shared_worktree_cleanup(
+        self,
+        forge_workspace: ContainerLike,
+    ) -> None:
+        """The delete preview must not claim ownership that mutation refuses."""
+        forge_workspace.exec("forge extension enable --scope user --profile minimal")
+        started = forge_workspace.exec("cd /workspace && forge session start preview-owner --worktree --no-launch")
+        assert started.returncode == 0, started.stderr
+
+        wt_path_result = forge_workspace.exec(f"""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+index = json.loads((Path.home() / '.forge' / 'sessions' / 'index.json').read_text())
+{_python_find_entry_by_name('preview-owner')}
+print(entry['worktree_path'])
+"
+        """)
+        wt_path = wt_path_result.stdout.strip()
+        assert wt_path, wt_path_result.stderr
+
+        enabled = forge_workspace.exec(f"cd {wt_path} && forge extension enable --scope local")
+        assert enabled.returncode == 0, enabled.stderr
+        forked = forge_workspace.exec(
+            f"cd /workspace && forge session fork preview-owner --name preview-guest --into {wt_path} --no-launch"
+        )
+        assert forked.returncode == 0, forked.stderr
+
+        deleted = forge_workspace.exec(
+            "cd /workspace && forge session delete preview-guest --yes --force --delete-branch"
+        )
+        assert deleted.returncode == 0, deleted.stderr
+        assert "Worktree will be kept (used by preview-owner)" in deleted.stdout
+        assert "Worktree will be removed" not in deleted.stdout
+        assert "Branch will be kept" in deleted.stdout
+        assert "Branch will be deleted" not in deleted.stdout
+
+        check = forge_workspace.exec(f"test -d {wt_path} && cd /workspace && forge session show preview-owner --json")
+        assert check.returncode == 0, check.stderr
+
+        forge_workspace.exec(f"cd {wt_path} && forge extension disable --scope local --yes")
+        forge_workspace.exec("cd /workspace && forge session delete preview-owner --yes --force --delete-branch")
+
     def test_worktree_config_copy(self, forge_workspace: ContainerLike) -> None:
         """Verify runtime files are copied safely from the main repo on worktree creation."""
         forge_workspace.exec("forge extension enable --scope user --profile minimal")
