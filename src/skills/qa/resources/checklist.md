@@ -4,9 +4,9 @@
 
 <!-- version: 1.1.0 -->
 
-<!-- test-count: 676 -->
+<!-- test-count: 677 -->
 
-<!-- last-updated: 2026-08-27 -->
+<!-- last-updated: 2026-08-29 -->
 
 <!-- aligned-with: v1.0.0 -->
 

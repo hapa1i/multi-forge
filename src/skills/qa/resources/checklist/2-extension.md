@@ -217,15 +217,20 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 <!-- auto -->
 
 ```bash
-# Re-enable only the shared hooks module with codex absent from PATH while keeping
-# the installed Claude binary visible.
+set -euo pipefail
+
+# Re-enable only the shared hooks module with Codex absent from PATH while keeping
+# the installed Claude binary visible through an isolated PATH fixture.
 export CODEX_HOME=$(mktemp -d)
-PATH="$HOME/.local/bin:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable --scope user --profile minimal \
+QA_CLAUDE_ONLY_BIN=/tmp/forge-qa-claude-only-2-11
+mkdir -p "$QA_CLAUDE_ONLY_BIN"
+ln -sf /usr/local/bin/claude "$QA_CLAUDE_ONLY_BIN/claude"
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable --scope user --profile minimal \
   --with hooks --without commands --runtime all --force
 test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
 
-# Restore: re-enable normally and clear the env override
-forge extension enable --scope user --runtime claude --force
+# Restore the full symlink-mode Claude installation expected by later steps.
+forge extension enable --scope user --symlink --profile full --runtime claude --force
 unset CODEX_HOME
 ```
 

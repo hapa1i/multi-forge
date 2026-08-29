@@ -88,7 +88,7 @@ forge config show --json | jq -e '
   and .downstream_retention.effective.max_total_mb == 300
 '
 
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import os
 from pathlib import Path
 
@@ -134,7 +134,7 @@ test -f "${FORGE_HOME:-$HOME/.forge}/config.yaml"
 forge claude preset show --raw
 
 # Verify file created and built-in keys present
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -159,7 +159,7 @@ PY
 
 ```bash
 # Add a disposable custom env var to the preset
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -176,7 +176,7 @@ PY
 forge claude preset reset --yes
 
 # Verify temporary key removed and built-in env preserved
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -209,41 +209,49 @@ test -f "${FORGE_HOME:-$HOME/.forge}/claude.preset.json"
 <!-- auto -->
 
 ```bash
-forge config set skills.invocation.review=model
-forge extension sync
+set -euo pipefail
 
-python3 - <<'PY'
+restore_review_invocation() {
+  forge config reset skills >/dev/null 2>&1 || true
+  forge extension sync --scope local >/dev/null 2>&1 || true
+}
+trap restore_review_invocation EXIT
+
+forge config set skills.invocation.review=model
+forge extension sync --scope local
+
+/opt/forge-qa/bin/python - <<'PY'
 import os
 from pathlib import Path
 
 import yaml
 
-claude_home = Path(os.environ.get("CLAUDE_HOME", str(Path.home() / ".claude")))
-document = (claude_home / "skills" / "review" / "SKILL.md").read_text()
+document = (Path(os.environ["FORGE_TEST_REPO"]) / ".claude" / "skills" / "review" / "SKILL.md").read_text()
 frontmatter = yaml.safe_load(document.split("---", 2)[1])
 assert frontmatter["disable-model-invocation"] is False
 print("REVIEW_MODEL_INVOCATION=true")
 PY
 
 forge config reset skills
-forge extension sync
+forge extension sync --scope local
 
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import os
 from pathlib import Path
 
 import yaml
 
-claude_home = Path(os.environ.get("CLAUDE_HOME", str(Path.home() / ".claude")))
-document = (claude_home / "skills" / "review" / "SKILL.md").read_text()
+document = (Path(os.environ["FORGE_TEST_REPO"]) / ".claude" / "skills" / "review" / "SKILL.md").read_text()
 frontmatter = yaml.safe_load(document.split("---", 2)[1])
 assert frontmatter["disable-model-invocation"] is True
 print("REVIEW_EXPLICIT_INVOCATION=true")
 PY
+
+trap - EXIT
 ```
 
 - [ ] Config can opt one skill into model invocation without an extension-enable flag
-- [ ] Sync materializes the changed policy in the installed package
+- [ ] Local-scope sync materializes the changed policy in the installed package
 - [ ] Removing the override restores human/explicit-only invocation
 
 ---

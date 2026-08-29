@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
 from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
@@ -108,7 +109,7 @@ def _report_categories() -> list[str]:
 
 def test_declared_assertion_count_matches_all_fragments() -> None:
     parsed = _parsed_checklist()
-    assert _declared_test_count() == parsed["total_assertions"] == 676
+    assert _declared_test_count() == parsed["total_assertions"] == 677
 
 
 def test_section_and_step_ids_are_unique_and_execution_classes_are_explicit() -> None:
@@ -124,6 +125,30 @@ def test_section_and_step_ids_are_unique_and_execution_classes_are_explicit() ->
         assert step["id"].startswith(f"{step['section_id']}.")
         execution_annotations = EXECUTION_CLASSES.intersection(step["annotations"])
         assert execution_annotations == {step["annotation"]}, step["id"]
+
+
+def test_every_automated_step_has_a_runnable_code_block() -> None:
+    for step in _parsed_checklist()["_all_subs"]:
+        if step["annotation"] != "auto":
+            continue
+        assert any(block["runnable"] for block in step["code_blocks"]), step["id"]
+
+
+def test_every_automated_code_block_is_valid_bash() -> None:
+    for step in _parsed_checklist()["_all_subs"]:
+        if step["annotation"] != "auto":
+            continue
+        for block in step["code_blocks"]:
+            if not block["runnable"]:
+                continue
+            result = subprocess.run(
+                ["bash", "-n"],
+                input=block["code"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            assert result.returncode == 0, f"{step['id']}: {result.stderr}"
 
 
 def test_report_categories_cover_the_index_in_order() -> None:

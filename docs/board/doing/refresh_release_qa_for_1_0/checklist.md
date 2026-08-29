@@ -11,14 +11,16 @@ creation happened in the same decision.
 
 ## Current Focus
 
-Implementation is complete through Phase 6 and is ready for maintainer review. The default blocking selection now
-contains 163 steps, 551 assertions, 9 human checkpoints, and 8 paid operations. The exact-wheel Docker isolation gate,
-the independent wheel-runtime smoke, the full unit/regression suites, and repository-wide pre-commit hooks pass.
+The first complete pinned run preserved wheel and runtime identity but failed 9 of 551 assertions. Follow-up fixes now
+leave the default blocking selection at 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations. One
+failure was a product defect in model-first route reporting; the remaining failures came from invalid fixtures,
+scope/ownership mismatches, or cleanup order in the QA checklist. Focused checklist contracts and corrected zero-cost
+steps pass against the retained run container.
 
-Phase 7 still needs the broad named integration-owner run, one human-driven pinned release-candidate QA pass, and the
-separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; do not turn
-the implementation branch's development wheel smoke into the v1.0.0 release verdict. The Codex integration owners must
-run against observed Codex CLI `0.149.1` before that pin's release validation is complete.
+Phase 7 still needs the broad named integration-owner run, a clean human-driven pinned release-candidate QA rerun, and
+the separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; the
+failed run and retained-container fixture checks are diagnostic evidence, not the v1.0.0 release verdict. The Codex
+integration owners must run against observed Codex CLI `0.149.1` before that pin's release validation is complete.
 
 ## Execution Guardrails
 
@@ -327,6 +329,45 @@ run against observed Codex CLI `0.149.1` before that pin's release validation is
 - `make build` and `make pre-commit` passed after the fixes; the distributable was rebuilt after this evidence update.
   The unticked full pinned QA run is still required, and none of the partial run's 103 unreached steps are reclassified
   as passed.
+
+### Full QA Follow-up -- 2026-08-29
+
+- The prebuilt `multi_forge-0.9.4-py3-none-any.whl` run preserved its recorded wheel identity and pinned Claude
+  `2.1.245` / Codex `0.149.1` pair. It completed all 163 selected steps with 542/551 assertions passing, 9/9 human
+  checkpoints completed, and 8/8 paid operations used. The saved verdict is correctly `fail`.
+- Duration disposition for this historical run: accept the 76,330-second measurement for review because it includes an
+  intentional overnight operator pause. It is not product-performance evidence, does not worsen the already-failed
+  verdict, and does not waive the duration review for the next complete run.
+- [x] Fix model-first route reporting. `session model show` now reads `requested_model` from the neutral
+  `intent.launch.model_route`; the intent-level `proxy_id` remains deliberately null because the exact proxy belongs to
+  confirmed route evidence.
+- [x] Replace the zero-turn Stop fixture with deterministic reuse of the paid parent conversation from 5.6. The retained
+  5.7 transcript contains a `where were we?` user turn and assistant response, so it was not evidence that an empty
+  launch must emit Stop. The replacement proves confirmed Stop ownership, source transcript presence, artifact copy, and
+  matching debug log without another completion.
+- [x] Correct the 11.9 scope mismatch. The failed run's bare sync targeted local scope while the assertion inspected
+  user scope; the later explicit user attempt exited nonzero. The corrected step syncs and inspects the same local
+  installation, and passes in the retained container.
+- [x] Correct proxy and extension-ownership fixtures. A configured-only proxy row is not an adopted process and may be
+  deleted without signalling a foreign listener; the automated adopted-identity guard remains authoritative. Rewind and
+  native-relocate worktrees now disable local extension ownership before their roots are removed, and runtime narrowing
+  uses a disposable project whose tracking row is removed before cleanup.
+- [x] Repair the thirteen checklist/harness defects from the report: executable fences, isolated interpreter/PATH and
+  credential fixtures, explicit launcher resolution, current session-summary timing, spend-cap rollback, stable reset
+  timing, valid session reuse, and uninstall expectations. Structural tests now require every automatic step to have a
+  runnable, syntactically valid Bash block.
+- Retained-container zero-cost reruns pass for 4.23, 5.21, 7.9, 11.9, and 18.4. The spend-cap rerun restored `qa-openai`
+  to `healthy`, and the disposable runtime project left neither its directory nor a tracking row.
+- The row-level extension `Mode` observation is not a physical-file claim: it records the latest requested install mode,
+  while individual file records retain copy/symlink ownership. Likewise, deleting a pre-seeded empty user settings file
+  loses no user setting. Neither observation is promoted to a product failure in this card.
+- [x] Build the follow-up wheel and run the focused automated owners. `make test-unit` passed with 9,968 tests and 117
+  deselected; `make test-regression` passed with 1,074 tests; the model-reporting and QA-skill focus passed with 262
+  tests; session-routing Docker integration passed with 2 tests; and the clean exact-wheel Docker gate passed with 1
+  test. `make build` and `make pre-commit` passed. The resulting wheel SHA-256 is
+  `7c0dd1c057e90fa2be0b561d336bd02b3f9a3449fe2ebe48308089e2529c2b47`.
+- [ ] Repeat the complete pinned blocking QA pass from that follow-up wheel. This remains distinct from the broader
+  unticked Phase 7 integration-owner sweep and the separately labelled `latest` compatibility pass.
 
 ## Acceptance Tests
 

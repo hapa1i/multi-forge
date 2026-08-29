@@ -104,12 +104,14 @@ Expected:
 
 <!-- paid-operations: 3 -->
 
+<!-- prereq: 5.6 -->
+
 Open one managed Claude session for the retained portable-skill smoke, invoke the panel skill, then exit.
 
 1. In the container shell, launch or resume the test session:
 
 ```
-forge session resume test-session-1
+forge session resume test-session-parent
 ```
 
 2. In Claude, invoke the panel skill:

@@ -111,8 +111,15 @@ unset ANTHROPIC_API_KEY
 <!-- auto -->
 
 ```bash
-# Check status for a specific profile
-forge auth status --profile work
+# Isolate profile resolution from provider keys injected into the QA container.
+env \
+  -u ANTHROPIC_API_KEY \
+  -u OPENROUTER_API_KEY \
+  -u OPENAI_API_KEY \
+  -u CODEX_API_KEY \
+  -u GEMINI_API_KEY \
+  -u LITELLM_API_KEY \
+  forge auth status --profile work
 ```
 
 - [ ] Shows `(file:work)` for keys stored in work profile
@@ -160,7 +167,7 @@ ls -la $FORGE_HOME/credentials.yaml
 # Expected: -rw------- (0o600)
 
 # Check file content structure without exposing secrets
-python3 -c "
+/opt/forge-qa/bin/python -c "
 import yaml, sys
 with open('$FORGE_HOME/credentials.yaml') as f:
     data = yaml.safe_load(f)

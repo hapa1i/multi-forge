@@ -202,53 +202,42 @@ echo "exit=$?"
 
 - [ ] Exit code is 0 (allowed)
 
-### 6.10 End-to-End Stop Hook (Real Session Exit)
+### 6.10 End-to-End Stop Hook (Paid Conversation Reuse)
 
-<!-- prereq: 4.2 -->
+<!-- prereq: 4.2, 5.6 -->
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-Start a real Claude session via the installed wheel, then exit without sending a prompt. This proves lifecycle hook
-wiring and transcript capture without adding a paid model completion; exhaustive synthetic hook payloads belong to the
-automated suite.
-
-In the **container shell**, clean up and start a session:
-
-```
-forge session delete hook-e2e-test --yes --force 2>/dev/null || true
-forge session start hook-e2e-test --proxy "$FORGE_QA_OPENAI_PROXY"
-```
-
-After the Claude UI appears, exit immediately with Ctrl+C or `/exit` without sending a prompt.
-
-After Claude exits, run these exact checks in the **container shell**:
+Reuse the parent conversation from 5.6, which already paid for one real turn and exited through the installed-wheel
+launcher. Anthropic's `Stop` event is a turn boundary, so an empty launch-and-exit is not a valid transcript-capture
+fixture. This step adds no model completion.
 
 ```bash
-MANIFEST=".forge/sessions/hook-e2e-test/forge.session.json"
+set -euo pipefail
 
-# Confirmed fields written by Stop hook
+MANIFEST=".forge/sessions/test-session-parent/forge.session.json"
+SESSION_ID=$(jq -r '.confirmed.claude_session_id // empty' "$MANIFEST")
+SESSION_ID_PREFIX=${SESSION_ID:0:12}
+TRANSCRIPT_PATH=$(jq -r '.confirmed.transcript_path // empty' "$MANIFEST")
+
 jq '.confirmed | {claude_session_id, transcript_path, confirmed_by, confirmed_at}' "$MANIFEST"
-
-# Programmatic manifest assertions
-jq -e '.confirmed.transcript_path | strings | length > 0' "$MANIFEST"
 jq -e '.confirmed.claude_session_id | strings | length > 0' "$MANIFEST"
+jq -e '.confirmed.transcript_path | strings | length > 0' "$MANIFEST"
 jq -e '.confirmed.confirmed_by == "hook:stop"' "$MANIFEST"
-
-# Transcript artifact copied
-test -d .forge/artifacts/hook-e2e-test/transcripts
-find .forge/artifacts/hook-e2e-test/transcripts -type f -name '*.jsonl' -print -quit | grep -q .
-
-# Stop hook log exists
-ls ~/.forge/logs/hooks/stop.*.log | tail -1
+test -s "$TRANSCRIPT_PATH"
+test -s ".forge/artifacts/test-session-parent/transcripts/${SESSION_ID}.jsonl"
+STOP_LOG=$(rg -F -l "stop: session_id=$SESSION_ID_PREFIX" ~/.forge/logs/hooks/stop.*.log 2>/dev/null | tail -1 || true)
+test -n "$STOP_LOG" || { echo "ERROR: no matching Stop-hook log" >&2; exit 1; }
+printf '%s\n' "$STOP_LOG"
 ```
 
-- [ ] Claude session starts from the wheel environment with hooks active; no model prompt is sent
-- [ ] After exit, `confirmed.transcript_path` is set in session manifest
-- [ ] After exit, `confirmed.claude_session_id` is set (reconciled from actual session)
-- [ ] Transcript artifact copied to `.forge/artifacts/hook-e2e-test/transcripts/`
-- [ ] Stop hook ran automatically (check `confirmed_by` = "hook:stop")
+- [ ] The paid parent from 5.6 has a real confirmed Claude session id
+- [ ] Its confirmed transcript path exists and is non-empty
+- [ ] `confirmed_by` is `hook:stop`
+- [ ] The transcript snapshot exists under `.forge/artifacts/test-session-parent/transcripts/`
+- [ ] A matching Stop-hook debug log exists
 
 ### 6.11 WorktreeCreate Hook (Claude-Native Worktree)
 

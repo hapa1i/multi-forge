@@ -19,7 +19,7 @@
     "max_human_checkpoints": 12,
     "max_paid_operations": 8,
     "duration_review_seconds": 2700,
-    "final_selected_human_checkpoints": 9,
+    "final_selected_human_checkpoints": 8,
     "final_selected_paid_operations": 8
   },
   "counting_contract": {
@@ -1841,8 +1841,8 @@
       "may_call_paid_model": true,
       "proposed_outcome": "keep",
       "target_section": "6",
-      "target_execution_class": "human:guided",
-      "evidence_lane": "human-acceptance",
+      "target_execution_class": "auto",
+      "evidence_lane": "clean-wheel-smoke",
       "proposed_paid_operations": 0,
       "merged_into": null,
       "automated_owners": []

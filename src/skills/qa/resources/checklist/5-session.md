@@ -601,6 +601,10 @@ cd $FORGE_TEST_REPO
 # Clean up from previous runs
 forge session delete nr-into-parent --yes --force 2>/dev/null || true
 NR_WT="${FORGE_TEST_REPO}-nr-into-target"
+if [ -d "$NR_WT" ]; then
+  (cd "$NR_WT" && forge extension disable --scope local --yes) \
+    || { echo "ERROR: could not remove stale local extension ownership" >&2; exit 1; }
+fi
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
 
@@ -616,7 +620,7 @@ jq --arg cwd "$NR_WT" \
   "$PJSON" > /tmp/nri.json && mv /tmp/nri.json "$PJSON"
 
 # Create the exact transcript file the CLI preflight checks (encoding-agnostic via the real helper).
-TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))")
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"type":"thinking","signature":"x"}' > "$TP"
 
@@ -626,7 +630,9 @@ forge session fork nr-into-parent --into "$NR_WT" --resume-mode native-relocate 
 # The parent's original transcript must be untouched.
 test -f "$TP" && echo "PARENT_TRANSCRIPT_PRESERVED=true" || echo "PARENT_TRANSCRIPT_PRESERVED=false"
 
-# Clean up
+# Clean up extension ownership before removing its root.
+(cd "$NR_WT" && forge extension disable --scope local --yes) \
+  || { echo "ERROR: could not remove local extension ownership" >&2; exit 1; }
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
 forge session delete nr-into-parent --yes --force 2>/dev/null || true
@@ -648,24 +654,47 @@ The launcher reads the same durable usage ledger as `forge telemetry activity`. 
 the no-op Claude fixture to exercise the exit renderer without a model completion.
 
 ```bash
+set -euo pipefail
+
+cleanup_session_end_fixture() {
+  forge session delete test-session-end --yes --force >/dev/null 2>&1 || true
+  rm -f "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl" /tmp/qa-session-end.out
+}
+trap cleanup_session_end_fixture EXIT
+
 forge session delete test-session-end --yes --force 2>/dev/null || true
+SESSION_END_BIN=/tmp/forge-qa-session-end-bin
+mkdir -p "$SESSION_END_BIN"
+cat > "$SESSION_END_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  echo "2.1.245 (Forge QA fixture)"
+  exit 0
+fi
 mkdir -p "$FORGE_HOME/usage/events"
-cat > "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl" <<'EOF'
-{"schema_version":1,"run_id":"qa-session-end-run","root_run_id":"qa-session-end-run","runtime":"claude_code","command":"supervisor","status":"error","session":"test-session-end","attribution_granularity":"verb","cost_micro_usd":40000,"ts":"2026-08-25T00:00:00Z"}
+# The launcher lower-bound has subsecond precision; cross the next second before
+# writing a whole-second fixture timestamp so it is unambiguously in-run.
+sleep 1
+TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+printf '%s\n' \
+  "{\"schema_version\":1,\"run_id\":\"qa-session-end-run\",\"root_run_id\":\"qa-session-end-run\",\"runtime\":\"claude_code\",\"command\":\"supervisor\",\"status\":\"error\",\"session\":\"test-session-end\",\"attribution_granularity\":\"verb\",\"confidence\":\"reported\",\"cost_micro_usd\":40000,\"ts\":\"$TS\"}" \
+  > "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl"
+exit 0
 EOF
-PATH="/tmp/forge-qa-noop-bin:$PATH" forge session start test-session-end \
+chmod +x "$SESSION_END_BIN/claude"
+PATH="$SESSION_END_BIN:$PATH" forge session start test-session-end \
   --proxy "$FORGE_QA_OPENAI_PROXY" 2>&1 | tee /tmp/qa-session-end.out
-rg 'Forge this session.*errors.*~\$0\.04' /tmp/qa-session-end.out
+rg 'Forge this session.*failing open: 1 error.*\$0\.04' /tmp/qa-session-end.out
 
 forge telemetry activity test-session-end
 
 # Clean up
-forge session delete test-session-end --yes --force 2>/dev/null || true
-rm -f "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl" /tmp/qa-session-end.out
+cleanup_session_end_fixture
+trap - EXIT
 ```
 
 - [ ] The launcher prints a `Forge this session` summary before the reconnect tip
-- [ ] The line reports the seeded error and `~$0.04` best-effort cost with no ` est` suffix
+- [ ] The line reports `failing open: 1 error` and exact reported cost `$0.04` without an estimate marker
 - [ ] `forge telemetry activity test-session-end` reports the same session activity
 - [ ] Fixture event, output, and session are removed
 
@@ -690,7 +719,7 @@ forge session start sd-xfer-parent --no-launch
 
 # Seed a parent transcript so transfer has content to assemble (same dir = project root).
 PJSON=".forge/sessions/sd-xfer-parent/forge.session.json"
-TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))")
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"requestId":"r1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"hello from sd parent"}]}}' > "$TP"
 jq --arg tp "$TP" '.confirmed.transcript_path = $tp | .confirmed.claude_session_id = "fixture-sd-xfer"' \
@@ -807,7 +836,7 @@ forge session delete qa-codex-parent qa-codex-initial --yes --force 2>/dev/null 
 forge session start qa-codex-parent --no-launch
 
 CODEX_PARENT_UUID=11111111-2222-4333-8444-555566667777
-CODEX_PARENT_TRANSCRIPT=$(python3 -c \
+CODEX_PARENT_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
   "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$CODEX_PARENT_UUID'))")
 mkdir -p "$(dirname "$CODEX_PARENT_TRANSCRIPT")"
 cat > "$CODEX_PARENT_TRANSCRIPT" <<'EOF'
@@ -930,7 +959,7 @@ cd "$FORGE_TEST_REPO"
 forge session delete qa-adopted qa-adopt-ambiguous qa-repair --yes --force 2>/dev/null || true
 
 NATIVE_UUID=22222222-3333-4444-8555-666677778888
-NATIVE_TRANSCRIPT=$(python3 -c \
+NATIVE_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
   "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$NATIVE_UUID'))")
 mkdir -p "$(dirname "$NATIVE_TRANSCRIPT")"
 printf '%s\n' \
@@ -948,7 +977,7 @@ jq -e --arg id "$NATIVE_UUID" '
 test -f "$NATIVE_TRANSCRIPT"
 
 AMBIGUOUS_UUID=33333333-4444-4555-8666-777788889999
-AMBIGUOUS_TRANSCRIPT=$(python3 -c \
+AMBIGUOUS_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
   "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$AMBIGUOUS_UUID'))")
 mkdir -p "$(dirname "$AMBIGUOUS_TRANSCRIPT")" "$CODEX_HOME/sessions/2026/08/26"
 printf '%s\n' "{\"type\":\"user\",\"cwd\":\"$FORGE_TEST_REPO\",\"message\":{\"content\":\"ambiguous\"}}" \
@@ -969,7 +998,7 @@ rm -f "$AMBIGUOUS_TRANSCRIPT" "$AMBIGUOUS_ROLLOUT" \
   /tmp/qa-adopt-ambiguous.stdout /tmp/qa-adopt-ambiguous.stderr
 
 forge session start qa-repair --no-launch
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 from forge.session import IndexStore
 from forge.session.identity import make_scoped_key
 

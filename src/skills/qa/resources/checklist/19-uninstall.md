@@ -12,15 +12,18 @@ verification. Package-manager removal is outside the container's extension-owner
 <!-- destructive -->
 
 ```bash
+set -euo pipefail
+
 # Verify user, local, and project installations
 cat ~/.forge/installed.json | jq '.installations | keys'
 # Should include: user, local:$FORGE_TEST_REPO, project:$FORGE_TEST_REPO
 
 # Verify artifacts exist
 ls ~/.forge/             # Should exist
-test "$(command -v forge)" = /opt/forge-qa/bin/forge
-ls ~/.claude/commands/   # Should have Forge commands
-ls .claude/commands/     # Should have Forge commands (local)
+test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
+  || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
+test -f ~/.claude/skills/qa/SKILL.md
+jq -e '.hooks != null and .statusLine != null' .claude/settings.local.json
 ls .agents/skills/       # Should have nine portable Codex project skills
 ```
 
@@ -116,7 +119,8 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 <!-- destructive -->
 
 ```bash
-test "$(command -v forge)" = /opt/forge-qa/bin/forge
+test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
+  || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
 test "$(forge --version | awk '{print $NF}')" = "$FORGE_QA_FORGE_VERSION"
 /opt/forge-qa/bin/python -I - <<'PY'
 import importlib.metadata as metadata

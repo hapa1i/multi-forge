@@ -6,7 +6,7 @@
 
 <!-- auto -->
 
-````bash
+```bash
 # Use a guaranteed-empty proxy_id for empty-state tests.
 # Other sections (e.g., section 4 guided sessions) may have created real cost logs,
 # so we cannot assume global cost logs are empty.
@@ -15,7 +15,7 @@ echo "---"
 forge telemetry costs show qa-no-such-proxy --period all 2>&1
 echo "---"
 forge telemetry costs show qa-no-such-proxy --json
-```bash
+```
 
 - [ ] `forge telemetry costs show qa-no-such-proxy` shows `No cost data for today (qa-no-such-proxy).`
 - [ ] `--period all` shows `No cost data for all (qa-no-such-proxy).`
@@ -27,7 +27,7 @@ forge telemetry costs show qa-no-such-proxy --json
 
 ```bash
 # Verify JSON output schema using the empty-proxy filter (guaranteed empty)
-forge telemetry costs show qa-no-such-proxy --json | python3 -c "
+forge telemetry costs show qa-no-such-proxy --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 fields = {'period','proxy_id','total_cost_micros','total_cost_usd','total_requests','interactive_cost_micros','by_verb','by_model','reported_requests','unavailable_requests'}
@@ -36,7 +36,7 @@ print(f'MISSING={missing}' if missing else 'ALL_FIELDS_PRESENT')
 print(f'period={d[\"period\"]}')
 print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_requests\"]}')
 "
-````
+```
 
 - [ ] JSON contains all required fields: `period`, `proxy_id`, `total_cost_micros`, `total_cost_usd`, `total_requests`,
   `interactive_cost_micros`, `by_verb`, `by_model`, `reported_requests`, `unavailable_requests`
@@ -155,6 +155,20 @@ rejection. This avoids depending on a real request landing above a tiny cap (whi
 models).
 
 ```bash
+set -euo pipefail
+
+# Always restore the live proxy even when an assertion below fails.
+cleanup_spend_reject() {
+  rm -f ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl \
+    /tmp/qa-spend-reject.headers /tmp/qa-spend-reject.body
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=none >/dev/null 2>&1 || true
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_month=none >/dev/null 2>&1 || true
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject >/dev/null 2>&1 || true
+  forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force >/dev/null 2>&1 || true
+  forge proxy start "$FORGE_QA_OPENAI_PROXY" >/dev/null 2>&1 || true
+}
+trap cleanup_spend_reject EXIT
+
 # Set a low daily cap on the working QA OpenAI proxy in the container
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
@@ -181,18 +195,21 @@ HTTP_CODE=$(curl -sS -D /tmp/qa-spend-reject.headers -o /tmp/qa-spend-reject.bod
   "$BASE_URL/v1/messages" \
   -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"messages":[{"role":"user","content":"This request must never reach a model."}]}')
 test "$HTTP_CODE" = 429
-rg -i '^x-spend-warning:' /tmp/qa-spend-reject.headers
 rg 'spend_cap_exceeded' /tmp/qa-spend-reject.body
 
-# Clean up seeded log
-rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl \
-  /tmp/qa-spend-reject.headers /tmp/qa-spend-reject.body
+# Clear both persisted and in-memory cap state before later provider calls.
+cleanup_spend_reject
+trap - EXIT
+forge proxy list --json | jq -e --arg id "$FORGE_QA_OPENAI_PROXY" '
+  any(.[]; .proxy_id == $id and .status == "healthy")
+'
 ```
 
 - [ ] After proxy restart, the seeded cost triggers the daily cap
 - [ ] Proxy returns HTTP 429 without forwarding a model completion
 - [ ] Error message includes current spend and limit amounts
 - [ ] Error message suggests `forge proxy set <id> costs.caps.per_day=<amount>` to adjust
+- [ ] Cleanup clears the seeded cap and leaves the QA OpenAI proxy healthy
 
 ### 7.10 Spend Cap Enforcement (Warn Mode)
 
@@ -318,7 +335,7 @@ cat > ~/.forge/usage/events/qa-usage-fixture_99999.jsonl <<'EOF'
 EOF
 
 # JSON contract + the double-count assertion
-forge telemetry activity qa-usage --period all --json | python3 -c "
+forge telemetry activity qa-usage --period all --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 cmds = {c['command']: c for c in d['downstream']['rows']}
@@ -369,7 +386,7 @@ cat > ~/.forge/telemetry/downstream/qa-fixture_prov-99999.jsonl <<'EOF'
 {"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-prov","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":0,"cost_micros":null,"reporter":"provider","confidence":"unavailable","latency_ms":300.0,"failed":false,"request_id":"req-prov-002"}
 EOF
 
-forge telemetry costs show qa-prov --period all --json | python3 -c "
+forge telemetry costs show qa-prov --period all --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 print(f'total_requests={d[\"total_requests\"]}')

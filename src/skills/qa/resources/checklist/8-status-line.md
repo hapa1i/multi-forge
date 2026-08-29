@@ -198,8 +198,8 @@ echo "$SUBSET" | FORGE_SESSION=test-session-1 ANTHROPIC_BASE_URL="$BASE_URL" for
 
 # Billing-aware cost (DIRECT mode — no proxy, so cost_mode applies; under a proxy the cost is always ~$).
 forge config reset statusline
-# Weekly window resets ~2 days out so the ↻ reset marker is exercised.
-RESET_AT=$(( $(date +%s) + 172800 ))
+# Set just under three days so elapsed execution time still renders a stable `2d` floor.
+RESET_AT=$(( $(date +%s) + 259200 ))
 COSTY=$(jq -nc --arg cwd "$FORGE_TEST_REPO" --argjson reset "$RESET_AT" \
   '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"},
     context_window:{context_window_size:200000, used_percentage:6, current_usage:{input_tokens:8500}},

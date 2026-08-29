@@ -8,7 +8,7 @@ This verifies the exact wheel installed by the release-QA harness before any For
 
 ```bash
 # Check you have the required tools
-python3 --version   # Need 3.11+
+/opt/forge-qa/bin/python --version   # Need 3.11+
 uv --version        # Need uv package manager
 git --version       # Need git
 ```
@@ -22,11 +22,14 @@ git --version       # Need git
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Runtime preflight may create a cache, but no extension/proxy ownership may predate the run.
 test ! -f "$FORGE_HOME/installed.json"
 test ! -d "$FORGE_HOME/proxies"
 which forge                # Must be the isolated release-wheel entry point
-test "$(command -v forge)" = /opt/forge-qa/bin/forge
+test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
+  || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
 test ! -d "$HOME/.agents/skills" || test -z "$(find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -print -quit)"
 
 # Check Claude settings have no Forge hooks
@@ -35,7 +38,7 @@ cat ~/.claude/settings.local.json | jq '.hooks' 2>/dev/null || true
 ```
 
 - [ ] `$FORGE_HOME` has no pre-existing extension tracking or proxy state
-- [ ] `forge` resolves to `/opt/forge-qa/bin/forge`
+- [ ] `forge` resolves through the container launcher to `/opt/forge-qa/bin/forge`
 - [ ] `$HOME/.agents/skills` has no pre-existing Codex skill packages
 - [ ] No Forge hooks in user or project-local Claude settings
 

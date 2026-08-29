@@ -615,43 +615,54 @@ forge proxy delete retention-degraded-qa --yes
 - [ ] Runtime truth reports top-level `status: degraded` and names `retention-degraded-qa` in the nested conflicts
 - [ ] The disposable degraded proxy stops and deletes cleanly
 
-### 4.23 Stop Failure Retains Proxy Ownership
+### 4.23 Configured Row Does Not Claim a Foreign Listener
 
 <!-- prereq: 4.2 -->
 
 <!-- auto -->
 
-Use a foreign HTTP listener to force the adopted-process identity guard. The failed required stop must leave every
-recovery surface intact.
+Put a configured-only proxy row on a port already held by a foreign HTTP listener. Because the row was never adopted,
+`--kill-adopted` must remove only Forge's configuration and must not signal the foreign process. The true adopted-PID
+identity-mismatch matrix remains owned by `tests/src/cli/test_proxy_commands.py`.
 
 ```bash
+set -euo pipefail
+
 forge proxy delete ownership-failure-qa --yes --no-kill 2>/dev/null || true
-python3 -m http.server 18201 >/tmp/forge-ownership-failure.log 2>&1 &
+/opt/forge-qa/bin/python -m http.server 18201 >/tmp/forge-ownership-failure.log 2>&1 &
 FOREIGN_PID=$!
+cleanup_foreign_listener() {
+  kill "$FOREIGN_PID" 2>/dev/null || true
+  forge proxy delete ownership-failure-qa --yes --no-kill >/dev/null 2>&1 || true
+}
+trap cleanup_foreign_listener EXIT
 for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:18201/ >/dev/null && break; sleep 0.1; done
 curl --fail --silent http://127.0.0.1:18201/ >/dev/null
 forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name ownership-failure-qa --port 18201 --no-start
+forge proxy list --json | jq -e '
+  any(.[]; .proxy_id == "ownership-failure-qa" and .status == "configured" and .pid == null)
+'
 
-set +e
 forge proxy delete ownership-failure-qa --yes --kill-adopted \
   >/tmp/forge-ownership-delete.stdout 2>/tmp/forge-ownership-delete.stderr
 DELETE_EXIT=$?
-set -e
 
-test "$DELETE_EXIT" -ne 0
-grep "refusing to stop" /tmp/forge-ownership-delete.stderr
-! grep "Deleted" /tmp/forge-ownership-delete.stdout
+test "$DELETE_EXIT" -eq 0
+grep "Deleted" /tmp/forge-ownership-delete.stdout
 kill -0 "$FOREIGN_PID"
-forge proxy show ownership-failure-qa --raw
+if forge proxy show ownership-failure-qa --raw >/tmp/forge-ownership-show.stdout 2>/tmp/forge-ownership-show.stderr; then
+  echo "ERROR: configured row survived delete" >&2
+  exit 1
+fi
 
 kill "$FOREIGN_PID"
-forge proxy delete ownership-failure-qa --yes --no-kill
+trap - EXIT
 ```
 
-- [ ] The identity-refused delete exits non-zero
-- [ ] The diagnostic is on stderr and stdout does not claim `Deleted`
-- [ ] The foreign listener remains alive after the refused stop
-- [ ] The retained proxy remains readable and can be deleted after the listener stops
+- [ ] Before deletion, the proxy is explicitly `configured` with no adopted PID
+- [ ] `--kill-adopted` exits zero and reports the configured row deleted
+- [ ] The foreign listener remains alive because Forge never claimed it
+- [ ] The proxy row is absent after deletion
 
 ### 4.24 Create Smoke Failure Is One JSON Result
 

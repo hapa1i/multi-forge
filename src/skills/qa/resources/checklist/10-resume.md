@@ -206,10 +206,16 @@ Use a no-op Claude launcher so valid resume/fork forms cross the installed CLI a
 without a model call. A separate plain-text transcript keeps rewind from invoking code-delta curation.
 
 ```bash
+set -euo pipefail
+
 cd "$FORGE_TEST_REPO"
+REWIND_WT="${FORGE_TEST_REPO}-qa-rewind-fork"
+if [ -d "$REWIND_WT" ]; then
+  (cd "$REWIND_WT" && forge extension disable --scope local --yes)
+fi
 forge session delete qa-rewind-parent qa-rewind-resume qa-rewind-fork qa-depth-parent qa-depth-all \
   --yes --force 2>/dev/null || true
-git worktree remove "${FORGE_TEST_REPO}-qa-rewind-fork" --force 2>/dev/null || true
+git worktree remove "$REWIND_WT" --force 2>/dev/null || true
 git branch -D qa-rewind-fork 2>/dev/null || true
 
 mkdir -p /tmp/forge-qa-rewind-bin
@@ -222,7 +228,7 @@ chmod +x /tmp/forge-qa-rewind-bin/claude
 
 forge session start qa-rewind-parent --no-launch
 REWIND_UUID=44444444-5555-4666-8777-888899990000
-REWIND_TRANSCRIPT=$(python3 -c \
+REWIND_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
   "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$REWIND_UUID'))")
 mkdir -p "$(dirname "$REWIND_TRANSCRIPT")"
 cat > "$REWIND_TRANSCRIPT" <<'EOF'
@@ -258,7 +264,7 @@ jq -e '
 
 forge session fork test-session-1 --name qa-depth-parent --resume-mode transfer --no-launch
 DEPTH_PARENT_UUID=55555555-6666-4777-8888-999900001111
-DEPTH_PARENT_TRANSCRIPT=$(python3 -c \
+DEPTH_PARENT_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
   "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$DEPTH_PARENT_UUID'))")
 mkdir -p "$(dirname "$DEPTH_PARENT_TRANSCRIPT")"
 cat > "$DEPTH_PARENT_TRANSCRIPT" <<'EOF'
@@ -289,6 +295,9 @@ test "$REWIND_RC" -ne 0
 rg -- '--depth requires --fresh' /tmp/qa-depth-invalid.out
 rg -- '--strategy rewind requires --fresh' /tmp/qa-rewind-invalid.out
 
+if [ -d "$REWIND_WT" ]; then
+  (cd "$REWIND_WT" && forge extension disable --scope local --yes)
+fi
 forge session delete qa-rewind-fork --yes --force
 test ! -e "${FORGE_TEST_REPO}-qa-rewind-fork"
 rm -f /tmp/qa-depth-invalid.out /tmp/qa-rewind-invalid.out

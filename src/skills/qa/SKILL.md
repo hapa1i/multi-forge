@@ -608,12 +608,12 @@ For each section/step in the filtered range:
 
 11. **Gate rules** -- check after each section completes:
 
-    | If section fails... | Then...                                                                    |
-    | ------------------- | -------------------------------------------------------------------------- |
-    | 0 (Artifact)        | Stop feature execution. Artifact provenance is broken.                     |
-    | 2 (Extensions)      | Skip Section 3 (can't verify auth without ext).                            |
-    | 4 (Proxy)           | Skip Sections 7, 14-16 (no proxy for costs/workflow/skills/memory-writer). |
-    | Any section         | Continue to artifact save. Run section 20 only when it is selected.        |
+    | If section fails... | Then...                                                                                                                                  |
+    | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+    | 0 (Artifact)        | Stop feature execution. Artifact provenance is broken.                                                                                   |
+    | 2 (Extensions)      | Skip Section 3 (can't verify auth without ext).                                                                                          |
+    | 4.2 (Proxy setup)   | Let prerequisite checks skip only selected steps that require 4.2; unrelated section-4 failures do not prove every proxy is unavailable. |
+    | Any section         | Continue to artifact save. Run section 20 only when it is selected.                                                                      |
 
 12. **Context conservation**: After completing each `## N.` section, print a one-line summary using the progress numbers
     from the last `record` output. Do NOT carry raw command output forward -- the state file and logs inside the
