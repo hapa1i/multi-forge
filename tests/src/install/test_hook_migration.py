@@ -205,7 +205,10 @@ def test_cleanup_v1_preview_is_read_only_then_apply_writes_current(
     settings.write_text(json.dumps({"hooks": {"SessionStart": [entry]}}), encoding="utf-8")
     installation = asdict(_installation(root, entry))
     installation.pop("skill_packages")
-    installation["modules_enabled"] = [InstallModule.HOOKS.value, InstallModule.STATUSLINE.value]
+    installation["modules_enabled"] = [
+        InstallModule.HOOKS.value,
+        InstallModule.STATUSLINE.value,
+    ]
     installation.pop("module_owners")
     for settings_entry in installation["settings_entries"]:
         settings_entry.pop("attribution")
@@ -357,7 +360,9 @@ def test_duplicate_user_dispatcher_blocks_before_selected_root_cleanup(
 
     plan = plan_project_hook_migration(root)
 
-    assert any("registered more than once" in blocker for blocker in plan.blockers)
+    duplicate = next(blocker for blocker in plan.blockers if "registered more than once" in blocker)
+    assert duplicate.count(str(user_settings)) == 1
+    assert " and " not in duplicate
     with pytest.raises(HookMigrationError, match="migration is blocked"):
         apply_project_hook_migration(root)
     assert read_settings(project_settings)["hooks"]["SessionStart"] == [entry]

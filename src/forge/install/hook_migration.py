@@ -536,7 +536,9 @@ def _logical_hook_registrations(
     return registrations
 
 
-def _duplicate_user_hook_issues(plans: tuple[SettingsCleanupPlan, ...]) -> tuple[str, ...]:
+def _duplicate_user_hook_issues(
+    plans: tuple[SettingsCleanupPlan, ...],
+) -> tuple[str, ...]:
     seen: dict[tuple[str, str | None, str], Path] = {}
     issues: list[str] = []
     for key, path in (registration for plan in plans for registration in _logical_hook_registrations(plan)):
@@ -546,7 +548,10 @@ def _duplicate_user_hook_issues(plans: tuple[SettingsCleanupPlan, ...]) -> tuple
             continue
         event, matcher, handler = key
         trigger = f"{event}/{matcher or '*'} -> {handler}"
-        issues.append(f"user hook trigger {trigger} is registered more than once in '{first}' and '{path}'")
+        if first == path:
+            issues.append(f"user hook trigger {trigger} is registered more than once in '{path}'")
+        else:
+            issues.append(f"user hook trigger {trigger} is registered in both '{first}' and '{path}'")
     return tuple(issues)
 
 
@@ -975,7 +980,7 @@ def apply_project_hook_migration(
         backup_paths=tuple(dict.fromkeys(backups)),
         enrolled=True,
         enrollment_created=enrollment.created,
-        user_codex_action=plan.user.codex.action if plan.user.codex is not None else None,
+        user_codex_action=(plan.user.codex.action if plan.user.codex is not None else None),
     )
 
 
