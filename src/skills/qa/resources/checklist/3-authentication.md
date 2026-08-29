@@ -162,6 +162,8 @@ forge auth profiles
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Check file permissions
 ls -la $FORGE_HOME/credentials.yaml
 # Expected: -rw------- (0o600)

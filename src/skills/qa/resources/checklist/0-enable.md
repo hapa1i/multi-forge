@@ -101,9 +101,10 @@ forge --version
 forge extension enable --help | rg -- '--runtime'
 
 # Print the immutable inputs that must appear in the report
-printf 'wheel=%s\nsha256=%s\nversion=%s\nmode=%s\ntrack=%s\n' \
+printf 'wheel=%s\nsha256=%s\ndriver_sha256=%s\nversion=%s\nmode=%s\ntrack=%s\n' \
   "$FORGE_QA_WHEEL_FILENAME" \
   "$FORGE_QA_WHEEL_SHA256" \
+  "$FORGE_QA_DRIVER_SHA256" \
   "$FORGE_QA_FORGE_VERSION" \
   "$FORGE_QA_ARTIFACT_MODE" \
   "$FORGE_QA_RUNTIME_TRACK"
@@ -112,6 +113,7 @@ printf 'wheel=%s\nsha256=%s\nversion=%s\nmode=%s\ntrack=%s\n' \
 - [ ] `forge` command is the isolated wheel entry point on `PATH`
 - [ ] `forge --version` matches the recorded wheel version
 - [ ] Extension help documents repeatable `--runtime` selection (`claude`, `codex`, or `all`)
-- [ ] Wheel filename, SHA-256, artifact mode, and runtime track are printable for the report
+- [ ] Wheel filename, wheel and matching QA-driver SHA-256 values, artifact mode, and runtime track are printable for
+  the report
 
 ---

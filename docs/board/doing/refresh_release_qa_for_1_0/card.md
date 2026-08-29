@@ -61,9 +61,9 @@ The refresh must resolve at least these verified inconsistencies before adding c
 2. **Four evidence lanes.** Classify each retained contract as `automated-suite`, `clean-wheel-smoke`,
    `human-acceptance`, or `extended-exploratory`. A feature is represented when its release owner is explicit; it does
    not need another manual checklist matrix.
-3. **Exact artifact first.** Build once, install that exact wheel into an isolated environment that cannot import the
-   checkout, and record its version and digest. Source-container QA remains useful for development but cannot be the
-   distribution gate.
+3. **Exact artifact first.** Build once, require the invoking host QA package to match that wheel, install the exact
+   wheel into an isolated environment that cannot import the checkout, and record wheel and driver digests.
+   Source-container QA remains useful for development but cannot be the distribution gate.
 4. **Bound deterministic work.** Hard-cap the blocking lane at 12 included human checkpoints and 8 paid model
    completions. Count each worker/round, prompted managed-session turn, enrollment probe turn, and AI-curation call
    separately; exclude the Claude-hosted checklist driver and report it separately. Record end-to-end duration, with 45
@@ -207,7 +207,7 @@ inspect a file or JSON record that the CLI can validate directly.
 | Checklist metadata truth         | all QA section fragments                                         | parsed assertion total equals the index count; every step has one supported execution class  | `tests/src/skills/test_qa_checklist_contract.py` (new)                                             |
 | State-script parity              | QA and walkthrough packaged copies                               | only the two approved identity lines differ; both execute the full behavior matrix           | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`  |
 | Runtime matrix                   | repository matrix plus runtime preflight fixtures                | both pins have release-baseline evidence; Codex meets its proxy floor and validated ceiling  | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/core/runtime/test_codex_preflight.py` |
-| Exact wheel isolation            | prebuilt RC wheel, checkout also present                         | imported Forge and extension resources resolve from the wheel environment, never `/forge`    | `tests/integration/docker/test_qa_release_artifact.py` (new)                                       |
+| Exact wheel isolation            | prebuilt RC wheel, host QA driver, checkout also present         | driver matches the wheel; imports and resources resolve from the wheel, never `/forge`       | `tests/integration/docker/test_qa_release_artifact.py` (new)                                       |
 | Managed Claude hook              | clean-wheel project and real Claude                              | session confirmation and transcript artifact are written by real lifecycle hooks             | `tests/integration/docker/test_real_claude_hooks.py`                                               |
 | Managed Codex turn               | authenticated Codex and clean Forge project                      | preflight passes; default initial-message start/resume records the thread                    | `tests/integration/core/test_codex_session_start.py`                                               |
 | Codex hook delivery              | enrolled real runtime plus staged receipt                        | real hook firing and staged delivery pass positively; recovery output is not a pass          | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py` |

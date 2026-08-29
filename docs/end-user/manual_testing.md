@@ -103,8 +103,15 @@ a product failure solely because of duration.
 Release sign-off requires an explicit prebuilt wheel on the repository-pinned Claude/Codex runtime track. Omitting
 `--wheel` still exercises one exact locally built wheel, but its verdict is development-only. `latest`, category/range,
 missing blocking evidence, and pending duration-review runs cannot report a release pass. Run artifacts record the wheel
-path/version/SHA-256, observed runtime versions, provider profile, selection, counts, verdict, state, logs, and
-transcript claim under `~/.forge/manual-testing/qa/runs/`.
+path/version/SHA-256, matching host QA-driver SHA-256, observed runtime versions, provider profile, selection, counts,
+verdict, state, logs, and transcript claim under `~/.forge/manual-testing/qa/runs/`.
+
+The installed `/forge:qa` driver must match the QA package inside the selected wheel. A mismatch stops before Docker
+mutation instead of letting an older checklist produce evidence for a newer artifact. Run the selected wheel's
+`forge extension sync --scope <owning-scope> --force`, then restart Claude Code so it reloads the synchronized skill
+before starting a fresh QA run. If a legacy local tracking row makes sync reject Codex's unsupported local scope,
+re-enable only the Claude assets with
+`forge extension enable --scope local --runtime claude --profile full --copy --force` instead.
 
 Only runs started with an explicit prebuilt `--wheel` can resume the same container. Development runs are
 single-invocation; start over with `--reset` if their container is still running. Their wheels remain under

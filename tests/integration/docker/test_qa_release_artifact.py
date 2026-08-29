@@ -6,6 +6,7 @@ import hashlib
 import json
 import shlex
 import subprocess
+import sys
 import uuid
 import zipfile
 from email.parser import Parser
@@ -17,6 +18,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.qa"
+QA_SKILL_ROOT = REPO_ROOT / "src" / "skills" / "qa"
 
 
 def _wheel_version(wheel: Path) -> str:
@@ -41,6 +43,27 @@ def test_release_image_imports_only_the_exact_wheel(tmp_path: Path, forge_test_i
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     version = _wheel_version(wheel)
     image = f"forge-qa-artifact-test:{uuid.uuid4().hex[:12]}"
+
+    driver_probe = subprocess.run(
+        [
+            sys.executable,
+            str(QA_SKILL_ROOT / "scripts" / "qa-artifact.py"),
+            "--wheel",
+            str(wheel),
+            "--matrix",
+            str(QA_SKILL_ROOT / "resources" / "runtime-matrix.json"),
+            "--skill-root",
+            str(QA_SKILL_ROOT),
+            "--runtime-track",
+            "pinned",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert driver_probe.returncode == 0, driver_probe.stderr
+    driver_identity = json.loads(driver_probe.stdout)
+    assert len(driver_identity["qa_driver_sha256"]) == 64
 
     build = subprocess.run(
         [

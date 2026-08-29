@@ -11,11 +11,11 @@ creation happened in the same decision.
 
 ## Current Focus
 
-The first complete pinned run preserved wheel and runtime identity but failed 9 of 551 assertions. Follow-up fixes now
-leave the default blocking selection at 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations. One
-failure was a product defect in model-first route reporting; the remaining failures came from invalid fixtures,
-scope/ownership mismatches, or cleanup order in the QA checklist. Focused checklist contracts and corrected zero-cost
-steps pass against the retained run container.
+The next partial pinned attempt selected the follow-up wheel but ran a stale host-installed QA package: its saved
+selection has 551 assertions and 9 human checkpoints, while that wheel's package has 552 and 8. It is invalid as release
+evidence. The harness now rejects host-driver/wheel drift before Docker mutation and records the matching driver digest.
+That attempt also exposed one independent product defect in the session-delete preview, now covered by a regression
+test. The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations.
 
 Phase 7 still needs the broad named integration-owner run, a clean human-driven pinned release-candidate QA rerun, and
 the separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; the
@@ -125,8 +125,9 @@ integration owners must run against observed Codex CLI `0.149.1` before that pin
 ## Phase 2 -- Make the Exact Wheel the QA Subject
 
 - [x] Implement one build-or-consume artifact preparation path owned by the QA harness. **Assertion**: it resolves one
-  wheel, verifies the filename/version metadata, computes SHA-256 once, and passes immutable identity into image and
-  container startup; rebuild/reuse never silently selects another artifact.
+  wheel, verifies the filename/version metadata and the invoking QA package against that wheel, computes wheel and
+  driver SHA-256 values once, and passes immutable identity into image and container startup; rebuild/reuse never
+  silently selects another artifact or host checklist.
 - [x] Install the wheel and its resolved dependencies into a clean environment outside `/forge`. **Assertion**:
   `command -v forge`, `forge --version`, `import forge`, distribution metadata, and `importlib.resources` all resolve
   from the wheel environment while the working directory is `/workspace` and the checkout is absent from `sys.path`.
@@ -369,6 +370,40 @@ integration owners must run against observed Codex CLI `0.149.1` before that pin
 - [ ] Repeat the complete pinned blocking QA pass from that follow-up wheel. This remains distinct from the broader
   unticked Phase 7 integration-owner sweep and the separately labelled `latest` compatibility pass.
 
+### Stale-Driver Partial QA Follow-up -- 2026-08-29
+
+- The partial run selected wheel SHA-256 `7c0dd1c057e90fa2be0b561d336bd02b3f9a3449fe2ebe48308089e2529c2b47` but loaded
+  `/forge:qa` from the older copied project package. Its saved 163-step/551-assertion/9-checkpoint selection proves that
+  mismatch; the selected wheel contains the newer 552-assertion/8-checkpoint driver. None of its 248 passes or 15
+  failures can establish the follow-up wheel's release verdict.
+- [x] Bind the host QA driver to the selected wheel before Docker mutation. **Assertion**: managed paths and bytes must
+  match; `artifact.json`, container labels/status, reuse checks, report identity, and final metrics carry the matching
+  driver digest; stale content fails with scope-sync and Claude-restart recovery. A legacy local row that still tracks
+  Codex uses a Claude-scoped `extension enable` recovery because whole-row sync correctly rejects local Codex skills.
+- [x] Fix the independent delete-preview product defect. **Assertion**: preview and mutation use one ownership-aware
+  worktree cleanup plan, so deleting a guest or co-resident session says the worktree and branch will be kept.
+- [x] Correct the remaining valid checklist observations. **Assertion**: interpreter-dependent fixtures fail loudly, the
+  OpenAI reasoning override differs from its template default, and proxy metrics use a distinct unreachable fixture
+  rather than requiring traffic that has not happened yet. The proposed 4.23 adopted-process rewrite and 5.21 timestamp
+  change are not applied because the selected wheel already contains the corrected configured-only and current-time
+  contracts.
+- [x] Clarify same-file duplicate-hook diagnostics so one settings path is not printed twice.
+- [x] Rebuild and run the focused unit, checklist, exact-wheel Docker, session, hook, regression, and pre-commit owners.
+- [ ] Restart from a synchronized copy of the rebuilt wheel's QA package; do not resume the stale-driver run at 5.23.
+
+### Stale-Driver Fix Verification -- 2026-08-29
+
+- `make test-unit`: 9,973 passed, 117 deselected; `make test-regression`: 1,074 passed.
+- Exact-wheel artifact identity, shared-worktree deletion, and hook-migration Docker owners: 3 passed. The artifact
+  probe built a clean wheel and proved the invoking source driver matched its packaged QA tree.
+- `make build` and `make pre-commit` passed. The rebuilt wheel SHA-256 is
+  `8a9f8a50b85cc7c7c25d4bcf49485d39ffc8d1c51f6d13f31ed25312362d3435`; its QA-driver SHA-256 is
+  `d2bffe9a970d54e3477f24d4c72b5ba2f8bb69fa108a2f4e05122e6ef66736f0`.
+- `./scripts/test-wheel-runtime.sh` passed from an isolated Python 3.12 install, including dependency resolution and
+  managed LiteLLM start/health.
+- The selected wheel's Claude-local QA package was re-enabled in copy mode and independently passed the driver/wheel
+  identity probe. Claude Code still needs to restart before the next fresh human-driven run.
+
 ## Acceptance Tests
 
 | Test                     | Fixture                                                                | Assertion                                                                                            | Test File                                                                                                                                                                                    |
@@ -377,8 +412,8 @@ integration owners must run against observed Codex CLI `0.149.1` before that pin
 | Evidence selection       | blocking and extended fixtures with category/range/resume              | selection is deterministic and budgets count only included steps                                     | `tests/src/skills/test_qa_checklist_contract.py`; state tests if parser changes                                                                                                              |
 | State-script parity      | both packaged state scripts                                            | only the two approved identity lines differ and the full behavior matrix passes                      | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`                                                                                            |
 | Runtime matrix           | repository matrix plus start/end Claude/Codex probes                   | pins have probe evidence, match at both run boundaries, and Codex meets its ceilings                 | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/skills/test_qa_start_container.py`, `tests/src/skills/test_qa_run_metrics.py`, `tests/src/core/runtime/test_codex_preflight.py` |
-| Artifact identity        | supplied RC wheel plus checkout with distinguishable content           | CLI, import, metadata, and resources resolve only from the recorded wheel                            | `tests/integration/docker/test_qa_release_artifact.py` (new)                                                                                                                                 |
-| Container reuse identity | editable and release builds sharing revision/runtime versions          | full identities differ; changed digest/profile/track/mode/path/auth rejects stale reuse              | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                              |
+| Artifact identity        | supplied RC wheel, host QA driver, and distinguishable checkout        | driver matches the wheel; CLI, metadata, and resources resolve only from the recorded wheel          | `tests/integration/docker/test_qa_release_artifact.py` (new)                                                                                                                                 |
+| Container reuse identity | editable and release builds sharing revision/runtime versions          | changed wheel/driver/profile/track/mode/path/auth rejects stale reuse                                | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                              |
 | Managed Claude lifecycle | clean-wheel project and real Claude                                    | SessionStart/Stop confirmation and transcript artifact are produced                                  | `tests/integration/docker/test_real_claude_hooks.py`                                                                                                                                         |
 | Managed Codex lifecycle  | authenticated Codex and clean-wheel project                            | preflight plus one `initial-message` start/resume records a thread                                   | `tests/integration/core/test_codex_session_start.py`                                                                                                                                         |
 | Codex hook delivery      | enrolled real runtime plus staged hook receipt                         | real hook firing and staged delivery pass positively; recovery output is not a pass                  | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py`                                                                                           |

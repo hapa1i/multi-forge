@@ -47,6 +47,7 @@ ENV_CLASSES = {
     "FORGE_QA_CODEX_AUTH_MODE": "test-qa",
     "FORGE_QA_CODEX_VERSION": "test-qa",
     "FORGE_QA_DEEPSEEK_TEMPLATE": "test-qa",
+    "FORGE_QA_DRIVER_SHA256": "test-qa",
     "FORGE_QA_FORGE_VERSION": "test-qa",
     "FORGE_QA_GEMINI_PROXY": "test-qa",
     "FORGE_QA_GEMINI_TEMPLATE": "test-qa",

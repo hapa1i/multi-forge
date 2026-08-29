@@ -12,6 +12,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "src" / "skills" / "qa" / "scripts" / "start-container.sh"
+QA_SKILL_ROOT = REPO_ROOT / "src" / "skills" / "qa"
 HEAD_REV = "1111111111111111111111111111111111111111"
 
 
@@ -20,13 +21,43 @@ def _write_exec(path: Path, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _wheel(tmp_path: Path, *, filename_version: str = "0.9.4", metadata_version: str = "0.9.4") -> Path:
+def _qa_driver_digest(wheel: Path) -> str:
+    prefix = "forge/_extensions/skills/qa/"
+    with zipfile.ZipFile(wheel) as archive:
+        files = {
+            name.removeprefix(prefix): archive.read(name)
+            for name in archive.namelist()
+            if name.startswith(prefix) and not name.endswith("/") and not name.endswith("/.forge-package.json")
+        }
+    digest = hashlib.sha256()
+    for relative, content in sorted(files.items()):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(content).digest())
+    return digest.hexdigest()
+
+
+def _wheel(
+    tmp_path: Path,
+    *,
+    filename_version: str = "0.9.4",
+    metadata_version: str = "0.9.4",
+    qa_overrides: dict[str, bytes] | None = None,
+) -> Path:
     wheel = tmp_path / f"multi_forge-{filename_version}-py3-none-any.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr(
             f"multi_forge-{metadata_version}.dist-info/METADATA",
             f"Name: multi-forge\nVersion: {metadata_version}\n",
         )
+        for path in sorted(
+            path
+            for path in QA_SKILL_ROOT.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        ):
+            relative = path.relative_to(QA_SKILL_ROOT).as_posix()
+            content = (qa_overrides or {}).get(relative, path.read_bytes())
+            archive.writestr(f"forge/_extensions/skills/qa/{relative}", content)
     return wheel
 
 
@@ -79,6 +110,7 @@ def _running_container_docker(
     codex_auth_mode: str = "api-key",
 ) -> str:
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    driver_digest = _qa_driver_digest(wheel)
     image = f"forge-qa-release:0.9.4-sha-{digest[:12]}-pinned-claude-2.1.245-codex-0.149.1"
     recorded_wheel_path = wheel_path or str(wheel.resolve())
     return (
@@ -90,6 +122,7 @@ def _running_container_docker(
         '    case "$args" in\n'
         f'      *org.opencontainers.image.revision*) printf "{HEAD_REV}" ;;\n'
         f'      *io.multi-forge.qa.wheel-sha256*) printf "{digest}" ;;\n'
+        f'      *io.multi-forge.qa.driver-sha256*) printf "{driver_digest}" ;;\n'
         '      *io.multi-forge.qa.forge-version*) printf "0.9.4" ;;\n'
         f'      *io.multi-forge.qa.runtime-track*) printf "{runtime_track}" ;;\n'
         '      *io.multi-forge.qa.claude-version*) printf "2.1.245" ;;\n'
@@ -179,6 +212,27 @@ def test_filename_metadata_version_mismatch_fails(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "does not match METADATA version" in result.stderr
+
+
+def test_stale_qa_driver_fails_before_docker_mutation(tmp_path: Path) -> None:
+    wheel = _wheel(
+        tmp_path,
+        qa_overrides={"resources/checklist.md": b"stale-driver-fixture\n"},
+    )
+
+    result = _run(
+        tmp_path,
+        ["--wheel", str(wheel)],
+        docker_body=(
+            'if [[ "$1" == "info" ]]; then exit 0; fi\n' 'echo "docker mutation must not run" >&2\n' "exit 99\n"
+        ),
+    )
+
+    assert result.returncode == 2
+    assert "QA driver package does not match the selected wheel" in result.stderr
+    assert "changed=resources/checklist.md" in result.stderr
+    assert "restart Claude Code" in result.stderr
+    assert "docker mutation must not run" not in result.stderr
 
 
 def test_unknown_runtime_track_and_missing_codex_auth_fail(tmp_path: Path) -> None:
@@ -321,6 +375,10 @@ def test_successful_reuse_records_artifact_and_observed_runtime_identity(
     identity = json.loads(identity_path.read_text(encoding="utf-8"))
     assert identity["artifact"]["path"] == str(wheel.resolve())
     assert identity["artifact"]["mode"] == "prebuilt"
+    assert identity["driver"] == {
+        "matches_artifact": True,
+        "sha256": _qa_driver_digest(wheel),
+    }
     assert identity["runtime"]["blocking"] is True
     assert identity["runtime"]["claude"] == {
         "pin": "2.1.245",
@@ -333,7 +391,9 @@ def test_successful_reuse_records_artifact_and_observed_runtime_identity(
     assert identity["runtime"]["codex_auth_mode"] == "api-key"
 
 
-def test_fresh_pinned_build_uses_nonempty_argument_lists_under_nounset(tmp_path: Path) -> None:
+def test_fresh_pinned_build_uses_nonempty_argument_lists_under_nounset(
+    tmp_path: Path,
+) -> None:
     wheel = _wheel(tmp_path)
     docker_log = tmp_path / "docker.log"
 
@@ -363,6 +423,7 @@ def test_status_reports_complete_release_identity(tmp_path: Path) -> None:
         "Repository revision:",
         "Wheel path:",
         "Wheel SHA-256:",
+        "QA driver SHA-256:",
         "Artifact mode:",
         "Runtime track:",
         "Claude version:",
@@ -409,7 +470,9 @@ def test_final_runtime_verification_records_drift_and_fails(tmp_path: Path) -> N
     assert "runtime identity changed" in result.stderr
 
 
-def test_final_runtime_verification_records_missing_container_from_starting_identity(tmp_path: Path) -> None:
+def test_final_runtime_verification_records_missing_container_from_starting_identity(
+    tmp_path: Path,
+) -> None:
     artifact_path = tmp_path / "forge-home" / "manual-testing" / "qa" / "artifact.json"
     artifact_path.parent.mkdir(parents=True)
     artifact_path.write_text(

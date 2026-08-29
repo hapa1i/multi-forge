@@ -6,6 +6,7 @@
 | **Artifact Path**          | canonical host path to the one wheel                                       |
 | **Wheel Filename**         | `multi_forge-X.Y.Z-py3-none-any.whl`                                       |
 | **Wheel SHA-256**          | 64 lowercase hexadecimal characters                                        |
+| **QA Driver SHA-256**      | host skill package digest, proven equal to the selected wheel package      |
 | **Artifact Mode**          | `prebuilt` (release-capable) or `development-build` (development-only)     |
 | **Forge Version**          | X.Y.Z from wheel metadata, `forge --version`, and `forge.__version__`      |
 | **Container**              | container name and immutable image identity                                |
@@ -80,7 +81,7 @@ If no issues: "No issues found."
 ## Artifacts
 
 - **step-logs/**: raw command output per checklist step (copied from the mounted QA state dir)
-- **artifact.json**: wheel, image, provider, and observed runtime identity
+- **artifact.json**: wheel, matching QA driver, image, provider, and observed runtime identity
 - **runtime-final.json**: end-of-run Claude/Codex availability and pin-match evidence
 - **selection.json**: selected step ids, evidence lanes, and planned deterministic budgets
 - **run-metrics.json**: selected results, actual counts, duration review state, scope, and verdict

@@ -35,6 +35,8 @@ forge proxy template list
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Clean up from previous runs
 forge proxy delete "$FORGE_QA_GEMINI_PROXY" --yes 2>/dev/null || true
 forge proxy delete "$FORGE_QA_OPENAI_PROXY" --yes 2>/dev/null || true
@@ -48,8 +50,15 @@ forge proxy delete test-proxy-nostart --yes 2>/dev/null || true
 # Create named role proxies used by downstream session/review steps.
 forge proxy create "$FORGE_QA_GEMINI_TEMPLATE" --name "$FORGE_QA_GEMINI_PROXY"
 
-# Create a named review proxy with per-tier overrides
-forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name "$FORGE_QA_OPENAI_PROXY" --opus-reasoning high
+# Create a named review proxy with a non-default per-tier override. Both supported
+# OpenAI templates default opus reasoning to high, so low makes the override observable.
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name "$FORGE_QA_OPENAI_PROXY" --opus-reasoning low
+forge proxy show "$FORGE_QA_OPENAI_PROXY" --raw | /opt/forge-qa/bin/python -c '
+import sys, yaml
+config = yaml.safe_load(sys.stdin)
+assert config["tier_overrides"]["opus"]["reasoning_effort"] == "low"
+print("OPUS_REASONING_OVERRIDE=low")
+'
 
 # Create workflow-default aliases so section 14 exercises production default proxy IDs.
 # In remote-litellm profile these names intentionally point at remote LiteLLM-backed proxies.
@@ -332,24 +341,50 @@ forge proxy stop test-proxy-nostart 2>&1; echo "EXIT=$?"
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
+# Add one genuinely unreachable configured proxy on a distinct port so the null
+# aggregate contract is observable rather than aliased to a healthy shared port.
+forge proxy delete metrics-unreachable-qa --yes --no-kill 2>/dev/null || true
+forge proxy create "$FORGE_QA_GEMINI_TEMPLATE" --name metrics-unreachable-qa --port 18202 --no-start
+cleanup_metrics_fixture() {
+  forge proxy delete metrics-unreachable-qa --yes --no-kill >/dev/null 2>&1 || true
+}
+trap cleanup_metrics_fixture EXIT
+
 # Metrics for a running proxy (QA Gemini proxy created in 4.2)
 forge proxy metrics "$FORGE_QA_GEMINI_PROXY"
 
-# JSON output
-forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json
+# A selected proxy returns its raw metrics object.
+SELECTED_JSON=$(forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json)
+printf '%s\n' "$SELECTED_JSON" | jq -e '
+  (.total_requests | type == "number")
+  and (.tokens | type == "object")
+  and (.by_tier | type == "object")
+  and (.by_model | type == "object")
+  and (.costs | type == "object")
+'
 
 # All proxies (the default aggregate when more than one is registered)
 forge proxy metrics
 
-# All proxies JSON (must be a single valid JSON object)
-forge proxy metrics --json
+# Bare JSON is one proxy-id map; unreachable entries are null.
+ALL_JSON=$(forge proxy metrics --json)
+printf '%s\n' "$ALL_JSON" | jq -e --arg live "$FORGE_QA_GEMINI_PROXY" '
+  type == "object"
+  and (.[$live] | type == "object")
+  and has("metrics-unreachable-qa")
+  and .["metrics-unreachable-qa"] == null
+'
+
+cleanup_metrics_fixture
+trap - EXIT
 ```
 
-- [ ] `forge proxy metrics` displays request counts, token totals, per-tier breakdown
-- [ ] Per-tier breakdown includes avg latency
-- [ ] `--json` outputs valid parseable JSON
-- [ ] bare `metrics --json` (with >1 proxy) outputs a single valid JSON object (not one per proxy)
-- [ ] Unreachable proxies show `null` in `metrics --json` output
+- [ ] `forge proxy metrics` displays request counts, token totals, per-tier/per-model maps, and cost totals
+- [ ] Selected `--json` returns one raw, parseable metrics object with the documented schema
+- [ ] Bare `metrics --json` returns a single proxy-id map with the healthy selected proxy as an object
+- [ ] The distinct configured-only proxy is `null` in the aggregate, then is removed
 
 ### 4.14 Proxy Metrics (Not Found / Shared-Port)
 

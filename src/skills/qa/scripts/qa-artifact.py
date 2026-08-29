@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 _DIST_NAME = "multi-forge"
+_QA_SKILL_PREFIX = "forge/_extensions/skills/qa/"
+_PACKAGE_SENTINEL = ".forge-package.json"
 _SAFE_TAG_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
@@ -38,6 +40,83 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _tree_digest(files: dict[str, bytes]) -> str:
+    """Return a stable digest for a relative-path-to-content mapping."""
+    digest = hashlib.sha256()
+    for relative, content in sorted(files.items()):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(content).digest())
+    return digest.hexdigest()
+
+
+def _local_qa_skill_files(skill_root: Path) -> dict[str, bytes]:
+    try:
+        resolved = skill_root.expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise ArtifactError(f"QA driver package does not exist: {skill_root}") from exc
+    if not resolved.is_dir():
+        raise ArtifactError(f"QA driver package is not a directory: {resolved}")
+
+    files: dict[str, bytes] = {}
+    try:
+        for path in resolved.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(resolved).as_posix()
+            if relative == _PACKAGE_SENTINEL or "__pycache__" in Path(relative).parts or relative.endswith(".pyc"):
+                continue
+            files[relative] = path.read_bytes()
+    except OSError as exc:
+        raise ArtifactError(f"cannot read QA driver package {resolved}: {exc}") from exc
+    if not files:
+        raise ArtifactError(f"QA driver package is empty: {resolved}")
+    return files
+
+
+def _wheel_qa_skill_files(wheel_path: Path) -> dict[str, bytes]:
+    try:
+        with zipfile.ZipFile(wheel_path) as archive:
+            files = {
+                name.removeprefix(_QA_SKILL_PREFIX): archive.read(name)
+                for name in archive.namelist()
+                if name.startswith(_QA_SKILL_PREFIX)
+                and not name.endswith("/")
+                and name.removeprefix(_QA_SKILL_PREFIX) != _PACKAGE_SENTINEL
+            }
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ArtifactError(f"cannot read QA driver package from {wheel_path}: {exc}") from exc
+    if not files:
+        raise ArtifactError(f"wheel contains no packaged QA driver at {_QA_SKILL_PREFIX}")
+    return files
+
+
+def _qa_driver_digest(*, wheel_path: Path, skill_root: Path) -> str:
+    local_files = _local_qa_skill_files(skill_root)
+    wheel_files = _wheel_qa_skill_files(wheel_path)
+    missing = sorted(wheel_files.keys() - local_files.keys())
+    extra = sorted(local_files.keys() - wheel_files.keys())
+    changed = sorted(
+        relative
+        for relative in wheel_files.keys() & local_files.keys()
+        if wheel_files[relative] != local_files[relative]
+    )
+    if missing or extra or changed:
+        details = []
+        if missing:
+            details.append(f"missing={','.join(missing[:3])}")
+        if extra:
+            details.append(f"extra={','.join(extra[:3])}")
+        if changed:
+            details.append(f"changed={','.join(changed[:3])}")
+        raise ArtifactError(
+            "QA driver package does not match the selected wheel "
+            f"({'; '.join(details)}). Install or sync the selected wheel's local Claude assets, "
+            "restart Claude Code, and rerun QA."
+        )
+    return _tree_digest(local_files)
 
 
 def _wheel_metadata(path: Path) -> tuple[str, str]:
@@ -85,7 +164,13 @@ def _load_runtime_track(matrix_path: Path, runtime_track: str) -> dict[str, Any]
     return track
 
 
-def inspect_artifact(*, wheel_path: Path, matrix_path: Path, runtime_track: str) -> dict[str, Any]:
+def inspect_artifact(
+    *,
+    wheel_path: Path,
+    matrix_path: Path,
+    runtime_track: str,
+    skill_root: Path,
+) -> dict[str, Any]:
     """Return the validated wheel/runtime identity consumed by the QA harness."""
     if "\n" in str(wheel_path) or "\t" in str(wheel_path):
         raise ArtifactError("wheel path cannot contain tabs or newlines")
@@ -98,6 +183,7 @@ def inspect_artifact(*, wheel_path: Path, matrix_path: Path, runtime_track: str)
 
     distribution, version = _wheel_metadata(resolved_wheel)
     digest = _sha256(resolved_wheel)
+    qa_driver_sha256 = _qa_driver_digest(wheel_path=resolved_wheel, skill_root=skill_root)
     track = _load_runtime_track(matrix_path, runtime_track)
 
     try:
@@ -114,7 +200,7 @@ def inspect_artifact(*, wheel_path: Path, matrix_path: Path, runtime_track: str)
     if len(release_tag) > 128:
         raise ArtifactError(f"release image tag is longer than Docker's 128-character limit: {release_tag}")
 
-    return {
+    identity = {
         "wheel_path": str(resolved_wheel),
         "wheel_dir": str(resolved_wheel.parent),
         "wheel_filename": resolved_wheel.name,
@@ -128,12 +214,15 @@ def inspect_artifact(*, wheel_path: Path, matrix_path: Path, runtime_track: str)
         "base_image": base_image,
         "release_image": f"forge-qa-release:{release_tag}",
     }
+    identity["qa_driver_sha256"] = qa_driver_sha256
+    return identity
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wheel", type=Path, required=True)
     parser.add_argument("--matrix", type=Path, required=True)
+    parser.add_argument("--skill-root", type=Path, required=True)
     parser.add_argument("--runtime-track", default="pinned")
     return parser
 
@@ -145,6 +234,7 @@ def main() -> int:
             wheel_path=args.wheel,
             matrix_path=args.matrix,
             runtime_track=args.runtime_track,
+            skill_root=args.skill_root,
         )
     except ArtifactError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

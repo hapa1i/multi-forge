@@ -26,11 +26,18 @@ def _artifact(*, mode: str = "prebuilt", blocking: bool = True) -> dict:
     return {
         "schema_version": 1,
         "artifact": {"mode": mode},
+        "driver": {"matches_artifact": True, "sha256": "a" * 64},
         "runtime": {
             "track": track,
             "blocking": blocking,
-            "claude": {"pin": "2.1.245" if blocking else "latest", "observed": "start-claude"},
-            "codex": {"pin": "0.149.1" if blocking else "latest", "observed": "start-codex"},
+            "claude": {
+                "pin": "2.1.245" if blocking else "latest",
+                "observed": "start-claude",
+            },
+            "codex": {
+                "pin": "0.149.1" if blocking else "latest",
+                "observed": "start-codex",
+            },
         },
     }
 
@@ -200,6 +207,18 @@ def test_runtime_unavailability_forces_failure() -> None:
 
     assert result["verdict"] == "fail"
     assert result["artifact_release_capable"] is False
+
+
+def test_missing_or_mismatched_driver_identity_fails_closed() -> None:
+    missing = _artifact()
+    del missing["driver"]
+    mismatched = _artifact()
+    mismatched["driver"]["matches_artifact"] = False
+
+    with pytest.raises(METRICS.MetricsError, match="QA driver identity"):
+        _compute(artifact=missing)
+    with pytest.raises(METRICS.MetricsError, match="QA driver identity"):
+        _compute(artifact=mismatched)
 
 
 def test_duration_requires_review_without_becoming_failure() -> None:

@@ -95,7 +95,8 @@ SELECTION_SCRIPT="$SCRIPTS/qa-selection.py"
 ```
 
 The selection and runtime resources are also resolved from this skill package. Never substitute files from `/forge` or
-another checkout.
+another checkout. Before Docker mutation, `start-container.sh` verifies every managed host-driver path and its bytes
+against the QA package inside the selected wheel; a copied or stale local skill must fail before checklist execution.
 
 **If `--stop` was set**: Run `bash "$SCRIPTS/start-container.sh" --stop` and stop. No selection or tests run.
 
@@ -130,9 +131,10 @@ created with a different provider profile, `start-container.sh` fails with a res
 stop.
 
 **Artifact and runtime identity**: Pass `--wheel`, `--runtime-track`, and `--codex-auth` when supplied. The harness
-records the canonical wheel path, SHA-256, version, image, runtime pins and observed versions, provider profile, and
-artifact mode in the mounted `artifact.json`. A pinned observed-version mismatch stops before checklist execution, and
-the same runtime identity is probed again when the report artifacts are saved.
+records the canonical wheel path, SHA-256, version, matching QA-driver SHA-256, image, runtime pins and observed
+versions, provider profile, and artifact mode in the mounted `artifact.json`. A driver mismatch or pinned observed-
+version mismatch stops before checklist execution, and the same runtime identity is probed again when the report
+artifacts are saved.
 
 **Category name allowlist** (exact match only -- reject unknown names):
 
@@ -194,14 +196,16 @@ jq -e '
   .schema_version == 1
   and (.artifact.path | type == "string" and length > 0)
   and (.artifact.sha256 | test("^[0-9a-f]{64}$"))
+  and .driver.matches_artifact == true
+  and (.driver.sha256 | test("^[0-9a-f]{64}$"))
   and (.runtime.track == "pinned" or .runtime.track == "latest")
   and (.runtime.claude.observed | length > 0)
   and (.runtime.codex.observed | length > 0)
 ' "$ARTIFACT_FILE"
 ```
 
-If the requested artifact mode, track, or wheel path differs from this record, stop. Do not repair release identity
-after checklist execution begins; the final probe records drift separately and makes the verdict fail.
+If the requested artifact mode, track, wheel path, or QA driver differs from this record, stop. Do not repair release
+identity after checklist execution begins; the final probe records runtime drift separately and makes the verdict fail.
 
 Tell the user: "Docker container ready: `<container>`. Starting QA run."
 
@@ -656,6 +660,7 @@ Full QA Results
 ====================================
   Container:       $CONTAINER
   Artifact:        <wheel filename> (<short SHA-256>)
+  QA driver:       <short matching SHA-256>
   Runtime track:   pinned|latest
   Selection:       blocking|extended (N steps)
 

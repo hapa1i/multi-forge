@@ -366,6 +366,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_QA_CODEX_AUTH_MODE`         | Test/QA harness   | Isolated Codex auth ingress mode; never credential material         |
 | `FORGE_QA_CODEX_VERSION`           | Test/QA harness   | Selected Codex client version                                       |
 | `FORGE_QA_DEEPSEEK_TEMPLATE`       | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_DRIVER_SHA256`           | Test/QA harness   | Host QA-driver digest proven equal to the selected wheel package    |
 | `FORGE_QA_FORGE_VERSION`           | Test/QA harness   | Exact wheel distribution version                                    |
 | `FORGE_QA_GEMINI_PROXY`            | Test/QA harness   | QA container proxy fixture                                          |
 | `FORGE_QA_GEMINI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                       |
@@ -709,6 +710,8 @@ verification.
 - `/forge:qa` tied to `full` install profile (Docker dependency)
 - `/forge:qa` remains Claude-hosted; Claude and Codex are independent subjects under test
 - Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
+- Before Docker mutation, the Claude-hosted QA driver must have the same managed paths and bytes as the QA package in
+  that wheel. The recorded driver digest makes a stale installed checklist ineligible for release evidence
 - The wheel environment exposes `/usr/local/bin/forge` as a stable symlink to its isolated launcher so runtime hooks
   retain the durable-global-launcher contract without recording the venv path directly
 - The repository-owned runtime matrix pins blocking Claude/Codex clients; the image disables Claude self-update and a

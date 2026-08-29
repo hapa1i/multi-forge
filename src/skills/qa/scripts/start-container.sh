@@ -33,8 +33,9 @@ RELEASE_BUILD_CONTEXT=""
 
 # Resolve the repository root and image tag.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd -P)"
-RUNTIME_MATRIX="$REPO_ROOT/src/skills/qa/resources/runtime-matrix.json"
+RUNTIME_MATRIX="$SKILL_ROOT/resources/runtime-matrix.json"
 ARTIFACT_HELPER="$SCRIPT_DIR/qa-artifact.py"
 QA_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.qa"
 BASE_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.forge"
@@ -367,6 +368,7 @@ docker_env_args() {
         -e "FORGE_QA_WHEEL_PATH=$WHEEL_PATH"
         -e "FORGE_QA_WHEEL_FILENAME=$WHEEL_FILENAME"
         -e "FORGE_QA_WHEEL_SHA256=$WHEEL_SHA256"
+        -e "FORGE_QA_DRIVER_SHA256=$QA_DRIVER_SHA256"
         -e "FORGE_QA_FORGE_VERSION=$FORGE_VERSION"
         -e "FORGE_QA_ARTIFACT_MODE=$ARTIFACT_MODE"
         -e "FORGE_QA_RUNTIME_TRACK=$RUNTIME_TRACK"
@@ -454,6 +456,7 @@ prepare_artifact() {
     if ! artifact_json="$(python3 "$ARTIFACT_HELPER" \
         --wheel "$WHEEL_PATH" \
         --matrix "$RUNTIME_MATRIX" \
+        --skill-root "$SKILL_ROOT" \
         --runtime-track "$RUNTIME_TRACK")"; then
         exit 2
     fi
@@ -461,6 +464,7 @@ prepare_artifact() {
     WHEEL_PATH="$(json_field "$artifact_json" wheel_path)"
     WHEEL_FILENAME="$(json_field "$artifact_json" wheel_filename)"
     WHEEL_SHA256="$(json_field "$artifact_json" sha256)"
+    QA_DRIVER_SHA256="$(json_field "$artifact_json" qa_driver_sha256)"
     FORGE_VERSION="$(json_field "$artifact_json" forge_version)"
     RUNTIME_TRACK_BLOCKING="$(json_field "$artifact_json" runtime_track_blocking)"
     CLAUDE_VERSION="$(json_field "$artifact_json" claude_version)"
@@ -511,6 +515,7 @@ record_artifact_identity() {
         "$WHEEL_PATH" \
         "$WHEEL_FILENAME" \
         "$WHEEL_SHA256" \
+        "$QA_DRIVER_SHA256" \
         "$FORGE_VERSION" \
         "$ARTIFACT_MODE" \
         "$BASE_IMAGE_NAME" \
@@ -534,6 +539,7 @@ from pathlib import Path
     wheel_path,
     wheel_filename,
     wheel_sha256,
+    qa_driver_sha256,
     forge_version,
     artifact_mode,
     base_image,
@@ -557,6 +563,10 @@ payload = {
         "sha256": wheel_sha256,
         "forge_version": forge_version,
         "mode": artifact_mode,
+    },
+    "driver": {
+        "sha256": qa_driver_sha256,
+        "matches_artifact": True,
     },
     "image": {
         "base": base_image,
@@ -778,6 +788,7 @@ if [[ "$ACTION" == "status" ]]; then
         info "Repository revision: $(status_label "org.opencontainers.image.revision")"
         info "Wheel path: $(status_label "io.multi-forge.qa.wheel-path")"
         info "Wheel SHA-256: $(status_label "io.multi-forge.qa.wheel-sha256")"
+        info "QA driver SHA-256: $(status_label "io.multi-forge.qa.driver-sha256")"
         info "Artifact mode: $(status_label "io.multi-forge.qa.artifact-mode")"
         info "Runtime track: $(status_label "io.multi-forge.qa.runtime-track")"
         info "Claude version: $(status_label "io.multi-forge.qa.claude-version")"
@@ -795,9 +806,13 @@ if [[ "$ACTION" == "status" ]]; then
     fi
 fi
 
-# Use the repository revision to detect stale containers and images.
+# Validate the selected release artifact and invoking QA driver before any
+# container or image mutation. A stale host-installed skill must not be able to
+# launch or reuse a container for a different wheel.
 FORGE_REV="$(get_forge_rev)"
 prepare_artifact
+
+# Use the repository revision and artifact identity to detect stale containers and images.
 load_qa_env
 if [[ -n "$CODEX_AUTH_FILE" ]]; then
     CODEX_AUTH_MODE="explicit-file"
@@ -838,6 +853,7 @@ if [[ "$RESET" != "true" ]] && docker ps -q -f "name=^${CONTAINER_NAME}$" | grep
     # runtime tracks can intentionally share that revision.
     require_container_label "org.opencontainers.image.revision" "$FORGE_REV" "repository revision"
     require_container_label "io.multi-forge.qa.wheel-sha256" "$WHEEL_SHA256" "wheel SHA-256"
+    require_container_label "io.multi-forge.qa.driver-sha256" "$QA_DRIVER_SHA256" "QA driver SHA-256"
     require_container_label "io.multi-forge.qa.forge-version" "$FORGE_VERSION" "Forge version"
     require_container_label "io.multi-forge.qa.runtime-track" "$RUNTIME_TRACK" "runtime track"
     require_container_label "io.multi-forge.qa.claude-version" "$CLAUDE_VERSION" "Claude version"
@@ -987,6 +1003,7 @@ if ! docker run -d \
     --label "io.multi-forge.qa.provider-profile=$FORGE_QA_PROVIDER_PROFILE" \
     --label "io.multi-forge.qa.artifact-mode=$ARTIFACT_MODE" \
     --label "io.multi-forge.qa.wheel-path=$WHEEL_PATH" \
+    --label "io.multi-forge.qa.driver-sha256=$QA_DRIVER_SHA256" \
     --label "io.multi-forge.qa.codex-auth-mode=$CODEX_AUTH_MODE" \
     "${DOCKER_ENV[@]}" \
     -v "$HOST_STATE_DIR:/workspace/.forge/qa" \
@@ -1035,6 +1052,7 @@ info "Running preflight checks..."
         FORGE_QA_WHEEL_PATH \
         FORGE_QA_WHEEL_FILENAME \
         FORGE_QA_WHEEL_SHA256 \
+        FORGE_QA_DRIVER_SHA256 \
         FORGE_QA_FORGE_VERSION \
         FORGE_QA_ARTIFACT_MODE \
         FORGE_QA_RUNTIME_TRACK \

@@ -208,6 +208,8 @@ forge session list
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Clean up from previous runs
 forge session delete test-session-delete-me --yes --force 2>/dev/null || true
 
@@ -227,6 +229,8 @@ forge session list
 Ref-count delete guard: verify that deleting a co-resident session preserves the shared worktree.
 
 ```bash
+set -euo pipefail
+
 # Create a worktree session (owns the worktree)
 forge session delete test-refcount-owner --yes --force 2>/dev/null || true
 forge session delete test-refcount-guest --yes --force 2>/dev/null || true
@@ -246,8 +250,10 @@ cd "$WORKTREE_PATH" && forge extension enable --scope local && cd "$FORGE_TEST_R
 # Fork into the same worktree (guest, does not own)
 forge session fork test-refcount-owner --name test-refcount-guest --into "$WORKTREE_PATH" --no-launch
 
-# Delete the guest — worktree must be preserved
-forge session delete test-refcount-guest --yes --force
+# Delete the guest — both the preview and mutation must preserve the shared worktree.
+forge session delete test-refcount-guest --yes --force 2>&1 | tee /tmp/qa-refcount-delete.out
+rg 'Worktree will be kept' /tmp/qa-refcount-delete.out
+! rg 'Worktree will be removed' /tmp/qa-refcount-delete.out
 
 # Verify worktree still exists
 test -d "$WORKTREE_PATH" && echo "WORKTREE_PRESERVED=true" || echo "WORKTREE_PRESERVED=false"
@@ -255,6 +261,7 @@ forge session list | grep test-refcount-owner
 ```
 
 - [ ] Guest session deleted successfully
+- [ ] Delete preview says the shared worktree will be kept and does not claim it will be removed
 - [ ] Worktree directory preserved (owner session still holds a reference)
 - [ ] Owner session still listed and functional
 
@@ -620,7 +627,9 @@ jq --arg cwd "$NR_WT" \
   "$PJSON" > /tmp/nri.json && mv /tmp/nri.json "$PJSON"
 
 # Create the exact transcript file the CLI preflight checks (encoding-agnostic via the real helper).
-TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))") \
+  || { echo "ERROR: wheel interpreter could not resolve the parent transcript" >&2; exit 1; }
+test -n "$TP" || { echo "ERROR: parent transcript path is empty" >&2; exit 1; }
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"type":"thinking","signature":"x"}' > "$TP"
 
@@ -719,7 +728,9 @@ forge session start sd-xfer-parent --no-launch
 
 # Seed a parent transcript so transfer has content to assemble (same dir = project root).
 PJSON=".forge/sessions/sd-xfer-parent/forge.session.json"
-TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))") \
+  || { echo "ERROR: wheel interpreter could not resolve the parent transcript" >&2; exit 1; }
+test -n "$TP" || { echo "ERROR: parent transcript path is empty" >&2; exit 1; }
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"requestId":"r1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"hello from sd parent"}]}}' > "$TP"
 jq --arg tp "$TP" '.confirmed.transcript_path = $tp | .confirmed.claude_session_id = "fixture-sd-xfer"' \
@@ -831,6 +842,8 @@ an oracle that exists only in the generated transfer. That proves the default de
 the initial message. This step does not claim Codex hook enrollment.
 
 ```bash
+set -euo pipefail
+
 cd "$FORGE_TEST_REPO"
 forge session delete qa-codex-parent qa-codex-initial --yes --force 2>/dev/null || true
 forge session start qa-codex-parent --no-launch
@@ -955,6 +968,8 @@ Create native evidence without launching a model, adopt it by full id, prove a d
 deliberately remove one coherent session's global index row and repair it from the authoritative manifest.
 
 ```bash
+set -euo pipefail
+
 cd "$FORGE_TEST_REPO"
 forge session delete qa-adopted qa-adopt-ambiguous qa-repair --yes --force 2>/dev/null || true
 

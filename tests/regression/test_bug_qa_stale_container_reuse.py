@@ -29,6 +29,7 @@ pytestmark = pytest.mark.regression
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "src" / "skills" / "qa" / "scripts" / "start-container.sh"
+QA_SKILL_ROOT = REPO_ROOT / "src" / "skills" / "qa"
 
 HEAD_REV = "1111111111111111111111111111111111111111"
 OLD_REV = "0000000000000000000000000000000000000000"
@@ -46,7 +47,30 @@ def _make_wheel(tmp_path: Path) -> Path:
             "multi_forge-0.9.4.dist-info/METADATA",
             "Name: multi-forge\nVersion: 0.9.4\n",
         )
+        for path in sorted(
+            path
+            for path in QA_SKILL_ROOT.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        ):
+            relative = path.relative_to(QA_SKILL_ROOT).as_posix()
+            archive.writestr(f"forge/_extensions/skills/qa/{relative}", path.read_bytes())
     return wheel
+
+
+def _qa_driver_digest(wheel: Path) -> str:
+    prefix = "forge/_extensions/skills/qa/"
+    with zipfile.ZipFile(wheel) as archive:
+        files = {
+            name.removeprefix(prefix): archive.read(name)
+            for name in archive.namelist()
+            if name.startswith(prefix) and not name.endswith("/") and not name.endswith("/.forge-package.json")
+        }
+    digest = hashlib.sha256()
+    for relative, content in sorted(files.items()):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(content).digest())
+    return digest.hexdigest()
 
 
 def _make_stubs(bin_dir: Path, image_rev: str, wheel: Path) -> None:
@@ -69,6 +93,7 @@ def _make_stubs(bin_dir: Path, image_rev: str, wheel: Path) -> None:
     )
 
     wheel_sha = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    driver_sha = _qa_driver_digest(wheel)
     release_image = f"forge-qa-release:0.9.4-sha-{wheel_sha[:12]}-pinned-claude-2.1.245-codex-0.149.1"
     wheel_path = str(wheel.resolve())
 
@@ -84,6 +109,7 @@ def _make_stubs(bin_dir: Path, image_rev: str, wheel: Path) -> None:
         '    case "$args" in\n'
         f'      *org.opencontainers.image.revision*) printf "{image_rev}" ;;\n'
         f'      *io.multi-forge.qa.wheel-sha256*) printf "{wheel_sha}" ;;\n'
+        f'      *io.multi-forge.qa.driver-sha256*) printf "{driver_sha}" ;;\n'
         '      *io.multi-forge.qa.forge-version*) printf "0.9.4" ;;\n'
         '      *io.multi-forge.qa.runtime-track*) printf "pinned" ;;\n'
         '      *io.multi-forge.qa.claude-version*) printf "2.1.245" ;;\n'

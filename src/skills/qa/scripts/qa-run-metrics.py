@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -160,6 +161,14 @@ def compute_metrics(
         raise MetricsError("ended epoch precedes started epoch")
     if artifact.get("schema_version") != 1 or selection.get("schema_version") != 1:
         raise MetricsError("unsupported artifact or selection schema")
+    driver = artifact.get("driver")
+    if (
+        not isinstance(driver, dict)
+        or driver.get("matches_artifact") is not True
+        or not isinstance(driver.get("sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", driver["sha256"]) is None
+    ):
+        raise MetricsError("artifact QA driver identity is missing, malformed, or does not match the selected wheel")
     runtime_identity_preserved = _final_runtime_identity_preserved(
         artifact=artifact,
         runtime_final=runtime_final,
