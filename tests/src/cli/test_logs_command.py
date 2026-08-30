@@ -233,6 +233,31 @@ def test_logs_clean_reports_active_files(tmp_path, monkeypatch):
     assert not (logs_dir / "proxy.99999999.log").exists()
 
 
+def test_logs_clean_removes_files_owned_by_a_zombie(tmp_path, monkeypatch):
+    """A defunct process cannot write again and must not pin its log shard."""
+    import forge.cli.logs as logs
+    from forge.core.paths import get_forge_home
+
+    pid = 424242
+    proc_root = tmp_path / "proc"
+    proc_dir = proc_root / str(pid)
+    proc_dir.mkdir(parents=True)
+    (proc_dir / "stat").write_text(f"{pid} (forge proxy worker) Z 1 2 3\n")
+    monkeypatch.setattr(logs, "_PROC_ROOT", proc_root)
+    monkeypatch.setattr(logs.os, "kill", lambda *_args: None)
+
+    logs_dir = get_forge_home() / "logs" / "proxy"
+    logs_dir.mkdir(parents=True)
+    zombie_log = logs_dir / f"proxy.{pid}.log"
+    zombie_log.write_text("cannot grow")
+
+    result = CliRunner().invoke(main, ["logs", "clean", "--yes"])
+
+    assert result.exit_code == 0
+    assert "Removed 1 log file" in result.output
+    assert not zombie_log.exists()
+
+
 # forge logs clean --older-than
 
 
