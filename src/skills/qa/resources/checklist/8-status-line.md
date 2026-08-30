@@ -240,19 +240,43 @@ forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
 forge session start qa-forge-cost --no-launch >/dev/null
 forge session start qa-forge-cost-none --no-launch >/dev/null
 
-# Seed ledger events.
+# Seed current-schema ledger events after session creation.
 #   qa-forge-cost: $0.20 + $0.05 reported & non-interactive (counted) = $0.25; a $9.00 reported
 #     claude_interactive harness event (MUST be excluded); an unavailable row (adds nothing).
 #   qa-forge-cost-none: only a reported harness event + an unavailable row -> sum is None -> no segment.
-mkdir -p ~/.forge/usage/events
-cat > ~/.forge/usage/events/qa-forgecost_99999.jsonl <<'EOF'
-{"schema_version":1,"run_id":"qa-fc1","root_run_id":"qa-fc1","runtime":"claude_code","command":"memory-writer","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"reported","cost_micro_usd":200000,"ts":"2026-05-01T00:00:00Z"}
-{"schema_version":1,"run_id":"qa-fc2","root_run_id":"qa-fc2","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"core_llm","confidence":"reported","cost_micro_usd":50000,"ts":"2026-05-01T00:01:00Z"}
-{"schema_version":1,"run_id":"qa-fc3","root_run_id":"qa-fc3","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost","route":"claude_interactive","confidence":"reported","cost_micro_usd":9000000,"ts":"2026-05-01T00:02:00Z"}
-{"schema_version":1,"run_id":"qa-fc4","root_run_id":"qa-fc4","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:03:00Z"}
-{"schema_version":1,"run_id":"qa-fc5","root_run_id":"qa-fc5","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost-none","route":"claude_interactive","confidence":"reported","cost_micro_usd":7000000,"ts":"2026-05-01T00:04:00Z"}
-{"schema_version":1,"run_id":"qa-fc6","root_run_id":"qa-fc6","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost-none","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:05:00Z"}
-EOF
+/opt/forge-qa/bin/python - <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+
+from forge.core.usage.ledger import UsageEvent
+
+def event(run_id, command, session, route, confidence, cost=None):
+    return UsageEvent(
+        run_id=run_id,
+        root_run_id=run_id,
+        runtime="claude_code",
+        command=command,
+        status="success",
+        session=session,
+        route=route,
+        confidence=confidence,
+        cost_micro_usd=cost,
+    )
+
+events = (
+    event("qa-fc1", "memory-writer", "qa-forge-cost", "claude_p", "reported", 200000),
+    event("qa-fc2", "supervisor", "qa-forge-cost", "core_llm", "reported", 50000),
+    event("qa-fc3", "interactive", "qa-forge-cost", "claude_interactive", "reported", 9000000),
+    event("qa-fc4", "supervisor", "qa-forge-cost", "claude_p", "unavailable"),
+    event("qa-fc5", "interactive", "qa-forge-cost-none", "claude_interactive", "reported", 7000000),
+    event("qa-fc6", "supervisor", "qa-forge-cost-none", "claude_p", "unavailable"),
+)
+path = Path.home() / ".forge/usage/events/qa-forgecost_99999.jsonl"
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("".join(json.dumps(asdict(item), separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # Opt in to the forge_cost segment (off by default).
 forge config set statusline.segments=path,model,forge_cost

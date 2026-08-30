@@ -23,7 +23,8 @@ ls ~/.forge/             # Should exist
 test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
   || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
 test -f ~/.claude/skills/qa/SKILL.md
-jq -e '.hooks != null and .statusLine != null' .claude/settings.local.json
+rg -q 'forge-hook session-start' "$CLAUDE_HOME/settings.json"
+jq -e '.statusLine != null' .claude/settings.local.json
 ls .agents/skills/       # Should have nine portable Codex project skills
 ```
 

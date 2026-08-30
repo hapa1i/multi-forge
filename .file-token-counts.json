@@ -99,10 +99,10 @@
       "tokens": 20456
     },
     "src/skills/qa/resources/checklist/5-session.md": {
-      "sha256": "2a77c16b989d041fe0ae960f4e7ad6d811740733b07a5e2d9b6d0c32b4265d37",
+      "sha256": "7f56c9bb53bc55db93decad0ab1bcdc13c4452a79969e2bc8fd83dcc8865c1bb",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 21916
+      "tokens": 21927
     },
     "src/skills/review/references/skills-writing-guide.md": {
       "sha256": "9006083e31ef0f57ac4bbb3ebe9ec8044eb5309c6c91d25e283e8e40a779be97",

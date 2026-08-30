@@ -1007,7 +1007,7 @@ forge session adopt "$AMBIGUOUS_UUID" --name qa-adopt-ambiguous --yes \
 AMBIGUOUS_RC=$?
 set -e
 test "$AMBIGUOUS_RC" -ne 0
-rg 'matches both.*Refusing to guess' /tmp/qa-adopt-ambiguous.stderr
+tr '\n' ' ' </tmp/qa-adopt-ambiguous.stderr | rg 'matches both.*Refusing to guess'
 test ! -d .forge/sessions/qa-adopt-ambiguous
 rm -f "$AMBIGUOUS_TRANSCRIPT" "$AMBIGUOUS_ROLLOUT" \
   /tmp/qa-adopt-ambiguous.stdout /tmp/qa-adopt-ambiguous.stderr

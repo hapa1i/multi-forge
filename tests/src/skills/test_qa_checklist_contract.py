@@ -151,6 +151,14 @@ def test_every_automated_code_block_is_valid_bash() -> None:
             assert result.returncode == 0, f"{step['id']}: {result.stderr}"
 
 
+def test_quoted_python_heredocs_compile() -> None:
+    """Bash syntax checks do not inspect Python embedded in fixture blocks."""
+    for step in _parsed_checklist()["_all_subs"]:
+        for block in step["code_blocks"]:
+            for body in re.findall(r"<<'PY'\n(.*?)\nPY(?=\n|$)", block["code"], flags=re.DOTALL):
+                compile(body, f"QA step {step['id']} embedded Python", "exec")
+
+
 def test_report_categories_cover_the_index_in_order() -> None:
     parsed = _parsed_checklist()
     expected = [REPORT_CATEGORIES[section["id"]] for section in parsed["sections"]]

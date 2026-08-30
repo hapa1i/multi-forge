@@ -33,6 +33,16 @@ forge config show
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
+# Reject a value that cannot be coerced to the declared float type.
+set +e
+INVALID_OUTPUT=$(forge config set status_timeout=not-a-number 2>&1)
+INVALID_RC=$?
+set -e
+test "$INVALID_RC" -ne 0
+printf '%s\n' "$INVALID_OUTPUT" | rg "Invalid value for 'status_timeout'"
+
 # Set a value
 forge config set status_timeout=1.0
 

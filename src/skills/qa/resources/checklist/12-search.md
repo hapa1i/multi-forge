@@ -53,8 +53,33 @@ forge search query "hello world" --scope all --json
 <!-- auto -->
 
 ```bash
-forge search clean          # preview (default)
-forge search clean --yes    # actually prune
+set -euo pipefail
+cd "$FORGE_TEST_REPO"
+
+# Create one real indexed transcript, then remove only its source so clean has a
+# deterministic orphan without hand-writing internal search-store schemas.
+ORPHAN_DIR=.forge/artifacts/qa-search-clean/transcripts
+ORPHAN_PATH="$ORPHAN_DIR/qa-orphan.jsonl"
+mkdir -p "$ORPHAN_DIR"
+cat >"$ORPHAN_PATH" <<'EOF'
+{"timestamp":"2026-08-30T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"qa orphan cleanup fixture"}]}}
+EOF
+forge search rebuild-index
+rm -f "$ORPHAN_PATH"
+
+forge search clean | tee /tmp/qa-search-clean-preview-1.txt
+rg -q 'Would prune' /tmp/qa-search-clean-preview-1.txt
+# A second preview must still see the orphan, proving preview was non-mutating.
+forge search clean | tee /tmp/qa-search-clean-preview-2.txt
+rg -q 'Would prune' /tmp/qa-search-clean-preview-2.txt
+
+forge search clean --yes | tee /tmp/qa-search-clean-apply.txt
+rg -q 'Pruned' /tmp/qa-search-clean-apply.txt
+forge search clean | tee /tmp/qa-search-clean-final.txt
+rg -q 'No orphaned entries found' /tmp/qa-search-clean-final.txt
+
+rmdir "$ORPHAN_DIR" "$(dirname "$ORPHAN_DIR")" 2>/dev/null || true
+rm -f /tmp/qa-search-clean-preview-{1,2}.txt /tmp/qa-search-clean-{apply,final}.txt
 ```
 
 - [ ] Bare `clean` previews ("Would prune ...") without removing

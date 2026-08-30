@@ -11,16 +11,17 @@ creation happened in the same decision.
 
 ## Current Focus
 
-The next partial pinned attempt selected the follow-up wheel but ran a stale host-installed QA package: its saved
-selection has 551 assertions and 9 human checkpoints, while that wheel's package has 552 and 8. It is invalid as release
-evidence. The harness now rejects host-driver/wheel drift before Docker mutation and records the matching driver digest.
-That attempt also exposed one independent product defect in the session-delete preview, now covered by a regression
-test. The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations.
+The synchronized pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved
+verdict is correctly `fail`: 12 of 13 failed assertions came from stale QA fixtures, while one exposed zombie-owned log
+retention in Linux containers. The fixture repairs, deterministic skip coverage, and product regression are now in the
+focused verification lane. The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8
+paid operations.
 
-Phase 7 still needs the broad named integration-owner run, a clean human-driven pinned release-candidate QA rerun, and
-the separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is reviewed; the
-failed run and retained-container fixture checks are diagnostic evidence, not the v1.0.0 release verdict. The Codex
-integration owners must run against observed Codex CLI `0.149.1` before that pin's release validation is complete.
+Phase 7 still needs the broad named integration-owner run, a clean human-driven pinned release-candidate QA rerun after
+these repairs, and the separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is
+reviewed; the failed run and disposable-container fixture checks are diagnostic evidence, not the v1.0.0 release
+verdict. The Codex integration owners must run against observed Codex CLI `0.149.1` before that pin's release validation
+is complete.
 
 ## Execution Guardrails
 
@@ -403,6 +404,38 @@ integration owners must run against observed Codex CLI `0.149.1` before that pin
   managed LiteLLM start/health.
 - The selected wheel's Claude-local QA package was re-enabled in copy mode and independently passed the driver/wheel
   identity probe. Claude Code still needs to restart before the next fresh human-driven run.
+
+### Complete QA Follow-up -- 2026-08-30
+
+- The synchronized prebuilt wheel and matching QA driver completed every selected step with pinned Claude `2.1.245` and
+  Codex `0.149.1` preserved at both boundaries. The run recorded 536 passes, 13 failures, and 3 skipped assertions; 8/8
+  human checkpoints and 8/8 paid operations completed. Its 39,452-second duration disposition is accepted because the
+  wall time was dominated by idle time at interactive checkpoints. The saved `fail` verdict remains historical
+  diagnostic evidence.
+- [x] Verify the failure classification before changing code. Nine cost assertions used kind-less, pre-v2-shaped
+  downstream records that genuine v1 writers never emitted; activity incorrectly coupled `cost_partial` to
+  `cost_estimated`; and status-line events predated the sessions' creation bound. The corresponding product paths pass
+  with current-schema/current-time fixtures.
+- [x] Fix zombie-owned log retention. **Assertion**: Linux `/proc/<pid>/stat` state `Z` is inactive even though
+  `kill(pid, 0)` succeeds; missing, unreadable, malformed, or raced-away process state remains protected. Unit,
+  regression, real-container, and release-QA fixtures cover the behavior.
+- [x] Replace hand-written cost and usage envelopes with records built from the installed wheel's production
+  dataclasses/factories. **Assertion**: the breakdown, provenance, activity, spend-cap, and Forge-added-cost fixtures
+  carry the current schema and timestamps, while fixture shards remain isolated and self-cleaning.
+- [x] Make the three skipped assertions executable and correct two latent gates. **Assertion**: 11.3 submits an invalid
+  typed value; 12.4 creates and removes one real indexed transcript before preview/apply; 19.1 checks runtime hooks at
+  user scope and status-line ownership locally; and 5.26 matches Rich-wrapped stderr after newline normalization.
+- [x] Run focused fixture verification. Current-schema breakdown/provenance, exact-versus-partial activity, time-bounded
+  Forge-added cost, invalid config, search orphan preview/apply, and real-zombie log cleanup all produced their asserted
+  outputs in disposable containers. The checklist contract also compiles quoted Python heredocs in addition to checking
+  Bash syntax.
+- [x] Run the automated release gates. `make test-unit` passed with 9,975 tests and 117 deselected;
+  `make test-regression` passed with 1,075 tests; `make pre-commit`, the clean wheel/LiteLLM runtime smoke, the
+  exact-wheel QA artifact Docker gate, and the real-zombie Docker integration all passed.
+- [x] Rebuild and synchronize the exact wheel. Its SHA-256 is
+  `b78a2dee5e3d68df01ab0a3bfe76e8925a4ad1fb7b41f9120a171e089bd1ca40`; the packaged and local copied QA driver both
+  resolve to `1a0710598fbbcf9f24b6e310e86a76af0f3915461a952c08635df325fad12195`.
+- [ ] Restart Claude Code, then repeat the complete pinned blocking run from the synchronized wheel/driver pair.
 
 ## Acceptance Tests
 
