@@ -1207,7 +1207,9 @@ A bare host `forge session resume <name>` preserves the exact proxy route record
 endpoint and recorded identity before launching Claude. Forge does not silently replace a dead or mismatched proxy. The
 error prints two recovery paths when the corresponding configuration is available: restart the recorded proxy with
 `forge proxy start <proxy-id>`, or explicitly authorize template realization with
-`forge session resume <name> --proxy <template>`.
+`forge session resume <name> --proxy <template>`. If `--fresh` or `--force` has already created a derived child before
+the launch check fails, the error names the retained child. Resume that child after recovery rather than retrying the
+parent, which would create another child.
 
 ### Sidecar specifics
 

@@ -45,10 +45,10 @@
       "tokens": 37015
     },
     "docs/design.md": {
-      "sha256": "042adda1130ea25222e590e3562129d62b9ebcf93dc42938c34ab2124fca3285",
+      "sha256": "27d1abd7e938188ae0c2b0de166d6f24ec3c5bd87bfb46a3a7f6063aec551eca",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20105
+      "tokens": 20153
     },
     "docs/design_runtime.md": {
       "sha256": "4f7f6e5598abf109236d57c77758c527470941b0206bdff2de1723434d6ff285",
@@ -81,10 +81,10 @@
       "tokens": 21297
     },
     "docs/end-user/session.md": {
-      "sha256": "c49fdf960fc259df564a244754349654eb6cbacb6f5f0fd6143f08915d797c5b",
+      "sha256": "fc430e111158e3df5826dd39e8378796f7e84ac4d78bda375f45c9a7fffb6240",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24005
+      "tokens": 24067
     },
     "src/skills/review/references/skills-writing-guide.md": {
       "sha256": "9006083e31ef0f57ac4bbb3ebe9ec8044eb5309c6c91d25e283e8e40a779be97",

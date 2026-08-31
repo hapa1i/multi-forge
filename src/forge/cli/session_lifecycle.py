@@ -773,7 +773,7 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
         )
     except ValueError as e:
         commands: list[str] = []
-        if proxy_id is not None:
+        if proxy_id is not None and template != "":
             from forge.config.loader import load_proxy_instance_config
 
             try:
@@ -783,7 +783,7 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
             if (
                 recorded_config is not None
                 and recorded_config.proxy_endpoint.rstrip("/") == base_url.rstrip("/")
-                and (not template or recorded_config.template == template)
+                and (template is None or recorded_config.template == template)
             ):
                 commands.append(f"forge proxy start {shlex.quote(proxy_id)}")
         if template:
@@ -791,17 +791,29 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
 
             try:
                 template_available = template_exists(template)
-            except ValueError:
+            except Exception:
                 template_available = False
             if template_available:
                 commands.append(
                     f"forge session resume {shlex.quote(plan.manifest.name)} --proxy {shlex.quote(template)}"
                 )
 
+        tips = [
+            (
+                "Use an applicable recovery command below, then retry."
+                if commands
+                else "Repair the recorded proxy identity, or retry with --proxy <proxy_id-or-template>."
+            )
+        ]
+        if plan.parent_name is not None:
+            tips.append(
+                f"Child session '{plan.manifest.name}' was created and retained. Resume that child after recovery; "
+                f"retrying parent '{plan.parent_name}' creates another child."
+            )
+        tips.append("Forge did not launch Claude or replace the recorded proxy route.")
         print_error_with_tip(
             f"Persisted proxy route for session '{plan.manifest.name}' is unavailable: {e}",
-            "Restart the recorded proxy and retry, or explicitly select a live proxy from its stored template.",
-            "Forge did not launch Claude or replace the recorded proxy route.",
+            *tips,
             commands=commands,
             console=err_console,
         )

@@ -612,7 +612,9 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Validates preconditions (proxy healthy, session file exists)
 - On a bare host resume, healthchecks the persisted proxy endpoint and every recorded identity field before committing
   launch routing or invoking Claude. It does not silently replace a dead or mismatched recorded proxy; an explicit
-  `--proxy <template-or-id>` authorizes realization of a different live route.
+  `--proxy <template-or-id>` authorizes realization of a different live route. Derived resume paths retain a child
+  already created before this launch-boundary check; the refusal names that child and warns that retrying the parent
+  would create another.
 - Records `confirmed.proxy` at session start when proxy mode is active
 
 **Codex-runtime sessions** (`forge session start --runtime codex`, see
