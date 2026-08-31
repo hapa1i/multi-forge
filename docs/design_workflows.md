@@ -234,6 +234,11 @@ git diff -- src/forge/session/store.py | forge policy check --bundle tdd --diff
 forge policy supervisor evaluate --file src/forge/session/store.py --resume-id <planning-session-or-uuid>
 ```
 
+The terminal `--diff` path and `%policy check` both split multi-file diffs into per-file contexts, order tests before
+implementation, and evaluate all contexts through one engine. A leading documentation file therefore cannot mask a
+path-scoped violation later in the patch, while stateful TDD policy still sees an atomic test-plus-implementation
+change.
+
 The deterministic manual and hook paths share `PolicyEngine`; one-shot supervisor evaluation and hook enforcement share
 `invoke_supervisor`. Forge does not expose one universal `forge policy check <policy-id>` registry surface.
 
@@ -665,11 +670,11 @@ runners**: reusable Python functions in `core/reactive/` that each implement one
 
 **Three-layer architecture:**
 
-| Layer | What                 | Lives in                            | Examples                                         |
-| ----- | -------------------- | ----------------------------------- | ------------------------------------------------ |
-| 1     | Abstract runners     | `core/reactive/`                    | Fan-out, adversarial, linear, actor/critic       |
-| 2     | Skill resources      | `src/skills/*/resources/`           | Review resource .md, analyze prompt, tagger      |
-| 3     | Concrete invocations | Neutral source or legacy `SKILL.md` | `/forge:panel`, `/forge:debate`, `/forge:review` |
+| Layer | What                 | Lives in                            | Examples                                    |
+| ----- | -------------------- | ----------------------------------- | ------------------------------------------- |
+| 1     | Abstract runners     | `core/reactive/`                    | Fan-out, adversarial, linear, actor/critic  |
+| 2     | Skill resources      | `src/skills/*/resources/`           | Review resource .md, analyze prompt, tagger |
+| 3     | Concrete invocations | Neutral source or legacy `SKILL.md` | `/panel`, `/debate`, `/review`              |
 
 Layer 3 entry points wire a runner (Layer 1) to specific resources (Layer 2). The same runner/resource can be combined
 differently by different entry points.
@@ -785,9 +790,9 @@ collects independent findings for synthesis. Each reviewer is a full Claude Code
 find issues with real file:line evidence). The main agent synthesizes all N reviews -- identifying consensus findings,
 unique insights, and conflicts -- with full project context to investigate disputes.
 
-**Dual use:** The panel serves as both a skill (`/forge:panel src/session/ --code`) and a policy (automatic multi-model
-gate before committing). Same `run_multi_review()` function, two callers -- the programmer wires both. `/forge:analyze`
-is a degenerate fan-out (N=1) with an analyze-specific resource.
+**Dual use:** The panel serves as both a skill (`/panel src/session/ --code`) and a policy (automatic multi-model gate
+before committing). Same `run_multi_review()` function, two callers -- the programmer wires both. `/analyze` is a
+degenerate fan-out (N=1) with an analyze-specific resource.
 
 ### 3.8 Debate (adversarial reference skill)
 
@@ -816,7 +821,7 @@ Reference details for [Skills Architecture](#3-skills-architecture).
 - Parallel via `ThreadPoolExecutor` + process group cleanup
 - Workers receive pre-resolved `RoutingResult` from a `WorkerRoutingPlan` (see
   [design_runtime.md §G](design_runtime.md#g-subprocess-routing-reference))
-- `/forge:analyze`: single-model fan-out with an analyze resource
+- `/analyze`: single-model fan-out with an analyze resource
 
 ### 4.2 Adversarial runner details (from §3.5)
 
@@ -828,7 +833,7 @@ Adversarial runner:
 - Stances: for/against/neutral with guardrails (lens, not honesty)
 - Synthesize agreement vs disagreement; evidence-weighted recommendation
 
-Adversarial-compatible skills include `{stance_prompt}` in their resource .md; `/forge:debate` enforces this.
+Adversarial-compatible skills include `{stance_prompt}` in their resource .md; `/debate` enforces this.
 
 ### 4.3 Panel engine details (from §3.7)
 
@@ -852,11 +857,11 @@ fan-out patterns -- code review, document review, security audit -- all using th
 unique insights, and conflicts. Because the main agent has full project context, it can **investigate conflicts** by
 reading the disputed code -- something external synthesis (which merges text without context) cannot do.
 
-**`/forge:analyze` as degenerate fan-out:** Single-model fan-out with an analyze-specific resource. Same panel engine
-with N=1. The resource instructs the model to act as a senior engineering collaborator with deep analysis guidelines.
+**`/analyze` as degenerate fan-out:** Single-model fan-out with an analyze-specific resource. Same panel engine with
+N=1. The resource instructs the model to act as a senior engineering collaborator with deep analysis guidelines.
 
-**Dual use:** The panel serves as both a skill (`/forge:panel src/session/ --code`) and a policy (automatic multi-model
-gate before committing). Same `run_multi_review()` function, two callers -- the programmer wires both.
+**Dual use:** The panel serves as both a skill (`/panel src/session/ --code`) and a policy (automatic multi-model gate
+before committing). Same `run_multi_review()` function, two callers -- the programmer wires both.
 
 ### 4.4 Debate / adversarial reference skill (from §3.8)
 

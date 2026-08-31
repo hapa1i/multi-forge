@@ -73,6 +73,7 @@ class TestGuardCheckFile:
         assert data["passed"] is True
         assert data["clean"] is True
         assert data["final_decision"] == "allow"
+        assert data["files_checked"] == 1
         assert "policies_evaluated" in data
 
     def test_json_output_deny(self, tmp_path):
@@ -133,40 +134,21 @@ class TestGuardCheckFile:
         assert data["clean"] is True
 
 
-class TestExtractPathFromDiff:
-    """Unit tests for _extract_path_from_diff helper."""
-
-    def test_standard_git_diff(self):
-        from forge.cli.policy import _extract_path_from_diff
-
-        diff = "+++ b/src/foo.py\n"
-        assert _extract_path_from_diff(diff) == "src/foo.py"
-
-    def test_strips_trailing_timestamp(self):
-        from forge.cli.policy import _extract_path_from_diff
-
-        diff = "+++ b/src/foo.py\t2026-02-12 10:30:00.000000000 +0000\n"
-        assert _extract_path_from_diff(diff) == "src/foo.py"
-
-    def test_dev_null_returns_none(self):
-        from forge.cli.policy import _extract_path_from_diff
-
-        diff = "+++ /dev/null\n"
-        assert _extract_path_from_diff(diff) is None
-
-    def test_no_match_returns_none(self):
-        from forge.cli.policy import _extract_path_from_diff
-
-        assert _extract_path_from_diff("just some text") is None
-
-    def test_first_file_in_multi_file_diff(self):
-        from forge.cli.policy import _extract_path_from_diff
-
-        diff = "+++ b/first.py\n--- a/second.py\n+++ b/second.py\n"
-        assert _extract_path_from_diff(diff) == "first.py"
-
-
 class TestGuardCheckDiff:
+    def test_simple_unified_diff_keeps_single_file_compatibility(self):
+        diff = "+++ b/src/foo.py\t2026-02-12 10:30:00.000000000 +0000\n+x = 1\n"
+
+        result = CliRunner().invoke(
+            main,
+            ["policy", "check", "--bundle", "tdd", "--diff", "--json"],
+            input=diff,
+        )
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["files_checked"] == 1
+        assert data["violations"][0]["file_path"] == "src/foo.py"
+
     def test_diff_with_file_path_extracted(self):
         """--diff should extract target_path from unified diff headers."""
         diff = (
@@ -223,6 +205,34 @@ class TestGuardCheckDiff:
         data = json.loads(result.output)
         # Should actually have evaluated policies (not empty)
         assert len(data["policies_evaluated"]) > 0
+
+    def test_multifile_tdd_diff_is_evaluated_tests_first(self):
+        """One engine sees test changes before implementation changes in an atomic diff."""
+        diff = (
+            "diff --git a/pkg/src/widget.py b/pkg/src/widget.py\n"
+            "--- /dev/null\n"
+            "+++ b/pkg/src/widget.py\n"
+            "@@ -0,0 +1,2 @@\n"
+            "+def widget():\n"
+            "+    return 42\n"
+            "diff --git a/pkg/tests/test_widget.py b/pkg/tests/test_widget.py\n"
+            "--- /dev/null\n"
+            "+++ b/pkg/tests/test_widget.py\n"
+            "@@ -0,0 +1,2 @@\n"
+            "+def test_widget():\n"
+            "+    assert True\n"
+        )
+
+        result = CliRunner().invoke(
+            main,
+            ["policy", "check", "--bundle", "tdd", "--diff", "--json"],
+            input=diff,
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["passed"] is True
+        assert data["files_checked"] == 2
 
 
 class TestGuardCheckFailMode:

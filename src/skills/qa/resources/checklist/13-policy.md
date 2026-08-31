@@ -77,6 +77,33 @@ git diff HEAD~1 | forge policy check --bundle tdd --bundle coding_standards --di
 # Check with JSON output
 git diff HEAD~1 | forge policy check --bundle tdd --diff --json
 
+# A multi-file check must evaluate a later Python file rather than applying the
+# first file's path to the whole diff.
+cat >/tmp/qa-policy-multifile.diff <<'EOF'
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1,2 @@
+ # Forge QA
++Harmless documentation.
+diff --git a/src/main.py b/src/main.py
+--- a/src/main.py
++++ b/src/main.py
+@@ -1 +1,2 @@
+ print("new")
++if TYPE_CHECKING:
+EOF
+set +e
+forge policy check --bundle coding_standards --diff --json \
+  </tmp/qa-policy-multifile.diff >/tmp/qa-policy-multifile.json
+MULTIFILE_RC=$?
+set -e
+test "$MULTIFILE_RC" -eq 1
+jq -e '
+  .files_checked == 2
+  and any(.violations[]; .file_path == "src/main.py" and .rule_id == "coding_standards.no-type-checking")
+' /tmp/qa-policy-multifile.json
+
 # Check the independent single-file source mode from the installed wheel.
 forge policy check --bundle coding_standards --file src/main.py --json \
   | jq -e 'has("passed") and has("clean")'
@@ -95,10 +122,11 @@ test "$TWO_SOURCES_RC" -ne 0
 rg 'Provide --file or --diff' /tmp/qa-policy-no-source.stderr
 rg 'cannot be used together' /tmp/qa-policy-two-sources.stderr
 rm -f /tmp/qa-policy-no-source.stdout /tmp/qa-policy-no-source.stderr \
-  /tmp/qa-policy-two-sources.stdout /tmp/qa-policy-two-sources.stderr
+  /tmp/qa-policy-two-sources.stdout /tmp/qa-policy-two-sources.stderr \
+  /tmp/qa-policy-multifile.diff /tmp/qa-policy-multifile.json
 ```
 
-- [ ] Evaluates diff against specified bundles
+- [ ] Evaluates every file in a diff against the specified bundles, including path-scoped rules after the first file
 - [ ] `--json` produces structured output with `passed` and `clean` fields
 - [ ] `--file` independently evaluates one installed source path
 - [ ] Zero sources and `--file` plus `--diff` both fail before evaluation with actionable diagnostics

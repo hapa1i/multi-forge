@@ -161,7 +161,8 @@ git diff | forge policy check --bundle coding_standards --diff
 - `--json` — structured JSON output
 
 Choose exactly one content source: `--file` / `-f` or `--diff`. Passing both is a usage error; Forge does not choose one
-and ignore the other.
+and ignore the other. `--diff` splits a multi-file patch into per-file action contexts and evaluates them tests-first
+through one policy engine. JSON output includes `files_checked`, and each violation names its `file_path`.
 
 Exit codes: 0 (passed or warnings only), 1 (policy violation), 2 (usage error or engine failure).
 

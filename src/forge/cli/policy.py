@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any, NoReturn, cast
@@ -616,22 +615,6 @@ def status(as_json: bool, session_name: str | None) -> None:
         )
 
 
-_DIFF_PATH_RE = re.compile(r"^\+\+\+ b/(.+?)(?:\t.*)?$", re.MULTILINE)
-
-
-def _extract_path_from_diff(diff: str) -> str | None:
-    """Extract the first file path from a unified diff.
-
-    Parses ``+++ b/<path>`` lines, stripping trailing tab-delimited
-    metadata (timestamps, etc.). Returns None if no path found.
-    """
-    m = _DIFF_PATH_RE.search(diff)
-    if m:
-        path = m.group(1).strip()
-        return path if path and path != "/dev/null" else None
-    return None
-
-
 @policy.command(name="check")
 @click.option(
     "--bundle",
@@ -689,6 +672,7 @@ def check(
         raise click.UsageError("Options --file and --diff cannot be used together.")
 
     from forge.policy.action_identity import compute_action_fingerprint
+    from forge.policy.diff import sort_tests_first, split_diff_per_file
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, FailMode, extract_added_lines
 
@@ -698,6 +682,7 @@ def check(
 
     cwd = Path.cwd().resolve()
 
+    inputs: list[tuple[str | None, str, str | None]]
     if use_diff:
         if sys.stdin.isatty():
             print_error(
@@ -707,8 +692,11 @@ def check(
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
-        target_path = _extract_path_from_diff(raw_input)
-        new_content = extract_added_lines(raw_input)
+        file_diffs = sort_tests_first(split_diff_per_file(raw_input))
+        if raw_input.strip() and not file_diffs:
+            print_error("Diff input could not be parsed into files", console=err_console)
+            sys.exit(2)
+        inputs = [(path, extract_added_lines(chunk), chunk) for path, chunk in file_diffs]
     else:
         assert file_path is not None
         target = Path(file_path)
@@ -723,31 +711,32 @@ def check(
             target_path = str(target.resolve().relative_to(cwd))
         except ValueError:
             target_path = str(target)
-
-    tool_args = {"file_path": file_path or "", "content": new_content[:200]}
-    action_fingerprint = compute_action_fingerprint(
-        tool_name=tool_name,
-        target_path=target_path,
-        tool_args=tool_args,
-        new_content=new_content,
-        raw_diff=raw_input if use_diff else None,
-    )
-    context = ActionContext(
-        origin="forge_cli",
-        event="OnDemand.Check",
-        tool_name=tool_name,
-        tool_args=tool_args,
-        repo_root=str(cwd),
-        session_name="on-demand",
-        target_path=target_path,
-        new_content=new_content[:5000] if new_content else None,
-        raw_diff=raw_input[:5000] if use_diff and raw_input else None,
-        action_fingerprint=action_fingerprint,
-    )
+        inputs = [(target_path, new_content, None)]
 
     try:
         engine = build_engine(list(bundles), fail_mode=cast(FailMode, fail_mode))
-        result = engine.evaluate(context)
+        results = []
+        for input_path, input_content, input_diff in inputs:
+            tool_args = {"file_path": input_path or "", "content": input_content[:200]}
+            context = ActionContext(
+                origin="forge_cli",
+                event="OnDemand.Check",
+                tool_name=tool_name,
+                tool_args=tool_args,
+                repo_root=str(cwd),
+                session_name="on-demand",
+                target_path=input_path,
+                new_content=input_content[:5000] if input_content else None,
+                raw_diff=input_diff[:5000] if input_diff else None,
+                action_fingerprint=compute_action_fingerprint(
+                    tool_name=tool_name,
+                    target_path=input_path,
+                    tool_args=tool_args,
+                    new_content=input_content,
+                    raw_diff=input_diff,
+                ),
+            )
+            results.append((input_path, engine.evaluate(context)))
     except Exception as e:
         if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}), err=True)
@@ -755,60 +744,95 @@ def check(
             print_error(f"Policy evaluation failed: {e}")
         sys.exit(2)
 
-    # Determine exit code: allow and warn both exit 0 (warn = advisory)
-    passed = result.final_decision in ("allow", "warn")
+    decisions = [result.final_decision for _, result in results]
+    if "deny" in decisions:
+        final_decision = "deny"
+    elif "needs_review" in decisions:
+        final_decision = "needs_review"
+    elif "warn" in decisions:
+        final_decision = "warn"
+    else:
+        final_decision = "allow"
+
+    # Determine exit code: allow and warn both exit 0 (warn = advisory).
+    passed = final_decision in ("allow", "warn")
     exit_code = 0 if passed else 1
+
+    all_warnings: list[str] = []
+    policies_evaluated: list[str] = []
+    seen_policies: set[str] = set()
+    for result_path, result in results:
+        all_warnings.extend(
+            f"{result_path}: {warning}" if use_diff and result_path else warning for warning in result.all_warnings
+        )
+        for decision in result.decisions:
+            if decision.policy_id not in seen_policies:
+                seen_policies.add(decision.policy_id)
+                policies_evaluated.append(decision.policy_id)
 
     if as_json:
         # Build violations with intent from their parent decisions
         violations_json = []
-        for d in result.decisions:
-            if d.decision != "deny":
-                continue
-            for v in d.violations:
-                entry: dict[str, str | None] = {
-                    "rule_id": v.rule_id,
-                    "message": v.message,
-                    "severity": v.severity,
-                    "suggested_fix": v.suggested_fix,
-                }
-                if d.intent:
-                    entry["intent"] = d.intent
-                violations_json.append(entry)
-        output = {
-            "passed": passed,
-            "clean": result.final_decision == "allow",
-            "final_decision": result.final_decision,
-            "violations": violations_json,
-            "warnings": result.all_warnings,
-            "policies_evaluated": [d.policy_id for d in result.decisions],
-        }
-        click.echo(json.dumps(output, indent=2))
-    else:
-        if result.final_decision == "allow":
-            console.print("[green]All policies passed[/green]")
-        elif result.final_decision == "warn":
-            console.print("[yellow]Passed with warnings[/yellow]")
-            for w in result.all_warnings:
-                console.print(f"  ⚠︎ {w}", style="yellow")
-        else:
-            console.print(f"[red]Policy check failed ({result.final_decision})[/red]")
+        for result_path, result in results:
             for d in result.decisions:
                 if d.decision != "deny":
                     continue
-                table = Table(show_header=True)
-                table.add_column("Rule", style="cyan")
-                table.add_column("Severity", style="red")
-                table.add_column("Message")
-                table.add_column("Fix", style="dim")
                 for v in d.violations:
-                    table.add_row(v.rule_id, v.severity, v.message, v.suggested_fix or "")
-                if d.intent:
-                    table.add_row("", "", f"[dim]Intent: {d.intent}[/dim]", "")
-                console.print(table)
+                    entry: dict[str, str | None] = {
+                        "file_path": result_path,
+                        "rule_id": v.rule_id,
+                        "message": v.message,
+                        "severity": v.severity,
+                        "suggested_fix": v.suggested_fix,
+                    }
+                    if d.intent:
+                        entry["intent"] = d.intent
+                    violations_json.append(entry)
+        output = {
+            "passed": passed,
+            "clean": final_decision == "allow",
+            "final_decision": final_decision,
+            "files_checked": len(results),
+            "violations": violations_json,
+            "warnings": all_warnings,
+            "policies_evaluated": policies_evaluated,
+        }
+        click.echo(json.dumps(output, indent=2))
+    else:
+        checked_suffix = f" ({len(results)} files checked)" if use_diff else ""
+        if final_decision == "allow":
+            console.print(f"[green]All policies passed[/green]{checked_suffix}")
+        elif final_decision == "warn":
+            console.print("[yellow]Passed with warnings[/yellow]")
+            for w in all_warnings:
+                console.print(f"  ⚠︎ {w}", style="yellow")
+        else:
+            console.print(f"[red]Policy check failed ({final_decision})[/red]{checked_suffix}")
+            for result_path, result in results:
+                for d in result.decisions:
+                    if d.decision != "deny":
+                        continue
+                    table = Table(show_header=True)
+                    if use_diff:
+                        table.add_column("File")
+                    table.add_column("Rule", style="cyan")
+                    table.add_column("Severity", style="red")
+                    table.add_column("Message")
+                    table.add_column("Fix", style="dim")
+                    for v in d.violations:
+                        row = [v.rule_id, v.severity, v.message, v.suggested_fix or ""]
+                        if use_diff:
+                            row.insert(0, result_path or "-")
+                        table.add_row(*row)
+                    if d.intent:
+                        row = ["", "", f"[dim]Intent: {d.intent}[/dim]", ""]
+                        if use_diff:
+                            row.insert(0, result_path or "-")
+                        table.add_row(*row)
+                    console.print(table)
 
-        if result.all_warnings and result.final_decision != "warn":
-            for w in result.all_warnings:
+        if all_warnings and final_decision != "warn":
+            for w in all_warnings:
                 console.print(f"  [dim]⚠︎ {w}[/dim]")
 
     sys.exit(exit_code)
