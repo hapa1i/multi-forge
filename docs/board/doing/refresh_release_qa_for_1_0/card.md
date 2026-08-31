@@ -81,6 +81,12 @@ The refresh must resolve at least these verified inconsistencies before adding c
    output is negative evidence, never an alternative pass.
 8. **Preserve section addressing.** Add v1.0.0 probes only by appending steps to their related sections 0-20. Do not
    insert, renumber, or create section 21+, so category and `--from`/`--to` meanings remain stable.
+9. **Ratified v1.0.0 delta closure.** Do not repeat unaffected paid and human steps after the synchronized 2026-08-30
+   run. That run completed every blocking step with exact wheel, driver, and pinned-runtime identity, and every non-pass
+   result was classified. Close its non-pass results with direct execution of each failed or skipped block, automated
+   coverage of the sole product delta, and exact-wheel/driver verification of the rebuilt candidate. Keep the saved
+   run's native `fail` verdict; the release decision is composite evidence, not a synthesized passing report. Any later
+   product or packaged QA change invalidates this exception and requires a new complete pinned run.
 
 ## Scope
 
@@ -226,7 +232,8 @@ inspect a file or JSON record that the CLI can validate directly.
 - Targeted integration tests required by the session, hook, Codex, proxy, backend, installer, and authority changes;
   Codex real-runtime owners must observe CLI `0.149.1` before the pin is release-validated.
 - `uv build` followed by `scripts/test-wheel-runtime.sh` and the new exact-wheel QA lifecycle.
-- One complete pinned-runtime blocking QA run with saved report and artifacts.
+- One complete pinned-runtime blocking QA run with saved report and artifacts. For this card, Accepted Decision 9 closes
+  the post-run repairs with a bounded evidence bridge; it does not rewrite the saved run as passing.
 - One separately labelled `latest` compatibility run when network/runtime availability permits.
 - `make pre-commit`, Markdown link checks, file-size checks, and `git diff --check`.
 

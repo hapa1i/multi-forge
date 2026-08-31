@@ -12,16 +12,17 @@ creation happened in the same decision.
 ## Current Focus
 
 The synchronized pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved
-verdict is correctly `fail`: 12 of 13 failed assertions came from stale QA fixtures, while one exposed zombie-owned log
-retention in Linux containers. The fixture repairs, deterministic skip coverage, and product regression are now in the
-focused verification lane. The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8
-paid operations.
+verdict remains `fail`: 12 of 13 failed assertions came from stale QA fixtures, while one exposed zombie-owned log
+retention in Linux containers. Every non-pass result is classified, the corrected fixtures have direct execution
+evidence, and the sole product delta has unit, regression, and real-container coverage. The rebuilt exact wheel and its
+packaged driver also pass the artifact boundary. The default blocking selection remains 163 steps, 552 assertions, 8
+human checkpoints, and 8 paid operations.
 
-Phase 7 still needs the broad named integration-owner run, a clean human-driven pinned release-candidate QA rerun after
-these repairs, and the separately labelled `latest` compatibility pass. Keep the card in `doing/` until that evidence is
-reviewed; the failed run and disposable-container fixture checks are diagnostic evidence, not the v1.0.0 release
-verdict. The Codex integration owners must run against observed Codex CLI `0.149.1` before that pin's release validation
-is complete.
+The v1.0.0 maintainer has ratified a bounded delta closure instead of repeating unaffected live steps. This is a
+composite release decision, not a rewritten or synthesized passing QA report. Any later product or packaged QA change
+invalidates the bridge and requires a new complete pinned run. Phase 7 still needs the broad named integration-owner run
+and separately labelled `latest` compatibility pass; the Codex integration owners must observe Codex CLI `0.149.1`
+before that pin's release validation is complete.
 
 ## Execution Guardrails
 
@@ -268,11 +269,12 @@ is complete.
 - [x] Run `make test-unit`, `make test-regression`, and `make pre-commit` with no unexplained failures or new skips.
 - [x] Run `uv build`, `scripts/test-wheel-runtime.sh`, and the exact-wheel isolation/lifecycle integration gate against
   the same candidate artifact.
-- [ ] Run one complete pinned-runtime blocking QA pass from a prebuilt release-candidate wheel. **Assertion**: report
-  and artifacts are saved, all blocking sections pass, runtime and artifact identities match, human checkpoints are at
-  most 12, paid operations are at most 8, duration is recorded, any over-45-minute run has explicit maintainer
-  disposition without being reclassified as a product failure solely for elapsed time, and cleanup preserves unrelated
-  bytes.
+- [x] Close the pinned-runtime blocking evidence from a prebuilt release-candidate wheel. The synchronized complete run
+  saved its report and artifacts, preserved exact artifact/driver/runtime identity, executed all 163 selected steps and
+  all 8 paid and 8 human operations, recorded duration with maintainer disposition, and preserved unrelated cleanup
+  bytes. Its native verdict remains `fail`; the ratified delta closure below classifies every non-pass result, directly
+  exercises every failed or skipped block after correction, covers the sole product delta through automated owners, and
+  verifies the rebuilt wheel/driver boundary. No passing report is inferred.
 - [ ] Run one separately labelled `latest` compatibility pass when runtime/network availability permits. Record a skip
   or failure as compatibility evidence without changing the pinned verdict.
 - [x] Run Markdown links, repository file-size checks, and `git diff --check`; review the final diff for accidental
@@ -315,7 +317,8 @@ is complete.
   launcher under its restricted PATH, 2.13 tolerates rendered truncation/wrapping, 3.3 isolates the file-backed
   credential probe, 4.1/4.17 name all 20 templates, and deleting a configured-only proxy does not claim adoption.
 - [x] Re-run the exact-wheel Docker gate and focused dispatcher/session integration owners.
-- [ ] Repeat the pinned blocking QA pass from a rebuilt release-candidate wheel.
+- [x] Superseded by the synchronized complete run recorded below and its bounded delta closure; do not treat the earlier
+  partial run as release evidence.
 
 ### Partial QA Fix Verification -- 2026-08-27
 
@@ -368,8 +371,8 @@ is complete.
   tests; session-routing Docker integration passed with 2 tests; and the clean exact-wheel Docker gate passed with 1
   test. `make build` and `make pre-commit` passed. The resulting wheel SHA-256 is
   `7c0dd1c057e90fa2be0b561d336bd02b3f9a3449fe2ebe48308089e2529c2b47`.
-- [ ] Repeat the complete pinned blocking QA pass from that follow-up wheel. This remains distinct from the broader
-  unticked Phase 7 integration-owner sweep and the separately labelled `latest` compatibility pass.
+- [x] Superseded by the later synchronized complete run. The stale-driver partial run itself remains excluded from
+  release evidence.
 
 ### Stale-Driver Partial QA Follow-up -- 2026-08-29
 
@@ -390,7 +393,8 @@ is complete.
   contracts.
 - [x] Clarify same-file duplicate-hook diagnostics so one settings path is not printed twice.
 - [x] Rebuild and run the focused unit, checklist, exact-wheel Docker, session, hook, regression, and pre-commit owners.
-- [ ] Restart from a synchronized copy of the rebuilt wheel's QA package; do not resume the stale-driver run at 5.23.
+- [x] Restarted from the synchronized wheel/driver pair for the complete 2026-08-30 run; the stale-driver partial run
+  was not resumed or counted.
 
 ### Stale-Driver Fix Verification -- 2026-08-29
 
@@ -403,7 +407,7 @@ is complete.
 - `./scripts/test-wheel-runtime.sh` passed from an isolated Python 3.12 install, including dependency resolution and
   managed LiteLLM start/health.
 - The selected wheel's Claude-local QA package was re-enabled in copy mode and independently passed the driver/wheel
-  identity probe. Claude Code still needs to restart before the next fresh human-driven run.
+  identity probe. The subsequent complete run restarted Claude Code and loaded that synchronized package.
 
 ### Complete QA Follow-up -- 2026-08-30
 
@@ -435,7 +439,32 @@ is complete.
 - [x] Rebuild and synchronize the exact wheel. Its SHA-256 is
   `b78a2dee5e3d68df01ab0a3bfe76e8925a4ad1fb7b41f9120a171e089bd1ca40`; the packaged and local copied QA driver both
   resolve to `1a0710598fbbcf9f24b6e310e86a76af0f3915461a952c08635df325fad12195`.
-- [ ] Restart Claude Code, then repeat the complete pinned blocking run from the synchronized wheel/driver pair.
+- [x] Close the repaired candidate through the ratified delta-evidence bridge instead of repeating unaffected paid and
+  human steps. The saved run remains `fail`; no synthetic passing report is created.
+
+### Ratified Release Delta Closure -- 2026-08-31
+
+- **Complete-run baseline**: `~/.forge/manual-testing/qa/runs/2026-08-30-221147/` contains the saved report and
+  artifacts for wheel SHA-256 `8a9f8a50b85cc7c7c25d4bcf49485d39ffc8d1c51f6d13f31ed25312362d3435` and matching driver
+  SHA-256 `d2bffe9a970d54e3477f24d4c72b5ba2f8bb69fa108a2f4e05122e6ef66736f0`. It completed all 163 selected steps and
+  552 assertions with pinned Claude `2.1.245` and Codex `0.149.1`, 8/8 human checkpoints, and 8/8 paid operations.
+  Preserve its recorded 536 passes, 13 failures, 3 skips, and native `fail` verdict.
+- **Bounded delta**: from that candidate to the rebuilt candidate, the only product behavior change is zombie-aware log
+  cleanup in `src/forge/cli/logs.py`. The remaining executable changes correct the QA blocks implicated by the 12 stale
+  assertions and 3 vacuous skips, repair two additional harness-only observations, add contract coverage, and record
+  evidence. Unaffected product surfaces carry forward only from the complete run; they are not claimed to have been
+  re-executed against the rebuilt wheel.
+- **Direct repair evidence**: current-schema cost breakdown/provenance, independent partial-versus-estimated activity,
+  session-bounded status-line cost, invalid config rejection, search orphan preview/apply, and real-zombie cleanup all
+  produced their asserted outputs in disposable containers. Unit and checklist contracts cover the corrected block
+  shape; unit, regression, and real-container tests cover the product delta.
+- **Rebuilt-candidate boundary**: wheel SHA-256 `b78a2dee5e3d68df01ab0a3bfe76e8925a4ad1fb7b41f9120a171e089bd1ca40` and
+  packaged/local driver SHA-256 `1a0710598fbbcf9f24b6e310e86a76af0f3915461a952c08635df325fad12195` passed the
+  exact-wheel artifact gate, clean wheel/LiteLLM smoke, build, unit, regression, pre-commit, and Markdown checks listed
+  above.
+- **Decision and invalidation**: the maintainer accepts this composite evidence for the v1.0.0 card instead of another
+  complete live run. It must never be presented as a native QA `pass`. Any subsequent product or packaged-QA change
+  invalidates the bridge and reopens the complete pinned-run item; board-only evidence wording does not.
 
 ## Acceptance Tests
 
@@ -472,4 +501,5 @@ is complete.
 - [ ] Confirm design and end-user documentation describe shipped behavior, then move this card to `done/` and repoint
   the walkthrough card's inbound link to the final lane.
 - [ ] Commit the reviewed implementation in a reviewable series, push the execution branch, open the PR with exact
-  verification evidence, and merge only after the release-candidate gate and required checks pass.
+  verification evidence, and merge only after the release-candidate evidence is closed under Accepted Decision 9 and
+  required checks pass.
