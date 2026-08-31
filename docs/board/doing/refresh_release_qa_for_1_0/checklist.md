@@ -12,17 +12,16 @@ creation happened in the same decision.
 ## Current Focus
 
 The synchronized pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved
-verdict remains `fail`: 12 of 13 failed assertions came from stale QA fixtures, while one exposed zombie-owned log
-retention in Linux containers. Every non-pass result is classified, the corrected fixtures have direct execution
-evidence, and the sole product delta has unit, regression, and real-container coverage. The rebuilt exact wheel and its
-packaged driver also pass the artifact boundary. The default blocking selection remains 163 steps, 552 assertions, 8
-human checkpoints, and 8 paid operations.
+verdict remains `fail`, and the subsequent bounded delta closure remains useful historical evidence. Post-closure review
+then found three product defects: byte-unsafe Linux process liveness, catalog-dependent reporting of durable model
+intent, and a mutating session-delete preview. It also found two packaged-QA defects: omitted driver identity in final
+metrics and non-transactional cleanup in step 18.4. Fixing them changed both the product and packaged QA, so the
+ratified bridge is invalid under its own rule.
 
-The v1.0.0 maintainer has ratified a bounded delta closure instead of repeating unaffected live steps. This is a
-composite release decision, not a rewritten or synthesized passing QA report. Any later product or packaged QA change
-invalidates the bridge and requires a new complete pinned run. Phase 7 still needs the broad named integration-owner run
-and separately labelled `latest` compatibility pass; the Codex integration owners must observe Codex CLI `0.149.1`
-before that pin's release validation is complete.
+A fresh complete pinned run against the rebuilt exact wheel and matching packaged driver is therefore open and required.
+The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations. Phase 7
+also still needs the broad named integration-owner run and separately labelled `latest` compatibility pass; the Codex
+integration owners must observe Codex CLI `0.149.1` before that pin's release validation is complete.
 
 ## Execution Guardrails
 
@@ -274,7 +273,12 @@ before that pin's release validation is complete.
   all 8 paid and 8 human operations, recorded duration with maintainer disposition, and preserved unrelated cleanup
   bytes. Its native verdict remains `fail`; the ratified delta closure below classifies every non-pass result, directly
   exercises every failed or skipped block after correction, covers the sole product delta through automated owners, and
-  verifies the rebuilt wheel/driver boundary. No passing report is inferred.
+  verifies the rebuilt wheel/driver boundary. No passing report is inferred. This historical closure was subsequently
+  invalidated by the post-review changes recorded below.
+- [ ] Rebuild the exact wheel after the 2026-08-31 product and packaged-QA fixes, synchronize its packaged driver, and
+  complete a fresh pinned-runtime blocking run. Save the native report and artifacts, require matching wheel, driver,
+  Claude, and Codex identity at both boundaries, and classify every non-pass result without carrying the invalidated
+  bridge forward.
 - [ ] Run one separately labelled `latest` compatibility pass when runtime/network availability permits. Record a skip
   or failure as compatibility evidence without changing the pinned verdict.
 - [x] Run Markdown links, repository file-size checks, and `git diff --check`; review the final diff for accidental
@@ -464,7 +468,33 @@ before that pin's release validation is complete.
   above.
 - **Decision and invalidation**: the maintainer accepts this composite evidence for the v1.0.0 card instead of another
   complete live run. It must never be presented as a native QA `pass`. Any subsequent product or packaged-QA change
-  invalidates the bridge and reopens the complete pinned-run item; board-only evidence wording does not.
+  invalidates the bridge and reopens the complete pinned-run item; board-only evidence wording does not. Product and
+  packaged-QA fixes made later on 2026-08-31 triggered this condition, so the bridge is no longer release-closing.
+
+### Post-Closure Invalidation -- 2026-08-31
+
+- **Product changes**: make `/proc/<pid>/stat` parsing byte-safe, preserve committed `model_route.requested_model`
+  independently of the current catalog, and give delete previews a non-pruning index snapshot while retaining repair
+  during confirmed deletion.
+- **Packaged-QA changes**: emit the validated QA-driver digest in final run metrics and make step 18.4 clean its
+  disposable project and installation row on both success and failure.
+- **Evidence consequence**: these are not board-only wording changes. They produce a new wheel and packaged driver, so
+  Accepted Decision 9 cannot cover them. The fresh complete pinned-run item in Phase 7 is open.
+
+### Post-Closure Fix Verification -- 2026-08-31
+
+- The combined focused unit/regression set passed with 267 tests. It executes the real step 18.4 Bash block through an
+  injected early failure and verifies cleanup, in addition to covering byte-safe process classification, durable model
+  intent, non-mutating delete preview, confirmed-delete repair, and final driver metrics.
+- Targeted Docker owners passed for real non-UTF-8 zombie cleanup, shared-worktree delete preview/cleanup, and managed
+  model-route fork/resume behavior (3 tests). `make test-unit` passed with 9,980 tests and 117 deselected;
+  `make test-regression` passed with 1,080 tests; and `make pre-commit` passed after reviewing and rerunning its
+  Markdown normalization.
+- `make build`, the clean wheel/LiteLLM runtime smoke, and the exact-wheel QA artifact Docker gate passed. The candidate
+  wheel SHA-256 is `d9a03bbdea741e88a7ce9aab0a1b01c1cad1e1ff55cd066c0b808dc0cff4bb69`; its matching packaged QA-driver
+  SHA-256 is `d4de2fe7c7198e9929c0fbf80cc6e79adcae5d3bb01f6a13ec1191b0d66c6968`.
+- This automated evidence does not substitute for the reopened complete live run. The Phase 7 pinned-run item remains
+  unchecked until that exact wheel and driver produce a saved native report.
 
 ## Acceptance Tests
 
