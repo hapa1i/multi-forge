@@ -1198,10 +1198,18 @@ If you run sessions concurrently and both write code, use `--worktree` to avoid 
 2. Active template match (healthy/starting only; fails if ambiguous)
 3. Auto-start from a config template of that name when nothing is running (reuse/adopt/spawn)
 
-All launch commands (`start`, `resume`, `fork`, `claude start`) use the same `ensure_proxy()` function: it resolves via
-the order above, auto-starts from a matching template when no proxy is running, then healthchecks. A name that matches
+Explicit `--proxy` launch routes (`start`, `resume`, `fork`, `claude start`) use `ensure_proxy()`: it resolves via the
+order above, auto-starts from a matching template when no proxy is running, then healthchecks. A name that matches
 neither a running proxy nor a template fails with a `forge proxy template list` hint. `--supervisor-proxy` resolves the
 same way.
+
+A bare host `forge session resume <name>` preserves the exact proxy route recorded by the session and healthchecks its
+endpoint and recorded identity before launching Claude. Forge does not silently replace a dead or mismatched proxy. The
+error prints two recovery paths when the corresponding configuration is available: restart the recorded proxy with
+`forge proxy start <proxy-id>`, or explicitly authorize template realization with
+`forge session resume <name> --proxy <template>`. If `--fresh` or `--force` has already created a derived child before
+the launch check fails, the error names the retained child. Resume that child after recovery rather than retrying the
+parent, which would create another child.
 
 ### Sidecar specifics
 

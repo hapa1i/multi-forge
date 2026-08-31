@@ -128,6 +128,7 @@ class TestSessionResumeExtended:
                 "forge.config.loader.load_proxy_instance_config",
                 return_value=_proxy_cfg(),
             ),
+            patch("forge.cli.claude._healthcheck_proxy"),
             successful_claude_launch() as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "reconnect-addendum"])
