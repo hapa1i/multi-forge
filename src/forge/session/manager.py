@@ -1976,15 +1976,23 @@ class SessionManager:
             return True
         return self.index_store.session_exists(name, forge_root=forge_root)
 
-    def _find_co_resident_sessions(self, worktree_path: str, exclude: str) -> list[str]:
+    def _find_co_resident_sessions(
+        self,
+        worktree_path: str,
+        exclude: str,
+        *,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
+    ) -> list[str]:
         """Find other sessions living in the same worktree directory.
 
-        Uses list_sessions() (self-healing) to avoid stale entries blocking cleanup.
+        Actual cleanup defaults to the self-healing list. Pre-confirmation planners
+        supply a non-mutating, manifest-backed snapshot instead.
         """
         normalized = str(Path(worktree_path).resolve())
+        session_entries = sessions if sessions is not None else self.index_store.list_sessions()
         return [
             name
-            for name, entry in self.index_store.list_sessions()
+            for name, entry in session_entries
             if str(Path(entry.worktree_path).resolve()) == normalized and name != exclude
         ]
 
@@ -2005,6 +2013,7 @@ class SessionManager:
             path=worktree.path,
             is_worktree=worktree.is_worktree,
             owns_worktree=getattr(worktree, "owns_worktree", True),
+            sessions=self.index_store.peek_sessions(),
         )
 
     def _plan_worktree_cleanup_fields(
@@ -2015,12 +2024,16 @@ class SessionManager:
         path: str,
         is_worktree: bool,
         owns_worktree: bool,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
     ) -> WorktreeCleanupPlan:
         if not delete_worktree:
             return WorktreeCleanupPlan(remove=False, reason="requested_keep")
         if not is_worktree:
             return WorktreeCleanupPlan(remove=False, reason="not_worktree")
-        co_residents = tuple(self._find_co_resident_sessions(path, exclude=name))
+        if sessions is None:
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name))
+        else:
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name, sessions=sessions))
         if co_residents:
             return WorktreeCleanupPlan(remove=False, reason="shared", co_residents=co_residents)
         if not owns_worktree:

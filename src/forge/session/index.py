@@ -238,6 +238,34 @@ class IndexStore:
         sessions.sort(key=lambda x: (-iso_to_timestamp(x[1].last_accessed_at), x[0]))
         return sessions
 
+    def peek_sessions(
+        self,
+        include_incognito: bool = True,
+        *,
+        project_root_filter: str | None = None,
+        forge_root_filter: str | None = None,
+    ) -> list[tuple[str, SessionIndexEntry]]:
+        """Return a manifest-backed session snapshot without pruning stale rows.
+
+        Pre-confirmation planners use this read-only peer of :meth:`list_sessions`
+        so a cancelled command cannot repair unrelated global index state. Missing
+        manifests are omitted from the returned snapshot but remain recorded.
+        """
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+
+        sessions = [
+            (session_name_from_key(key), entry)
+            for key, entry in index.sessions.items()
+            if self._manifest_exists_for_row(key, entry) and (include_incognito or not entry.is_incognito)
+        ]
+        if project_root_filter is not None:
+            sessions = [(name, entry) for name, entry in sessions if entry.project_root == project_root_filter]
+        if forge_root_filter is not None:
+            sessions = [(name, entry) for name, entry in sessions if entry.forge_root == forge_root_filter]
+        sessions.sort(key=lambda item: (-iso_to_timestamp(item[1].last_accessed_at), item[0]))
+        return sessions
+
     def run_session_entries_txn(
         self,
         callback: Callable[[list[tuple[str, SessionIndexEntry]]], _T],
