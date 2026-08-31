@@ -221,6 +221,18 @@ def test_missing_or_mismatched_driver_identity_fails_closed() -> None:
         _compute(artifact=mismatched)
 
 
+def test_validated_driver_identity_is_emitted_in_final_metrics() -> None:
+    artifact = _artifact()
+    artifact["driver"]["sha256"] = "b" * 64
+
+    result = _compute(artifact=artifact)
+
+    assert result["driver_identity"] == {
+        "matches_artifact": True,
+        "sha256": "b" * 64,
+    }
+
+
 def test_duration_requires_review_without_becoming_failure() -> None:
     pending = _compute(ended_epoch=2801)
     disposed = _compute(ended_epoch=2801, duration_disposition="accepted provider variance")

@@ -291,6 +291,10 @@ def compute_metrics(
             "preserved": runtime_identity_preserved,
             "final": runtime_final,
         },
+        "driver_identity": {
+            "matches_artifact": True,
+            "sha256": driver["sha256"],
+        },
         "artifact_release_capable": artifact_release_capable,
         "verdict": verdict,
     }

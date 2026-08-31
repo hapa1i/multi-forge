@@ -84,7 +84,8 @@ If no issues: "No issues found."
 - **artifact.json**: wheel, matching QA driver, image, provider, and observed runtime identity
 - **runtime-final.json**: end-of-run Claude/Codex availability and pin-match evidence
 - **selection.json**: selected step ids, evidence lanes, and planned deterministic budgets
-- **run-metrics.json**: selected results, actual counts, duration review state, scope, and verdict
+- **run-metrics.json**: selected results, actual counts, validated driver/runtime identity, duration review state,
+  scope, and verdict
 - **checklist-report.json**: parser-owned assertion detail; unselected ids are not release gaps
 - **forge-logs/final/**: final Forge debug logs copied from the container at artifact-save time
 - **forge-logs-snapshots/**: pre-clean snapshots captured before any checklist step runs `forge logs clean --yes`

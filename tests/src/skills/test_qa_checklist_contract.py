@@ -159,6 +159,16 @@ def test_quoted_python_heredocs_compile() -> None:
                 compile(body, f"QA step {step['id']} embedded Python", "exec")
 
 
+def test_disposable_project_runtime_registers_cleanup_before_mutation() -> None:
+    step = next(step for step in _parsed_checklist()["_all_subs"] if step["id"] == "18.4")
+    code = next(block["code"] for block in step["code_blocks"] if block["runnable"])
+
+    trap_at = code.index("trap cleanup_project_runtime EXIT")
+    assert trap_at < code.index('git init -q "$PROJECT_RUNTIME_ROOT"')
+    assert code.count("trap cleanup_project_runtime EXIT") == 1
+    assert code.rstrip().endswith("cleanup_project_runtime")
+
+
 def test_report_categories_cover_the_index_in_order() -> None:
     parsed = _parsed_checklist()
     expected = [REPORT_CATEGORIES[section["id"]] for section in parsed["sections"]]

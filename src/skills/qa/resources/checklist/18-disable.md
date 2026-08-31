@@ -89,6 +89,33 @@ set -euo pipefail
 
 cd "$FORGE_TEST_REPO"
 PROJECT_RUNTIME_ROOT=$(mktemp -d /tmp/forge-qa-project-runtime.XXXXXX)
+
+cleanup_project_runtime() {
+  local original_status=$?
+  local cleanup_status=0
+  local disable_status=0
+  local remove_status=0
+
+  trap - EXIT
+  set +e
+  if [ -n "${PROJECT_RUNTIME_ROOT:-}" ] && [ -d "$PROJECT_RUNTIME_ROOT" ]; then
+    (cd "$PROJECT_RUNTIME_ROOT" && forge extension disable --scope project --yes >/dev/null 2>&1)
+    disable_status=$?
+    rm -rf -- "$PROJECT_RUNTIME_ROOT"
+    remove_status=$?
+    if [ "$disable_status" -ne 0 ]; then
+      cleanup_status=$disable_status
+    elif [ "$remove_status" -ne 0 ]; then
+      cleanup_status=$remove_status
+    fi
+  fi
+  if [ "$original_status" -ne 0 ]; then
+    exit "$original_status"
+  fi
+  exit "$cleanup_status"
+}
+trap cleanup_project_runtime EXIT
+
 git init -q "$PROJECT_RUNTIME_ROOT"
 PROJECT_KEY="project:$(cd "$PROJECT_RUNTIME_ROOT" && pwd -P)"
 
@@ -119,9 +146,9 @@ forge extension status --scope project --root "$PROJECT_RUNTIME_ROOT" --json \
       and any(.installations[0].skill_packages[]; .runtime == "claude_code" and .state == "present")
       and any(.installations[0].skill_packages[]; .runtime == "codex" and .state == "present")'
 
-# Remove the disposable installation before its root disappears.
-(cd "$PROJECT_RUNTIME_ROOT" && forge extension disable --scope project --yes)
-rm -rf "$PROJECT_RUNTIME_ROOT"
+# Remove the disposable installation before its root disappears. The same
+# idempotent cleanup runs automatically if an earlier assertion exits the block.
+cleanup_project_runtime
 ```
 
 - [ ] Runtime disable removes tracked project `.agents/skills` packages but retains the project row
