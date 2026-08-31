@@ -740,7 +740,76 @@ def _render_claude_resume_result(result: ClaudeResumeResult) -> int:
     )
 
 
+def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
+    """Reject an unavailable persisted host proxy before launch state is committed."""
+    if (
+        plan.direct
+        or plan.routing is not None
+        or plan.model_route_selection is not None
+        or plan.launch_preferences.use_sidecar
+    ):
+        return
+
+    template, base_url, proxy_id = _get_effective_proxy_for_session(plan.manifest)
+    if base_url is None:
+        return
+
+    # Older hook snapshots may omit the template even though intent still owns it.
+    intent_proxy = plan.manifest.intent.proxy
+    if template is None and intent_proxy is not None and intent_proxy.base_url == base_url:
+        template = intent_proxy.template
+    if not template and proxy_id is None:
+        # An opaque custom ANTHROPIC_BASE_URL is not required to expose Forge's
+        # identity endpoint; preserve its established bare-resume behavior.
+        return
+
+    from forge.cli.claude import _healthcheck_proxy
+
+    try:
+        _healthcheck_proxy(
+            base_url=base_url,
+            expected_template=template,
+            expected_proxy_id=proxy_id,
+        )
+    except ValueError as e:
+        commands: list[str] = []
+        if proxy_id is not None:
+            from forge.config.loader import load_proxy_instance_config
+
+            try:
+                recorded_config = load_proxy_instance_config(proxy_id)
+            except Exception:
+                recorded_config = None
+            if (
+                recorded_config is not None
+                and recorded_config.proxy_endpoint.rstrip("/") == base_url.rstrip("/")
+                and (not template or recorded_config.template == template)
+            ):
+                commands.append(f"forge proxy start {shlex.quote(proxy_id)}")
+        if template:
+            from forge.config.loader import template_exists
+
+            try:
+                template_available = template_exists(template)
+            except ValueError:
+                template_available = False
+            if template_available:
+                commands.append(
+                    f"forge session resume {shlex.quote(plan.manifest.name)} --proxy {shlex.quote(template)}"
+                )
+
+        print_error_with_tip(
+            f"Persisted proxy route for session '{plan.manifest.name}' is unavailable: {e}",
+            "Restart the recorded proxy and retry, or explicitly select a live proxy from its stored template.",
+            "Forge did not launch Claude or replace the recorded proxy route.",
+            commands=commands,
+            console=err_console,
+        )
+        raise SystemExit(1) from None
+
+
 def _execute_resume_launch_plan(*, manager: SessionManager, plan: ResumeLaunchPlan) -> None:
+    _preflight_persisted_resume_proxy(plan)
     result = resume_claude_session(
         manager=manager,
         plan=plan,

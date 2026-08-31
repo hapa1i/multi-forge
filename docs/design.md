@@ -610,6 +610,9 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Sets `FORGE_SESSION` env var -- hooks and status line can locate the correct session file
 - Sets `ANTHROPIC_BASE_URL` env var in proxy mode -- routes requests to the correct proxy
 - Validates preconditions (proxy healthy, session file exists)
+- On a bare host resume, healthchecks the persisted proxy endpoint and every recorded identity field before committing
+  launch routing or invoking Claude. It does not silently replace a dead or mismatched recorded proxy; an explicit
+  `--proxy <template-or-id>` authorizes realization of a different live route.
 - Records `confirmed.proxy` at session start when proxy mode is active
 
 **Codex-runtime sessions** (`forge session start --runtime codex`, see

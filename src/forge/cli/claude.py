@@ -34,8 +34,13 @@ from forge.session.context_limit import _get_context_limit_for_proxy
 console = Console()
 
 
-def _healthcheck_proxy(*, base_url: str, expected_template: str, expected_proxy_id: str) -> None:
-    """Validate proxy is reachable and matches proxy identity."""
+def _healthcheck_proxy(
+    *,
+    base_url: str,
+    expected_template: str | None,
+    expected_proxy_id: str | None,
+) -> None:
+    """Validate proxy reachability and every available identity field."""
 
     url = base_url.rstrip("/") + "/"
 
@@ -61,7 +66,7 @@ def _healthcheck_proxy(*, base_url: str, expected_template: str, expected_proxy_
         raise ValueError(f"proxy healthcheck failed at {url}: is_proxy is not true")
 
     template = data.get("template")
-    if template != expected_template:
+    if expected_template is not None and template != expected_template:
         raise ValueError(
             f"proxy healthcheck failed at {url}: template mismatch (expected '{expected_template}', got '{template}')"
         )
@@ -71,7 +76,7 @@ def _healthcheck_proxy(*, base_url: str, expected_template: str, expected_proxy_
         raise ValueError(f"proxy healthcheck failed at {url}: missing proxy block")
 
     actual_proxy_id = proxy_block.get("proxy_id")
-    if actual_proxy_id != expected_proxy_id:
+    if expected_proxy_id is not None and actual_proxy_id != expected_proxy_id:
         raise ValueError(
             f"proxy healthcheck failed at {url}: proxy_id mismatch (expected '{expected_proxy_id}', got '{actual_proxy_id}')"
         )

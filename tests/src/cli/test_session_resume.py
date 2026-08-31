@@ -128,6 +128,7 @@ class TestSessionResumeExtended:
                 "forge.config.loader.load_proxy_instance_config",
                 return_value=_proxy_cfg(),
             ),
+            patch("forge.cli.claude._healthcheck_proxy"),
             successful_claude_launch() as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "reconnect-addendum"])
@@ -398,7 +399,10 @@ class TestModelRouteResume:
             )
         assert created.exit_code == 0, created.output
 
-        with mocked_model_route_proxy(**proxy_kwargs), successful_claude_launch() as mock_invoke:
+        with (
+            mocked_model_route_proxy(**proxy_kwargs),
+            successful_claude_launch() as mock_invoke,
+        ):
             result = runner.invoke(main, ["session", "resume", "stored-proxy-one-m-route"])
 
         assert result.exit_code == 0, result.output

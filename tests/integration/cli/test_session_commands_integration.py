@@ -278,6 +278,51 @@ class TestSessionDelete:
 class TestSessionResume:
     """Tests for 'forge session resume' command."""
 
+    def test_bare_resume_refuses_dead_persisted_proxy_before_launch(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        created = mock_claude_workspace.exec(
+            "cd /workspace && forge session start dead-proxy-resume --no-proxy --no-launch"
+        )
+        assert created.returncode == 0, created.stderr
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            import json
+            from pathlib import Path
+
+            path = Path("/workspace/.forge/sessions/dead-proxy-resume/forge.session.json")
+            data = json.loads(path.read_text())
+            data["intent"]["proxy"] = {
+                "template": "openrouter-gemini",
+                "base_url": "http://127.0.0.1:65534",
+            }
+            data["confirmed"]["claude_session_id"] = "dead-proxy-conversation"
+            data["confirmed"]["confirmed_by"] = "hook:SessionStart:startup"
+            data["confirmed"]["started_with_proxy"] = {
+                "base_url": "http://127.0.0.1:65534",
+                "proxy_id": "missing-dead-proxy",
+                "template": "openrouter-gemini",
+                "port": 65534,
+            }
+            path.write_text(json.dumps(data))
+            """,
+        )
+        mock_claude_workspace.exec("> /tmp/claude_invocations.log")
+
+        result = mock_claude_workspace.exec("cd /workspace && forge session resume dead-proxy-resume")
+
+        assert result.returncode == 1
+        assert "Persisted proxy route" in result.stderr
+        assert "connection refused" in result.stderr
+        assert "forge session resume dead-proxy-resume --proxy openrouter-gemini" in result.stderr
+        assert "forge proxy start missing-dead-proxy" not in result.stderr
+        assert mock_claude_workspace.read_file("/tmp/claude_invocations.log") == ""
+        assert not mock_claude_workspace.file_exists(
+            "/workspace/.forge/artifacts/dead-proxy-resume/routing/events.jsonl"
+        )
+
     def test_missing_worktree_remains_visible_and_resume_refuses_without_mutation(
         self,
         mock_claude_workspace: ContainerLike,
@@ -682,7 +727,8 @@ class TestSessionResumeScenarios:
 
     def test_fork_same_directory_transfer_uses_fresh_session(self, mock_claude_workspace: ContainerLike) -> None:
         """A same-directory --resume-mode transfer fork launches a FRESH child session with assembled
-        parent context (--session-id + --append-system-prompt-file), not a native --resume --fork-session."""
+        parent context (--session-id + --append-system-prompt-file), not a native --resume --fork-session.
+        """
         mock_claude_workspace.exec("cd /workspace && forge session start sd-transfer-parent --no-launch")
         # Seed a parent UUID + transcript so the transfer context has content to assemble.
         _run_container_python(

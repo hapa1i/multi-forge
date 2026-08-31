@@ -277,6 +277,7 @@ class TestResumeProjectScoping:
                 "forge.core.ops.session_routing.load_config",
                 return_value=SimpleNamespace(proxy=proxy),
             ),
+            patch("forge.cli.claude._healthcheck_proxy"),
             successful_claude_launch() as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "shared", "--force"])
