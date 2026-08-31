@@ -225,6 +225,27 @@ def test_model_first_route_reports_the_requested_model_from_launch_intent(projec
     }
 
 
+def test_model_first_route_reports_removed_requested_model_verbatim(project: Path) -> None:
+    store = _publish(project, proxy=True)
+    state = store.read()
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="removed-model-v1",
+        selected_tier="opus",
+        kind="proxy",
+        source_id="openrouter",
+    )
+    state.intent.launch.direct_model = None
+    store.write(state)
+
+    payload = ops.get_session_model_report(
+        ctx=ExecutionContext.from_cwd(),
+        session_name="planner",
+    ).to_dict()
+
+    assert payload["route_intent"]["requested_model"] == "removed-model-v1"
+
+
 def test_supported_projection_exposes_journal_owned_scope_and_launch_marking(
     project: Path,
 ) -> None:
