@@ -126,9 +126,10 @@ class TokenAllowance:
 class SkillManifest:
     """Typed, runtime-neutral identity plus narrowly scoped adapter data.
 
-    ``name`` is the unprefixed portable skill name (for example ``review``).
-    Claude compilation renders it as ``forge:review`` while the Agent Skills /
-    Codex package keeps ``review`` and validates that directory/name contract.
+    ``name`` is the portable skill name (for example ``review``). Both Claude
+    Code standalone skills and Agent Skills / Codex packages keep that name
+    aligned with the package directory. Claude plugin namespaces are assigned
+    by a plugin manifest; a standalone skill cannot create one in frontmatter.
     """
 
     name: str
@@ -1428,7 +1429,7 @@ def _frontmatter_for(
 ) -> dict[str, Any]:
     if runtime == SkillRuntime.CLAUDE_CODE:
         frontmatter: dict[str, Any] = {
-            "name": f"forge:{manifest.name}",
+            "name": manifest.name,
             "description": manifest.description,
         }
         if allow_implicit_invocation is not None:

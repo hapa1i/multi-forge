@@ -7,7 +7,7 @@ automated, clean-wheel, human, and exploratory release evidence.
 **References**:
 
 - [Interactive manual testing design](../../../design_installation.md#d-interactive-manual-testing)
-- [Interactive manual testing guidelines](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test-smoke-test-forgewalkthrough-forgeqa)
+- [Interactive manual testing guidelines](../../../developer/testing_guidelines.md#interactive-manual-testing-smoke-test-smoke-test-walkthrough-qa)
 - [Session launch and continuity design](../../../design_sessions.md#39-session-resume-context-management)
 - [Session end-user guide](../../../end-user/session.md)
 - [`harden_walkthrough_sandbox_provenance`](../../done/harden_walkthrough_sandbox_provenance/card.md)
@@ -16,8 +16,8 @@ automated, clean-wheel, human, and exploratory release evidence.
 
 ## Goal
 
-Make `/forge:walkthrough` a short, accurate Day 1 tour of managed sessions, model/runtime choice, session continuity,
-and operator evidence. The default journey should teach Forge's mental model in 25-30 minutes; it must not double as an
+Make `/walkthrough` a short, accurate Day 1 tour of managed sessions, model/runtime choice, session continuity, and
+operator evidence. The default journey should teach Forge's mental model in 25-30 minutes; it must not double as an
 installer schema regression suite.
 
 ## Verified Baseline
@@ -143,7 +143,7 @@ manual-testing design/guidelines when default versus optional walkthrough semant
 
 - A second independent Codex checklist or copied state machine.
 - Exhaustive extension lifecycle, malformed-state, proxy-template, telemetry-schema, or strategy-matrix testing.
-- Replacing `/forge:smoke-test` / `$smoke-test`; the walkthrough remains stateful education, not a health probe.
+- Replacing `/smoke-test` / `$smoke-test`; the walkthrough remains stateful education, not a health probe.
 - Requiring Codex, Docker, sidecar, or more than one provider for the default walkthrough to pass.
 - Changing product behavior to preserve a walkthrough command that contradicts the managed-session contract.
 

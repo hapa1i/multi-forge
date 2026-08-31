@@ -244,6 +244,10 @@ print('hooks present')
         qa = synced_container.read_file("$HOME/.claude/skills/qa/resources/checklist/16-memory.md")
         walkthrough = synced_container.read_file("$HOME/.claude/skills/walkthrough/resources/checklist.md")
 
+        for skill in ("qa", "walkthrough"):
+            document = synced_container.read_file(f"$HOME/.claude/skills/{skill}/SKILL.md")
+            assert yaml.safe_load(document.split("---", 2)[1])["name"] == skill
+
         for content in (qa, walkthrough):
             assert "Memory Document" in content
             assert "forge_memory" in content
@@ -560,6 +564,7 @@ chmod +x /tmp/forge-invocation-bin/claude /tmp/forge-invocation-bin/codex
         def claude_allows_model(skill: str) -> bool:
             document = synced_container.read_file(f"$HOME/.claude/skills/{skill}/SKILL.md")
             frontmatter = yaml.safe_load(document.split("---", 2)[1])
+            assert frontmatter["name"] == skill
             return not frontmatter["disable-model-invocation"]
 
         def codex_allows_model(skill: str) -> bool:

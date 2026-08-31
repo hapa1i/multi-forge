@@ -1,7 +1,10 @@
 # Forge Skills
 
 Forge installs runtime-specific skills that teach Claude Code and Codex how to compose Forge capabilities into
-workflows. Claude invokes a skill as `/forge:<name>`; Codex uses `$<name>`.
+workflows. Claude invokes a skill as `/<name>`; Codex uses `$<name>`.
+
+Forge installs Claude skills directly under `.claude/skills`, so they use standalone selectors such as `/review`.
+Colon-prefixed selectors are plugin namespaces and do not apply to these packages.
 
 - Canonical architecture: [`docs/design.md` §5](../design.md#5-extensions-workflows-and-testing)
 - Workflow CLI (engine): [`workflow.md`](workflow.md)
@@ -13,9 +16,9 @@ workflows. Claude invokes a skill as `/forge:<name>`; Codex uses `$<name>`.
 
 ```text
 # Claude Code: portable skills
-/forge:review src/forge/session/
-/forge:review-docs docs/design.md
-/forge:understand src/forge/core/ops/session_context.py
+/review src/forge/session/
+/review-docs docs/design.md
+/understand src/forge/core/ops/session_context.py
 
 # Codex: the same portable frontends
 $review src/forge/session/
@@ -23,9 +26,9 @@ $review-docs docs/design.md
 $understand src/forge/core/ops/session_context.py
 
 # Portable workflow frontends (Claude selectors shown)
-/forge:panel src/forge/session/ --code
-/forge:analyze "Should we use event sourcing for the audit log?"
-/forge:debate "Should we migrate from skills to MCP?"
+/panel src/forge/session/ --code
+/analyze "Should we use event sourcing for the audit log?"
+/debate "Should we migrate from skills to MCP?"
 
 # Codex: the same workflow frontends
 $panel src/forge/session/ --code --models codex
@@ -90,7 +93,7 @@ row does not manage the requested runtime, disable exits successfully with a no-
 ## Invocation control
 
 All Forge skills install as human/explicit-only by default. Models cannot select them automatically, while explicit
-selectors such as `/forge:review` and `$review` continue to work.
+selectors such as `/review` and `$review` continue to work.
 
 Opt in one skill by name, then enable or sync the runtime packages:
 
@@ -106,12 +109,12 @@ Claude-only preset field. See [config.md](config.md#skill-invocation).
 
 ---
 
-## `/forge:review`
+## `/review`
 
 Review code for conformance, correctness, and architecture alignment.
 
 ```text
-Claude Code: /forge:review [target]
+Claude Code: /review [target]
 Codex:       $review [target]
 ```
 
@@ -123,16 +126,16 @@ Codex:       $review [target]
 based on the session's proxy. Falls back to the Opus-optimized default if no model-specific resource exists.
 
 **Multi-model alternative:** For independent reviews from multiple models in parallel, use `forge workflow panel --code`
-(CLI), `/forge:panel --code` (Claude), or `$panel --code` (Codex).
+(CLI), `/panel --code` (Claude), or `$panel --code` (Codex).
 
 ---
 
-## `/forge:review-docs`
+## `/review-docs`
 
 Review design documents, specs, and technical writing for completeness and consistency.
 
 ```text
-Claude Code: /forge:review-docs [target]
+Claude Code: /review-docs [target]
 Codex:       $review-docs [target]
 ```
 
@@ -140,19 +143,19 @@ Codex:       $review-docs [target]
 | -------- | -------- | ------------------------------------------------------------------- |
 | `target` | Optional | File, directory, or instruction on what to review (defaults to cwd) |
 
-Same model-aware resource selection as `/forge:review`, but loads `docs.md` / `docs-{family}.md` rubrics.
+Same model-aware resource selection as `/review`, but loads `docs.md` / `docs-{family}.md` rubrics.
 
-**Multi-model alternative:** For independent reviews from multiple models, use `forge workflow panel` (CLI),
-`/forge:panel` (Claude), or `$panel` (Codex).
+**Multi-model alternative:** For independent reviews from multiple models, use `forge workflow panel` (CLI), `/panel`
+(Claude), or `$panel` (Codex).
 
 ---
 
-## `/forge:understand`
+## `/understand`
 
 Explain code, documentation, or technical concepts. Auto-detects code vs docs mode.
 
 ```text
-Claude Code: /forge:understand [target] [--mode code|docs] [--depth quick|detailed|deep]
+Claude Code: /understand [target] [--mode code|docs] [--depth quick|detailed|deep]
 Codex:       $understand [target] [--mode code|docs] [--depth quick|detailed|deep]
 ```
 
@@ -175,12 +178,12 @@ selection as other skills.
 
 ---
 
-## `/forge:panel`
+## `/panel`
 
 Multi-model panel review. Multiple models review independently, then findings are synthesized.
 
 ```text
-Claude Code: /forge:panel [target] [--code] [--models worker1,worker2]
+Claude Code: /panel [target] [--code] [--models worker1,worker2]
 Codex:       $panel [target] [--code] [--models worker1,worker2]
 ```
 
@@ -219,12 +222,12 @@ active proxies; direct Claude requires its credential; Codex requires the cached
 
 ---
 
-## `/forge:debate`
+## `/debate`
 
 Adversarial multi-model evaluation. Models argue for, against, and neutrally about a subject.
 
 ```text
-Claude Code: /forge:debate [subject] [--code] [--models worker1,worker2]
+Claude Code: /debate [subject] [--code] [--models worker1,worker2]
 Codex:       $debate [subject] [--code] [--models worker1,worker2]
 ```
 
@@ -254,12 +257,12 @@ key disagreements, and an evidence-weighted recommendation.
 
 ---
 
-## `/forge:challenge`
+## `/challenge`
 
 Pressure-test a claim, recommendation, or assumption with adversarial skepticism.
 
 ```text
-Claude Code: /forge:challenge [claim or objection]
+Claude Code: /challenge [claim or objection]
 Codex:       $challenge [claim or objection]
 ```
 
@@ -279,16 +282,16 @@ An explicit invocation without arguments infers the claim from the preceding con
 
 ## Other skills
 
-| Skill                               | Runtime        | Purpose                                                           |
-| ----------------------------------- | -------------- | ----------------------------------------------------------------- |
-| `/forge:analyze` / `$analyze`       | Claude + Codex | Deep single-worker analysis (default worker: claude-opus)         |
-| `/forge:consensus` / `$consensus`   | Claude + Codex | Two-round multi-worker convergence toward a shared recommendation |
-| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | Read-only installation health check                               |
-| `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                     |
-| `/forge:qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                    |
+| Skill                         | Runtime        | Purpose                                                           |
+| ----------------------------- | -------------- | ----------------------------------------------------------------- |
+| `/analyze` / `$analyze`       | Claude + Codex | Deep single-worker analysis (default worker: claude-opus)         |
+| `/consensus` / `$consensus`   | Claude + Codex | Two-round multi-worker convergence toward a shared recommendation |
+| `/smoke-test` / `$smoke-test` | Claude + Codex | Read-only installation health check                               |
+| `/walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                     |
+| `/qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                    |
 
 The portable smoke test resolves and directly executes its bundled script from the installed skill directory, so its
-entry point selects the interpreter and `$smoke-test`/`/forge:smoke-test` do not depend on the session CWD.
+entry point selects the interpreter and `$smoke-test`/`/smoke-test` do not depend on the session CWD.
 
 ---
 
@@ -329,9 +332,9 @@ must not change Codex's resource selection.
 **No extra skill configuration is needed.** Claude selects from detected session metadata; Codex uses its
 host-authoritative OpenAI binding.
 
-For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/forge:panel`, and
-when to cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there
-treats long-context retrieval and citation fidelity as the checks to validate locally.
+For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/panel`, and when to
+cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
+long-context retrieval and citation fidelity as the checks to validate locally.
 
 ---
 

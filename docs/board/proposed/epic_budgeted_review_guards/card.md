@@ -13,9 +13,9 @@ estimate, or stop-before-spend checkpoint.
 Code review sounds bounded. Users reasonably expect "look at the target/diff and report findings," not an unmetered
 repository exploration that burns subscription quota.
 
-Forge's own `/forge:review` skill is already prompt-conservative: it preflights, selects one instruction resource,
-scopes the target, and delegates to a bounded Explore-style pass. The incident was not caused by that skill. It came
-from a native Claude Code review path that bypassed Forge's review discipline.
+Forge's own `/review` skill is already prompt-conservative: it preflights, selects one instruction resource, scopes the
+target, and delegates to a bounded Explore-style pass. The incident was not caused by that skill. It came from a native
+Claude Code review path that bypassed Forge's review discipline.
 
 The deeper product problem is that Forge has no enforced admission envelope around expensive review-like work:
 
@@ -220,7 +220,7 @@ rejoins the tracks: Seam 5 unblocks `budget-required`, gated on the correlation 
 - Exact upstream Claude subscription billing math. Forge can record observed usage counters and guard decisions, but it
   cannot infer Anthropic's private allotment accounting perfectly.
 - TLS or API interception for subscription traffic.
-- Rewriting `/forge:review` from scratch. It should be hardened with enforcement, not replaced.
+- Rewriting `/review` from scratch. It should be hardened with enforcement, not replaced.
 
 ## References
 

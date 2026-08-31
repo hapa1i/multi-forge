@@ -24,7 +24,7 @@ def _compiled_skill(name: str, runtime: SkillRuntime = SkillRuntime.CLAUDE_CODE)
 
 
 class TestReviewCodeSkill:
-    """Code review skill (forge:review)."""
+    """Code review skill."""
 
     def test_skill_exists(self):
         assert (SKILLS_DIR / "review" / "forge-skill.yaml").exists()
@@ -33,7 +33,7 @@ class TestReviewCodeSkill:
 
     def test_name_is_review(self):
         content = _compiled_skill("review")
-        assert "name: forge:review" in content
+        assert "name: review" in content
 
     def test_no_mode_detection(self):
         """Auto-detection removed; always code mode."""
@@ -158,7 +158,7 @@ def test_workflow_frontend_is_portable_and_names_per_worker_runtime_prerequisite
 
 
 class TestReviewDocsSkill:
-    """Document review skill (forge:review-docs)."""
+    """Document review skill."""
 
     def test_skill_exists(self):
         assert (SKILLS_DIR / "review-docs" / "forge-skill.yaml").exists()
@@ -167,7 +167,7 @@ class TestReviewDocsSkill:
 
     def test_name_is_review_docs(self):
         content = _compiled_skill("review-docs")
-        assert "name: forge:review-docs" in content
+        assert "name: review-docs" in content
 
     def test_docs_resources_exist(self):
         resources = SKILLS_DIR / "review-docs" / "resources"
@@ -211,7 +211,7 @@ class TestPanelSkill:
         assert _compiled_skill("panel", SkillRuntime.CODEX)
 
     def test_name_is_panel(self):
-        assert "name: forge:panel" in _compiled_skill("panel")
+        assert "name: panel" in _compiled_skill("panel")
         assert "name: panel" in _compiled_skill("panel", SkillRuntime.CODEX)
 
     def test_references_forge_workflow(self):
@@ -256,7 +256,7 @@ class TestAnalyzeSkill:
         assert _compiled_skill("analyze", SkillRuntime.CODEX)
 
     def test_name_is_analyze(self):
-        assert "name: forge:analyze" in _compiled_skill("analyze")
+        assert "name: analyze" in _compiled_skill("analyze")
         assert "name: analyze" in _compiled_skill("analyze", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_analyze(self):
@@ -286,7 +286,7 @@ class TestDebateSkill:
         assert _compiled_skill("debate", SkillRuntime.CODEX)
 
     def test_name_is_debate(self):
-        assert "name: forge:debate" in _compiled_skill("debate")
+        assert "name: debate" in _compiled_skill("debate")
         assert "name: debate" in _compiled_skill("debate", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_debate(self):
@@ -362,7 +362,7 @@ class TestChallengeSkill:
 
     def test_name_is_challenge(self):
         content = _compiled_skill("challenge")
-        assert "name: forge:challenge" in content
+        assert "name: challenge" in content
 
     def test_defaults_to_explicit_invocation(self):
         content = _compiled_skill("challenge")
@@ -406,8 +406,8 @@ class TestQaWorkflowChecklist:
         review_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "14-workflow.md"
         content = review_md.read_text()
         step = content.split("### 14.10", 1)[1].split("\n---", 1)[0]
-        assert "/forge:debate" in step
-        assert "Do not type `/forge:debate`" not in step
+        assert "/debate" in step
+        assert "Do not type `/debate`" not in step
 
     def test_live_debate_step_is_display_only(self):
         """Regression for QA-036: guided step must not look directly runnable."""
@@ -432,7 +432,7 @@ class TestConsensusSkill:
         assert _compiled_skill("consensus", SkillRuntime.CODEX)
 
     def test_name_is_consensus(self):
-        assert "name: forge:consensus" in _compiled_skill("consensus")
+        assert "name: consensus" in _compiled_skill("consensus")
         assert "name: consensus" in _compiled_skill("consensus", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_consensus(self):

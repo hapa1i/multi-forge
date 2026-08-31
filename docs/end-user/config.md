@@ -98,7 +98,7 @@ retention or `log_tool_failures`.
 
 Every Forge skill defaults to human/explicit invocation. Claude Code therefore receives
 `disable-model-invocation: true`, and Codex receives `allow_implicit_invocation: false`. Explicit selectors such as
-`/forge:review` and `$review` continue to work.
+`/review` and `$review` continue to work.
 
 Opt individual skills into model invocation through the shared runtime config:
 

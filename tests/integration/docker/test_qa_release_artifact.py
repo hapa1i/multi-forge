@@ -157,8 +157,9 @@ print(json.dumps({
                 '&& test "$(readlink /usr/local/bin/forge)" = /opt/forge-qa/bin/forge '
                 '&& test "$DISABLE_AUTOUPDATER" = 1 '
                 "&& forge --version >/dev/null "
-                "&& forge extension enable --scope user --profile minimal --with hooks --without commands "
+                "&& forge extension enable --scope user --profile minimal --with hooks,skills --without commands "
                 "> /tmp/forge-enable.log "
+                "&& grep -qx 'name: smoke-test' /root/.claude/skills/smoke-test/SKILL.md "
                 "&& forge extension doctor --json > /tmp/forge-doctor.json "
                 "&& mv /forge/src/forge /forge/src/forge.unavailable "
                 f"&& /opt/forge-qa/bin/python -I -c {shlex.quote(probe_code)} "

@@ -5,8 +5,8 @@
 Validates workflow runners + skill architecture.
 
 - `forge workflow panel` is the fan-out runner CLI (supports `--code`, `--context`, and `--check`).
-- `/forge:analyze` is a skill that calls `forge workflow analyze` (N=1 model).
-- `/forge:debate` is a skill that calls `forge workflow debate` (supports `--code` for code evaluation).
+- `/analyze` is a skill that calls `forge workflow analyze` (N=1 model).
+- `/debate` is a skill that calls `forge workflow debate` (supports `--code` for code evaluation).
 - This section uses `$FORGE_QA_WORKFLOW_MODELS` (set by `start-container.sh` per provider profile). Workflow proxy
   aliases are created in 4.2.
 - Omitting `--models` uses all configured defaults (from `forge workflow list-models`).
@@ -201,7 +201,7 @@ echo "Exit code: $?"
 - [ ] Returns structured JSON output with code-specific findings per worker per round
 - [ ] `--check` mode: schema-strict -- only SUPPORT/SUPPORT_WITH_CONDITIONS pass
 
-### 14.10 `/forge:debate` (Live Session)
+### 14.10 `/debate` (Live Session)
 
 <!-- prereq: 14.1 -->
 
@@ -211,8 +211,8 @@ echo "Exit code: $?"
 
 <!-- requires: api_key -->
 
-Validate the real Claude-facing `/forge:debate` path, not a terminal fallback. This step passes only if Claude Code
-accepts the slash command and actually executes the adversarial runner end to end.
+Validate the real Claude-facing `/debate` path, not a terminal fallback. This step passes only if Claude Code accepts
+the slash command and actually executes the adversarial runner end to end.
 
 If Session B is not already open, start Claude Code in the container shell first:
 
@@ -225,7 +225,7 @@ Read `$FORGE_QA_WORKFLOW_MODELS` from the container environment and construct th
 type in Session B:
 
 ```
-/forge:debate --models <expanded FORGE_QA_WORKFLOW_MODELS> A startup with 5 developers has a working Python monolith serving 10k req/sec. They're hitting scaling issues. Should they rewrite the core in Rust?
+/debate --models <expanded FORGE_QA_WORKFLOW_MODELS> A startup with 5 developers has a working Python monolith serving 10k req/sec. They're hitting scaling issues. Should they rewrite the core in Rust?
 ```
 
 Wait for Claude to finish. Do not replace this with `forge workflow debate` in the shell; that CLI surface is already

@@ -88,7 +88,7 @@ class TestPlanExcludesPycacheWithoutGit:
 
         (skill_dir / "SKILL.md").write_text("""\
 ---
-name: forge:test-pycache-regression
+name: test-pycache-regression
 description: Temporary package for the pycache exclusion regression.
 ---
 

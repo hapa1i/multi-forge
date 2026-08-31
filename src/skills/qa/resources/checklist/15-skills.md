@@ -6,7 +6,7 @@ Validates the user-facing skill invocation UX. Section 14 tested the underlying 
 section tests the skills that wrap it with auto-detection and model-aware resource selection.
 
 The workflow-backed skills in this section depend on the workflow proxy aliases created in 4.2. In partial runs such as
-`--from 15`, prereq auto-resolution should create those aliases before `/forge:panel` or `/forge:consensus` is checked.
+`--from 15`, prereq auto-resolution should create those aliases before `/panel` or `/consensus` is checked.
 
 ### 15.1 `forge session show` CLI
 
@@ -45,7 +45,7 @@ fi
 
 - [ ] UUID resolves to the correct session name (or skips if no UUID confirmed yet)
 
-### 15.3 `/forge:review` (Live Session)
+### 15.3 `/review` (Live Session)
 
 <!-- human:guided -->
 
@@ -58,7 +58,7 @@ In Session B (or a live Claude session in the container), invoke the review skil
 1. In the container shell, launch Claude and invoke the review skill:
 
 ```
-/forge:review src/
+/review src/
 ```
 
 2. Verify that Claude:
@@ -70,7 +70,7 @@ Expected:
 - [ ] Skill invocation accepted by Claude Code (no "skill not found" error)
 - [ ] Review output includes file:line references and severity ratings
 
-### 15.4 `/forge:understand` (Live Session)
+### 15.4 `/understand` (Live Session)
 
 <!-- human:guided -->
 
@@ -83,7 +83,7 @@ In the same live Claude session, invoke the understand skill.
 1. Invoke the understand skill:
 
 ```
-/forge:understand src/main.py --depth quick
+/understand src/main.py --depth quick
 ```
 
 2. Verify that Claude:
@@ -96,7 +96,7 @@ Expected:
 - [ ] Output includes Summary and Key Components sections
 - [ ] Quick depth produces concise output (\<500 words)
 
-### 15.5 `/forge:panel` (Live Session)
+### 15.5 `/panel` (Live Session)
 
 <!-- human:guided -->
 
@@ -117,7 +117,7 @@ forge session resume test-session-parent
 2. In Claude, invoke the panel skill:
 
 ```
-/forge:panel src/ --code
+/panel src/ --code
 ```
 
 3. This fans out to multiple models. Verify that Claude:
@@ -138,7 +138,7 @@ Expected:
 Failure cue: if output says the default model set is unusable because OpenRouter proxies are missing, or falls back to a
 Claude-only panel, mark this step failed. That means 4.2 did not create the workflow proxy aliases for this run.
 
-### 15.6 `/forge:consensus` (Live Session)
+### 15.6 `/consensus` (Live Session)
 
 <!-- human:guided -->
 
@@ -151,7 +151,7 @@ In the same live Claude session, invoke the consensus skill for a multi-model re
 1. Invoke the consensus skill:
 
 ```
-/forge:consensus Should we split the session manager into separate read and write modules?
+/consensus Should we split the session manager into separate read and write modules?
 ```
 
 2. This runs two rounds across multiple models. Verify that Claude:
@@ -193,8 +193,11 @@ comm -23 /tmp/forge-claude-skills.expected /tmp/forge-portable-skills.expected \
   | diff -u /tmp/forge-claude-only-skills.expected -
 
 while read -r skill; do
+  rg -q "^name: ${skill}$" "$CLAUDE_HOME/skills/$skill/SKILL.md"
   rg -q "^name: ${skill}$" ".agents/skills/$skill/SKILL.md"
 done < /tmp/forge-portable-skills.expected
+rg -q '^name: qa$' "$CLAUDE_HOME/skills/qa/SKILL.md"
+rg -q '^name: walkthrough$' "$CLAUDE_HOME/skills/walkthrough/SKILL.md"
 
 ! rg -n '\$\{CLAUDE_SKILL_DIR\}|\$ARGUMENTS|subagent_type:[[:space:]]*["]?Explore' .agents/skills
 for skill in analyze consensus debate panel; do
@@ -205,10 +208,10 @@ done
 - [ ] Claude user target contains exactly eleven compiled skill packages
 - [ ] Codex project target contains exactly nine portable skills, including analyze, consensus, debate, and panel
 - [ ] The exact Claude-only set is qa and walkthrough
-- [ ] Every Codex `SKILL.md` name matches its package directory, the full tree has no prohibited Claude tokens, and each
-  workflow frontend invokes `forge workflow`
+- [ ] Every Claude and Codex `SKILL.md` name matches its package directory, the Codex tree has no prohibited Claude
+  tokens, and each workflow frontend invokes `forge workflow`
 
-### 15.8 `/forge:smoke-test` Explicit Invocation
+### 15.8 `/smoke-test` Explicit Invocation
 
 <!-- human:guided -->
 
@@ -217,7 +220,7 @@ done
 In the live Claude session, explicitly invoke the portable smoke skill:
 
 ```
-/forge:smoke-test
+/smoke-test
 ```
 
 Expected:

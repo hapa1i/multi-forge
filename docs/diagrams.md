@@ -381,10 +381,10 @@ flowchart TB
         RunAnalyze["forge workflow analyze"]
         RunDebate["forge workflow debate"]
         RunConsensus["forge workflow consensus"]
-        SkillPanel["/forge:panel"]
-        SkillAnalyze["/forge:analyze"]
-        SkillDebate["/forge:debate"]
-        SkillConsensus["/forge:consensus"]
+        SkillPanel["/panel"]
+        SkillAnalyze["/analyze"]
+        SkillDebate["/debate"]
+        SkillConsensus["/consensus"]
     end
 
     subgraph Layer2["Layer 2: Prompt / Resource Inputs"]
@@ -427,10 +427,9 @@ flowchart TB
 - `forge workflow analyze` is a specialized fan-out with one worker and a bundled resource
 - `forge workflow debate` layers stance injection and blinding on top of fan-out
 - `forge workflow consensus` runs two fan-out rounds (evaluate, then reconcile)
-- `/forge:panel`, `/forge:analyze`, `/forge:debate`, and `/forge:consensus` prepare prompts/resources and then call the
-  corresponding CLI entry point
-- `/forge:review` and `/forge:review-docs` are local review skills; their optional multi-model path uses
-  `forge workflow panel`
+- `/panel`, `/analyze`, `/debate`, and `/consensus` prepare prompts/resources and then call the corresponding CLI entry
+  point
+- `/review` and `/review-docs` are local review skills; their optional multi-model path uses `forge workflow panel`
 
 ---
 

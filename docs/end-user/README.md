@@ -178,15 +178,15 @@ See [policy.md](policy.md).
 
 ### Skills -- Review, Understand, Panel
 
-Skills teach supported agent runtimes how to compose Forge capabilities. Portable skills use `/forge:<name>` in Claude
-Code and `$<name>` in Codex; model family is auto-detected from session context where the skill uses family resources:
+Skills teach supported agent runtimes how to compose Forge capabilities. Portable skills use `/<name>` in Claude Code
+and `$<name>` in Codex; model family is auto-detected from session context where the skill uses family resources:
 
 ```text
-/forge:review src/forge/session/           # Claude: code review
+/review src/forge/session/           # Claude: code review
 $review src/forge/session/                 # Codex: same portable review
-/forge:review-docs docs/design.md          # Claude portable document review
+/review-docs docs/design.md          # Claude portable document review
 $understand src/forge/core/ops/            # Codex portable explanation
-/forge:panel src/forge/session/ --code     # Claude workflow frontend with selectable workers
+/panel src/forge/session/ --code     # Claude workflow frontend with selectable workers
 $panel src/forge/session/ --code           # Codex: same portable workflow frontend
 ```
 
@@ -264,10 +264,10 @@ See [config.md](config.md).
 
 Three tiers of verification:
 
-| Skill                               | Runtime        | What it does                        |
-| ----------------------------------- | -------------- | ----------------------------------- |
-| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | Read-only health check (30 seconds) |
-| `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic) |
-| `/forge:qa`                         | Claude only    | Full Docker-based QA                |
+| Skill                         | Runtime        | What it does                        |
+| ----------------------------- | -------------- | ----------------------------------- |
+| `/smoke-test` / `$smoke-test` | Claude + Codex | Read-only health check (30 seconds) |
+| `/walkthrough`                | Claude only    | Interactive feature tour (hermetic) |
+| `/qa`                         | Claude only    | Full Docker-based QA                |
 
 See [manual_testing.md](manual_testing.md).

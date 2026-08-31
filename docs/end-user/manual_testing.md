@@ -2,11 +2,11 @@
 
 Three skills verify that Forge is installed and working correctly, with escalating isolation:
 
-| Mode        | Invocation                                        | What it does                                              | Runtime          | Install requirement |
-| ----------- | ------------------------------------------------- | --------------------------------------------------------- | ---------------- | ------------------- |
-| Smoke test  | Claude: `/forge:smoke-test`; Codex: `$smoke-test` | Read-only health check (no writes)                        | Claude and Codex | SKILLS module       |
-| Walkthrough | `/forge:walkthrough`                              | Install + assert in sandbox, verify real system untouched | Claude Code only | SKILLS module       |
-| Full QA     | `/forge:qa`                                       | Bounded exact-wheel checklist in Docker                   | Claude Code only | `full` profile      |
+| Mode        | Invocation                                  | What it does                                              | Runtime          | Install requirement |
+| ----------- | ------------------------------------------- | --------------------------------------------------------- | ---------------- | ------------------- |
+| Smoke test  | Claude: `/smoke-test`; Codex: `$smoke-test` | Read-only health check (no writes)                        | Claude and Codex | SKILLS module       |
+| Walkthrough | `/walkthrough`                              | Install + assert in sandbox, verify real system untouched | Claude Code only | SKILLS module       |
+| Full QA     | `/qa`                                       | Bounded exact-wheel checklist in Docker                   | Claude Code only | `full` profile      |
 
 - Canonical architecture:
   [`docs/design_installation.md` section D](../design_installation.md#d-interactive-manual-testing)
@@ -19,8 +19,8 @@ Three skills verify that Forge is installed and working correctly, with escalati
 Inside a Claude Code session:
 
 ```
-/forge:smoke-test                      # Quick read-only health check
-/forge:walkthrough                     # Default: interactive walkthrough
+/smoke-test                      # Quick read-only health check
+/walkthrough                     # Default: interactive walkthrough
 ```
 
 Inside Codex, explicitly invoke the portable smoke skill:
@@ -59,10 +59,9 @@ The agent walks through each step interactively, explaining what it's checking a
 uninstall) go through `run-in-repo.sh`; read-only checks are done directly.
 
 Use `--sidecar` for sidecar runtime coverage (Docker startup, shell access, cleanup). This is the only place sidecar
-runtime is exercised -- `/forge:qa` runs inside a container and cannot safely launch sidecars against container-local
-paths.
+runtime is exercised -- `/qa` runs inside a container and cannot safely launch sidecars against container-local paths.
 
-## Full QA (`/forge:qa`)
+## Full QA (`/qa`)
 
 Runs the full checklist inside a Docker container. Requires Docker Desktop.
 
@@ -76,18 +75,18 @@ forge extension enable --profile full
 Then in Claude Code:
 
 ```
-/forge:qa                              # Build one wheel; development-only verdict
-/forge:qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
+/qa                              # Build one wheel; development-only verdict
+/qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
                                        # Run the pinned blocking release gate
-/forge:qa session proxy                # Run specific categories
-/forge:qa --wheel <same-wheel> --from 4.1
+/qa session proxy                # Run specific categories
+/qa --wheel <same-wheel> --from 4.1
                                        # Resume a run that began with --wheel
-/forge:qa --from 10 --to 13            # Run sections 10-12; `--to` is exclusive
-/forge:qa --runtime-track latest --extended
+/qa --from 10 --to 13            # Run sections 10-12; `--to` is exclusive
+/qa --runtime-track latest --extended
                                        # Non-blocking client compatibility/exploration
-/forge:qa --codex-auth ~/.codex/auth.json
+/qa --codex-auth ~/.codex/auth.json
                                        # Copy only this Codex auth file into the container
-/forge:qa --stop                       # Stop and remove the QA container
+/qa --stop                       # Stop and remove the QA container
 ```
 
 The agent reads the checklist section by section, runs commands inside the container via `docker exec`, and checks
@@ -106,8 +105,8 @@ missing blocking evidence, and pending duration-review runs cannot report a rele
 path/version/SHA-256, matching host QA-driver SHA-256, observed runtime versions, provider profile, selection, counts,
 verdict, state, logs, and transcript claim under `~/.forge/manual-testing/qa/runs/`.
 
-The installed `/forge:qa` driver must match the QA package inside the selected wheel. A mismatch stops before Docker
-mutation instead of letting an older checklist produce evidence for a newer artifact. Run the selected wheel's
+The installed `/qa` driver must match the QA package inside the selected wheel. A mismatch stops before Docker mutation
+instead of letting an older checklist produce evidence for a newer artifact. Run the selected wheel's
 `forge extension sync --scope <owning-scope> --force`, then restart Claude Code so it reloads the synchronized skill
 before starting a fresh QA run. If a legacy local tracking row makes sync reject Codex's unsupported local scope,
 re-enable only the Claude assets with
@@ -178,20 +177,20 @@ Run the following failure-path checks only in a disposable Forge home:
 Walkthrough:
 
 ```
-/forge:walkthrough --setup-only        # Create test repo without running tests
-/forge:walkthrough --reset             # Reset test repo to clean baseline
-/forge:walkthrough --report            # Save report + logs + transcript after run
+/walkthrough --setup-only        # Create test repo without running tests
+/walkthrough --reset             # Reset test repo to clean baseline
+/walkthrough --report            # Save report + logs + transcript after run
 ```
 
 QA:
 
 ```
-/forge:qa --wheel <path>              # Release-capable pinned run
-/forge:qa --runtime-track latest      # Non-blocking compatibility run
-/forge:qa --extended                  # Include exploratory checklist steps
-/forge:qa --codex-auth <auth.json>    # Narrow Codex credential ingress
-/forge:qa --stop                       # Stop and remove the QA container
-/forge:qa --keep                       # Keep container running after completion
+/qa --wheel <path>              # Release-capable pinned run
+/qa --runtime-track latest      # Non-blocking compatibility run
+/qa --extended                  # Include exploratory checklist steps
+/qa --codex-auth <auth.json>    # Narrow Codex credential ingress
+/qa --stop                       # Stop and remove the QA container
+/qa --keep                       # Keep container running after completion
 ```
 
 ---
@@ -220,7 +219,7 @@ enforces six numbered isolation/structure gates before running any command. Your
 
 ## When to run
 
-- **After installing Forge** -- run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
-  `/forge:walkthrough` for the interactive tour
+- **After installing Forge** -- run `/smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
+  `/walkthrough` for the interactive tour
 - **After upgrading Forge** -- catch regressions with the walkthrough
-- **Before a release** -- build the candidate once and run `/forge:qa --wheel <candidate>` for the full pinned checklist
+- **Before a release** -- build the candidate once and run `/qa --wheel <candidate>` for the full pinned checklist

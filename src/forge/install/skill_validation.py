@@ -127,7 +127,7 @@ _CODEX_TOKEN_RULES = (
         id="token.claude-command-name",
         pattern=re.compile(r"/forge:[a-z0-9][a-z0-9-]*"),
         message="a Claude slash-command selector leaked into a Codex package",
-        recovery="Render the runtime's invocation form from adapter data rather than embedding /forge:<name>.",
+        recovery="Render the runtime's invocation form from adapter data rather than embedding a plugin namespace.",
     ),
     _TokenRule(
         id="token.claude-dynamic-command",
@@ -378,14 +378,14 @@ def _validate_claude_frontmatter(
     frontmatter: Mapping[str, Any],
 ) -> list[SkillDiagnostic]:
     diagnostics: list[SkillDiagnostic] = []
-    expected_name = f"forge:{package.name}"
+    expected_name = package.name
     if frontmatter.get("name") != expected_name:
         diagnostics.append(
             _diagnostic(
                 package,
                 "claude.name",
                 f"Claude package name must be '{expected_name}'",
-                "Preserve the established forge:<skill> Claude selector in the Claude adapter.",
+                "Match the standalone Claude skill name to its package directory.",
                 PurePosixPath("SKILL.md"),
             )
         )

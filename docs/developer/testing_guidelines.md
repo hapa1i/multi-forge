@@ -601,7 +601,7 @@ def test_proxy_create(clean_workspace: ContainerLike):
 
 ---
 
-## Interactive Manual Testing (`/forge:smoke-test` / `$smoke-test`, `/forge:walkthrough`, `/forge:qa`)
+## Interactive Manual Testing (`/smoke-test` / `$smoke-test`, `/walkthrough`, `/qa`)
 
 Automated tests miss UX/latency/real-system failures. Three skills provide three tiers of verification.
 
@@ -650,41 +650,41 @@ matrix runs against both copies. Any behavioral change must update both files in
 
 ```text
 # In Claude Code or Codex:
-/forge:smoke-test                           # Claude: read-only health check
+/smoke-test                           # Claude: read-only health check
 $smoke-test                                 # Codex: same portable health check
 
 # Claude Code only:
-/forge:walkthrough                          # Walkthrough (hermetic functional test)
-/forge:walkthrough --setup-only             # Create test repo only
-/forge:qa                                   # One-wheel development-only Docker QA
-/forge:qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
+/walkthrough                          # Walkthrough (hermetic functional test)
+/walkthrough --setup-only             # Create test repo only
+/qa                                   # One-wheel development-only Docker QA
+/qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
                                             # Pinned blocking release gate
-/forge:qa --wheel <same-wheel> --from 4.1   # Artifact-stable resume
-/forge:qa --runtime-track latest --extended # Non-blocking compatibility/exploration
+/qa --wheel <same-wheel> --from 4.1   # Artifact-stable resume
+/qa --runtime-track latest --extended # Non-blocking compatibility/exploration
 ```
 
 ### Safety model
 
 Risky operations go through safety scripts. The agent handles read-only checks directly.
 
-| Mode                                | Safety layer                    | Isolation                                         |
-| ----------------------------------- | ------------------------------- | ------------------------------------------------- |
-| `/forge:smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after     |
-| `/forge:walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification |
-| `/forge:qa`                         | exact-wheel scripts + Docker    | Container isolation; one host QA-state mount      |
+| Mode                          | Safety layer                    | Isolation                                         |
+| ----------------------------- | ------------------------------- | ------------------------------------------------- |
+| `/smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after     |
+| `/walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification |
+| `/qa`                         | exact-wheel scripts + Docker    | Container isolation; one host QA-state mount      |
 
 ### Install profiles
 
-`/forge:qa` requires the `full` install profile (`forge extension enable --profile full`). The walkthrough and
-smoke-test skills install with any resolved module set that includes SKILLS; standard includes it by default, while
-minimal requires `--with skills`.
+`/qa` requires the `full` install profile (`forge extension enable --profile full`). The walkthrough and smoke-test
+skills install with any resolved module set that includes SKILLS; standard includes it by default, while minimal
+requires `--with skills`.
 
 ### When to run
 
-- After installing Forge: run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; use `/forge:walkthrough` for the
-  Claude-only interactive tour
+- After installing Forge: run `/smoke-test` in Claude or `$smoke-test` in Codex; use `/walkthrough` for the Claude-only
+  interactive tour
 - After upgrading Forge: walkthrough catches regressions
-- Before releases: build one candidate wheel, then run `/forge:qa --wheel <candidate>` on the pinned track
+- Before releases: build one candidate wheel, then run `/qa --wheel <candidate>` on the pinned track
 
 ### Updating the QA checklist
 

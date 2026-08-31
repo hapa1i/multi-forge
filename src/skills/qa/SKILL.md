@@ -1,5 +1,5 @@
 ---
-name: forge:qa
+name: qa
 description: Full Forge QA checklist in Docker container. Use for release validation or comprehensive verification of all Forge features.
 disable-model-invocation: true
 argument-hint: '[--wheel PATH] [--runtime-track pinned|latest] [--codex-auth PATH] [--provider-profile openrouter|remote-litellm] [--extended] [--from X.Y] [--to X.Y] [--reset] [--stop] [--keep] [categories...]'
@@ -13,22 +13,22 @@ Full Forge QA checklist inside a Docker container. The container IS the sandbox 
 ## Usage
 
 ```
-/forge:qa                          Build one wheel and run development-only QA
-/forge:qa --wheel dist/multi_forge-1.0.0-py3-none-any.whl
+/qa                          Build one wheel and run development-only QA
+/qa --wheel dist/multi_forge-1.0.0-py3-none-any.whl
                                    Run the blocking release gate on one prebuilt wheel
-/forge:qa session proxy            Run specific categories only
-/forge:qa --from 4.1               Resume from section 4.1
-/forge:qa --from 4.1 --to 7        Run sections 4.1 through 6.x (excludes 7)
-/forge:qa --from 10 --to 13        Run sections 10 through 12 (13 is excluded)
-/forge:qa --provider-profile remote-litellm
+/qa session proxy            Run specific categories only
+/qa --from 4.1               Resume from section 4.1
+/qa --from 4.1 --to 7        Run sections 4.1 through 6.x (excludes 7)
+/qa --from 10 --to 13        Run sections 10 through 12 (13 is excluded)
+/qa --provider-profile remote-litellm
                                    Use remote/shared LiteLLM instead of default OpenRouter
-/forge:qa --runtime-track latest --extended
+/qa --runtime-track latest --extended
                                    Run non-blocking client compatibility plus exploratory steps
-/forge:qa --codex-auth ~/.codex/auth.json
+/qa --codex-auth ~/.codex/auth.json
                                    Copy only the selected Codex auth file into the container
-/forge:qa --reset                  Rebuild the wheel-backed image on the selected runtime base
-/forge:qa --stop                   Stop and remove the QA container
-/forge:qa --keep                   Keep container running after completion
+/qa --reset                  Rebuild the wheel-backed image on the selected runtime base
+/qa --stop                   Stop and remove the QA container
+/qa --keep                   Keep container running after completion
 ```
 
 ## Arguments
@@ -860,7 +860,7 @@ present. Transcript claim token: `$TRANSCRIPT_TOKEN`. Transcript will be added w
 #### Phase 6: Cleanup
 
 - If the verdict is `pass` and `--keep` was NOT set: stop and remove the container.
-- If any failures: keep the container for inspection. Print: "Container kept for inspection. Run `/forge:qa --stop` to
+- If any failures: keep the container for inspection. Print: "Container kept for inspection. Run `/qa --stop` to
   remove."
 - For every other verdict, keep the container unless the user explicitly asks to remove it. The last `record` call
   already updated `last_updated` in the state file.
@@ -942,6 +942,6 @@ Commands are deterministic (from checklist); interpretation is adaptive (agent j
 
 - **Context window**: Full QA may be long-running -- use `--from X.Y` to resume after compaction.
 - **Run a range**: Use `--from 4.1 --to 7` to run sections 4 through 6 only (excludes the `--to` step).
-- **Resume after compaction**: Use `/forge:qa --wheel <same-wheel> --from X.Y` with the same runtime track and provider
+- **Resume after compaction**: Use `/qa --wheel <same-wheel> --from X.Y` with the same runtime track and provider
   profile. Only runs started with an explicit prebuilt `--wheel` are resumable; development runs are single-invocation.
-- **Quick check**: For a quick non-interactive health check, use `/forge:smoke-test`.
+- **Quick check**: For a quick non-interactive health check, use `/smoke-test`.

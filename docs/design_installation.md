@@ -185,8 +185,8 @@ make test-integration  # Runs: docker build + docker run pytest
 ### 5.4 Interactive manual testing
 
 Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. The
-portable smoke test runs as `/forge:smoke-test` or `$smoke-test`; the Claude-only `/forge:walkthrough` and `/forge:qa`
-provide the higher isolation tiers. The detailed pattern, annotation types, and wrappers live in
+portable smoke test runs as `/smoke-test` or `$smoke-test`; the Claude-only `/walkthrough` and `/qa` provide the higher
+isolation tiers. The detailed pattern, annotation types, and wrappers live in
 [design_installation.md §D](design_installation.md#d-interactive-manual-testing). The end-user guide is
 [manual_testing.md](end-user/manual_testing.md).
 
@@ -615,6 +615,10 @@ declares the cross-runtime source policy, and all shipped sources default false.
 compiles the effective mode into both runtime outputs; malformed config fails safe to explicit-only. Executables use
 their entry point. Codex emits family `openai`, no exact model, and ignores Claude sessions.
 
+Claude packages are standalone skills, not plugins. Their frontmatter `name` matches the package directory and Claude
+invokes them as `/<skill>`. A colon namespace such as `/forge:<skill>` is assigned only to plugin skills by the plugin
+manifest; putting that spelling in standalone frontmatter neither creates the namespace nor changes discovery.
+
 SKILLS planning is explicit over scope/runtime/profile/skill:
 
 | Runtime       | User target                    | Project target                  | Local target                      |
@@ -688,11 +692,11 @@ deterministic and the agent only interprets results. Checklist edits change test
 
 **Three skills** with escalating isolation and explicit runtime boundaries:
 
-| Skill                               | Runtime        | Install requirement | Isolation                                          | Audience          |
-| ----------------------------------- | -------------- | ------------------- | -------------------------------------------------- | ----------------- |
-| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | SKILLS module       | Host, read-only probes                             | End users         |
-| `/forge:walkthrough`                | Claude only    | SKILLS module       | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
-| `/forge:qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
+| Skill                         | Runtime        | Install requirement | Isolation                                          | Audience          |
+| ----------------------------- | -------------- | ------------------- | -------------------------------------------------- | ----------------- |
+| `/smoke-test` / `$smoke-test` | Claude + Codex | SKILLS module       | Host, read-only probes                             | End users         |
+| `/walkthrough`                | Claude only    | SKILLS module       | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
+| `/qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
 
 **Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
 mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
@@ -707,8 +711,8 @@ verification.
 - Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
   script counts
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
-- `/forge:qa` tied to `full` install profile (Docker dependency)
-- `/forge:qa` remains Claude-hosted; Claude and Codex are independent subjects under test
+- `/qa` tied to `full` install profile (Docker dependency)
+- `/qa` remains Claude-hosted; Claude and Codex are independent subjects under test
 - Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
 - Before Docker mutation, the Claude-hosted QA driver must have the same managed paths and bytes as the QA package in
   that wheel. The recorded driver digest makes a stale installed checklist ineligible for release evidence
@@ -737,10 +741,10 @@ verification.
 
 ### D.2 Wrapper abstraction
 
-| Skill                | Wrapper                        | Isolation                               |
-| -------------------- | ------------------------------ | --------------------------------------- |
-| `/forge:walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
-| `/forge:qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount  |
+| Skill          | Wrapper                        | Isolation                               |
+| -------------- | ------------------------------ | --------------------------------------- |
+| `/walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
+| `/qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount  |
 
 **Three-window model:** Session A prompts the user to open Terminal early. Session B is launched only when the checklist
 first needs interactive verification.

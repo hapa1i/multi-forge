@@ -8,7 +8,7 @@
 
 <!-- aligned-with: v0.1.0 -->
 
-This checklist is read by the `/forge:walkthrough` skill (Session A). Commands run through `run-in-repo.sh` for sandbox
+This checklist is read by the `/walkthrough` skill (Session A). Commands run through `run-in-repo.sh` for sandbox
 isolation. `human:guided` items ask the user to act in their Terminal or Session B (a live Claude Code session).
 
 ---

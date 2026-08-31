@@ -58,7 +58,7 @@ def mock_repo(tmp_path: Path) -> Path:
     skills = src / "skills" / "search"
     skills.mkdir(parents=True)
     (skills / "SKILL.md").write_text(
-        "---\nname: forge:search\ndescription: Search fixture. Use when testing the installer.\n---\n"
+        "---\nname: search\ndescription: Search fixture. Use when testing the installer.\n---\n"
         "# Search Skill\nSearch capabilities.\n"
     )
     scripts = skills / "scripts"

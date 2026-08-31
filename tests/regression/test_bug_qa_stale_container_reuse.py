@@ -3,7 +3,7 @@
 Bug: the running-container reuse path in
 ``.claude``/``src/skills/qa/scripts/start-container.sh`` exited 0 before any
 image-revision check. A container built from an image older than the current
-checkout was therefore reused indefinitely, so ``/forge:qa`` silently validated
+checkout was therefore reused indefinitely, so ``/qa`` silently validated
 stale code (e.g. a proxy build predating the system-role 422 fix) while
 reporting success.
 

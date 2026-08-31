@@ -1,6 +1,6 @@
 # Forge v1.0.0 QA Coverage Map
 
-This map separates product-contract ownership from the bounded release journey. The default `/forge:qa` selection runs
+This map separates product-contract ownership from the bounded release journey. The default `/qa` selection runs
 `clean-wheel-smoke` and `human-acceptance`; `--extended` additionally runs `extended-exploratory`. `automated-suite`
 entries are references only and are never credited as commands executed by a manual run.
 

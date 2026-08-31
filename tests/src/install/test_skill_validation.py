@@ -41,18 +41,29 @@ def _package(
 
 @pytest.mark.parametrize("runtime", [SkillRuntime.CLAUDE_CODE, SkillRuntime.CODEX])
 def test_whole_tree_validator_accepts_package_sentinel(runtime: SkillRuntime) -> None:
-    frontmatter_name = "forge:demo-skill" if runtime == SkillRuntime.CLAUDE_CODE else "demo-skill"
     package = _package(
         CompiledSkillFile(
             PurePosixPath(FORGE_PACKAGE_SENTINEL),
             b'{"files":[],"producer":"multi-forge","runtime":"codex","schema_version":1,"skill":"demo-skill"}\n',
             0o644,
         ),
-        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document(frontmatter_name), 0o644),
+        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document("demo-skill"), 0o644),
         runtime=runtime,
     )
 
     assert validate_compiled_skill(package) == ()
+
+
+def test_claude_standalone_name_must_match_package_directory() -> None:
+    package = _package(
+        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document("forge:demo-skill"), 0o644),
+        runtime=SkillRuntime.CLAUDE_CODE,
+    )
+
+    diagnostic = next(item for item in validate_compiled_skill(package) if item.rule == "claude.name")
+
+    assert "demo-skill" in diagnostic.message
+    assert "package directory" in diagnostic.recovery
 
 
 def test_whole_tree_token_scan_reports_nested_path_runtime_rule_and_recovery() -> None:
@@ -156,7 +167,7 @@ def test_claude_allowance_cannot_suppress_unresolved_placeholder() -> None:
     path = PurePosixPath("references/unresolved.md")
     rule = "token.unresolved-placeholder"
     package = _package(
-        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document("forge:demo-skill"), 0o644),
+        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document("demo-skill"), 0o644),
         CompiledSkillFile(path, b"Use {{forge:task_arguments}}.\n", 0o644),
         runtime=SkillRuntime.CLAUDE_CODE,
         allowances=(TokenAllowance(SkillRuntime.CLAUDE_CODE, path, rule),),
@@ -220,7 +231,7 @@ def test_non_string_unknown_frontmatter_key_is_reported_without_validator_crash(
 
 def test_claude_owned_frontmatter_fields_validate_types_and_enums() -> None:
     document = _skill_document(
-        "forge:demo-skill",
+        "demo-skill",
         compatibility="x" * 501,
         license=1,
         metadata=[],
@@ -261,7 +272,7 @@ def test_claude_owned_frontmatter_fields_validate_types_and_enums() -> None:
 
 def test_claude_owned_frontmatter_accepts_documented_values() -> None:
     document = _skill_document(
-        "forge:demo-skill",
+        "demo-skill",
         **{
             "allowed-tools": "Read, Bash(git:*)",
             "argument-hint": "[target]",
@@ -284,7 +295,7 @@ def test_claude_owned_frontmatter_accepts_documented_values() -> None:
 
 def test_claude_owned_frontmatter_rejects_explicit_nulls() -> None:
     document = _skill_document(
-        "forge:demo-skill",
+        "demo-skill",
         **{
             "allowed-tools": None,
             "argument-hint": None,
@@ -308,7 +319,7 @@ def test_claude_owned_frontmatter_rejects_explicit_nulls() -> None:
 
 
 def test_claude_effort_type_validation_does_not_assume_a_hashable_value() -> None:
-    document = _skill_document("forge:demo-skill", effort=["high"])
+    document = _skill_document("demo-skill", effort=["high"])
     package = _package(
         CompiledSkillFile(PurePosixPath("SKILL.md"), document, 0o644),
         runtime=SkillRuntime.CLAUDE_CODE,

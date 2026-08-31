@@ -47,7 +47,7 @@ def _wheel(
 def _qa_skill(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
     skill_root = tmp_path / "qa"
     files = {
-        "SKILL.md": b"---\nname: forge:qa\n---\n",
+        "SKILL.md": b"---\nname: qa\n---\n",
         "resources/checklist.md": b"# QA checklist\n",
         "scripts/start-container.sh": b"#!/usr/bin/env bash\n",
     }
