@@ -258,6 +258,37 @@ def test_logs_clean_removes_files_owned_by_a_zombie(tmp_path, monkeypatch):
     assert not zombie_log.exists()
 
 
+def test_logs_clean_handles_non_utf8_process_names(tmp_path, monkeypatch):
+    """Linux task names are byte strings and must not abort the cleanup sweep."""
+    import forge.cli.logs as logs
+    from forge.core.paths import get_forge_home
+
+    proc_root = tmp_path / "proc"
+    live_pid = 424242
+    zombie_pid = 424243
+    for pid, state in ((live_pid, b"R"), (zombie_pid, b"Z")):
+        proc_dir = proc_root / str(pid)
+        proc_dir.mkdir(parents=True)
+        (proc_dir / "stat").write_bytes(str(pid).encode() + b" (\xffforge worker) " + state + b" 1 2 3\n")
+    monkeypatch.setattr(logs, "_PROC_ROOT", proc_root)
+    monkeypatch.setattr(logs.os, "kill", lambda *_args: None)
+
+    logs_dir = get_forge_home() / "logs" / "proxy"
+    logs_dir.mkdir(parents=True)
+    live_log = logs_dir / f"proxy.{live_pid}.log"
+    zombie_log = logs_dir / f"proxy.{zombie_pid}.log"
+    live_log.write_text("can grow")
+    zombie_log.write_text("cannot grow")
+
+    result = CliRunner().invoke(main, ["logs", "clean", "--yes"])
+
+    assert result.exit_code == 0
+    assert "Removed 1 log file" in result.output
+    assert "Kept 1 file belonging to running process" in result.output
+    assert live_log.exists()
+    assert not zombie_log.exists()
+
+
 # forge logs clean --older-than
 
 

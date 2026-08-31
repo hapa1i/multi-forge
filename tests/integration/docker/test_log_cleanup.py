@@ -9,10 +9,17 @@ from tests.fixtures.docker import ContainerLike
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 
 _ZOMBIE_PARENT = """\
+import ctypes
 import os
 import signal
 import time
 from pathlib import Path
+
+libc = ctypes.CDLL(None)
+prctl = libc.prctl
+prctl.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+prctl.restype = ctypes.c_int
+assert prctl(15, bytes([255]) + b"forge", 0, 0, 0) == 0
 
 child = os.fork()
 if child == 0:

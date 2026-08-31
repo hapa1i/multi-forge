@@ -138,12 +138,12 @@ def _is_process_alive(pid: int) -> bool:
     # write another byte and must not pin its log shards forever. Fail closed on
     # unreadable or malformed proc state so an uncertain process stays protected.
     try:
-        stat = (_PROC_ROOT / str(pid) / "stat").read_text(encoding="utf-8")
+        stat = (_PROC_ROOT / str(pid) / "stat").read_bytes()
     except OSError:
         return True
-    _, separator, remainder = stat.rpartition(")")
+    _, separator, remainder = stat.rpartition(b")")
     fields = remainder.split() if separator else []
-    return not fields or fields[0] != "Z"
+    return not fields or fields[0] != b"Z"
 
 
 def _is_active_log_file(path: Path) -> bool:
