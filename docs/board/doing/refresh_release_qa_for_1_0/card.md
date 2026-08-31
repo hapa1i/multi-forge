@@ -8,7 +8,7 @@ release coverage boundaries instead of growing another product-contract suite.
 **References**:
 
 - [Interactive manual testing design](../../../design_installation.md#d-interactive-manual-testing)
-- [Interactive manual testing guidelines](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test-smoke-test-forgewalkthrough-forgeqa)
+- [Interactive manual testing guidelines](../../../developer/testing_guidelines.md#interactive-manual-testing-smoke-test-smoke-test-walkthrough-qa)
 - [`cross_runtime_skills`](../../done/cross_runtime_skills/card.md)
 - [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)
 - [`model_first_session_routing`](../../done/model_first_session_routing/card.md)
@@ -16,9 +16,9 @@ release coverage boundaries instead of growing another product-contract suite.
 
 ## Goal
 
-Turn `/forge:qa` into a bounded v1.0.0 release gate that validates the exact distribution artifact, exercises the real
-Claude and Codex runtime seams, and reserves human checkpoints for behavior that cannot be judged deterministically.
-Remove stale assertions and stop duplicating exhaustive contracts already owned by automated tests.
+Turn `/qa` into a bounded v1.0.0 release gate that validates the exact distribution artifact, exercises the real Claude
+and Codex runtime seams, and reserves human checkpoints for behavior that cannot be judged deterministically. Remove
+stale assertions and stop duplicating exhaustive contracts already owned by automated tests.
 
 ## Verified Baseline
 
@@ -56,39 +56,43 @@ The refresh must resolve at least these verified inconsistencies before adding c
 
 ## Accepted Decisions
 
-1. **One QA frontend.** Keep `/forge:qa` Claude-hosted for v1.0.0. Codex is a subject under test, not a duplicated
-   orchestration package. A successful managed Codex path is release evidence; a Codex-hosted copy of QA is not.
-2. **Four evidence lanes.** Classify each retained contract as `automated-suite`, `clean-wheel-smoke`,
-   `human-acceptance`, or `extended-exploratory`. A feature is represented when its release owner is explicit; it does
-   not need another manual checklist matrix.
-3. **Exact artifact first.** Build once, require the invoking host QA package to match that wheel, install the exact
-   wheel into an isolated environment that cannot import the checkout, and record wheel and driver digests.
-   Source-container QA remains useful for development but cannot be the distribution gate.
-4. **Bound deterministic work.** Hard-cap the blocking lane at 12 included human checkpoints and 8 paid model
-   completions. Count each worker/round, prompted managed-session turn, enrollment probe turn, and AI-curation call
-   separately; exclude the Claude-hosted checklist driver and report it separately. Record end-to-end duration, with 45
-   minutes as a review threshold rather than a correctness gate.
-5. **Repository-owned runtime matrix.** Store the pinned Claude/Codex pair and probe evidence in
-   `src/skills/qa/resources/runtime-matrix.json`. Establish both pins with fresh release probes; choose Codex at or
-   above the proxy floor and raise the general-probe ceiling to the validated version in the same change. Exercise
-   `latest` in a separately labelled compatibility lane whose failure does not rewrite the pinned verdict.
-6. **Preserve deterministic bookkeeping.** Prefer checklist/resource changes that do not alter the state-machine
-   contract. If the selection model requires a state-script change, update both copies and their parity/behavior tests
-   in the same commit.
-7. **Make Codex delivery evidence deterministic.** The blocking live journey uses the default `initial-message`
-   delivery. Real enrolled hook firing and staged hook-delivery assertions remain required automated-suite evidence. An
-   optional enrolled extended run may test `hook` delivery only when success is the expected result; trust-recovery
-   output is negative evidence, never an alternative pass.
-8. **Preserve section addressing.** Add v1.0.0 probes only by appending steps to their related sections 0-20. Do not
-   insert, renumber, or create section 21+, so category and `--from`/`--to` meanings remain stable.
-9. **Ratified v1.0.0 delta closure (invalidated 2026-08-31).** The maintainer initially chose not to repeat unaffected
-   paid and human steps after the synchronized 2026-08-30 run. That run completed every blocking step with exact wheel,
-   driver, and pinned-runtime identity, and every non-pass result was classified. Its non-pass results were closed with
-   direct execution of each failed or skipped block, automated coverage of the sole product delta, and exact-wheel/
-   driver verification of the rebuilt candidate. The saved run's native verdict remains `fail`; the decision was
-   composite evidence, not a synthesized passing report. Its own terms required any later product or packaged QA change
-   to invalidate the exception and require a new complete pinned run. Post-closure product and packaged-QA fixes on
-   2026-08-31 triggered that condition, so this exception is now historical evidence and may not close the release gate.
+01. **One QA frontend.** Keep `/qa` Claude-hosted for v1.0.0. Codex is a subject under test, not a duplicated
+    orchestration package. A successful managed Codex path is release evidence; a Codex-hosted copy of QA is not.
+02. **Four evidence lanes.** Classify each retained contract as `automated-suite`, `clean-wheel-smoke`,
+    `human-acceptance`, or `extended-exploratory`. A feature is represented when its release owner is explicit; it does
+    not need another manual checklist matrix.
+03. **Exact artifact first.** Build once, require the invoking host QA package to match that wheel, install the exact
+    wheel into an isolated environment that cannot import the checkout, and record wheel and driver digests.
+    Source-container QA remains useful for development but cannot be the distribution gate.
+04. **Bound deterministic work.** Hard-cap the blocking lane at 12 included human checkpoints and 8 paid model
+    completions. Count each worker/round, prompted managed-session turn, enrollment probe turn, and AI-curation call
+    separately; exclude the Claude-hosted checklist driver and report it separately. Record end-to-end duration, with 45
+    minutes as a review threshold rather than a correctness gate.
+05. **Repository-owned runtime matrix.** Store the pinned Claude/Codex pair and probe evidence in
+    `src/skills/qa/resources/runtime-matrix.json`. Establish both pins with fresh release probes; choose Codex at or
+    above the proxy floor and raise the general-probe ceiling to the validated version in the same change. Exercise
+    `latest` in a separately labelled compatibility lane whose failure does not rewrite the pinned verdict.
+06. **Preserve deterministic bookkeeping.** Prefer checklist/resource changes that do not alter the state-machine
+    contract. If the selection model requires a state-script change, update both copies and their parity/behavior tests
+    in the same commit.
+07. **Make Codex delivery evidence deterministic.** The blocking live journey uses the default `initial-message`
+    delivery. Real enrolled hook firing and staged hook-delivery assertions remain required automated-suite evidence. An
+    optional enrolled extended run may test `hook` delivery only when success is the expected result; trust-recovery
+    output is negative evidence, never an alternative pass.
+08. **Preserve section addressing.** Add v1.0.0 probes only by appending steps to their related sections 0-20. Do not
+    insert, renumber, or create section 21+, so category and `--from`/`--to` meanings remain stable.
+09. **Ratified v1.0.0 delta closure (invalidated 2026-08-31).** The maintainer initially chose not to repeat unaffected
+    paid and human steps after the synchronized 2026-08-30 run. That run completed every blocking step with exact wheel,
+    driver, and pinned-runtime identity, and every non-pass result was classified. Its non-pass results were closed with
+    direct execution of each failed or skipped block, automated coverage of the sole product delta, and exact-wheel/
+    driver verification of the rebuilt candidate. The saved run's native verdict remains `fail`; the decision was
+    composite evidence, not a synthesized passing report. Its own terms required any later product or packaged QA change
+    to invalidate the exception and require a new complete pinned run. Post-closure product and packaged-QA fixes on
+    2026-08-31 triggered that condition, so this exception is now historical evidence and may not close the release
+    gate.
+10. **Standalone Claude skill identity.** Forge remains a direct filesystem installer, not a Claude plugin. Every
+    `.claude/skills/<name>/SKILL.md` therefore carries `name: <name>` and is invoked as `/<name>`. A `/forge:<name>`
+    namespace would require a real plugin manifest and lifecycle; frontmatter alone cannot create it.
 
 ## Scope
 
@@ -191,7 +195,7 @@ inspect a file or JSON record that the CLI can validate directly.
 
 ## Out of Scope
 
-- A Codex-hosted clone of `/forge:qa`.
+- A Codex-hosted clone of `/qa`.
 - Replacing the self-contained state scripts with imports from the Forge package or repository checkout.
 - Turning QA into the owner of exhaustive unit, malformed-input, concurrency, security, or rollback matrices.
 - Making unpinned `latest` client behavior part of the reproducible v1.0.0 verdict.

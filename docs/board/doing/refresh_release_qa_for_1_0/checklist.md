@@ -11,21 +11,21 @@ creation happened in the same decision.
 
 ## Current Focus
 
-The synchronized pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved
-verdict remains `fail`, and the subsequent bounded delta closure remains useful historical evidence. Post-closure review
-then found three product defects: byte-unsafe Linux process liveness, catalog-dependent reporting of durable model
-intent, and a mutating session-delete preview. It also found two packaged-QA defects: omitted driver identity in final
-metrics and non-transactional cleanup in step 18.4. Fixing them changed both the product and packaged QA, so the
-ratified bridge is invalid under its own rule.
+The fresh pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved verdict
+is `fail`: standalone Claude skills were documented and compiled with a plugin-only `/forge:<name>` namespace, while the
+actual host QA invocation proved Claude discovers the direct install as `/qa`; terminal multi-file policy checks also
+evaluated only the first path even though the corresponding QA step lacked an assertion for file granularity. Two other
+failures were stale checklist claims about session-list and info columns.
 
-A fresh complete pinned run against the rebuilt exact wheel and matching packaged driver is therefore open and required.
-The default blocking selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8 paid operations. Phase 7
-also still needs the broad named integration-owner run and separately labelled `latest` compatibility pass; the Codex
-integration owners must observe Codex CLI `0.149.1` before that pin's release validation is complete.
+The selector, policy, and checklist repairs change both the product and packaged QA, so the corrected candidate still
+needs a fresh complete pinned run; the default selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8
+paid operations. Phase 7 also still needs the broad named integration-owner run and separately labelled `latest`
+compatibility pass; the Codex integration owners must observe Codex CLI `0.149.1` before that pin's release validation
+is complete.
 
 ## Execution Guardrails
 
-- `/forge:qa` remains a Claude-hosted frontend. Claude and Codex are subjects under test; this card does not create a
+- `/qa` remains a Claude-hosted frontend. Claude and Codex are subjects under test; this card does not create a
   Codex-hosted QA package.
 - The release verdict comes from one exact wheel installed outside the checkout. `/forge`, editable environments, and
   `PYTHONPATH` may provide fixtures but may not satisfy Forge imports or packaged-resource discovery.
@@ -53,7 +53,7 @@ integration owners must observe Codex CLI `0.149.1` before that pin's release va
   6 `human:confirm`, and 636 parsed assertions without omissions.
 - [x] Ratify the evidence/selection contract before changing annotations. **Accepted contract**:
   `resources/coverage-map.md` classifies contracts as `automated-suite`, `clean-wheel-smoke`, `human-acceptance`, or
-  `extended-exploratory`; `/forge:qa` runs the blocking clean-wheel/human set by default, while one `--extended` switch
+  `extended-exploratory`; `/qa` runs the blocking clean-wheel/human set by default, while one `--extended` switch
   includes exploratory steps. Do not expose four runner modes or overload category names with evidence semantics.
   **Assertion**: default, category, range, resume, and extended selection have deterministic, regression-tested
   inclusion rules.
@@ -80,9 +80,9 @@ integration owners must observe Codex CLI `0.149.1` before that pin's release va
   turn counts zero. Exclude the Claude-hosted checklist driver's own orchestration and report it separately.
   **Assertion**: the same fixtures produce the same counts before execution and in the saved report; the hard limits are
   12 human checkpoints and 8 paid operations, with no minimum.
-- [x] Ratify duration semantics. **Accepted contract**: record wall-clock time for the complete `/forge:qa` invocation
-  from artifact validation through final report save. A run over 45 minutes sets `budget_review_required: true` and
-  needs explicit maintainer disposition before sign-off, but duration alone does not fail an otherwise correct run.
+- [x] Ratify duration semantics. **Accepted contract**: record wall-clock time for the complete `/qa` invocation from
+  artifact validation through final report save. A run over 45 minutes sets `budget_review_required: true` and needs
+  explicit maintainer disposition before sign-off, but duration alone does not fail an otherwise correct run.
   **Assertion**: reports cannot omit duration or silently treat the review threshold as a product-test failure.
 - [x] Ratify the append-only landing map. **Accepted contract**: append extension lifecycle probes to section 2;
   backend/provider trace to 4; managed runtimes, routing, adoption/repair, and consumer lanes to 5; runtime hook
@@ -192,7 +192,7 @@ integration owners must observe Codex CLI `0.149.1` before that pin's release va
   one representative editor and destructive confirmation remain.
 - [x] Move the planner -> supervisor -> executor demonstration and redundant catalog matrices to the extended lane.
   **Assertion**: the blocking gate retains deterministic supervisor, compiler, installer, and package-health owners;
-  default `/forge:qa` does not launch the three-session demonstration.
+  default `/qa` does not launch the three-session demonstration.
 - [x] Recount the resulting gate and extend `tests/src/skills/test_qa_checklist_contract.py` for evidence selection and
   budgets in the same green slice as the final blocking metadata. **Assertion**: every retained contract has one lane
   and an existing owner path; default and extended steps remain distinguishable without changing section ids; computed
@@ -381,7 +381,7 @@ integration owners must observe Codex CLI `0.149.1` before that pin's release va
 ### Stale-Driver Partial QA Follow-up -- 2026-08-29
 
 - The partial run selected wheel SHA-256 `7c0dd1c057e90fa2be0b561d336bd02b3f9a3449fe2ebe48308089e2529c2b47` but loaded
-  `/forge:qa` from the older copied project package. Its saved 163-step/551-assertion/9-checkpoint selection proves that
+  `/qa` from the older copied project package. Its saved 163-step/551-assertion/9-checkpoint selection proves that
   mismatch; the selected wheel contains the newer 552-assertion/8-checkpoint driver. None of its 248 passes or 15
   failures can establish the follow-up wheel's release verdict.
 - [x] Bind the host QA driver to the selected wheel before Docker mutation. **Assertion**: managed paths and bytes must
@@ -496,31 +496,65 @@ integration owners must observe Codex CLI `0.149.1` before that pin's release va
 - This automated evidence does not substitute for the reopened complete live run. The Phase 7 pinned-run item remains
   unchecked until that exact wheel and driver produce a saved native report.
 
+### Fresh Pinned QA Follow-up -- 2026-08-31
+
+- The complete run at `~/.forge/manual-testing/qa/runs/2026-08-31-214829/` exercised wheel SHA-256
+  `d9a03bbdea741e88a7ce9aab0a1b01c1cad1e1ff55cd066c0b808dc0cff4bb69` with matching driver SHA-256
+  `d4de2fe7c7198e9929c0fbf80cc6e79adcae5d3bb01f6a13ec1191b0d66c6968`. It completed all 163 selected steps and 552
+  assertions with pinned Claude `2.1.245` and Codex `0.149.1`, recording 546 passes, 6 failures, no skips, 8/8 human
+  checkpoints, and 5 observed paid operations. Preserve its native `fail` verdict.
+- [x] Classify the six recorded failures. Step 15.5 exposed a product/packaging contract error: Forge directly installs
+  standalone `.claude/skills/<name>` packages, whose selector is `/<name>`; `/forge:<name>` is a plugin namespace and
+  was never created by the frontmatter. The successful host run was actually `/qa`, as its transcript records. Steps 5.2
+  and 17.1 were checklist drift: session list intentionally shows location only to disambiguate duplicate names, and
+  info lists configured proxies plus recent sessions without probing live status.
+- [x] Promote the unasserted 13.5 observation to a product defect. Terminal `--diff` built one `ActionContext` from the
+  first file, so a leading README could mask a path-scoped violation in a later Python file. The `%policy check` path
+  already split per file and therefore did not share the bypass.
+- [x] Repair standalone Claude skill identity and selectors. **Assertion**: compiler output and legacy Claude-only
+  packages use a frontmatter name matching their directory; installer messages, live QA commands, design docs, user
+  guides, and future board cards advertise bare selectors; the installer remains a direct filesystem delivery surface
+  and does not invent a plugin migration.
+- [x] Share multi-file diff parsing between terminal and `%policy` checks. **Assertion**: both paths evaluate every
+  non-deleted file through one engine in tests-first order; terminal JSON reports `files_checked`, each violation names
+  `file_path`, a later path-scoped violation denies, and an atomic nested test-plus-implementation diff passes TDD.
+- [x] Correct the two stale dashboard assertions and make 13.5 prove the multi-file property in the clean wheel.
+  **Assertion**: step 5.2 checks the actual template/model/status/last-used columns, step 17.1 distinguishes configured
+  proxies from live status and recent sessions from active state, and step 13.5 denies the deterministic two-file bypass
+  fixture.
+- [x] Rebuild and validate the corrected exact wheel. `make build`, `make pre-commit`, the 9,978-test unit suite, the
+  1,081-test regression suite, the 4-test policy CLI integration owner, the 2-test installer owner slice, and the
+  exact-wheel QA artifact test pass. The candidate wheel SHA-256 is
+  `4c0ac99391ec5083dbe28870420971d9878e23ba71fee9f287aaad3f386c5a5d`; its matching packaged QA-driver SHA-256 is
+  `e35829bf4cc5e71445bd42d86f331367a3a846f907d24e06ecb18782d1b8052e`.
+- [ ] Synchronize that exact QA driver and complete the required full pinned run on the corrected candidate. The prior
+  run found real product defects and cannot be converted into a passing verdict by reclassification.
+
 ## Acceptance Tests
 
-| Test                     | Fixture                                                                | Assertion                                                                                            | Test File                                                                                                                                                                                    |
-| ------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checklist metadata truth | 21 QA fragments and index                                              | declared count, ids, execution classes, categories, and parsed assertions agree                      | `tests/src/skills/test_qa_checklist_contract.py` (new)                                                                                                                                       |
-| Evidence selection       | blocking and extended fixtures with category/range/resume              | selection is deterministic and budgets count only included steps                                     | `tests/src/skills/test_qa_checklist_contract.py`; state tests if parser changes                                                                                                              |
-| State-script parity      | both packaged state scripts                                            | only the two approved identity lines differ and the full behavior matrix passes                      | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`                                                                                            |
-| Runtime matrix           | repository matrix plus start/end Claude/Codex probes                   | pins have probe evidence, match at both run boundaries, and Codex meets its ceilings                 | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/skills/test_qa_start_container.py`, `tests/src/skills/test_qa_run_metrics.py`, `tests/src/core/runtime/test_codex_preflight.py` |
-| Artifact identity        | supplied RC wheel, host QA driver, and distinguishable checkout        | driver matches the wheel; CLI, metadata, and resources resolve only from the recorded wheel          | `tests/integration/docker/test_qa_release_artifact.py` (new)                                                                                                                                 |
-| Container reuse identity | editable and release builds sharing revision/runtime versions          | changed wheel/driver/profile/track/mode/path/auth rejects stale reuse                                | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                              |
-| Managed Claude lifecycle | clean-wheel project and real Claude                                    | SessionStart/Stop confirmation and transcript artifact are produced                                  | `tests/integration/docker/test_real_claude_hooks.py`                                                                                                                                         |
-| Managed Codex lifecycle  | authenticated Codex and clean-wheel project                            | preflight plus one `initial-message` start/resume records a thread                                   | `tests/integration/core/test_codex_session_start.py`                                                                                                                                         |
-| Codex hook delivery      | enrolled real runtime plus staged hook receipt                         | real hook firing and staged delivery pass positively; recovery output is not a pass                  | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py`                                                                                           |
-| Model route evidence     | direct and proxy-capable catalog fixtures                              | explicit model resolves expected route and show/history report its event                             | `tests/integration/docker/test_session_routing.py`                                                                                                                                           |
-| Native adoption          | Claude/Codex evidence plus ambiguous and already-bound ids             | binding follows on-disk runtime evidence and preserves the native transcript                         | `tests/integration/docker/test_adopt_native_conversation.py`                                                                                                                                 |
-| Store repair             | orphan and degraded manifests in one Forge root                        | preview/apply restores valid rows without recreating worktrees or accepting corruption               | `tests/integration/docker/test_session_lifecycle.py`                                                                                                                                         |
-| Rewind and depth         | native parent lineage plus valid/invalid fresh flags                   | resume/fork preserves rewind and ancestry contracts                                                  | `tests/integration/docker/test_rewind_native_contract.py`                                                                                                                                    |
-| Transfer generation      | four strategies, child snapshot, and notes overlay                     | regeneration changes only the parent cache and reports strategy/runtime honestly                     | `tests/src/session/test_transfer.py`, `tests/src/cli/test_transfer_cli.py`                                                                                                                   |
-| Consumer lanes           | four consumers plus keyed/direct, keyless/direct, and proxied fixtures | live lane/status and API/unknown/proxied agree; automated keyless Claude Max is `subscription_quota` | `tests/src/cli/test_session_lane.py`, `tests/src/cli/test_policy_supervisor.py`, `tests/src/core/usage/test_billing.py`, `tests/integration/session/test_shadow_curation_codex_smoke.py`     |
-| Authority enforcement    | advisory and producer fixtures on both runtimes                        | mutation outcome and journal agree with authority                                                    | `tests/integration/docker/test_real_authority.py`                                                                                                                                            |
-| Backend and trace paths  | authenticated backend and one traced request                           | lifecycle ids are correct and trace list/show/explain join the request                               | `tests/integration/backend/test_backend_cli.py`, `tests/integration/proxy/test_provider_trace_e2e.py`                                                                                        |
-| Policy source modes      | one file, one piped diff, zero sources, and both sources               | exactly one source succeeds; invalid source counts fail before evaluation                            | `tests/integration/cli/test_policy_cli_contract_integration.py` plus QA installed probe                                                                                                      |
-| Runtime budget           | selected blocking steps plus complete blocking report                  | human checkpoints are at most 12 and paid model completions are at most 8                            | `tests/src/skills/test_qa_checklist_contract.py`                                                                                                                                             |
-| Duration evidence        | complete blocking report                                               | elapsed time is recorded; over 45 minutes sets review-required without changing test verdict         | `tests/src/skills/test_qa_checklist_contract.py` plus recorded RC evidence                                                                                                                   |
-| Clean uninstall          | wheel-owned Claude/Codex surfaces plus unrelated bytes                 | selected ownership is removed and unrelated content remains byte-identical                           | `tests/integration/docker/test_installer.py`                                                                                                                                                 |
+| Test                     | Fixture                                                                | Assertion                                                                                               | Test File                                                                                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checklist metadata truth | 21 QA fragments and index                                              | declared count, ids, execution classes, categories, and parsed assertions agree                         | `tests/src/skills/test_qa_checklist_contract.py` (new)                                                                                                                                       |
+| Evidence selection       | blocking and extended fixtures with category/range/resume              | selection is deterministic and budgets count only included steps                                        | `tests/src/skills/test_qa_checklist_contract.py`; state tests if parser changes                                                                                                              |
+| State-script parity      | both packaged state scripts                                            | only the two approved identity lines differ and the full behavior matrix passes                         | `tests/src/skills/test_walkthrough_state.py`, `tests/src/skills/test_walkthrough_state_parity.py`                                                                                            |
+| Runtime matrix           | repository matrix plus start/end Claude/Codex probes                   | pins have probe evidence, match at both run boundaries, and Codex meets its ceilings                    | `tests/src/skills/test_qa_checklist_contract.py`, `tests/src/skills/test_qa_start_container.py`, `tests/src/skills/test_qa_run_metrics.py`, `tests/src/core/runtime/test_codex_preflight.py` |
+| Artifact identity        | supplied RC wheel, host QA driver, and distinguishable checkout        | driver matches the wheel; CLI, metadata, and resources resolve only from the recorded wheel             | `tests/integration/docker/test_qa_release_artifact.py` (new)                                                                                                                                 |
+| Container reuse identity | editable and release builds sharing revision/runtime versions          | changed wheel/driver/profile/track/mode/path/auth rejects stale reuse                                   | `tests/src/skills/test_qa_start_container.py` (new), `tests/regression/test_bug_qa_runtime_image_tag_parity.py`                                                                              |
+| Managed Claude lifecycle | clean-wheel project and real Claude                                    | SessionStart/Stop confirmation and transcript artifact are produced                                     | `tests/integration/docker/test_real_claude_hooks.py`                                                                                                                                         |
+| Managed Codex lifecycle  | authenticated Codex and clean-wheel project                            | preflight plus one `initial-message` start/resume records a thread                                      | `tests/integration/core/test_codex_session_start.py`                                                                                                                                         |
+| Codex hook delivery      | enrolled real runtime plus staged hook receipt                         | real hook firing and staged delivery pass positively; recovery output is not a pass                     | `tests/integration/docker/test_real_authority.py`, `tests/integration/docker/test_policy_hooks.py`                                                                                           |
+| Model route evidence     | direct and proxy-capable catalog fixtures                              | explicit model resolves expected route and show/history report its event                                | `tests/integration/docker/test_session_routing.py`                                                                                                                                           |
+| Native adoption          | Claude/Codex evidence plus ambiguous and already-bound ids             | binding follows on-disk runtime evidence and preserves the native transcript                            | `tests/integration/docker/test_adopt_native_conversation.py`                                                                                                                                 |
+| Store repair             | orphan and degraded manifests in one Forge root                        | preview/apply restores valid rows without recreating worktrees or accepting corruption                  | `tests/integration/docker/test_session_lifecycle.py`                                                                                                                                         |
+| Rewind and depth         | native parent lineage plus valid/invalid fresh flags                   | resume/fork preserves rewind and ancestry contracts                                                     | `tests/integration/docker/test_rewind_native_contract.py`                                                                                                                                    |
+| Transfer generation      | four strategies, child snapshot, and notes overlay                     | regeneration changes only the parent cache and reports strategy/runtime honestly                        | `tests/src/session/test_transfer.py`, `tests/src/cli/test_transfer_cli.py`                                                                                                                   |
+| Consumer lanes           | four consumers plus keyed/direct, keyless/direct, and proxied fixtures | live lane/status and API/unknown/proxied agree; automated keyless Claude Max is `subscription_quota`    | `tests/src/cli/test_session_lane.py`, `tests/src/cli/test_policy_supervisor.py`, `tests/src/core/usage/test_billing.py`, `tests/integration/session/test_shadow_curation_codex_smoke.py`     |
+| Authority enforcement    | advisory and producer fixtures on both runtimes                        | mutation outcome and journal agree with authority                                                       | `tests/integration/docker/test_real_authority.py`                                                                                                                                            |
+| Backend and trace paths  | authenticated backend and one traced request                           | lifecycle ids are correct and trace list/show/explain join the request                                  | `tests/integration/backend/test_backend_cli.py`, `tests/integration/proxy/test_provider_trace_e2e.py`                                                                                        |
+| Policy source modes      | one file, one multi-file piped diff, zero sources, and both sources    | exactly one source succeeds; every diff file is evaluated tests-first; invalid source counts fail early | `tests/integration/cli/test_policy_cli_contract_integration.py` plus QA installed probe                                                                                                      |
+| Runtime budget           | selected blocking steps plus complete blocking report                  | human checkpoints are at most 12 and paid model completions are at most 8                               | `tests/src/skills/test_qa_checklist_contract.py`                                                                                                                                             |
+| Duration evidence        | complete blocking report                                               | elapsed time is recorded; over 45 minutes sets review-required without changing test verdict            | `tests/src/skills/test_qa_checklist_contract.py` plus recorded RC evidence                                                                                                                   |
+| Clean uninstall          | wheel-owned Claude/Codex surfaces plus unrelated bytes                 | selected ownership is removed and unrelated content remains byte-identical                              | `tests/integration/docker/test_installer.py`                                                                                                                                                 |
 
 ## Closeout
 

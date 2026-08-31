@@ -12,8 +12,8 @@ forge info
 
 - [ ] Shows Forge version
 - [ ] Shows installation status
-- [ ] Shows proxy status
-- [ ] Shows active session (if any)
+- [ ] Shows configured proxy registry entries
+- [ ] Shows recent sessions (if any)
 
 ### 17.2 Debug Logging and `forge logs`
 

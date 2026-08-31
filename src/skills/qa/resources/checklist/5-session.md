@@ -34,7 +34,7 @@ forge session list
 ```
 
 - [ ] Shows `test-session-1` with status
-- [ ] Shows session directory and last-used timestamp
+- [ ] Shows template/model columns and a last-used timestamp
 
 ### 5.3 Show Session Details
 
