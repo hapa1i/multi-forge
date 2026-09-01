@@ -308,7 +308,7 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel walkthrough package
   owner. The Codex test completed two real turns and the sidecar tests required no provider completion.
 - `make build`, `./scripts/test-wheel-runtime.sh`, and `make pre-commit` passed. The final locally built wheel SHA-256
-  is `5fffb5a600c3f5a08a5986c4641737cfbcb902adeaee8ddbe6b37227c03fa1bd`.
+  is `5d5f39d720f988643302d4890b274ed9c1eb32f1bbb45e533d04628eda3f0a1e`.
 - The exact-wheel owner installs outside the checkout, binds the answering distribution to the installed package tree,
   runs setup/index/report/cleanup twice, verifies protected-path preservation, and confirms `python -I` cannot import
   the checkout. This automated proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
@@ -323,6 +323,10 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   manifest. The probe now reports `answering_distribution_issue: editable-install`, emits no payload digest for that
   ineligible source, and explicitly forbids substituting checkout resources. Unit and exact-wheel integration coverage
   pin both the editable refusal and installed-wheel success paths.
+- Installing the candidate then exposed a legacy local installation row that still attributed skills to Codex. Sync
+  correctly refused because Codex packages have no local scope, but its recovery tip named only the separate user-scope
+  install and could not repair the local row. The tip now names runtime-scoped local disable before sync, while
+  retaining the user-scope Codex command as an optional second action.
 
 ## Acceptance Tests
 

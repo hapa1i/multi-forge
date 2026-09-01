@@ -721,8 +721,9 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False, *, output: Console | N
         )
         if has_local_codex_scope_conflict:
             print_tip(
-                "Codex skill packages do not support local scope; retry with "
-                "forge extension enable --scope user --runtime codex.",
+                "Codex skill packages do not support local scope. Remove legacy local Codex ownership with "
+                "'forge extension disable --scope local --runtime codex' before syncing; install Codex packages "
+                "separately with 'forge extension enable --scope user --runtime codex'.",
                 console=output,
             )
         elif has_policy_conflicts and has_forceable_conflicts:
