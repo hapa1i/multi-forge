@@ -43,23 +43,43 @@ point selects the interpreter independently of the session CWD.
 
 ## Walkthrough
 
-The default mode creates a hermetic test environment, installs Forge extensions into it, and verifies:
+The default creates a hermetic repository and teaches the complete direct managed-session loop without a provider key:
 
-1. Files landed in the test repo (not your real `~/.claude/`)
-2. Your real system was not modified (mtime assertions)
-3. Isolation invariants are correct (`FORGE_HOME`, `CLAUDE_HOME`, and `CODEX_HOME` redirected; `HOME` unchanged for
-   existing authentication)
+1. Verify package identity and snapshot the real Claude/Codex extension paths using privacy-preserving tree digests.
+2. Enable sandboxed user runtime hooks and local project assets, then inspect which scope owns each surface.
+3. Compare a managed session with the sessionless `forge claude start` and `forge codex start` launchers.
+4. Create `walkthrough-demo` with `--model claude-haiku-4-5 --no-proxy --no-launch`. Before launch, inspect canonical
+   route intent and the honest absence of committed runtime evidence.
+5. Resume the session through Forge, confirm hook-written lifecycle evidence, use `%help` and `%session model show`, and
+   try one visible policy interaction.
+6. Exit cleanly and inspect the transcript, search, activity, and cost surfaces. Direct interactive activity can be
+   sparse and direct-session spend can be unavailable; the walkthrough never invents proxy cost.
+7. Resume into one fresh child with deterministic `structured` transfer, demonstrate incognito ephemerality, and clean
+   every walkthrough-owned resource.
 
-Codex verification in the walkthrough is deliberately project-scoped under the hermetic repo at
-`$FORGE_TEST_REPO/.agents/skills`. It never installs Codex user skills under the real `$HOME/.agents/skills`. Codex
-planning/status subprocesses temporarily point `HOME` at a directory inside the test repo so duplicate discovery cannot
-depend on or inspect real user skill packages; the interactive environment keeps the real `HOME` for auth.
+Session A is the guide. You open one Terminal inside the generated sandbox and launch the managed Claude child there.
+The default has seven human checkpoints and two intentional model completions; more than 30 minutes is recorded for
+review, not treated as a correctness failure by itself. Every Forge or sandbox-mutating command run by the guide goes
+through the packaged `run-in-repo.sh` safety wrapper. Walkthrough Forge state is redirected; the six protected real
+Claude settings/asset and Codex skill paths are compared before and after by type, mode, and content/tree digest without
+copying their contents.
 
-The agent walks through each step interactively, explaining what it's checking and why. Risky operations (install,
-uninstall) go through `run-in-repo.sh`; read-only checks are done directly.
+`--from <section-or-step>` resumes only when the preserved checklist prefix and the selected options still match. A
+version mismatch, changed or unverified prefix, or orphaned record refuses without changing the state and directs you to
+`--reset`. `--report` saves package provenance, selected options, state, step and Forge logs, metrics, and a transcript
+claim under `~/.forge/manual-testing/walkthrough/runs/`, outside sandbox cleanup.
 
-Use `--sidecar` for sidecar runtime coverage (Docker startup, shell access, cleanup). This is the only place sidecar
-runtime is exercised -- `/qa` runs inside a container and cannot safely launch sidecars against container-local paths.
+Optional chapters are bounded and do not change the default result:
+
+- `--codex` adds readiness plus one managed headless Codex continuation. Transfer uses `initial-message`, so hook trust
+  enrollment is not required. The isolated `CODEX_HOME` accepts either an environment key/token or one explicitly
+  supplied `--codex-auth <auth.json>` file; native `~/.codex/auth.json` is never imported implicitly.
+- `--sidecar` adds launch through the packaged `openrouter-anthropic` template, one container/mount observation, and
+  cleanup. It requires Docker, the configured sidecar image, and OpenRouter auth available to the sandbox (normally
+  `OPENROUTER_API_KEY`). The default probes none of them.
+
+The skill frontend remains Claude-only. Codex is an optional subject under test; Codex users still have the portable
+`$smoke-test` Day 1 health check.
 
 ## Full QA (`/qa`)
 
@@ -177,9 +197,14 @@ Run the following failure-path checks only in a disposable Forge home:
 Walkthrough:
 
 ```
-/walkthrough --setup-only        # Create test repo without running tests
-/walkthrough --reset             # Reset test repo to clean baseline
-/walkthrough --report            # Save report + logs + transcript after run
+/walkthrough --setup-only              # Create/prove sandbox + installed package, then stop
+/walkthrough --reset                   # Reclaim owned resources and recreate the baseline
+/walkthrough --report                  # Save report, provenance, logs, state, and transcript claim
+/walkthrough --from 10.2 --report      # Resume after validating preserved evidence/options
+/walkthrough --codex                   # Add the optional Codex initial-message chapter
+/walkthrough --codex --codex-auth ~/.codex/auth.json
+                                            # Copy exactly one auth file into isolated CODEX_HOME
+/walkthrough --sidecar                 # Add the optional Docker sidecar chapter
 ```
 
 QA:
@@ -204,16 +229,18 @@ The setup script creates a hermetic environment at `~/.forge/manual-testing/walk
 test-repo/
 +-- .forge-home/         # Redirected Forge global state
 +-- .claude-user/        # Redirected user-scope Claude extensions
-+-- .codex-user/         # Redirected user-scope Codex config
-+-- .agents/skills/      # Project-scoped portable Codex packages
-+-- .forge/walkthrough/  # State, reports, fake Codex, and duplicate-scan HOME
++-- .codex-user/         # Redirected Codex config and optional explicit auth copy
++-- .forge/walkthrough/  # Generated environment, protected-path baseline, and progress
 +-- src/                 # Fixture source files
 +-- tests/               # Fixture test files
 +-- CLAUDE.md            # Fixture project file
 ```
 
 Every risky operation passes through `run-in-repo.sh`, which applies a dangerous-path denylist, sources `env.sh`, and
-enforces six numbered isolation/structure gates before running any command. Your real home directory is never touched.
+enforces six numbered isolation/structure gates before running any command. The ordinary `HOME` value remains available
+to the managed Claude runtime for its existing login, but the walkthrough's owned Forge/Claude/Codex paths are
+redirected and protected real extension targets must remain digest-identical. Reports live beside, not inside,
+`test-repo/`.
 
 ---
 
@@ -221,5 +248,7 @@ enforces six numbered isolation/structure gates before running any command. Your
 
 - **After installing Forge** -- run `/smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
   `/walkthrough` for the interactive tour
-- **After upgrading Forge** -- catch regressions with the walkthrough
+- **After upgrading Forge** -- use the walkthrough to relearn and verify the managed-session loop
+- **Before accepting walkthrough release evidence** -- install or sync the exact candidate wheel, restart Claude so it
+  reloads the candidate skill, and run `/walkthrough --setup-only` before the full reported journey
 - **Before a release** -- build the candidate once and run `/qa --wheel <candidate>` for the full pinned checklist

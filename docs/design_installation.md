@@ -699,10 +699,9 @@ deterministic and the agent only interprets results. Checklist edits change test
 | `/qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
 
 **Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
-mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
-subject under test, Terminal for raw CLI) enables interactive verification of things the agent can't see. Session A
-prompts the user to open Terminal early. Session B is launched only when the checklist first needs interactive
-verification.
+mode-specific wrapper, and routes items by annotation. The walkthrough's default uses two windows: Session A guides,
+while one sandboxed Terminal launches the managed Claude child and runs user-entered commands. The optional sidecar
+chapter may add a container shell. QA retains its own container-oriented interaction model.
 
 **Key design decisions:**
 
@@ -713,6 +712,13 @@ verification.
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
 - `/qa` tied to `full` install profile (Docker dependency)
 - `/qa` remains Claude-hosted; Claude and Codex are independent subjects under test
+- `/walkthrough` remains Claude-hosted; its optional Codex chapter is a subject under test, not a Codex frontend
+- The walkthrough default is a direct managed-session journey with seven human checkpoints and two intentional model
+  completions. Codex and sidecar chapters are explicit options and do not probe their infrastructure by default
+- Walkthrough resume is evidence-preserving only when checklist structure and selected-option identity still match;
+  validation refuses before changing state otherwise
+- Walkthrough reports live outside the sandbox and bind results to the answering distribution, installed skill package,
+  and managed-package tree digest
 - Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
 - Before Docker mutation, the Claude-hosted QA driver must have the same managed paths and bytes as the QA package in
   that wheel. The recorded driver digest makes a stale installed checklist ineligible for release evidence
@@ -729,15 +735,20 @@ verification.
 
 ### D.1 Annotation types
 
-| Annotation                    | Session A does                                     | User does                              |
-| ----------------------------- | -------------------------------------------------- | -------------------------------------- |
-| `<!-- auto -->`               | Runs command via wrapper, checks assertions        | Nothing                                |
-| `<!-- human:confirm -->`      | Runs command, shows output                         | Eyeballs output in Session A, confirms |
-| `<!-- human:guided -->`       | Tells user what to do in Session B or Terminal     | Does it, reports back to Session A     |
-| `<!-- requires: X -->`        | Checks infra probe                                 | Skip if unavailable                    |
-| `<!-- destructive -->`        | Runs command (safe in sandbox)                     | Nothing                                |
-| `<!-- evidence: L -->`        | Applies the precomputed evidence selection         | Nothing                                |
-| `<!-- paid-operations: N -->` | Records the maximum subject-under-test completions | Nothing                                |
+| Annotation                    | Session A does                                                 | User does                             |
+| ----------------------------- | -------------------------------------------------------------- | ------------------------------------- |
+| `<!-- auto -->`               | Runs command via wrapper, checks assertions                    | Nothing                               |
+| `<!-- human:confirm -->`      | Runs or presents deterministic checks, then requests review    | Confirms output or approves follow-up |
+| `<!-- human:guided -->`       | Tells user what to do in the managed child or sandbox Terminal | Does it, reports back to Session A    |
+| `<!-- requires: X -->`        | Checks infra probe                                             | Skip if unavailable                   |
+| `<!-- option: codex -->`      | Selects the Codex chapter only when the driver has `--codex`   | Nothing                               |
+| `<!-- option: sidecar -->`    | Selects the sidecar chapter only with `--sidecar`              | Nothing                               |
+| `<!-- destructive -->`        | Runs command after the applicable safety/approval gate         | Nothing                               |
+| `<!-- evidence: L -->`        | Applies QA's precomputed evidence lane                         | Nothing                               |
+| `<!-- paid-operations: N -->` | Records the maximum subject-under-test completions             | Nothing                               |
+
+`option:` is a walkthrough-driver modifier, not an execution class or a shared parser feature. Walkthrough evidence
+ownership lives in `resources/journey-map.md`; it does not reuse QA's `evidence:` lane values.
 
 ### D.2 Wrapper abstraction
 
@@ -746,16 +757,24 @@ verification.
 | `/walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
 | `/qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount  |
 
-**Three-window model:** Session A prompts the user to open Terminal early. Session B is launched only when the checklist
-first needs interactive verification.
+**Walkthrough interaction model:** Session A prompts the user to open one sandboxed Terminal early. The managed Claude
+child runs from that Terminal, so the user does not need a separate pre-opened Session B window. Sidecar selection may
+add a container shell; the default does not.
 
 ### D.3 Per-skill details
 
 **Smoke test** (`smoke-test.sh`): Read-only probes with mtime snapshot assertions. Not checklist-driven.
 
-**Walkthrough** (checklist-driven via `run-in-repo.sh`): Annotated checklist covering setup, install verification,
-real-system isolation checks, CLI exploration, proxy/session creation, live Claude session, sidecar execution, and
-cleanup. Hermetic isolation via `setup-test-repo.sh` (Forge/Claude/Codex home redirection, a path denylist, and six
+**Walkthrough** (checklist-driven via `run-in-repo.sh`): The default teaches extension ownership, managed versus bare
+launches, model-first direct intent, post-launch route evidence, one policy interaction, transcript/search/activity
+inspection, deterministic structured continuity, incognito cleanup, and memory follow-up. It performs seven human
+checkpoints and two intentional model completions. Proxy start versus `--smoke-test` is display-only, so the default
+needs no provider key. `--codex` adds one initial-message continuation with explicit-file or environment auth ingress;
+it never imports native Codex auth implicitly or requires hook enrollment. `--sidecar` adds a bounded Docker chapter
+through a packaged proxy template and requires its provider auth. Optional unavailability or failure is compatibility
+evidence and does not change the default verdict. `--from <id>` resumes only after checklist-prefix and option-identity
+validation. `--report` preserves state, logs, metrics, transcript claim, and package provenance outside cleanup scope.
+Hermetic isolation comes from `setup-test-repo.sh` (Forge/Claude/Codex home redirection, a path denylist, and six
 numbered gates in `run-in-repo.sh`).
 
 **Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
@@ -772,7 +791,8 @@ remote-LiteLLM profile is diagnostic evidence rather than a complete release ver
 **Deterministic bookkeeper** (`walkthrough-state.py`): Each checklist-driven skill keeps a local state script that
 parses its checklist markdown into structured JSON. Commands: `index`, `step N.X`, and `summary` for read-only
 inspection; `init`, `record`, `var`, `prereq-check`, `report`, and `validate` for state management. Code blocks tagged
-`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection. The
-tests keep both self-contained copies identical except for two identity lines.
+`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State files use checklist version, structural hashes,
+and SHA-256 drift detection. Resume validation refuses a version mismatch, changed/unverified prefix, or orphaned record
+before clearing any suffix. The tests keep both self-contained copies identical except for two identity lines.
 
 ---

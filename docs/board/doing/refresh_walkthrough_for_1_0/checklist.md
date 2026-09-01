@@ -10,17 +10,13 @@
 
 ## Current Focus
 
-Planning only. The journey contract was reviewed and ratified with amendments on 2026-09-01; do not change the packaged
-walkthrough, product code, tests, or user documentation until this amended checklist receives its final planning review.
+Implementation and automated verification are complete on the execution branch. The packaged checklist now parses to 14
+sections, 43 steps, and 145 assertions. Its default selection has seven human checkpoints and two paid operations; the
+optional Codex and sidecar chapters remain outside that budget and outside the default verdict.
 
-The activation audit confirms that the current checklist still parses to 14 sections, 45 steps, and 108 assertions: 33
-automatic and 12 guided. The default path excludes three sidecar checkpoints but still asks for nine human checkpoints,
-teaches a sessionless launcher as though it were managed, and has no usable resume path even though the shared state
-engine already supports validated `--from` state.
-
-Phase 0 records the ratified answers to the card's four execution questions. The direct-route decision deliberately
-trades a live proxy dollar amount for a provider-neutral default; the tour still explains proxy-scoped costs and
-upstream smoke testing without manufacturing spend.
+The remaining work is release-candidate evidence and review: install/sync the exact candidate wheel, restart Claude, run
+`--setup-only`, complete one default report, exercise interruption/resume, and review the saved evidence with the
+maintainer. Keep the card in `doing/` until those live checks pass and the closeout is approved.
 
 ## Execution Guardrails
 
@@ -105,187 +101,188 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 
 ## Phase 1 -- Make Checklist Drift and Budgets Testable
 
-- [ ] Add `tests/src/skills/test_walkthrough_checklist_contract.py` against the real packaged checklist and parser.
+- [x] Add `tests/src/skills/test_walkthrough_checklist_contract.py` against the real packaged checklist and parser.
   **Assertion**: declared assertion count equals parsed count; section/step ids are unique and ordered; every step has
   exactly one execution class; prerequisites name earlier selected steps; and execution, requirement, option, and
   paid-operation annotations use the ratified vocabulary.
-- [ ] Map each retained step to an explicit human or automated evidence owner in `journey-map.md`, and give each
+- [x] Map each retained step to an explicit human or automated evidence owner in `journey-map.md`, and give each
   intentional model call a `paid-operations` annotation. **Assertion**: journey-map coverage is complete without reusing
   QA's evidence-selection lanes; the mechanically derived default selection stays at or below eight human checkpoints
   and three paid operations; and optional Codex and sidecar totals are separately reproducible.
-- [ ] Add a compact `src/skills/walkthrough/resources/journey-map.md`. **Assertion**: every default and optional chapter
+- [x] Add a compact `src/skills/walkthrough/resources/journey-map.md`. **Assertion**: every default and optional chapter
   states the user question it teaches, its human seam, its automated owner, its flag/prerequisite, and why removed
   inventory/migration/schema checks do not belong in the default tour.
-- [ ] Move brittle walkthrough-content assertions out of `tests/src/review/test_skill_content.py`. **Assertion**:
+- [x] Move brittle walkthrough-content assertions out of `tests/src/review/test_skill_content.py`. **Assertion**:
   removing the long step 11.5 passport exercise does not weaken passport behavior because `tests/src/cli/test_memory.py`
   and `tests/src/session/test_passport.py` remain authoritative; walkthrough tests assert the new educational contracts,
   not a copied implementation matrix.
-- [ ] Pin the declared checklist version, `last-updated`, `aligned-with: v1.0.0`, total assertions, default checkpoint
+- [x] Pin the declared checklist version, `last-updated`, `aligned-with: v1.0.0`, total assertions, default checkpoint
   count, and default paid count. **Assertion**: changing content or annotations without updating metadata fails the new
   contract test.
-- [ ] Preserve state-script parity. **Assertion**: if no parser behavior changes, both copies remain byte-identical to
+- [x] Preserve state-script parity. **Assertion**: if no parser behavior changes, both copies remain byte-identical to
   their activation versions; otherwise both execute the complete state suite and differ only in the two approved
   identity lines.
 
 ## Phase 2 -- Simplify the Driver and Add Honest Resume
 
-- [ ] Extend the argument contract to `--setup-only`, `--reset`, `--report`, `--from <id>`, `--codex`,
+- [x] Extend the argument contract to `--setup-only`, `--reset`, `--report`, `--from <id>`, `--codex`,
   `--codex-auth <path>`, and `--sidecar`. **Assertion**: `--codex-auth` requires `--codex`; unknown, duplicate-value, or
   incompatible arguments fail before setup mutation; usage and examples use the standalone `/walkthrough` selector.
-- [ ] Split fresh and resumed initialization. **Assertion**: a fresh run initializes with `--force`; `--from` never
+- [x] Split fresh and resumed initialization. **Assertion**: a fresh run initializes with `--force`; `--from` never
   overwrites first, validates the existing state, preserves verified prefix results and captured variables, and clears
   only the requested suffix.
-- [ ] Keep `--setup-only` small but prove the generated sandbox. **Assertion**: after setup it executes one packaged
+- [x] Keep `--setup-only` small but prove the generated sandbox. **Assertion**: after setup it executes one packaged
   `run-in-repo.sh true` probe so all six gates are exercised, then stops before checklist initialization, installs, or
   live-runtime work.
-- [ ] Bind resume to checklist and option identity. **Assertion**: a checklist-version mismatch, changed/unverified
+- [x] Bind resume to checklist and option identity. **Assertion**: a checklist-version mismatch, changed/unverified
   prefix, or changed `--codex`/`--sidecar` selection refuses before commands run and names `/walkthrough --reset`;
   adding `--report` alone may resume because it changes artifact capture, not subject coverage.
-- [ ] Make Codex auth ingress explicit and resumable. **Assertion**: `--codex-auth` resolves exactly one regular file,
+- [x] Make Codex auth ingress explicit and resumable. **Assertion**: `--codex-auth` resolves exactly one regular file,
   makes sandboxed `$CODEX_HOME` mode `0700`, copies the file as mode-`0600` `auth.json` only after sandbox validation,
   and records only `explicit-file`, `environment`, or `none`. Explicit-file mode scrubs competing Codex auth environment
   variables for Codex probes/turns; `--from` requires the preserved copy to remain a regular mode-`0600` file; reset
   removes it; and driver-generated state, reports, and logs contain no source path, credential bytes, or auth-file copy.
-- [ ] Make expected installed assets resume state, not stale-install evidence. **Assertion**: `--from` validates
+- [x] Make expected installed assets resume state, not stale-install evidence. **Assertion**: `--from` validates
   progress before any reset prompt and continues with the existing sandbox installation; a fresh invocation may still
   offer a reset when unmanaged prior artifacts make its starting state ambiguous.
-- [ ] Route option-gated section-12 steps from their annotations. **Assertion**: the default run does not probe Docker
+- [x] Route option-gated section-12 steps from their annotations. **Assertion**: the default run does not probe Docker
   or Codex; the skill interprets `option: codex` and `option: sidecar` from existing generic parser output; each
   explicit flag enables only its chapter; missing optional infrastructure produces an honest not-selected or unavailable
   result; and section 13 always executes without changing either state-script parser.
-- [ ] Make the opening narration describe the two-window default accurately: Session A guides, one sandboxed Terminal
+- [x] Make the opening narration describe the two-window default accurately: Session A guides, one sandboxed Terminal
   hosts the managed Claude child, and extra windows are introduced only by the sidecar option. **Assertion**: no prose
   says local scope owns runtime hooks or that a sessionless launcher has a Forge session manifest; before the first bare
   `forge` command, the Terminal proves its walkthrough marker and isolated `FORGE_HOME`, `CLAUDE_HOME`, and
   `CODEX_HOME`.
-- [ ] Record run start/end timestamps, selected options, declared human/paid budgets, and elapsed seconds in report
+- [x] Record run start/end timestamps, selected options, declared human/paid budgets, and elapsed seconds in report
   mode. **Assertion**: the saved report distinguishes selected failures from option-gated omissions and marks a duration
   above 30 minutes for review without synthesizing a failure.
-- [ ] Keep report artifacts outside the sandbox and cleanup scope. **Assertion**: state, selected options, step logs,
+- [x] Keep report artifacts outside the sandbox and cleanup scope. **Assertion**: state, selected options, step logs,
   debug-log snapshots, final logs, package identity, and transcript claim survive successful and failed cleanup without
   copying credentials.
 
 ## Phase 3 -- Rebuild the Default Day 1 Journey
 
-- [ ] Reduce sections 2-3 to `extension doctor`, user-scope Claude runtime enablement, local project enablement, and a
+- [x] Reduce sections 2-3 to `extension doctor`, user-scope Claude runtime enablement, local project enablement, and a
   concise `extension status`/manifest summary. **Assertion**: the default path proves user runtime hooks plus local
   status-line/project assets without fake Codex binaries, exact package counts, legacy migration, or directory diffs.
-- [ ] Replace mtime-only orientation with a quiet real-system snapshot that records existence, type, mode, and content
+- [x] Replace mtime-only orientation with a quiet real-system snapshot that records existence, type, mode, and content
   or tree digests for the six protected Claude/Codex targets. **Assertion**: later comparisons detect nested content
   changes without printing source bytes, settings values, auth data, or unrelated filenames into the report.
-- [ ] Teach managed versus bare launch before creating a session. **Assertion**: narration names manifests, lifecycle
+- [x] Teach managed versus bare launch before creating a session. **Assertion**: narration names manifests, lifecycle
   hooks, artifacts, continuity, search, and telemetry as managed-session behavior, while `forge claude start` and
   `forge codex start` are accurately described as sessionless proxy launchers.
-- [ ] Teach local proxy health versus upstream validation as display-only narration in section 6. **Assertion**: the
+- [x] Teach local proxy health versus upstream validation as display-only narration in section 6. **Assertion**: the
   walkthrough displays `forge proxy start <id>` versus `forge proxy start <id> --smoke-test`, states that the latter
   requires credentials and may incur provider cost, executes neither command, and leaves a live request to explicit user
   follow-up.
-- [ ] Create the managed parent through the ratified model-first command and inspect
+- [x] Create the managed parent through the ratified model-first command and inspect
   `forge session model show walkthrough-demo --json`. **Assertion**: the typed `claude-haiku-4-5` alias is stored and
   reported as canonical `claude-haiku-4-5-20251001`; pre-launch `route_intent.kind` is `direct`, template/proxy id are
   null, and `route_commit` is null; the command creates no model completion.
-- [ ] Merge parent launch and status-line review into one guided checkpoint. **Assertion**: the user runs
+- [x] Merge parent launch and status-line review into one guided checkpoint. **Assertion**: the user runs
   `forge session resume walkthrough-demo`, sees the `walkthrough-demo` status line, and an immediate
   `session show --json` reports non-null `confirmed_at` with `confirmed_by` matching `hook:SessionStart:*`. A
   post-resume `session model show --json` reports supported committed direct-route evidence; the pre-seeded Claude id is
   correlation data, not proof that launch occurred.
-- [ ] Merge read-only in-session orientation into one guided checkpoint using `%help` and `%session model show`.
+- [x] Merge read-only in-session orientation into one guided checkpoint using `%help` and `%session model show`.
   **Assertion**: both commands are intercepted as direct commands, show the current managed session/route, and consume
   no model completion.
-- [ ] Keep one policy interaction as the parent conversation's single prompted turn. **Assertion**: the visible deny
+- [x] Keep one policy interaction as the parent conversation's single prompted turn. **Assertion**: the visible deny
   names the configured policy intent, the model takes or requests a compliant path rather than silently bypassing it,
   and the step is annotated as one paid operation.
-- [ ] Exit the managed parent cleanly in one guided checkpoint and inspect only user-facing evidence. **Assertion**:
+- [x] Exit the managed parent cleanly in one guided checkpoint and inspect only user-facing evidence. **Assertion**:
   `session show --json` names a transcript path that exists after exit, the transcript artifact and search results all
   resolve `walkthrough-demo`, and no assertion reads a raw manifest field when a stable CLI surface exists.
-- [ ] Add `forge telemetry activity walkthrough-demo` and `forge telemetry costs show`. **Assertion**: activity reports
+- [x] Add `forge telemetry activity walkthrough-demo` and `forge telemetry costs show`. **Assertion**: activity reports
   the policy deny in the operation-outcomes pane and explains that the main interactive Claude harness does not emit
   model-call telemetry, so its model-calls pane may honestly be empty or sparse. The costs view is explained as
   proxy-scoped and reports empty/zero/unavailable rather than inventing direct-session spend or billing provenance.
-- [ ] Add the fresh continuity loop using deterministic `structured` context. **Assertion**: transfer regeneration/show
+- [x] Add the fresh continuity loop using deterministic `structured` context. **Assertion**: transfer regeneration/show
   exposes the parent's assembled context, `resume --fresh --child-name walkthrough-continuation` launches one child, and
   one parent-grounded question demonstrates delivery without an AI-curation call.
-- [ ] Add automated incognito ephemerality after continuity. **Assertion**: a temporary no-op Claude launcher exits
+- [x] Add automated incognito ephemerality after continuity. **Assertion**: a temporary no-op Claude launcher exits
   zero, the named incognito session disappears from list/index/disk, and cleanup remains idempotent if the fixture
   aborts.
-- [ ] Replace the long memory-passport exercise with a short further-reading orientation. **Assertion**: users learn
+- [x] Replace the long memory-passport exercise with a short further-reading orientation. **Assertion**: users learn
   that project memory and session transfer solve different continuity problems and receive current guide/CLI pointers
   without editing or validating frontmatter in the default tour.
 
 ## Phase 4 -- Bound Optional Runtime Chapters
 
-- [ ] Add a Codex readiness step gated by `--codex`. **Assertion**: `forge runtime preflight codex --json` runs through
+- [x] Add a Codex readiness step gated by `--codex`. **Assertion**: `forge runtime preflight codex --json` runs through
   the sandbox wrapper without `--proxy`; a ready result proceeds, while missing auth or binary prints its exact recovery
   and does not claim a successful Codex runtime. `proxy_responses` reports `native_direct`; `hook_seam` is reported
   separately; missing enrollment is not treated as a blocker for initial-message delivery; and a login present only in
   the native Codex home remains invisible rather than being imported implicitly.
-- [ ] Add one structured-context headless Codex continuation. **Assertion**: the ready path uses a managed
+- [x] Add one structured-context headless Codex continuation. **Assertion**: the ready path uses a managed
   `session start --runtime codex --resume-from walkthrough-demo --strategy structured` with
   `--context-delivery initial-message` and `--task ...`, records the Codex thread id and response, consumes at most one
   completion and no enrollment probe, removes its walkthrough session, and confines auth/rollouts to the sandboxed Codex
   home without modifying native auth.
-- [ ] Keep sidecar behind `--sidecar` and trim it to launch, one container/mount observation, and exit/cleanup.
+- [x] Keep sidecar behind `--sidecar` and trim it to launch, one container/mount observation, and exit/cleanup.
   **Assertion**: Docker is never probed by default; selected sidecar steps name their prerequisites and human windows;
   foreign containers and listeners remain outside cleanup ownership.
-- [ ] Keep legacy migration, exact runtime-package inventory, passport internals, supervisor fan-out, and
+- [x] Keep legacy migration, exact runtime-package inventory, passport internals, supervisor fan-out, and
   Claude-to-Codex interactive handoff discoverable as links or explicit follow-up commands rather than default
   assertions. **Assertion**: each points to a current end-user guide or automated owner and contributes zero default
   checkpoints.
 
 ## Phase 5 -- Make Interruption and Cleanup Safe
 
-- [ ] Inventory every walkthrough-owned resource: parent, continuation, incognito, optional Codex/sidecar sessions,
-  proxies, containers, installation rows, search/artifact/memory state, fake binaries, and temporary files.
-  **Assertion**: each has one idempotent cleanup owner and no cleanup command relies only on a volatile shell variable.
-- [ ] Make `--reset` reclaim owned runtime resources before discarding their state. **Assertion**: if cleanup cannot be
+- [x] Inventory every walkthrough-owned resource: parent, continuation, incognito, optional Codex/sidecar sessions,
+  proxies, containers, installation rows, transfer/search/artifact state, sandboxed Codex auth/rollouts, the fixed
+  policy source target, fake binaries, and temporary files. **Assertion**: each has one idempotent cleanup owner and no
+  cleanup command relies only on a volatile shell variable.
+- [x] Make `--reset` reclaim owned runtime resources before discarding their state. **Assertion**: if cleanup cannot be
   proven, reset refuses with a resume/cleanup recovery rather than erasing manifests or registry rows and orphaning a
   live process.
-- [ ] Make section 13 safe from any interruption point and on repeated execution. **Assertion**: absent resources are
+- [x] Make section 13 safe from any interruption point and on repeated execution. **Assertion**: absent resources are
   success, known owned resources are removed, foreign same-port proxies/containers/installations are preserved, and a
   second cleanup run produces no failure or new mutation.
-- [ ] Route all cleanup mutations through `run-in-repo.sh` and register immediate traps for disposable host fixtures.
+- [x] Route all cleanup mutations through `run-in-repo.sh` and register immediate traps for disposable host fixtures.
   **Assertion**: no direct `rm -rf`, temp directory, fake binary, or copied Codex auth file can escape the proven
   walkthrough root or survive a failing checklist block.
-- [ ] Preserve reports before destructive cleanup. **Assertion**: debug logs needed as evidence are snapshotted first,
+- [x] Preserve reports before destructive cleanup. **Assertion**: debug logs needed as evidence are snapshotted first,
   transcript claims remain outside the sandbox, and no report path is deleted by reset or section 13.
-- [ ] Extend sandbox and interrupted-cleanup regressions. **Assertion**: missing marker, unsafe canonical target,
+- [x] Extend sandbox and interrupted-cleanup regressions. **Assertion**: missing marker, unsafe canonical target,
   malicious `env.sh`, symlink alias, option mismatch, mid-run abort, stale progress, and foreign resource fixtures all
   fail closed; the valid generated repo still runs and cleans normally.
 
 ## Phase 6 -- Prove the Installed Package and Synchronize Docs
 
-- [ ] Add `tests/integration/docker/test_walkthrough_release_artifact.py` or an equivalently focused installer owner.
+- [x] Add `tests/integration/docker/test_walkthrough_release_artifact.py` or an equivalently focused installer owner.
   **Assertion**: one supplied wheel is installed outside the checkout, installs the Claude walkthrough package into an
   isolated home, resolves every resource/script from that package, runs setup/index/report/cleanup smokes, and cannot
   import or read the checkout copy as its implementation.
-- [ ] Record package provenance for report mode. **Assertion**: the report identifies the answering Forge distribution,
+- [x] Record package provenance for report mode. **Assertion**: the report identifies the answering Forge distribution,
   installed package path, and `.forge-package.json` tree digest; the exact-wheel integration records the wheel SHA-256,
   and the final-run procedure requires candidate install/sync plus a Claude restart before invocation.
-- [ ] Update `docs/design_installation.md` and `docs/developer/testing_guidelines.md`. **Assertion**: they describe the
+- [x] Update `docs/design_installation.md` and `docs/developer/testing_guidelines.md`. **Assertion**: they describe the
   direct managed default, seven/two budget, `--from`, optional Codex/sidecar branches, explicit Codex auth ingress,
   report semantics, and unchanged Claude-only frontend/state-parity boundary. Design §D.1 defines `option: codex` and
   `option: sidecar` as driver-owned modifiers and keeps QA evidence-selection lanes distinct from walkthrough ownership
   mapping.
-- [ ] Update `docs/end-user/manual_testing.md`, `README.md`, `docs/end-user/README.md`, `docs/end-user/session.md`,
+- [x] Update `docs/end-user/manual_testing.md`, `README.md`, `docs/end-user/README.md`, `docs/end-user/session.md`,
   `docs/end-user/transfer.md`, `docs/end-user/model_selection.md`, and `docs/end-user/skills.md` only where Day 1
   instructions changed. **Assertion**: examples use `/walkthrough`, managed `session resume`, current telemetry and
   transfer namespaces, and distinguish direct, proxied, bare, and managed launches without promising unavailable cost.
-- [ ] Retag the packaged checklist after content settles. **Assertion**: version, date, alignment, assertion total, and
+- [x] Retag the packaged checklist after content settles. **Assertion**: version, date, alignment, assertion total, and
   declared budgets match the parser/contract test exactly; no stale v0.1.0 or sessionless Session B claim remains.
 
 ## Phase 7 -- Verify the Candidate
 
-- [ ] Run the focused contract/state/content slice. **Assertion**: the walkthrough checklist contract, both state-script
+- [x] Run the focused contract/state/content slice. **Assertion**: the walkthrough checklist contract, both state-script
   suites, skill-content tests, and new resume/report tests pass together.
-- [ ] Run sandbox and cleanup regressions. **Assertion**: all existing walkthrough regressions plus new interruption,
+- [x] Run sandbox and cleanup regressions. **Assertion**: all existing walkthrough regressions plus new interruption,
   option-identity, and idempotent-cleanup cases pass without skips.
-- [ ] Run targeted installer/session/hook/search/telemetry integrations required by the changed journey. **Assertion**:
+- [x] Run targeted installer/session/hook/search/telemetry integrations required by the changed journey. **Assertion**:
   managed parent confirmation, structured fresh context, transcript/search ownership, direct-route reporting, incognito
   removal, optional Codex, and wheel-installed resources pass their authoritative owners.
-- [ ] Run `make test-unit`, `make test-regression`, `make build`, `./scripts/test-wheel-runtime.sh`, and the exact-wheel
+- [x] Run `make test-unit`, `make test-regression`, `make build`, `./scripts/test-wheel-runtime.sh`, and the exact-wheel
   walkthrough integration. **Assertion**: all commands pass on the final implementation head; any skip or deselection is
   named and justified.
-- [ ] Run `make pre-commit`, Markdown links, file-size checks, and `git diff --check`. **Assertion**: all repository
+- [x] Run `make pre-commit`, Markdown links, file-size checks, and `git diff --check`. **Assertion**: all repository
   gates pass after formatting and generated token-count updates are reviewed.
 - [ ] Install/sync the exact candidate wheel and run `/walkthrough --setup-only`. **Assertion**: the package-identity
   record matches the candidate installation, the sandbox is created outside the checkout, the packaged wrapper proves
@@ -301,6 +298,20 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   auth ingress, or the exact not-ready reason is recorded as optional compatibility evidence; hook enrollment is never
   required or claimed, and the branch never alters the default result. Sidecar remains covered by its targeted Docker
   owner.
+
+### Automated Verification -- 2026-09-01
+
+- `make test-unit` passed with 10,019 tests and 117 deselected; `make test-regression` passed all 1,095 tests. The first
+  unit run exposed one stale path left by the completed QA card: its baseline-inventory contract still named `doing/`
+  after promotion to `done/`. The owner path is corrected and the complete unit suite passed on the final head.
+- The targeted integration sweep passed 36 tests: 21 managed lifecycle, routing, hook, search, transfer, and activity
+  owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel walkthrough package
+  owner. The Codex test completed two real turns and the sidecar tests required no provider completion.
+- `make build`, `./scripts/test-wheel-runtime.sh`, and `make pre-commit` passed. The final locally built wheel SHA-256
+  is `565d78d1263dfea7d07e28329654781bf12cd4e570b39ab5967f1e2a78e97682`.
+- The exact-wheel owner installs outside the checkout, binds the answering distribution to the installed package tree,
+  runs setup/index/report/cleanup twice, verifies protected-path preservation, and confirms `python -I` cannot import
+  the checkout. This automated proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
 
 ## Acceptance Tests
 
