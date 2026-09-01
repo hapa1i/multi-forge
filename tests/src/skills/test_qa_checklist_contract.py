@@ -26,7 +26,7 @@ RUNTIME_MATRIX = QA_ROOT / "resources" / "runtime-matrix.json"
 COVERAGE_MAP = QA_ROOT / "resources" / "coverage-map.md"
 EXECUTION_BUDGET = QA_ROOT / "resources" / "execution-budget.json"
 SELECTION_SCRIPT = QA_ROOT / "scripts" / "qa-selection.py"
-BASELINE_INVENTORY = REPO_ROOT / "docs" / "board" / "doing" / "refresh_release_qa_for_1_0" / "baseline-inventory.json"
+BASELINE_INVENTORY = REPO_ROOT / "docs" / "board" / "done" / "refresh_release_qa_for_1_0" / "baseline-inventory.json"
 STATE_SCRIPT = QA_ROOT / "scripts" / "walkthrough-state.py"
 
 EXECUTION_CLASSES = {"auto", "human:confirm", "human:guided"}

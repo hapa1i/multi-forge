@@ -1,606 +1,366 @@
 ---
 name: walkthrough
-description: Interactive Forge verification walkthrough in a hermetic test environment. Use after installing or upgrading Forge to verify everything works.
+description: Interactive Forge Day 1 walkthrough in a hermetic test environment. Use after installing or upgrading Forge to learn the managed-session workflow and verify the installation.
 disable-model-invocation: true
-argument-hint: '[--setup-only] [--reset] [--report] [--sidecar]'
-allowed-tools: Read, Bash, Glob  # AskUserQuestion deliberately omitted — listing it triggers CC auto-approve bug (github.com/anthropics/claude-code/issues/29547). The tool remains available; omitting it preserves the interactive dialog.
+argument-hint: '[--setup-only] [--reset] [--report] [--from <id>] [--codex] [--codex-auth <path>] [--sidecar]'
+allowed-tools: Read, Bash, Glob  # AskUserQuestion is intentionally omitted because declaring it can trigger Claude Code auto-approval behavior. It remains available for checkpoints.
 ---
 
 # Walkthrough
 
-Interactive verification of Forge installation and features in an isolated test environment. Your real `~/.claude/` is
-never touched.
+Teach Forge's Day 1 managed-session loop in an isolated repository. Session A is the guide. The user opens one sandboxed
+Terminal and launches one managed Claude child from it. Codex and sidecar are optional subjects under test; this skill
+remains a Claude-hosted frontend.
 
 ## Usage
 
-```
-/walkthrough                   Interactive walkthrough (default)
-/walkthrough --setup-only      Create/reset test repo, then stop
-/walkthrough --reset           Reset test repo to clean baseline
-/walkthrough --report          Save run artifacts (report, state, logs, transcript)
-/walkthrough --sidecar         Include sidecar section (requires Docker)
-```
-
-## Arguments
-
-| Argument       | Description                                                                                                                  |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `--setup-only` | Create or reset the test repo and generate env.sh, then stop.                                                                |
-| `--reset`      | Reset test repo to clean baseline before running.                                                                            |
-| `--report`     | Save report, state, step logs, Forge debug logs, and transcript marker to a timestamped run directory after the walkthrough. |
-| `--sidecar`    | Include sidecar section (section 12). Requires Docker + sidecar image.                                                       |
-
-## Execution
-
-Follow these steps in order. Do not skip steps.
-
-### Step 1: Parse Arguments and Route
-
-Parse `$ARGUMENTS` to extract flags: `--setup-only`, `--reset`, `--report`, `--sidecar`. Track them as booleans
-(`SETUP_ONLY`, `RESET`, `REPORT`, `SIDECAR`) for later phases.
-
-**Greet the user:**
-
-"I'll walk you through a functional verification of Forge in an isolated test environment. This is **Session A** — we
-work together here. I run automated checks, you watch and ask questions. Later, I'll ask you to open a **Terminal** for
-hands-on commands, and then launch **Session B** — a separate Claude Code instance where you experiment with Forge
-features (hooks, status line, % commands) while I stay here to guide you. I'll install Forge extensions into a hermetic
-sandbox, verify your real `~/.claude/` was not touched, then clean up."
-
-If `--setup-only`: "I'll create the isolated test environment and stop -- no tests will run."
-
-If `--report`: add "I'll also capture raw step output plus sandbox Forge debug logs and save them with the report when
-we finish."
-
-### Step 2: Walkthrough Mode
-
-The walkthrough is a **checklist-driven** interactive demo. You read `checklist.md` section by section, run commands
-through `run-in-repo.sh`, and check assertions. The checklist defines what to run and check; you provide educational
-narration and handle user interactions.
-
-**Safety rule:** ALL `forge` CLI invocations MUST go through `run-in-repo.sh` -- even seemingly read-only ones like
-`forge info` can write caches or state files to the real system. Only pure filesystem reads (`ls`, `cat`, `stat`,
-`python3` for reading files, the Read tool) are safe to run directly. NEVER construct raw `forge` commands outside the
-wrapper.
-
-#### Phase 1: Setup
-
-**Set the setup script** from the skill's own location:
-
-```bash
-SETUP_SCRIPT="${CLAUDE_SKILL_DIR}/scripts/setup-test-repo.sh"
+```text
+/walkthrough
+/walkthrough --setup-only
+/walkthrough --reset --report
+/walkthrough --from 10.2 --report
+/walkthrough --codex
+/walkthrough --codex --codex-auth ~/.codex/auth.json
+/walkthrough --sidecar
 ```
 
-**Handle special modes** before proceeding:
+| Argument              | Meaning                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `--setup-only`        | Create the sandbox, prove all wrapper gates, record package identity, then stop.                                  |
+| `--reset`             | Reclaim walkthrough-owned state and recreate the sandbox baseline before a fresh run.                             |
+| `--report`            | Preserve identity, state, selected options, outputs, logs, metrics, and a transcript claim outside cleanup scope. |
+| `--from <id>`         | Resume an existing run after validating its prefix; accepts a section or exact step id.                           |
+| `--codex`             | Select the optional direct Codex chapter.                                                                         |
+| `--codex-auth <path>` | On a fresh Codex run, copy exactly one auth file into the isolated Codex home.                                    |
+| `--sidecar`           | Select the optional Docker sidecar chapter.                                                                       |
 
-- `--setup-only`: run `bash "$SETUP_SCRIPT"` (add `--reset` if that flag is also set), print the env file path, and
-  stop. No checklist execution.
-- `--reset` (without `--setup-only`): run `bash "$SETUP_SCRIPT" --reset`, then continue to the walkthrough.
+The default journey has exactly seven human checkpoints and two intentional model completions. Its hard ceiling is eight
+checkpoints and three completions; selected optional chapters report their additions separately. A duration over 30
+minutes is review evidence, not an automatic failure.
 
-**Set the scripts directory** from the skill's own location:
+## Non-negotiable Safety Rules
+
+1. Resolve resources from `CLAUDE_SKILL_DIR`. Never substitute checkout copies.
+2. `setup-test-repo.sh` is the only mutation allowed before the wrapper proves the sandbox.
+3. After setup, every Forge or sandbox-mutating command run by Session A goes through packaged `run-in-repo.sh`. Pure
+   reads of packaged resources and writes to the validated host report directory may run directly.
+4. Bare `forge` is allowed only in the user's Terminal after step 1.1 proves the marker, current directory, and all
+   three isolated homes.
+5. Never print credential values, inspect native Codex auth implicitly, or put an auth source path/copy in state,
+   reports, step logs, or debug snapshots.
+6. Cleanup section 13 stays selected after success, failure, skipped optional infrastructure, or resume.
+7. Stop on parser/state errors. Never hand-edit progress to make a run continue.
+
+## 1. Parse Arguments Before Mutation
+
+Interpret `$ARGUMENTS` as the flags above. Reject, before running setup:
+
+- unknown arguments;
+- duplicate flags or duplicate values;
+- a missing value for `--from` or `--codex-auth`;
+- `--codex-auth` without `--codex`;
+- `--from` with `--reset` or `--setup-only`;
+- a non-regular `--codex-auth` source on a fresh run.
+
+Track booleans `SETUP_ONLY`, `RESET`, `REPORT`, `CODEX`, and `SIDECAR`, plus optional `FROM_STEP` and
+`CODEX_AUTH_SOURCE`. The canonical coverage identity is exactly:
+
+```text
+codex=<true|false>,sidecar=<true|false>
+```
+
+Adding `--report` does not change coverage identity.
+
+Tell the user the shape of the selected journey: Session A guides, one sandboxed Terminal hosts the managed Claude
+child, and additional windows exist only when sidecar is selected. Do not describe a bare launcher as managed.
+
+## 2. Resolve Packaged Paths and Host Artifacts
 
 ```bash
 SCRIPTS="${CLAUDE_SKILL_DIR}/scripts"
-```
-
-**Resolve `$FORGE_TEST_REPO`**: use the env var if set, otherwise default to
-`~/.forge/manual-testing/walkthrough/test-repo` (or `$FORGE_HOME/manual-testing/walkthrough/test-repo` if `FORGE_HOME`
-is set).
-
-**Check for stale install artifacts**: If `$FORGE_TEST_REPO/.claude/commands/` exists (leftover from a previous run),
-ask the user: "Previous walkthrough artifacts detected. Reset the test repo?" If yes, run
-`bash "$SETUP_SCRIPT" --reset`.
-
-The setup script already scrubs walkthrough-derived volatile state on reruns (`.forge/artifacts/`,
-`.forge/search-index/`, and `.forge-home/logs`), so a full reset is only needed when installed extensions or repo
-contents drift.
-
-**Ensure test repo exists** (for Phase 2 state init):
-
-```bash
-# First run: create the test repo (Section 0.2 will re-run idempotently with tracked assertions)
-# Re-run: setup script preserves the repo baseline and scrubs volatile walkthrough state
-if [ ! -f "$FORGE_TEST_REPO/.forge-walkthrough-marker" ]; then
-  bash "$SETUP_SCRIPT"
-fi
-mkdir -p "$FORGE_TEST_REPO/.forge/walkthrough"
-```
-
-**Resolve host-side walkthrough artifact paths**. These live outside the sandboxed `FORGE_HOME` used by
-`run-in-repo.sh`, so reports from Session A stay under the user's normal manual-testing directory:
-
-```bash
-WT_STATE_DIR_RAW="${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough"
-WT_STATE_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(os.path.expandvars(sys.argv[1]))))' "$WT_STATE_DIR_RAW")
-WT_STEP_LOGS_DIR="$WT_STATE_DIR/logs"
-WT_FORGE_LOG_SNAPSHOTS="$WT_STATE_DIR/forge-logs-snapshots"
-```
-
-If `--report` was passed, clear any previous run-local step logs / snapshots before execution:
-
-```bash
-if [ "$REPORT" = true ]; then
-  rm -rf "$WT_STEP_LOGS_DIR" "$WT_FORGE_LOG_SNAPSHOTS"
-  mkdir -p "$WT_STEP_LOGS_DIR" "$WT_FORGE_LOG_SNAPSHOTS"
-fi
-```
-
-#### Phase 1b: Docker Infrastructure Probe (only if `--sidecar`)
-
-If `--sidecar` was passed, probe Docker availability before building the checklist index. If `--sidecar` was NOT passed,
-skip this entirely (no Docker dependency for the default walkthrough).
-
-```bash
-# 1. Resolve sidecar image from runtime config (respects user overrides)
-SIDECAR_IMAGE=$(bash "$SCRIPTS/run-in-repo.sh" forge config show --raw 2>/dev/null \
-  | grep '^sidecar_image:' | awk '{print $2}')
-SIDECAR_IMAGE="${SIDECAR_IMAGE:-forge-sidecar:latest}"
-```
-
-Store `$SIDECAR_IMAGE` via `walkthrough-state.py var set SIDECAR_IMAGE <value>` for use in checklist variable
-substitution.
-
-```bash
-# 2. Probe Docker daemon + image
-docker info --format '{{.ServerVersion}}' >/dev/null 2>&1 && \
-docker image inspect "$SIDECAR_IMAGE" --format '{{.Id}}' >/dev/null 2>&1 && \
-echo "true" || echo "false"
-```
-
-Store result via `walkthrough-state.py var set INFRA_DOCKER <true|false>`.
-
-#### Phase 2: Build Checklist Index
-
-**Set the walkthrough checklist** from the skill's own location:
-
-```bash
 CHECKLIST="${CLAUDE_SKILL_DIR}/resources/checklist.md"
+JOURNEY_MAP="${CLAUDE_SKILL_DIR}/resources/journey-map.md"
+SETUP_SCRIPT="$SCRIPTS/setup-test-repo.sh"
+FORGE_TEST_REPO="${FORGE_TEST_REPO:-${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough/test-repo}"
 ```
 
-Run the checklist parser to get the full structure:
+Resolve `FORGE_TEST_REPO` to an absolute canonical path before displaying it. State lives at
+`$FORGE_TEST_REPO/.forge/walkthrough/progress.json`.
+
+Host-side artifacts live outside the sandbox:
+
+```text
+${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough/runs/<UTC timestamp>/
+```
+
+Set `WT_STATE_DIR=${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough`. For `--report`, choose `WT_RUN_DIR` as a new
+UTC-timestamped path under `$WT_STATE_DIR/runs/` without deleting older runs, but do not create it before the wrapper
+proof. Set `RUN_STARTED_EPOCH` before setup. After the wrapper succeeds, create the run directory and its `step-logs/`
+and `forge-logs/pre-clean/` children. Keep final report files there. Never use a sandbox path as the report root.
+
+## 3. Fresh Setup, Setup-only, or Resume
+
+### Fresh run
+
+Before invoking setup, inspect only whether the canonical target already exists and carries the walkthrough marker. If
+it does and `--reset` was not supplied, explain that a fresh setup would replace its progress/auth baseline and ask
+whether to reclaim it with reset or stop. Do not call setup, inspect target-controlled files, or silently discard state
+before that choice. An unmarked existing target is never eligible for reset.
+
+Build setup arguments from the approved `--reset` and `--codex-auth`, then run the packaged setup script. Reset must
+reclaim tracked installations and managed sessions through the wrapper before discarding their evidence.
+
+After setup, prove all six wrapper gates with:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" true
+```
+
+Record package identity using the installed skill package, never the checkout:
+
+```bash
+python3 "$SCRIPTS/package-identity.py" --skill-root "$CLAUDE_SKILL_DIR"
+```
+
+The identity command must report both `package_tree_matches_marker: true` and
+`package_matches_answering_distribution: true`. This rejects a coherent but stale installed skill package. In report
+mode save the exact JSON as `package-identity.json`.
+
+If `--setup-only` was selected, stop here. Do not initialize checklist state, enable extensions, probe a runtime, or run
+a checklist step.
+
+For a normal fresh run, initialize state with `--force` through `run-in-repo.sh`, then record these variables through
+the same wrapper with `walkthrough-state.py var`:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" init "$STATE_FILE" --force
+```
+
+- `RUN_SCOPE`: a fresh UUID;
+- `RUN_OPTIONS`: the canonical coverage identity;
+- `RUN_STARTED_EPOCH`;
+- `CODEX_AUTH_MODE`: read only `FORGE_WALKTHROUGH_CODEX_AUTH_MODE` through the wrapper;
+- `DECLARED_HUMAN_CHECKPOINTS=7`;
+- `DECLARED_PAID_OPERATIONS=2`;
+- `HUMAN_CHECKPOINTS_OBSERVED=0`;
+- `PAID_OPERATIONS_OBSERVED=0`;
+- `SIDECAR_MAY_EXIST=false`.
+
+### Resume with `--from`
+
+Do not run setup and do not initialize with `--force`. Require the existing marker, wrapper, and state file. Read
+`RUN_OPTIONS` and refuse if it differs from the requested Codex/sidecar selection. Name `/walkthrough --reset` as the
+recovery.
+
+Validate preserved Codex ingress before any checklist command:
+
+- `explicit-file`: `$CODEX_HOME/auth.json` must remain one regular file, mode `0600`, beneath a mode-`0700`
+  `$CODEX_HOME`; competing Codex key/token variables remain scrubbed by generated `env.sh`;
+- `environment`: `CODEX_API_KEY` or `CODEX_ACCESS_TOKEN` must still resolve in the wrapper environment;
+- `none`: no auth file is imported from native `$HOME/.codex`.
+
+The user does not need to re-supply the original auth source on resume. If `--codex-auth` is present, use it only to
+confirm the stored mode was `explicit-file`; do not recopy or record its path.
+
+Then run:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" true
+bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" validate "$STATE_FILE" --from "$FROM_STEP"
+```
+
+`status: refused` exits non-zero and leaves state byte-identical. Stop and show its `/walkthrough --reset` recovery.
+`status: ok` preserves verified prefix evidence and clears only the selected suffix. Keep the original start time and
+observed counters.
+
+## 4. Optional Infrastructure Selection
+
+Do not probe Docker or Codex in a default run.
+
+When `--sidecar` is selected, resolve `sidecar_image` through a wrapped Forge config read, then probe the Docker daemon
+and exact image through `run-in-repo.sh --no-cd`. Also inspect `forge auth status --json` through the wrapper for a
+configured `openrouter` credential without printing its secret. Store `SIDECAR_IMAGE`, `INFRA_DOCKER=true|false`, and
+`INFRA_OPENROUTER_AUTH=true|false`. Missing Docker, image, or OpenRouter auth makes the sidecar chapter unavailable; it
+does not alter default results.
+
+Immediately before presenting selected step 12.4, set `SIDECAR_MAY_EXIST=true` through the wrapped state `var` command.
+Do not set it merely because `--sidecar` was selected or because step 12.1 was unavailable. Keep it true until cleanup
+passes, so interruption after the launch prompt remains conservative.
+
+Codex readiness is evaluated by checklist step 12.8, not during setup. Capture its JSON even when preflight exits
+non-zero. Store `INFRA_CODEX_READY=true` only for a genuine ready result. Do not use `--proxy`, `--verify-enrollment`,
+or hook delivery. Initial-message delivery deliberately does not require trust enrollment.
+
+## 5. Build and Execute the Checklist
+
+Parse the index once:
 
 ```bash
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" index
 ```
 
-This returns JSON with all sections, subsections, annotations, and assertion counts. Store this as the checklist index.
+For each step, fetch its details with `step <id>`. The parser owns IDs, annotations, code blocks, assertions, and
+prerequisites; do not count Markdown manually.
 
-Initialize progress tracking (always `--force` -- this is the start of a fresh run):
+### Selection order
+
+1. Read `annotations[]` from the step result.
+2. An `option: codex` or `option: sidecar` step is selected only by that flag. If not selected, label it `not selected`,
+   record every assertion as `s`, and do not inspect its infrastructure.
+3. For selected steps, map `requires: docker`, `requires: openrouter-auth`, and `requires: codex-ready` to
+   `INFRA_DOCKER`, `INFRA_OPENROUTER_AUTH`, and `INFRA_CODEX_READY`. Missing infrastructure is `unavailable`, records
+   `s`, and includes the exact recovery.
+4. Run `prereq-check`. A failed, skipped, stale, or unrecorded prerequisite blocks the step and records `s`.
+5. Section 13 remains selected despite failures or optional-chapter fallout. Its internal prerequisites still apply:
+   never run steps 13.2 or 13.3 unless the user passed cleanup approval at 13.1.
+
+### Execution classes
+
+| Annotation      | Behavior                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------- |
+| `auto`          | Run each runnable Bash block as one Bash call. Classify every assertion from output and durable evidence. |
+| `human:guided`  | Show all instructions and display-only blocks first, then ask the user to perform/observe them.           |
+| `human:confirm` | Show the complete plan first and ask for approval before any destructive follow-up step.                  |
+
+`option:`, `requires:`, and `paid-operations:` are modifiers, not execution classes. Unknown annotations are a driver
+error. Walkthrough ownership is documented in `journey-map.md`; do not interpret QA `evidence:` lanes here.
+
+Before every human question, print the full action, expected observations, one short buffer line, and at least three
+blank lines so the dialog does not hide instructions. Offer context-appropriate `Done/Pass`, `Fail`, `Skip`, and stop
+choices. Increment `HUMAN_CHECKPOINTS_OBSERVED` only when a selected checkpoint is actually presented. Increment
+`PAID_OPERATIONS_OBSERVED` only when an annotated completion is actually attempted.
+
+Record exactly one result per assertion:
 
 ```bash
-python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" init --force "$FORGE_TEST_REPO/.forge/walkthrough/progress.json"
+bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" record "$STATE_FILE" <id> <p,f,s,...>
 ```
 
-Store the state file path as `$STATE_FILE` for Phase 3.
-
-#### Phase 3: Execute Checklist (Main Loop)
-
-For each subsection in the index, get its details:
-
-```bash
-python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" step <N.X>
-```
-
-This returns JSON with:
-
-- `annotation` / `annotations`: step type(s)
-- `prereqs`: prerequisite step/section IDs, if any
-- `code_blocks`: list of `{code, runnable}` objects -- run entries where `runnable` is `true`; show others as
-  display-only
-- `instructions`: prose for the user (human:guided items)
-- `assertions`: list of assertion texts to verify
-- `assertion_count`: number of assertions (deterministic -- do not count manually)
-- `next`: ID of the next step (or null if last)
-
-01. **For each step**, call the parser to get its details. The parser handles all markdown parsing -- the agent never
-    reads raw checklist markdown during execution.
-
-    **Before presenting the step**, check prerequisites:
-
-    ```bash
-    python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" prereq-check "$STATE_FILE" <N.X>
-    ```
-
-    If `ok` is `false`, do **not** run or ask about the blocked step. Render it as skipped, include a short reason such
-    as `Skipped -- blocked by prereq: 7.1 (skipped)` or `Skipped -- blocked by prereq: 10.1 (not_run)`, record all its
-    assertions as `s`, and continue. A skipped prerequisite is blocking; do **not** treat it as success.
-
-02. **Annotations** map to step types. Never show raw HTML comments in output.
-
-    | Annotation               | Step type     | Preamble                                                       |
-    | ------------------------ | ------------- | -------------------------------------------------------------- |
-    | `<!-- auto -->`          | `[Automatic]` | "Automatic step -- sit back while I check a few things."       |
-    | `<!-- human:confirm -->` | `[Review]`    | "I'll run this and show you the output for review."            |
-    | `<!-- human:guided -->`  | `[Hands-on]`  | "Your turn -- here's what to do in your Terminal / Session B." |
-
-03. **Step presentation format**: Every subsection follows a visual pattern so progress is easy to scan.
-
-    **Glue calls are silent.** The `walkthrough-state.py step`, `record`, and `var` calls between steps are bookkeeping.
-    Do NOT print commentary around them -- just call the tool and move on. The user should see a clean flow of steps
-    without JSON output or "now let me fetch the next step" narration.
-
-    **Step layout:**
-
-    ```
-    --- N.X Step Title [Type] -------------------------
-    <preamble from annotation table above>
-
-    <body: commands, output, or instructions>
-
-    Results:
-      ✔ First assertion passed
-      ✘ Second assertion FAILED: reason
-      o Third assertion skipped
-    ----------------------------------------------------
-    ```
-
-    **`[Hands-on]` body template** -- guided steps use a fixed inner layout so every run looks the same:
-
-    ```
-    --- N.X Step Title [Hands-on] -------------------------
-    Your turn -- here's what to do in your Terminal / Session B.
-
-    In your Terminal (or Session B):
-
-    1. First action
-    ```
-
-    command-to-run
-
-    ```
-
-    2. Second action
-    ```
-
-    another-command
-
-    ```
-
-    Expected:
-    - First assertion text from checklist
-    - Second assertion text from checklist
-
-    If something goes wrong: <failure cue from checklist, if any>
-
-    Review the instructions above, then answer below.
-
-
-
-    <AskUserQuestion>
-    ```
-
-    Rules for the template:
-
-    - **"In your Terminal:"** (or **"In Session B:"** for live Claude steps) -- always anchor where
-    - **Numbered steps** with flush-left code blocks -- no indentation so copy-paste has no leading spaces
-    - **"Expected:"** bullet list pulled from the checklist assertions -- tells the user what to look for
-    - **Failure cue** line only if the checklist includes one
-    - Never rephrase checklist instructions as prose -- copy the structure, fill in runtime values
-    - The buffer line and blank lines before AskUserQuestion are mandatory (rule 9)
-
-    **Section boundaries** appear between sections (not between steps within a section):
-
-    ```
-    Section N Complete: X/Y passed
-
-    <educational narration from narration table>
-
-    ====================================================
-
-    --- M.1 First Step [Type] -------------------------
-    ```
-
-    Use `---` (thin) for step boundaries, `===` (thick) as a single separator line between sections. This gives the user
-    a clear visual hierarchy: sections are major milestones, steps are work items within them.
-
-    Use ✔ for pass, ✘ for fail, o for skip. Each `- [ ]` line in the checklist = one result line. Include a brief note
-    in brackets when useful (e.g., `V run-in-repo.sh found [needed for sandbox isolation]`).
-
-04. **Handle by annotation type**:
-
-    | Annotation               | Action                                                                                                                                                                            |
-    | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | `<!-- auto -->`          | Run bash block (with variable substitution). Check assertions against output. Show results block.                                                                                 |
-    | `<!-- human:confirm -->` | Run bash block via wrapper, show output to user. Use AskUserQuestion: "Does this look correct?" (Pass / Fail / Skip). Show results block.                                         |
-    | `<!-- human:guided -->`  | Show instructions and bash snippet from the checklist. Do NOT run the bash block yourself. Use AskUserQuestion with context-appropriate framing (see rule 8). Show results block. |
-    | `<!-- requires: X -->`   | Check infrastructure probe result for `X`. Skip if unavailable (see below).                                                                                                       |
-    | No annotation            | Treat as `<!-- human:confirm -->`.                                                                                                                                                |
-
-    A subsection can have multiple annotations. Apply all that match. `requires` is checked first (skip before
-    attempting anything else).
-
-    **`requires:` parsing**: The parser returns annotations as raw strings (e.g., `"requires: docker"`). To handle them:
-
-    1. Check `annotations[]` for any string starting with `requires:`.
-    2. Extract the requirement name after the colon (e.g., `docker`).
-    3. Look up `INFRA_<NAME>` (uppercased) via `walkthrough-state.py var get` (e.g., `INFRA_DOCKER`).
-    4. If the value is `false` (or the variable doesn't exist), skip the subsection: show `[Skipped -- requires: X]` and
-       record all its assertions as `s` (skip).
-
-    The sidecar section (section 12) uses `<!-- requires: docker -->`. The `INFRA_DOCKER` probe is set in Phase 1b (only
-    when `--sidecar` is passed).
-
-    **`prereq:` handling**: Prerequisites are not step types; they come back in `prereqs[]` and are checked with the
-    `prereq-check` command above. The walkthrough uses them to skip Session B-dependent sections cleanly when Session B
-    was not launched, and to skip Search follow-up steps when the user chose not to exit Session B.
-
-05. **Variable substitution**: Replace these variables in bash blocks before running:
-
-    | Variable           | Source                                            |
-    | ------------------ | ------------------------------------------------- |
-    | `$SCRIPTS`         | Resolved scripts directory (Phase 1)              |
-    | `$SETUP_SCRIPT`    | Resolved setup script path (Phase 1)              |
-    | `$FORGE_TEST_REPO` | Resolved test repo path (Phase 1)                 |
-    | `$PROXY_ID`        | Captured from section 6.1 proxy creation output   |
-    | `$PROXY_BASE_URL`  | Captured from section 6.1 proxy creation output   |
-    | `$SIDECAR_IMAGE`   | Resolved sidecar image name (Phase 1b, if probed) |
-
-    When a command outputs a proxy ID or base URL, persist it in the state file:
-
-    ```bash
-    python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" var "$STATE_FILE" set PROXY_ID <value>
-    ```
-
-    Retrieve with `var ... get PROXY_ID` when needed for substitution.
-
-    For blocks that start with `bash "$SCRIPTS/run-in-repo.sh"`, the wrapper handles CWD and env. For blocks without the
-    wrapper prefix (e.g., python3 mtime snapshots, `ls`, `test`), run directly -- these are read-only host operations.
-
-06. **Executing code blocks**: For each entry in the parser's `code_blocks` array where `runnable` is `true`, run `code`
-    as **one** Bash tool call. A single fenced block = one call, even if it spans multiple lines (e.g.,
-    `python3 -c "..."`). Entries where `runnable` is `false` are display-only snippets -- show them to the user in
-    `human:guided` steps but do not execute them.
-
-    **Default debug logging**: the walkthrough sandbox exports `FORGE_DEBUG=1` via `.forge/walkthrough/env.sh`, so Forge
-    commands write debug logs to `$FORGE_TEST_REPO/.forge-home/logs/...`.
-
-    **Before a block that contains `forge logs clean --yes`** and only when `--report` is enabled, snapshot the current
-    sandbox Forge logs so evidence survives the cleanup step:
-
-    ```bash
-    SNAP="$WT_FORGE_LOG_SNAPSHOTS/N.X/pre-clean"
-    rm -rf "$SNAP"
-    if [ -d "$FORGE_TEST_REPO/.forge-home/logs" ]; then
-      mkdir -p "$SNAP"
-      cp -R "$FORGE_TEST_REPO/.forge-home/logs/." "$SNAP"/
-    fi
-    ```
-
-    **When `--report` is enabled**, save raw command output to a per-step host-side log file:
-
-    ```bash
-    mkdir -p "$WT_STEP_LOGS_DIR"
-    cat > "$WT_STEP_LOGS_DIR/N.X.log" <<'EOF'
-    <raw output>
-    EOF
-    ```
-
-    **After classifying each step's assertions**, record results in the state file:
-
-    ```bash
-    python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" record "$STATE_FILE" <N.X> <results>
-    ```
-
-    Where `<results>` is comma-separated: `p` (pass), `f` (fail), `s` (skip) -- one per assertion. Example:
-    `record "$STATE_FILE" 6.1 p,p` for a step where both assertions passed. The output shows progress:
-    `6.1: 2/2 pass | Section 6: 2/7 | Overall: 27/51`.
-
-07. **Flag gate** -- If `--sidecar` was NOT passed, skip section 12 (Sidecar) entirely. Record all its assertions as `s`
-    (skip) and move directly to section 13 (Cleanup).
-
-08. **Gate rules** -- check after each section completes:
-
-    | If section fails... | Then...                           |
-    | ------------------- | --------------------------------- |
-    | 0 (Setup)           | Stop. Setup is broken.            |
-    | 2 (Install)         | Skip Section 3 (can't verify).    |
-    | 6 (Proxy/Session)   | Skip Sections 7-11 (no proxy).    |
-    | Any section         | Section 13 (Cleanup) always runs. |
-
-09. **For `human:guided` items**: CRITICAL -- print the full instructions and bash snippet from the checklist **before**
-    calling AskUserQuestion. Do **not** end immediately on the last instruction line or code fence: Claude Code's dialog
-    overlays the bottom few terminal lines. After the real instructions, print one short disposable buffer line such as
-    `Review the instructions above, then answer below.` and then print **at least three blank lines** before calling
-    AskUserQuestion. Treat that buffer line and blank space as sacrificial padding. The user must see what to do BEFORE
-    being asked to confirm. The instructions appear in the step body between the opening preamble and the
-    AskUserQuestion call. If you put instructions after the question, the user sees only the question with no context.
-
-    **Match question framing and options to the step type:**
-
-    | Step asks user to...              | Question style                  | Options                            |
-    | --------------------------------- | ------------------------------- | ---------------------------------- |
-    | Perform an action (open, launch)  | "Have you [action]?"            | Done / Skip / Stop walkthrough     |
-    | Verify something (status, output) | "[Expected result] visible?"    | Yes / No, something's wrong / Skip |
-    | Both (run command + check result) | "Did [expected result] appear?" | Yes / No, something's wrong / Skip |
-
-    Keep the AskUserQuestion prompt itself short enough to fit on one line when possible. Put detail in the printed
-    instructions, not in the dialog. Don't use "Done" as an answer to a yes/no question. "Did %help show commands?"
-    needs Yes/No, not Done.
-
-    The user acts in their Terminal window or Session B. If they choose "Stop walkthrough", skip all remaining sections
-    and go to Phase 4 (Summary).
-
-    **Do not invent Claude availability failures**: For guided steps that involve a live Claude Code session
-    (`forge claude start`, `forge session start`, Session B, status line checks, `%` commands, etc.), do **not**
-    recommend "Skip" merely because the agent cannot drive the TUI itself. Recommend "Skip" only when you have concrete
-    evidence that live Claude launching is unavailable:
-
-    - A direct probe fails, for example:
-
-      ```bash
-      command -v claude >/dev/null 2>&1
-      ```
-
-    - The user reports an actual launch failure such as `claude: command not found`.
-
-    If the current walkthrough already contains evidence that Claude launched successfully, treat live Claude as
-    available and continue guiding the user instead of steering them toward `Skip`.
-
-10. **Educational narration**: after each `## N.` section completes, print a brief explanation:
-
-| After Section      | Say                                                                                                                                                                         |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 (Setup)          | "Test repo ready. Your real `~/.claude/` timestamps are recorded as a baseline."                                                                                            |
-| 1 (Terminal)       | "You now have a sandboxed terminal. Commands there target the test repo, not your real system."                                                                             |
-| 2 (Install)        | "Extensions installed. The wrapper enforced its path denylist and 6 safety gates before running the install."                                                               |
-| 3 (Verify)         | "Hooks, skills, commands all landed correctly. Pre-existing settings survived the install."                                                                                 |
-| 4 (Untouched)      | "Real system confirmed untouched -- all timestamps match the baseline."                                                                                                     |
-| 5 (CLI)            | "You've seen the Forge CLI surface -- sessions, proxies, config, policy, all managed through `forge`."                                                                      |
-| 6 (Proxy/Session)  | "Proxies route API calls; sessions track your workspace. Together they let you switch models without changing code."                                                        |
-| 7 (Session B)      | "A live Claude session with Forge hooks, status line, and % commands active."                                                                                               |
-| 8 (% Commands)     | "Direct commands let you control Forge from inside a Claude session without leaving the conversation."                                                                      |
-| 9 (Policy)         | "The policy engine enforces coding policies at tool boundaries. Deny messages include intent (why the policy exists) so models comply with the goal, not just the check."   |
-| 10 (Search)        | "Search indexes your session transcripts for later retrieval. The BM25 engine works per-project -- no external service needed."                                             |
-| 11 (Session State) | "The session manifest captures intent (what you wanted), overrides (live changes), and confirmed (what hooks observed). Forking shows how sessions derive from each other." |
-| 12 (Sidecar)       | "Sidecar bundles proxy + Claude in Docker -- lifecycle coupling, port isolation, no host proxy needed."                                                                     |
-| 13 (Cleanup)       | "Sandbox cleaned. Everything removed, real system still pristine."                                                                                                          |
-
-#### Common Mistakes (DON'T)
-
-- **DON'T count assertions manually.** Use `walkthrough-state.py record` and `report` for all counting. LLMs get
-  arithmetic wrong.
-- **DON'T combine multiple Bash commands in one call.** Run each `code_blocks` entry as a separate Bash call. Piped
-  multi-command blocks fail silently in the Bash tool.
-- **DON'T put instructions after AskUserQuestion.** The user sees the question modal immediately -- anything you print
-  after it appears below their answer, not above the question. Print instructions BEFORE the tool call.
-- **DO add a real visual buffer before AskUserQuestion.** Use a short sacrificial buffer line plus at least three blank
-  lines so the dialog covers padding, not the instructions or command snippet.
-- **DON'T assume Claude Code is unavailable without evidence.** For `human:guided` live-session steps, only recommend
-  `Skip` after a real failed probe (`command -v claude`) or an actual user-reported launch error.
-- **DON'T invent CLI commands.** Run ONLY commands from the checklist's `code_blocks`. If a command doesn't exist, the
-  walkthrough will show a confusing error.
-- **DON'T use `$HOME` in Bash tool calls.** Use fully resolved absolute paths (e.g.,
-  `/Users/.../.forge/manual-testing/walkthrough/test-repo` not `$HOME/.forge/manual-testing/walkthrough/test-repo`). The
-  Bash tool's environment may not expand shell variables reliably.
-- **DON'T run `forge` commands without the wrapper.** Even `forge info` can write caches. Use `run-in-repo.sh` for
-  everything except pure filesystem reads (Read tool, Glob tool, `python3`, `test`, `ls`).
-- **DON'T modify files during the walkthrough.** This skill has Read, Bash, and Glob only -- no Write or Edit. The
-  walkthrough is verification, not modification.
-- **DON'T ignore script failures.** If `walkthrough-state.py` exits with a non-zero code, STOP. The error message on
-  stderr tells you what went wrong (count mismatch, hash drift, corrupt state). Do not proceed with stale data.
-
-#### Phase 4: Summary
-
-Get the final report from the state file:
+Never convert an unverified assertion into a pass. A non-zero automatic command normally fails its affected assertions;
+step 12.8 is the sole compatibility exception because an actionable not-ready result is its asserted outcome. Continue
+toward cleanup after ordinary failures unless doing so would be unsafe.
+
+### Command execution and evidence
+
+- Substitute only `$SCRIPTS`, `$SETUP_SCRIPT`, `$FORGE_TEST_REPO`, `$SIDECAR_IMAGE`, and state variables named by the
+  checklist.
+- Runnable blocks containing Forge or mutation already begin with `run-in-repo.sh`; do not strip the wrapper.
+- Non-`bash` fences are display-only.
+- Save raw stdout/stderr for each selected step as `<run-dir>/step-logs/<id>.log` in report mode. Redact nothing by
+  copying credentials in the first place; if output unexpectedly contains a secret, stop artifact publication and report
+  the leak.
+- Use stable CLI surfaces for lifecycle evidence. A pre-seeded Claude UUID does not prove launch; require
+  `confirmed_at`, `confirmed_by=hook:SessionStart:*`, status-line observation, and later transcript evidence.
+- Before launch, route intent is canonical and `route_commit` is null. After managed resume, require supported direct
+  committed evidence.
+- The policy prompt and fresh-continuation prompt are the only two default paid operations.
+
+## 6. Cleanup and Interruption
+
+Before presenting step 13.1 in report mode, copy the current progress file, selected option facts, package identity,
+step logs, and sandbox Forge logs into the host run directory. Do not copy `$CODEX_HOME`, `env.sh`, credential
+environment, settings contents, or auth material.
+
+After cleanup, copy final logs and state again. If a user stops before section 13, clearly say owned resources remain
+and offer either continuation with `--from 13` or `/walkthrough --reset`. Reset must reclaim resources before it
+discards their manifests; if ownership cannot be proven, it refuses rather than guessing.
+
+Cleanup is idempotent and names only walkthrough-owned sessions, `walkthrough-sidecar-proxy`, and the exact walkthrough
+sidecar container. Missing owned resources are success. Foreign same-port proxies, containers, sessions, listeners, and
+installation rows are never cleanup targets. Disposable fake binaries register an `EXIT` trap immediately after their
+path is chosen.
+
+## 7. Summary and Report
+
+Always obtain structural results from:
 
 ```bash
 python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" report "$STATE_FILE"
 ```
 
-This returns JSON with per-section pass/fail/skip counts, failures list, gaps, and totals. Render it as the results
-table. The script provides all numbers -- do not count manually.
-
-```
-Walkthrough Results
-====================================
-  Section                    Pass  Fail  Skip  Expected
-  -----------------------------------------------------
-  0. Setup                     7     0     0       7
-  ...
-  -----------------------------------------------------
-  TOTAL                       N      0     0       N
-
-  Failures: (none)
-  Gaps: (none)
-====================================
-```
-
-#### Phase 4b: Save Run Artifacts (`--report` only)
-
-When `--report` is set, do not stop after printing the summary. Continue directly into artifact save.
+In report mode, after section 13 is recorded, build deterministic metrics and report files with:
 
 ```bash
-RUN_DIR="$WT_STATE_DIR/runs/$(date +%Y-%m-%d-%H%M%S)"
-mkdir -p "$RUN_DIR"
+python3 "$SCRIPTS/walkthrough-report.py" \
+  --checklist "$CHECKLIST" \
+  --parser "$SCRIPTS/walkthrough-state.py" \
+  --state "$STATE_FILE" \
+  --package-identity "$WT_RUN_DIR/package-identity.json" \
+  --output-dir "$WT_RUN_DIR" \
+  --ended-epoch "$(date +%s)"
 ```
 
-1. Generate the final report with `walkthrough-state.py report` and write the rendered markdown to `$RUN_DIR/report.md`.
+Render per-section pass/fail/skip counts, then separately state:
 
-2. Copy the state file:
+- selected options;
+- default failures, unavailable steps, and missing steps;
+- each selected optional chapter's `pass`, `fail`, `unavailable`, or `incomplete` compatibility status;
+- optional steps omitted as `not selected`;
+- human checkpoints observed versus the seven-checkpoint default and any selected optional ceiling;
+- paid operations observed versus the two-operation default and any selected optional ceiling;
+- package-tree identity;
+- elapsed seconds and whether the 1,800-second review threshold was crossed.
 
-   ```bash
-   cp "$STATE_FILE" "$RUN_DIR/state.json"
-   ```
+Pass requires every default assertion to pass, no default gaps, valid observed counts, exact package-tree identity, and
+successful cleanup. Optional Codex/sidecar failures or unavailable infrastructure are reported as compatibility evidence
+without changing the default verdict. Not-selected optional assertions are excluded. Duration overage changes only
+`duration_review_required`.
 
-3. Copy raw step logs when present:
+For `--report`, save:
 
-   ```bash
-   if [ -d "$WT_STEP_LOGS_DIR" ]; then
-     cp -R "$WT_STEP_LOGS_DIR" "$RUN_DIR/step-logs"
-   fi
-   ```
+```text
+report.md
+run-metrics.json
+state.json
+selected-options.json
+package-identity.json
+step-logs/
+forge-logs/pre-clean/
+forge-logs/final/
+```
 
-4. Copy any pre-clean Forge log snapshots when present:
-
-   ```bash
-   if [ -d "$WT_FORGE_LOG_SNAPSHOTS" ]; then
-     cp -R "$WT_FORGE_LOG_SNAPSHOTS" "$RUN_DIR/forge-logs-snapshots"
-   fi
-   ```
-
-5. Copy the current sandbox Forge debug logs when present:
-
-   ```bash
-   if [ -d "$FORGE_TEST_REPO/.forge-home/logs" ]; then
-     mkdir -p "$RUN_DIR/forge-logs/final"
-     cp -R "$FORGE_TEST_REPO/.forge-home/logs/." "$RUN_DIR/forge-logs/final"
-   fi
-   ```
-
-6. Generate a transcript claim token and write the marker so only this walkthrough session can copy the transcript here
-   when it ends:
+Generate a transcript claim token and write the marker so only this Session A transcript can be copied after it ends:
 
 ```bash
-WT_TRANSCRIPT_TOKEN="forge-walkthrough-transcript-token:$(python3 - <<'PY'
+TRANSCRIPT_TOKEN="forge-walkthrough-transcript-token:$(python3 - <<'PY'
 import uuid
 print(uuid.uuid4())
 PY
 )"
-python3 - <<'PY' "$RUN_DIR" "$WT_STATE_DIR/.pending-transcript" "$WT_TRANSCRIPT_TOKEN"
+python3 - <<'PY' "$WT_RUN_DIR" "$WT_STATE_DIR/.pending-transcript" "$TRANSCRIPT_TOKEN"
 import json
+import os
 import sys
+from pathlib import Path
 
 run_dir, marker_path, token = sys.argv[1:4]
-with open(marker_path, "w", encoding="utf-8") as handle:
-    json.dump({"run_dir": run_dir, "transcript_contains": token}, handle)
-    handle.write("\n")
+marker = Path(marker_path)
+marker.parent.mkdir(parents=True, exist_ok=True)
+temporary = marker.with_suffix(".tmp")
+temporary.write_text(
+    json.dumps({"run_dir": run_dir, "transcript_contains": token}) + "\n",
+    encoding="utf-8",
+)
+os.replace(temporary, marker)
 PY
 ```
 
-Tell the user: "Walkthrough artifacts saved to `$RUN_DIR`. Forge step logs and debug logs were copied when present.
-Transcript claim token: `$WT_TRANSCRIPT_TOKEN`. Transcript will be added when this walkthrough session ends."
+Tell the user that the Session A transcript will be attached only after this walkthrough session ends, and print the
+claim token in the final message so it appears in that transcript. The marker contains the run directory and random
+claim token, never auth facts.
 
-Tip: "For a quick non-interactive check, use `/smoke-test`. For the full QA checklist in Docker, use `/qa` (requires
-`forge extension enable --profile full`)."
+End with current follow-ups: `/smoke-test` for a quick non-interactive check, `/qa` for containerized release QA, and
+the session, transfer, model-selection, memory, and manual-testing guides for deeper paths.
 
-## Safety Model
+## Wrapper Safety Gates
 
-| Tier        | Scripts involved                | What can go wrong           | Mitigation                                         |
-| ----------- | ------------------------------- | --------------------------- | -------------------------------------------------- |
-| Walkthrough | `run-in-repo.sh` (agent-driven) | Install targets real system | Path denylist + 6 gates + agent mtime verification |
+`run-in-repo.sh` canonicalizes and deny-lists unsafe roots before it sources target-controlled code, then proves:
 
-### Safety Gates (run-in-repo.sh)
+1. generated `env.sh` exists;
+2. the walkthrough marker exists;
+3. `FORGE_HOME` is the sandbox `.forge-home`;
+4. `CLAUDE_HOME` is the sandbox `.claude-user`;
+5. `CODEX_HOME` is the sandbox `.codex-user`;
+6. `.forge/walkthrough/` and `CLAUDE.md` establish the generated repository.
 
-Every command in the walkthrough passes through a path denylist and these numbered gates:
-
-- **Denylist** -- resolves symlinks and refuses FORGE_TEST_REPO = empty, `/`, `$HOME`, `/Users`, `/tmp`, `/var`, etc.
-
-1. **Gate 1** -- env.sh exists (test repo not deleted)
-2. **Gate 2** -- marker file exists (this is actually a test repo)
-3. **Gate 3** -- FORGE_HOME points to `$FORGE_TEST_REPO/.forge-home` (not real `~/.forge/`)
-4. **Gate 4** -- CLAUDE_HOME points to `$FORGE_TEST_REPO/.claude-user`
-5. **Gate 5** -- CODEX_HOME points to `$FORGE_TEST_REPO/.codex-user`
-6. **Gate 6** -- `.forge/walkthrough/` and `CLAUDE.md` establish the expected test-repo structure
-
-Gates 1, 2, and 6 prove the target before its `env.sh` can execute. The canonical target is retained independently while
-the environment loads; an unset or canonically different post-source `FORGE_TEST_REPO` is rejected. Gates 3--5 and the
-final `cd` derive only from that retained root, while equivalent safe symlink aliases remain valid.
-
-Any gate failure = loud error message + exit 1. No silent fallthrough.
-
-## Tips
-
-- **Quick check**: For a quick non-interactive health check, use `/smoke-test`.
-- **Full QA**: For the full QA checklist in Docker, use `/qa` (requires `--profile full`).
-- **Robustness principle**: The user should never see an error you could have avoided. If something is known to fail,
-  use the working alternative directly.
+Any gate failure stops the run. Never weaken or bypass a gate to finish a walkthrough.
