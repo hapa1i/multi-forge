@@ -1,7 +1,7 @@
 # Refresh the walkthrough for v1.0.0
 
 **Lane**: `proposed/` -- candidate release-blocking end-user education work for v1.0.0. Execute after
-[`refresh_release_qa_for_1_0`](../../doing/refresh_release_qa_for_1_0/card.md) defines which contracts belong to
+[`refresh_release_qa_for_1_0`](../../done/refresh_release_qa_for_1_0/card.md) defines which contracts belong to
 automated, clean-wheel, human, and exploratory release evidence.
 
 **References**:

@@ -2,8 +2,7 @@
 
 **Card**: [card.md](card.md).
 
-**Lane**: `doing/` -- accepted and activated directly from `proposed/` on 2026-08-25 because acceptance and branch
-creation happened in the same decision.
+**Lane**: `done/` -- shipped in PR #247 (`35dd157d`) on 2026-09-01 with all five GitHub checks passing.
 
 **Execution branch**: `test/refresh-release-qa-for-1-0`.
 
@@ -21,7 +20,8 @@ Closeout preserves three explicit limitations instead of editing the packaged dr
 one additional unannotated model completion (nine actual, although native metrics can record only the eight planned
 operations); its editor wording names the frozen context instead of the durable notes overlay; and step 4.18.1 does not
 flip `allow_non_zdr` for its manual contrast. Accepted Decision 11 records the one-run budget exception and the
-automated owners that keep the two behavior claims covered. The card remains in `doing/` until PR review and merge.
+automated owners that keep the two behavior claims covered. PR #247 merged as `35dd157d`; this execution record is
+closed in `done/`.
 
 ## Execution Guardrails
 
@@ -46,7 +46,7 @@ automated owners that keep the two behavior claims covered. The card remains in 
 
 ## Phase 0 -- Freeze the Runner Contracts
 
-- [x] Produce `docs/board/doing/refresh_release_qa_for_1_0/baseline-inventory.json` with a versioned JSON schema and one
+- [x] Produce `docs/board/done/refresh_release_qa_for_1_0/baseline-inventory.json` with a versioned JSON schema and one
   record for each of the 188 current steps. **Assertion**: every record includes section/step id, execution class,
   prerequisites, paid/live-runtime use, current assertion count, proposed keep/merge/move/remove outcome, target
   section, evidence lane, and automated owner where applicable; the inventory reconciles 150 `auto`, 32 `human:guided`,
@@ -595,8 +595,7 @@ automated owners that keep the two behavior claims covered. The card remains in 
   explicit accepted limitation before release sign-off.
 - [x] Add the compact completed-work entry to `docs/board/change_log.md`; promote only human-approved durable evidence
   lane, artifact-boundary, or runtime-identity decisions through `docs/board/impl_notes.md`.
-- [ ] Confirm design and end-user documentation describe shipped behavior, then move this card to `done/` and repoint
+- [x] Confirm design and end-user documentation describe shipped behavior, then move this card to `done/` and repoint
   the walkthrough card's inbound link to the final lane.
-- [ ] Commit the reviewed implementation in a reviewable series, push the execution branch, open the PR with exact
-  verification evidence, and merge only after the release-candidate evidence is closed under Accepted Decision 9 and
-  required checks pass.
+- [x] Commit the reviewed implementation in a reviewable series, push the execution branch, and merge PR #247 as
+  `35dd157d` after the release-candidate evidence closed under Accepted Decision 11 and all five required checks passed.

@@ -28,7 +28,8 @@ Claude- and Codex-runtime features.
 2.1.245 and Codex 0.149.1. The named integration owners passed 106 Docker tests plus one real host Codex 0.149.1 session
 test; a non-blocking latest lifecycle passed with Claude 2.1.252 and Codex 0.152.0. Unit, regression, pre-commit, build,
 clean-wheel runtime, exact-wheel lifecycle, link, size, and diff gates pass. The RC checklist records the maintainer's
-explicit one-run paid-operation exception and two accepted manual-coverage limitations.
+explicit one-run paid-operation exception and two accepted manual-coverage limitations. PR #247 merged as `35dd157d`
+with all five GitHub checks passing.
 
 ## 2026-08-24
 
