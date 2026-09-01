@@ -5,6 +5,31 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-09-01
+
+### Refresh release QA for v1.0.0
+
+**Goal/outcome**: Make release QA a bounded, exact-artifact gate with explicit automated and human ownership across
+Claude- and Codex-runtime features.
+
+**Key changes**:
+
+- Replaced checkout-backed evidence with one prebuilt wheel installed in isolation, a byte-matched packaged QA driver,
+  repository-pinned runtime identities, final drift probes, deterministic selection/budget metrics, and a separately
+  classified non-blocking latest-client lane.
+- Reduced the default run to 163 clean-wheel/human steps and mapped exhaustive contracts to automated owners while
+  adding release seams for model routing, Codex sessions, adoption/repair, rewind, consumer lanes, backend lifecycle,
+  provider trace, and both policy content sources.
+- Closed clean-install defects surfaced by repeated RC runs, including venv hook launch resolution, missing-runtime
+  errors, durable route reporting, non-mutating delete previews, container zombie classification, standalone Claude
+  skill discovery, and multi-file policy enforcement.
+
+**Verification**: The exact prebuilt wheel passed all 552 selected assertions with zero failures or skips under Claude
+2.1.245 and Codex 0.149.1. The named integration owners passed 106 Docker tests plus one real host Codex 0.149.1 session
+test; a non-blocking latest lifecycle passed with Claude 2.1.252 and Codex 0.152.0. Unit, regression, pre-commit, build,
+clean-wheel runtime, exact-wheel lifecycle, link, size, and diff gates pass. The RC checklist records the maintainer's
+explicit one-run paid-operation exception and two accepted manual-coverage limitations.
+
 ## 2026-08-24
 
 ### Close daily bug scan follow-ups

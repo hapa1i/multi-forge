@@ -93,6 +93,13 @@ The refresh must resolve at least these verified inconsistencies before adding c
 10. **Standalone Claude skill identity.** Forge remains a direct filesystem installer, not a Claude plugin. Every
     `.claude/skills/<name>/SKILL.md` therefore carries `name: <name>` and is invoked as `/<name>`. A `/forge:<name>`
     namespace would require a real plugin manifest and lifecycle; frontmatter alone cannot create it.
+11. **Final RC evidence disposition.** Accept the 2026-09-01 pinned run as the release gate under one explicit,
+    non-generalizing budget exception: its native metrics record the eight annotated paid operations, while the report
+    separately discloses one additional prompted completion during step 10.7. Preserve that discrepancy as nine actual
+    subject completions; do not rewrite the report or relax the eight-completion contract for future runs. The run's
+    stale 10.7 editor wording and 4.18.1's unexercised manual contrast are accepted documentation/coverage limitations,
+    not product failures: durable notes-overlay behavior and required-ZDR direct callers remain covered by their design
+    and automated owners. Board-only disposition does not invalidate the exact wheel or packaged driver.
 
 ## Scope
 

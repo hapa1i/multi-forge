@@ -8,6 +8,23 @@ Durable core, state, extension, hook, and installation decisions.
 
 ## Notes
 
+### Release QA evidence is an artifact-bound contract (refresh_release_qa_for_1_0, approved 2026-09-01)
+
+- Release-capable QA starts from an explicit prebuilt wheel. The Claude-hosted driver must match the QA package inside
+  that wheel byte-for-byte before Docker mutation, and Forge/package resources must resolve from the isolated wheel
+  prefix rather than a checkout or editable environment. Development-built runs remain useful but cannot emit a release
+  pass.
+- The repository runtime matrix owns the blocking Claude/Codex pair. Record both clients at container start and at final
+  artifact save; missing or changed identity fails the pinned verdict. Resolve `latest` afresh in a separately labelled
+  compatibility lane whose result never rewrites pinned evidence.
+- Evidence ownership has four lanes: `automated-suite`, `clean-wheel-smoke`, `human-acceptance`, and
+  `extended-exploratory`. The default release selection runs only the middle two; automated owners are references, not
+  commands silently credited to the manual report. Keep the blocking selection at no more than 12 human checkpoints and
+  eight subject-under-test model completions, counting every worker, round, prompted session turn, enrollment probe, and
+  curation call separately from driver orchestration.
+- QA remains one Claude-hosted interactive frontend. Claude and Codex are independent subjects under test; adding Codex
+  runtime coverage does not justify duplicating the checklist as a Codex-hosted package.
+
 ### Worktree config cleanup must reject symlinked directory components (shipped 2026-08-20)
 
 - Lexical containment and Git tracking checks do not make a path safe when a parent component is a symlink: filesystem

@@ -11,17 +11,17 @@ creation happened in the same decision.
 
 ## Current Focus
 
-The fresh pinned run completed all 163 blocking steps with exact wheel, driver, and runtime identity. Its saved verdict
-is `fail`: standalone Claude skills were documented and compiled with a plugin-only `/forge:<name>` namespace, while the
-actual host QA invocation proved Claude discovers the direct install as `/qa`; terminal multi-file policy checks also
-evaluated only the first path even though the corresponding QA step lacked an assertion for file granularity. Two other
-failures were stale checklist claims about session-list and info columns.
+Release evidence is closed on exact revision `a1d81c5c`: the fresh prebuilt-wheel pinned run saved a native `pass` with
+all 163 selected steps and 552 assertions passing, exact wheel/driver identity, and matching Claude `2.1.245` and Codex
+`0.149.1` observations at both boundaries. The named integration owners also pass, including a genuine host Codex
+`0.149.1` session-start run, and a separately labelled latest-runtime lifecycle passes with Claude `2.1.252` and Codex
+`0.152.0` without affecting the pinned verdict.
 
-The selector, policy, and checklist repairs change both the product and packaged QA, so the corrected candidate still
-needs a fresh complete pinned run; the default selection remains 163 steps, 552 assertions, 8 human checkpoints, and 8
-paid operations. Phase 7 also still needs the broad named integration-owner run and separately labelled `latest`
-compatibility pass; the Codex integration owners must observe Codex CLI `0.149.1` before that pin's release validation
-is complete.
+Closeout preserves three explicit limitations instead of editing the packaged driver after its pass: step 10.7 caused
+one additional unannotated model completion (nine actual, although native metrics can record only the eight planned
+operations); its editor wording names the frozen context instead of the durable notes overlay; and step 4.18.1 does not
+flip `allow_non_zdr` for its manual contrast. Accepted Decision 11 records the one-run budget exception and the
+automated owners that keep the two behavior claims covered. The card remains in `doing/` until PR review and merge.
 
 ## Execution Guardrails
 
@@ -261,7 +261,7 @@ is complete.
 
 - [x] Run focused skill/checklist tests, including the new contract tests and both state-script behavior/parity suites.
 - [x] Run the updated QA image-identity regression and focused installer/compiler/profile tests.
-- [ ] Run the targeted Docker/integration owners named in the acceptance table for Claude hooks, Codex sessions, model
+- [x] Run the targeted Docker/integration owners named in the acceptance table for Claude hooks, Codex sessions, model
   routing, authority, adoption/repair, rewind, backend lifecycle, provider trace, policy source modes, and installer
   lifecycle. **Codex ceiling gate**: the real-runtime Codex owners must observe CLI `0.149.1`; a host-detected different
   version does not close the Codex portion of this item.
@@ -275,11 +275,11 @@ is complete.
   exercises every failed or skipped block after correction, covers the sole product delta through automated owners, and
   verifies the rebuilt wheel/driver boundary. No passing report is inferred. This historical closure was subsequently
   invalidated by the post-review changes recorded below.
-- [ ] Rebuild the exact wheel after the 2026-08-31 product and packaged-QA fixes, synchronize its packaged driver, and
+- [x] Rebuild the exact wheel after the 2026-08-31 product and packaged-QA fixes, synchronize its packaged driver, and
   complete a fresh pinned-runtime blocking run. Save the native report and artifacts, require matching wheel, driver,
   Claude, and Codex identity at both boundaries, and classify every non-pass result without carrying the invalidated
   bridge forward.
-- [ ] Run one separately labelled `latest` compatibility pass when runtime/network availability permits. Record a skip
+- [x] Run one separately labelled `latest` compatibility pass when runtime/network availability permits. Record a skip
   or failure as compatibility evidence without changing the pinned verdict.
 - [x] Run Markdown links, repository file-size checks, and `git diff --check`; review the final diff for accidental
   walkthrough changes, secret material, stale paths, and checklist claims not backed by executed evidence.
@@ -527,8 +527,41 @@ is complete.
   exact-wheel QA artifact test pass. The candidate wheel SHA-256 is
   `4c0ac99391ec5083dbe28870420971d9878e23ba71fee9f287aaad3f386c5a5d`; its matching packaged QA-driver SHA-256 is
   `e35829bf4cc5e71445bd42d86f331367a3a846f907d24e06ecb18782d1b8052e`.
-- [ ] Synchronize that exact QA driver and complete the required full pinned run on the corrected candidate. The prior
+- [x] Synchronize that exact QA driver and complete the required full pinned run on the corrected candidate. The prior
   run found real product defects and cannot be converted into a passing verdict by reclassification.
+
+### Final Release-Candidate Closure -- 2026-09-01
+
+- **Pinned native verdict**: `~/.forge/manual-testing/qa/runs/2026-09-01-134926/run-metrics.json` records `pass` for the
+  full blocking selection: 163/163 steps, 552 passes, zero failures, zero skips, and 8/8 human checkpoints. The exact
+  prebuilt wheel SHA-256 is `a6cc89130f2da78be0fa933ce78fe0f1884af6c2fb2b063499e5313a4796ab51`; the byte-matched
+  QA-driver SHA-256 is `e35829bf4cc5e71445bd42d86f331367a3a846f907d24e06ecb18782d1b8052e`. The image records revision
+  `a1d81c5c25ba93b602e9c9651171050129ea94cf`, and both start and final probes match Claude `2.1.245` and Codex
+  `0.149.1`. The container was removed after the passing run.
+- **Duration disposition**: 51,712 seconds exceeds the 2,700-second review threshold. The maintainer accepts the overage
+  as idle time at human checkpoints plus context compaction; every selected assertion passed and no step timed out.
+- **Paid-operation exception**: native metrics record all eight annotated operations, but the report correctly discloses
+  one additional prompted completion during 10.7, for nine actual subject completions. The maintainer accepts this
+  one-run operator overage under Accepted Decision 11. The default selection remains capped at eight; the extra turn is
+  not normalized away and creates no precedent for future release runs.
+- **10.7 evidence classification**: the report's non-persistence concern is not a reproduced product defect. The exact
+  implementation writes `--review` edits to `children/<child>.notes.md`, merges user content after the frozen snapshot
+  on launch and relaunch, and has unit plus Docker integration owners. The manual instruction's "generated child
+  context" wording and the diagnostic evidence were insufficient to distinguish that overlay from a later prompted echo,
+  so the stale wording is accepted without changing the packaged driver that produced this run.
+- **4.18.1 evidence classification**: assertion 4 does not exercise its `allow_non_zdr=true` contrast manually. This is
+  accepted as a non-blocking clean-wheel coverage gap; `tests/src/core/llm/test_openrouter_policy.py`,
+  `tests/src/policy/semantic/test_plan_check.py`, and `tests/src/session/test_transfer.py` remain authoritative for the
+  required-ZDR direct callers.
+- **Other report notes**: 4.23 was re-executed hermetically with explicit exit zero before it was recorded; 19.3's
+  removal of a semantically empty settings file is intentional and covered by preservation tests.
+- **Named integration owners**: the 11-file Docker/integration sweep passed 106 tests against the preserved Claude
+  `2.1.245`/Codex `0.149.1` image. The host-backed `tests/integration/core/test_codex_session_start.py` then passed one
+  real session test with an isolated, genuine Codex CLI `0.149.1`, closing the ceiling gate without a version shim.
+- **Latest compatibility evidence**: a fresh exact-wheel lifecycle resolved Claude `2.1.252` and Codex `0.152.0`, passed
+  isolated-wheel provenance and runtime discovery, installed and removed both runtimes' assets at supported project
+  scope, preserved final runtime identity, and removed the temporary container. Auto-detected local scope first refused
+  Codex skill installation with the documented project/user-scope recovery; that fail-closed result is expected.
 
 ## Acceptance Tests
 
@@ -558,9 +591,9 @@ is complete.
 
 ## Closeout
 
-- [ ] Review the complete implementation and RC evidence with the maintainer; close every review finding or record an
+- [x] Review the complete implementation and RC evidence with the maintainer; close every review finding or record an
   explicit accepted limitation before release sign-off.
-- [ ] Add the compact completed-work entry to `docs/board/change_log.md`; promote only human-approved durable evidence
+- [x] Add the compact completed-work entry to `docs/board/change_log.md`; promote only human-approved durable evidence
   lane, artifact-boundary, or runtime-identity decisions through `docs/board/impl_notes.md`.
 - [ ] Confirm design and end-user documentation describe shipped behavior, then move this card to `done/` and repoint
   the walkthrough card's inbound link to the final lane.
