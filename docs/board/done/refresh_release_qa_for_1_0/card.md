@@ -2,7 +2,7 @@
 
 **Lane**: `done/` -- shipped in PR #247 (`35dd157d`) on 2026-09-01 with all five GitHub checks passing. It was accepted
 and activated directly from `proposed/` on branch `test/refresh-release-qa-for-1-0`. This card completed before
-[`refresh_walkthrough_for_1_0`](../../proposed/refresh_walkthrough_for_1_0/card.md), so the walkthrough consumes the
+[`refresh_walkthrough_for_1_0`](../../doing/refresh_walkthrough_for_1_0/card.md), so the walkthrough consumes the
 release coverage boundaries instead of growing another product-contract suite.
 
 **References**:
