@@ -124,7 +124,10 @@ python3 "$SCRIPTS/package-identity.py" --skill-root "$CLAUDE_SKILL_DIR"
 
 The identity command must report both `package_tree_matches_marker: true` and
 `package_matches_answering_distribution: true`. This rejects a coherent but stale installed skill package. In report
-mode save the exact JSON as `package-identity.json`.
+mode save the exact JSON as `package-identity.json`. If `answering_distribution_issue` is `editable-install`, stop and
+explain that the candidate wheel must be installed, its extension package synced, and Claude restarted with that wheel's
+launcher first on `PATH`. Never substitute checkout resources for this release-candidate gate. A
+`walkthrough-payload-missing` issue requires reinstalling the candidate wheel rather than continuing.
 
 If `--setup-only` was selected, stop here. Do not initialize checklist state, enable extensions, probe a runtime, or run
 a checklist step.

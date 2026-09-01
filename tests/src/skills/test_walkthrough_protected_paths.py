@@ -72,9 +72,7 @@ def test_compare_accepts_an_unchanged_snapshot(tmp_path: Path) -> None:
     assert json.loads(result.stdout) == {"changed": [], "status": "match"}
 
 
-def test_capture_refuses_unreadable_target_without_writing_snapshot(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_capture_refuses_unreadable_target_without_writing_snapshot(tmp_path: Path, monkeypatch, capsys) -> None:
     home = tmp_path / "home"
     home.mkdir()
     snapshot = tmp_path / "snapshot.json"
@@ -94,9 +92,7 @@ def test_capture_refuses_unreadable_target_without_writing_snapshot(
         return original(path)
 
     monkeypatch.setitem(module_globals["main"].__globals__, "_facts", unreadable)
-    monkeypatch.setattr(
-        sys, "argv", [str(SCRIPT), "capture", str(snapshot), "--home", str(home)]
-    )
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "capture", str(snapshot), "--home", str(home)])
 
     assert module_globals["main"]() == 2
     result = json.loads(capsys.readouterr().err)
@@ -108,9 +104,7 @@ def test_capture_refuses_unreadable_target_without_writing_snapshot(
     assert not snapshot.exists()
 
 
-def test_nested_tree_disappearance_is_unreadable_not_missing(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_nested_tree_disappearance_is_unreadable_not_missing(tmp_path: Path, monkeypatch) -> None:
     home = tmp_path / "home"
     target = home / ".claude/skills"
     target.mkdir(parents=True)

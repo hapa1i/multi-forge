@@ -301,17 +301,28 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 
 ### Automated Verification -- 2026-09-01
 
-- `make test-unit` passed with 10,019 tests and 117 deselected; `make test-regression` passed all 1,095 tests. The first
+- `make test-unit` passed with 10,020 tests and 117 deselected; `make test-regression` passed all 1,095 tests. The first
   unit run exposed one stale path left by the completed QA card: its baseline-inventory contract still named `doing/`
   after promotion to `done/`. The owner path is corrected and the complete unit suite passed on the final head.
 - The targeted integration sweep passed 36 tests: 21 managed lifecycle, routing, hook, search, transfer, and activity
   owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel walkthrough package
   owner. The Codex test completed two real turns and the sidecar tests required no provider completion.
 - `make build`, `./scripts/test-wheel-runtime.sh`, and `make pre-commit` passed. The final locally built wheel SHA-256
-  is `565d78d1263dfea7d07e28329654781bf12cd4e570b39ab5967f1e2a78e97682`.
+  is `5fffb5a600c3f5a08a5986c4641737cfbcb902adeaee8ddbe6b37227c03fa1bd`.
 - The exact-wheel owner installs outside the checkout, binds the answering distribution to the installed package tree,
   runs setup/index/report/cleanup twice, verifies protected-path preservation, and confirms `python -I` cannot import
   the checkout. This automated proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
+
+### Setup-only Attempt -- 2026-09-01
+
+- The first Claude-hosted `/walkthrough --setup-only` attempt passed sandbox creation and all six wrapper gates, then
+  stopped before checklist initialization because Claude's inherited `PATH` selected the checkout's editable
+  `.venv/bin/forge`, not the candidate-wheel launcher. That is the intended clean-wheel refusal, so the setup-only gate
+  remains unchecked until it is rerun from the installed candidate.
+- The refusal exposed a diagnostic defect: the identity probe hashed a missing wheel-resource directory as the empty
+  manifest. The probe now reports `answering_distribution_issue: editable-install`, emits no payload digest for that
+  ineligible source, and explicitly forbids substituting checkout resources. Unit and exact-wheel integration coverage
+  pin both the editable refusal and installed-wheel success paths.
 
 ## Acceptance Tests
 

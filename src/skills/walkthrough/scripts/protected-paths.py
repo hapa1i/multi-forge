@@ -49,9 +49,7 @@ def _hash_path(path: Path) -> str:
             digest.update(os.readlink(node).encode("utf-8", errors="surrogateescape"))
         elif node.is_dir():
             digest.update(b"directory\0")
-            for child in sorted(
-                node.iterdir(), key=lambda item: os.fsencode(item.name)
-            ):
+            for child in sorted(node.iterdir(), key=lambda item: os.fsencode(item.name)):
                 child_relative = f"{relative}/{child.name}" if relative else child.name
                 add(child, child_relative)
         elif node.is_file():
@@ -108,19 +106,14 @@ def _facts(path: Path) -> ProtectedPathFacts:
 def capture(home: Path) -> ProtectedSnapshot:
     return {
         "schema_version": 1,
-        "targets": {
-            label: _facts(home / relative)
-            for label, relative in PROTECTED_PATHS.items()
-        },
+        "targets": {label: _facts(home / relative) for label, relative in PROTECTED_PATHS.items()},
     }
 
 
 def write_capture(path: Path, snapshot: ProtectedSnapshot) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -133,8 +126,7 @@ def _unreadable_labels(snapshot: object) -> list[str]:
     return [
         label
         for label in PROTECTED_PATHS
-        if not isinstance(targets.get(label), dict)
-        or targets[label].get("kind") == "unreadable"
+        if not isinstance(targets.get(label), dict) or targets[label].get("kind") == "unreadable"
     ]
 
 
@@ -185,11 +177,7 @@ def main() -> int:
         )
         return 2
 
-    baseline_unreadable = (
-        _unreadable_labels(baseline)
-        if isinstance(baseline, dict)
-        else list(PROTECTED_PATHS)
-    )
+    baseline_unreadable = _unreadable_labels(baseline) if isinstance(baseline, dict) else list(PROTECTED_PATHS)
     if baseline_unreadable:
         print(
             json.dumps(
@@ -205,11 +193,7 @@ def main() -> int:
         return 2
 
     baseline_targets = baseline.get("targets", {}) if isinstance(baseline, dict) else {}
-    changed = [
-        label
-        for label in PROTECTED_PATHS
-        if baseline_targets.get(label) != current["targets"][label]
-    ]
+    changed = [label for label in PROTECTED_PATHS if baseline_targets.get(label) != current["targets"][label]]
     print(
         json.dumps(
             {"status": "match" if not changed else "changed", "changed": changed},

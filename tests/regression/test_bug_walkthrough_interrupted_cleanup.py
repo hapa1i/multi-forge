@@ -402,9 +402,7 @@ def test_reset_does_not_probe_docker_for_an_unattempted_sidecar_option(
     fake_bin.mkdir()
     docker_log = tmp_path / "docker.log"
     docker = fake_bin / "docker"
-    docker.write_text(
-        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$WALKTHROUGH_DOCKER_LOG"\nexit 99\n'
-    )
+    docker.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$WALKTHROUGH_DOCKER_LOG"\nexit 99\n')
     docker.chmod(0o755)
     env["PATH"] = f"{fake_bin}:{env['PATH']}"
     env["WALKTHROUGH_DOCKER_LOG"] = str(docker_log)

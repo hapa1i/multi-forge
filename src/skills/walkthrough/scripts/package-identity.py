@@ -50,17 +50,11 @@ def verify_skill_root(root: Path) -> tuple[str, str, bool, list[str]]:
         relative = row.get("path")
         expected_sha256 = row.get("sha256")
         expected_mode = row.get("mode")
-        if (
-            not isinstance(relative, str)
-            or not isinstance(expected_sha256, str)
-            or not isinstance(expected_mode, int)
-        ):
+        if not isinstance(relative, str) or not isinstance(expected_sha256, str) or not isinstance(expected_mode, int):
             failures.append("invalid_file_row")
             continue
         parsed = PurePosixPath(relative)
-        if parsed.is_absolute() or any(
-            part in {"", ".", ".."} for part in parsed.parts
-        ):
+        if parsed.is_absolute() or any(part in {"", ".", ".."} for part in parsed.parts):
             failures.append(relative)
             continue
         if relative in expected_paths:
@@ -77,17 +71,13 @@ def verify_skill_root(root: Path) -> tuple[str, str, bool, list[str]]:
         if not stat.S_ISREG(metadata.st_mode):
             failures.append(relative)
             continue
-        if (
-            _sha256(target) != expected_sha256
-            or stat.S_IMODE(metadata.st_mode) != expected_mode
-        ):
+        if _sha256(target) != expected_sha256 or stat.S_IMODE(metadata.st_mode) != expected_mode:
             failures.append(relative)
 
     actual_paths = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
-        if (path.is_file() or path.is_symlink())
-        and path.name != ".forge-package.json"
+        if (path.is_file() or path.is_symlink()) and path.name != ".forge-package.json"
     }
     failures.extend(sorted(actual_paths - expected_paths))
     failures.extend(sorted(expected_paths - actual_paths))
@@ -99,7 +89,7 @@ def verify_skill_root(root: Path) -> tuple[str, str, bool, list[str]]:
     )
 
 
-def answering_distribution() -> dict[str, str | None]:
+def answering_distribution() -> dict[str, object]:
     """Resolve metadata through the Forge launcher that answers on PATH."""
     launcher = shutil.which("forge")
     if launcher is None:
@@ -120,18 +110,34 @@ forge_spec = importlib.util.find_spec("forge")
 if forge_spec is None or not forge_spec.submodule_search_locations:
     raise RuntimeError("answering Forge package has no resource root")
 resource_root = Path(next(iter(forge_spec.submodule_search_locations))) / "_extensions" / "skills" / "walkthrough"
+direct_url_text = distribution.read_text("direct_url.json")
+direct_url = json.loads(direct_url_text) if direct_url_text else {}
+editable = bool(
+    isinstance(direct_url, dict)
+    and isinstance(direct_url.get("dir_info"), dict)
+    and direct_url["dir_info"].get("editable") is True
+)
+payload_present = resource_root.is_dir()
+issue = "editable-install" if editable else (None if payload_present else "walkthrough-payload-missing")
 rows = []
-for path in resource_root.rglob("*"):
-    if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
-        rows.append((path.relative_to(resource_root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mode & 0o777))
-payload = json.dumps(sorted(rows), separators=(",", ":")).encode("utf-8")
+if issue is None:
+    for path in resource_root.rglob("*"):
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+            rows.append((path.relative_to(resource_root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mode & 0o777))
+payload_sha256 = None
+if issue is None:
+    payload = json.dumps(sorted(rows), separators=(",", ":")).encode("utf-8")
+    payload_sha256 = "sha256:" + hashlib.sha256(payload).hexdigest()
 print(json.dumps({
     "distribution": distribution.metadata["Name"],
     "version": distribution.version,
     "distribution_root": str(Path(distribution.locate_file("")).resolve()),
     "forge_module": str(Path(forge_spec.origin).resolve()) if forge_spec.origin else None,
+    "answering_distribution_kind": "editable" if editable else "installed",
+    "answering_distribution_issue": issue,
     "walkthrough_source_root": str(resource_root.resolve()),
-    "walkthrough_payload_sha256": "sha256:" + hashlib.sha256(payload).hexdigest(),
+    "walkthrough_payload_present": payload_present,
+    "walkthrough_payload_sha256": payload_sha256,
 }))
 """
     probe = subprocess.run(
@@ -156,9 +162,7 @@ def main() -> int:
 
     try:
         distribution = answering_distribution()
-        marker_digest, payload_digest, tree_matches, failures = verify_skill_root(
-            args.skill_root.resolve()
-        )
+        marker_digest, payload_digest, tree_matches, failures = verify_skill_root(args.skill_root.resolve())
     except (
         OSError,
         UnicodeError,
@@ -172,9 +176,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    distribution_matches = payload_digest == distribution.get(
-        "walkthrough_payload_sha256"
-    )
+    distribution_matches = distribution.get(
+        "answering_distribution_issue"
+    ) is None and payload_digest == distribution.get("walkthrough_payload_sha256")
     result = {
         **distribution,
         "skill_root": str(args.skill_root.resolve()),

@@ -41,9 +41,7 @@ def _complete_state(
         "DECLARED_HUMAN_CHECKPOINTS": "7",
         "HUMAN_CHECKPOINTS_OBSERVED": str(7 + (2 if sidecar else 0)),
         "DECLARED_PAID_OPERATIONS": "2",
-        "PAID_OPERATIONS_OBSERVED": str(
-            2 + (1 if codex and not codex_unavailable else 0)
-        ),
+        "PAID_OPERATIONS_OBSERVED": str(2 + (1 if codex and not codex_unavailable else 0)),
     }.items():
         module.cmd_var(str(state), "set", key, value)
 
@@ -54,20 +52,14 @@ def _complete_state(
             if annotation.startswith("option:")
         ]
         option = option_annotations[0] if option_annotations else None
-        selected = (
-            option is None
-            or (option == "codex" and codex)
-            or (option == "sidecar" and sidecar)
-        )
+        selected = option is None or (option == "codex" and codex) or (option == "sidecar" and sidecar)
         code = "p" if selected else "s"
         if codex_unavailable and step["id"] == "12.9":
             code = "s"
         results = [code] * step["assertion_count"]
         if step["id"] == failing_step:
             results[0] = "f"
-        module.cmd_record(
-            data, str(CHECKLIST), str(state), step["id"], ",".join(results), force=False
-        )
+        module.cmd_record(data, str(CHECKLIST), str(state), step["id"], ",".join(results), force=False)
 
     identity = tmp_path / "package-identity.json"
     identity.write_text(
@@ -86,9 +78,7 @@ def _complete_state(
     return state, identity
 
 
-def _run(
-    tmp_path: Path, state: Path, identity: Path
-) -> subprocess.CompletedProcess[str]:
+def _run(tmp_path: Path, state: Path, identity: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             "python3",

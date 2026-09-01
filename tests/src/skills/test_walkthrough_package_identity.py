@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -13,9 +14,7 @@ SCRIPT = REPO_ROOT / "src/skills/walkthrough/scripts/package-identity.py"
 
 
 def _module():
-    spec = importlib.util.spec_from_file_location(
-        "walkthrough_package_identity_test", SCRIPT
-    )
+    spec = importlib.util.spec_from_file_location("walkthrough_package_identity_test", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -59,9 +58,7 @@ def _run(root: Path) -> subprocess.CompletedProcess[str]:
 def test_reports_distribution_and_exact_package_tree(tmp_path: Path) -> None:
     _package(tmp_path)
 
-    marker_digest, payload_digest, matches, mismatches = _module().verify_skill_root(
-        tmp_path
-    )
+    marker_digest, payload_digest, matches, mismatches = _module().verify_skill_root(tmp_path)
 
     assert marker_digest.startswith("sha256:")
     assert payload_digest.startswith("sha256:")
@@ -106,9 +103,7 @@ def test_cli_refuses_a_valid_marker_from_another_answering_distribution(
     assert payload["package_matches_answering_distribution"] is False
 
 
-def test_answering_distribution_uses_the_forge_launcher_interpreter(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_answering_distribution_uses_the_forge_launcher_interpreter(tmp_path: Path, monkeypatch) -> None:
     module = _module()
     launcher = tmp_path / "forge"
     launcher.write_text("#!/opt/answering-forge/bin/python\n")
@@ -145,3 +140,21 @@ def test_answering_distribution_uses_the_forge_launcher_interpreter(
     assert observed[0] == "/opt/answering-forge/bin/python"
     assert result["version"] == "1.0.0"
     assert result["forge_launcher"] == str(launcher.resolve())
+
+
+def test_editable_answering_distribution_is_explicitly_ineligible(tmp_path: Path, monkeypatch) -> None:
+    module = _module()
+    launcher = tmp_path / "forge"
+    launcher.write_text(f"#!{sys.executable}\n")
+    monkeypatch.setattr(
+        module.shutil,
+        "which",
+        lambda command: str(launcher) if command == "forge" else None,
+    )
+
+    result = module.answering_distribution()
+
+    assert result["answering_distribution_kind"] == "editable"
+    assert result["answering_distribution_issue"] == "editable-install"
+    assert result["walkthrough_payload_present"] is False
+    assert result["walkthrough_payload_sha256"] is None

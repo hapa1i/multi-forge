@@ -18,9 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 def test_walkthrough_setup_report_and_cleanup_resolve_from_one_wheel(
     tmp_path: Path, forge_test_image: str | None
 ) -> None:
-    assert (
-        forge_test_image is not None
-    ), "walkthrough artifact isolation requires the Docker-host test lane"
+    assert forge_test_image is not None, "walkthrough artifact isolation requires the Docker-host test lane"
     built = subprocess.run(
         ["uv", "build", "--wheel", "--out-dir", str(tmp_path), str(REPO_ROOT)],
         check=False,
@@ -167,9 +165,7 @@ PY
         text=True,
         timeout=300,
     )
-    assert (
-        result.returncode == 0
-    ), f"stdout={result.stdout!r}\nstderr={result.stderr!r}\nprobe={shlex.quote(probe)}"
+    assert result.returncode == 0, f"stdout={result.stdout!r}\nstderr={result.stderr!r}\nprobe={shlex.quote(probe)}"
     evidence = json.loads(result.stdout.strip().splitlines()[-1])
     assert evidence["forge_file"].startswith("/opt/forge-walkthrough/")
     assert evidence["wheel_sha256"] == wheel_sha256
@@ -177,5 +173,8 @@ PY
     assert evidence["index"]["total_assertions"] == 145
     assert evidence["identity"]["package_tree_matches_marker"] is True
     assert evidence["identity"]["package_matches_answering_distribution"] is True
+    assert evidence["identity"]["answering_distribution_kind"] == "installed"
+    assert evidence["identity"]["answering_distribution_issue"] is None
+    assert evidence["identity"]["walkthrough_payload_present"] is True
     assert evidence["metrics"]["verdict"] == "incomplete"
     assert evidence["resource_hashes"] == wheel_resources

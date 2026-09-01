@@ -30,9 +30,7 @@ PARSER = _load_parser()
 
 
 def _metadata(name: str) -> str:
-    match = re.search(
-        rf"^<!-- {re.escape(name)}:\s*(.+?)\s*-->$", CHECKLIST.read_text(), re.MULTILINE
-    )
+    match = re.search(rf"^<!-- {re.escape(name)}:\s*(.+?)\s*-->$", CHECKLIST.read_text(), re.MULTILINE)
     assert match is not None, f"missing checklist metadata: {name}"
     return match.group(1)
 
@@ -42,11 +40,7 @@ def _numeric_id(value: str) -> tuple[int, ...]:
 
 
 def _modifier(step: dict, prefix: str) -> list[str]:
-    return [
-        annotation.split(":", 1)[1].strip()
-        for annotation in step["annotations"]
-        if annotation.startswith(prefix)
-    ]
+    return [annotation.split(":", 1)[1].strip() for annotation in step["annotations"] if annotation.startswith(prefix)]
 
 
 def _paid_operations(step: dict) -> int:
@@ -75,30 +69,21 @@ def test_sections_steps_and_prerequisites_are_unique_ordered_and_closed() -> Non
 
     assert section_ids == [str(number) for number in range(14)]
     assert len(step_ids) == len(set(step_ids))
-    assert [_numeric_id(step_id) for step_id in step_ids] == sorted(
-        _numeric_id(step_id) for step_id in step_ids
-    )
+    assert [_numeric_id(step_id) for step_id in step_ids] == sorted(_numeric_id(step_id) for step_id in step_ids)
 
     positions = {step_id: index for index, step_id in enumerate(step_ids)}
     for step in steps:
         assert step["id"].startswith(f"{step['section_id']}.")
         for prereq in step["prereqs"]:
             assert prereq in positions, f"unknown prerequisite {prereq} on {step['id']}"
-            assert (
-                positions[prereq] < positions[step["id"]]
-            ), f"non-earlier prerequisite {prereq} on {step['id']}"
+            assert positions[prereq] < positions[step["id"]], f"non-earlier prerequisite {prereq} on {step['id']}"
             prereq_step = steps[positions[prereq]]
             if not _modifier(step, "option:"):
-                assert not _modifier(
-                    prereq_step, "option:"
-                ), f"default step {step['id']} depends on optional {prereq}"
+                assert not _modifier(prereq_step, "option:"), f"default step {step['id']} depends on optional {prereq}"
 
 
 def test_cleanup_mutations_require_explicit_approval() -> None:
-    steps = {
-        step["id"]: step
-        for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]
-    }
+    steps = {step["id"]: step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]}
 
     assert steps["13.1"]["annotation"] == "human:confirm"
     assert steps["13.2"]["prereqs"] == ["13.1"]
@@ -110,14 +95,8 @@ def test_annotations_use_the_ratified_vocabulary() -> None:
     data = PARSER.parse_checklist(str(CHECKLIST))
 
     for step in data["_all_subs"]:
-        execution = [
-            annotation
-            for annotation in step["annotations"]
-            if annotation in EXECUTION_CLASSES
-        ]
-        assert (
-            len(execution) == 1
-        ), f"{step['id']} needs exactly one explicit execution class"
+        execution = [annotation for annotation in step["annotations"] if annotation in EXECUTION_CLASSES]
+        assert len(execution) == 1, f"{step['id']} needs exactly one explicit execution class"
         assert step["annotation"] == execution[0]
 
         for annotation in step["annotations"]:
@@ -166,9 +145,7 @@ def test_default_and_optional_budgets_are_mechanical() -> None:
 
 
 def test_journey_map_has_one_owner_row_for_every_step() -> None:
-    step_ids = {
-        step["id"] for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]
-    }
+    step_ids = {step["id"] for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]}
     mapped_ids = re.findall(r"^\| (\d+\.\d+)\s+\|", JOURNEY_MAP.read_text(), re.MULTILINE)
 
     assert len(mapped_ids) == len(set(mapped_ids))
@@ -186,14 +163,9 @@ def test_default_path_is_direct_managed_and_provider_neutral() -> None:
         if block["runnable"]
     )
 
-    assert (
-        "session start walkthrough-demo --model claude-haiku-4-5 --no-proxy --no-launch"
-        in default_text
-    )
+    assert "session start walkthrough-demo --model claude-haiku-4-5 --no-proxy --no-launch" in default_text
     launch_text = (
-        steps["7.1"]["instructions"]
-        + "\n"
-        + "\n".join(block["code"] for block in steps["7.1"]["code_blocks"])
+        steps["7.1"]["instructions"] + "\n" + "\n".join(block["code"] for block in steps["7.1"]["code_blocks"])
     )
     assert "session resume walkthrough-demo" in launch_text
     assert "claude-haiku-4-5-20251001" in " ".join(steps["6.4"]["assertions"])
@@ -204,14 +176,8 @@ def test_default_path_is_direct_managed_and_provider_neutral() -> None:
 
 def test_optional_codex_uses_initial_message_without_fake_readiness() -> None:
     text = CHECKLIST.read_text()
-    codex_step = next(
-        step
-        for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]
-        if step["id"] == "12.9"
-    )
-    command = "\n".join(
-        block["code"] for block in codex_step["code_blocks"] if block["runnable"]
-    )
+    codex_step = next(step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"] if step["id"] == "12.9")
+    command = "\n".join(block["code"] for block in codex_step["code_blocks"] if block["runnable"])
 
     assert "--runtime codex" in command
     assert "--strategy structured" in command
@@ -223,30 +189,18 @@ def test_optional_codex_uses_initial_message_without_fake_readiness() -> None:
 def test_optional_sidecar_uses_one_fixed_owned_proxy() -> None:
     data = PARSER.parse_checklist(str(CHECKLIST))
     steps = {step["id"]: step for step in data["_all_subs"]}
-    preparation = "\n".join(
-        block["code"] for block in steps["12.1"]["code_blocks"] if block["runnable"]
-    )
-    launch = steps["12.4"]["instructions"] + "\n" + "\n".join(
-        block["code"] for block in steps["12.4"]["code_blocks"]
-    )
+    preparation = "\n".join(block["code"] for block in steps["12.1"]["code_blocks"] if block["runnable"])
+    launch = steps["12.4"]["instructions"] + "\n" + "\n".join(block["code"] for block in steps["12.4"]["code_blocks"])
 
-    assert "proxy create openrouter-anthropic --name \"$proxy_id\"" in preparation
+    assert 'proxy create openrouter-anthropic --name "$proxy_id"' in preparation
     assert "proxy_id=walkthrough-sidecar-proxy" in preparation
     assert "--proxy walkthrough-sidecar-proxy" in launch
     assert subprocess.run(["bash", "-n", "-c", preparation], check=False).returncode == 0
 
 
 def test_memory_is_orientation_not_a_schema_matrix() -> None:
-    step = next(
-        step
-        for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]
-        if step["id"] == "11.5"
-    )
-    text = (
-        step["instructions"]
-        + "\n"
-        + "\n".join(block["code"] for block in step["code_blocks"])
-    )
+    step = next(step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"] if step["id"] == "11.5")
+    text = step["instructions"] + "\n" + "\n".join(block["code"] for block in step["code_blocks"])
 
     assert "forge memory --help" in text
     assert "forge session memory report --help" in text
@@ -268,12 +222,13 @@ def test_driver_declares_the_complete_argument_and_setup_only_contract() -> None
     ):
         assert token in frontmatter
 
-    setup_only = content.split("If `--setup-only` was selected", 1)[1].split(
-        "For a normal fresh run", 1
-    )[0]
+    setup_only = content.split("If `--setup-only` was selected", 1)[1].split("For a normal fresh run", 1)[0]
     assert "Do not initialize checklist state" in setup_only
     assert "package-identity.json" in content
     assert "package_matches_answering_distribution: true" in content
+    assert "answering_distribution_issue" in content
+    assert "editable-install" in content
+    assert "Never substitute checkout resources" in content
     assert 'bash "$SCRIPTS/run-in-repo.sh" true' in content
     assert "Do not call setup" in content
     assert "An unmarked existing target is never eligible for reset" in content

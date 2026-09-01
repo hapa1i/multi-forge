@@ -7,7 +7,6 @@ import stat
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SETUP = REPO_ROOT / "src/skills/walkthrough/scripts/setup-test-repo.sh"
 
@@ -73,9 +72,7 @@ def test_reset_does_not_reuse_a_previous_explicit_auth_copy(tmp_path: Path) -> N
 
     assert result.returncode == 0, result.stderr
     assert not (target / ".codex-user/auth.json").exists()
-    assert "export FORGE_WALKTHROUGH_CODEX_AUTH_MODE=none" in (
-        target / ".forge/walkthrough/env.sh"
-    ).read_text()
+    assert "export FORGE_WALKTHROUGH_CODEX_AUTH_MODE=none" in (target / ".forge/walkthrough/env.sh").read_text()
 
 
 def test_environment_ingress_records_mode_without_copying_auth(tmp_path: Path) -> None:

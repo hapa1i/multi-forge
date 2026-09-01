@@ -16,9 +16,7 @@ def _load_parser(path: Path):
     # The parser lives in the installed skill package. Importing it must not
     # create __pycache__ beside user-owned extension files.
     sys.dont_write_bytecode = True
-    spec = importlib.util.spec_from_file_location(
-        "forge_walkthrough_report_parser", path
-    )
+    spec = importlib.util.spec_from_file_location("forge_walkthrough_report_parser", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load parser: {path}")
     module = importlib.util.module_from_spec(spec)
@@ -28,9 +26,7 @@ def _load_parser(path: Path):
 
 def _option(step: dict) -> str | None:
     values = [
-        annotation.split(":", 1)[1].strip()
-        for annotation in step["annotations"]
-        if annotation.startswith("option:")
+        annotation.split(":", 1)[1].strip() for annotation in step["annotations"] if annotation.startswith("option:")
     ]
     if len(values) > 1:
         raise ValueError(f"step {step['id']} has multiple option annotations")
@@ -43,11 +39,7 @@ def _options(raw: object) -> dict[str, bool]:
     parsed: dict[str, bool] = {}
     for item in raw.split(","):
         key, separator, value = item.partition("=")
-        if (
-            not separator
-            or key not in {"codex", "sidecar"}
-            or value not in {"true", "false"}
-        ):
+        if not separator or key not in {"codex", "sidecar"} or value not in {"true", "false"}:
             raise ValueError("state has invalid RUN_OPTIONS")
         parsed[key] = value == "true"
     if set(parsed) != {"codex", "sidecar"}:
@@ -132,16 +124,11 @@ def build_metrics(
     checklist_step_ids = {step["id"] for step in data["_all_subs"]}
     orphaned_steps = sorted(set(recorded_steps) - checklist_step_ids)
     if orphaned_steps:
-        raise ValueError(
-            f"state has orphaned step records: {', '.join(orphaned_steps)}"
-        )
+        raise ValueError(f"state has orphaned step records: {', '.join(orphaned_steps)}")
 
     totals = {"pass": 0, "fail": 0, "skip": 0, "missing": 0}
     selected_totals = {"pass": 0, "fail": 0, "skip": 0, "missing": 0}
-    optional_results = {
-        option: {"pass": 0, "fail": 0, "skip": 0, "missing": 0}
-        for option in ("codex", "sidecar")
-    }
+    optional_results = {option: {"pass": 0, "fail": 0, "skip": 0, "missing": 0} for option in ("codex", "sidecar")}
     selected_steps = 0
     not_selected_steps = 0
     not_selected_assertions = 0
@@ -180,14 +167,10 @@ def build_metrics(
                 section_totals[result] += 1
                 for bucket in buckets:
                     bucket[result] += 1
-        sections.append(
-            {"id": section["id"], "title": section["title"], **section_totals}
-        )
+        sections.append({"id": section["id"], "title": section["title"], **section_totals})
 
     if state.get("checklist_version") != data["version"]:
-        raise ValueError(
-            "state checklist version does not match the packaged checklist"
-        )
+        raise ValueError("state checklist version does not match the packaged checklist")
 
     optional_statuses: dict[str, dict[str, object]] = {}
     for option, counts in optional_results.items():
@@ -213,9 +196,7 @@ def build_metrics(
     )
 
     default_steps = [step for step in data["_all_subs"] if _option(step) is None]
-    default_human = sum(
-        step["annotation"].startswith("human:") for step in default_steps
-    )
+    default_human = sum(step["annotation"].startswith("human:") for step in default_steps)
     default_paid = sum(
         int(annotation.split(":", 1)[1].strip())
         for step in default_steps
@@ -239,15 +220,9 @@ def build_metrics(
         for annotation in step["annotations"]
         if annotation.startswith("paid-operations:")
     )
-    passed_options = {
-        option
-        for option, result in optional_statuses.items()
-        if result["status"] == "pass"
-    }
+    passed_options = {option for option, result in optional_statuses.items() if result["status"] == "pass"}
     required_optional_human = sum(
-        step["annotation"].startswith("human:")
-        for step in data["_all_subs"]
-        if _option(step) in passed_options
+        step["annotation"].startswith("human:") for step in data["_all_subs"] if _option(step) in passed_options
     )
     required_optional_paid = sum(
         int(annotation.split(":", 1)[1].strip())
@@ -259,23 +234,13 @@ def build_metrics(
     human_observed = _integer_var(state, "HUMAN_CHECKPOINTS_OBSERVED")
     paid_observed = _integer_var(state, "PAID_OPERATIONS_OBSERVED")
     budget_counts_valid = (
-        default_human + required_optional_human
-        <= human_observed
-        <= default_human + optional_human
-        and default_paid + required_optional_paid
-        <= paid_observed
-        <= default_paid + optional_paid
+        default_human + required_optional_human <= human_observed <= default_human + optional_human
+        and default_paid + required_optional_paid <= paid_observed <= default_paid + optional_paid
     )
 
     if totals["missing"]:
         verdict = "incomplete"
-    elif (
-        totals["fail"]
-        or totals["skip"]
-        or not cleanup_passed
-        or not identity_preserved
-        or not budget_counts_valid
-    ):
+    elif totals["fail"] or totals["skip"] or not cleanup_passed or not identity_preserved or not budget_counts_valid:
         verdict = "fail"
     else:
         verdict = "pass"
@@ -356,9 +321,7 @@ def main() -> int:
         print(json.dumps({"status": "error", "reason": str(exc)}), file=sys.stderr)
         return 2
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "run-metrics.json").write_text(
-        json.dumps(metrics, indent=2, sort_keys=True) + "\n"
-    )
+    (args.output_dir / "run-metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
     (args.output_dir / "report.md").write_text(_render_report(metrics))
     (args.output_dir / "selected-options.json").write_text(
         json.dumps(
