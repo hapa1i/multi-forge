@@ -669,6 +669,34 @@ class TestSessionDelete:
 
         assert "Cancelled" in result.output
 
+    @pytest.mark.parametrize(
+        ("keep_transcripts", "expected_native_line"),
+        [
+            (False, "Native Claude transcript files will be deleted"),
+            (True, "Native Claude transcript files will be kept"),
+        ],
+    )
+    def test_delete_preview_distinguishes_native_transcripts_from_forge_artifacts(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        keep_transcripts: bool,
+        expected_native_line: str,
+    ) -> None:
+        """The preview must not imply that retained Forge snapshots are native transcripts."""
+        runner.invoke(main, ["session", "start", "transcript-preview", "--no-launch"])
+        args = ["session", "delete", "transcript-preview"]
+        if keep_transcripts:
+            args.append("--keep-transcripts")
+
+        result = runner.invoke(main, args, input="n\n")
+
+        assert result.exit_code == 0
+        assert expected_native_line in result.output
+        assert "Forge artifact snapshots will be kept" in result.output
+        assert "Transcript files will also be deleted" not in result.output
+        assert "Cancelled" in result.output
+
     def test_delete_preview_keeps_a_guest_session_shared_worktree(
         self,
         runner: CliRunner,

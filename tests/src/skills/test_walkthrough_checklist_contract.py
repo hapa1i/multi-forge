@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
+import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -172,6 +175,52 @@ def test_default_path_is_direct_managed_and_provider_neutral() -> None:
     assert all(not block["runnable"] for block in steps["6.1"]["code_blocks"])
     assert "OPENROUTER_API_KEY" not in CHECKLIST.read_text()
     assert "forge claude start --proxy" not in CHECKLIST.read_text()
+
+
+def test_registry_summary_handles_the_current_keyed_installation_schema(
+    tmp_path: Path,
+) -> None:
+    """Step 3.3 must summarize installation rows, not iterate their string keys."""
+    forge_home = tmp_path / "forge-home"
+    forge_home.mkdir()
+    (forge_home / "installed.json").write_text(
+        json.dumps(
+            {
+                "version": 3,
+                "installations": {
+                    "user": {"scope": "user", "unrelated": "do-not-print"},
+                    "local:/sandbox": {"scope": "local", "root": "/sandbox"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    step = next(step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"] if step["id"] == "3.3")
+    command = next(block["code"] for block in step["code_blocks"] if block["runnable"])
+    prefix = 'bash "$SCRIPTS/run-in-repo.sh" python3 -c \'\n'
+    assert command.startswith(prefix) and command.endswith("\n'")
+    script = command[len(prefix) : -2]
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FORGE_HOME": str(forge_home)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"rows": 2, "scopes": ["local", "user"]}
+    assert "do-not-print" not in result.stdout
+
+
+def test_continuation_delete_targets_claudes_native_transcript_store() -> None:
+    """The sandbox install home must not redirect cleanup away from native transcripts."""
+    step = next(step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"] if step["id"] == "11.4")
+    command = "\n".join(block["code"] for block in step["code_blocks"] if block["runnable"])
+
+    assert 'CLAUDE_HOME="$FORGE_WALKTHROUGH_CLAUDE_CONFIG_DIR"' in command
+    assert "session delete walkthrough-continuation --yes --force" in command
 
 
 def test_optional_codex_uses_initial_message_without_fake_readiness() -> None:

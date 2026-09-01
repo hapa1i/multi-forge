@@ -70,7 +70,19 @@ cleanup_runtime() {
         walkthrough-incognito \
         walkthrough-demo; do
         if session_is_listed "$session_name"; then
-            forge session delete "$session_name" --yes --force
+            case "$session_name" in
+                walkthrough-demo|walkthrough-continuation)
+                    # Claude Code writes native transcripts under its own
+                    # CLAUDE_CONFIG_DIR, while Forge-owned settings remain in
+                    # the sandbox CLAUDE_HOME. Point deletion at the native
+                    # store only for these two fixed, walkthrough-created ids.
+                    CLAUDE_HOME="$FORGE_WALKTHROUGH_CLAUDE_CONFIG_DIR" \
+                        forge session delete "$session_name" --yes --force
+                    ;;
+                *)
+                    forge session delete "$session_name" --yes --force
+                    ;;
+            esac
         else
             local lookup_status=$?
             if [ "$lookup_status" -ne 1 ]; then

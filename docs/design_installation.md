@@ -752,10 +752,10 @@ ownership lives in `resources/journey-map.md`; it does not reuse QA's `evidence:
 
 ### D.2 Wrapper abstraction
 
-| Skill          | Wrapper                        | Isolation                               |
-| -------------- | ------------------------------ | --------------------------------------- |
-| `/walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
-| `/qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount  |
+| Skill          | Wrapper                        | Isolation                                      |
+| -------------- | ------------------------------ | ---------------------------------------------- |
+| `/walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 gates + Claude settings shim |
+| `/qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount         |
 
 **Walkthrough interaction model:** Session A prompts the user to open one sandboxed Terminal early. The managed Claude
 child runs from that Terminal, so the user does not need a separate pre-opened Session B window. Sidecar selection may
@@ -774,8 +774,13 @@ it never imports native Codex auth implicitly or requires hook enrollment. `--si
 through a packaged proxy template and requires its provider auth. Optional unavailability or failure is compatibility
 evidence and does not change the default verdict. `--from <id>` resumes only after checklist-prefix and option-identity
 validation. `--report` preserves state, logs, metrics, transcript claim, and package provenance outside cleanup scope.
-Hermetic isolation comes from `setup-test-repo.sh` (Forge/Claude/Codex home redirection, a path denylist, and six
-numbered gates in `run-in-repo.sh`).
+Hermetic extension isolation comes from `setup-test-repo.sh` (Forge/Claude/Codex home redirection, a path denylist, and
+six numbered gates in `run-in-repo.sh`). `CLAUDE_HOME` is Forge's user-install override; Claude Code itself selects its
+native auth and transcript store through `CLAUDE_CONFIG_DIR` (default `~/.claude`). The generated `claude` shim pins the
+native executable, excludes the real user settings source, and adds the sandboxed `$CLAUDE_HOME/settings.json` through
+Claude's explicit `--settings` surface. This keeps existing native authentication available without borrowing real Forge
+hooks. Deleting the two host-Claude walkthrough sessions temporarily points Forge's transcript cleanup at the captured
+native config root; Forge artifact snapshots remain governed by normal artifact retention and final sandbox cleanup.
 
 **Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
 (`resources/checklist.md` + `resources/checklist/*.md`). `start-container.sh` builds or consumes one wheel, installs it

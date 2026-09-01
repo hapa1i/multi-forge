@@ -59,14 +59,16 @@ printf "sandbox=%s\\n" "$PWD"
 
 ```bash
 test -x "$SCRIPTS/run-in-repo.sh"
+test -x "$SCRIPTS/claude-wrapper.sh"
 test -x "$SCRIPTS/walkthrough-state.py"
 test -x "$SCRIPTS/protected-paths.py"
 test -x "$SCRIPTS/package-identity.py"
 test -x "$SCRIPTS/walkthrough-report.py"
 test -x "$SCRIPTS/cleanup-owned.sh"
+bash "$SCRIPTS/run-in-repo.sh" claude --version
 ```
 
-- [ ] The sandbox wrapper is executable
+- [ ] The sandbox wrapper and native-Claude settings shim are executable
 - [ ] The state engine is executable
 - [ ] The protected-path, package-identity, report, and cleanup helpers are executable
 
@@ -187,8 +189,14 @@ import json
 import os
 from pathlib import Path
 data = json.loads((Path(os.environ["FORGE_HOME"]) / "installed.json").read_text())
-rows = data.get("installations", data if isinstance(data, list) else [])
-print(json.dumps({"rows": len(rows), "scopes": sorted({row.get("scope") for row in rows})}))
+installations = data.get("installations")
+if not isinstance(installations, dict) or any(not isinstance(row, dict) for row in installations.values()):
+    raise SystemExit("unexpected installation registry shape")
+rows = list(installations.values())
+scopes = [row.get("scope") for row in rows]
+if any(not isinstance(scope, str) for scope in scopes):
+    raise SystemExit("installation registry row has no scope")
+print(json.dumps({"rows": len(rows), "scopes": sorted(set(scopes))}))
 '
 ```
 
@@ -530,7 +538,8 @@ bash "$SCRIPTS/run-in-repo.sh" forge session show walkthrough-continuation --jso
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge session delete walkthrough-continuation --yes --force
+bash "$SCRIPTS/run-in-repo.sh" bash -c \
+  'CLAUDE_HOME="$FORGE_WALKTHROUGH_CLAUDE_CONFIG_DIR" forge session delete walkthrough-continuation --yes --force'
 ```
 
 - [ ] The continuation session is removed

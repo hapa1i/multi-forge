@@ -37,7 +37,7 @@ def test_runtime_cleanup_is_repeatable_and_preserves_foreign_resources(
     fake = fake_bin / "forge"
     fake.write_text("""#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\\n' "$*" >> "$WALKTHROUGH_FAKE_LOG"
+printf '%s\\t%s\\n' "${CLAUDE_HOME:-}" "$*" >> "$WALKTHROUGH_FAKE_LOG"
 if [[ "$1 $2" == "session list" ]]; then
   printf '%s\\n' '[{"name":"walkthrough-demo"},{"name":"foreign-session"}]'
 elif [[ "$1 $2" == "session delete" ]]; then
@@ -91,6 +91,7 @@ fi
     assert first.returncode == second.returncode == 0
     calls = log.read_text()
     assert "session delete walkthrough-demo --yes --force" in calls
+    assert f"{home / '.claude'}\tsession delete walkthrough-demo --yes --force" in calls
     assert "session delete foreign-session" not in calls
     assert "proxy delete walkthrough-sidecar-proxy --yes" in calls
     assert "proxy delete foreign-proxy" not in calls

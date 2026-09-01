@@ -77,7 +77,12 @@ from forge.session.plan_resolution import (  # noqa: E402
     is_flag=True,
     help="Override dirty-worktree, corruption, and active-session guards",
 )
-@click.option("--keep-transcripts", "-k", is_flag=True, help="Keep transcript files")
+@click.option(
+    "--keep-transcripts",
+    "-k",
+    is_flag=True,
+    help="Keep native Claude transcripts (Forge artifact snapshots are always preserved)",
+)
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option("--delete-branch", "-d", is_flag=True, help="Also delete git branch")
 def delete(
@@ -421,10 +426,12 @@ def _delete_single_session(
             else:
                 console.print(f"  [dim]Branch will be kept: {manifest.worktree.branch}[/dim]")
 
-        if not keep_transcripts:
-            console.print("  [dim]Transcript files will also be deleted[/dim]")
-        else:
-            console.print("  [dim]Transcript files will be kept[/dim]")
+        if session_runtime(manifest) == "claude_code":
+            if not keep_transcripts:
+                console.print("  [dim]Native Claude transcript files will be deleted[/dim]")
+            else:
+                console.print("  [dim]Native Claude transcript files will be kept[/dim]")
+        console.print("  [dim]Forge artifact snapshots will be kept[/dim]")
 
         console.print()
     except ForgeSessionError:

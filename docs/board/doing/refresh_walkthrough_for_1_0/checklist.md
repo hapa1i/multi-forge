@@ -10,13 +10,15 @@
 
 ## Current Focus
 
-Implementation and automated verification are complete on the execution branch. The packaged checklist now parses to 14
-sections, 43 steps, and 145 assertions. Its default selection has seven human checkpoints and two paid operations; the
-optional Codex and sidecar chapters remain outside that budget and outside the default verdict.
+The first complete default run exercised all 43 steps and found one keyed-registry checklist bug. Its otherwise healthy
+managed lifecycle also exposed a deeper isolation flaw: Claude Code ignored Forge's sandbox-only `CLAUDE_HOME`, so the
+child borrowed hooks from the maintainer's real user settings and left native transcripts outside Forge's cleanup path.
+The corrected checklist, launcher boundary, cleanup targeting, and delete preview now pass the full automated and
+clean-wheel verification sweep.
 
-The remaining work is release-candidate evidence and review: install/sync the exact candidate wheel, restart Claude, run
-`--setup-only`, complete one default report, exercise interruption/resume, and review the saved evidence with the
-maintainer. Keep the card in `doing/` until those live checks pass and the closeout is approved.
+Install/sync the exact amended candidate wheel, rerun `--setup-only` and the complete default report, exercise
+interruption/resume, and review the saved evidence with the maintainer. Keep the card in `doing/` until those live
+checks pass and the closeout is approved.
 
 ## Execution Guardrails
 
@@ -28,9 +30,11 @@ maintainer. Keep the card in `doing/` until those live checks pass and the close
   or Forge CLI command run by Session A goes through packaged `run-in-repo.sh`. Commands shown to a user in the
   already-sandboxed Terminal may use bare `forge` only after that shell verifies the walkthrough marker and its isolated
   home variables; other direct host commands remain read-only.
-- Preserve real `HOME` for installed-tool and Claude-auth reachability while isolating `FORGE_HOME`, `CLAUDE_HOME`, and
-  `CODEX_HOME`. An explicit `--codex-auth <path>` may copy only that regular file into the sandboxed Codex home; never
-  print credential values, read a native Codex store implicitly, or copy auth material into reports.
+- Preserve real `HOME` and Claude's native config root for installed-tool, auth, and transcript reachability while
+  isolating `FORGE_HOME`, Forge's `CLAUDE_HOME`, and `CODEX_HOME`. Managed Claude launches must exclude the real user
+  settings source and load sandbox hooks explicitly; cleanup may target only the fixed walkthrough transcripts in the
+  captured native store. An explicit `--codex-auth <path>` may copy only that regular file into the sandboxed Codex
+  home; never print credential values, read a native Codex store implicitly, or copy auth material into reports.
 - Keep sections 0-13 and cleanup section 13 stable. Retain an existing step id when its teaching outcome remains; retire
   rather than reuse an id for a different assertion, and append new ids within the relevant section.
 - Keep the two self-contained `walkthrough-state.py` copies unchanged unless their shared parser/state behavior truly
@@ -301,14 +305,15 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 
 ### Automated Verification -- 2026-09-01
 
-- `make test-unit` passed with 10,020 tests and 117 deselected; `make test-regression` passed all 1,095 tests. The first
-  unit run exposed one stale path left by the completed QA card: its baseline-inventory contract still named `doing/`
-  after promotion to `done/`. The owner path is corrected and the complete unit suite passed on the final head.
-- The targeted integration sweep passed 36 tests: 21 managed lifecycle, routing, hook, search, transfer, and activity
-  owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel walkthrough package
-  owner. The Codex test completed two real turns and the sidecar tests required no provider completion.
-- `make build`, `./scripts/test-wheel-runtime.sh`, and `make pre-commit` passed. The final locally built wheel SHA-256
-  is `5d5f39d720f988643302d4890b274ed9c1eb32f1bbb45e533d04628eda3f0a1e`.
+- The focused walkthrough contract, state, content, sandbox, cleanup, and CLI slice passed 402 tests. `make test-unit`
+  passed with 10,024 tests and 117 deselected; `make test-regression` passed all 1,096 tests, including the generated
+  Claude-launcher isolation regression.
+- The amended-head targeted integration sweep passed 36 tests: 21 managed lifecycle, routing, hook, search, transfer,
+  and activity owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel
+  walkthrough package owner. The Codex test completed two real turns and the sidecar tests required no provider
+  completion.
+- `make build`, `./scripts/test-wheel-runtime.sh`, `make pre-commit`, and `git diff --check` passed. The amended locally
+  built wheel SHA-256 is `bdd1c195d21bb80763ec82c71f69a6739b00ecbf435a9d0f8be9ef309443185c`.
 - The exact-wheel owner installs outside the checkout, binds the answering distribution to the installed package tree,
   runs setup/index/report/cleanup twice, verifies protected-path preservation, and confirms `python -I` cannot import
   the checkout. This automated proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
@@ -327,6 +332,26 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   correctly refused because Codex packages have no local scope, but its recovery tip named only the separate user-scope
   install and could not repair the local row. The tip now names runtime-scoped local disable before sync, while
   retaining the user-scope Codex command as an optional second action.
+
+### First Complete Default Attempt -- 2026-09-01
+
+- The installed-package identity gates passed with payload digest
+  `30c3101a1daaf777007f6de090c9415f779f5e79ab2c73e2b4867db6d42b8ee1`. The run completed all 43 steps with 123 pass, one
+  fail, and 21 correctly unselected optional assertions; it observed exactly seven human checkpoints and two paid
+  operations. Evidence is under `~/.forge/manual-testing/walkthrough/runs/20260901T211149Z/`.
+- Step 3.3 failed because its Python block iterated keyed installation ids as if they were row objects. The corrected
+  block validates the schema, summarizes `installations.values()`, and has an executable keyed-registry regression.
+- The run's hook evidence came from the maintainer's pre-existing real Claude user settings: Claude Code uses
+  `CLAUDE_CONFIG_DIR`, not Forge's sandbox-only `CLAUDE_HOME`. The generated launcher now pins the native binary,
+  excludes the real user setting source, and supplies sandbox hooks through `--settings`; regression and exact-wheel
+  probes pin this boundary. Native transcript cleanup uses the captured config root for only the fixed parent/child.
+- The delete preview now distinguishes native Claude transcripts from retained Forge artifact snapshots. Artifact-tree
+  survival after ordinary session deletion is intentional and final walkthrough cleanup owns it; the
+  `compatibility-fallback` label is the designed schema for non-curated transfer strategies; and an empty shared
+  `.claude/skills/` root is outside package-leaf ownership. Those three observations require no product behavior change.
+- The 5,909-second duration was checkpoint wait time and is accepted as review-only evidence, not a correctness failure.
+  This attempt cannot satisfy final acceptance because of its assertion failure and real-settings dependency; the
+  amended exact wheel needs a fresh complete run.
 
 ## Acceptance Tests
 

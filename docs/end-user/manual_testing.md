@@ -64,6 +64,11 @@ through the packaged `run-in-repo.sh` safety wrapper. Walkthrough Forge state is
 Claude settings/asset and Codex skill paths are compared before and after by type, mode, and content/tree digest without
 copying their contents.
 
+The sandbox keeps Forge-installed Claude hooks and skills separate from your real user settings. A generated launcher
+shim loads those sandbox settings explicitly while retaining your existing native Claude authentication and transcript
+store. Cleanup deletes the walkthrough's two native Claude transcripts and its sandbox artifact copies; it does not load
+or modify unrelated real user settings.
+
 `--from <section-or-step>` resumes only when the preserved checklist prefix and the selected options still match. A
 version mismatch, changed or unverified prefix, or orphaned record refuses without changing the state and directs you to
 `--reset`. `--report` saves package provenance, selected options, state, step and Forge logs, metrics, and a transcript

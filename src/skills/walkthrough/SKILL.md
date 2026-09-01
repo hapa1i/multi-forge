@@ -367,3 +367,8 @@ the session, transfer, model-selection, memory, and manual-testing guides for de
 6. `.forge/walkthrough/` and `CLAUDE.md` establish the generated repository.
 
 Any gate failure stops the run. Never weaken or bypass a gate to finish a walkthrough.
+
+The sandbox also puts its generated `claude` shim first on `PATH`. The shim invokes the native Claude binary recorded at
+setup, excludes the real user settings source, and loads `$CLAUDE_HOME/settings.json` explicitly. Native Claude auth and
+transcript storage remain in the captured `CLAUDE_CONFIG_DIR` (normally `~/.claude`); cleanup redirects Forge's
+native-transcript deletion there only for the fixed walkthrough parent and continuation.

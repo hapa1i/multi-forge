@@ -705,6 +705,12 @@ eight/three). Each step has exactly one `auto`, `human:guided`, or `human:confir
 either runtime. `requires:` and `paid-operations:` remain modifiers. QA's `evidence:` lanes do not apply: map every
 walkthrough step to one automated or human owner in `resources/journey-map.md`.
 
+Forge's isolated `CLAUDE_HOME` owns the walkthrough's user hooks and skills; native Claude Code still selects auth and
+transcript storage through `CLAUDE_CONFIG_DIR` (normally `~/.claude`). The generated PATH shim must invoke the captured
+native binary with `--setting-sources project,local` plus sandbox user settings through `--settings`. Regression tests
+pin those arguments so a walkthrough cannot pass merely because real user settings already contain Forge hooks.
+Transcript cleanup points at the captured native store only for the two fixed host-Claude walkthrough sessions.
+
 Score the default and optional chapters separately. A missing Codex, Docker daemon, sidecar image, or optional provider
 credential is compatibility evidence, not a default-journey failure. A selected optional chapter still records its own
 pass/fail/unavailable status, checkpoint ceiling, paid-operation ceiling, prerequisites, and cleanup owner.

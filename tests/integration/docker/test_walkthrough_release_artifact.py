@@ -45,6 +45,7 @@ def test_walkthrough_setup_report_and_cleanup_resolve_from_one_wheel(
         "SKILL.md",
         "resources/checklist.md",
         "resources/journey-map.md",
+        "scripts/claude-wrapper.sh",
         "scripts/cleanup-owned.sh",
         "scripts/package-identity.py",
         "scripts/protected-paths.py",
@@ -81,6 +82,7 @@ for path in \
   SKILL.md \
   resources/checklist.md \
   resources/journey-map.md \
+  scripts/claude-wrapper.sh \
   scripts/cleanup-owned.sh \
   scripts/package-identity.py \
   scripts/protected-paths.py \
@@ -94,6 +96,7 @@ python3 "$skill/scripts/package-identity.py" --skill-root "$skill" >/tmp/package
 export FORGE_TEST_REPO=/tmp/walkthrough-sandbox
 bash "$skill/scripts/setup-test-repo.sh"
 bash "$skill/scripts/run-in-repo.sh" true
+bash "$skill/scripts/run-in-repo.sh" claude --version >/tmp/walkthrough-claude-version.log
 bash "$skill/scripts/run-in-repo.sh" python3 "$skill/scripts/protected-paths.py" capture .forge/walkthrough/real-system.json
 state="$FORGE_TEST_REPO/.forge/walkthrough/progress.json"
 python3 "$skill/scripts/walkthrough-state.py" "$skill/resources/checklist.md" init "$state"
