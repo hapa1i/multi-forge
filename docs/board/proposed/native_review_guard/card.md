@@ -22,9 +22,9 @@ policy:
 
 Semantics:
 
-- `block`: deny native review before expensive behavior starts; the deny message points at `/forge:review`. **The
-  shipped v1 default per epic D3.** It is the only cheap mode with a hard guarantee: the deny contract instructs the
-  model to explain the conflict and ask how to proceed, so the refusal becomes a user decision point before spend.
+- `block`: deny native review before expensive behavior starts; the deny message points at `/review`. **The shipped v1
+  default per epic D3.** It is the only cheap mode with a hard guarantee: the deny contract instructs the model to
+  explain the conflict and ask how to proceed, so the refusal becomes a user decision point before spend.
 - `warn`: allow, but emit a preflight estimate (agent-count range, diff size, context floor) at the Skill boundary
   before fan-out. **v2, and never the default.** Warn output is model-facing stderr, so it neither stops spend nor
   reaches the user at the consent moment the incident identified; that makes it observability-grade rather than
@@ -74,7 +74,7 @@ cannot separate review-owned agents from unrelated Agent work, native caps do no
 it remains a reported estimate. Stop and TTL cleanup prevent abandoned reservations from poisoning later sessions.
 `block` denies the Skill before fan-out, while `warn` and `allow` do not enforce caps. In `budget-required` mode,
 missing parent-operation correlation is a capability failure: deny the native review at the Skill boundary with an
-actionable `/forge:review` fallback instead of accepting a budget Forge cannot enforce.
+actionable `/review` fallback instead of accepting a budget Forge cannot enforce.
 
 ## Acceptance Criteria
 
@@ -83,15 +83,15 @@ Split by probe status (epic "Decisions owed"):
 Provable now (assistant-initiated path):
 
 - With `mode: block`, an assistant-initiated native review (Skill-tool invocation) is denied before broad reads or
-  subagent fan-out; the deny message names `/forge:review` and carries the guard's intent.
+  subagent fan-out; the deny message names `/review` and carries the guard's intent.
 - (**v2**) With `mode: warn`, the review proceeds and a preflight estimate is visibly emitted before fan-out.
 - (**v2**, with Seam 5) With `mode: budget-required`, no envelope means denial before fan-out. With an envelope and
   proven parent-operation correlation, launches beyond its total-agent cap are denied; parallel-agent denial
   additionally requires reliable active-slot release. Without parent-operation correlation, the Skill is denied with an
-  enforceability explanation and `/forge:review` fallback.
+  enforceability explanation and `/review` fallback.
 - With `mode: allow`, no estimate or agent-budget enforcement changes native behavior.
 - A session opt-out override suppresses the guard for that session only and is auditable.
-- `/forge:review` is unaffected in every mode and still starts with its current preflight summary.
+- `/review` is unaffected in every mode and still starts with its current preflight summary.
 
 Conditional on the Phase 0 probe (user-typed path):
 

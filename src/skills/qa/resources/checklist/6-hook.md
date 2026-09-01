@@ -50,6 +50,8 @@ jq -e '(.installations.user.skill_packages | length == 11)
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 cd $FORGE_TEST_REPO
 
@@ -85,6 +87,8 @@ echo '{"prompt": "%help"}' | FORGE_SESSION=test-session-1 forge hook user-prompt
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 cd $FORGE_TEST_REPO
 
@@ -103,6 +107,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.confirmed.transcrip
 ### 6.5 Smoke Test plan-write Hook (Plan Path Recorded)
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -125,6 +131,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.confirmed.latest_pl
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 cd $FORGE_TEST_REPO
 
@@ -142,6 +150,8 @@ ls -la .forge/artifacts/test-session-1/plans/ | head -50
 ### 6.7 Smoke Test Stop Hook (Transcript Copy + Queue Markers)
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -166,6 +176,8 @@ test -f ".forge/artifacts/test-session-1/transcripts/${SESSION_ID}.jsonl"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # pre-compact captures transcript before compaction (always exit 0)
 jq -nc --arg cwd "$FORGE_TEST_REPO" \
@@ -180,6 +192,8 @@ echo "exit=$?"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Default session has policy disabled, so this should allow (exit 0)
 echo '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"src/example.py","content":"x"}}' | FORGE_SESSION=test-session-1 forge hook policy-check
@@ -188,54 +202,42 @@ echo "exit=$?"
 
 - [ ] Exit code is 0 (allowed)
 
-### 6.10 End-to-End Stop Hook (Real Session Exit)
+### 6.10 End-to-End Stop Hook (Paid Conversation Reuse)
 
-<!-- prereq: 4.2 -->
+<!-- prereq: 4.2, 5.6 -->
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-Start a real Claude session via Forge, perform a small action, then exit. Verify that hooks actually fired and wrote to
-the session manifest and artifacts — this catches "hooks wired but not firing" regressions that manual `forge hook ...`
-invocations (steps 6.3–6.9) cannot detect.
-
-In the **container shell**, clean up and start a session:
-
-```
-forge session delete hook-e2e-test --yes --force 2>/dev/null || true
-forge session start hook-e2e-test --proxy "$FORGE_QA_OPENAI_PROXY"
-```
-
-Inside the launched Claude session, do a small action (e.g., "write hello to /tmp/test.txt" or "read the repository
-README and tell me the title"), then exit Claude (Ctrl+C or `/exit`).
-
-After Claude exits, run these exact checks in the **container shell**:
+Reuse the parent conversation from 5.6, which already paid for one real turn and exited through the installed-wheel
+launcher. Anthropic's `Stop` event is a turn boundary, so an empty launch-and-exit is not a valid transcript-capture
+fixture. This step adds no model completion.
 
 ```bash
-MANIFEST=".forge/sessions/hook-e2e-test/forge.session.json"
+set -euo pipefail
 
-# Confirmed fields written by Stop hook
+MANIFEST=".forge/sessions/test-session-parent/forge.session.json"
+SESSION_ID=$(jq -r '.confirmed.claude_session_id // empty' "$MANIFEST")
+SESSION_ID_PREFIX=${SESSION_ID:0:12}
+TRANSCRIPT_PATH=$(jq -r '.confirmed.transcript_path // empty' "$MANIFEST")
+
 jq '.confirmed | {claude_session_id, transcript_path, confirmed_by, confirmed_at}' "$MANIFEST"
-
-# Programmatic manifest assertions
-jq -e '.confirmed.transcript_path | strings | length > 0' "$MANIFEST"
 jq -e '.confirmed.claude_session_id | strings | length > 0' "$MANIFEST"
+jq -e '.confirmed.transcript_path | strings | length > 0' "$MANIFEST"
 jq -e '.confirmed.confirmed_by == "hook:stop"' "$MANIFEST"
-
-# Transcript artifact copied
-test -d .forge/artifacts/hook-e2e-test/transcripts
-find .forge/artifacts/hook-e2e-test/transcripts -type f -name '*.jsonl' -print -quit | grep -q .
-
-# Stop hook log exists
-ls ~/.forge/logs/hooks/stop.*.log | tail -1
+test -s "$TRANSCRIPT_PATH"
+test -s ".forge/artifacts/test-session-parent/transcripts/${SESSION_ID}.jsonl"
+STOP_LOG=$(rg -F -l "stop: session_id=$SESSION_ID_PREFIX" ~/.forge/logs/hooks/stop.*.log 2>/dev/null | tail -1 || true)
+test -n "$STOP_LOG" || { echo "ERROR: no matching Stop-hook log" >&2; exit 1; }
+printf '%s\n' "$STOP_LOG"
 ```
 
-- [ ] Claude session starts and runs with hooks active
-- [ ] After exit, `confirmed.transcript_path` is set in session manifest
-- [ ] After exit, `confirmed.claude_session_id` is set (reconciled from actual session)
-- [ ] Transcript artifact copied to `.forge/artifacts/hook-e2e-test/transcripts/`
-- [ ] Stop hook ran automatically (check `confirmed_by` = "hook:stop")
+- [ ] The paid parent from 5.6 has a real confirmed Claude session id
+- [ ] Its confirmed transcript path exists and is non-empty
+- [ ] `confirmed_by` is `hook:stop`
+- [ ] The transcript snapshot exists under `.forge/artifacts/test-session-parent/transcripts/`
+- [ ] A matching Stop-hook debug log exists
 
 ### 6.11 WorktreeCreate Hook (Claude-Native Worktree)
 
@@ -244,6 +246,8 @@ ls ~/.forge/logs/hooks/stop.*.log | tail -1
 <!-- requires: api_key -->
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 Verify that Claude Code's native worktree creation (via `--worktree` or the Agent tool with `isolation: "worktree"`)
 triggers Forge's WorktreeCreate hook, which creates the worktree and auto-installs extensions.
@@ -282,5 +286,40 @@ git worktree list | grep wt-hook-test && echo "FAIL: worktree not removed" || ec
 - [ ] Forge extensions installed in the worktree (hooks in settings.local.json)
 - [ ] Status line visible in the worktree session
 - [ ] Worktree cleaned up after session delete
+
+### 6.12 Codex Hook Registration and Static Readiness
+
+<!-- requires: codex -->
+
+<!-- auto -->
+
+Inspect registration and static readiness without consuming the one-turn enrollment probe. Positive enrolled hook firing
+is release evidence from the automated real-runtime owners, not an either/or manual assertion.
+
+```bash
+forge extension enable --scope user --profile minimal \
+  --with hooks --without commands --runtime codex --force
+forge codex status --scope user --json | tee /tmp/qa-codex-status.json
+forge runtime preflight codex --json | tee /tmp/qa-codex-preflight.json
+
+jq -e '
+  .runtime.id == "codex"
+  and .runtime.installed == true
+  and (.scopes | length) == 1
+  and .scopes[0].scope == "user"
+  and .scopes[0].registered == "yes"
+  and any(.scopes[0].registered_pairs[]; contains("codex-session-start"))
+  and any(.scopes[0].registered_pairs[]; contains("codex-policy-check"))
+' /tmp/qa-codex-status.json
+jq -e '
+  .ready == true
+  and (.version | type == "string" and length > 0)
+' /tmp/qa-codex-preflight.json
+rm -f /tmp/qa-codex-status.json /tmp/qa-codex-preflight.json
+```
+
+- [ ] Installed-wheel enable registers both Forge Codex hooks at user scope without duplicating project skills
+- [ ] Static preflight is ready and records the observed Codex version
+- [ ] No empirical enrollment turn is counted or mistaken for positive hook-firing evidence
 
 ---

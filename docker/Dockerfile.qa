@@ -1,0 +1,50 @@
+# Install one validated Multi-Forge wheel over the shared Claude/Codex runtime image.
+#
+# The harness stages only FORGE_WHEEL_NAME in a temporary build context. The
+# base image may contain an editable checkout for integration fixtures, but the
+# release-QA executable and imports come only from /opt/forge-qa.
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ARG FORGE_WHEEL_NAME
+ARG FORGE_WHEEL_SHA256
+ARG FORGE_VERSION
+ARG FORGE_REV=unknown
+ARG RUNTIME_TRACK
+ARG CLAUDE_VERSION
+ARG CODEX_VERSION
+
+COPY ${FORGE_WHEEL_NAME} /tmp/forge-wheel/${FORGE_WHEEL_NAME}
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends jq lsof \
+    && rm -rf /var/lib/apt/lists/* \
+    && printf '%s  %s\n' "${FORGE_WHEEL_SHA256}" "/tmp/forge-wheel/${FORGE_WHEEL_NAME}" \
+        | sha256sum --check --strict - \
+    && uv venv /opt/forge-qa \
+    && uv pip install --python /opt/forge-qa/bin/python "/tmp/forge-wheel/${FORGE_WHEEL_NAME}" \
+    && ln -s /opt/forge-qa/bin/forge /usr/local/bin/forge \
+    && mkdir -p /workspace \
+    && cd /workspace \
+    && FORGE_EXPECTED_VERSION="${FORGE_VERSION}" /opt/forge-qa/bin/python -I -c \
+        'import importlib.metadata as m; import importlib.resources as r; import os; import pathlib; import forge; from forge.install.installer import get_extensions_root; expected=os.environ["FORGE_EXPECTED_VERSION"]; assert m.version("multi-forge") == expected; assert forge.__version__ == expected; assert pathlib.Path(forge.__file__).is_relative_to("/opt/forge-qa"); root=pathlib.Path(str(r.files("forge"))); assert root.is_relative_to("/opt/forge-qa"); extensions=get_extensions_root(); assert extensions.is_relative_to("/opt/forge-qa"); qa=extensions / "skills" / "qa"; expected_files=("SKILL.md", "resources/checklist.md", "resources/coverage-map.md", "resources/execution-budget.json", "resources/report-template.md", "resources/runtime-matrix.json", "scripts/qa-artifact.py", "scripts/qa-run-metrics.py", "scripts/qa-selection.py", "scripts/start-container.sh", "scripts/walkthrough-state.py"); assert all((qa / path).is_file() for path in expected_files); assert len(list((qa / "resources/checklist").glob("*.md"))) == 21' \
+    && rm -rf /tmp/forge-wheel
+
+# The wheel remains isolated in /opt/forge-qa, while the lexical global path
+# gives the hook dispatcher a durable launcher that it may safely record.
+ENV PATH="/usr/local/bin:/opt/forge-qa/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+ENV PYTHONNOUSERSITE=1
+
+LABEL org.opencontainers.image.title="Forge Release QA Container"
+LABEL org.opencontainers.image.description="Pinned Claude/Codex runtime with one exact Multi-Forge wheel"
+LABEL org.opencontainers.image.revision=${FORGE_REV}
+LABEL io.multi-forge.qa.wheel-sha256=${FORGE_WHEEL_SHA256}
+LABEL io.multi-forge.qa.forge-version=${FORGE_VERSION}
+LABEL io.multi-forge.qa.runtime-track=${RUNTIME_TRACK}
+LABEL io.multi-forge.qa.claude-version=${CLAUDE_VERSION}
+LABEL io.multi-forge.qa.codex-version=${CODEX_VERSION}
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

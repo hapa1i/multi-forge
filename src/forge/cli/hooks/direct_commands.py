@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shlex
 from pathlib import Path
 from typing import Any
@@ -15,7 +14,8 @@ from forge.core.ops import policy as policy_ops
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
-from forge.policy.deterministic.base import tests_first_sort_key
+from forge.policy.diff import sort_tests_first as _sort_tests_first
+from forge.policy.diff import split_diff_per_file as _split_diff_per_file
 from forge.session import set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.hooks import resolve_session_store
@@ -1099,63 +1099,6 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
 
 # --- %policy check helpers ---
-
-# Primary split boundary: diff --git a/<path> b/<path>
-_DIFF_GIT_HEADER_RE = re.compile(r"^diff --git a/(.+?) b/(.+?)$", re.MULTILINE)
-# Fallback path extraction: +++ b/<path> (may be absent for binary files)
-_DIFF_PLUS_PATH_RE = re.compile(r"^\+\+\+ b/(.+?)(?:\t.*)?$", re.MULTILINE)
-
-
-def _split_diff_per_file(diff: str) -> list[tuple[str, str]]:
-    """Split a multi-file unified diff into (path, chunk) pairs.
-
-    Primary split is on ``diff --git`` boundaries (handles binary diffs).
-    Path extracted from ``diff --git a/... b/<path>``, with ``+++ b/<path>``
-    as fallback. Deleted files (target /dev/null) are skipped.
-    """
-    if not diff or not diff.strip():
-        return []
-
-    headers = list(_DIFF_GIT_HEADER_RE.finditer(diff))
-    if not headers:
-        return []
-
-    results: list[tuple[str, str]] = []
-    for i, match in enumerate(headers):
-        start = match.start()
-        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff)
-        chunk = diff[start:end]
-
-        # Primary: path from diff --git header (group 2 = b/ path)
-        path = match.group(2).strip()
-
-        # Fallback: if diff --git path looks odd, try +++ b/
-        if not path:
-            plus_match = _DIFF_PLUS_PATH_RE.search(chunk)
-            if plus_match:
-                path = plus_match.group(1).strip()
-
-        if not path:
-            continue
-
-        # Skip deleted files
-        if path == "/dev/null":
-            continue
-        if "\n+++ /dev/null" in chunk:
-            continue
-
-        results.append((path, chunk))
-
-    return results
-
-
-def _sort_tests_first(file_diffs: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Sort file diffs so tests paths come before src paths.
-
-    Optimistic ordering for TDD stateful evaluation: test files populate
-    ``_tests_touched`` before implementation files are checked.
-    """
-    return sorted(file_diffs, key=lambda item: tests_first_sort_key(item[0]))
 
 
 def _handle_policy_check(argv: list[str]) -> None:

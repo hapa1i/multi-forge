@@ -251,6 +251,23 @@ class TestIndexStoreListSessions:
         assert active_store.get_session("stale-other-root", forge_root=str(incompatible_root)) is not None
         assert pin.read_bytes() == pin_before
 
+    def test_peek_sessions_filters_stale_rows_without_pruning(self, store: IndexStore, index_path: Path) -> None:
+        live_root = index_path.parent.parent / "live-project"
+        stale_root = index_path.parent.parent / "stale-project"
+        live_root.mkdir()
+        stale_root.mkdir()
+        publish_session_from_fields(store, "visible", live_root, live_root, forge_root=live_root)
+        stale = create_session_state("stale", worktree_path=str(stale_root))
+        # Deliberately model row-first publication residue: previews must ignore it
+        # without taking ownership of the repair.
+        seed_row_only_session(store, stale, stale_root, forge_root=stale_root)
+        before = index_path.read_bytes()
+
+        sessions = store.peek_sessions()
+
+        assert [name for name, _entry in sessions] == ["visible"]
+        assert index_path.read_bytes() == before
+
     def test_list_sessions_sorted_by_last_accessed(self, store: IndexStore) -> None:
         """list_sessions() should sort by last_accessed_at DESC."""
         # Add sessions with different timestamps

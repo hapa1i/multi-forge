@@ -1,5 +1,10 @@
 # cross_runtime_skills -- run Forge skills under Codex (and other Agent-Skills runtimes), not just Claude Code
 
+> **Post-closeout correction (2026-08-31):** Decision 6's Claude namespace premise was wrong for Forge's direct
+> filesystem delivery. Standalone `.claude/skills/<name>` packages use `name: <name>` and `/<name>`; `/forge:<name>`
+> requires a real Claude plugin manifest. The v1.0.0 QA refresh corrected the compiler, packages, tests, and current
+> design/end-user documentation without changing the direct-installer decision.
+
 **Lane**: `done/` -- shipped through PR #107 on 2026-07-17 after implementation, verification, and human review.
 
 **Branch**: `cross-runtime-skills`, merged into `main` as `d2a94bf7`. Execution record: [`checklist.md`](checklist.md).

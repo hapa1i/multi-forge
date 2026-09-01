@@ -99,7 +99,14 @@ def get_session_model_history_report(
 
 def _route_intent(state: SessionState) -> dict[str, Any]:
     runtime = session_runtime(state)
-    requested = state.intent.launch.direct_model if state.intent.launch is not None else None
+    launch = state.intent.launch
+    requested = None
+    if launch is not None:
+        requested = (
+            launch.model_route.requested_model
+            if launch.model_route is not None
+            else normalize_model_reference(launch.direct_model)
+        )
     if runtime == "codex":
         return {
             "kind": "runtime_native",
@@ -115,7 +122,7 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
             "template": None,
             "proxy_id": None,
             "custom_route_fingerprint": None,
-            "requested_model": normalize_model_reference(requested),
+            "requested_model": requested,
         }
     if proxy.template:
         return {
@@ -123,14 +130,14 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
             "template": proxy.template,
             "proxy_id": None,
             "custom_route_fingerprint": None,
-            "requested_model": normalize_model_reference(requested),
+            "requested_model": requested,
         }
     return {
         "kind": "custom",
         "template": None,
         "proxy_id": None,
         "custom_route_fingerprint": custom_route_fingerprint(proxy.base_url),
-        "requested_model": normalize_model_reference(requested),
+        "requested_model": requested,
     }
 
 

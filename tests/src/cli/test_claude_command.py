@@ -10,9 +10,22 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.proxy.proxies import ProxyEntry
+from forge.session.claude import ClaudeBinaryNotFoundError
 
 # Mock target: invoke_claude is imported inside start_cmd
 _INVOKE = "forge.session.claude.invoke.invoke_claude"
+
+
+def test_start_missing_claude_is_actionable(runner: CliRunner, temp_env: Path) -> None:
+    with patch(
+        _INVOKE,
+        side_effect=ClaudeBinaryNotFoundError("Claude Code CLI not found on PATH. Install Claude Code."),
+    ):
+        result = runner.invoke(main, ["claude", "start", "--no-proxy"])
+
+    assert result.exit_code == 1
+    assert "Claude Code CLI not found on PATH" in result.output
+    assert "Traceback" not in result.output
 
 
 def _write_proxy_registry(

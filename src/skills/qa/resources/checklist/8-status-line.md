@@ -4,7 +4,7 @@
 
 ### 8.1 Direct Invocation
 
-<!-- human:confirm -->
+<!-- auto -->
 
 This is a rendered status-line smoke test. It does not call Claude or an LLM; it feeds a synthetic Claude Code
 `statusLine` JSON payload into `forge status-line` and asks you to review the terminal-facing output.
@@ -71,7 +71,7 @@ echo "$STATUS_INPUT" \
 
 ### 8.2 Verify Display Elements
 
-<!-- human:confirm -->
+<!-- auto -->
 
 The status line uses a category-based layout with 5 categories: Where, Who, What, Metrics, State. This step
 intentionally pipes the output through `cat -v`, so the output will look ugly on purpose:
@@ -134,7 +134,7 @@ echo "$STATUS_INPUT" \
 
 ### 8.3 Breadcrumb Display (for resumed sessions)
 
-<!-- human:confirm -->
+<!-- auto -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -198,8 +198,8 @@ echo "$SUBSET" | FORGE_SESSION=test-session-1 ANTHROPIC_BASE_URL="$BASE_URL" for
 
 # Billing-aware cost (DIRECT mode — no proxy, so cost_mode applies; under a proxy the cost is always ~$).
 forge config reset statusline
-# Weekly window resets ~2 days out so the ↻ reset marker is exercised.
-RESET_AT=$(( $(date +%s) + 172800 ))
+# Set just under three days so elapsed execution time still renders a stable `2d` floor.
+RESET_AT=$(( $(date +%s) + 259200 ))
 COSTY=$(jq -nc --arg cwd "$FORGE_TEST_REPO" --argjson reset "$RESET_AT" \
   '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"},
     context_window:{context_window_size:200000, used_percentage:6, current_usage:{input_tokens:8500}},
@@ -240,19 +240,43 @@ forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
 forge session start qa-forge-cost --no-launch >/dev/null
 forge session start qa-forge-cost-none --no-launch >/dev/null
 
-# Seed ledger events.
+# Seed current-schema ledger events after session creation.
 #   qa-forge-cost: $0.20 + $0.05 reported & non-interactive (counted) = $0.25; a $9.00 reported
 #     claude_interactive harness event (MUST be excluded); an unavailable row (adds nothing).
 #   qa-forge-cost-none: only a reported harness event + an unavailable row -> sum is None -> no segment.
-mkdir -p ~/.forge/usage/events
-cat > ~/.forge/usage/events/qa-forgecost_99999.jsonl <<'EOF'
-{"schema_version":1,"run_id":"qa-fc1","root_run_id":"qa-fc1","runtime":"claude_code","command":"memory-writer","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"reported","cost_micro_usd":200000,"ts":"2026-05-01T00:00:00Z"}
-{"schema_version":1,"run_id":"qa-fc2","root_run_id":"qa-fc2","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"core_llm","confidence":"reported","cost_micro_usd":50000,"ts":"2026-05-01T00:01:00Z"}
-{"schema_version":1,"run_id":"qa-fc3","root_run_id":"qa-fc3","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost","route":"claude_interactive","confidence":"reported","cost_micro_usd":9000000,"ts":"2026-05-01T00:02:00Z"}
-{"schema_version":1,"run_id":"qa-fc4","root_run_id":"qa-fc4","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:03:00Z"}
-{"schema_version":1,"run_id":"qa-fc5","root_run_id":"qa-fc5","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost-none","route":"claude_interactive","confidence":"reported","cost_micro_usd":7000000,"ts":"2026-05-01T00:04:00Z"}
-{"schema_version":1,"run_id":"qa-fc6","root_run_id":"qa-fc6","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost-none","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:05:00Z"}
-EOF
+/opt/forge-qa/bin/python - <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+
+from forge.core.usage.ledger import UsageEvent
+
+def event(run_id, command, session, route, confidence, cost=None):
+    return UsageEvent(
+        run_id=run_id,
+        root_run_id=run_id,
+        runtime="claude_code",
+        command=command,
+        status="success",
+        session=session,
+        route=route,
+        confidence=confidence,
+        cost_micro_usd=cost,
+    )
+
+events = (
+    event("qa-fc1", "memory-writer", "qa-forge-cost", "claude_p", "reported", 200000),
+    event("qa-fc2", "supervisor", "qa-forge-cost", "core_llm", "reported", 50000),
+    event("qa-fc3", "interactive", "qa-forge-cost", "claude_interactive", "reported", 9000000),
+    event("qa-fc4", "supervisor", "qa-forge-cost", "claude_p", "unavailable"),
+    event("qa-fc5", "interactive", "qa-forge-cost-none", "claude_interactive", "reported", 7000000),
+    event("qa-fc6", "supervisor", "qa-forge-cost-none", "claude_p", "unavailable"),
+)
+path = Path.home() / ".forge/usage/events/qa-forgecost_99999.jsonl"
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("".join(json.dumps(asdict(item), separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # Opt in to the forge_cost segment (off by default).
 forge config set statusline.segments=path,model,forge_cost
@@ -281,7 +305,7 @@ forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
 
 ### 8.6 Segment-lazy proxy/session sources
 
-<!-- human:guided -->
+<!-- auto -->
 
 A status line configured with only `path` and `branch` does not consume proxy or Forge-session facts. This packaged-CLI
 smoke supplies deliberately unavailable source addresses and confirms the selected fields still render alone. The

@@ -1,8 +1,9 @@
 <!-- prereq: 0.3, 2.13, 18.4 -->
 
-## 19. Complete Uninstallation (setup.sh --uninstall)
+## 19. Complete Extension Removal
 
-This tests the curl-installable uninstall that removes EVERYTHING.
+This removes every tracked extension installation while keeping the exact wheel environment available for final
+verification. Package-manager removal is outside the container's extension-ownership contract.
 
 ### 19.1 Pre-Uninstall State Verification
 
@@ -11,48 +12,46 @@ This tests the curl-installable uninstall that removes EVERYTHING.
 <!-- destructive -->
 
 ```bash
+set -euo pipefail
+
 # Verify user, local, and project installations
 cat ~/.forge/installed.json | jq '.installations | keys'
 # Should include: user, local:$FORGE_TEST_REPO, project:$FORGE_TEST_REPO
 
 # Verify artifacts exist
 ls ~/.forge/             # Should exist
-ls ~/.forge/bin/forge    # Should exist
-ls ~/.claude/commands/   # Should have Forge commands
-ls .claude/commands/     # Should have Forge commands (local)
+test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
+  || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
+test -f ~/.claude/skills/qa/SKILL.md
+rg -q 'forge-hook session-start' "$CLAUDE_HOME/settings.json"
+jq -e '.statusLine != null' .claude/settings.local.json
 ls .agents/skills/       # Should have nine portable Codex project skills
 ```
 
 - [ ] User, local, and project installations tracked
-- [ ] `~/.forge/` exists
+- [ ] Forge tracking state exists
 - [ ] User scope has Forge files
 - [ ] Local scope has Forge files
 - [ ] Project scope has nine portable Codex packages under `.agents/skills`
 
-### 19.2 Run Complete Uninstall
+### 19.2 Disable Every Tracked Installation
 
 <!-- auto -->
 
 <!-- destructive -->
 
 ```bash
-# Run the uninstall script using the local copy
-~/.forge/repo/scripts/setup.sh --uninstall
+# Remove every tracked user, local, and project extension installation.
+forge extension disable --all --yes
 ```
 
-The script attempts to remove extensions via Forge CLI:
-
-- `forge extension disable --all --yes` (remove tracked extensions)
-
-Then it removes `~/.forge/` and other artifacts.
-
-- [ ] Script runs without errors
-- [ ] ALL scopes uninstalled (via `forge extension disable --all --yes` or equivalent)
-- [ ] Shows "Found N Forge installation(s)" summary (if forge available)
-- [ ] `~/.forge/` removed
-- [ ] `~/.forge/sessions/` removed (Forge session data)
-- [ ] Docker images removed (multi-forge-\*)
-- [ ] Shell profile cleaned (block markers removed)
+- [ ] Command runs without errors
+- [ ] All tracked scopes are processed
+- [ ] Output reports the full-disable summary
+- [ ] User Claude commands, agents, skills, and runtime hooks are removed
+- [ ] Local Claude commands, agents, skills, and status-line ownership are removed
+- [ ] Project Codex skill packages are removed
+- [ ] Session and telemetry data remain available for report preservation
 
 ### 19.3 Verify Complete Removal
 
@@ -61,12 +60,10 @@ Then it removes `~/.forge/` and other artifacts.
 <!-- destructive -->
 
 ```bash
-# Verify ~/.forge/ is gone
-ls ~/.forge/ 2>/dev/null || echo "~/.forge/ removed"
-
-# Verify forge not on PATH (need new terminal or source profile)
-# source ~/.zshrc  # or restart terminal
-# which forge      # Should fail or show nothing
+# Verify tracking contains no installation rows (the file may be retained).
+if [ -f "$FORGE_HOME/installed.json" ]; then
+  jq -e '(.installations // {}) == {}' "$FORGE_HOME/installed.json"
+fi
 
 # Verify no Forge hooks in global settings
 cat ~/.claude/settings.json | jq '.hooks'
@@ -80,16 +77,20 @@ ls ~/.claude/skills/ 2>/dev/null | grep -v "^$" || echo "User skills removed"
 ! find "$FORGE_TEST_REPO/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
 ```
 
-- [ ] `~/.forge/` directory removed
+- [ ] No tracked extension installation remains
 - [ ] Forge hooks removed from `~/.claude/settings.json`
 - [ ] User commands/agents/skills removed
 - [ ] No tracked Codex package remains under user or project `.agents/skills`
 
 ### 19.4 Verify Local Project Settings Preserved
 
-<!-- auto -->
+<!-- human:confirm -->
 
 <!-- destructive -->
+
+Run the deterministic preservation checks below, then review the surviving settings as the one final uninstall
+checkpoint. The filesystem assertions decide pass/fail; the human review catches unexpected but syntactically valid
+settings drift before cleanup removes the remaining QA fixtures.
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -112,40 +113,29 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 - [ ] Forge-added entries (hooks, Write/Edit permissions, env) removed; user-approved permissions (e.g.,
   `Bash(forge workflow:*)`) may remain
 
-### 19.5 Verify Shell Profile Cleaned
+### 19.5 Verify Wheel Environment Preserved
 
 <!-- auto -->
 
 <!-- destructive -->
 
 ```bash
-# Check that block markers were removed from any shell profile Forge may touch.
-PROFILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.config/fish/config.fish")
-FOUND_PROFILE=0
-FOUND_BACKUP=0
+test "$(readlink -f "$(command -v forge)")" = /opt/forge-qa/bin/forge \
+  || { echo "ERROR: forge does not resolve to the isolated wheel launcher" >&2; exit 1; }
+test "$(forge --version | awk '{print $NF}')" = "$FORGE_QA_FORGE_VERSION"
+/opt/forge-qa/bin/python -I - <<'PY'
+import importlib.metadata as metadata
+from pathlib import Path
 
-for profile in "${PROFILES[@]}"; do
-  if [ -f "$profile" ]; then
-    FOUND_PROFILE=1
-    echo "Checking $profile"
-    grep -n ">>> multi-forge >>>" "$profile" && exit 1 || true
-    grep -n "$HOME/.forge/bin" "$profile" && exit 1 || true
-  fi
+import forge
 
-  if [ -f "$profile.forge-uninstall-backup" ]; then
-    FOUND_BACKUP=1
-    echo "Backup exists: $profile.forge-uninstall-backup"
-  fi
-done
-
-echo "profiles_found=$FOUND_PROFILE backups_found=$FOUND_BACKUP"
-if [ "$FOUND_PROFILE" -eq 0 ]; then
-  echo "No shell profile exists in this container; profile cleanup is N/A."
-fi
+assert metadata.version("multi-forge") == forge.__version__
+assert Path(forge.__file__).is_relative_to("/opt/forge-qa")
+PY
 ```
 
-- [ ] No `>>> multi-forge >>>` block remains in any existing shell profile
-- [ ] No `.forge/bin` PATH entry remains in any existing shell profile
-- [ ] Backup file exists for any profile that was modified; if no shell profile exists, profile cleanup is N/A
+- [ ] `forge` remains available only from the isolated wheel environment
+- [ ] CLI and distribution versions still match the recorded wheel
+- [ ] Removing extensions did not remove or redirect the installed Python package
 
 ---

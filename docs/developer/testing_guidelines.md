@@ -601,7 +601,7 @@ def test_proxy_create(clean_workspace: ContainerLike):
 
 ---
 
-## Interactive Manual Testing (`/forge:smoke-test` / `$smoke-test`, `/forge:walkthrough`, `/forge:qa`)
+## Interactive Manual Testing (`/smoke-test` / `$smoke-test`, `/walkthrough`, `/qa`)
 
 Automated tests miss UX/latency/real-system failures. Three skills provide three tiers of verification.
 
@@ -629,10 +629,16 @@ src/skills/qa/
 │   ├── checklist.md                  # Index (metadata + section map)
 │   ├── checklist/                    # One file per section
 │   │   ├── 0-enable.md … 20-cleanup.md
+│   ├── coverage-map.md               # Automated/manual release ownership
+│   ├── execution-budget.json         # Blocking counts and duration threshold
+│   ├── runtime-matrix.json           # Pinned and latest client tracks
 │   └── report-template.md           # Report template
 └── scripts/
-    ├── start-container.sh           # Docker lifecycle
-    └── walkthrough-state.py        # Self-contained parity-locked state machine
+    ├── qa-artifact.py               # Wheel and image identity
+    ├── qa-run-metrics.py            # Selected counts, duration, and verdict
+    ├── qa-selection.py              # Evidence/category/range resolver
+    ├── start-container.sh           # Exact-wheel Docker lifecycle
+    └── walkthrough-state.py         # Self-contained parity-locked state machine
 ```
 
 The walkthrough and QA state scripts are separate physical copies so each installed skill remains runnable without
@@ -644,38 +650,41 @@ matrix runs against both copies. Any behavioral change must update both files in
 
 ```text
 # In Claude Code or Codex:
-/forge:smoke-test                           # Claude: read-only health check
+/smoke-test                           # Claude: read-only health check
 $smoke-test                                 # Codex: same portable health check
 
 # Claude Code only:
-/forge:walkthrough                          # Walkthrough (hermetic functional test)
-/forge:walkthrough --setup-only             # Create test repo only
-/forge:qa                                   # Docker QA
-/forge:qa --from 4.1                        # Resume from section 4.1
+/walkthrough                          # Walkthrough (hermetic functional test)
+/walkthrough --setup-only             # Create test repo only
+/qa                                   # One-wheel development-only Docker QA
+/qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
+                                            # Pinned blocking release gate
+/qa --wheel <same-wheel> --from 4.1   # Artifact-stable resume
+/qa --runtime-track latest --extended # Non-blocking compatibility/exploration
 ```
 
 ### Safety model
 
 Risky operations go through safety scripts. The agent handles read-only checks directly.
 
-| Mode                                | Safety layer                    | Isolation                                          |
-| ----------------------------------- | ------------------------------- | -------------------------------------------------- |
-| `/forge:smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after      |
-| `/forge:walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification  |
-| `/forge:qa`                         | `start-container.sh` + Docker   | OS-level isolation; `docker exec` for all commands |
+| Mode                          | Safety layer                    | Isolation                                         |
+| ----------------------------- | ------------------------------- | ------------------------------------------------- |
+| `/smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after     |
+| `/walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification |
+| `/qa`                         | exact-wheel scripts + Docker    | Container isolation; one host QA-state mount      |
 
 ### Install profiles
 
-`/forge:qa` requires the `full` install profile (`forge extension enable --profile full`). The walkthrough and
-smoke-test skills install with any resolved module set that includes SKILLS; standard includes it by default, while
-minimal requires `--with skills`.
+`/qa` requires the `full` install profile (`forge extension enable --profile full`). The walkthrough and smoke-test
+skills install with any resolved module set that includes SKILLS; standard includes it by default, while minimal
+requires `--with skills`.
 
 ### When to run
 
-- After installing Forge: run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; use `/forge:walkthrough` for the
-  Claude-only interactive tour
+- After installing Forge: run `/smoke-test` in Claude or `$smoke-test` in Codex; use `/walkthrough` for the Claude-only
+  interactive tour
 - After upgrading Forge: walkthrough catches regressions
-- Before releases: `/forge:qa` for full Docker QA
+- Before releases: build one candidate wheel, then run `/qa --wheel <candidate>` on the pinned track
 
 ### Updating the QA checklist
 
@@ -689,10 +698,36 @@ When adding/changing a feature, update the QA checklist:
    - `<!-- auto -->` -- fully automatable (Bash + checks)
    - `<!-- human:confirm -->` -- agent runs command, user verifies output
    - `<!-- human:guided -->` -- agent shows instructions, user performs action (interactive input, editor, live Claude)
-   - `<!-- requires: proxy,docker,api-key -->` -- skip if infra missing
+   - `<!-- requires: proxy,docker,api_key -->` -- skip if named infra is missing
    - `<!-- destructive -->` -- modifies real system, needs consent
+   - `<!-- evidence: automated-suite|clean-wheel-smoke|human-acceptance|extended-exploratory -->` -- explicit evidence
+     owner; omitted evidence derives to human acceptance for human steps and clean-wheel smoke for automatic steps
+   - `<!-- paid-operations: N -->` -- maximum intentional subject-under-test completions for that step
    - No annotation = human verification
-3. **Update index header** `<!-- test-count: ~N -->` and `<!-- last-updated: YYYY-MM-DD -->` in `checklist.md`.
+3. **Update index header** with the exact parsed `<!-- test-count: N -->` and `<!-- last-updated: YYYY-MM-DD -->` in
+   `checklist.md`.
+4. **Update ownership and budgets** in `coverage-map.md` and `execution-budget.json`. Every excluded step needs a real
+   automated owner path. The default blocking selection must stay at or below 12 human checkpoints and 8 paid model
+   completions; 45 minutes is a recorded review threshold, not a test failure.
+5. **Append, do not renumber.** Keep sections 0-20 and existing step ids stable so category/range/resume addresses do
+   not change under installed users.
+6. **Keep state scripts paired only when their behavior changes.** Evidence selection and verdict assembly are QA-only
+   helper concerns and must not create a dependency from either self-contained `walkthrough-state.py` copy.
+
+Release-capable QA requires an explicit prebuilt wheel and the pinned runtime track. The release image is distinct from
+the editable integration image even when both share a runtime base, and its temporary Docker build context contains only
+the selected wheel rather than the wheel's parent directory. Before Docker mutation, the invoking host QA package must
+match the selected wheel's QA paths and bytes; `artifact.json` records the matching driver digest, and final metrics
+repeat that validated identity and fail closed without it. The image exposes the exact-wheel launcher through
+`/usr/local/bin/forge` for durable hook dispatch while imports remain isolated under `/opt/forge-qa`. Reports must
+preserve the starting `artifact.json`, ending `runtime-final.json`, `selection.json`, `run-metrics.json`, state, raw
+step logs, debug logs, and the transcript claim. A pinned runtime mismatch at either boundary is a failure. `latest`,
+partial, development-build, missing blocking evidence, and undisposed over-threshold duration results remain visibly
+non-release verdicts. Paid observations are per-step and count only with current-scope structural-hash evidence, so
+resume cannot double-count cleared or stale records. Runtime pins and probe facts live in
+`resources/runtime-matrix.json`; `latest` resolves fresh client layers in a fresh container. The default OpenRouter
+profile is required for the blocking provider-trace/reconciliation seam; remote LiteLLM remains diagnostic compatibility
+coverage.
 
 ---
 

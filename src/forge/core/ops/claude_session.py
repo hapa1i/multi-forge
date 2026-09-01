@@ -49,7 +49,12 @@ from forge.session.addendum import (
     write_managed_addendum,
 )
 from forge.session.authority import AUTHORITY_MARKER_ENV
-from forge.session.claude import build_claude_args, invoke_claude
+from forge.session.claude import (
+    ClaudeBinaryNotFoundError,
+    build_claude_args,
+    invoke_claude,
+    require_claude_binary,
+)
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.exceptions import (
     BranchExistsError,
@@ -92,6 +97,7 @@ from .session_model_routing import (
 from .session_routing import build_claude_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
+_DEFAULT_CLAUDE_INVOKER = invoke_claude
 
 
 @dataclass(frozen=True)
@@ -430,6 +436,26 @@ def resolve_claude_session_state_context(
     )
 
 
+def preflight_host_claude_binary(
+    *,
+    use_sidecar: bool,
+    invoke: Callable[..., int] | None = None,
+    no_launch: bool = False,
+) -> None:
+    """Require Claude before a real host launch can mutate session state."""
+
+    if use_sidecar or no_launch:
+        return
+    selected_invoke = invoke or invoke_claude
+    if selected_invoke is not _DEFAULT_CLAUDE_INVOKER:
+        # An injected launcher owns its own availability contract.
+        return
+    try:
+        require_claude_binary()
+    except ClaudeBinaryNotFoundError as exc:
+        raise ForgeOpError(str(exc)) from exc
+
+
 def launch_claude_session(
     *,
     manifest: SessionState,
@@ -461,6 +487,8 @@ def launch_claude_session(
             f"session '{manifest.name}' has runtime '{_runtime}' "
             "and cannot be launched with Claude. Use the matching runtime command."
         )
+
+    preflight_host_claude_binary(use_sidecar=use_sidecar, invoke=invoke)
 
     state_context = resolve_claude_session_state_context(manifest, cwd=Path.cwd())
     try:
@@ -641,6 +669,7 @@ def start_claude_session(
     for create and launch-prep failures; ``StateCorrupted*`` propagate bare to the
     top-level reset handler.
     """
+    preflight_host_claude_binary(use_sidecar=use_sidecar, invoke=invoke, no_launch=no_launch)
     operation_started_at = datetime.now(timezone.utc)
     pre_seeded_uuid = str(uuid.uuid4())
 
@@ -799,6 +828,10 @@ def resume_claude_session(
     store = state_context.store
 
     try:
+        preflight_host_claude_binary(
+            use_sidecar=plan.launch_preferences.use_sidecar,
+            invoke=invoke,
+        )
         if plan.model_route_selection is not None:
             transition = plan_model_route_transition(plan.model_route_selection)
 
@@ -923,6 +956,10 @@ def fork_claude_session(
     preferences = plan.launch_preferences
 
     try:
+        preflight_host_claude_binary(
+            use_sidecar=plan.launch_preferences.use_sidecar,
+            invoke=invoke,
+        )
         launch_result = launch_claude_session(
             manifest=manifest,
             session_id=plan.session_id,

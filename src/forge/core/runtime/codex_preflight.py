@@ -71,16 +71,18 @@ _FEATURES_TIMEOUT_S = 10
 
 _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 
-# The newest codex-cli version the codex_frontend probe harness
-# (``scripts/experiments/codex-hooks/``) was run against end-to-end (stages 85-87 PASS
-# on 2026-06-12). Codex's trust/enrollment, hook-firing, and ``apply_patch``/argv
-# behavior are pinned empirically, not contractually -- exactly the surface a minor
+# The newest codex-cli version covered by the release probe contract. The v1.0.0
+# refresh ran the static preflight plus stages 00/10 of
+# ``scripts/experiments/codex-hooks/`` on 0.149.1 through 2026-08-26; deeper
+# product-hook behavior remains owned by the real-runtime
+# integration suites. Codex's trust/enrollment and hook-firing behavior is pinned
+# empirically, not contractually -- exactly the surface a minor
 # release can change silently. This is a *ceiling*, surfaced as a re-probe notice when
 # the installed binary runs ahead of it (``version_beyond_validated``): a bump does not
 # block readiness (the binary may be fine), it tells the operator the pinned facts are
 # now unverified for their version. Mirrors the 4g ``CLAUDE_VERSION_VALIDATED`` guard;
 # bump it after a green probe round on a newer codex.
-CODEX_VERSION_VALIDATED = "0.139.0"
+CODEX_VERSION_VALIDATED = "0.149.1"
 
 # Hard floor for the ``forge codex start --proxy`` launcher: the codex version on which the
 # ``-c model_providers.<id>.{base_url,wire_api,env_key}`` custom-provider contract was proved
@@ -110,7 +112,14 @@ CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none
 # reserved -- reachable only if a codex-cli source-dive makes the hash computable.
 # ``unknown`` covers only the moot cases: not installed, or version unparseable (the
 # floor cannot even be proven).
-HookSeam = Literal["active", "untrusted", "managed_suppressed", "enrollment_gated", "disabled", "unknown"]
+HookSeam = Literal[
+    "active",
+    "untrusted",
+    "managed_suppressed",
+    "enrollment_gated",
+    "disabled",
+    "unknown",
+]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
 # ``wire_api="responses"`` only. Direct ``codex exec`` is ``native_direct``;
@@ -187,7 +196,7 @@ def preflight_codex(
         installed=installed,
         version=version,
         runtime=runtime,
-        features_hooks_enabled=_probe_features_hooks_enabled(runtime) if installed else None,
+        features_hooks_enabled=(_probe_features_hooks_enabled(runtime) if installed else None),
         managed_only=_read_managed_only(),
     )
     responses = _resolve_responses_posture(proxy_id)

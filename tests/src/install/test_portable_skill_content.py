@@ -285,7 +285,7 @@ def test_claude_frontmatter_preserves_existing_contract(
     for name, extras in EXPECTED_CLAUDE_EXTRAS.items():
         frontmatter = _frontmatter(compiled_packages[(name, SkillRuntime.CLAUDE_CODE)])
         assert frontmatter == {
-            "name": f"forge:{name}",
+            "name": name,
             "description": portable_sources[name].manifest.description,
             **extras,
         }

@@ -27,7 +27,7 @@ forge telemetry costs show qa-no-such-proxy --json
 
 ```bash
 # Verify JSON output schema using the empty-proxy filter (guaranteed empty)
-forge telemetry costs show qa-no-such-proxy --json | python3 -c "
+forge telemetry costs show qa-no-such-proxy --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 fields = {'period','proxy_id','total_cost_micros','total_cost_usd','total_requests','interactive_cost_micros','by_verb','by_model','reported_requests','unavailable_requests'}
@@ -48,14 +48,44 @@ print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_request
 <!-- auto -->
 
 ```bash
-# Seed QA-prefixed fixture request logs matching cost_logger.py record schema.
-# Uses qa-fixture prefix and PID 99999 to avoid collision with real proxy logs.
-mkdir -p ~/.forge/telemetry/downstream
-cat > ~/.forge/telemetry/downstream/qa-fixture_99999.jsonl <<'EOF'
-{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-fixture","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":300,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-qa-001"}
-{"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":50,"cost_micros":1200,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":350.0,"failed":false,"request_id":"req-qa-002"}
-{"ts":"2026-05-01T00:02:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"opus","input_tokens":1000,"output_tokens":400,"cached_tokens":100,"cost_micros":3500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":800.0,"failed":false,"request_id":"req-qa-003"}
-EOF
+# Build current-schema downstream records through the wheel's production factory.
+# The dedicated qa-fixture shard remains easy to clean without touching real traffic.
+/opt/forge-qa/bin/python - <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+
+from forge.proxy.cost_logger import build_request_cost_record
+
+specs = (
+    ("test/gemini-2.5-flash", "haiku", 200, 80, 0, 300, 120.0, "req-qa-001"),
+    ("test/gemini-3.1-pro-preview", "sonnet", 500, 150, 50, 1200, 350.0, "req-qa-002"),
+    ("test/gemini-3.1-pro-preview", "opus", 1000, 400, 100, 3500, 800.0, "req-qa-003"),
+)
+records = []
+for model, tier, input_tokens, output_tokens, cached_tokens, cost_micros, latency_ms, request_id in specs:
+    record = build_request_cost_record(
+        proxy_id="qa-fixture",
+        model=model,
+        tier=tier,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=cached_tokens,
+        cost_micros=cost_micros,
+        latency_ms=latency_ms,
+        failed=False,
+        request_id=request_id,
+        reporter="litellm",
+        confidence="gateway_calculated",
+        downstream_event_id=f"ds_{request_id}",
+    )
+    records.append({key: value for key, value in asdict(record).items() if value is not None})
+
+path = Path.home() / ".forge/telemetry/downstream/qa-fixture_99999.jsonl"
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("".join(json.dumps(record, separators=(",", ":")) + "\n" for record in records), encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # Verify fixture is readable -- filter by qa-fixture to isolate from real proxy logs
 forge telemetry costs show qa-fixture --period all --json
@@ -148,41 +178,86 @@ forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=invalid 2>&1; echo "EX
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- auto -->
 
 Seed a current-timestamp cost log so the proxy's cost tracker bootstraps above the cap, then make a request to verify
 rejection. This avoids depending on a real request landing above a tiny cap (which is non-deterministic for cheap
 models).
 
-```
+```bash
+set -euo pipefail
+
+# Always restore the live proxy even when an assertion below fails.
+cleanup_spend_reject() {
+  rm -f ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl \
+    /tmp/qa-spend-reject.headers /tmp/qa-spend-reject.body
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=none >/dev/null 2>&1 || true
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_month=none >/dev/null 2>&1 || true
+  forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject >/dev/null 2>&1 || true
+  forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force >/dev/null 2>&1 || true
+  forge proxy start "$FORGE_QA_OPENAI_PROXY" >/dev/null 2>&1 || true
+}
+trap cleanup_spend_reject EXIT
+
 # Set a low daily cap on the working QA OpenAI proxy in the container
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
 
-# Seed a cost log with a current timestamp so the tracker bootstraps above the cap.
+# Seed a current-schema cost record so the tracker bootstraps above the cap.
 # The tracker reads ~/.forge/telemetry/downstream/YYYY-MM_*.jsonl on startup (bootstrap_from_logs).
-mkdir -p ~/.forge/telemetry/downstream
 MONTH=$(date -u +%Y-%m)
-TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-seed\"}" \
-  > ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
+CAP_SEED="$HOME/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl"
+/opt/forge-qa/bin/python - "$CAP_SEED" "$FORGE_QA_OPENAI_PROXY" <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+import sys
+
+from forge.proxy.cost_logger import build_request_cost_record
+
+record = build_request_cost_record(
+    proxy_id=sys.argv[2], model="seed", tier="sonnet",
+    input_tokens=0, output_tokens=0, cached_tokens=0,
+    cost_micros=50000, latency_ms=0, failed=False,
+    request_id="req-qa-cap-seed", reporter="litellm",
+    confidence="gateway_calculated", downstream_event_id="ds_qa_cap_seed",
+)
+payload = {key: value for key, value in asdict(record).items() if value is not None}
+path = Path(sys.argv[1])
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # Restart proxy so it bootstraps from the seeded log (--force bypasses shared-port check)
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
 forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
-# Make a request -- should be rejected immediately
-forge claude start --proxy "$FORGE_QA_OPENAI_PROXY"
-# Say "hello" -- expect rejection or error about spend cap, then exit (/exit)
+# Make a request -- it must be rejected before any upstream model completion.
+BASE_URL=$(jq -r --arg id "$FORGE_QA_OPENAI_PROXY" '.proxies[$id].base_url' ~/.forge/proxies/index.json)
+HTTP_CODE=$(curl -sS -D /tmp/qa-spend-reject.headers -o /tmp/qa-spend-reject.body \
+  -w '%{http_code}' \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: test' \
+  -H 'user-agent: claude-code/qa-spend-reject' \
+  "$BASE_URL/v1/messages" \
+  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"messages":[{"role":"user","content":"This request must never reach a model."}]}')
+test "$HTTP_CODE" = 429
+rg 'spend_cap_exceeded' /tmp/qa-spend-reject.body
 
-# Clean up seeded log
-rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
+# Clear both persisted and in-memory cap state before later provider calls.
+cleanup_spend_reject
+trap - EXIT
+forge proxy list --json | jq -e --arg id "$FORGE_QA_OPENAI_PROXY" '
+  any(.[]; .proxy_id == $id and .status == "healthy")
+'
 ```
 
 - [ ] After proxy restart, the seeded cost triggers the daily cap
-- [ ] Proxy returns HTTP 429 or Claude reports a `spend_cap_exceeded` error
+- [ ] Proxy returns HTTP 429 without forwarding a model completion
 - [ ] Error message includes current spend and limit amounts
 - [ ] Error message suggests `forge proxy set <id> costs.caps.per_day=<amount>` to adjust
+- [ ] Cleanup clears the seeded cap and leaves the QA OpenAI proxy healthy
 
 ### 7.10 Spend Cap Enforcement (Warn Mode)
 
@@ -190,22 +265,44 @@ rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
 
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- evidence: extended-exploratory -->
+
+<!-- paid-operations: 1 -->
+
+<!-- auto -->
 
 Switch to warn mode and verify requests succeed with a warning header instead of being blocked. Uses the same seeded
 cost log approach for deterministic cap triggering.
 
-```
+```bash
 # Use the same deterministic cap settings as 7.9, then switch to warn mode.
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=warn
 
-# Re-seed the cost log (cleanup from 7.9 removed it)
-mkdir -p ~/.forge/telemetry/downstream
+# Re-seed the current-schema cost log (cleanup from 7.9 removed it).
 MONTH=$(date -u +%Y-%m)
-TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-warn\"}" \
-  > ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
+CAP_SEED="$HOME/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl"
+/opt/forge-qa/bin/python - "$CAP_SEED" "$FORGE_QA_OPENAI_PROXY" <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+import sys
+
+from forge.proxy.cost_logger import build_request_cost_record
+
+record = build_request_cost_record(
+    proxy_id=sys.argv[2], model="seed", tier="sonnet",
+    input_tokens=0, output_tokens=0, cached_tokens=0,
+    cost_micros=50000, latency_ms=0, failed=False,
+    request_id="req-qa-cap-warn", reporter="litellm",
+    confidence="gateway_calculated", downstream_event_id="ds_qa_cap_warn",
+)
+payload = {key: value for key, value in asdict(record).items() if value is not None}
+path = Path(sys.argv[1])
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # Restart proxy so it bootstraps with the seeded cost (--force bypasses shared-port check)
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
@@ -213,33 +310,30 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
 # Make a direct request and capture response headers.
 BASE_URL=$(jq -r --arg id "$FORGE_QA_OPENAI_PROXY" '.proxies[$id].base_url' ~/.forge/proxies/index.json)
-curl -sS -D /tmp/qa-spend-warn.headers -o /tmp/qa-spend-warn.body \
-  -w 'HTTP=%{http_code}\n' \
+HTTP_CODE=$(curl -sS -D /tmp/qa-spend-warn.headers -o /tmp/qa-spend-warn.body \
+  -w '%{http_code}' \
   -H 'content-type: application/json' \
   -H 'x-api-key: test' \
   -H 'user-agent: claude-code/qa-spend-warn' \
   "$BASE_URL/v1/messages" \
-  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"temperature":0,"messages":[{"role":"user","content":"Reply with exactly one word: ok"}]}'
+  -d '{"model":"claude-3-5-haiku-20241022","max_tokens":16,"temperature":0,"messages":[{"role":"user","content":"Reply with exactly one word: ok"}]}')
 
 # Verify the response was allowed and included the warn-mode header.
-grep -i '^x-spend-warning:' /tmp/qa-spend-warn.headers
-cat /tmp/qa-spend-warn.body | jq -r '._request_id // empty'
+test "$HTTP_CODE" = 200
+rg -i '^x-spend-warning:' /tmp/qa-spend-warn.headers
+jq -e '.type == "message" and (.content | type == "array")' /tmp/qa-spend-warn.body
 # If curl did not report HTTP=200, inspect the proxy error details:
 # cat /tmp/qa-spend-warn.body | jq .
 # forge logs --tail proxy
 
-# Optional Claude smoke: run with debug output, say "hello", then exit (/exit).
-# The deterministic header check above is the source of truth for this step.
-forge claude start --proxy "$FORGE_QA_OPENAI_PROXY" -- --debug
-
 # Clean up seeded log
-rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl /tmp/qa-spend-warn.headers /tmp/qa-spend-warn.body
+rm -f "$CAP_SEED" /tmp/qa-spend-warn.headers /tmp/qa-spend-warn.body
 ```
 
 - [ ] Request succeeds (not blocked) in warn mode
-- [ ] `curl` reports `HTTP=200`
-- [ ] `grep -i '^x-spend-warning:' /tmp/qa-spend-warn.headers` prints the spend-cap warning header
-- [ ] Optional Claude debug run also succeeds (no `spend_cap_exceeded` block)
+- [ ] The captured HTTP status is `200`
+- [ ] The response includes the `x-spend-warning` header
+- [ ] Response body is a valid provider response rather than a `spend_cap_exceeded` error
 
 ### 7.11 Cleanup Fixture Cost Logs
 
@@ -269,7 +363,7 @@ forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
 forge proxy start "$FORGE_QA_OPENAI_PROXY"
 ```
 
-- [ ] QA fixture request logs removed (no `qa-fixture_*.jsonl` in `requests/`)
+- [ ] QA fixture request logs removed (no `qa-fixture_*.jsonl` in `telemetry/downstream/`)
 - [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `telemetry/downstream/`)
 - [ ] Spend caps reset on QA OpenAI and Gemini test proxies
 
@@ -281,9 +375,9 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
 `forge telemetry activity [session]` renders operation outcomes plus model calls. This fixture seeds transitional
 usage-attribution events (`~/.forge/usage/events/`) for a throwaway session and asserts the model-call rollup --
-including the workflow worker/verb split (one panel = 1 call + N workers, not N+1 calls) and the cost-honesty rendering:
-the aggregate cost is reported-or-estimated/best-effort (flagged with `~` and a footnote), while
-`forge telemetry costs show` is the authoritative spend view.
+including the workflow worker/verb split (one panel = 1 call + N workers, not N+1 calls) and the cost-honesty rendering.
+This fixture deliberately combines exact reported costs with cost-less attempts: `cost_partial` is true while
+`cost_estimated` is false, and `forge telemetry costs show` remains the authoritative spend view.
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -294,20 +388,31 @@ forge session start qa-usage --no-launch
 
 # Seed fixture usage events: 3 supervisor (1 error) + one panel verb aggregate + 3 panel
 # worker leaves. The workers share command="panel"; the double-count fix must keep them
-# out of `calls`. PID 99999 avoids collision with any real ledger shard.
-mkdir -p ~/.forge/usage/events
-cat > ~/.forge/usage/events/qa-usage-fixture_99999.jsonl <<'EOF'
-{"schema_version":1,"run_id":"qa-r1","root_run_id":"qa-r1","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":200,"output_tokens":80,"cost_micro_usd":300,"ts":"2026-05-01T00:00:00Z"}
-{"schema_version":1,"run_id":"qa-r2","root_run_id":"qa-r2","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":150,"output_tokens":60,"cost_micro_usd":250,"ts":"2026-05-01T00:01:00Z"}
-{"schema_version":1,"run_id":"qa-r3","root_run_id":"qa-r3","runtime":"claude_code","command":"supervisor","status":"error","session":"qa-usage","attribution_granularity":"verb","ts":"2026-05-01T00:02:00Z"}
-{"schema_version":1,"run_id":"qa-r4","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":700,"output_tokens":230,"cost_micro_usd":1500,"ts":"2026-05-01T00:03:00Z"}
-{"schema_version":1,"run_id":"qa-w1","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:01Z"}
-{"schema_version":1,"run_id":"qa-w2","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:02Z"}
-{"schema_version":1,"run_id":"qa-w3","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:03Z"}
-EOF
+# out of `calls`. Build through UsageEvent so schema/envelope fields cannot drift.
+/opt/forge-qa/bin/python - <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
+
+from forge.core.usage.ledger import UsageEvent
+
+events = (
+    UsageEvent(run_id="qa-r1", root_run_id="qa-r1", runtime="claude_code", command="supervisor", status="success", session="qa-usage", input_tokens=200, output_tokens=80, cost_micro_usd=300, measurement_source="runtime_native", confidence="reported"),
+    UsageEvent(run_id="qa-r2", root_run_id="qa-r2", runtime="claude_code", command="supervisor", status="success", session="qa-usage", input_tokens=150, output_tokens=60, cost_micro_usd=250, measurement_source="runtime_native", confidence="reported"),
+    UsageEvent(run_id="qa-r3", root_run_id="qa-r3", runtime="claude_code", command="supervisor", status="error", session="qa-usage", confidence="unavailable"),
+    UsageEvent(run_id="qa-r4", root_run_id="qa-r4", runtime="claude_code", command="panel", status="success", session="qa-usage", input_tokens=700, output_tokens=230, cost_micro_usd=1500, measurement_source="runtime_native", confidence="reported"),
+    UsageEvent(run_id="qa-w1", root_run_id="qa-r4", runtime="claude_code", command="panel", status="success", session="qa-usage", attribution_granularity="worker", confidence="unavailable"),
+    UsageEvent(run_id="qa-w2", root_run_id="qa-r4", runtime="claude_code", command="panel", status="success", session="qa-usage", attribution_granularity="worker", confidence="unavailable"),
+    UsageEvent(run_id="qa-w3", root_run_id="qa-r4", runtime="claude_code", command="panel", status="success", session="qa-usage", attribution_granularity="worker", confidence="unavailable"),
+)
+path = Path.home() / ".forge/usage/events/qa-usage-fixture_99999.jsonl"
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("".join(json.dumps(asdict(event), separators=(",", ":")) + "\n" for event in events), encoding="utf-8")
+path.chmod(0o600)
+PY
 
 # JSON contract + the double-count assertion
-forge telemetry activity qa-usage --period all --json | python3 -c "
+forge telemetry activity qa-usage --period all --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 cmds = {c['command']: c for c in d['downstream']['rows']}
@@ -317,7 +422,7 @@ print(f'supervisor calls={sup.get(\"calls\")} errors={sup.get(\"errors\")}')
 print(f'panel calls={panel.get(\"calls\")} workers={panel.get(\"workers\")}')
 print('DOUBLE_COUNT_OK' if panel.get('calls') == 1 and panel.get('workers') == 3 else 'DOUBLE_COUNT_FAIL')
 print(f'session={d[\"session\"]} tagging_partial={\"session_tagging_partial\" in d[\"notes\"]}')
-print(f'cost_partial={d[\"downstream\"][\"cost_partial\"]} total_cost_micro_usd={d[\"downstream\"][\"total_cost_micro_usd\"]}')
+print(f'cost_partial={d[\"downstream\"][\"cost_partial\"]} cost_estimated={d[\"downstream\"][\"cost_estimated\"]} total_cost_micro_usd={d[\"downstream\"][\"total_cost_micro_usd\"]}')
 "
 
 echo "---"
@@ -333,12 +438,12 @@ forge session delete qa-usage --yes --force 2>/dev/null || true
 - [ ] `supervisor calls=3 errors=1` (the error mirrors an OpenRouter content-filter failure)
 - [ ] `panel calls=1 workers=3` and the script prints `DOUBLE_COUNT_OK` (verb + workers not double-counted)
 - [ ] `session=qa-usage tagging_partial=True`
-- [ ] `cost_partial=True total_cost_micro_usd=2050` (the 3 reported costs sum to 2050; the supervisor error + 3 workers
-  report no cost, so the aggregate is flagged best-effort/partial -- missing costs are not priced to 0)
+- [ ] `cost_partial=True cost_estimated=False total_cost_micro_usd=2050` (the 3 reported costs sum to 2050; the
+  supervisor error + 3 workers report no cost, so the aggregate is partial without turning exact costs into estimates)
 - [ ] Human render shows the `Model calls` pane with a `supervisor` row and a `panel` row, a `Workers` column with `3`
   on the panel row, and a `Total: 7 events` line
-- [ ] Human render cost honesty: the `Total:` line carries a `~` best-effort marker, and the footnotes include
-  `best-effort and partial` and `reported-or-estimated` (the always-on
+- [ ] Human render cost honesty: the `Total:` line shows `$0.0021` without a `~` estimate marker, and the footnotes
+  independently include `best-effort and partial` and `reported (no snapshot estimates mixed in)` (the always-on
   `'forge telemetry costs show' is the authoritative spend view` pointer)
 - [ ] Fixture shard + `qa-usage` session removed at the end
 
@@ -352,13 +457,43 @@ and excludes it from the dollar total -- it is never summed as `0`. Uses an isol
 `qa-fixture` 3-request invariant (7.5/7.6) is untouched.
 
 ```bash
-mkdir -p ~/.forge/telemetry/downstream
-cat > ~/.forge/telemetry/downstream/qa-fixture_prov-99999.jsonl <<'EOF'
-{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-prov","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":2500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-prov-001"}
-{"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-prov","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":0,"cost_micros":null,"reporter":"provider","confidence":"unavailable","latency_ms":300.0,"failed":false,"request_id":"req-prov-002"}
-EOF
+/opt/forge-qa/bin/python - <<'PY'
+from dataclasses import asdict
+import json
+from pathlib import Path
 
-forge telemetry costs show qa-prov --period all --json | python3 -c "
+from forge.proxy.cost_logger import build_request_cost_record
+
+specs = (
+    ("test/gemini-2.5-flash", "haiku", 200, 80, 2500, "litellm", "gateway_calculated", "req-prov-001"),
+    ("test/gemini-3.1-pro-preview", "sonnet", 500, 150, None, "provider", "unavailable", "req-prov-002"),
+)
+records = []
+for model, tier, input_tokens, output_tokens, cost_micros, reporter, confidence, request_id in specs:
+    record = build_request_cost_record(
+        proxy_id="qa-prov",
+        model=model,
+        tier=tier,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=0,
+        cost_micros=cost_micros,
+        latency_ms=120.0,
+        failed=False,
+        request_id=request_id,
+        reporter=reporter,
+        confidence=confidence,
+        downstream_event_id=f"ds_{request_id}",
+    )
+    records.append({key: value for key, value in asdict(record).items() if value is not None})
+
+path = Path.home() / ".forge/telemetry/downstream/qa-fixture_prov-99999.jsonl"
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("".join(json.dumps(record, separators=(",", ":")) + "\n" for record in records), encoding="utf-8")
+path.chmod(0o600)
+PY
+
+forge telemetry costs show qa-prov --period all --json | /opt/forge-qa/bin/python -c "
 import json, sys
 d = json.load(sys.stdin)
 print(f'total_requests={d[\"total_requests\"]}')
@@ -428,7 +563,7 @@ rm -f ~/.forge/audit/qa-reset-sentinel.jsonl ~/.forge/cache/statusline/qaresetdi
   `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
 - [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 3) followed by the `Tip:` restart guidance
   naming `forge proxy stop <id>` / `forge proxy start <id>`
-- [ ] After the real reset: `requests=0 events=0 fcost=0` (planes + derived cost cache cleared) while `cache_hit=1`
+- [ ] After the real reset: `downstream=0 events=0 fcost=0` (planes + derived cost cache cleared) while `cache_hit=1`
   (transcript cache-hit untouched) and `audit_sentinel=1` (audit plane untouched)
 - [ ] The second `reset --yes` with nothing left prints `No cost or usage telemetry to reset.` (clean no-op, no error)
 - [ ] Audit sentinel + cache-hit entry removed at the end

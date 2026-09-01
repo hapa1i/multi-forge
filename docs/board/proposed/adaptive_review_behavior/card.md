@@ -8,11 +8,11 @@ policy.
 ## Goal
 
 Make Forge-owned review surfaces degrade gracefully inside the envelope rather than stopping mid-thought or refusing
-outright. `/forge:review` stays the recommended single-agent path; multi-model workflows use explicit orchestration.
-Claude's opaque native review protocol is not adapted here -- M1 may block, warn, or admit its launches, but Forge does
-not rewrite its finder/verifier algorithm.
+outright. `/review` stays the recommended single-agent path; multi-model workflows use explicit orchestration. Claude's
+opaque native review protocol is not adapted here -- M1 may block, warn, or admit its launches, but Forge does not
+rewrite its finder/verifier algorithm.
 
-## `/forge:review` behavior
+## `/review` behavior
 
 - **Size before Agent**: use deterministic git/path statistics to size the target before the one Explore launch; do not
   spend a second agent merely to scout.
@@ -41,8 +41,8 @@ not rewrite its finder/verifier algorithm.
 
 ## Acceptance Criteria
 
-- `/forge:review` with no target uses changed files when available and launches at most its existing single Explore
-  agent; a broad target narrows before that launch or requires an explicit envelope.
+- `/review` with no target uses changed files when available and launches at most its existing single Explore agent; a
+  broad target narrows before that launch or requires an explicit envelope.
 - Workflow workers receive one centrally prepared bounded context and do not independently re-read the full diff.
 - Workflow scheduling occurs in envelope-sized batches; an unscheduled batch cannot spawn after the synthesis reserve
   binds.

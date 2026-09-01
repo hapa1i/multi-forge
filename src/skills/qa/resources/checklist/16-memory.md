@@ -21,7 +21,7 @@ EOF
 forge memory track .forge/memory/debugging.md --strategy generic
 
 # Inspect the complete frontmatter semantically; key order is not part of the contract.
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 from pathlib import Path
 
 import yaml
@@ -62,6 +62,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -104,6 +106,8 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -165,6 +169,8 @@ test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -253,7 +259,7 @@ forge_memory:
 EOF
 
 # Record the raw parsed Forge value before migration.
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import json
 from pathlib import Path
 
@@ -266,7 +272,7 @@ PY
 
 forge memory passport upgrade .forge/memory/legacy-passport.md
 
-python3 - <<'PY'
+/opt/forge-qa/bin/python - <<'PY'
 import json
 from pathlib import Path
 

@@ -19,7 +19,7 @@ Installed skill packages must remain executable without importing the Forge tool
 a package import is not a safe simplification. Authority:
 [`docs/design_installation.md` "D. Interactive Manual Testing"](../../../design_installation.md#d-interactive-manual-testing)
 and
-[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-forgesmoke-test-smoke-test-forgewalkthrough-forgeqa).
+[`docs/developer/testing_guidelines.md` "Interactive Manual Testing"](../../../developer/testing_guidelines.md#interactive-manual-testing-smoke-test-smoke-test-walkthrough-qa).
 
 ## Acceptance Criteria
 

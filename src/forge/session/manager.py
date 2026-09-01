@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterable
 from contextlib import nullcontext
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,15 @@ from .validation import validate_name
 logger = logging.getLogger(__name__)
 
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+
+@dataclass(frozen=True)
+class WorktreeCleanupPlan:
+    """Whether a requested session deletion can remove its worktree."""
+
+    remove: bool
+    reason: str
+    co_residents: tuple[str, ...] = ()
 
 
 def fork_target_matches_replacement(
@@ -1966,17 +1976,69 @@ class SessionManager:
             return True
         return self.index_store.session_exists(name, forge_root=forge_root)
 
-    def _find_co_resident_sessions(self, worktree_path: str, exclude: str) -> list[str]:
+    def _find_co_resident_sessions(
+        self,
+        worktree_path: str,
+        exclude: str,
+        *,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
+    ) -> list[str]:
         """Find other sessions living in the same worktree directory.
 
-        Uses list_sessions() (self-healing) to avoid stale entries blocking cleanup.
+        Actual cleanup defaults to the self-healing list. Pre-confirmation planners
+        supply a non-mutating, manifest-backed snapshot instead.
         """
         normalized = str(Path(worktree_path).resolve())
+        session_entries = sessions if sessions is not None else self.index_store.list_sessions()
         return [
             name
-            for name, entry in self.index_store.list_sessions()
+            for name, entry in session_entries
             if str(Path(entry.worktree_path).resolve()) == normalized and name != exclude
         ]
+
+    def plan_worktree_cleanup(
+        self,
+        name: str,
+        state: SessionState,
+        *,
+        delete_worktree: bool,
+    ) -> WorktreeCleanupPlan:
+        """Plan worktree cleanup for user-facing deletion previews."""
+        worktree = state.worktree
+        if worktree is None:
+            return WorktreeCleanupPlan(remove=False, reason="not_worktree")
+        return self._plan_worktree_cleanup_fields(
+            name,
+            delete_worktree=delete_worktree,
+            path=worktree.path,
+            is_worktree=worktree.is_worktree,
+            owns_worktree=getattr(worktree, "owns_worktree", True),
+            sessions=self.index_store.peek_sessions(),
+        )
+
+    def _plan_worktree_cleanup_fields(
+        self,
+        name: str,
+        *,
+        delete_worktree: bool,
+        path: str,
+        is_worktree: bool,
+        owns_worktree: bool,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
+    ) -> WorktreeCleanupPlan:
+        if not delete_worktree:
+            return WorktreeCleanupPlan(remove=False, reason="requested_keep")
+        if not is_worktree:
+            return WorktreeCleanupPlan(remove=False, reason="not_worktree")
+        if sessions is None:
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name))
+        else:
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name, sessions=sessions))
+        if co_residents:
+            return WorktreeCleanupPlan(remove=False, reason="shared", co_residents=co_residents)
+        if not owns_worktree:
+            return WorktreeCleanupPlan(remove=False, reason="not_owned")
+        return WorktreeCleanupPlan(remove=True, reason="owned")
 
     def _find_shared_transcript_sessions(
         self,
@@ -2121,19 +2183,23 @@ class SessionManager:
         # we'll remove the worktree. This lets the dirty preflight block everything
         # (transcripts + worktree + index removal) atomically.
         _should_cleanup_worktree = False
-        if delete_worktree and _worktree_info and _worktree_info["is_worktree"]:
-            _owns = _worktree_info["owns_worktree"]
-            co_residents = self._find_co_resident_sessions(_worktree_info["path"], exclude=name)
-            if co_residents:
+        if _worktree_info:
+            cleanup_plan = self._plan_worktree_cleanup_fields(
+                name,
+                delete_worktree=delete_worktree,
+                path=_worktree_info["path"],
+                is_worktree=_worktree_info["is_worktree"],
+                owns_worktree=_worktree_info["owns_worktree"],
+            )
+            _should_cleanup_worktree = cleanup_plan.remove
+            if cleanup_plan.reason == "shared":
                 logger.info(
                     "Skipping worktree removal: %d other session(s) present (%s)",
-                    len(co_residents),
-                    ", ".join(co_residents[:3]),
+                    len(cleanup_plan.co_residents),
+                    ", ".join(cleanup_plan.co_residents[:3]),
                 )
-            elif not _owns:
+            elif cleanup_plan.reason == "not_owned":
                 logger.info("Skipping worktree removal: session does not own worktree (--into)")
-            else:
-                _should_cleanup_worktree = True
 
         # Dirty-worktree preflight: only check if we'll actually remove the worktree.
         # Runs before transcript cleanup so DirtyWorktreeError blocks all destructive work.

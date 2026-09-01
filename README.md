@@ -139,8 +139,8 @@ forge session start --proxy openrouter-anthropic
 
 Developing on Forge itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for the editable install.
 
-Once running, try `/forge:smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check, or
-`/forge:walkthrough` for a guided tour in a sandboxed test repo.
+Once running, try `/smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check, or `/walkthrough` for a
+guided tour in a sandboxed test repo.
 
 ## Plan, Execute, Review
 
@@ -222,9 +222,9 @@ hashes, lengths, and counts, never prompt or completion text.
 
 ## Skills
 
-Nine skills compile for **both** runtimes -- Claude invokes `/forge:<name>`, Codex invokes `$<name>`: `analyze`,
-`challenge`, `consensus`, `debate`, `panel`, `review`, `review-docs`, `smoke-test`, `understand`. Only
-`/forge:walkthrough` and `/forge:qa` are Claude-only.
+Nine skills compile for **both** runtimes -- Claude invokes `/<name>`, Codex invokes `$<name>`: `analyze`, `challenge`,
+`consensus`, `debate`, `panel`, `review`, `review-docs`, `smoke-test`, `understand`. Only `/walkthrough` and `/qa` are
+Claude-only.
 
 The same runners are available from the terminal, and `--check` turns one into an exit-code gate you can script:
 

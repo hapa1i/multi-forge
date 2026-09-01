@@ -1,5 +1,5 @@
 ---
-name: forge:walkthrough
+name: walkthrough
 description: Interactive Forge verification walkthrough in a hermetic test environment. Use after installing or upgrading Forge to verify everything works.
 disable-model-invocation: true
 argument-hint: '[--setup-only] [--reset] [--report] [--sidecar]'
@@ -14,11 +14,11 @@ never touched.
 ## Usage
 
 ```
-/forge:walkthrough                   Interactive walkthrough (default)
-/forge:walkthrough --setup-only      Create/reset test repo, then stop
-/forge:walkthrough --reset           Reset test repo to clean baseline
-/forge:walkthrough --report          Save run artifacts (report, state, logs, transcript)
-/forge:walkthrough --sidecar         Include sidecar section (requires Docker)
+/walkthrough                   Interactive walkthrough (default)
+/walkthrough --setup-only      Create/reset test repo, then stop
+/walkthrough --reset           Reset test repo to clean baseline
+/walkthrough --report          Save run artifacts (report, state, logs, transcript)
+/walkthrough --sidecar         Include sidecar section (requires Docker)
 ```
 
 ## Arguments
@@ -570,8 +570,8 @@ PY
 Tell the user: "Walkthrough artifacts saved to `$RUN_DIR`. Forge step logs and debug logs were copied when present.
 Transcript claim token: `$WT_TRANSCRIPT_TOKEN`. Transcript will be added when this walkthrough session ends."
 
-Tip: "For a quick non-interactive check, use `/forge:smoke-test`. For the full QA checklist in Docker, use `/forge:qa`
-(requires `forge extension enable --profile full`)."
+Tip: "For a quick non-interactive check, use `/smoke-test`. For the full QA checklist in Docker, use `/qa` (requires
+`forge extension enable --profile full`)."
 
 ## Safety Model
 
@@ -600,7 +600,7 @@ Any gate failure = loud error message + exit 1. No silent fallthrough.
 
 ## Tips
 
-- **Quick check**: For a quick non-interactive health check, use `/forge:smoke-test`.
-- **Full QA**: For the full QA checklist in Docker, use `/forge:qa` (requires `--profile full`).
+- **Quick check**: For a quick non-interactive health check, use `/smoke-test`.
+- **Full QA**: For the full QA checklist in Docker, use `/qa` (requires `--profile full`).
 - **Robustness principle**: The user should never see an error you could have avoided. If something is known to fail,
   use the working alternative directly.

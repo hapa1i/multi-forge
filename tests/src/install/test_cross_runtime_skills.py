@@ -648,7 +648,7 @@ def test_runtime_packages_copy_sync_stale_cleanup_and_disable(
     codex_target = home / ".agents" / "skills" / "portable"
     assert (claude_target / "SKILL.md").is_file()
     assert (codex_target / "SKILL.md").is_file()
-    assert "name: forge:portable" in (claude_target / "SKILL.md").read_text(encoding="utf-8")
+    assert "name: portable" in (claude_target / "SKILL.md").read_text(encoding="utf-8")
     assert "name: portable" in (codex_target / "SKILL.md").read_text(encoding="utf-8")
     assert not (home / ".codex" / "skills" / "portable").exists()
 

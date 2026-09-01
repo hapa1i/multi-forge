@@ -401,11 +401,22 @@ def _delete_single_session(
             console.print(f"  UUID: {manifest.confirmed.claude_session_id}")
 
         if manifest.worktree and manifest.worktree.is_worktree:
-            if keep_worktree:
-                console.print(f"  [dim]Worktree will be kept: {display_path(manifest.worktree.path)}[/dim]")
-            else:
+            cleanup_plan = manager.plan_worktree_cleanup(
+                name,
+                manifest,
+                delete_worktree=not keep_worktree,
+            )
+            if cleanup_plan.remove:
                 console.print(f"  Worktree will be removed: {display_path(manifest.worktree.path)}")
-            if delete_branch:
+            else:
+                reason = ""
+                if cleanup_plan.reason == "shared":
+                    residents = ", ".join(cleanup_plan.co_residents[:3])
+                    reason = f" (used by {residents})"
+                elif cleanup_plan.reason == "not_owned":
+                    reason = " (session does not own it)"
+                console.print(f"  [dim]Worktree will be kept{reason}: {display_path(manifest.worktree.path)}[/dim]")
+            if delete_branch and cleanup_plan.remove:
                 console.print(f"  Branch will be deleted: {manifest.worktree.branch}")
             else:
                 console.print(f"  [dim]Branch will be kept: {manifest.worktree.branch}[/dim]")

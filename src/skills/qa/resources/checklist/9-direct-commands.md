@@ -52,7 +52,7 @@ echo '{"prompt": "%policy disable"}' | FORGE_SESSION=test-session-1 forge hook u
 - [ ] `%policy enable` enables TDD enforcement
 - [ ] `%policy disable` disables all policy
 
-### 9.5 Test %policy check (Phase 18)
+### 9.5 Test %policy check
 
 <!-- auto -->
 
@@ -161,5 +161,49 @@ echo '{"prompt": "%proxy audit diff"}' | FORGE_SESSION=test-session-1 forge hook
 - [ ] Bare `%proxy` usage lists `audit show|diff` alongside `list` and `show`
 - [ ] `%proxy audit show` returns audit metadata or a clean `No audit data` message (no secrets/plaintext)
 - [ ] `%proxy audit diff` returns wire changes or a clean `No wire changes` message
+
+### 9.11 Test `%session model show` and `%plan`
+
+<!-- prereq: 5.25 -->
+
+<!-- auto -->
+
+```bash
+cd "$FORGE_TEST_REPO"
+
+echo '{"prompt":"%session model show qa-route-authority","transcript_path":""}' \
+  | FORGE_SESSION=test-session-1 forge hook user-prompt-submit \
+  | tee /tmp/qa-direct-model.json
+jq -e '
+  .decision == "block"
+  and (.reason | contains("Session: qa-route-authority"))
+  and (.reason | contains("Committed route: proxy"))
+  and (.reason | contains("Route evidence: route_commit"))
+' /tmp/qa-direct-model.json
+
+mkdir -p .claude/plans
+cat > .claude/plans/qa-direct-plan.md <<'EOF'
+# QA Direct Plan
+
+1. Preserve the exact release artifact identity.
+EOF
+jq '.confirmed.latest_plan_path = ".claude/plans/qa-direct-plan.md"' \
+  .forge/sessions/test-session-1/forge.session.json > /tmp/qa-direct-plan-manifest.json
+mv /tmp/qa-direct-plan-manifest.json .forge/sessions/test-session-1/forge.session.json
+echo '{"prompt":"%plan","transcript_path":""}' \
+  | FORGE_SESSION=test-session-1 forge hook user-prompt-submit \
+  | tee /tmp/qa-direct-plan.json
+jq -e '
+  .decision == "block"
+  and (.reason | contains("Plan (draft):"))
+  and (.reason | contains(".claude/plans/qa-direct-plan.md"))
+' /tmp/qa-direct-plan.json
+grep -q "QA Direct Plan" .claude/plans/qa-direct-plan.md
+grep -q "Preserve the exact release artifact identity" .claude/plans/qa-direct-plan.md
+rm -f /tmp/qa-direct-model.json /tmp/qa-direct-plan.json
+```
+
+- [ ] `%session model show` reports the same committed proxy route as the CLI surface
+- [ ] `%plan` resolves the current session's recorded plan path, whose artifact retains the expected content
 
 ---

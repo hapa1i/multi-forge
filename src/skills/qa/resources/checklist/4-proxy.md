@@ -23,11 +23,11 @@ forge proxy template list
 
 - [ ] `forge proxy list` shows "No proxies found." when none exist
 - [ ] `forge proxy list` shows tip to run `forge proxy template list`
-- [ ] `forge proxy template list` shows available templates (19 user-facing: anthropic-passthrough, litellm-anthropic,
-  litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local, litellm-gemini-local, litellm-openai,
-  litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic, openrouter-deepseek, openrouter-gemini,
-  openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax, openrouter-openai,
-  openrouter-openai-codex, openrouter-qwen)
+- [ ] `forge proxy template list` shows available templates (20 user-facing: anthropic-passthrough,
+  codex-responses-local, litellm-anthropic, litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local,
+  litellm-gemini-local, litellm-openai, litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic,
+  openrouter-deepseek, openrouter-gemini, openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax,
+  openrouter-openai, openrouter-openai-codex, openrouter-qwen)
 - [ ] Internal test-only templates (e.g., litellm-gemini-test) are hidden from the default list
 
 ### 4.2 Create a Proxy
@@ -35,6 +35,8 @@ forge proxy template list
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Clean up from previous runs
 forge proxy delete "$FORGE_QA_GEMINI_PROXY" --yes 2>/dev/null || true
 forge proxy delete "$FORGE_QA_OPENAI_PROXY" --yes 2>/dev/null || true
@@ -48,8 +50,15 @@ forge proxy delete test-proxy-nostart --yes 2>/dev/null || true
 # Create named role proxies used by downstream session/review steps.
 forge proxy create "$FORGE_QA_GEMINI_TEMPLATE" --name "$FORGE_QA_GEMINI_PROXY"
 
-# Create a named review proxy with per-tier overrides
-forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name "$FORGE_QA_OPENAI_PROXY" --opus-reasoning high
+# Create a named review proxy with a non-default per-tier override. Both supported
+# OpenAI templates default opus reasoning to high, so low makes the override observable.
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name "$FORGE_QA_OPENAI_PROXY" --opus-reasoning low
+forge proxy show "$FORGE_QA_OPENAI_PROXY" --raw | /opt/forge-qa/bin/python -c '
+import sys, yaml
+config = yaml.safe_load(sys.stdin)
+assert config["tier_overrides"]["opus"]["reasoning_effort"] == "low"
+print("OPUS_REASONING_OVERRIDE=low")
+'
 
 # Create workflow-default aliases so section 14 exercises production default proxy IDs.
 # In remote-litellm profile these names intentionally point at remote LiteLLM-backed proxies.
@@ -97,27 +106,19 @@ forge proxy show test-proxy-nostart
 
 <!-- prereq: 4.2 -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-In the **container shell**, run these commands to view, edit, validate, and delete a proxy. The `edit` command opens
-`$EDITOR` — verify it launches.
-
-```
-# View proxy config
-forge proxy show <proxy_id>
-
-# Edit proxy config (opens in $EDITOR)
-forge proxy edit <proxy_id>
-
-# Validate proxy config
-forge proxy validate <proxy_id>
-
-# Delete a proxy
-forge proxy delete <proxy_id>
+```bash
+forge proxy delete edit-test-proxy --yes 2>/dev/null || true
+forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --no-start --name edit-test-proxy
+forge proxy show edit-test-proxy
+EDITOR=true forge proxy edit edit-test-proxy
+forge proxy validate edit-test-proxy
+forge proxy delete edit-test-proxy --yes
 ```
 
 - [ ] `show` displays full proxy configuration
-- [ ] `edit` opens proxy.yaml in editor
+- [ ] `EDITOR=true` exercises the edit path non-interactively and leaves valid YAML
 - [ ] `validate` reports config health
 - [ ] `delete` removes proxy and cleans up registry
 
@@ -141,6 +142,8 @@ forge proxy list   # auto-prunes dead-PID entries as a side effect
 <!-- requires: api_key -->
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 In the **container shell**, create a session bound to a proxy, then launch Claude through the proxy.
 
@@ -181,6 +184,8 @@ forge claude start --proxy "$FORGE_QA_OPENAI_PROXY" -- --debug
 
 <!-- human:guided -->
 
+<!-- evidence: automated-suite -->
+
 Now launch Claude (or reuse the session from 4.6):
 
 ```
@@ -206,7 +211,7 @@ Exit the Claude session when done.
 
 ### 4.8 Proxy Delete UX (Confirmation + Smart-Pointer Semantics)
 
-<!-- prereq: 4.2, 4.6 -->
+<!-- prereq: 4.2 -->
 
 <!-- human:guided -->
 
@@ -218,6 +223,8 @@ In the **container shell**:
 ```
 # Clean up from previous runs
 forge proxy delete delete-test-proxy --yes 2>/dev/null || true
+forge session delete proxy-session --yes --force 2>/dev/null || true
+forge session start proxy-session --proxy "$FORGE_QA_OPENAI_PROXY" --no-launch
 
 # Create an alias on the same shared port as the QA OpenAI proxy
 forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --no-start --name delete-test-proxy
@@ -334,24 +341,50 @@ forge proxy stop test-proxy-nostart 2>&1; echo "EXIT=$?"
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
+# Add one genuinely unreachable configured proxy on a distinct port so the null
+# aggregate contract is observable rather than aliased to a healthy shared port.
+forge proxy delete metrics-unreachable-qa --yes --no-kill 2>/dev/null || true
+forge proxy create "$FORGE_QA_GEMINI_TEMPLATE" --name metrics-unreachable-qa --port 18202 --no-start
+cleanup_metrics_fixture() {
+  forge proxy delete metrics-unreachable-qa --yes --no-kill >/dev/null 2>&1 || true
+}
+trap cleanup_metrics_fixture EXIT
+
 # Metrics for a running proxy (QA Gemini proxy created in 4.2)
 forge proxy metrics "$FORGE_QA_GEMINI_PROXY"
 
-# JSON output
-forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json
+# A selected proxy returns its raw metrics object.
+SELECTED_JSON=$(forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json)
+printf '%s\n' "$SELECTED_JSON" | jq -e '
+  (.total_requests | type == "number")
+  and (.tokens | type == "object")
+  and (.by_tier | type == "object")
+  and (.by_model | type == "object")
+  and (.costs | type == "object")
+'
 
 # All proxies (the default aggregate when more than one is registered)
 forge proxy metrics
 
-# All proxies JSON (must be a single valid JSON object)
-forge proxy metrics --json
+# Bare JSON is one proxy-id map; unreachable entries are null.
+ALL_JSON=$(forge proxy metrics --json)
+printf '%s\n' "$ALL_JSON" | jq -e --arg live "$FORGE_QA_GEMINI_PROXY" '
+  type == "object"
+  and (.[$live] | type == "object")
+  and has("metrics-unreachable-qa")
+  and .["metrics-unreachable-qa"] == null
+'
+
+cleanup_metrics_fixture
+trap - EXIT
 ```
 
-- [ ] `forge proxy metrics` displays request counts, token totals, per-tier breakdown
-- [ ] Per-tier breakdown includes avg latency
-- [ ] `--json` outputs valid parseable JSON
-- [ ] bare `metrics --json` (with >1 proxy) outputs a single valid JSON object (not one per proxy)
-- [ ] Unreachable proxies show `null` in `metrics --json` output
+- [ ] `forge proxy metrics` displays request counts, token totals, per-tier/per-model maps, and cost totals
+- [ ] Selected `--json` returns one raw, parseable metrics object with the documented schema
+- [ ] Bare `metrics --json` returns a single proxy-id map with the healthy selected proxy as an object
+- [ ] The distinct configured-only proxy is `null` in the aggregate, then is removed
 
 ### 4.14 Proxy Metrics (Not Found / Shared-Port)
 
@@ -400,6 +433,8 @@ forge model backend show litellm-4000 --raw
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # List all templates -- should now include OpenRouter alongside LiteLLM
 forge proxy template list
@@ -417,8 +452,8 @@ forge proxy template show openrouter-minimax
 forge proxy template show openrouter-qwen
 ```
 
-- [ ] `forge proxy template list` shows 19 user-facing templates total (8 litellm + 10 openrouter + 1
-  anthropic-passthrough)
+- [ ] `forge proxy template list` shows 20 user-facing templates total (8 LiteLLM + 10 OpenRouter +
+  `anthropic-passthrough` + `codex-responses-local`)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
   opus=claude-opus-5)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
@@ -586,7 +621,7 @@ forge proxy delete passthrough-test --yes 2>/dev/null || true
 
 <!-- auto -->
 
-<!-- requires: proxy,api-key -->
+<!-- requires: proxy,api_key -->
 
 Use a disposable proxy with conflicting legacy retention inputs. The proxy must stay reachable while runtime truth
 reports that destructive maintenance was disabled.
@@ -615,43 +650,54 @@ forge proxy delete retention-degraded-qa --yes
 - [ ] Runtime truth reports top-level `status: degraded` and names `retention-degraded-qa` in the nested conflicts
 - [ ] The disposable degraded proxy stops and deletes cleanly
 
-### 4.23 Stop Failure Retains Proxy Ownership
+### 4.23 Configured Row Does Not Claim a Foreign Listener
 
 <!-- prereq: 4.2 -->
 
 <!-- auto -->
 
-Use a foreign HTTP listener to force the adopted-process identity guard. The failed required stop must leave every
-recovery surface intact.
+Put a configured-only proxy row on a port already held by a foreign HTTP listener. Because the row was never adopted,
+`--kill-adopted` must remove only Forge's configuration and must not signal the foreign process. The true adopted-PID
+identity-mismatch matrix remains owned by `tests/src/cli/test_proxy_commands.py`.
 
 ```bash
+set -euo pipefail
+
 forge proxy delete ownership-failure-qa --yes --no-kill 2>/dev/null || true
-python3 -m http.server 18201 >/tmp/forge-ownership-failure.log 2>&1 &
+/opt/forge-qa/bin/python -m http.server 18201 >/tmp/forge-ownership-failure.log 2>&1 &
 FOREIGN_PID=$!
+cleanup_foreign_listener() {
+  kill "$FOREIGN_PID" 2>/dev/null || true
+  forge proxy delete ownership-failure-qa --yes --no-kill >/dev/null 2>&1 || true
+}
+trap cleanup_foreign_listener EXIT
 for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:18201/ >/dev/null && break; sleep 0.1; done
 curl --fail --silent http://127.0.0.1:18201/ >/dev/null
 forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --name ownership-failure-qa --port 18201 --no-start
+forge proxy list --json | jq -e '
+  any(.[]; .proxy_id == "ownership-failure-qa" and .status == "configured" and .pid == null)
+'
 
-set +e
 forge proxy delete ownership-failure-qa --yes --kill-adopted \
   >/tmp/forge-ownership-delete.stdout 2>/tmp/forge-ownership-delete.stderr
 DELETE_EXIT=$?
-set -e
 
-test "$DELETE_EXIT" -ne 0
-grep "refusing to stop" /tmp/forge-ownership-delete.stderr
-! grep "Deleted" /tmp/forge-ownership-delete.stdout
+test "$DELETE_EXIT" -eq 0
+grep "Deleted" /tmp/forge-ownership-delete.stdout
 kill -0 "$FOREIGN_PID"
-forge proxy show ownership-failure-qa --raw
+if forge proxy show ownership-failure-qa --raw >/tmp/forge-ownership-show.stdout 2>/tmp/forge-ownership-show.stderr; then
+  echo "ERROR: configured row survived delete" >&2
+  exit 1
+fi
 
 kill "$FOREIGN_PID"
-forge proxy delete ownership-failure-qa --yes --no-kill
+trap - EXIT
 ```
 
-- [ ] The identity-refused delete exits non-zero
-- [ ] The diagnostic is on stderr and stdout does not claim `Deleted`
-- [ ] The foreign listener remains alive after the refused stop
-- [ ] The retained proxy remains readable and can be deleted after the listener stops
+- [ ] Before deletion, the proxy is explicitly `configured` with no adopted PID
+- [ ] `--kill-adopted` exits zero and reports the configured row deleted
+- [ ] The foreign listener remains alive because Forge never claimed it
+- [ ] The proxy row is absent after deletion
 
 ### 4.24 Create Smoke Failure Is One JSON Result
 
@@ -701,6 +747,8 @@ forge proxy delete smoke-json-qa --yes
 
 <!-- requires: api_key -->
 
+<!-- paid-operations: 1 -->
+
 Send a small Anthropic-shaped request with an explicit Claude Code User-Agent through the selected translated proxy. The
 exact sanitized upstream header is pinned by integration tests; this operator smoke catches gateways that reject the
 OpenAI SDK default identity.
@@ -722,9 +770,13 @@ curl --fail --silent --show-error \
 
 <!-- prereq: 2.4 -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-<!-- requires: api_key -->
+<!-- requires: anthropic_api -->
+
+<!-- evidence: extended-exploratory -->
+
+<!-- paid-operations: 1 -->
 
 When a native Anthropic credential is available, send one small request through the signature-safe passthrough and
 inspect the downstream headers. Retry/error parity and the denylist are pinned by hermetic integration tests; this live
@@ -759,5 +811,71 @@ fi
 ```
 
 - [ ] Safe Anthropic rate-limit metadata reaches the downstream response
+
+### 4.27 Backend Lifecycle and Authentication
+
+<!-- prereq: 4.16 -->
+
+<!-- auto -->
+
+```bash
+case "$FORGE_QA_PROVIDER_PROFILE" in
+  openrouter) QA_BACKEND=openrouter ;;
+  remote-litellm) QA_BACKEND=litellm-remote ;;
+esac
+
+forge model backend list --json | jq -e --arg backend "$QA_BACKEND" 'any(.[]; .backend_instance_id == $backend)'
+forge model backend show "$QA_BACKEND" --json | jq -e '.backend_instance_id != null'
+forge model backend test-auth "$QA_BACKEND" --json | jq -e 'type == "object"'
+
+# Exercise the local managed-process object separately from source ids.
+forge model backend stop litellm-4199 --yes 2>/dev/null || true
+forge model backend start litellm --port 4199
+forge model backend show litellm-4199 --json \
+  | jq -e '.found == true and .managed_process.process_id == "litellm-4199"'
+forge model backend stop litellm-4199 --yes
+
+# Delete targets the adapter config, then restore it for later cleanup.
+forge model backend delete litellm --yes
+test ! -d "$FORGE_HOME/backends/litellm"
+forge model backend create litellm
+```
+
+- [ ] Backend list/show expose the selected configured source from the installed wheel
+- [ ] `test-auth` returns structured reachability/auth evidence without exposing credentials
+- [ ] `start` registers `litellm-4199`, and `stop` targets that runtime process id
+- [ ] `delete litellm` removes the adapter config and `create` restores it
+
+### 4.28 Provider Trace and Reconciliation
+
+<!-- prereq: 4.25 -->
+
+<!-- requires: openrouter -->
+
+<!-- auto -->
+
+```bash
+forge telemetry trace list --period all --json | tee /tmp/qa-provider-traces.json
+TRACE_ID=$(jq -r \
+  'map(select(.request_id != null and .backend_id == "openrouter")) | last | .request_id // empty' \
+  /tmp/qa-provider-traces.json)
+test -n "$TRACE_ID"
+
+forge telemetry trace show "$TRACE_ID" --json \
+  | jq -e --arg request_id "$TRACE_ID" '.request_id == $request_id'
+forge telemetry trace explain "$TRACE_ID" --json \
+  | jq -e --arg request_id "$TRACE_ID" '.request_id == $request_id and .remote_lookup_performed == false'
+
+TRACE_BACKEND=$(forge telemetry trace show "$TRACE_ID" --json | jq -r '.backend_id')
+test "$TRACE_BACKEND" = openrouter
+forge model backend reconcile "$TRACE_BACKEND" --request-id "$TRACE_ID" --json \
+  | jq -e '.entries | type == "array"'
+rm -f /tmp/qa-provider-traces.json
+```
+
+- [ ] Trace list returns a bare array containing a real request from this QA run
+- [ ] Trace show returns the matching metadata-only record
+- [ ] Trace explain is explicitly local-only (`remote_lookup_performed=false`)
+- [ ] Backend reconcile joins the request through exactly one `--request-id` selector and returns structured entries
 
 ---

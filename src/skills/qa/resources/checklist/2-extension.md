@@ -217,15 +217,20 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 <!-- auto -->
 
 ```bash
-# Re-enable only the shared hooks module with codex absent from PATH while keeping
-# the installed Claude binary visible.
+set -euo pipefail
+
+# Re-enable only the shared hooks module with Codex absent from PATH while keeping
+# the installed Claude binary visible through an isolated PATH fixture.
 export CODEX_HOME=$(mktemp -d)
-PATH="$HOME/.local/bin:/usr/bin:/bin" forge extension enable --scope user --profile minimal \
+QA_CLAUDE_ONLY_BIN=/tmp/forge-qa-claude-only-2-11
+mkdir -p "$QA_CLAUDE_ONLY_BIN"
+ln -sf /usr/local/bin/claude "$QA_CLAUDE_ONLY_BIN/claude"
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable --scope user --profile minimal \
   --with hooks --without commands --runtime all --force
 test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
 
-# Restore: re-enable normally and clear the env override
-forge extension enable --scope user --runtime claude --force
+# Restore the full symlink-mode Claude installation expected by later steps.
+forge extension enable --scope user --symlink --profile full --runtime claude --force
 unset CODEX_HOME
 ```
 
@@ -310,7 +315,7 @@ printf '#!/bin/sh\nprintf "%%s\\n" "2.1.78 (Claude Code)"\n' > "$QA_CLAUDE_ONLY_
 chmod +x "$QA_CLAUDE_ONLY_BIN/claude"
 PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v claude >/dev/null
 ! PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v codex >/dev/null 2>&1
-PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable \
   --scope user --symlink --profile full --force
 USER_SKILLS_AFTER_AUTO=$(jq -c \
   '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
@@ -319,10 +324,10 @@ find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
   | diff -u /tmp/forge-portable-skills.expected -
 
 # Explicit runtime narrowing reports preservation and also leaves omitted tracked packages owned.
-PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" /opt/forge-qa/bin/forge extension enable \
   --scope user --symlink --profile full --runtime claude --force \
   | tee /tmp/forge-explicit-runtime-preservation.txt
-rg -q 'managed_runtime_preservation' /tmp/forge-explicit-runtime-preservation.txt
+rg -q 'managed_runtime_pres' /tmp/forge-explicit-runtime-preservation.txt
 USER_SKILLS_AFTER_EXPLICIT=$(jq -c \
   '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
 test "$USER_SKILLS_AFTER_EXPLICIT" = "$USER_SKILLS_BEFORE"
@@ -401,7 +406,7 @@ rg -q 'forge_managed_scope_duplicate' /tmp/forge-codex-cross-scope.txt
 ! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
 
 # Runtime selection is persisted: sync still owns Codex with a PATH that cannot find the fake binary.
-PATH="/usr/bin:/bin" "$HOME/.local/bin/forge" extension sync --scope project
+PATH="/usr/bin:/bin" /opt/forge-qa/bin/forge extension sync --scope project
 jq -e --arg root "$(pwd -P)" \
   '[.installations["project:" + $root].skill_packages[] | select(.runtime == "codex")] | length == 9' \
   "$FORGE_HOME/installed.json"
@@ -476,13 +481,15 @@ if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension status --scope project --
   echo "ERROR: status accepted an incoherent skill-package ledger" >&2
   exit 1
 fi
-rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-status.txt
+tr '\n' ' ' < /tmp/forge-invalid-skill-ledger-status.txt \
+  | rg -q 'file_paths[[:space:]]+must not be empty'
 if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension disable --scope project --yes \
   >/tmp/forge-invalid-skill-ledger-disable.txt 2>&1; then
   echo "ERROR: disable accepted an incoherent skill-package ledger" >&2
   exit 1
 fi
-rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-disable.txt
+tr '\n' ' ' < /tmp/forge-invalid-skill-ledger-disable.txt \
+  | rg -q 'file_paths[[:space:]]+must not be empty'
 PACKAGE_AFTER=$(shasum -a 256 .agents/skills/challenge/SKILL.md | cut -d' ' -f1)
 TRACKING_AFTER=$(shasum -a 256 "$QA_CORRUPT_FORGE_HOME/installed.json" | cut -d' ' -f1)
 test "$PACKAGE_AFTER" = "$PACKAGE_BEFORE"

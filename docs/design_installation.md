@@ -185,8 +185,8 @@ make test-integration  # Runs: docker build + docker run pytest
 ### 5.4 Interactive manual testing
 
 Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. The
-portable smoke test runs as `/forge:smoke-test` or `$smoke-test`; the Claude-only `/forge:walkthrough` and `/forge:qa`
-provide the higher isolation tiers. The detailed pattern, annotation types, and wrappers live in
+portable smoke test runs as `/smoke-test` or `$smoke-test`; the Claude-only `/walkthrough` and `/qa` provide the higher
+isolation tiers. The detailed pattern, annotation types, and wrappers live in
 [design_installation.md §D](design_installation.md#d-interactive-manual-testing). The end-user guide is
 [manual_testing.md](end-user/manual_testing.md).
 
@@ -359,15 +359,26 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_SUBPROCESS_TEMPLATE`        | Internal wiring   | Child-process resolved proxy template                               |
 | `FORGE_TEMPLATE`                   | Internal wiring   | Sidecar template metadata                                           |
 | `FORGE_MANUAL_TEST_SYSTEM_PROMPT`  | Test/QA harness   | Manual QA fixture marker                                            |
+| `FORGE_QA_ARTIFACT_MODE`           | Test/QA harness   | Prebuilt release candidate or development-build label               |
 | `FORGE_QA_ANTHROPIC_PROXY`         | Test/QA harness   | QA container proxy fixture                                          |
 | `FORGE_QA_ANTHROPIC_TEMPLATE`      | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_CLAUDE_VERSION`          | Test/QA harness   | Selected Claude client version                                      |
+| `FORGE_QA_CODEX_AUTH_MODE`         | Test/QA harness   | Isolated Codex auth ingress mode; never credential material         |
+| `FORGE_QA_CODEX_VERSION`           | Test/QA harness   | Selected Codex client version                                       |
 | `FORGE_QA_DEEPSEEK_TEMPLATE`       | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_DRIVER_SHA256`           | Test/QA harness   | Host QA-driver digest proven equal to the selected wheel package    |
+| `FORGE_QA_FORGE_VERSION`           | Test/QA harness   | Exact wheel distribution version                                    |
 | `FORGE_QA_GEMINI_PROXY`            | Test/QA harness   | QA container proxy fixture                                          |
 | `FORGE_QA_GEMINI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                       |
 | `FORGE_QA_MINIMAX_TEMPLATE`        | Test/QA harness   | QA container template fixture                                       |
 | `FORGE_QA_OPENAI_PROXY`            | Test/QA harness   | QA container proxy fixture                                          |
 | `FORGE_QA_OPENAI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                       |
 | `FORGE_QA_PROVIDER_PROFILE`        | Test/QA harness   | QA provider profile selector                                        |
+| `FORGE_QA_RUNTIME_TRACK`           | Test/QA harness   | Pinned blocking or latest compatibility runtime track               |
+| `FORGE_QA_RUNTIME_TRACK_BLOCKING`  | Test/QA harness   | Whether the selected runtime track can gate a release               |
+| `FORGE_QA_WHEEL_FILENAME`          | Test/QA harness   | Exact wheel basename                                                |
+| `FORGE_QA_WHEEL_PATH`              | Test/QA harness   | Canonical host artifact path recorded for the run                   |
+| `FORGE_QA_WHEEL_SHA256`            | Test/QA harness   | Exact wheel digest                                                  |
 | `FORGE_QA_WORKFLOW_MODEL_A`        | Test/QA harness   | QA workflow model fixture                                           |
 | `FORGE_QA_WORKFLOW_MODEL_B`        | Test/QA harness   | QA workflow model fixture                                           |
 | `FORGE_QA_WORKFLOW_MODELS`         | Test/QA harness   | QA workflow model fixture                                           |
@@ -604,6 +615,10 @@ declares the cross-runtime source policy, and all shipped sources default false.
 compiles the effective mode into both runtime outputs; malformed config fails safe to explicit-only. Executables use
 their entry point. Codex emits family `openai`, no exact model, and ignores Claude sessions.
 
+Claude packages are standalone skills, not plugins. Their frontmatter `name` matches the package directory and Claude
+invokes them as `/<skill>`. A colon namespace such as `/forge:<skill>` is assigned only to plugin skills by the plugin
+manifest; putting that spelling in standalone frontmatter neither creates the namespace nor changes discovery.
+
 SKILLS planning is explicit over scope/runtime/profile/skill:
 
 | Runtime       | User target                    | Project target                  | Local target                      |
@@ -677,11 +692,11 @@ deterministic and the agent only interprets results. Checklist edits change test
 
 **Three skills** with escalating isolation and explicit runtime boundaries:
 
-| Skill                               | Runtime        | Install requirement | Isolation                                          | Audience          |
-| ----------------------------------- | -------------- | ------------------- | -------------------------------------------------- | ----------------- |
-| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | SKILLS module       | Host, read-only probes                             | End users         |
-| `/forge:walkthrough`                | Claude only    | SKILLS module       | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
-| `/forge:qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
+| Skill                         | Runtime        | Install requirement | Isolation                                          | Audience          |
+| ----------------------------- | -------------- | ------------------- | -------------------------------------------------- | ----------------- |
+| `/smoke-test` / `$smoke-test` | Claude + Codex | SKILLS module       | Host, read-only probes                             | End users         |
+| `/walkthrough`                | Claude only    | SKILLS module       | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
+| `/qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
 
 **Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
 mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
@@ -696,26 +711,40 @@ verification.
 - Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
   script counts
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
-- `/forge:qa` tied to `full` install profile (Docker dependency)
+- `/qa` tied to `full` install profile (Docker dependency)
+- `/qa` remains Claude-hosted; Claude and Codex are independent subjects under test
+- Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
+- Before Docker mutation, the Claude-hosted QA driver must have the same managed paths and bytes as the QA package in
+  that wheel. The recorded driver digest makes a stale installed checklist ineligible for release evidence
+- The wheel environment exposes `/usr/local/bin/forge` as a stable symlink to its isolated launcher so runtime hooks
+  retain the durable-global-launcher contract without recording the venv path directly
+- The repository-owned runtime matrix pins blocking Claude/Codex clients; the image disables Claude self-update and a
+  final runtime probe must still match the starting pins; `latest` is compatibility evidence only
+- QA contracts use four lanes: `automated-suite`, `clean-wheel-smoke`, `human-acceptance`, and `extended-exploratory`;
+  the default runner selects the middle two
+- Blocking selection is capped at 12 human checkpoints and 8 subject-under-test model completions. Duration above 45
+  minutes requires review but is not a correctness failure
 
 > See also [testing_guidelines.md](developer/testing_guidelines.md) for the full testing reference.
 
 ### D.1 Annotation types
 
-| Annotation               | Session A does                                 | User does                              |
-| ------------------------ | ---------------------------------------------- | -------------------------------------- |
-| `<!-- auto -->`          | Runs command via wrapper, checks assertions    | Nothing                                |
-| `<!-- human:confirm -->` | Runs command, shows output                     | Eyeballs output in Session A, confirms |
-| `<!-- human:guided -->`  | Tells user what to do in Session B or Terminal | Does it, reports back to Session A     |
-| `<!-- requires: X -->`   | Checks infra probe                             | Skip if unavailable                    |
-| `<!-- destructive -->`   | Runs command (safe in sandbox)                 | Nothing                                |
+| Annotation                    | Session A does                                     | User does                              |
+| ----------------------------- | -------------------------------------------------- | -------------------------------------- |
+| `<!-- auto -->`               | Runs command via wrapper, checks assertions        | Nothing                                |
+| `<!-- human:confirm -->`      | Runs command, shows output                         | Eyeballs output in Session A, confirms |
+| `<!-- human:guided -->`       | Tells user what to do in Session B or Terminal     | Does it, reports back to Session A     |
+| `<!-- requires: X -->`        | Checks infra probe                                 | Skip if unavailable                    |
+| `<!-- destructive -->`        | Runs command (safe in sandbox)                     | Nothing                                |
+| `<!-- evidence: L -->`        | Applies the precomputed evidence selection         | Nothing                                |
+| `<!-- paid-operations: N -->` | Records the maximum subject-under-test completions | Nothing                                |
 
 ### D.2 Wrapper abstraction
 
-| Skill                | Wrapper                        | Isolation                               |
-| -------------------- | ------------------------------ | --------------------------------------- |
-| `/forge:walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
-| `/forge:qa`          | `docker exec $CONTAINER <cmd>` | OS-level container boundary             |
+| Skill          | Wrapper                        | Isolation                               |
+| -------------- | ------------------------------ | --------------------------------------- |
+| `/walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
+| `/qa`          | `docker exec $CONTAINER <cmd>` | Container plus one host QA-state mount  |
 
 **Three-window model:** Session A prompts the user to open Terminal early. Session B is launched only when the checklist
 first needs interactive verification.
@@ -730,8 +759,15 @@ cleanup. Hermetic isolation via `setup-test-repo.sh` (Forge/Claude/Codex home re
 numbered gates in `run-in-repo.sh`).
 
 **Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
-(`resources/checklist.md` + `resources/checklist/*.md`). Includes `human:guided` items for interactive verification.
-State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
+(`resources/checklist.md` + `resources/checklist/*.md`). `start-container.sh` builds or consumes one wheel, installs it
+under `/opt/forge-qa`, and records artifact/runtime identity. `qa-selection.py` excludes automated-suite owners and
+enforces the blocking budget; `qa-run-metrics.py` joins saved state with that selection so partial, development,
+compatibility, incomplete, and duration-review results cannot be reported as a release pass. `--from X.Y` resume must
+reuse the same wheel, runtime track, provider profile, and container identity. Paid observations are stored per selected
+step and counted only when that step has current-scope structural-hash evidence. The pinned client pair and probe facts
+live in `resources/runtime-matrix.json`; the `latest` track rebuilds without client-layer cache and never reuses a
+running QA container. The OpenRouter profile owns the blocking provider-trace/reconciliation seam, so the legacy
+remote-LiteLLM profile is diagnostic evidence rather than a complete release verdict.
 
 **Deterministic bookkeeper** (`walkthrough-state.py`): Each checklist-driven skill keeps a local state script that
 parses its checklist markdown into structured JSON. Commands: `index`, `step N.X`, and `summary` for read-only

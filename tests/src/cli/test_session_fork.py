@@ -16,6 +16,7 @@ import forge.cli.session as session_cli
 from forge.cli.main import main
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
+from forge.session.claude import ClaudeBinaryNotFoundError
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
@@ -777,7 +778,12 @@ class TestSessionFork:
         manager.fork_session produces when no worktree is created (the path is the shared parent
         checkout). Downstream code gates on is_worktree, never truthiness.
         """
-        parent = create_session_state("fork-parent", worktree_path=str(temp_env), worktree_branch="main")
+        parent = create_session_state(
+            "fork-parent",
+            worktree_path=str(temp_env),
+            worktree_branch="main",
+            launch_mode=fork_launch_mode,
+        )
         parent.confirmed.claude_session_id = "parent-uuid"
         fork_state = create_session_state(
             "fork-child",
@@ -894,6 +900,25 @@ class TestSessionFork:
         assert kwargs.get("fork_session") is True
         assert kwargs.get("session_id") is None
         assert mock_manager.fork_session.call_args.kwargs.get("resume_mode") is None
+
+    def test_samedir_fork_without_claude_refuses_before_child_creation(self, runner: CliRunner, temp_env: Path) -> None:
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
+            patch(
+                "forge.core.ops.claude_session.require_claude_binary",
+                side_effect=ClaudeBinaryNotFoundError("Claude Code CLI not found on PATH. Install Claude Code."),
+            ),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            _configure_mock_fork_manager(mock_manager, parent, temp_env)
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(main, ["session", "fork", "fork-parent", "-n", "fork-child"])
+
+        assert result.exit_code == 1
+        assert "Claude Code CLI not found on PATH" in result.output
+        assert "Traceback" not in result.output
+        mock_manager.fork_session.assert_not_called()
 
     def test_samedir_transfer_sidecar_registers_fork(self, runner: CliRunner, temp_env: Path) -> None:
         """Sidecar same-dir transfer: launch_claude_session gets a fresh session_id,
@@ -1128,6 +1153,7 @@ class TestSessionFork:
                 "forge.session.claude.relocate_transcript",
                 side_effect=RelocateConflictError("dup"),
             ),
+            successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
             _configure_mock_fork_manager(mock_manager, parent, temp_env)
@@ -1162,6 +1188,7 @@ class TestSessionFork:
                 "forge.session.claude.relocate_transcript",
                 side_effect=PermissionError("denied"),
             ),
+            successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
             _configure_mock_fork_manager(mock_manager, parent, temp_env)
@@ -1199,6 +1226,7 @@ class TestSessionFork:
             proxy_base_url="http://localhost:8085",
             worktree_path=str(temp_env),
             worktree_branch="main",
+            launch_mode=LAUNCH_MODE_SIDECAR,
         )
         parent.confirmed.claude_session_id = "parent-uuid"
 

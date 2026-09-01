@@ -55,14 +55,12 @@ def skill_installer(tmp_path: Path, isolate_claude_home: Path) -> tuple[Installe
     # Skills: walkthrough (no profile requirement)
     wt = src / "skills" / "walkthrough"
     wt.mkdir(parents=True)
-    (wt / "SKILL.md").write_text(
-        "---\nname: forge:walkthrough\ndescription: Test walkthrough skill\n---\n# Walkthrough\n"
-    )
+    (wt / "SKILL.md").write_text("---\nname: walkthrough\ndescription: Test walkthrough skill\n---\n# Walkthrough\n")
 
     # Skills: qa (requires full profile)
     qa = src / "skills" / "qa"
     qa.mkdir(parents=True)
-    (qa / "SKILL.md").write_text("---\nname: forge:qa\ndescription: Test QA skill\n---\n# QA\n")
+    (qa / "SKILL.md").write_text("---\nname: qa\ndescription: Test QA skill\n---\n# QA\n")
     qa_scripts = qa / "scripts"
     qa_scripts.mkdir()
     (qa_scripts / "start-container.sh").write_text("#!/bin/bash\n")

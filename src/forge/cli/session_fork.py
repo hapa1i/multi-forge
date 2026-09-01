@@ -42,6 +42,7 @@ from forge.core.ops.claude_session import (
     ClaudeForkResult,
     ClaudeSidecarLaunch,
     fork_claude_session,
+    preflight_host_claude_binary,
 )
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
@@ -494,6 +495,11 @@ def fork(
     parent_launch = preflight.parent.intent.launch
     neutral_route = parent_launch.model_route if parent_launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(preflight.parent, direct=direct)
+    try:
+        preflight_host_claude_binary(use_sidecar=uses_sidecar, no_launch=no_launch)
+    except ForgeOpError as e:
+        print_error(str(e))
+        sys.exit(1)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
         if uses_sidecar:
             print_error(

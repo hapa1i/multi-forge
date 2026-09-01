@@ -17,6 +17,7 @@ from forge.core.reactive.env import (
     FORGE_RUN_ID_VAR,
 )
 from forge.session.claude.invoke import (
+    ClaudeBinaryNotFoundError,
     _build_command,
     _build_environment,
     _run_claude,
@@ -244,6 +245,13 @@ class TestRunClaude:
 class TestInvokeClaude:
     """Tests for invoke_claude()."""
 
+    @pytest.fixture(autouse=True)
+    def _available_claude(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "forge.session.claude.invoke.find_claude_binary",
+            lambda: "/usr/local/bin/claude",
+        )
+
     def test_builds_correct_command_for_new_session(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should build correct command for new session."""
         mock_run = Mock(return_value=Mock(returncode=0))
@@ -316,6 +324,22 @@ class TestInvokeClaude:
 
         result = invoke_claude(session_id="test")
         assert result == 1
+
+    def test_missing_binary_raises_actionable_error_before_spawn(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_run = Mock()
+        monkeypatch.setattr("subprocess.run", mock_run)
+        monkeypatch.setattr("forge.session.claude.invoke.find_claude_binary", lambda: None)
+
+        with pytest.raises(ClaudeBinaryNotFoundError, match="Claude Code CLI not found on PATH"):
+            invoke_claude(session_id="test")
+
+        mock_run.assert_not_called()
+
+    def test_disappearing_binary_uses_same_actionable_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("subprocess.run", Mock(side_effect=FileNotFoundError("claude disappeared")))
+
+        with pytest.raises(ClaudeBinaryNotFoundError, match="Claude Code CLI not found on PATH"):
+            invoke_claude(session_id="test")
 
 
 class TestFindClaudeBinary:

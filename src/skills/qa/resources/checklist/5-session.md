@@ -34,7 +34,7 @@ forge session list
 ```
 
 - [ ] Shows `test-session-1` with status
-- [ ] Shows session directory and last-used timestamp
+- [ ] Shows template/model columns and a last-used timestamp
 
 ### 5.3 Show Session Details
 
@@ -85,6 +85,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides'
 
 <!-- human:guided -->
 
+<!-- paid-operations: 2 -->
+
 In the **container shell**, start the parent session routed through the proxy provisioned in 4.2 (Claude will launch --
 interact briefly, then exit with `/exit`). Then fork it **without `--worktree`** (the default). The fork stays in the
 same directory, so Claude's `--resume --fork-session` finds the parent conversation and carries it over. Ask "where were
@@ -129,8 +131,9 @@ cat "$FORGE_TEST_REPO/.forge/sessions/test-session-forked/forge.session.json" | 
 
 Fork the parent session again, this time with `--worktree` for code isolation. The fork gets its own git worktree and
 branch. Because conversations are project-scoped, the fork starts a fresh Claude session in the new worktree and
-automatically injects a parent transfer context file. Ask "where were we?" to confirm the parent context is present,
-then exit (`/exit`).
+automatically injects a parent transfer context file. Confirm that the fresh Claude UI opens after Forge names the
+transfer context, then exit immediately without sending a prompt. Content accuracy is asserted from the generated file
+and by the automated transfer owners; this human checkpoint covers real-runtime delivery without another model call.
 
 Note: `fork --worktree` gives the forked session its own Forge root in the new worktree. The fork manifest and parent
 transfer context should both live under the forked worktree's `.forge/` directory.
@@ -144,8 +147,7 @@ git branch -D test-session-forked-wt 2>/dev/null || true
 
 # Fork with --worktree (creates isolated worktree + branch).
 # Starts fresh Claude with parent transfer context (no --resume attempt).
-# Disable auto-memory so "where were we?" tests Forge transfer, not CC memory.
-# Ask "where were we?" to confirm parent context, then exit (/exit).
+# Confirm the Context line and fresh Claude UI, then exit without sending a prompt.
 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 forge session fork test-session-parent --name test-session-forked-wt --worktree --extensions
 
 # Verify fork
@@ -161,7 +163,7 @@ cat "$WORKTREE_PATH/.forge/prev_sessions/test-session-parent/children/test-sessi
 - [ ] `forge session show` reports type as Fork with worktree info
 - [ ] Fork output shows `Extensions:` line confirming auto-install in worktree
 - [ ] Fork output shows `Context:` line with parent transfer file
-- [ ] Asking "where were we?" reflects parent context
+- [ ] A fresh Claude UI opens in the worktree and exits without a model prompt
 - [ ] Manifest at `${FORGE_TEST_REPO}-test-session-forked-wt/.forge/sessions/test-session-forked-wt/`
 - [ ] Manifest has `is_fork: true`, `parent_session`, `is_worktree: true`
 - [ ] `confirmed.claude_session_id` is populated
@@ -170,27 +172,34 @@ cat "$WORKTREE_PATH/.forge/prev_sessions/test-session-parent/children/test-sessi
 
 ### 5.8 Incognito Session
 
-<!-- requires: api_key -->
+<!-- prereq: 4.2 -->
 
-<!-- human:guided -->
+<!-- requires: proxy -->
 
-Incognito sessions auto-delete on exit, so `--incognito` requires launching Claude (`--no-launch` is mutually
-exclusive). In the **container shell**, launch an incognito session, interact briefly, then exit.
+<!-- auto -->
 
-```
+Incognito sessions auto-delete on exit, so `--incognito` requires a launch. A no-op Claude fixture exercises launcher
+cleanup without spending a model turn.
+
+```bash
 # Clean up from previous runs
 forge session delete test-incognito --yes --force 2>/dev/null || true
 
-# Launch an incognito session (auto-deletes on exit).
-# Say "hello", then exit with /exit.
-forge session incognito test-incognito --proxy "$FORGE_QA_OPENAI_PROXY"
+mkdir -p /tmp/forge-qa-noop-bin
+cat > /tmp/forge-qa-noop-bin/claude <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then echo "2.1.245 (Forge QA fixture)"; fi
+exit 0
+EOF
+chmod +x /tmp/forge-qa-noop-bin/claude
+PATH="/tmp/forge-qa-noop-bin:$PATH" forge session incognito test-incognito --proxy "$FORGE_QA_OPENAI_PROXY"
 
 # After exiting Claude, verify auto-cleanup removed the session
 forge session list
 # Expected: test-incognito should NOT appear (auto-deleted on exit)
 ```
 
-- [ ] Incognito session launches successfully
+- [ ] Incognito launcher exits successfully without a model completion
 - [ ] Session auto-deleted after exit (not in `forge session list`)
 - [ ] No `.forge/sessions/test-incognito/` directory remains
 
@@ -199,6 +208,8 @@ forge session list
 <!-- auto -->
 
 ```bash
+set -euo pipefail
+
 # Clean up from previous runs
 forge session delete test-session-delete-me --yes --force 2>/dev/null || true
 
@@ -218,6 +229,8 @@ forge session list
 Ref-count delete guard: verify that deleting a co-resident session preserves the shared worktree.
 
 ```bash
+set -euo pipefail
+
 # Create a worktree session (owns the worktree)
 forge session delete test-refcount-owner --yes --force 2>/dev/null || true
 forge session delete test-refcount-guest --yes --force 2>/dev/null || true
@@ -237,8 +250,10 @@ cd "$WORKTREE_PATH" && forge extension enable --scope local && cd "$FORGE_TEST_R
 # Fork into the same worktree (guest, does not own)
 forge session fork test-refcount-owner --name test-refcount-guest --into "$WORKTREE_PATH" --no-launch
 
-# Delete the guest — worktree must be preserved
-forge session delete test-refcount-guest --yes --force
+# Delete the guest — both the preview and mutation must preserve the shared worktree.
+forge session delete test-refcount-guest --yes --force 2>&1 | tee /tmp/qa-refcount-delete.out
+rg 'Worktree will be kept' /tmp/qa-refcount-delete.out
+! rg 'Worktree will be removed' /tmp/qa-refcount-delete.out
 
 # Verify worktree still exists
 test -d "$WORKTREE_PATH" && echo "WORKTREE_PRESERVED=true" || echo "WORKTREE_PRESERVED=false"
@@ -246,6 +261,7 @@ forge session list | grep test-refcount-owner
 ```
 
 - [ ] Guest session deleted successfully
+- [ ] Delete preview says the shared worktree will be kept and does not claim it will be removed
 - [ ] Worktree directory preserved (owner session still holds a reference)
 - [ ] Owner session still listed and functional
 
@@ -284,20 +300,21 @@ cat "$MANIFEST" | jq '.worktree.is_worktree'
 
 ### 5.11 System Prompt Generation
 
+<!-- prereq: 5.8 -->
+
 <!-- requires: api_key -->
 
-<!-- human:guided -->
+<!-- auto -->
 
-System prompts are injected at launch time (`--system-prompt` is mutually exclusive with `--no-launch`). In the
-**container shell**, launch a session with a custom system prompt, verify the generated file, then exit.
+System prompts are injected at launch time (`--system-prompt` is mutually exclusive with `--no-launch`). The no-op
+Claude fixture from 5.8 exercises generation without a model completion.
 
-```
+```bash
 # Clean up from previous runs
 forge session delete test-session-system-prompt --yes --force 2>/dev/null || true
 
-# Launch a session with an inline system prompt.
-# Say "hello", then exit with /exit.
-forge session start test-session-system-prompt --proxy "$FORGE_QA_OPENAI_PROXY" --system-prompt "FORGE_MANUAL_TEST_SYSTEM_PROMPT"
+PATH="/tmp/forge-qa-noop-bin:$PATH" forge session start test-session-system-prompt \
+  --proxy "$FORGE_QA_OPENAI_PROXY" --system-prompt "FORGE_MANUAL_TEST_SYSTEM_PROMPT"
 
 # After exiting Claude, verify the generated file
 test -f .claude/forge.system-prompt.generated.md && echo "FILE_EXISTS=true" || echo "FILE_EXISTS=false"
@@ -426,6 +443,8 @@ grep -c "greet function" "$TRANSFER"
 <!-- requires: api_key -->
 
 <!-- human:guided -->
+
+<!-- evidence: automated-suite -->
 
 Fork a session into an existing non-main worktree using `--into`. Unlike `--worktree` (which creates a new worktree),
 `--into` reuses an existing one and marks the session as non-owning — the worktree is preserved when the session is
@@ -589,6 +608,10 @@ cd $FORGE_TEST_REPO
 # Clean up from previous runs
 forge session delete nr-into-parent --yes --force 2>/dev/null || true
 NR_WT="${FORGE_TEST_REPO}-nr-into-target"
+if [ -d "$NR_WT" ]; then
+  (cd "$NR_WT" && forge extension disable --scope local --yes) \
+    || { echo "ERROR: could not remove stale local extension ownership" >&2; exit 1; }
+fi
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
 
@@ -604,7 +627,9 @@ jq --arg cwd "$NR_WT" \
   "$PJSON" > /tmp/nri.json && mv /tmp/nri.json "$PJSON"
 
 # Create the exact transcript file the CLI preflight checks (encoding-agnostic via the real helper).
-TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))") \
+  || { echo "ERROR: wheel interpreter could not resolve the parent transcript" >&2; exit 1; }
+test -n "$TP" || { echo "ERROR: parent transcript path is empty" >&2; exit 1; }
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"type":"thinking","signature":"x"}' > "$TP"
 
@@ -614,7 +639,9 @@ forge session fork nr-into-parent --into "$NR_WT" --resume-mode native-relocate 
 # The parent's original transcript must be untouched.
 test -f "$TP" && echo "PARENT_TRANSCRIPT_PRESERVED=true" || echo "PARENT_TRANSCRIPT_PRESERVED=false"
 
-# Clean up
+# Clean up extension ownership before removing its root.
+(cd "$NR_WT" && forge extension disable --scope local --yes) \
+  || { echo "ERROR: could not remove local extension ownership" >&2; exit 1; }
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
 forge session delete nr-into-parent --yes --force 2>/dev/null || true
@@ -626,35 +653,59 @@ forge session delete nr-into-parent --yes --force 2>/dev/null || true
 
 ### 5.21 Session-End Activity Summary
 
+<!-- prereq: 5.8 -->
+
 <!-- requires: api_key -->
 
-<!-- human:confirm -->
+<!-- auto -->
 
-On exit the launcher prints a one-line rollup of what Forge did this session (policy/supervisor outcomes, workflows,
-cost, tokens) just before the reconnect tip -- the one session-end channel Claude Code does not suppress. It is the
-interactive complement to the non-interactive `forge telemetry activity` (section 7.12).
+The launcher reads the same durable usage ledger as `forge telemetry activity`. Seed one session-scoped event and use
+the no-op Claude fixture to exercise the exit renderer without a model completion.
 
-In the **container shell**, launch a session through the QA proxy, do a little work (a file edit or two so the
-supervisor runs when a policy bundle is enabled), then exit (`/exit`) and read the final lines.
+```bash
+set -euo pipefail
 
-```
-# Launch through the QA proxy. Interact briefly, edit a file, then exit (/exit).
+cleanup_session_end_fixture() {
+  forge session delete test-session-end --yes --force >/dev/null 2>&1 || true
+  rm -f "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl" /tmp/qa-session-end.out
+}
+trap cleanup_session_end_fixture EXIT
+
 forge session delete test-session-end --yes --force 2>/dev/null || true
-forge session start test-session-end --proxy "$FORGE_QA_OPENAI_PROXY"
+SESSION_END_BIN=/tmp/forge-qa-session-end-bin
+mkdir -p "$SESSION_END_BIN"
+cat > "$SESSION_END_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  echo "2.1.245 (Forge QA fixture)"
+  exit 0
+fi
+mkdir -p "$FORGE_HOME/usage/events"
+# The launcher lower-bound has subsecond precision; cross the next second before
+# writing a whole-second fixture timestamp so it is unambiguously in-run.
+sleep 1
+TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+printf '%s\n' \
+  "{\"schema_version\":1,\"run_id\":\"qa-session-end-run\",\"root_run_id\":\"qa-session-end-run\",\"runtime\":\"claude_code\",\"command\":\"supervisor\",\"status\":\"error\",\"session\":\"test-session-end\",\"attribution_granularity\":\"verb\",\"confidence\":\"reported\",\"cost_micro_usd\":40000,\"ts\":\"$TS\"}" \
+  > "$FORGE_HOME/usage/events/qa-session-end_99999.jsonl"
+exit 0
+EOF
+chmod +x "$SESSION_END_BIN/claude"
+PATH="$SESSION_END_BIN:$PATH" forge session start test-session-end \
+  --proxy "$FORGE_QA_OPENAI_PROXY" 2>&1 | tee /tmp/qa-session-end.out
+rg 'Forge this session.*failing open: 1 error.*\$0\.04' /tmp/qa-session-end.out
 
-# After exiting, the same activity is available non-interactively:
 forge telemetry activity test-session-end
 
 # Clean up
-forge session delete test-session-end --yes --force 2>/dev/null || true
+cleanup_session_end_fixture
+trap - EXIT
 ```
 
-- [ ] When the session had activity, a `Forge this session — …` summary line prints on exit, before the reconnect tip
-- [ ] The line reports supervisor `errors` when an LLM call failed (e.g. an OpenRouter content-filter rejection)
-- [ ] If a cost figure appears, it carries the `~` best-effort marker (e.g. `~$0.04`) with no ` est` suffix (Phase 6
-  dropped ` est`)
-- [ ] `forge telemetry activity test-session-end` reports the same session's activity (or `No Forge activity` if the
-  session was idle)
+- [ ] The launcher prints a `Forge this session` summary before the reconnect tip
+- [ ] The line reports `failing open: 1 error` and exact reported cost `$0.04` without an estimate marker
+- [ ] `forge telemetry activity test-session-end` reports the same session activity
+- [ ] Fixture event, output, and session are removed
 
 ### 5.22 Same-Directory Transfer Fork (`--resume-mode transfer` + auto-switch)
 
@@ -677,7 +728,9 @@ forge session start sd-xfer-parent --no-launch
 
 # Seed a parent transcript so transfer has content to assemble (same dir = project root).
 PJSON=".forge/sessions/sd-xfer-parent/forge.session.json"
-TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))")
+TP=$(/opt/forge-qa/bin/python -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))") \
+  || { echo "ERROR: wheel interpreter could not resolve the parent transcript" >&2; exit 1; }
+test -n "$TP" || { echo "ERROR: parent transcript path is empty" >&2; exit 1; }
 mkdir -p "$(dirname "$TP")"
 printf '%s\n' '{"requestId":"r1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"hello from sd parent"}]}}' > "$TP"
 jq --arg tp "$TP" '.confirmed.transcript_path = $tp | .confirmed.claude_session_id = "fixture-sd-xfer"' \
@@ -773,5 +826,303 @@ forge session delete qa-workspace-main --yes --force
 - [ ] Moving the checkout away preserves its row and renders `missing (prunable)`
 - [ ] Missing-row JSON keeps `path_exists=false` and Git's independent `is_prunable=true` fact
 - [ ] A non-Git directory returns one primary member and `common_dir=null`
+
+### 5.24 Managed Codex with Default Context Delivery
+
+<!-- prereq: 2.4 -->
+
+<!-- requires: codex -->
+
+<!-- paid-operations: 1 -->
+
+<!-- auto -->
+
+Create a small parent transcript, run one bounded Codex turn through the installed wheel, and require Codex to recover
+an oracle that exists only in the generated transfer. That proves the default delivery mode put the parent context in
+the initial message. This step does not claim Codex hook enrollment.
+
+```bash
+set -euo pipefail
+
+cd "$FORGE_TEST_REPO"
+forge session delete qa-codex-parent qa-codex-initial --yes --force 2>/dev/null || true
+forge session start qa-codex-parent --no-launch
+
+CODEX_PARENT_UUID=11111111-2222-4333-8444-555566667777
+CODEX_PARENT_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
+  "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$CODEX_PARENT_UUID'))")
+mkdir -p "$(dirname "$CODEX_PARENT_TRANSCRIPT")"
+cat > "$CODEX_PARENT_TRANSCRIPT" <<'EOF'
+{"requestId":"qa-codex-parent","message":{"role":"user","content":[{"type":"text","text":"The release token is CEDAR."}]}}
+{"requestId":"qa-codex-parent","message":{"role":"assistant","content":[{"type":"text","text":"Recorded CEDAR for the handoff."}]}}
+EOF
+jq --arg uuid "$CODEX_PARENT_UUID" --arg transcript "$CODEX_PARENT_TRANSCRIPT" \
+  '.confirmed.claude_session_id = $uuid | .confirmed.transcript_path = $transcript' \
+  .forge/sessions/qa-codex-parent/forge.session.json > /tmp/qa-codex-parent.json
+mv /tmp/qa-codex-parent.json .forge/sessions/qa-codex-parent/forge.session.json
+
+forge runtime preflight codex --json | jq -e '.ready == true'
+forge session start qa-codex-initial \
+  --runtime codex \
+  --resume-from qa-codex-parent \
+  --strategy structured \
+  --sandbox read-only \
+  --task 'Read the supplied parent context. Reply with FORGE_CODEX_ followed immediately by its release token. Do not modify files.' \
+  2>&1 | tee /tmp/qa-codex-initial.out
+rg 'FORGE_CODEX_CEDAR' /tmp/qa-codex-initial.out
+
+CODEX_MANIFEST=.forge/sessions/qa-codex-initial/forge.session.json
+jq -e '
+  .intent.launch.runtime == "codex"
+  and (.confirmed.codex.thread_id | type == "string" and length > 0)
+  and .confirmed.codex.context_delivery == "initial_message"
+  and (.confirmed.codex.rollout_path | type == "string" and length > 0)
+  and .confirmed.derivation.parent_session == "qa-codex-parent"
+  and .confirmed.derivation.context_file == ".forge/prev_sessions/qa-codex-parent/children/qa-codex-initial.md"
+  and .confirmed.route_commit != null
+' "$CODEX_MANIFEST"
+test -f "$(jq -r '.confirmed.codex.rollout_path' "$CODEX_MANIFEST")"
+test -f .forge/prev_sessions/qa-codex-parent/children/qa-codex-initial.md
+rm -f /tmp/qa-codex-initial.out
+```
+
+- [ ] Static Codex preflight is ready in the isolated QA identity
+- [ ] One bounded installed-wheel Codex turn succeeds and returns the parent-context oracle text
+- [ ] The manifest records runtime `codex`, a real thread id, rollout path, and route commitment
+- [ ] `confirmed.codex.context_delivery` is exactly `initial_message`
+- [ ] The derivation points at the parent and the named child transfer snapshot
+
+### 5.25 Model Route and Artifact Authority
+
+<!-- prereq: 2.4, 4.2 -->
+
+<!-- auto -->
+
+Use a no-op Claude executable as the launcher boundary. It invokes the installed authority hook from inside the marked
+advisory run, proving a read is allowed and a write is denied without spending a model turn.
+
+```bash
+cd "$FORGE_TEST_REPO"
+forge session delete qa-route-authority --yes --force 2>/dev/null || true
+forge session start qa-route-authority \
+  --proxy "$FORGE_QA_OPENAI_PROXY" \
+  --model gpt-5.6-sol \
+  --no-launch
+forge session authority set qa-route-authority --role advisory
+
+mkdir -p /tmp/forge-qa-authority-bin
+cat > /tmp/forge-qa-authority-bin/claude <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  echo "2.1.245 (Forge QA fixture)"
+  exit 0
+fi
+payload() {
+  jq -nc --arg cwd "$FORGE_FORGE_ROOT" --arg tool "$1" \
+    '{session_id:"qa-authority",hook_event_name:"PreToolUse",cwd:$cwd,tool_name:$tool,tool_input:{file_path:"src/main.py"}}'
+}
+payload Read | forge hook authority-check
+READ_RC=$?
+set +e
+payload Write | forge hook authority-check >/tmp/qa-authority-write.stdout 2>/tmp/qa-authority-write.stderr
+WRITE_RC=$?
+set -e
+printf 'read=%s write=%s\n' "$READ_RC" "$WRITE_RC" > /tmp/qa-authority-hook.rc
+test "$READ_RC" -eq 0
+test "$WRITE_RC" -eq 2
+exit 0
+EOF
+chmod +x /tmp/forge-qa-authority-bin/claude
+PATH="/tmp/forge-qa-authority-bin:$PATH" forge session resume qa-route-authority
+
+test "$(cat /tmp/qa-authority-hook.rc)" = 'read=0 write=2'
+rg 'Artifact authority denied' /tmp/qa-authority-write.stderr
+forge session model show qa-route-authority --json | jq -e '
+  .route_intent.requested_model == "gpt-5.6-sol"
+  and .route_intent.kind == "proxy"
+  and .route_commit.kind == "proxy"
+  and .route_commit.evidence_source == "route_commit"
+'
+forge session model history qa-route-authority --json | jq -e '
+  (.events | length) == 1
+  and .events[0].event_type == "launch_routing_committed"
+  and .events[0].payload.route.kind == "proxy"
+'
+forge session authority show qa-route-authority --json | jq -e '
+  .role == "advisory"
+  and .tier == "shell_closed"
+  and .observed_denials.count == 1
+'
+```
+
+- [ ] `--model gpt-5.6-sol` resolves to and commits the selected proxy route
+- [ ] Model show and history expose the committed event rather than intent alone
+- [ ] Authority set/show reports the advisory `shell_closed` contract
+- [ ] The launch-marked hook allows Read, denies Write with exit 2, and journals one denial
+
+### 5.26 Native Adoption and Store Repair
+
+<!-- auto -->
+
+Create native evidence without launching a model, adopt it by full id, prove a dual-runtime match fails closed, then
+deliberately remove one coherent session's global index row and repair it from the authoritative manifest.
+
+```bash
+set -euo pipefail
+
+cd "$FORGE_TEST_REPO"
+forge session delete qa-adopted qa-adopt-ambiguous qa-repair --yes --force 2>/dev/null || true
+
+NATIVE_UUID=22222222-3333-4444-8555-666677778888
+NATIVE_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
+  "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$NATIVE_UUID'))")
+mkdir -p "$(dirname "$NATIVE_TRANSCRIPT")"
+printf '%s\n' \
+  "{\"type\":\"user\",\"cwd\":\"$FORGE_TEST_REPO\",\"message\":{\"content\":\"adopt the release investigation\"}}" \
+  "{\"type\":\"assistant\",\"cwd\":\"$FORGE_TEST_REPO\",\"message\":{\"model\":\"claude-opus-4-8\"}}" \
+  > "$NATIVE_TRANSCRIPT"
+
+forge session adopt --json | jq -e --arg id "$NATIVE_UUID" \
+  'any(.candidates[]; .conversation_id == $id and .user_turns == 1)'
+forge session adopt "$NATIVE_UUID" --name qa-adopted --yes
+jq -e --arg id "$NATIVE_UUID" '
+  .confirmed.claude_session_id == $id
+  and .confirmed.adoption.source_runtime == "claude_code"
+' .forge/sessions/qa-adopted/forge.session.json
+test -f "$NATIVE_TRANSCRIPT"
+
+AMBIGUOUS_UUID=33333333-4444-4555-8666-777788889999
+AMBIGUOUS_TRANSCRIPT=$(/opt/forge-qa/bin/python -c \
+  "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO', '$AMBIGUOUS_UUID'))")
+mkdir -p "$(dirname "$AMBIGUOUS_TRANSCRIPT")" "$CODEX_HOME/sessions/2026/08/26"
+printf '%s\n' "{\"type\":\"user\",\"cwd\":\"$FORGE_TEST_REPO\",\"message\":{\"content\":\"ambiguous\"}}" \
+  > "$AMBIGUOUS_TRANSCRIPT"
+AMBIGUOUS_ROLLOUT="$CODEX_HOME/sessions/2026/08/26/rollout-2026-08-26T00-00-00-$AMBIGUOUS_UUID.jsonl"
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$AMBIGUOUS_UUID\",\"cwd\":\"$FORGE_TEST_REPO\"}}" \
+  > "$AMBIGUOUS_ROLLOUT"
+set +e
+forge session adopt "$AMBIGUOUS_UUID" --name qa-adopt-ambiguous --yes \
+  >/tmp/qa-adopt-ambiguous.stdout 2>/tmp/qa-adopt-ambiguous.stderr
+AMBIGUOUS_RC=$?
+set -e
+test "$AMBIGUOUS_RC" -ne 0
+tr '\n' ' ' </tmp/qa-adopt-ambiguous.stderr | rg 'matches both.*Refusing to guess'
+test ! -d .forge/sessions/qa-adopt-ambiguous
+rm -f "$AMBIGUOUS_TRANSCRIPT" "$AMBIGUOUS_ROLLOUT" \
+  /tmp/qa-adopt-ambiguous.stdout /tmp/qa-adopt-ambiguous.stderr
+
+forge session start qa-repair --no-launch
+/opt/forge-qa/bin/python - <<'PY'
+from forge.session import IndexStore
+from forge.session.identity import make_scoped_key
+
+store = IndexStore()
+index = store.read()
+key = make_scoped_key("qa-repair", "/workspace")
+assert key in index.sessions
+del index.sessions[key]  # Deliberately violate manifest/index coherence for repair QA.
+store.write(index)
+PY
+forge session repair --json | jq -e \
+  'any(.records[]; .name == "qa-repair" and .classification == "repairable") and .apply == null'
+forge session repair --yes --json | jq -e \
+  '.apply.repaired == ["qa-repair"] and .apply.refused == [] and .apply.failed == []'
+forge session list --scope workspace --json | jq -e 'any(.[]; .name == "qa-repair")'
+```
+
+- [ ] Adoption preview finds the exact-CWD native conversation and adoption binds its full id
+- [ ] Adoption preserves the native transcript and records Claude provenance
+- [ ] Matching Claude and Codex evidence for one id fails closed without creating a session
+- [ ] Repair preview is root-scoped and classifies the manifest-only record as repairable
+- [ ] Repair apply republishes the existing manifest without recreating a worktree
+
+### 5.27 Consumer Lane Placement
+
+<!-- prereq: 5.6 -->
+
+<!-- requires: anthropic_api -->
+
+<!-- paid-operations: 1 -->
+
+<!-- auto -->
+
+Exercise every supported consumer through the installed CLI. Configure the semantic supervisor as well so its status
+surface proves the same effective lane; the exhaustive dispatch and billing matrix stays with the automated owners.
+
+```bash
+cd "$FORGE_TEST_REPO"
+forge session delete qa-consumer-lanes --yes --force 2>/dev/null || true
+forge session start qa-consumer-lanes --no-launch
+
+for consumer in supervisor memory_writer shadow_curation team_supervisor; do
+  forge session lane set \
+    --session qa-consumer-lanes \
+    --consumer "$consumer" \
+    --runtime claude_code \
+    --backend anthropic-direct
+done
+forge session lane show --session qa-consumer-lanes --json | tee /tmp/qa-consumer-lanes.json
+jq -e '
+  (.consumers | length) == 4
+  and all(.consumers[]; .requested.runtime == "claude_code" and .requested.backend == "anthropic-direct")
+  and all(.consumers[]; .frozen == null and .drift == false)
+' /tmp/qa-consumer-lanes.json
+
+forge policy supervisor set test-session-parent \
+  --session qa-consumer-lanes \
+  --no-supervisor-proxy \
+  --runtime claude_code \
+  --backend anthropic-direct
+forge policy supervisor status --session qa-consumer-lanes --json | jq -e '
+  .supervisor.resume_id == "test-session-parent"
+  and .supervisor.lane.runtime == "claude_code"
+  and .supervisor.lane.backend == "anthropic-direct"
+'
+
+# One real direct supervisor check proves the keyed container resolves this lane as API-billed.
+SUPERVISOR_INPUT=$(jq -nc --arg cwd "$FORGE_TEST_REPO" '
+  {
+    session_id: "qa-consumer-lanes",
+    hook_event_name: "PreToolUse",
+    cwd: $cwd,
+    tool_name: "Write",
+    tool_input: {file_path: "src/main.py", content: "def hello():\n    return \"world\"\n"}
+  }
+')
+set +e
+printf '%s\n' "$SUPERVISOR_INPUT" \
+  | FORGE_SESSION=qa-consumer-lanes forge hook policy-check \
+  >/tmp/qa-consumer-policy.stdout 2>/tmp/qa-consumer-policy.stderr
+SUPERVISOR_RC=$?
+set -e
+[[ "$SUPERVISOR_RC" -eq 0 || "$SUPERVISOR_RC" -eq 2 ]]
+forge telemetry activity qa-consumer-lanes --period all --json | jq -e '
+  any(.downstream.rows[];
+    .command == "supervisor"
+    and .runtime == "claude_code"
+    and .billing_mode == "api"
+    and .calls >= 1)
+'
+
+for consumer in supervisor memory_writer shadow_curation team_supervisor; do
+  forge session lane clear --session qa-consumer-lanes --consumer "$consumer"
+done
+forge session lane show --session qa-consumer-lanes --json | jq -e '
+  all(.consumers[]; .requested == null and .drift == false)
+  and (.consumers[] | select(.consumer == "supervisor")
+    | .frozen.runtime == "claude_code" and .frozen.backend == "anthropic-direct")
+  and all(.consumers[]; .consumer == "supervisor" or .frozen == null)
+'
+forge policy supervisor remove --session qa-consumer-lanes
+rm -f /tmp/qa-consumer-lanes.json /tmp/qa-consumer-policy.stdout /tmp/qa-consumer-policy.stderr
+```
+
+- [ ] Lane set/show covers all four consumers with the requested direct API-capable lane
+- [ ] No consumer is prematurely frozen and no drift is reported
+- [ ] Supervisor status resolves the same effective lane as the general lane surface
+- [ ] One keyed direct supervisor call is reported as `claude_code/api`
+- [ ] Lane clear drops every request without mutating the supervisor's frozen binding
+- [ ] Unknown/proxied variants and keyless `claude-max` subscription labeling remain owned by automated billing tests
 
 ---

@@ -8,6 +8,18 @@
       "family": "anthropic",
       "tokens": 20683
     },
+    "docs/board/change_log.md": {
+      "sha256": "1372396059133cb32a4fb8e192d50290d7346336ced51dd87dfcfbcff7d72625",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 20682
+    },
+    "docs/board/doing/refresh_release_qa_for_1_0/checklist.md": {
+      "sha256": "e1266192aeb6ef50e3f184b1664439941b558f4d1a23d8876c6db47939c50f0a",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 21295
+    },
     "docs/board/done/codex_frontend/checklist.md": {
       "sha256": "7913507ba21f7de63c3fa4c2a9d6572f5c99bc8e4e68bac28c3976b53e90cf5c",
       "method": "claude-opus-5",
@@ -50,6 +62,12 @@
       "family": "anthropic",
       "tokens": 20153
     },
+    "docs/design_installation.md": {
+      "sha256": "58ea71ceb0e41ffb2b229050b9b5212bd36255b36b1a96510bc7b4c4735a6e64",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 21524
+    },
     "docs/design_runtime.md": {
       "sha256": "4f7f6e5598abf109236d57c77758c527470941b0206bdff2de1723434d6ff285",
       "method": "claude-opus-5",
@@ -69,10 +87,10 @@
       "tokens": 20856
     },
     "docs/design_workflows.md": {
-      "sha256": "2f7c1d15e00d723657ca7c0f9c77e1d78e30a9924f5cbb042af3e6e67a60caa0",
+      "sha256": "43cbfebda3f1c18e032dbd244d420869372ab1df7f7d9c3536cb350fdf25eb2e",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 22947
+      "tokens": 23034
     },
     "docs/end-user/proxy.md": {
       "sha256": "5e450a89ea7a46775c183f0c0ea6d8048989e002ecb18dfc38a1ed305aa047c1",
@@ -85,6 +103,18 @@
       "method": "claude-opus-5",
       "family": "anthropic",
       "tokens": 24067
+    },
+    "src/skills/qa/SKILL.md": {
+      "sha256": "f51d8eda562947797dda7e4b8f28ba88ed984722eabd4ba35669bd298b8a0e91",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 20408
+    },
+    "src/skills/qa/resources/checklist/5-session.md": {
+      "sha256": "d70bb60ab811a5fad7568b6dacfb954729c9b3a2c66b24c0537ffa685c40c0e2",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 21930
     },
     "src/skills/review/references/skills-writing-guide.md": {
       "sha256": "9006083e31ef0f57ac4bbb3ebe9ec8044eb5309c6c91d25e283e8e40a779be97",

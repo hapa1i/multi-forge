@@ -12,16 +12,69 @@ forge info
 
 - [ ] Shows Forge version
 - [ ] Shows installation status
-- [ ] Shows proxy status
-- [ ] Shows active session (if any)
+- [ ] Shows configured proxy registry entries
+- [ ] Shows recent sessions (if any)
 
 ### 17.2 Debug Logging and `forge logs`
 
-<!-- human:confirm -->
+<!-- auto -->
 
 Run a Forge command with debug logging enabled, then use `forge logs show` to inspect and clean up log files.
 
 ```bash
+set -euo pipefail
+
+ZOMBIE_PARENT_PID=
+ZOMBIE_PID_FILE=$(mktemp /tmp/forge-qa-zombie-pid.XXXXXX)
+ZOMBIE_SCRIPT=$(mktemp /tmp/forge-qa-zombie-parent.XXXXXX)
+cleanup_zombie_fixture() {
+  if test -n "$ZOMBIE_PARENT_PID"; then
+    kill -TERM "$ZOMBIE_PARENT_PID" 2>/dev/null || true
+    wait "$ZOMBIE_PARENT_PID" 2>/dev/null || true
+  fi
+  rm -f "$ZOMBIE_PID_FILE" "$ZOMBIE_SCRIPT"
+}
+trap cleanup_zombie_fixture EXIT
+
+# Keep a child defunct long enough to prove kill(pid, 0) is not Forge's only
+# liveness signal. Containers without an init may otherwise retain these logs forever.
+cat >"$ZOMBIE_SCRIPT" <<'PY'
+import os
+from pathlib import Path
+import signal
+import sys
+import time
+
+child = os.fork()
+if child == 0:
+    os._exit(0)
+
+Path(sys.argv[1]).write_text(str(child), encoding="utf-8")
+
+def reap_and_exit(_signum, _frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, reap_and_exit)
+while True:
+    time.sleep(1)
+PY
+/opt/forge-qa/bin/python "$ZOMBIE_SCRIPT" "$ZOMBIE_PID_FILE" &
+ZOMBIE_PARENT_PID=$!
+ZOMBIE_STATE=
+for _attempt in $(seq 1 100); do
+  if test -s "$ZOMBIE_PID_FILE"; then
+    ZOMBIE_PID=$(cat "$ZOMBIE_PID_FILE")
+    ZOMBIE_STATE=$(awk '{print $3}' "/proc/$ZOMBIE_PID/stat" 2>/dev/null || true)
+    test "$ZOMBIE_STATE" = Z && break
+  fi
+  sleep 0.05
+done
+test "$ZOMBIE_STATE" = Z
+ZOMBIE_LOG="$HOME/.forge/logs/proxy/proxy.$ZOMBIE_PID.log"
+mkdir -p "$(dirname "$ZOMBIE_LOG")"
+printf '%s\n' 'defunct processes cannot append to this shard' >"$ZOMBIE_LOG"
+
 # Run a command with debug logging
 FORGE_DEBUG=1 forge info
 
@@ -34,6 +87,10 @@ forge logs show
 
 # Clean up logs
 forge logs clean --yes
+test ! -e "$ZOMBIE_LOG"
+echo "ZOMBIE_LOG_REMOVED"
+cleanup_zombie_fixture
+trap - EXIT
 
 # Verify cleanup
 forge logs show
@@ -45,7 +102,8 @@ forge logs show
 - [ ] `forge logs show` shows log directory location and file counts
 - [ ] Log files were actually written (count > 0 after debug run)
 - [ ] `forge logs clean --yes` removes stale log files
-- [ ] After cleanup, `forge logs show` reports 0 files, or only logs for currently running Forge proxy processes
+- [ ] After cleanup, `ZOMBIE_LOG_REMOVED` is printed and `forge logs show` reports 0 files, or only logs for currently
+  running Forge proxy processes
 
 ### 17.3 `forge runtime list`
 

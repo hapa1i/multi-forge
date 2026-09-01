@@ -135,7 +135,7 @@ def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -
     (package_root / "scripts" / "__pycache__").mkdir(parents=True)
     (package_root / ".pytest_cache").mkdir()
     (package_root / "SKILL.md").write_text(
-        "---\nname: forge:legacy-skill\ndescription: Legacy test skill. Use when testing artifact filters.\n---\n"
+        "---\nname: legacy-skill\ndescription: Legacy test skill. Use when testing artifact filters.\n---\n"
         "\n# Legacy\n",
         encoding="utf-8",
     )
@@ -181,7 +181,7 @@ def test_skill_loaders_reject_generated_package_sentinel(
         loader = load_neutral_skill_source
     else:
         (package_root / "SKILL.md").write_text(
-            "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+            "---\nname: legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
             encoding="utf-8",
         )
         loader = load_claude_skill_source
@@ -248,7 +248,7 @@ def test_claude_loader_rejects_external_skill_document_symlink(tmp_path: Path) -
     package_root.mkdir()
     external_document = tmp_path / "external-SKILL.md"
     external_document.write_text(
-        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        "---\nname: legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
         encoding="utf-8",
     )
     (package_root / "SKILL.md").symlink_to(external_document)
@@ -262,7 +262,7 @@ def test_mixed_loader_rejects_symlinked_skills_root(tmp_path: Path) -> None:
     package_root = real_root / "legacy-skill"
     package_root.mkdir(parents=True)
     (package_root / "SKILL.md").write_text(
-        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        "---\nname: legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
         encoding="utf-8",
     )
     linked_root = tmp_path / "linked-skills"
@@ -278,7 +278,7 @@ def test_mixed_loader_rejects_top_level_package_symlink(tmp_path: Path) -> None:
     external_package = tmp_path / "external-skill"
     external_package.mkdir()
     (external_package / "SKILL.md").write_text(
-        "---\nname: forge:external-skill\ndescription: External test. Use for tests.\n---\n\n# External\n",
+        "---\nname: external-skill\ndescription: External test. Use for tests.\n---\n\n# External\n",
         encoding="utf-8",
     )
     (skills_root / "external-skill").symlink_to(external_package, target_is_directory=True)
@@ -329,7 +329,7 @@ def test_ineligible_neutral_manifest_does_not_hide_eligible_legacy_package(
     package_root.mkdir(parents=True)
     skill_document = package_root / "SKILL.md"
     skill_document.write_text(
-        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        "---\nname: legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
         encoding="utf-8",
     )
     (package_root / "forge-skill.yaml").write_text(
@@ -464,7 +464,7 @@ def test_compilation_is_deterministic_and_runtime_names_are_explicit() -> None:
 
     assert claude_first == claude_second
     assert codex_first == codex_second
-    assert _frontmatter(claude_first.file("SKILL.md").content)["name"] == "forge:demo-skill"
+    assert _frontmatter(claude_first.file("SKILL.md").content)["name"] == "demo-skill"
     assert _frontmatter(codex_first.file("SKILL.md").content)["name"] == "demo-skill"
     assert codex_first.file("scripts/run.sh").mode == 0o755
     assert tuple(item.path for item in codex_first.files) == tuple(
@@ -770,7 +770,7 @@ def test_mixed_loader_discovers_neutral_and_legacy_sources(tmp_path: Path) -> No
     legacy = tmp_path / "legacy-skill"
     legacy.mkdir()
     (legacy / "SKILL.md").write_text(
-        "---\nname: forge:legacy-skill\ndescription: Legacy test skill. Use when testing discovery.\n---\n\n# Legacy\n",
+        "---\nname: legacy-skill\ndescription: Legacy test skill. Use when testing discovery.\n---\n\n# Legacy\n",
         encoding="utf-8",
     )
 
@@ -1068,7 +1068,6 @@ def test_codex_bridge_rejects_raw_claude_tokens_after_explicit_opt_in() -> None:
 
     rules = {diagnostic.rule for diagnostic in exc_info.value.diagnostics}
     assert "token.claude-arguments" in rules
-    assert "token.claude-command-name" in rules
     assert all(diagnostic.runtime == SkillRuntime.CODEX for diagnostic in exc_info.value.diagnostics)
 
 

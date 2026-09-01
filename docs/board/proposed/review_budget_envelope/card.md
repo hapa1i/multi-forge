@@ -86,7 +86,7 @@ estimated/observed token totals, start/update times, and the resolved envelope f
 
 ## Defaults
 
-- Forge `/forge:review`: allowed, but inherits a generous default envelope when the target is cwd or a directory.
+- Forge `/review`: allowed, but inherits a generous default envelope when the target is cwd or a directory.
 - Workflow fan-out skills (`panel`, `analyze`, `debate`, `consensus`): require an envelope or use a conservative preset.
 - Direct subscription sessions: warn that proxy spend caps do not apply and hook guards are the enforcement layer.
 

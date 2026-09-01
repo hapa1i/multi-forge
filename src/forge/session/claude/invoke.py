@@ -11,6 +11,14 @@ from pathlib import Path
 
 from forge.core.reactive.env import FORGE_AUTHORITY_MARKER_VAR, RunIdentity
 
+CLAUDE_BINARY_NOT_FOUND_MESSAGE = (
+    "Claude Code CLI not found on PATH. Install Claude Code, ensure 'claude' is available, then retry."
+)
+
+
+class ClaudeBinaryNotFoundError(RuntimeError):
+    """Raised when an interactive Claude launch has no executable runtime."""
+
 
 def invoke_claude(
     *,
@@ -47,7 +55,7 @@ def invoke_claude(
         Claude's exit code.
 
     Raises:
-        FileNotFoundError: If claude binary is not found.
+        ClaudeBinaryNotFoundError: If the Claude binary is not found.
 
     Example:
         >>> # Start new session
@@ -74,6 +82,7 @@ def invoke_claude(
         ...     },
         ... )
     """
+    claude_binary = require_claude_binary()
     cmd = _build_command(
         session_id=session_id,
         resume_id=resume_id,
@@ -83,6 +92,7 @@ def invoke_claude(
         system_prompt_file=system_prompt_file,
         extra_args=extra_args,
     )
+    cmd[0] = claude_binary
 
     env = (
         _build_environment(env_vars, unset_env_vars)
@@ -90,7 +100,13 @@ def invoke_claude(
         else _build_environment(env_vars, unset_env_vars, run_identity=run_identity)
     )
 
-    return _run_claude(cmd, env=env, cwd=cwd)
+    try:
+        return _run_claude(cmd, env=env, cwd=cwd)
+    except FileNotFoundError as exc:
+        # The binary can disappear between PATH resolution and exec (for
+        # example, during a broken runtime update). Keep that race on the same
+        # actionable error path as an initially absent installation.
+        raise ClaudeBinaryNotFoundError(CLAUDE_BINARY_NOT_FOUND_MESSAGE) from exc
 
 
 def build_claude_args(
@@ -255,6 +271,15 @@ def find_claude_binary() -> str | None:
     import shutil
 
     return shutil.which("claude")
+
+
+def require_claude_binary() -> str:
+    """Resolve the Claude executable or raise an actionable launch error."""
+
+    binary = find_claude_binary()
+    if binary is None:
+        raise ClaudeBinaryNotFoundError(CLAUDE_BINARY_NOT_FOUND_MESSAGE)
+    return binary
 
 
 def is_claude_available() -> bool:

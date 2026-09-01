@@ -675,6 +675,9 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
 
     # PID unknown (adopted) — not our process to kill
     if entry.pid is None:
+        if entry.status != "healthy":
+            console.print(f"[dim]No running process recorded for proxy on port {entry.port}[/dim]")
+            return "already_stopped"
         if not kill_adopted:
             console.print(
                 f"[dim]Adopted proxy on port {entry.port} (not started by Forge, leaving process alone)[/dim]"

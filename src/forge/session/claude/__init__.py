@@ -15,10 +15,12 @@ from .cleanup import (
     delete_session_data,
 )
 from .invoke import (
+    ClaudeBinaryNotFoundError,
     build_claude_args,
     find_claude_binary,
     invoke_claude,
     is_claude_available,
+    require_claude_binary,
 )
 from .paths import (
     encode_project_path,
@@ -43,10 +45,12 @@ __all__ = [
     "cleanup_session",
     "delete_session_data",
     # Invoke
+    "ClaudeBinaryNotFoundError",
     "build_claude_args",
     "invoke_claude",
     "find_claude_binary",
     "is_claude_available",
+    "require_claude_binary",
     # Paths
     "encode_project_path",
     "find_agent_logs",

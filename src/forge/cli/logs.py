@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
+_PROC_ROOT = Path("/proc")
+
 # Descriptions for known log subdirectories (display only).
 # Unknown subdirectories are auto-discovered and shown without a description.
 _LOG_DIR_DESCRIPTIONS: dict[str, str] = {
@@ -123,14 +125,25 @@ def _extract_pid(filename: str) -> int | None:
 
 
 def _is_process_alive(pid: int) -> bool:
-    """Check if a process with the given PID is running."""
+    """Check if a process with the given PID can still write its logs."""
     try:
         os.kill(pid, 0)
-        return True
     except ProcessLookupError:
         return False
     except PermissionError:
-        return True  # exists but we can't signal it
+        pass  # The process exists even though this user cannot signal it.
+
+    # ``kill(pid, 0)`` also succeeds for a zombie. Linux containers without a
+    # reaping init can retain zombies indefinitely, but a defunct process cannot
+    # write another byte and must not pin its log shards forever. Fail closed on
+    # unreadable or malformed proc state so an uncertain process stays protected.
+    try:
+        stat = (_PROC_ROOT / str(pid) / "stat").read_bytes()
+    except OSError:
+        return True
+    _, separator, remainder = stat.rpartition(b")")
+    fields = remainder.split() if separator else []
+    return not fields or fields[0] != b"Z"
 
 
 def _is_active_log_file(path: Path) -> bool:

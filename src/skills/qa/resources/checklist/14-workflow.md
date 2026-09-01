@@ -5,8 +5,8 @@
 Validates workflow runners + skill architecture.
 
 - `forge workflow panel` is the fan-out runner CLI (supports `--code`, `--context`, and `--check`).
-- `/forge:analyze` is a skill that calls `forge workflow analyze` (N=1 model).
-- `/forge:debate` is a skill that calls `forge workflow debate` (supports `--code` for code evaluation).
+- `/analyze` is a skill that calls `forge workflow analyze` (N=1 model).
+- `/debate` is a skill that calls `forge workflow debate` (supports `--code` for code evaluation).
 - This section uses `$FORGE_QA_WORKFLOW_MODELS` (set by `start-container.sh` per provider profile). Workflow proxy
   aliases are created in 4.2.
 - Omitting `--models` uses all configured defaults (from `forge workflow list-models`).
@@ -43,6 +43,8 @@ forge workflow list-models --available --json \
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODELS --json
 ```
@@ -58,6 +60,8 @@ forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODELS --json
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Policy gate mode (structured verdict + exit code)
 forge workflow panel -p "Check for security issues" --models $FORGE_QA_WORKFLOW_MODELS --check
@@ -72,6 +76,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Multi-model code review (uses bundled codereview resource)
@@ -91,6 +97,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Single-model deep analysis (N=1 fan-out with bundled thinkdeep resource)
@@ -112,6 +120,8 @@ echo "Exit code: $?"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Adversarial debate with positional proposal
 forge workflow debate "Should we rewrite the core in Rust?" --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -131,6 +141,8 @@ forge workflow debate "Should we adopt microservices?" --models $FORGE_QA_WORKFL
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Adversarial code evaluation (uses bundled code evaluation resource)
 forge workflow debate src/ --code --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -149,6 +161,8 @@ echo "Exit code: $?"
 <!-- prereq: 14.1 -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Two-round consensus with role-assigned workers (proposal mode)
@@ -172,6 +186,8 @@ echo "Exit code: $?"
 
 <!-- auto -->
 
+<!-- evidence: automated-suite -->
+
 ```bash
 # Two-round code consensus (code mode uses architecture/security/maintainability)
 forge workflow consensus src/ --code --models $FORGE_QA_WORKFLOW_MODELS --json
@@ -185,16 +201,18 @@ echo "Exit code: $?"
 - [ ] Returns structured JSON output with code-specific findings per worker per round
 - [ ] `--check` mode: schema-strict -- only SUPPORT/SUPPORT_WITH_CONDITIONS pass
 
-### 14.10 `/forge:debate` (Live Session)
+### 14.10 `/debate` (Live Session)
 
 <!-- prereq: 14.1 -->
 
 <!-- human:guided -->
 
+<!-- evidence: automated-suite -->
+
 <!-- requires: api_key -->
 
-Validate the real Claude-facing `/forge:debate` path, not a terminal fallback. This step passes only if Claude Code
-accepts the slash command and actually executes the adversarial runner end to end.
+Validate the real Claude-facing `/debate` path, not a terminal fallback. This step passes only if Claude Code accepts
+the slash command and actually executes the adversarial runner end to end.
 
 If Session B is not already open, start Claude Code in the container shell first:
 
@@ -207,7 +225,7 @@ Read `$FORGE_QA_WORKFLOW_MODELS` from the container environment and construct th
 type in Session B:
 
 ```
-/forge:debate --models <expanded FORGE_QA_WORKFLOW_MODELS> A startup with 5 developers has a working Python monolith serving 10k req/sec. They're hitting scaling issues. Should they rewrite the core in Rust?
+/debate --models <expanded FORGE_QA_WORKFLOW_MODELS> A startup with 5 developers has a working Python monolith serving 10k req/sec. They're hitting scaling issues. Should they rewrite the core in Rust?
 ```
 
 Wait for Claude to finish. Do not replace this with `forge workflow debate` in the shell; that CLI surface is already
@@ -229,6 +247,8 @@ command was accepted but the nested workflow worker runtime is missing from Clau
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Single model filter -- should limit to that model only
@@ -256,6 +276,8 @@ forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODEL_B --json 2>&1 | jq 
 <!-- requires: api_key -->
 
 <!-- auto -->
+
+<!-- evidence: automated-suite -->
 
 ```bash
 # Explicit proxy routing: one selected proxy handles this worker.

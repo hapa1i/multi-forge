@@ -357,7 +357,7 @@ def _print_completion_message(
     profile = InstallProfile(plan.profile)
     gated = get_gated_skills(profile)
     if gated:
-        skill_list = ", ".join(f"/forge:{name}" for name, _ in gated)
+        skill_list = ", ".join(f"/{name}" for name, _ in gated)
         required = gated[0][1].value
         print_tip(
             f"Additional skills available with --profile {required}: {skill_list}",
@@ -1927,7 +1927,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
             inst_profile = InstallProfile(installation.profile)
             gated = get_gated_skills(inst_profile)
             if gated:
-                skill_list = ", ".join(f"/forge:{name}" for name, _ in gated)
+                skill_list = ", ".join(f"/{name}" for name, _ in gated)
                 required = gated[0][1].value
                 console.print(f"  [dim]Gated:    {skill_list} (needs --profile {required})[/dim]")
         except ValueError:
