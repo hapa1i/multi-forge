@@ -10,15 +10,12 @@
 
 ## Current Focus
 
-The amended setup-only run passed package identity and every wrapper gate, then exposed a foreign installation row in
-the isolated Forge registry: the candidate sync had run from a sandboxed Terminal and made that registry co-own this
-checkout's Claude assets with the normal registry. CWD-scoped extension status hid the foreign row, so reset incorrectly
-reported success even though the baseline was contaminated.
+The exact candidate's setup-only rerun now passes package identity, raw-registry cleanup, and all six wrapper gates from
+a clean baseline. The installed payload digest matches the locally built wheel byte for byte; its `0.9.4` distribution
+version is the expected pre-release metadata before the separate `1.0.0` release bump.
 
-Add a raw-registry fail-closed gate before reset mutation, reconcile the accidental sandbox claim, rebuild and sync the
-exact candidate from a normal shell, and rerun `--setup-only`. Then complete the default report, exercise
-interruption/resume, and review the saved evidence with the maintainer. Keep the card in `doing/` until those live
-checks pass and the closeout is approved.
+Complete the default report, exercise interruption/resume, and review the saved evidence with the maintainer. Keep the
+card in `doing/` until those live checks pass and the closeout is approved.
 
 ## Execution Guardrails
 
@@ -297,7 +294,7 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   named and justified.
 - [x] Run `make pre-commit`, Markdown links, file-size checks, and `git diff --check`. **Assertion**: all repository
   gates pass after formatting and generated token-count updates are reviewed.
-- [ ] Install/sync the exact candidate wheel and run `/walkthrough --setup-only`. **Assertion**: the package-identity
+- [x] Install/sync the exact candidate wheel and run `/walkthrough --setup-only`. **Assertion**: the package-identity
   record matches the candidate installation, the sandbox is created outside the checkout, the packaged wrapper proves
   all six safety gates, and no checklist or live-runtime step runs.
 - [ ] Run one complete default `/walkthrough --report`. **Assertion**: every selected default assertion passes with at
@@ -363,7 +360,7 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   This attempt cannot satisfy final acceptance because of its assertion failure and real-settings dependency; the
   amended exact wheel needs a fresh complete run.
 
-### Amended Setup-only Attempt -- 2026-09-02
+### Contaminated Setup-only Attempt -- 2026-09-02
 
 - Package identity passed from the installed wheel with payload digest
   `7ab9d7a2d402086863b6831b180b1f6bbabfc95d0471b9f267923cb0998a3a35`; all six wrapper gates passed, the generated Claude
@@ -378,6 +375,21 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   behavior passes from a rebuilt candidate.
 - This guard contains the walkthrough failure mode; it does not claim to coordinate ownership across arbitrary
   `FORGE_HOME` registries. Candidate installation and sync therefore remain normal-shell prerequisites.
+
+### Accepted Setup-only Rerun -- 2026-09-02
+
+- Reset proved the marker and generated-repository structure, reclaimed walkthrough-owned resources through the wrapper,
+  and rebuilt the baseline. The raw isolated-registry gate passed after the accidental cross-project claim was
+  reconciled; no checklist state was initialized and no extension, runtime probe, checklist step, or paid operation ran.
+- All six wrapper gates passed with isolated Forge, Claude-settings, and Codex homes while the ordinary user home and
+  native Claude auth/store remained available. Codex auth ingress was correctly `none` for the default selection.
+- Both package-identity gates passed. The answering uv-tool distribution is installed rather than editable, its
+  `direct_url.json` names the candidate wheel, and installed/project package digest
+  `7cef26d91aaa3cd1acdc18a5eb4ec4a7bff122fac96c963c6ae73f63e6cc34c5` exactly matches the walkthrough payload inside
+  wheel SHA-256 `a45bcb8522736666d79035d727b1f2cc1ce0fa28dc1fcd30a979aecb9283e44a`.
+- Distribution version `0.9.4` is expected for this pre-bump candidate. The release process owns the later metadata bump
+  to `1.0.0`; changing it before the behavioral walkthrough would create a different artifact without increasing the
+  provenance proof.
 
 ## Acceptance Tests
 
