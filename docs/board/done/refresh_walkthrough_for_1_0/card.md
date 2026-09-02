@@ -1,8 +1,9 @@
 # Refresh the walkthrough for v1.0.0
 
-**Lane**: `doing/` -- accepted on 2026-09-01 and activated on branch `test/refresh-walkthrough-for-1-0` after
-[`refresh_release_qa_for_1_0`](../../done/refresh_release_qa_for_1_0/card.md) established the automated, clean-wheel,
-human, and exploratory release-evidence boundaries.
+**Lane**: `done/` -- shipped in PR #249 (`fc015113`) on 2026-09-02 with all five GitHub checks passing. It was accepted
+on 2026-09-01 and activated on branch `test/refresh-walkthrough-for-1-0` after
+[`refresh_release_qa_for_1_0`](../refresh_release_qa_for_1_0/card.md) established the automated, clean-wheel, human, and
+exploratory release-evidence boundaries.
 
 **References**:
 

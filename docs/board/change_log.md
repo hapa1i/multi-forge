@@ -5,6 +5,31 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-09-02
+
+### Refresh the Day 1 walkthrough for v1.0.0
+
+**Goal/outcome**: Replace the stale, QA-heavy walkthrough with a bounded and evidence-backed introduction to managed
+sessions, continuity, routing, telemetry, and safe cleanup.
+
+**Key changes**:
+
+- Rebuilt the provider-neutral default journey around one direct managed Claude parent, one structured fresh-context
+  continuation, explicit route intent/commit evidence, policy and telemetry orientation, and deterministic incognito;
+  reduced it to seven human checkpoints and two paid operations.
+- Added validated `--from` resume, package-bound reports and protected-path snapshots, plus optional Codex and sidecar
+  chapters whose readiness, auth ingress, costs, and cleanup remain separate from the default verdict.
+- Hardened the marked sandbox around isolated Forge/Claude/Codex state, explicit native-Claude settings exclusion,
+  strict installation/trust registry handling, fail-closed reset, and repeatable ownership-aware cleanup.
+- Synchronized the installation design, developer test contract, and Day 1 session, transfer, model-selection, skill,
+  and manual-testing guidance.
+
+**Verification**: 10,025 unit tests with 117 deselected; 1,104 regressions; 36 targeted lifecycle, sidecar, Codex, and
+exact-wheel integration tests; build, clean-wheel runtime, pre-commit, link, size, and diff gates. The human default run
+passed all 124 selected assertions with seven checkpoints and two paid operations; the maintainer accepted its recorded
+package identity plus the corrected exact-wheel cleanup owner as composite final evidence. PR #249 merged as `fc015113`
+with all five GitHub checks passing.
+
 ## 2026-09-01
 
 ### Refresh release QA for v1.0.0

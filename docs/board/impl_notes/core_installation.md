@@ -8,6 +8,22 @@ Durable core, state, extension, hook, and installation decisions.
 
 ## Notes
 
+### Walkthrough evidence is bounded education with artifact-bound safety (refresh_walkthrough_for_1_0, approved 2026-09-02)
+
+- `/walkthrough` remains one Claude-hosted educational frontend. Its provider-neutral default teaches direct managed
+  launch, route evidence, continuity, telemetry, and cleanup within seven human checkpoints and two paid operations;
+  Codex and sidecar are optional subjects, while exhaustive feature matrices remain release-QA or automated owners.
+- Preserve real `HOME` and native Claude auth/transcript storage, but isolate `FORGE_HOME`, Forge's `CLAUDE_HOME`, and
+  `CODEX_HOME`. Managed Claude children must exclude native user settings and receive only the sandbox settings source;
+  cleanup may delete only fixed walkthrough transcripts after proving their ownership.
+- The isolated installation registry owns files and therefore blocks cleanup on foreign, malformed, or out-of-boundary
+  rows. The separate project registry grants dispatcher trust but owns no checkout files: strictly validate it, then
+  clear the whole sandbox registry without touching enrolled roots. A valid standalone dispatcher may remain, and doctor
+  status `current` is a valid initial state.
+- Bind reports to the Forge distribution actually answering on `PATH` and the installed skill-package digest, and keep
+  report evidence outside sandbox cleanup. If a final payload-only correction uses composite human plus exact-wheel
+  evidence, record both identities and the maintainer's acceptance explicitly; never relabel a failed or skipped report.
+
 ### Release QA evidence is an artifact-bound contract (refresh_release_qa_for_1_0, approved 2026-09-01)
 
 - Release-capable QA starts from an explicit prebuilt wheel. The Claude-hosted driver must match the QA package inside

@@ -2,7 +2,7 @@
 
 **Card**: [card.md](card.md).
 
-**Lane**: `doing/` -- accepted and activated on 2026-09-01.
+**Lane**: `done/` -- shipped in PR #249 (`fc015113`) on 2026-09-02.
 
 **Execution branch**: `test/refresh-walkthrough-for-1-0`.
 
@@ -10,12 +10,9 @@
 
 ## Current Focus
 
-Implementation and verification are complete. The maintainer accepted the green 124/124 human run plus corrected
-exact-wheel, resume-state, cleanup, and real-Codex owners as composite final evidence; no failed or skipped assertion
-was reclassified. Unit, regression, packaging, pre-commit, and exact-wheel checks pass on the corrected head.
-
-Open the review PR and keep the card in `doing/` until it merges. Complete the change-log entry, final-lane move,
-inbound link updates, and branch closeout on `main` after review.
+Closed on 2026-09-02. PR #249 merged as `fc015113` with all five GitHub checks passing. The maintainer accepted the
+green 124/124 human run plus corrected exact-wheel, resume-state, cleanup, and real-Codex owners as composite final
+evidence; no failed or skipped assertion was reclassified.
 
 ## Execution Guardrails
 
@@ -481,9 +478,9 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 
 - [x] Review the complete implementation and final walkthrough evidence with the maintainer; close every finding or
   record an explicit accepted limitation before release sign-off.
-- [ ] Add the completed-work entry to `docs/board/change_log.md`; promote only human-approved durable manual-testing or
+- [x] Add the completed-work entry to `docs/board/change_log.md`; promote only human-approved durable manual-testing or
   sandbox decisions through `docs/board/impl_notes.md`.
-- [ ] Confirm design and end-user documentation describe shipped behavior, move the card to `done/`, and repoint every
+- [x] Confirm design and end-user documentation describe shipped behavior, move the card to `done/`, and repoint every
   inbound board link to its final lane.
-- [ ] Commit the reviewed implementation in a reviewable series, push the execution branch, open the PR with exact
+- [x] Commit the reviewed implementation in a reviewable series, push the execution branch, open the PR with exact
   verification evidence, and merge only after the clean-wheel default walkthrough and required checks pass.
