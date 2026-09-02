@@ -10,8 +10,8 @@ by the stable Fable aliases and review-worker name without changing the global O
 - Anthropic model ID: `claude-fable-5-1`.
 - OpenRouter model ID: `anthropic/claude-fable-5.1`.
 - Context window: 1,000,000 tokens; maximum output: 128,000 tokens.
-- Adaptive thinking is always on; supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`, with
-  `high` as the default.
+- Adaptive thinking is always on; supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`, with `high`
+  as the default.
 - Input/output pricing remains $10/$50 per million tokens; cache reads are $0.25 per million tokens.
 - OpenRouter's ZDR endpoint catalog had no Fable 5.1 route on 2026-09-02.
 
