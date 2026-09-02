@@ -879,6 +879,27 @@ def proxy_server_remote_gemini(module_forge_home: Path, tmp_path_factory) -> Gen
 
 
 @pytest.fixture(scope="module")
+def proxy_server_openrouter_offline(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    """Start the OpenRouter template for runtime-truth checks without calling upstream."""
+    port = allocate_ephemeral_port()
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+    env["OPENROUTER_API_KEY"] = "test-openrouter-key"
+
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
+    proc = _start_proxy_subprocess(
+        template="openrouter-anthropic",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+    )
+
+    yield f"http://localhost:{port}"
+    kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
 def proxy_server_openrouter(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
     if not os.environ.get("OPENROUTER_API_KEY"):
         pytest.fail("OPENROUTER_API_KEY not set (required for OpenRouter proxy tests)")

@@ -4,8 +4,8 @@ Bug: the shared --model validator (`_proxy_supports_model_pin`) accepted a pin
 only when it equaled the tier default or a configured `model_alternatives` entry.
 `anthropic-passthrough` forwards the client model byte-for-byte and configures no
 alternatives, so after the default tiers flipped to Sonnet 5 / Opus 4.8, pinning
-a displaced model (`claude-fable-5`, `claude-opus-4-6`, `claude-sonnet-4-6`) was
-rejected pre-launch even though passthrough would have forwarded it unchanged.
+a non-default Claude model was rejected pre-launch even though passthrough would
+have forwarded it unchanged.
 
 Fix: `_proxy_supports_model_pin` short-circuits to True for
 `wire_shape == "anthropic_passthrough"`.
@@ -34,6 +34,7 @@ _PROXY_ID = "test-passthrough"
 # Models that are NOT the tier default and NOT in model_alternatives, yet must
 # stay pinnable on passthrough because the model is forwarded unchanged.
 _DISPLACED_PINS = {
+    "claude-fable-5-1": ("opus", "claude-fable-5-1"),
     "claude-fable-5": ("opus", "claude-fable-5"),
     "claude-opus-4-8": ("opus", "claude-opus-4-8"),
     "claude-opus-4-6": ("opus", "claude-opus-4-6"),

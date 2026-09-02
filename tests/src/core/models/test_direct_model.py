@@ -25,30 +25,31 @@ def test_resolves_opus_48_alias_to_env_pin() -> None:
     }
 
 
-def test_resolves_fable_to_opus_tier_pin() -> None:
+def test_resolves_fable_5_1_to_opus_tier_pin() -> None:
     # Fable has no tier word of its own; it rides the opus tier so Claude Code
     # pins ANTHROPIC_DEFAULT_OPUS_MODEL and the proxy routes it as opus.
-    pin = resolve_direct_model_pin("claude-fable-5")
+    pin = resolve_direct_model_pin("claude-fable-5-1")
 
-    assert pin.canonical_model == "claude-fable-5"
-    assert pin.env_model == "claude-fable-5"
+    assert pin.canonical_model == "claude-fable-5-1"
+    assert pin.env_model == "claude-fable-5-1"
     assert pin.tier == "opus"
     assert pin.env() == {
         "ANTHROPIC_MODEL": "opus",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-fable-5",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-fable-5-1",
     }
 
 
 def test_resolves_fable_alias_to_opus_tier_pin() -> None:
     pin = resolve_direct_model_pin("fable")
 
-    assert pin.canonical_model == "claude-fable-5"
+    assert pin.canonical_model == "claude-fable-5-1"
     assert pin.tier == "opus"
 
 
 @pytest.mark.parametrize(
     ("model", "tier"),
     [
+        ("claude-fable-5-1", "opus"),
         ("claude-fable-5", "opus"),
         ("claude-opus-5", "opus"),
         ("claude-sonnet-5", "sonnet"),

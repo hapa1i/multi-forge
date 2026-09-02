@@ -259,6 +259,7 @@ class TestLoadConfig:
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
         assert config.proxy.openrouter.model_alternatives == {
             "opus": {
+                "claude-fable-5-1": "anthropic/claude-fable-5.1",
                 "claude-fable-5": "anthropic/claude-fable-5",
                 "claude-opus-4-8": "anthropic/claude-opus-4.8",
                 "claude-opus-4-6": "anthropic/claude-opus-4.6",
@@ -343,6 +344,7 @@ class TestLoadConfig:
             assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-5", template
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
+                    "claude-fable-5-1": "anthropic/claude-fable-5-1",
                     "claude-fable-5": "anthropic/claude-fable-5",
                     "claude-opus-4-8": "anthropic/claude-opus-4-8",
                     "claude-opus-4-6": "anthropic/claude-opus-4-6",
@@ -1207,6 +1209,7 @@ class TestTemplateResolution:
         }
         anthropic = load_config(template="openrouter-anthropic")
         assert anthropic.proxy.openrouter.zdr_fallbacks == {
+            "anthropic/claude-fable-5.1": "anthropic/claude-opus-5",
             "anthropic/claude-fable-5": "anthropic/claude-opus-5",
         }
         kimi = load_config(template="openrouter-kimi")

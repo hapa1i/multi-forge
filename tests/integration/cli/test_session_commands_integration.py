@@ -101,12 +101,18 @@ class TestSessionStart:
         _run_container_python(
             mock_claude_workspace,
             """
+            from forge.core.models import resolve_model_id
             from forge.core.models.model_routes import get_model_route_candidates
 
             direct = get_model_route_candidates("claude-opus-4-8")
+            fable = get_model_route_candidates("fable")
             proxy = get_model_route_candidates("gpt-5.6-sol")
             assert direct[0].kind == "direct"
             assert direct[0].model_ref == "claude-opus-4-8"
+            assert resolve_model_id("fable") == "claude-fable-5-1"
+            assert resolve_model_id("fable-5") == "claude-fable-5"
+            assert fable[0].kind == "direct"
+            assert fable[0].model_ref == "claude-fable-5-1"
             assert proxy[0].kind == "proxy"
             assert proxy[0].template == "openrouter-openai"
             assert proxy[0].model_ref == "openai/gpt-5.6-sol"
@@ -182,6 +188,28 @@ class TestSessionStart:
         env_text = mock_claude_workspace.read_file(env_path)
         assert "ANTHROPIC_MODEL=opus" in env_text
         assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-8" in env_text
+        assert "ANTHROPIC_BASE_URL=" not in env_text
+
+    def test_start_with_fable_family_default_pins_claude_env(self, mock_claude_workspace: ContainerLike) -> None:
+        """The stable Fable alias is stored and launched as the exact 5.1 direct pin."""
+        result = mock_claude_workspace.exec("cd /workspace && forge session start fable-model-test --model fable")
+
+        assert result.returncode == 0, result.stderr
+        assert "Routing: direct" in result.stdout
+
+        manifest = json.loads(
+            mock_claude_workspace.read_file("/workspace/.forge/sessions/fable-model-test/forge.session.json")
+        )
+        assert manifest["intent"]["launch"]["direct_model"] == "claude-fable-5-1"
+
+        invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
+        assert "--model" not in invocations
+
+        env_path = mock_claude_workspace.exec("ls -1 /tmp/claude_env_*.log | head -n 1").stdout.strip()
+        assert env_path
+        env_text = mock_claude_workspace.read_file(env_path)
+        assert "ANTHROPIC_MODEL=opus" in env_text
+        assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-fable-5-1" in env_text
         assert "ANTHROPIC_BASE_URL=" not in env_text
 
     def test_human_courier_authority_flow_uses_independent_sessions(self, mock_claude_workspace: ContainerLike) -> None:

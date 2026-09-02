@@ -120,27 +120,36 @@ class TestGPT56Family:
         assert spec.system_prompt_addendum == "system_prompt_addendums/openai.md"
 
 
-class TestClaudeFable5:
-    """Tests for the claude-fable-5 catalog entry and its aliases."""
+class TestClaudeFableFamily:
+    """Tests for the Claude Fable catalog entries and family-default aliases."""
 
-    def test_fable_is_canonical(self):
-        """claude-fable-5 exists as a canonical model, not an alias."""
+    def test_fable_versions_are_canonical(self):
         catalog = load_model_catalog()
 
-        assert "claude-fable-5" in catalog.models
-        assert "claude-fable-5" not in catalog.aliases
+        for model_id in ("claude-fable-5-1", "claude-fable-5"):
+            assert model_id in catalog.models
+            assert model_id not in catalog.aliases
 
     @pytest.mark.parametrize(
-        "alias",
-        ["anthropic/claude-fable-5", "claude-fable", "fable", "fable-5"],
+        ("alias", "canonical"),
+        [
+            ("anthropic/claude-fable-5-1", "claude-fable-5-1"),
+            ("anthropic/claude-fable-5.1", "claude-fable-5-1"),
+            ("claude-fable-5.1", "claude-fable-5-1"),
+            ("fable-5-1", "claude-fable-5-1"),
+            ("fable-5.1", "claude-fable-5-1"),
+            ("claude-fable", "claude-fable-5-1"),
+            ("fable", "claude-fable-5-1"),
+            ("anthropic/claude-fable-5", "claude-fable-5"),
+            ("fable-5", "claude-fable-5"),
+        ],
     )
-    def test_aliases_resolve_to_fable(self, alias):
-        """Convenience and provider-prefixed aliases resolve to claude-fable-5."""
-        assert resolve_model_id(alias) == "claude-fable-5"
+    def test_aliases_resolve_to_the_expected_fable_version(self, alias, canonical):
+        assert resolve_model_id(alias) == canonical
 
-    def test_fable_intrinsic_properties(self):
-        """Fable 5 shares the Opus 4.8 request surface: 1M context, adaptive-only."""
-        spec = get_model_spec("claude-fable-5")
+    @pytest.mark.parametrize("model_id", ["claude-fable-5-1", "claude-fable-5"])
+    def test_fable_intrinsic_properties(self, model_id):
+        spec = get_model_spec(model_id)
 
         assert spec.context_window_tokens == 1_000_000
         assert spec.max_output_tokens == 128_000
@@ -149,8 +158,13 @@ class TestClaudeFable5:
         assert spec.supports_sampling_overrides is False
         assert spec.native_thinking_param == "output_config.effort"
 
-    def test_fable_is_not_a_catalog_default(self):
-        """Catalog opus defaults are Opus 5; Fable 5 is opt-in via template/--model."""
+    def test_fable_5_1_supports_every_documented_effort_level(self):
+        spec = get_model_spec("claude-fable-5-1")
+
+        assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh", "max")
+        assert spec.default_reasoning_effort == "high"
+
+    def test_fable_family_is_not_an_opus_catalog_default(self):
         catalog = load_model_catalog()
 
         for provider in ("anthropic", "openrouter"):

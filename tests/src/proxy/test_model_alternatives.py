@@ -89,6 +89,7 @@ class TestResolveModelWithAlternatives:
     @pytest.mark.parametrize(
         ("source", "fallback"),
         [
+            ("anthropic/claude-fable-5.1", "anthropic/claude-opus-5"),
             ("anthropic/claude-fable-5", "anthropic/claude-opus-5"),
             ("qwen/qwen3.6-flash", "qwen/qwen3.8-27b"),
             ("qwen/qwen3.6-plus", "qwen/qwen3.8-27b"),
@@ -102,7 +103,7 @@ class TestResolveModelWithAlternatives:
         assert server._model_for_zdr_policy(source) == fallback
 
     def test_zdr_fallback_target_is_exact_and_drops_client_lookup_suffix(self):
-        assert server._model_for_zdr_policy("anthropic/claude-fable-5[1m]") == "anthropic/claude-opus-5"
+        assert server._model_for_zdr_policy("anthropic/claude-fable-5.1[1m]") == "anthropic/claude-opus-5"
 
     def test_allow_non_zdr_keeps_primary_model(self):
         proxy_cfg = server.config.proxy

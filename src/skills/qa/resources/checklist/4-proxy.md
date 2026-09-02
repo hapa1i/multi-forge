@@ -463,8 +463,8 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
 - [ ] `openrouter-qwen` maps tiers to Qwen models (haiku/sonnet=qwen3.8-27b, opus=qwen3.8-max)
 - [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields
-- [ ] The dated ZDR audit fallbacks cover Fable 5 and all six bundled non-ZDR Qwen slugs; Qwen3.8 Max maps to
-  `qwen/qwen3.8-2.4t-a95b`
+- [ ] The dated ZDR audit fallbacks cover Fable 5.1, Fable 5, and all six bundled non-ZDR Qwen slugs; Qwen3.8 Max maps
+  to `qwen/qwen3.8-2.4t-a95b`
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.6-sol, opus=gpt-5.6-sol)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-5.6-sol)

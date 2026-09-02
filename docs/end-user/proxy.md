@@ -156,7 +156,7 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
-### Picking up the August 2026 model defaults after an upgrade
+### Picking up current model defaults and alternatives after an upgrade
 
 New proxies created from the current built-in templates use these defaults:
 
@@ -175,6 +175,10 @@ The OpenRouter tier-1 cascade checker default also moves to Gemini 3.7 Flash (se
 LiteLLM checker default remains Gemini 3.6 Flash because the bundled local adapter does not yet expose a 3.7 route. The
 Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
 model alternative.
+
+The Anthropic templates retain Opus 5 as their opus-tier default and now expose both Fable 5.1 and Fable 5 as explicit
+alternatives. The unversioned `fable` and `claude-fable` aliases select Fable 5.1; use `claude-fable-5` when you need
+the prior version.
 
 Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
 endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
@@ -286,12 +290,14 @@ currently marks ZDR-compatible. This request policy is the enforcement boundary;
 replaces models already known to lack a compatible endpoint before dispatch.
 
 Forge audited all 34 model slugs in the bundled OpenRouter defaults and alternatives against OpenRouter's
-[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21. Twenty-seven had at least one ZDR
-endpoint. The seven exceptions and their required-ZDR fallbacks are:
+[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21, then checked the newly added Fable 5.1
+slug on 2026-09-02. The original seven exceptions plus Fable 5.1 had no eligible endpoint and use these required-ZDR
+fallbacks:
 
 ```yaml
 allow_non_zdr: false
 zdr_fallbacks:
+  anthropic/claude-fable-5.1: anthropic/claude-opus-5
   anthropic/claude-fable-5: anthropic/claude-opus-5
   qwen/qwen3.6-flash: qwen/qwen3.8-27b
   qwen/qwen3.6-plus: qwen/qwen3.8-27b
@@ -339,7 +345,7 @@ does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr`
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
 `model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5 and
-their sonnet tier to Sonnet 5, with Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
+their sonnet tier to Sonnet 5, with Fable 5.1, Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
 (`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model directly with no
 alternatives map.) Use `--model` to select an alternative:
 
@@ -347,14 +353,14 @@ alternatives map.) Use `--model` to select an alternative:
 # Default: opus tier routes to Opus 5, sonnet tier to Sonnet 5
 forge session start my-session --proxy openrouter-anthropic
 
-# Select an alternative instead (e.g. Fable 5, Opus 4.8, or Sonnet 4.6)
-forge session start my-session --proxy openrouter-anthropic --model claude-fable-5
+# Select the current Fable family model
+forge session start my-session --proxy openrouter-anthropic --model claude-fable
 ```
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
 `model_alternatives[tier][model]` and routes to the configured backend model. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5 currently
-resolves to Opus 5 because the dated endpoint audit found no Fable-compatible ZDR route.
+(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5.1 and
+Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
 
 For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
 exactly as before. The same flag now accepts any Forge catalog model: non-Claude requests resolve a compatible
@@ -366,6 +372,7 @@ To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 ```yaml
 model_alternatives:
   opus:
+    claude-fable-5-1: anthropic/claude-fable-5.1
     claude-fable-5: anthropic/claude-fable-5
     claude-opus-4-8: anthropic/claude-opus-4.8
     claude-opus-4-6: anthropic/claude-opus-4.6
@@ -373,7 +380,11 @@ model_alternatives:
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable-5`) vs leave the default Opus 5
+The OpenRouter backend slug uses dotted `5.1`; the direct Anthropic and LiteLLM model ID is `claude-fable-5-1` (with the
+usual `anthropic/` LiteLLM prefix). Fresh proxies receive the correct provider-specific mapping from their template.
+Existing user-owned proxy snapshots must be edited or recreated to gain the new alternative.
+
+For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable`) vs leave the default Opus 5
 mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,
 and per-family cost + multi-needle retrieval data — see [model_selection.md](model_selection.md).
 

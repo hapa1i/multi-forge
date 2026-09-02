@@ -26,10 +26,10 @@ def _anthropic_response_text(data: dict[str, Any]) -> str:
 class TestProxyWithOpenRouter:
     """Integration tests for proxy to OpenRouter flow."""
 
-    def test_health_endpoint(self, proxy_server_openrouter: str) -> None:
+    def test_health_endpoint(self, proxy_server_openrouter_offline: str) -> None:
         """GET / returns OpenRouter proxy runtime truth."""
         with httpx.Client() as client:
-            resp = client.get(f"{proxy_server_openrouter}/")
+            resp = client.get(f"{proxy_server_openrouter_offline}/")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -38,6 +38,7 @@ class TestProxyWithOpenRouter:
         assert data["provider"] == "openrouter"
         assert data["runtime"]["tier_mappings"]["haiku"] == "anthropic/claude-haiku-4.5"
         assert data["runtime"]["configured_tier_mappings"] == data["runtime"]["tier_mappings"]
+        assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-1"] == "anthropic/claude-opus-5"
         assert data["runtime"]["data_policy"] == {"zdr": "required", "zdr_fallbacks": {}}
         assert data["runtime"]["llm_defaults_by_tier"]["haiku"]["extra"] == {
             "openai": {"extra_body": {"provider": {"zdr": True}}}

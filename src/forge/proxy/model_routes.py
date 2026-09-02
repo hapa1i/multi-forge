@@ -8,9 +8,11 @@ from typing import Any
 from forge.core.models.model_reference import strip_transport_model_suffix
 
 # Full bundled-default/alternative audit against OpenRouter's ZDR endpoint
-# catalog on 2026-08-21. These seven slugs had no eligible endpoint. Request-level
-# provider.zdr remains authoritative if this dated snapshot becomes stale.
+# catalog on 2026-08-21, refreshed for Fable 5.1 on 2026-09-02. These eight
+# slugs had no eligible endpoint. Request-level provider.zdr remains authoritative
+# if this dated snapshot becomes stale.
 BUILTIN_OPENROUTER_ZDR_FALLBACKS = {
+    "anthropic/claude-fable-5.1": "anthropic/claude-opus-5",
     "anthropic/claude-fable-5": "anthropic/claude-opus-5",
     "qwen/qwen3.6-flash": "qwen/qwen3.8-27b",
     "qwen/qwen3.6-plus": "qwen/qwen3.8-27b",
