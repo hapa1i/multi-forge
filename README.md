@@ -139,8 +139,10 @@ forge session start --proxy openrouter-anthropic
 
 Developing on Forge itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for the editable install.
 
-Once running, try `/smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check, or `/walkthrough` for a
-guided tour in a sandboxed test repo.
+Once running, try `/smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check. `/walkthrough` teaches
+the direct managed-session, model-route, policy, telemetry, and structured-resume loop in a sandboxed repository; add
+`--codex` or `--sidecar` only for those optional chapters. See the
+[manual-testing guide](docs/end-user/manual_testing.md).
 
 ## Plan, Execute, Review
 
@@ -224,7 +226,7 @@ hashes, lengths, and counts, never prompt or completion text.
 
 Nine skills compile for **both** runtimes -- Claude invokes `/<name>`, Codex invokes `$<name>`: `analyze`, `challenge`,
 `consensus`, `debate`, `panel`, `review`, `review-docs`, `smoke-test`, `understand`. Only `/walkthrough` and `/qa` are
-Claude-only.
+Claude-hosted; walkthrough can still exercise Codex as an optional managed runtime.
 
 The same runners are available from the terminal, and `--check` turns one into an exit-code gate you can script:
 

@@ -481,17 +481,23 @@ def checklist_hash(path: str) -> str:
 def step_hash(step: Subsection) -> str:
     """Hash the structural content of a step that affects result validity.
 
-    Includes: ID, title, annotation, assertion texts (normalized).
-    Excludes: instructions, code blocks (presentation only).
+    Instructions and code blocks are evidence-producing behavior, not merely
+    presentation. Hash them with every annotation and prerequisite so a resume
+    cannot preserve results after an unversioned command or selection change.
     """
-    h = hashlib.sha256()
-    h.update(b"forge-step-hash-v1\n")
-    h.update(step["id"].encode() + b"\n")
-    h.update(step["title"].strip().encode() + b"\n")
-    h.update((step.get("annotation") or "").encode() + b"\n")
-    for a in step["assertions"]:
-        h.update(a.strip().encode() + b"\n")
-    return h.hexdigest()
+    payload = {
+        "id": step["id"],
+        "title": step["title"].strip(),
+        "section_id": step.get("section_id"),
+        "section_title": step.get("section_title"),
+        "annotations": step.get("annotations", []),
+        "prereqs": step.get("prereqs", []),
+        "instructions": step.get("instructions", ""),
+        "code_blocks": step.get("code_blocks", []),
+        "assertions": [assertion.strip() for assertion in step["assertions"]],
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(b"forge-step-hash-v2\n" + encoded).hexdigest()
 
 
 def _migrate_v1_to_v2(state: dict, data: Checklist, checklist_path: str) -> dict:
@@ -984,11 +990,12 @@ def cmd_report(data: Checklist, checklist_path: str, state_path: str) -> dict:
 
 
 def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_step: str) -> dict:
-    """Pre-flight validation for resume. Checks hashes and clears stale future steps.
+    """Pre-flight validation for resume. Refuse stale evidence before mutation.
 
     Steps before from_step: validate stored hash vs current checklist.
     Steps at/after from_step: clear from state to prevent phantom progress.
-    Returns JSON with changed_steps, unverified_steps, cleared_steps.
+    A checklist-version mismatch or stale prefix returns a refusal without
+    rewriting the state file. Otherwise, clear only the requested suffix.
     """
     state = read_state(state_path)
 
@@ -1012,18 +1019,29 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
     cleared_steps = []
     orphaned_steps = []
 
+    state_version = state.get("checklist_version")
+    current_version = data.get("version")
+    if state_version != current_version:
+        return {
+            "status": "refused",
+            "reason": "checklist version changed since this run was initialized",
+            "state_checklist_version": state_version,
+            "current_checklist_version": current_version,
+            "changed_steps": [],
+            "unverified_steps": [],
+            "cleared_steps": [],
+            "orphaned_steps": [],
+            "recovery": "/walkthrough --reset",
+        }
+
     all_checklist_ids = set(step_order)
-    for sid, sdata in list(state.get("steps", {}).items()):
-        # Purge recorded steps that the checklist no longer contains.
+    for sid, sdata in state.get("steps", {}).items():
         if sid not in all_checklist_ids:
             orphaned_steps.append(sid)
-            del state["steps"][sid]
             continue
 
-        # Clear the resume point and later steps to prevent phantom progress.
         if sid in at_or_after_steps:
             cleared_steps.append(sid)
-            del state["steps"][sid]
             continue
 
         # Validate hashes for steps before the resume point.
@@ -1036,16 +1054,26 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
             if found and step_hash(found) != stored_hash:
                 changed_steps.append({"id": sid, "reason": "step content changed since recorded"})
 
+    if changed_steps or unverified_steps or orphaned_steps:
+        return {
+            "status": "refused",
+            "reason": "recorded prefix cannot be verified against the current checklist",
+            "changed_steps": changed_steps,
+            "unverified_steps": unverified_steps,
+            "cleared_steps": [],
+            "orphaned_steps": orphaned_steps,
+            "recovery": "/walkthrough --reset",
+        }
+
+    for sid in cleared_steps:
+        del state["steps"][sid]
+
     state["current_step"] = from_step
     _refresh_section_status_vars(data, state)
     write_state(state_path, state)
 
-    status = "ok"
-    if changed_steps or unverified_steps:
-        status = "warnings"
-
     return {
-        "status": status,
+        "status": "ok",
         "changed_steps": changed_steps,
         "unverified_steps": unverified_steps,
         "cleared_steps": cleared_steps,
@@ -1161,6 +1189,8 @@ def main():
         raise AssertionError(f"unhandled command: {command}")
 
     print(json.dumps(result, indent=2))
+    if command == "validate" and result.get("status") == "refused":
+        sys.exit(2)
 
 
 if __name__ == "__main__":

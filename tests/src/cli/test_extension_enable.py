@@ -430,6 +430,7 @@ class TestRuntimeScopedModuleSelection:
         output = " ".join(result.output.split())
         assert "Auto-detected scope: local" in output
         assert "scope_unsupported" in output
+        assert "forge extension disable --scope local --runtime codex" in output
         assert "forge extension enable --scope user" in output
 
     def test_minimal_codex_conflicts_when_runtime_filter_empties_profile(

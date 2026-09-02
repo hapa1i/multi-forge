@@ -903,12 +903,26 @@ class TestStepHash:
         h2 = pc.step_hash(step)
         assert h1 != h2
 
-    def test_ignores_instruction_edit(self, parsed):
+    def test_changes_on_instruction_edit(self, parsed):
         step = parsed["_all_subs"][1]  # 0.2 has instructions
         h1 = pc.step_hash(step)
         step["instructions"] = "Totally different instructions"
         h2 = pc.step_hash(step)
-        assert h1 == h2
+        assert h1 != h2
+
+    def test_changes_on_runnable_code_edit(self, parsed):
+        step = parsed["_all_subs"][0]
+        h1 = pc.step_hash(step)
+        step["code_blocks"][0]["code"] = 'echo "different"'
+        h2 = pc.step_hash(step)
+        assert h1 != h2
+
+    def test_changes_on_modifier_edit(self, parsed):
+        step = parsed["_all_subs"][0]
+        h1 = pc.step_hash(step)
+        step["annotations"].append("paid-operations: 1")
+        h2 = pc.step_hash(step)
+        assert h1 != h2
 
     def test_whitespace_normalized(self, parsed):
         step = parsed["_all_subs"][0]
@@ -947,10 +961,54 @@ class TestCmdValidate:
         modified = MINIMAL_CHECKLIST.replace("Output says hello", "Output says goodbye")
         Path(checklist_path).write_text(modified)
         modified_data = pc.parse_checklist(checklist_path)
+        before = Path(initialized_state).read_bytes()
         result = pc.cmd_validate(modified_data, checklist_path, initialized_state, "0.2")
-        assert result["status"] == "warnings"
+        assert result["status"] == "refused"
         assert len(result["changed_steps"]) == 1
         assert result["changed_steps"][0]["id"] == "0.1"
+        assert result["recovery"] == "/walkthrough --reset"
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_detects_changed_runnable_command(self, checklist_path, initialized_state, parsed):
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
+        modified = MINIMAL_CHECKLIST.replace('echo "hello"', 'echo "different"')
+        Path(checklist_path).write_text(modified)
+        modified_data = pc.parse_checklist(checklist_path)
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(modified_data, checklist_path, initialized_state, "0.2")
+
+        assert result["status"] == "refused"
+        assert [changed["id"] for changed in result["changed_steps"]] == ["0.1"]
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_version_mismatch_refuses_without_mutation(self, checklist_path, initialized_state, parsed):
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.2", "p", force=False)
+        before = Path(initialized_state).read_bytes()
+        parsed["version"] = "2.0.1"
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "0.2")
+
+        assert result["status"] == "refused"
+        assert result["state_checklist_version"] == "2.0.0"
+        assert result["current_checklist_version"] == "2.0.1"
+        assert result["cleared_steps"] == []
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_unverified_prefix_refuses_without_mutation(self, checklist_path, initialized_state, parsed):
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
+        state = json.loads(Path(initialized_state).read_text())
+        state["steps"]["0.1"]["hash"] = None
+        Path(initialized_state).write_text(json.dumps(state, indent=2) + "\n")
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "0.2")
+
+        assert result["status"] == "refused"
+        assert result["unverified_steps"] == ["0.1"]
+        assert result["cleared_steps"] == []
+        assert Path(initialized_state).read_bytes() == before
 
     def test_unknown_from_step(self, checklist_path, initialized_state, parsed):
         with pytest.raises(SystemExit):

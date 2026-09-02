@@ -270,4 +270,5 @@ Three tiers of verification:
 | `/walkthrough`                | Claude only    | Interactive feature tour (hermetic) |
 | `/qa`                         | Claude only    | Full Docker-based QA                |
 
-See [manual_testing.md](manual_testing.md).
+The walkthrough's default is a provider-key-free direct managed-session journey; `--codex` and `--sidecar` add bounded
+runtime chapters without changing the default path. See [manual_testing.md](manual_testing.md).

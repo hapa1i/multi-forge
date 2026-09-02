@@ -42,7 +42,8 @@ the claim text and `smoke-test` runs its fixed read-only checks.
 
 The workflow frontend's host runtime does not choose its workers. The built-in defaults remain Claude-backed; select the
 opt-in `codex` worker explicitly with `--models codex`, or mix it with Claude worker names. Only `walkthrough` and `qa`
-remain Claude-only because they drive Claude-specific manual-test flows.
+remain Claude-hosted because they drive Claude-specific manual-test flows. `/walkthrough --codex` can exercise one
+managed Codex continuation as an optional subject under test; it does not make the walkthrough a Codex frontend.
 
 ## Installation and runtime targets
 
@@ -287,11 +288,15 @@ An explicit invocation without arguments infers the claim from the preceding con
 | `/analyze` / `$analyze`       | Claude + Codex | Deep single-worker analysis (default worker: claude-opus)         |
 | `/consensus` / `$consensus`   | Claude + Codex | Two-round multi-worker convergence toward a shared recommendation |
 | `/smoke-test` / `$smoke-test` | Claude + Codex | Read-only installation health check                               |
-| `/walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                     |
+| `/walkthrough`                | Claude only    | Direct managed-session tour; optional Codex/sidecar chapters      |
 | `/qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                    |
 
 The portable smoke test resolves and directly executes its bundled script from the installed skill directory, so its
 entry point selects the interpreter and `$smoke-test`/`/smoke-test` do not depend on the session CWD.
+
+Use `/walkthrough --from <section-or-step>` to resume only when its recorded checklist prefix and options still match,
+and `--report` to preserve package identity, state, logs, metrics, and a transcript claim outside sandbox cleanup. The
+full option and isolation contract is in [manual_testing.md](manual_testing.md#walkthrough).
 
 ---
 

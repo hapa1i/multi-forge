@@ -617,11 +617,16 @@ src/skills/smoke-test/
 src/skills/walkthrough/
 ├── SKILL.md                          # Interactive walkthrough (host-based)
 ├── resources/
-│   └── checklist.md      # Annotated checklist
+│   ├── checklist.md                  # Annotated Day 1 journey
+│   └── journey-map.md                # Step-to-evidence ownership map
 └── scripts/
-    ├── setup-test-repo.sh           # Hermetic repo setup
-    ├── run-in-repo.sh              # Safety wrapper (path denylist + 6 gates)
-    └── walkthrough-state.py        # Self-contained parity-locked state machine
+    ├── cleanup-owned.sh              # Exact, repeatable owned-resource cleanup
+    ├── package-identity.py           # Installed package/tree provenance
+    ├── protected-paths.py            # Privacy-preserving host path digests
+    ├── run-in-repo.sh                # Safety wrapper (path denylist + 6 gates)
+    ├── setup-test-repo.sh            # Hermetic repo setup and Codex auth ingress
+    ├── walkthrough-report.py         # Selection-aware report metrics
+    └── walkthrough-state.py          # Self-contained parity-locked state machine
 
 src/skills/qa/
 ├── SKILL.md                          # Full QA in Docker container
@@ -656,6 +661,10 @@ $smoke-test                                 # Codex: same portable health check
 # Claude Code only:
 /walkthrough                          # Walkthrough (hermetic functional test)
 /walkthrough --setup-only             # Create test repo only
+/walkthrough --from 10.2 --report     # Evidence-preserving resume + report
+/walkthrough --codex --codex-auth ~/.codex/auth.json
+                                      # Optional Codex initial-message chapter
+/walkthrough --sidecar                # Optional Docker sidecar chapter
 /qa                                   # One-wheel development-only Docker QA
 /qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl
                                             # Pinned blocking release gate
@@ -667,11 +676,11 @@ $smoke-test                                 # Codex: same portable health check
 
 Risky operations go through safety scripts. The agent handles read-only checks directly.
 
-| Mode                          | Safety layer                    | Isolation                                         |
-| ----------------------------- | ------------------------------- | ------------------------------------------------- |
-| `/smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after     |
-| `/walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification |
-| `/qa`                         | exact-wheel scripts + Docker    | Container isolation; one host QA-state mount      |
+| Mode                          | Safety layer                    | Isolation                                       |
+| ----------------------------- | ------------------------------- | ----------------------------------------------- |
+| `/smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after   |
+| `/walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; protected-tree digests |
+| `/qa`                         | exact-wheel scripts + Docker    | Container isolation; one host QA-state mount    |
 
 ### Install profiles
 
@@ -683,8 +692,45 @@ requires `--with skills`.
 
 - After installing Forge: run `/smoke-test` in Claude or `$smoke-test` in Codex; use `/walkthrough` for the Claude-only
   interactive tour
-- After upgrading Forge: walkthrough catches regressions
+- After upgrading Forge: walkthrough teaches and verifies the direct managed-session loop; for release evidence,
+  install/sync the candidate wheel and restart Claude before invoking it
 - Before releases: build one candidate wheel, then run `/qa --wheel <candidate>` on the pinned track
+
+### Updating the walkthrough checklist
+
+The walkthrough is an educational journey rather than an exhaustive matrix. Keep its sections 0-13 ordered, cleanup
+fixed at section 13, and its default at seven human checkpoints and two intentional model completions (hard ceiling
+eight/three). Each step has exactly one `auto`, `human:guided`, or `human:confirm` execution class. `option: codex` and
+`option: sidecar` are driver-owned modifiers; they do not create shared parser semantics, and the default must not probe
+either runtime. `requires:` and `paid-operations:` remain modifiers. QA's `evidence:` lanes do not apply: map every
+walkthrough step to one automated or human owner in `resources/journey-map.md`.
+
+Forge's isolated `CLAUDE_HOME` owns the walkthrough's user hooks and skills; native Claude Code still selects auth and
+transcript storage through `CLAUDE_CONFIG_DIR` (normally `~/.claude`). The generated PATH shim must invoke the captured
+native binary with `--setting-sources project,local` plus sandbox user settings through `--settings`. Regression tests
+pin those arguments so a walkthrough cannot pass merely because real user settings already contain Forge hooks.
+Transcript cleanup points at the captured native store only for the two fixed host-Claude walkthrough sessions. Install
+or sync a release-candidate wheel from a normal shell, never one that sourced the walkthrough `env.sh`. Before reset
+mutates runtime state, cleanup must inspect the raw isolated installation registry and reject any row other than the
+walkthrough user row and canonical sandbox-local row. Allowed rows must also remain copy-mode, Claude-owned, and contain
+only targets within their scope's sandbox boundary. `extension status --all` is not an ownership inventory across
+project roots: it remains CWD-scoped. Regression coverage must prove a foreign or boundary-violating row blocks reset
+without losing runtime evidence or deleting the registry. Cleanup must also strictly parse and then clear the isolated
+trusted-project registry: those rows grant the sandbox dispatcher permission but own no files in the enrolled roots.
+Malformed or non-regular trust state refuses before runtime cleanup. The standalone dispatcher may validly survive a
+prior run, so the walkthrough accepts a `current` initial diagnosis and relies on doctor tests for exhaustive drift
+branches.
+
+Score the default and optional chapters separately. A missing Codex, Docker daemon, sidecar image, or optional provider
+credential is compatibility evidence, not a default-journey failure. A selected optional chapter still records its own
+pass/fail/unavailable status, checkpoint ceiling, paid-operation ceiling, prerequisites, and cleanup owner.
+
+Update the declared checklist version, date, v1.0 alignment, assertion count, and default budgets together. Resume tests
+must prove that a checklist-version mismatch, changed/unverified prefix, orphaned record, or option mismatch refuses
+before state mutation. Any state-parser change lands in both self-contained copies and runs the full parity suite. The
+clean-wheel owner is `tests/integration/docker/test_walkthrough_release_artifact.py`; it installs one wheel outside the
+checkout, verifies every installed resource against its package marker, and smokes setup, parsing, reporting, and
+cleanup from those installed bytes.
 
 ### Updating the QA checklist
 

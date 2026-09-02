@@ -113,6 +113,11 @@ OpenAI account variables and inherited Forge session or run-tree identity do not
 
 Running `claude` directly bypasses both paths.
 
+To learn these boundaries without changing your real Forge or runtime-extension state, run `/walkthrough` from Claude
+Code. Its default creates a model-pinned direct session without launching it, shows intent without fabricated route
+commitment, then uses `forge session resume` to produce hook-confirmed lifecycle and route evidence. See
+[manual_testing.md](manual_testing.md#walkthrough).
+
 ---
 
 ## Core commands (cheat sheet)

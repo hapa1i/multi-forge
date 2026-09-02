@@ -35,7 +35,7 @@ matches_expected_path() {
     local actual="$1"
     local expected="$2"
     case "$actual" in
-        /*) [ "$(resolve_path "$actual")" = "$(resolve_path "$expected")" ] ;;
+        /*) [ ! -L "$expected" ] && [ "$(resolve_path "$actual")" = "$expected" ] ;;
         *) return 1 ;;
     esac
 }

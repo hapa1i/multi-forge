@@ -24,6 +24,10 @@ directory. **Curated transfer is the portable form of that context**: a parent's
 doc you can read, edit, and hand to another runtime. See
 [session.md](session.md#derive-a-fresh-session-from-an-existing-one) for how resume and fork produce it.
 
+The default `/walkthrough` demonstrates the smallest deterministic continuity loop: inspect a `structured` transfer,
+then use `forge session resume <parent> --fresh --strategy structured --child-name <child>` for one managed child turn.
+It deliberately leaves `ai-curated`, rewind, and cross-runtime transfer as follow-up topics.
+
 ## The three files
 
 Each parent gets a directory under `.forge/prev_sessions/<parent>/`:

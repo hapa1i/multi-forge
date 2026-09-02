@@ -109,6 +109,11 @@ and Forge never falls through to a second provider after selecting a route. Forg
 Code's in-conversation `/model`: the Forge flag owns prelaunch session routing; `/model` changes the already running
 Claude conversation.
 
+The default `/walkthrough` makes the intent/evidence boundary visible with a direct Claude alias: it creates a
+`--no-launch` session, shows the canonical requested model and null route commitment, then resumes it and inspects the
+supported direct commitment. This is a teaching example; it does not imply that a pre-seeded conversation id proves a
+runtime launch.
+
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
 The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5 and the `sonnet` tier to Sonnet 5, and
