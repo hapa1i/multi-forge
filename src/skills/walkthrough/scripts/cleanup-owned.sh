@@ -12,6 +12,145 @@ fi
 test -f .forge-walkthrough-marker
 test "$PWD" = "$FORGE_TEST_REPO"
 
+resolve_forge_python() {
+    local forge_launcher
+    local forge_real
+    local candidate
+    if ! forge_launcher="$(command -v forge 2>/dev/null)"; then
+        echo "ERROR: Could not resolve the Forge launcher for registry validation" >&2
+        return 1
+    fi
+    forge_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$forge_launcher")"
+    for candidate in "$(dirname "$forge_real")/python" "$(dirname "$forge_real")/python3"; do
+        if [ -x "$candidate" ] && "$candidate" -c 'from forge.install.tracking import TrackingStore' 2>/dev/null; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    echo "ERROR: Could not resolve the Python environment used by Forge: $forge_real" >&2
+    return 1
+}
+
+check_extension_registry() {
+    local expectation="$1"
+    local registry="$FORGE_HOME/installed.json"
+    if [ ! -e "$registry" ] && [ ! -L "$registry" ]; then
+        return 0
+    fi
+    if [ -L "$registry" ] || [ ! -f "$registry" ]; then
+        echo "ERROR: Sandboxed Forge installation registry is not a regular file: $registry" >&2
+        return 2
+    fi
+    local forge_python
+    if ! forge_python="$(resolve_forge_python)"; then
+        return 2
+    fi
+    "$forge_python" - "$registry" "$expectation" "$FORGE_TEST_REPO" "$CLAUDE_HOME" <<'PY'
+import sys
+from pathlib import Path
+
+from forge.install.exceptions import TrackingCorruptedError, TrackingUnreadableError
+from forge.install.tracking import TrackingStore
+
+registry = Path(sys.argv[1])
+expectation = sys.argv[2]
+walkthrough_root = sys.argv[3]
+claude_home = Path(sys.argv[4])
+
+try:
+    rows = TrackingStore(tracking_path=registry).read().installations
+except (OSError, UnicodeError, ValueError, TypeError, TrackingCorruptedError, TrackingUnreadableError):
+    print("ERROR: Sandboxed Forge installation registry is unreadable or malformed", file=sys.stderr)
+    raise SystemExit(2)
+
+def target_is_within(raw_path: str, boundary: Path) -> bool:
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        return False
+    try:
+        # Resolve the parent while retaining the leaf so a target symlink is
+        # validated by its owned location, matching Forge's removal policy.
+        location = candidate.parent.resolve(strict=False) / candidate.name
+        return location.is_relative_to(boundary.resolve(strict=False))
+    except (OSError, RuntimeError):
+        return False
+
+
+def ownership_violation(key, row):
+    expected_local_id = f"local:{walkthrough_root}"
+    if key == "user" and row.scope == "user" and row.project_path in (None, ""):
+        boundary = claude_home
+    elif key == expected_local_id and row.scope == "local" and row.project_path == walkthrough_root:
+        boundary = Path(walkthrough_root) / ".claude"
+    else:
+        return "installation id is outside walkthrough ownership"
+
+    if row.mode != "copy" or any(record.mode != "copy" for record in row.files):
+        return "installation uses a non-copy mode"
+    if any(owner.runtime != "claude_code" for owner in row.module_owners):
+        return "installation contains non-Claude runtime ownership"
+    if any(package.runtime != "claude_code" for package in row.skill_packages):
+        return "installation contains a non-Claude skill package"
+    if row.codex_config_path is not None or row.codex_commands:
+        return "installation contains Codex configuration ownership"
+
+    tracked_targets = [record.target_path for record in row.files]
+    for package in row.skill_packages:
+        tracked_targets.append(package.target_dir)
+        tracked_targets.extend(package.file_paths)
+    if row.settings_backup_path is not None:
+        tracked_targets.append(row.settings_backup_path)
+    if any(not target_is_within(target, boundary) for target in tracked_targets):
+        return "installation records a target outside its walkthrough boundary"
+    return None
+
+
+if expectation == "owned-only":
+    unexpected = {
+        key: (row, violation)
+        for key, row in rows.items()
+        if (violation := ownership_violation(key, row)) is not None
+    }
+    heading = "Sandboxed Forge registry contains installations outside walkthrough ownership"
+elif expectation == "empty":
+    unexpected = {key: (row, "installation remains after cleanup") for key, row in rows.items()}
+    heading = "Sandboxed Forge registry still contains installations after cleanup"
+else:
+    print(f"ERROR: Unknown registry expectation: {expectation}", file=sys.stderr)
+    raise SystemExit(2)
+
+if not unexpected:
+    raise SystemExit(0)
+
+print(f"ERROR: {heading}:", file=sys.stderr)
+for key in sorted(unexpected):
+    row, violation = unexpected[key]
+    print(
+        f"  - id={key!r} (scope={row.scope!r}, project_path={row.project_path!r}, reason={violation})",
+        file=sys.stderr,
+    )
+raise SystemExit(1)
+PY
+}
+
+require_registry_state() {
+    local expectation="$1"
+    if check_extension_registry "$expectation"; then
+        return 0
+    else
+        local registry_status=$?
+        if [ "$registry_status" -eq 1 ]; then
+            echo "ERROR: Refusing cleanup because another target is tracked by the sandbox registry." >&2
+            echo "Do not delete installed.json; reconcile the listed row from its recorded project with:" >&2
+            echo "  FORGE_HOME=$FORGE_HOME forge extension disable --scope <scope> --yes" >&2
+            echo "Then restore that project from a normal, non-walkthrough Forge environment and retry --reset." >&2
+        else
+            echo "ERROR: Could not prove the sandbox extension registry is safe for cleanup." >&2
+        fi
+        return 1
+    fi
+}
+
 session_is_listed() {
     local session_name="$1"
     local rows
@@ -188,6 +327,7 @@ cleanup_extensions() {
     elif [ "$?" -ne 1 ]; then
         exit 1
     fi
+    require_registry_state empty
     git rm --cached --ignore-unmatch -q -- src/greeting.py
     if [ -e src/greeting.py ] || [ -L src/greeting.py ]; then
         if [ ! -f src/greeting.py ] && [ ! -L src/greeting.py ]; then
@@ -201,6 +341,11 @@ cleanup_extensions() {
     chmod 700 .codex-user
 }
 
+if [[ "$PHASE" == "extensions" || "$PHASE" == "all" ]]; then
+    # Validate the entire isolated registry before runtime cleanup can remove
+    # evidence. Status queries are CWD-scoped and cannot expose foreign rows.
+    require_registry_state owned-only
+fi
 if [[ "$PHASE" == "runtime" || "$PHASE" == "all" ]]; then
     cleanup_runtime
 fi

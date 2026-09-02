@@ -69,6 +69,13 @@ shim loads those sandbox settings explicitly while retaining your existing nativ
 store. Cleanup deletes the walkthrough's two native Claude transcripts and its sandbox artifact copies; it does not load
 or modify unrelated real user settings.
 
+Reset also checks the sandbox's raw Forge installation registry before removing anything. If a command run from a
+sandboxed Terminal accidentally recorded another project's extension installation there, or an apparently owned row
+points beyond its sandbox boundary, reset refuses and lists only the installation id, scope, project path, and refusal
+reason. Reconcile that row from the listed project using the sandbox `FORGE_HOME`, restore the project's extension
+package from a normal Forge environment, and retry reset. Do not delete `installed.json`: that would discard ownership
+while leaving its target files behind.
+
 `--from <section-or-step>` resumes only when the preserved checklist prefix and the selected options still match. A
 version mismatch, changed or unverified prefix, or orphaned record refuses without changing the state and directs you to
 `--reset`. `--report` saves package provenance, selected options, state, step and Forge logs, metrics, and a transcript
@@ -254,6 +261,7 @@ redirected and protected real extension targets must remain digest-identical. Re
 - **After installing Forge** -- run `/smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
   `/walkthrough` for the interactive tour
 - **After upgrading Forge** -- use the walkthrough to relearn and verify the managed-session loop
-- **Before accepting walkthrough release evidence** -- install or sync the exact candidate wheel, restart Claude so it
-  reloads the candidate skill, and run `/walkthrough --setup-only` before the full reported journey
+- **Before accepting walkthrough release evidence** -- install or sync the exact candidate wheel from a normal Terminal
+  that has not sourced the walkthrough sandbox's `env.sh`, restart Claude so it reloads the candidate skill, and run
+  `/walkthrough --setup-only` before the full reported journey
 - **Before a release** -- build the candidate once and run `/qa --wheel <candidate>` for the full pinned checklist

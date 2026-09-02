@@ -124,6 +124,32 @@ python3 "$skill/scripts/walkthrough-report.py" \
 WALKTHROUGH_SIDECAR_MAY_EXIST=false bash "$skill/scripts/run-in-repo.sh" bash "$skill/scripts/cleanup-owned.sh" all
 WALKTHROUGH_SIDECAR_MAY_EXIST=false bash "$skill/scripts/run-in-repo.sh" bash "$skill/scripts/cleanup-owned.sh" all
 bash "$skill/scripts/run-in-repo.sh" python3 "$skill/scripts/protected-paths.py" compare .forge/walkthrough/real-system.json
+mkdir -p /tmp/foreign-project "$FORGE_TEST_REPO/.forge/artifacts"
+printf 'preserve\n' > "$FORGE_TEST_REPO/.forge/artifacts/foreign-registry-proof.txt"
+python3 - "$FORGE_TEST_REPO/.forge-home/installed.json" <<'PY'
+import json
+import pathlib
+import sys
+
+pathlib.Path(sys.argv[1]).write_text(json.dumps({
+    "version": 3,
+    "installations": {
+        "local:/tmp/foreign-project": {
+            "scope": "local",
+            "mode": "copy",
+            "profile": "standard",
+            "project_path": "/tmp/foreign-project",
+        },
+    },
+}))
+PY
+if bash "$skill/scripts/setup-test-repo.sh" --reset >/tmp/foreign-reset.out 2>/tmp/foreign-reset.err; then
+  echo "ERROR: reset accepted a foreign sandbox-registry row" >&2
+  exit 1
+fi
+grep -F "installations outside walkthrough ownership" /tmp/foreign-reset.err >/dev/null
+test -f "$FORGE_TEST_REPO/.forge/artifacts/foreign-registry-proof.txt"
+test -f "$FORGE_TEST_REPO/.forge-home/installed.json"
 /opt/forge-walkthrough/bin/python -I - <<'PY'
 import hashlib
 import importlib.metadata

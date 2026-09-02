@@ -781,6 +781,13 @@ native executable, excludes the real user settings source, and adds the sandboxe
 Claude's explicit `--settings` surface. This keeps existing native authentication available without borrowing real Forge
 hooks. Deleting the two host-Claude walkthrough sessions temporarily points Forge's transcript cleanup at the captured
 native config root; Forge artifact snapshots remain governed by normal artifact retention and final sandbox cleanup.
+Candidate installation and extension sync run outside the sandbox environment. Before any reset cleanup, the packaged
+cleanup driver reads the isolated `installed.json` directly and permits only its copy-mode, Claude-owned `user` row and
+the canonical sandbox `local:` row. Every removal target in those rows must remain inside its scope's sandbox boundary.
+A scoped `extension status` query is insufficient because it hides rows for other working directories. Any foreign,
+malformed, unreadable, or boundary-violating row blocks cleanup before runtime evidence is removed; recovery must
+disable the row from its recorded project with the isolated `FORGE_HOME`, then restore that project from its normal
+registry.
 
 **Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
 (`resources/checklist.md` + `resources/checklist/*.md`). `start-container.sh` builds or consumes one wheel, installs it

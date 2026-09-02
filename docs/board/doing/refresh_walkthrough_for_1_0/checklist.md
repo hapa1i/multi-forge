@@ -10,13 +10,13 @@
 
 ## Current Focus
 
-The first complete default run exercised all 43 steps and found one keyed-registry checklist bug. Its otherwise healthy
-managed lifecycle also exposed a deeper isolation flaw: Claude Code ignored Forge's sandbox-only `CLAUDE_HOME`, so the
-child borrowed hooks from the maintainer's real user settings and left native transcripts outside Forge's cleanup path.
-The corrected checklist, launcher boundary, cleanup targeting, and delete preview now pass the full automated and
-clean-wheel verification sweep.
+The amended setup-only run passed package identity and every wrapper gate, then exposed a foreign installation row in
+the isolated Forge registry: the candidate sync had run from a sandboxed Terminal and made that registry co-own this
+checkout's Claude assets with the normal registry. CWD-scoped extension status hid the foreign row, so reset incorrectly
+reported success even though the baseline was contaminated.
 
-Install/sync the exact amended candidate wheel, rerun `--setup-only` and the complete default report, exercise
+Add a raw-registry fail-closed gate before reset mutation, reconcile the accidental sandbox claim, rebuild and sync the
+exact candidate from a normal shell, and rerun `--setup-only`. Then complete the default report, exercise
 interruption/resume, and review the saved evidence with the maintainer. Keep the card in `doing/` until those live
 checks pass and the closeout is approved.
 
@@ -35,6 +35,11 @@ checks pass and the closeout is approved.
   settings source and load sandbox hooks explicitly; cleanup may target only the fixed walkthrough transcripts in the
   captured native store. An explicit `--codex-auth <path>` may copy only that regular file into the sandboxed Codex
   home; never print credential values, read a native Codex store implicitly, or copy auth material into reports.
+- Candidate install/sync runs from a normal shell, never one that sourced the sandbox `env.sh`. The isolated registry
+  may track only its user installation and the canonical walkthrough-local installation. Inspect `installed.json`
+  directly before reset mutation because extension status remains CWD-scoped; allowed rows must also be copy-mode,
+  Claude-owned, and confined to their sandbox target roots. Foreign, malformed, unreadable, or boundary-violating rows
+  block cleanup without discarding their ownership records.
 - Keep sections 0-13 and cleanup section 13 stable. Retain an existing step id when its teaching outcome remains; retire
   rather than reuse an id for a different assertion, and append new ids within the relevant section.
 - Keep the two self-contained `walkthrough-state.py` copies unchanged unless their shared parser/state behavior truly
@@ -252,6 +257,10 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 - [x] Extend sandbox and interrupted-cleanup regressions. **Assertion**: missing marker, unsafe canonical target,
   malicious `env.sh`, symlink alias, option mismatch, mid-run abort, stale progress, and foreign resource fixtures all
   fail closed; the valid generated repo still runs and cleans normally.
+- [x] Reject cross-project rows in the isolated installation registry before cleanup. **Assertion**: schema-aware raw
+  inspection permits only copy-mode, Claude-owned walkthrough user/local rows whose targets remain within the matching
+  sandbox roots; a foreign, malformed, or boundary-violating row stops reset before runtime evidence is removed, and
+  recovery preserves the row until it is disabled from its recorded project.
 
 ## Phase 6 -- Prove the Installed Package and Synchronize Docs
 
@@ -303,20 +312,21 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   required or claimed, and the branch never alters the default result. Sidecar remains covered by its targeted Docker
   owner.
 
-### Automated Verification -- 2026-09-01
+### Automated Verification -- 2026-09-02
 
 - The focused walkthrough contract, state, content, sandbox, cleanup, and CLI slice passed 402 tests. `make test-unit`
-  passed with 10,024 tests and 117 deselected; `make test-regression` passed all 1,096 tests, including the generated
-  Claude-launcher isolation regression.
+  passed with 10,024 tests and 117 deselected; `make test-regression` passed all 1,101 tests, including the generated
+  Claude-launcher isolation and sandbox-registry refusal regressions.
 - The amended-head targeted integration sweep passed 36 tests: 21 managed lifecycle, routing, hook, search, transfer,
   and activity owners; 13 sidecar lifecycle/mount owners; one real Codex start/resume owner; and the exact-wheel
   walkthrough package owner. The Codex test completed two real turns and the sidecar tests required no provider
   completion.
 - `make build`, `./scripts/test-wheel-runtime.sh`, `make pre-commit`, and `git diff --check` passed. The amended locally
-  built wheel SHA-256 is `bdd1c195d21bb80763ec82c71f69a6739b00ecbf435a9d0f8be9ef309443185c`.
+  built wheel SHA-256 is `a45bcb8522736666d79035d727b1f2cc1ce0fa28dc1fcd30a979aecb9283e44a`.
 - The exact-wheel owner installs outside the checkout, binds the answering distribution to the installed package tree,
   runs setup/index/report/cleanup twice, verifies protected-path preservation, and confirms `python -I` cannot import
-  the checkout. This automated proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
+  the checkout. It also proves a foreign isolated-registry row blocks reset without deleting evidence. This automated
+  proof does not substitute for the unchecked Claude-hosted release-candidate runs above.
 
 ### Setup-only Attempt -- 2026-09-01
 
@@ -352,6 +362,22 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 - The 5,909-second duration was checkpoint wait time and is accepted as review-only evidence, not a correctness failure.
   This attempt cannot satisfy final acceptance because of its assertion failure and real-settings dependency; the
   amended exact wheel needs a fresh complete run.
+
+### Amended Setup-only Attempt -- 2026-09-02
+
+- Package identity passed from the installed wheel with payload digest
+  `7ab9d7a2d402086863b6831b180b1f6bbabfc95d0471b9f267923cb0998a3a35`; all six wrapper gates passed, the generated Claude
+  shim was first on `PATH`, and setup stopped before state initialization, extension enablement, runtime probes, or paid
+  operations.
+- The isolated registry nevertheless retained `local:/Users/habib/workspace/multi-forge`, created when candidate sync
+  ran with the walkthrough `FORGE_HOME`. The normal registry holds an older row for the same physical assets. Refreshing
+  only the normal row would leave double ownership, so this baseline is not accepted for the full run.
+- Reset relied on CWD-scoped extension status and could not see the foreign row. Raw-registry preflight now treats it as
+  an ownership failure before any cleanup mutation and directs reconciliation from the recorded project; a regression
+  preserves runtime evidence and the registry on refusal. The setup-only acceptance item remains open until that amended
+  behavior passes from a rebuilt candidate.
+- This guard contains the walkthrough failure mode; it does not claim to coordinate ownership across arbitrary
+  `FORGE_HOME` registries. Candidate installation and sync therefore remain normal-shell prerequisites.
 
 ## Acceptance Tests
 

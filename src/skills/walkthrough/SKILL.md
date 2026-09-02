@@ -108,7 +108,11 @@ whether to reclaim it with reset or stop. Do not call setup, inspect target-cont
 before that choice. An unmarked existing target is never eligible for reset.
 
 Build setup arguments from the approved `--reset` and `--codex-auth`, then run the packaged setup script. Reset must
-reclaim tracked installations and managed sessions through the wrapper before discarding their evidence.
+reclaim tracked installations and managed sessions through the wrapper before discarding their evidence. Candidate wheel
+installation and extension sync happen beforehand from a normal shell, never from the walkthrough Terminal with its
+isolated `FORGE_HOME`. Setup refuses before cleanup if that isolated registry contains any installation other than the
+walkthrough's own user row and local sandbox row, or if either row records a mode, runtime, or target outside its
+sandbox boundary; do not delete the registry to bypass this ownership failure.
 
 After setup, prove all six wrapper gates with:
 

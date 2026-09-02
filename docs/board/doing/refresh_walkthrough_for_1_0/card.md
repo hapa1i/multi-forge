@@ -67,7 +67,9 @@ Rechecked on `main` at `7c6847dd` on 2026-09-01:
    proven boundary; no educational simplification may touch real extension targets or Forge state. Before a guided
    Terminal uses bare `forge`, it verifies the walkthrough marker and isolated home variables in that shell. Managed
    Claude children load the sandbox user settings through an explicit launcher shim rather than inheriting real user
-   hooks; native auth/transcript storage remains reachable and only walkthrough-owned transcripts are deleted.
+   hooks; native auth/transcript storage remains reachable and only walkthrough-owned transcripts are deleted. Reset
+   reads the isolated installation registry directly and refuses before mutation if another project is tracked there or
+   an allowed row records a non-sandbox target.
 7. **Keep ownership and selection distinct.** Optional section-12 steps use driver-owned `option: codex` or
    `option: sidecar` modifiers over the existing generic annotation parser. Automated owners live in the journey map;
    the walkthrough does not reuse QA's evidence-selection lanes for a different meaning.

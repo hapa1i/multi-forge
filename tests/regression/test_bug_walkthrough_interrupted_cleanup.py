@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -247,6 +248,177 @@ def test_extension_cleanup_preserves_auth_when_install_inventory_fails(
     assert result.returncode == 1
     assert "Could not inspect the local extension installation" in result.stderr
     assert auth.read_text(encoding="utf-8") == '{"tokens":[]}\n'
+
+
+def test_reset_refuses_foreign_rows_in_the_sandbox_install_registry(
+    tmp_path: Path,
+) -> None:
+    """CWD-scoped status must not hide another project's ownership row."""
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough"
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["FORGE_TEST_REPO"] = str(target)
+    setup = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert setup.returncode == 0, setup.stderr
+
+    foreign_project = tmp_path / "foreign-project"
+    foreign_project.mkdir()
+    foreign_file = foreign_project / "preserve.txt"
+    foreign_file.write_text("foreign\n", encoding="utf-8")
+    artifact = target / ".forge/artifacts/preserve.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    registry = target / ".forge-home/installed.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "version": 3,
+                "installations": {
+                    f"local:{foreign_project}": {
+                        "scope": "local",
+                        "mode": "copy",
+                        "profile": "standard",
+                        "project_path": str(foreign_project),
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reset = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh"), "--reset"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert reset.returncode == 1
+    assert "installations outside walkthrough ownership" in reset.stderr
+    assert f"local:{foreign_project}" in reset.stderr
+    assert "Do not delete installed.json" in reset.stderr
+    assert artifact.read_text(encoding="utf-8") == "{}\n"
+    assert foreign_file.read_text(encoding="utf-8") == "foreign\n"
+    assert json.loads(registry.read_text(encoding="utf-8"))["installations"]
+
+
+@pytest.mark.parametrize("scope", ["user", "local"])
+def test_reset_refuses_owned_row_ids_with_targets_outside_the_sandbox(
+    tmp_path: Path,
+    scope: str,
+) -> None:
+    """A familiar row id must not launder targets from a different home."""
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough"
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["FORGE_TEST_REPO"] = str(target)
+    setup = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert setup.returncode == 0, setup.stderr
+
+    foreign_backup = tmp_path / "foreign-settings-backup.json"
+    foreign_backup.write_text('{"preserve":true}\n', encoding="utf-8")
+    artifact = target / ".forge/artifacts/preserve.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    installation_id = "user" if scope == "user" else f"local:{target}"
+    registry = target / ".forge-home/installed.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "version": 3,
+                "installations": {
+                    installation_id: {
+                        "scope": scope,
+                        "mode": "copy",
+                        "profile": "standard",
+                        "project_path": None if scope == "user" else str(target),
+                        "settings_backup_path": str(foreign_backup),
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reset = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh"), "--reset"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert reset.returncode == 1
+    assert "target outside its walkthrough boundary" in reset.stderr
+    assert f"id='{installation_id}'" in reset.stderr
+    assert artifact.read_text(encoding="utf-8") == "{}\n"
+    assert foreign_backup.read_text(encoding="utf-8") == '{"preserve":true}\n'
+    assert json.loads(registry.read_text(encoding="utf-8"))["installations"]
+
+
+@pytest.mark.parametrize(
+    "registry_bytes",
+    [
+        b"\xff",
+        b'{"version":3,"installations":[]}',
+    ],
+    ids=["non-utf8", "invalid-row-container"],
+)
+def test_reset_refuses_an_unreadable_or_malformed_sandbox_install_registry(
+    tmp_path: Path,
+    registry_bytes: bytes,
+) -> None:
+    """Unknown registry state must block before reset discards evidence."""
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough"
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["FORGE_TEST_REPO"] = str(target)
+    setup = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert setup.returncode == 0, setup.stderr
+
+    artifact = target / ".forge/artifacts/preserve.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    registry = target / ".forge-home/installed.json"
+    registry.write_bytes(registry_bytes)
+
+    reset = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh"), "--reset"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert reset.returncode == 1
+    assert "Could not prove the sandbox extension registry is safe" in reset.stderr
+    assert artifact.read_text(encoding="utf-8") == "{}\n"
+    assert registry.read_bytes() == registry_bytes
 
 
 def test_extension_cleanup_removes_fixed_source_and_sandbox_codex_state(

@@ -709,7 +709,13 @@ Forge's isolated `CLAUDE_HOME` owns the walkthrough's user hooks and skills; nat
 transcript storage through `CLAUDE_CONFIG_DIR` (normally `~/.claude`). The generated PATH shim must invoke the captured
 native binary with `--setting-sources project,local` plus sandbox user settings through `--settings`. Regression tests
 pin those arguments so a walkthrough cannot pass merely because real user settings already contain Forge hooks.
-Transcript cleanup points at the captured native store only for the two fixed host-Claude walkthrough sessions.
+Transcript cleanup points at the captured native store only for the two fixed host-Claude walkthrough sessions. Install
+or sync a release-candidate wheel from a normal shell, never one that sourced the walkthrough `env.sh`. Before reset
+mutates runtime state, cleanup must inspect the raw isolated installation registry and reject any row other than the
+walkthrough user row and canonical sandbox-local row. Allowed rows must also remain copy-mode, Claude-owned, and contain
+only targets within their scope's sandbox boundary. `extension status --all` is not an ownership inventory across
+project roots: it remains CWD-scoped. Regression coverage must prove a foreign or boundary-violating row blocks reset
+without losing runtime evidence or deleting the registry.
 
 Score the default and optional chapters separately. A missing Codex, Docker daemon, sidecar image, or optional provider
 credential is compatibility evidence, not a default-journey failure. A selected optional chapter still records its own
