@@ -719,6 +719,10 @@ chapter may add a container shell. QA retains its own container-oriented interac
   validation refuses before changing state otherwise
 - Walkthrough reports live outside the sandbox and bind results to the answering distribution, installed skill package,
   and managed-package tree digest
+- Walkthrough cleanup strictly reads and clears its isolated trusted-project registry after extension ownership is
+  empty. Enrollment grants sandbox dispatcher permission but owns no files in the referenced roots; clearing it never
+  mutates those roots. A valid standalone dispatcher may remain across reset, so the initial doctor check accepts
+  `current` and requires actionable recovery only for `missing` or `stale`
 - Release QA consumes one exact wheel outside `/forge`; source/editable imports cannot satisfy provenance
 - Before Docker mutation, the Claude-hosted QA driver must have the same managed paths and bytes as the QA package in
   that wheel. The recorded driver digest makes a stale installed checklist ineligible for release evidence

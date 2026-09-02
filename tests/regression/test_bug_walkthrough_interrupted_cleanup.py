@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,14 @@ import pytest
 pytestmark = pytest.mark.regression
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO_ROOT / "src/skills/walkthrough/scripts"
+
+
+def _write_answering_python(fake_bin: Path) -> None:
+    """Let a fake Forge launcher expose the interpreter used by this test run."""
+
+    python = fake_bin / "python"
+    python.write_text(f'#!/usr/bin/env bash\nexec {shlex.quote(sys.executable)} "$@"\n', encoding="utf-8")
+    python.chmod(0o755)
 
 
 def test_runtime_cleanup_is_repeatable_and_preserves_foreign_resources(
@@ -487,6 +497,145 @@ fi
     assert list((target / ".codex-user").iterdir()) == []
     assert (target / ".codex-user").stat().st_mode & 0o777 == 0o700
     assert "should-survive-forge" in (target / ".claude/settings.local.json").read_text()
+
+
+def test_extension_cleanup_clears_isolated_project_trust_without_touching_roots(
+    tmp_path: Path,
+) -> None:
+    """Sandbox enrollment grants permission but owns nothing in an enrolled root."""
+
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough"
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["FORGE_TEST_REPO"] = str(target)
+    setup = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert setup.returncode == 0, setup.stderr
+
+    foreign_root = tmp_path / "foreign-project"
+    foreign_root.mkdir()
+    foreign_file = foreign_root / "preserve.txt"
+    foreign_file.write_text("foreign\n", encoding="utf-8")
+    registry = target / ".forge-home/projects.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "projects": [
+                    {
+                        "canonical_path": str(target.resolve()),
+                        "enrolled_at": "2026-09-02T00:00:00+00:00",
+                        "enrollment_source": "enable",
+                    },
+                    {
+                        "canonical_path": str(foreign_root.resolve()),
+                        "enrolled_at": "2026-09-02T00:00:00+00:00",
+                        "enrollment_source": "enable",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    dispatcher = target / ".forge-home/bin/forge-hook"
+    dispatcher.parent.mkdir(parents=True)
+    dispatcher.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    dispatcher.chmod(0o755)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "forge"
+    fake.write_text("""#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$1 $2" == "extension status" ]]; then
+  printf '%s\\n' '{"installations":[]}'
+else
+  exit 99
+fi
+""")
+    fake.chmod(0o755)
+    _write_answering_python(fake_bin)
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+
+    for _ in range(2):
+        cleanup = subprocess.run(
+            [
+                "bash",
+                str(SCRIPTS / "run-in-repo.sh"),
+                "bash",
+                str(SCRIPTS / "cleanup-owned.sh"),
+                "extensions",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert cleanup.returncode == 0, cleanup.stderr
+
+    assert not registry.exists()
+    assert foreign_file.read_text(encoding="utf-8") == "foreign\n"
+    assert dispatcher.is_file()
+
+
+@pytest.mark.parametrize(
+    "registry_bytes",
+    [b"\xff", b'{"schema_version":2,"projects":[]}'],
+    ids=["non-utf8", "newer-schema"],
+)
+def test_reset_refuses_malformed_sandbox_project_registry_before_runtime_cleanup(
+    tmp_path: Path,
+    registry_bytes: bytes,
+) -> None:
+    """Unknown trust state must survive while reset preserves runtime evidence."""
+
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "walkthrough"
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["FORGE_TEST_REPO"] = str(target)
+    setup = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert setup.returncode == 0, setup.stderr
+
+    artifact = target / ".forge/artifacts/preserve.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    registry = target / ".forge-home/projects.json"
+    registry.write_bytes(registry_bytes)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "forge"
+    fake.write_text("#!/usr/bin/env bash\nexit 99\n")
+    fake.chmod(0o755)
+    _write_answering_python(fake_bin)
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+
+    reset = subprocess.run(
+        ["bash", str(SCRIPTS / "setup-test-repo.sh"), "--reset"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert reset.returncode == 1
+    assert "Could not prove the sandbox project registry is safe" in reset.stderr
+    assert artifact.read_text(encoding="utf-8") == "{}\n"
+    assert registry.read_bytes() == registry_bytes
 
 
 def test_sidecar_cleanup_refuses_same_name_container_from_another_project(

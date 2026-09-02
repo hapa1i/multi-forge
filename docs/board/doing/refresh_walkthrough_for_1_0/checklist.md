@@ -10,12 +10,12 @@
 
 ## Current Focus
 
-The exact candidate's setup-only rerun now passes package identity, raw-registry cleanup, and all six wrapper gates from
-a clean baseline. The installed payload digest matches the locally built wheel byte for byte; its `0.9.4` distribution
-version is the expected pre-release metadata before the separate `1.0.0` release bump.
+Implementation and verification are complete. The maintainer accepted the green 124/124 human run plus corrected
+exact-wheel, resume-state, cleanup, and real-Codex owners as composite final evidence; no failed or skipped assertion
+was reclassified. Unit, regression, packaging, pre-commit, and exact-wheel checks pass on the corrected head.
 
-Complete the default report, exercise interruption/resume, and review the saved evidence with the maintainer. Keep the
-card in `doing/` until those live checks pass and the closeout is approved.
+Open the review PR and keep the card in `doing/` until it merges. Complete the change-log entry, final-lane move,
+inbound link updates, and branch closeout on `main` after review.
 
 ## Execution Guardrails
 
@@ -258,6 +258,9 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   inspection permits only copy-mode, Claude-owned walkthrough user/local rows whose targets remain within the matching
   sandbox roots; a foreign, malformed, or boundary-violating row stops reset before runtime evidence is removed, and
   recovery preserves the row until it is disabled from its recorded project.
+- [x] Reclaim the isolated trusted-project registry independently of installation ownership. **Assertion**: cleanup
+  strictly validates the registry before runtime mutation, clears all sandbox dispatcher trust without touching any
+  enrolled checkout, remains idempotent, and accepts a valid retained dispatcher at the next doctor inspection.
 
 ## Phase 6 -- Prove the Installed Package and Synchronize Docs
 
@@ -294,20 +297,22 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   named and justified.
 - [x] Run `make pre-commit`, Markdown links, file-size checks, and `git diff --check`. **Assertion**: all repository
   gates pass after formatting and generated token-count updates are reviewed.
-- [x] Install/sync the exact candidate wheel and run `/walkthrough --setup-only`. **Assertion**: the package-identity
-  record matches the candidate installation, the sandbox is created outside the checkout, the packaged wrapper proves
-  all six safety gates, and no checklist or live-runtime step runs.
-- [ ] Run one complete default `/walkthrough --report`. **Assertion**: every selected default assertion passes with at
-  most seven human checkpoints and two paid operations; duration is recorded against the 30-minute target; real-system
-  digests match; and the saved artifacts identify the exact wheel-installed package.
-- [ ] Exercise interruption/resume and repeat cleanup. **Assertion**: stop after the managed parent, resume from an
-  exact later step with the same options, finish successfully, then rerun cleanup and prove no owned state remains and
-  no foreign state changed.
-- [ ] Exercise the optional Codex branch when release credentials/readiness are available. **Assertion**: either one
-  genuine structured initial-message headless turn passes and records its thread through explicit-file or environment
-  auth ingress, or the exact not-ready reason is recorded as optional compatibility evidence; hook enrollment is never
-  required or claimed, and the branch never alters the default result. Sidecar remains covered by its targeted Docker
-  owner.
+- [x] Install/sync a candidate wheel and run `/walkthrough --setup-only`. **Assertion**: the package-identity record
+  matches that candidate installation, the sandbox is created outside the checkout, the packaged wrapper proves all six
+  safety gates, and no checklist or live-runtime step runs. If a later payload-only correction leaves this control flow
+  unchanged, the exact-wheel integration plus final full report own final-package binding instead of repeating
+  setup-only.
+- [x] Close the complete default `/walkthrough --report` gate with composite evidence. **Assertion**: the green human
+  report passes all 124 selected assertions with seven checkpoints, two paid operations, matching real-system digests,
+  and preserved installed-package identity; the corrected exact-wheel owner separately binds and exercises the only
+  later payload changes. The maintainer explicitly accepts this decomposition instead of another full run.
+- [x] Disposition interruption/resume and repeat cleanup. **Assertion**: focused state tests prove exact suffix resume
+  and refusal of changed evidence/options, while the green human report and corrected exact-wheel owner each prove
+  repeat cleanup. The maintainer accepts those owners instead of another deliberately interrupted Claude-hosted run.
+- [x] Disposition the optional Codex branch. **Assertion**: the targeted real-runtime integration completed the managed
+  Codex start/resume path with real turns and the auth/readiness owners cover unavailable ingress; the optional human
+  chapter remained honestly unselected. The maintainer accepts that evidence, while sidecar remains covered by its
+  targeted Docker owner.
 
 ### Automated Verification -- 2026-09-02
 
@@ -391,6 +396,68 @@ sidecar adds human windows but no completion unless its instructions explicitly 
   to `1.0.0`; changing it before the behavioral walkthrough would create a different artifact without increasing the
   provenance proof.
 
+### Second Complete Default Attempt -- 2026-09-02
+
+- The exact installed candidate and package digest from the accepted setup-only run remained bound throughout the full
+  journey. The report recorded 123 pass, zero fail, one skip, zero missing, 21 correctly unselected optional assertions,
+  seven of seven human checkpoints, two of two paid operations, successful cleanup, and preserved package identity.
+  Evidence is under `~/.forge/manual-testing/walkthrough/runs/20260902T111948Z/`.
+- The sole skip was step 2.1's missing/stale dispatcher diagnostic. Reset correctly retained the standalone dispatcher,
+  doctor honestly reported it as `current`, and the assertion offered no valid contrast fixture. The `fail` verdict was
+  therefore a checklist defect, not a product failure or permission to infer a pass.
+- Cleanup also retained the isolated `projects.json`, including an enrollment for the real checkout created by an older
+  sandboxed command. The product registry is user-global and those rows grant dispatcher trust but own no checkout
+  files, so generic doctor behavior must not reject roots outside the walkthrough. The walkthrough instead owns and
+  clears the complete registry inside its dedicated `FORGE_HOME` after a strict read and empty installation check.
+- The 4,134-second duration was checkpoint wait time and remains accepted as review-only evidence. This attempt cannot
+  satisfy final acceptance because of its recorded skip; the corrected package needs one final complete default run.
+
+### Post-attempt Harness Correction -- 2026-09-02
+
+- Step 2.1 now accepts an explicit `current` dispatcher result and requires actionable recovery only for `missing` or
+  `stale`; existing doctor unit/integration tests own the exhaustive drift branches. Cleanup validates the isolated
+  project registry before runtime mutation, removes that permission-only registry after extension ownership is empty,
+  remains idempotent, and retains a valid standalone dispatcher.
+- The focused walkthrough contract/cleanup slice passed 32 tests. `make test-unit` passed 10,025 tests with 117
+  deselected, `make test-regression` passed all 1,104 tests, and the corrected exact-wheel walkthrough integration
+  passed. `make build`, `./scripts/test-wheel-runtime.sh`, and `make pre-commit` also passed. The corrected wheel
+  SHA-256 is `4549590c58af6a039e244ab0c280c03c287f514f9466bb2532801033e8e98121`.
+- The standalone setup-only flow and its early-stop behavior did not change. The exact-wheel integration binds the
+  corrected package, while the final full report must bind its installed package digest and re-prove the same six setup
+  gates; repeating setup-only separately would add no distinct evidence.
+
+### Green Previous-payload Attempt -- 2026-09-02
+
+- The report under `~/.forge/manual-testing/walkthrough/runs/20260902T130856Z/` recorded 124 pass, zero
+  fail/skip/missing, seven of seven human checkpoints, two of two paid operations, successful cleanup, and preserved
+  package identity. Its 1,856-second duration exceeded the review threshold by 56 seconds; the overage is accepted as
+  wait-time evidence and does not affect the `pass` verdict.
+- Provenance binds that run to walkthrough payload `7cef26d91aaa3cd1acdc18a5eb4ec4a7bff122fac96c963c6ae73f63e6cc34c5`,
+  the same payload as the accepted setup-only and failed default attempts. The corrected wheel SHA-256
+  `4549590c58af6a039e244ab0c280c03c287f514f9466bb2532801033e8e98121` contains walkthrough payload
+  `ea16756ea191eb64f3fcbf9d8bbd9baba2efc9b16e4f926d650b9351af43135b`; this run therefore does not satisfy the exact
+  final-package gate.
+- `forge_home_cleared_before_reset: true` explains why the old step 2.1 passed: doctor exercised the valid `missing`
+  recovery branch. That is useful proof of the product diagnostic, but clearing the home before setup also prevented the
+  run from exercising the corrected package's `current` acceptance and permission-only project-registry cleanup.
+- `schema: compatibility-fallback` with `strategy: structured` is the explicit transfer contract in
+  `docs/design_sessions.md` §H.2 and is pinned across all non-curated strategies; it is not an open product defect. The
+  `session list --json` `name` and `session show --json` `session_name` fields are separately stable command schemas.
+  Their naming difference is an ergonomic observation, not a violation of the current CLI guideline or a release change
+  for this card.
+
+### Maintainer Evidence Disposition -- 2026-09-02
+
+- The maintainer accepted the green human run plus corrected exact-wheel integration as the final default evidence. The
+  correction changed only checklist/cleanup behavior: the human run proved the unchanged journey and valid
+  missing-dispatcher branch, while the checklist contract pins `current` acceptance and the installed-wheel owner proves
+  the retained dispatcher stays current as isolated project trust is removed without touching enrolled roots.
+- The maintainer also accepted focused resume-state coverage and repeated human/automated cleanup in place of another
+  intentionally interrupted run, and the completed real-Codex integration in place of selecting the optional frontend
+  chapter. No skip or failure is reclassified; the evidence owners and residual composition risk remain explicit.
+- The 56-second duration review overage is accepted as checkpoint wait time. No further walkthrough execution is
+  required before review.
+
 ## Acceptance Tests
 
 | Test                  | Fixture                                                            | Assertion                                                                                                  | Test File                                                                                         |
@@ -412,7 +479,7 @@ sidecar adds human windows but no completion unless its instructions explicitly 
 
 ## Closeout
 
-- [ ] Review the complete implementation and final walkthrough evidence with the maintainer; close every finding or
+- [x] Review the complete implementation and final walkthrough evidence with the maintainer; close every finding or
   record an explicit accepted limitation before release sign-off.
 - [ ] Add the completed-work entry to `docs/board/change_log.md`; promote only human-approved durable manual-testing or
   sandbox decisions through `docs/board/impl_notes.md`.

@@ -274,8 +274,11 @@ discards their manifests; if ownership cannot be proven, it refuses rather than 
 
 Cleanup is idempotent and names only walkthrough-owned sessions, `walkthrough-sidecar-proxy`, and the exact walkthrough
 sidecar container. Missing owned resources are success. Foreign same-port proxies, containers, sessions, listeners, and
-installation rows are never cleanup targets. Disposable fake binaries register an `EXIT` trap immediately after their
-path is chosen.
+installation rows are never cleanup targets. The isolated `projects.json` grants hook trust but owns no checkout files:
+after a strict read, extension cleanup deletes that complete sandbox registry without touching any enrolled root. A
+malformed or non-regular registry refuses before runtime cleanup. A valid standalone dispatcher may remain, so step 2.1
+accepts `current` and requires recovery only when doctor reports `missing` or `stale`. Disposable fake binaries register
+an `EXIT` trap immediately after their path is chosen.
 
 ## 7. Summary and Report
 

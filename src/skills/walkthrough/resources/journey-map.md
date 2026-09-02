@@ -10,7 +10,7 @@ their named flag. QA evidence lanes are deliberately not used here.
 | 0.2  | Is this really the sandbox?               | None                            | `test_bug_o036_walkthrough_sandbox_provenance.py` | default                                | Canonical marked root only          |
 | 0.3  | Are helpers and the Claude shim present?  | None                            | wheel + Claude-shim regressions                   | default                                | Installed package, not checkout     |
 | 1.1  | How do I enter the sandbox?               | One Terminal checkpoint         | sandbox provenance regression                     | default                                | Bare `forge` only after this proof  |
-| 2.1  | Which Forge install answers?              | None                            | extension-doctor unit/integration                 | default                                | Launcher and dispatcher facts       |
+| 2.1  | Which Forge install answers?              | None                            | extension-doctor unit/integration                 | default                                | Explicit dispatcher state/recovery  |
 | 2.2  | Where do runtime hooks belong?            | None                            | installer runtime-scope integration               | default                                | Sandboxed user scope                |
 | 2.3  | Where do project assets belong?           | None                            | installer local-scope integration                 | default                                | Marked walkthrough project          |
 | 3.1  | Are both installs healthy?                | None                            | extension-status schema tests                     | default / 2.2, 2.3                     | Summary, not package inventory      |
@@ -47,7 +47,7 @@ their named flag. QA evidence lanes are deliberately not used here.
 | 12.9 | Can Codex consume parent context?         | None (headless)                 | `test_codex_session_start.py`                     | `--codex` / ready 12.8                 | Initial-message; paid operations: 1 |
 | 13.1 | What exactly will be removed?             | One cleanup approval            | interrupted-cleanup regressions                   | always                                 | Reports saved first                 |
 | 13.2 | Is runtime cleanup scoped?                | None                            | session/sidecar cleanup tests                     | always / 13.1                          | Named runtime and transfer state    |
-| 13.3 | Are installs and runtime residue removed? | None                            | installer/auth-ingress regressions                | always / 13.1                          | Sandbox paths and fixed source only |
+| 13.3 | Are installs and runtime residue removed? | None                            | installer/auth-ingress regressions                | always / 13.1                          | Paths, auth, and project trust      |
 | 13.4 | Did cleanup preserve everything else?     | None                            | sandbox and snapshot regressions                  | always / 13.2, 13.3                    | Repeatable final proof              |
 
 Inventory matrices, legacy migration, passport schema internals, supervisor fan-out, and interactive Claude-to-Codex

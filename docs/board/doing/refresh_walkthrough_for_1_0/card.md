@@ -69,7 +69,8 @@ Rechecked on `main` at `7c6847dd` on 2026-09-01:
    Claude children load the sandbox user settings through an explicit launcher shim rather than inheriting real user
    hooks; native auth/transcript storage remains reachable and only walkthrough-owned transcripts are deleted. Reset
    reads the isolated installation registry directly and refuses before mutation if another project is tracked there or
-   an allowed row records a non-sandbox target.
+   an allowed row records a non-sandbox target. It strictly reads and clears the separate isolated project-trust
+   registry, whose enrollment rows grant dispatcher permission but own no files in the referenced checkouts.
 7. **Keep ownership and selection distinct.** Optional section-12 steps use driver-owned `option: codex` or
    `option: sidecar` modifiers over the existing generic annotation parser. Automated owners live in the journey map;
    the walkthrough does not reuse QA's evidence-selection lanes for a different meaning.

@@ -56,7 +56,7 @@ def test_metadata_matches_the_parsed_checklist() -> None:
     data = PARSER.parse_checklist(str(CHECKLIST))
 
     assert data["version"] == "2.0.0"
-    assert _metadata("last-updated") == "2026-09-01"
+    assert _metadata("last-updated") == "2026-09-02"
     assert _metadata("aligned-with") == "v1.0.0"
     assert _metadata("test-count") == f"{data['total_assertions']} assertions"
     assert data["total_assertions"] == 145
@@ -175,6 +175,14 @@ def test_default_path_is_direct_managed_and_provider_neutral() -> None:
     assert all(not block["runnable"] for block in steps["6.1"]["code_blocks"])
     assert "OPENROUTER_API_KEY" not in CHECKLIST.read_text()
     assert "forge claude start --proxy" not in CHECKLIST.read_text()
+
+
+def test_initial_doctor_accepts_current_or_requires_recovery_for_drift() -> None:
+    steps = {step["id"]: step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]}
+    assertion = " ".join(steps["2.1"]["assertions"])
+
+    assert "accept `current`" in assertion
+    assert "require recovery advice for `missing` or `stale`" in assertion
 
 
 def test_registry_summary_handles_the_current_keyed_installation_schema(

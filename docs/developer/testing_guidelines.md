@@ -715,7 +715,11 @@ mutates runtime state, cleanup must inspect the raw isolated installation regist
 walkthrough user row and canonical sandbox-local row. Allowed rows must also remain copy-mode, Claude-owned, and contain
 only targets within their scope's sandbox boundary. `extension status --all` is not an ownership inventory across
 project roots: it remains CWD-scoped. Regression coverage must prove a foreign or boundary-violating row blocks reset
-without losing runtime evidence or deleting the registry.
+without losing runtime evidence or deleting the registry. Cleanup must also strictly parse and then clear the isolated
+trusted-project registry: those rows grant the sandbox dispatcher permission but own no files in the enrolled roots.
+Malformed or non-regular trust state refuses before runtime cleanup. The standalone dispatcher may validly survive a
+prior run, so the walkthrough accepts a `current` initial diagnosis and relies on doctor tests for exhaustive drift
+branches.
 
 Score the default and optional chapters separately. A missing Codex, Docker daemon, sidecar image, or optional provider
 credential is compatibility evidence, not a default-journey failure. A selected optional chapter still records its own

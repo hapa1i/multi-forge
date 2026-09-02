@@ -76,6 +76,11 @@ reason. Reconcile that row from the listed project using the sandbox `FORGE_HOME
 package from a normal Forge environment, and retry reset. Do not delete `installed.json`: that would discard ownership
 while leaving its target files behind.
 
+The separate project registry inside the walkthrough's isolated Forge home grants hook trust but owns no files in its
+enrolled checkouts. Cleanup strictly validates and clears that sandbox registry without modifying those checkouts; an
+unreadable, malformed, or non-regular registry blocks reset. A previously rendered standalone dispatcher may remain
+valid across runs, so the first doctor check accepts `current` or shows recovery when it is `missing` or `stale`.
+
 `--from <section-or-step>` resumes only when the preserved checklist prefix and the selected options still match. A
 version mismatch, changed or unverified prefix, or orphaned record refuses without changing the state and directs you to
 `--reset`. `--report` saves package provenance, selected options, state, step and Forge logs, metrics, and a transcript

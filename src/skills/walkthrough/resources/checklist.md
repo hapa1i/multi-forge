@@ -4,7 +4,7 @@
 
 <!-- test-count: 145 assertions -->
 
-<!-- last-updated: 2026-09-01 -->
+<!-- last-updated: 2026-09-02 -->
 
 <!-- aligned-with: v1.0.0 -->
 
@@ -111,7 +111,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge extension doctor --json
 
 - [ ] Doctor identifies the Forge launcher and install kind
 - [ ] The launcher is reachable on `PATH`
-- [ ] A missing or stale hook dispatcher is reported with an actionable enablement recovery
+- [ ] Dispatcher status is explicit; accept `current`, and require recovery advice for `missing` or `stale`
 
 ### 2.2 Enable User Runtime Hooks
 
@@ -720,9 +720,9 @@ bash "$SCRIPTS/run-in-repo.sh" forge session show walkthrough-codex --json
 <!-- human:confirm -->
 
 Review the owned resources before cleanup: `walkthrough-demo`, any continuation/incognito/Codex/sidecar sessions,
-`walkthrough-sidecar-proxy`, the walkthrough sidecar container, the sandbox's user/local installation rows, generated
-transfer/search/artifact state, `src/greeting.py`, and sandbox Codex auth/rollouts. Cleanup must preserve foreign
-resources and the six real-system targets.
+`walkthrough-sidecar-proxy`, the walkthrough sidecar container, the sandbox's user/local installation rows and isolated
+project-trust registry, generated transfer/search/artifact state, `src/greeting.py`, and sandbox Codex auth/rollouts.
+Cleanup must preserve foreign resources and the six real-system targets.
 
 - [ ] The cleanup targets are confined to the marked walkthrough repository and its tracked sandbox rows
 - [ ] Reports are saved outside the sandbox before destructive cleanup
@@ -756,7 +756,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash "$SCRIPTS/cleanup-owned.sh" extensions
 ```
 
 - [ ] Local project assets are removed or already absent
-- [ ] User-scope Claude runtime hooks are removed or already absent
+- [ ] User-scope Claude runtime hooks are removed or already absent, and isolated project trust is cleared
 - [ ] Sandboxed Codex auth and rollout state is removed and its private home is recreated empty
 - [ ] Pre-existing unrelated local settings remain intact
 - [ ] The walkthrough-owned `src/greeting.py` is absent
@@ -776,6 +776,7 @@ test ! -d .forge/sessions/walkthrough-continuation
 test ! -d .forge/artifacts
 test ! -d .forge/search-index
 test ! -d .forge/prev_sessions/walkthrough-demo
+test ! -e "$FORGE_HOME/projects.json"
 test ! -e "$CODEX_HOME/auth.json"
 test -d "$CODEX_HOME"
 test "$(find "$CODEX_HOME" -mindepth 1 -print -quit)" = ""
@@ -789,7 +790,7 @@ python3 -c "import json; d=json.load(open(\".claude/settings.local.json\")); ass
 - [ ] All six real-system protected targets still match the baseline
 - [ ] Walkthrough parent and continuation session directories are absent
 - [ ] Walkthrough transcript, transfer, and search state are absent
-- [ ] The sandboxed Codex home is empty and private
+- [ ] The sandboxed Codex home is empty and private, and its Forge project-trust registry is absent
 - [ ] The pre-existing local setting survives
 - [ ] The walkthrough-owned source fixture is absent
 - [ ] Re-running section 13 is safe and produces no new mutation

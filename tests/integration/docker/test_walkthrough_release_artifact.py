@@ -121,9 +121,29 @@ python3 "$skill/scripts/walkthrough-report.py" \
   --package-identity /tmp/package-identity.json \
   --output-dir /tmp/walkthrough-report \
   --ended-epoch 1001 >/tmp/run-metrics.json
+bash "$skill/scripts/run-in-repo.sh" forge extension enable --scope user --runtime claude >/tmp/sandbox-user-enable.log
+bash "$skill/scripts/run-in-repo.sh" forge extension enable --scope local --root "$FORGE_TEST_REPO" --runtime claude \
+  >/tmp/sandbox-local-enable.log
+mkdir -p /tmp/foreign-enrolled-root
+printf 'preserve\n' >/tmp/foreign-enrolled-root/preserve.txt
+bash "$skill/scripts/run-in-repo.sh" /opt/forge-walkthrough/bin/python - <<'PY'
+from forge.install.project_registry import ProjectRegistryStore
+
+ProjectRegistryStore().enroll("/tmp/foreign-enrolled-root", "manual")
+PY
 WALKTHROUGH_SIDECAR_MAY_EXIST=false bash "$skill/scripts/run-in-repo.sh" bash "$skill/scripts/cleanup-owned.sh" all
 WALKTHROUGH_SIDECAR_MAY_EXIST=false bash "$skill/scripts/run-in-repo.sh" bash "$skill/scripts/cleanup-owned.sh" all
 bash "$skill/scripts/run-in-repo.sh" python3 "$skill/scripts/protected-paths.py" compare .forge/walkthrough/real-system.json
+test ! -e "$FORGE_TEST_REPO/.forge-home/projects.json"
+test -x "$FORGE_TEST_REPO/.forge-home/bin/forge-hook"
+test "$(cat /tmp/foreign-enrolled-root/preserve.txt)" = preserve
+bash "$skill/scripts/run-in-repo.sh" forge extension doctor --json >/tmp/post-cleanup-doctor.json
+python3 - <<'PY'
+import json
+
+doctor = json.load(open("/tmp/post-cleanup-doctor.json", encoding="utf-8"))
+assert doctor["hook_dispatcher"]["status"] == "current"
+PY
 mkdir -p /tmp/foreign-project "$FORGE_TEST_REPO/.forge/artifacts"
 printf 'preserve\n' > "$FORGE_TEST_REPO/.forge/artifacts/foreign-registry-proof.txt"
 python3 - "$FORGE_TEST_REPO/.forge-home/installed.json" <<'PY'

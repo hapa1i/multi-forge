@@ -151,6 +151,69 @@ require_registry_state() {
     fi
 }
 
+manage_project_registry() {
+    local action="$1"
+    local registry="$FORGE_HOME/projects.json"
+    if [ ! -e "$registry" ] && [ ! -L "$registry" ]; then
+        return 0
+    fi
+    if [ -L "$registry" ] || [ ! -f "$registry" ]; then
+        echo "ERROR: Sandboxed Forge project registry is not a regular file: $registry" >&2
+        return 2
+    fi
+    local forge_python
+    if ! forge_python="$(resolve_forge_python)"; then
+        return 2
+    fi
+    "$forge_python" - "$registry" "$action" <<'PY'
+import sys
+from pathlib import Path
+
+from forge.core.state import FileLockTimeoutError, file_lock_for_target
+from forge.install.project_registry import (
+    ProjectRegistryCorruptedError,
+    ProjectRegistryStore,
+    ProjectRegistryUnreadableError,
+)
+
+registry = Path(sys.argv[1])
+action = sys.argv[2]
+if action not in {"check", "reset"}:
+    print(f"ERROR: Unknown project-registry action: {action}", file=sys.stderr)
+    raise SystemExit(2)
+
+try:
+    with file_lock_for_target(target_path=registry, timeout_s=5.0):
+        if registry.is_symlink() or (registry.exists() and not registry.is_file()):
+            raise OSError(f"project registry is not a regular file: {registry}")
+        ProjectRegistryStore(registry).read_strict()
+        if action == "reset":
+            # This registry grants hook trust but owns no files in an enrolled
+            # checkout. The dedicated walkthrough FORGE_HOME therefore reclaims
+            # the complete trust registry without touching any referenced root.
+            registry.unlink(missing_ok=True)
+except (
+    FileLockTimeoutError,
+    OSError,
+    UnicodeError,
+    ValueError,
+    TypeError,
+    ProjectRegistryCorruptedError,
+    ProjectRegistryUnreadableError,
+):
+    print("ERROR: Sandboxed Forge project registry is unreadable or malformed", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}
+
+require_project_registry_readable() {
+    if manage_project_registry check; then
+        return 0
+    fi
+    echo "ERROR: Could not prove the sandbox project registry is safe for cleanup." >&2
+    return 1
+}
+
 session_is_listed() {
     local session_name="$1"
     local rows
@@ -328,6 +391,7 @@ cleanup_extensions() {
         exit 1
     fi
     require_registry_state empty
+    manage_project_registry reset
     git rm --cached --ignore-unmatch -q -- src/greeting.py
     if [ -e src/greeting.py ] || [ -L src/greeting.py ]; then
         if [ ! -f src/greeting.py ] && [ ! -L src/greeting.py ]; then
@@ -342,9 +406,11 @@ cleanup_extensions() {
 }
 
 if [[ "$PHASE" == "extensions" || "$PHASE" == "all" ]]; then
-    # Validate the entire isolated registry before runtime cleanup can remove
-    # evidence. Status queries are CWD-scoped and cannot expose foreign rows.
+    # Validate the isolated ownership and trust registries before runtime
+    # cleanup can remove evidence. Status queries are CWD-scoped and cannot
+    # expose foreign installation rows.
     require_registry_state owned-only
+    require_project_registry_readable
 fi
 if [[ "$PHASE" == "runtime" || "$PHASE" == "all" ]]; then
     cleanup_runtime
