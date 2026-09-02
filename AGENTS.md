@@ -42,6 +42,7 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `FORGE_DEV="$PWD" uv run forge session start dev-hooks` launches a managed session whose host hooks use this checkout;
   `FORGE_DEV` must be an absolute root, and the session must be relaunched after changing or unsetting it.
 - `make deps` syncs dev dependencies and is the prerequisite behind the standard targets.
+- `make build` builds the source distribution and wheel with `uv`.
 - `uv run forge --help` checks the CLI entry point.
 - `make test-unit` runs tests.
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
@@ -67,6 +68,12 @@ commit.
 Editable installs can hide packaging and clean-environment bugs. For changes that affect `pyproject.toml`,
 `scripts/setup.sh`, installer code, bundled extensions (`src/skills/`, `src/commands/`, `src/agents/`), or runtime files
 loaded with `importlib.resources`, build a wheel/sdist and verify the behavior from a clean install path when practical.
+After installing or upgrading, run `/smoke-test` in Claude or `$smoke-test` in Codex; use Claude's `/walkthrough` for
+the hermetic Day 1 path. Before a release, build one candidate with `make build`, install/sync that same wheel, restart
+Claude, and run `/qa --wheel dist/multi_forge-X.Y.Z-py3-none-any.whl` on the default pinned runtime track. `/qa`
+requires `forge extension enable --profile full`, and its installed driver must match the selected wheel.
+`/qa --runtime-track latest --extended` is non-blocking compatibility evidence, not a release gate.
+
 For Day 1 install or extension lifecycle changes, verify the global-tool path with `forge extension doctor` (use
 `--json` when checking install kind, PATH reachability, hook dispatcher, project registry, and compatibility fields),
 then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup. For
@@ -107,9 +114,10 @@ does not reroute direct Claude or Codex workers, and `--effort` applies only to 
 For policy CLI or hook changes, exercise `forge policy check --bundle coding_standards --file <path>` and
 `git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown policy
 bundle names, unknown `bundle_config` owners, and invalid supported-bundle field types must fail atomic engine
-construction. The removed `workflow` bundle diagnostic must name both `policy.bundles` and
-`policy.bundle_config.workflow`. Claude and Codex hooks report that build error and allow the action before the
-configured fail mode applies.
+construction. The diff path splits multi-file patches into per-file contexts, evaluates tests before implementation
+through one engine, and reports `files_checked` plus each violation's `file_path` in JSON. The removed `workflow` bundle
+diagnostic must name both `policy.bundles` and `policy.bundle_config.workflow`. Claude and Codex hooks report that build
+error and allow the action before the configured fail mode applies.
 
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status
@@ -147,6 +155,12 @@ For session-store, launchability, repair, or workspace-scope changes, preview or
 membership and session occupancy with `forge workspace worktrees [--json]`. Repair is scoped to the current Forge root;
 it must never recreate missing worktrees or accept collision/corrupt records. Valid missing-worktree sessions remain
 visible but unlaunchable until the checkout returns.
+
+For Claude model-route changes, exercise `forge session start|resume|fork|incognito --model <catalog-id-or-alias>` and
+use `--model-tier haiku|sonnet|opus` only to disambiguate a multi-tier proxy match. Inspect intent, durable commitment,
+current proxy facts, and the validated event sequence with `forge session model show|history <session> --json`. Explicit
+`--proxy` is strict, `--no-proxy` accepts only direct Claude models, bare resume reuses stored route intent, and a
+non-Claude `--model` may start a paid proxy even with `--no-launch`; Codex sessions reject these route-selection flags.
 
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
@@ -234,7 +248,7 @@ Release checklist:
 
 1. Verify the current version and latest tag: `rg -n '^version =' pyproject.toml && git tag --sort=-v:refname | head`.
 2. Bump `pyproject.toml`, then run `uv lock` so `uv.lock` records the project version.
-3. Build locally before tagging: `uv build`.
+3. Build locally before tagging: `make build`.
 4. Run release-appropriate checks, normally `make pre-commit` for a package release.
 5. Commit on `main`, create an annotated tag, and push both: `git commit -m "chore: release X.Y.Z"`,
    `git tag -a vX.Y.Z -m "Release X.Y.Z"`, `git push origin main vX.Y.Z`.
