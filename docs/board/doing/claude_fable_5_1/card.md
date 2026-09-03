@@ -32,7 +32,7 @@ Sources: [Anthropic model overview](https://platform.claude.com/docs/en/models/f
 ## Risks
 
 - OpenRouter uses a dotted `5.1` slug while Anthropic and LiteLLM use the hyphenated API ID.
-- Anthropic requires 30-day retention for Fable 5.1 unless it expressly authorizes ZDR.
+- Anthropic requires 30-day retention for Fable 5 and 5.1 unless it expressly authorizes ZDR.
 - Forced tool choice is unsupported, and older Claude models cannot consume Fable 5.1 thinking blocks.
 - Repointing only the catalog aliases would leave the review worker and proxy alternatives pinned to Fable 5.
 - Omitting the ZDR fallback would make the new bundled alternative violate Forge's audited required-ZDR posture.

@@ -73,6 +73,33 @@ class TestCreateBackendConfig:
 
         assert (model_name, upstream_model) in model_pairs
 
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "anthropic/claude-haiku-4-5",
+            "anthropic/claude-sonnet-5",
+            "anthropic/claude-opus-5",
+            "anthropic/claude-fable-5-1",
+            "anthropic/claude-fable-5",
+            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-6",
+            "anthropic/claude-sonnet-4-6",
+        ],
+    )
+    def test_default_config_exposes_litellm_anthropic_template_models(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        model_name: str,
+    ) -> None:
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        config_path = create_backend_config(adapter_type="litellm")
+        config = yaml.safe_load(config_path.read_text())
+        model_pairs = {(entry["model_name"], entry["litellm_params"]["model"]) for entry in config["model_list"]}
+
+        assert (model_name, model_name) in model_pairs
+
     def test_creates_config_from_custom_source(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify config can be created from custom source."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))

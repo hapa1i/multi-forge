@@ -34,9 +34,9 @@ async def _apply_passthrough_override(
 ) -> JSONResponse | None:
     """Apply override mutations to the raw body and write a mutation record.
 
-    Returns a 403 JSONResponse when a guard blocks the request (caller returns it),
-    else None (continue forwarding the possibly-mutated body). The mutation-safety
-    RuntimeError is intentionally NOT caught — it must fail closed (no forward).
+    Returns a JSONResponse when a guard blocks the request or an effort override is
+    invalid; otherwise returns None to forward the possibly-mutated body. The
+    mutation-safety RuntimeError is intentionally not caught -- it must fail closed.
     """
     import forge.proxy.server as server
     from forge.proxy import audit_logger, intercept
@@ -48,12 +48,22 @@ async def _apply_passthrough_override(
     route = (ctx or {}).get("route") or server._inspect_route()
     proxy_id = server.PROXY_ID or "unknown"
 
-    result = intercept.apply_override(
-        raw_body,
-        system_prompt_augment=getattr(override_cfg, "system_prompt_augment", "") if override_cfg else "",
-        system_prompt_guards=getattr(override_cfg, "system_prompt_guards", []) if override_cfg else [],
-        reasoning_floor_effort=reasoning_floor,
-    )
+    try:
+        result = intercept.apply_override(
+            raw_body,
+            system_prompt_augment=getattr(override_cfg, "system_prompt_augment", "") if override_cfg else "",
+            system_prompt_guards=getattr(override_cfg, "system_prompt_guards", []) if override_cfg else [],
+            reasoning_floor_effort=reasoning_floor,
+        )
+    except intercept.ReasoningOverrideError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "error": {"type": "invalid_request_error", "message": f"{exc} [{request_id}]"},
+            },
+            headers={"X-Request-ID": request_id},
+        )
     for warning in result.warnings:
         logger.warning("[%s] override: %s", request_id, warning)
     if result.mutation_record is not None:

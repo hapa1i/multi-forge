@@ -134,7 +134,11 @@ retain the prior version explicitly. OpenRouter's ZDR endpoint catalog had no el
 either model. Using Fable itself requires the explicit non-ZDR opt-out described in
 [proxy.md](proxy.md#openrouter-zero-data-retention-zdr).
 
-Anthropic's direct API also requires 30-day retention for Fable 5.1 unless Anthropic expressly authorizes ZDR. Its
+An existing proxy is a user-owned snapshot. If it predates the 5.1 alternative, `--model fable` fails and names that
+proxy instead of silently changing to direct Anthropic. Update or recreate the proxy, select a compatible proxy with
+`--proxy`, or explicitly cross the boundary with `--no-proxy`.
+
+Anthropic's direct API requires 30-day retention for Fable 5 and 5.1 unless Anthropic expressly authorizes ZDR. The 5.1
 [migration contract](https://platform.claude.com/docs/en/models/fable-5-1/migration-guide) accepts only `auto` or `none`
 tool choice, and an older Claude model drops Fable 5.1 thinking blocks it cannot read and replans after a route switch.
 Use a fresh transfer (`forge session resume <name> --fresh --model <older-model>`) when you want that switch to start

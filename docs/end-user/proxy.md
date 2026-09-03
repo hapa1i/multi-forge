@@ -188,8 +188,9 @@ endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default
 Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
 rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
 `forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
-LiteLLM path, the new `gemini/gemini-3.6-flash` route must exist in `~/.forge/backends/litellm/config.yaml` — update the
-materialized config or delete/recreate it, then restart the backend; restarting alone re-reads the old copy.
+LiteLLM path, the required Gemini and Anthropic routes must exist in `~/.forge/backends/litellm/config.yaml` — update
+the materialized config or delete/recreate it, then restart the backend; restarting alone re-reads the old copy. A stale
+Anthropic proxy that does not expose Fable 5.1 fails explicitly on `--model fable`; it is never replaced implicitly.
 
 ---
 

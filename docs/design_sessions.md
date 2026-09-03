@@ -469,8 +469,8 @@ UUID `<R>`, not the parent's UUID.
 3. Lineage reference: pointer to raw artifacts for deep reads
 
 **Proxy inheritance:** The child inherits the parent's proxy and neutral model-route intent by default, keeping routing
-stable across resumes. A matching `[1m]` execution projection is inherited with that intent. `--proxy <name>`,
-`--no-proxy`, or an explicit model that the inherited route cannot serve authorizes a complete replacement.
+stable across resumes. A matching `[1m]` execution projection is inherited with that intent. An explicit model must
+remain compatible with that persisted proxy; `--proxy <name>` or `--no-proxy` is required to cross the route boundary.
 
 **Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
 authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child

@@ -124,10 +124,50 @@ class TestApplyOverride:
         result = intercept.apply_override(body, system_prompt_augment="EXTRA", reasoning_floor_effort="high")
         assert not result.blocked
         assert body["system"][-1]["text"] == "EXTRA"  # augment applied
-        assert body["thinking"]["budget_tokens"] == 10000  # pin applied
+        assert body["output_config"]["effort"] == "high"  # native effort pin applied
+        assert "thinking" not in body
         actions = {m["action"] for m in result.mutation_record["mutations"]}
         assert actions == {"augment", "reasoning_pin"}
         assert result.mutation_record["system_prompt_hash_before"] != result.mutation_record["system_prompt_hash_after"]
+
+    def test_fable_max_uses_native_effort_without_manual_thinking(self):
+        body = self._body(model="claude-fable-5-1", temperature=0.7)
+
+        result = intercept.apply_override(body, reasoning_floor_effort="max")
+
+        assert body["output_config"] == {"effort": "max"}
+        assert "thinking" not in body
+        assert "temperature" not in body
+        assert result.mutation_record["mutations"] == [
+            {
+                "target": "output_config.effort",
+                "action": "reasoning_pin",
+                "effort_floor": "max",
+                "effort_before": None,
+                "effort_after": "max",
+                "removed_sampling_parameters": ["temperature"],
+            }
+        ]
+
+    def test_native_effort_floor_never_lowers_explicit_effort(self):
+        body = self._body(model="claude-fable-5", output_config={"effort": "max", "future_key": "keep"})
+
+        result = intercept.apply_override(body, reasoning_floor_effort="high")
+
+        assert body["output_config"] == {"effort": "max", "future_key": "keep"}
+        assert result.mutation_record is None
+
+    def test_adaptive_model_rejects_manual_thinking_budget(self):
+        body = self._body(model="claude-fable-5-1", thinking={"type": "enabled", "budget_tokens": 10_000})
+
+        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+            intercept.apply_override(body, reasoning_floor_effort="high")
+
+    def test_unknown_passthrough_model_rejects_unrepresentable_max_floor(self):
+        body = self._body(model="future-claude")
+
+        with pytest.raises(intercept.ReasoningOverrideError, match="cannot be represented safely"):
+            intercept.apply_override(body, reasoning_floor_effort="max")
 
     def test_block_leaves_body_unmutated(self):
         body = self._body()

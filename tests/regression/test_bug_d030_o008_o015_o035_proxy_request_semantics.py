@@ -104,7 +104,8 @@ def test_o008_reasoning_pin_removes_incompatible_sampling_parameters() -> None:
 
     result = intercept.apply_override(body, reasoning_floor_effort="high")
 
-    assert body["thinking"] == {"type": "enabled", "budget_tokens": 10000}
+    assert body["output_config"] == {"effort": "high"}
+    assert "thinking" not in body
     assert "temperature" not in body
     assert "top_p" not in body
     assert "top_k" not in body
@@ -134,7 +135,7 @@ def test_o008_no_reasoning_mutation_preserves_sampling_parameters() -> None:
     assert result.mutation_record is None
 
 
-def test_o008_satisfied_reasoning_floor_preserves_sampling_parameters() -> None:
+def test_o008_native_effort_preserves_manual_thinking_and_removes_sampling_parameters() -> None:
     body = {
         "model": "claude-opus-4-6",
         "max_tokens": 64000,
@@ -144,11 +145,16 @@ def test_o008_satisfied_reasoning_floor_preserves_sampling_parameters() -> None:
         "top_p": 0.8,
         "top_k": 40,
     }
-    expected_body = deepcopy(body)
+    expected_thinking = deepcopy(body["thinking"])
 
     result = intercept.apply_override(body, reasoning_floor_effort="high")
 
-    assert (body, result.mutation_record) == (expected_body, None)
+    assert body["thinking"] == expected_thinking
+    assert body["output_config"] == {"effort": "high"}
+    assert "temperature" not in body
+    assert "top_p" not in body
+    assert "top_k" not in body
+    assert result.mutation_record is not None
 
 
 class _RequestState:

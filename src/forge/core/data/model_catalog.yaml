@@ -1016,7 +1016,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: high
     tags: []
 
@@ -1042,7 +1042,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: [bounded-review, opt-in]
@@ -1070,7 +1070,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []
@@ -1101,7 +1101,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []  # Default opus tier (anthropic + openrouter)
@@ -1157,7 +1157,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: [opt-in]
@@ -1186,7 +1186,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []
@@ -1211,7 +1211,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: medium
     tags: []
 
@@ -1236,7 +1236,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: high
     tags: []
 
@@ -1260,7 +1260,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: medium
     tags: []
 

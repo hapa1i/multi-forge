@@ -33,7 +33,7 @@ _PROXY_ID = "test-passthrough"
 
 # Models that are NOT the tier default and NOT in model_alternatives, yet must
 # stay pinnable on passthrough because the model is forwarded unchanged.
-_DISPLACED_PINS = {
+_NON_DEFAULT_PINS = {
     "claude-fable-5-1": ("opus", "claude-fable-5-1"),
     "claude-fable-5": ("opus", "claude-fable-5"),
     "claude-opus-4-8": ("opus", "claude-opus-4-8"),
@@ -57,23 +57,23 @@ def _passthrough_cfg() -> ProxyInstanceConfig:
     )
 
 
-@pytest.mark.parametrize("model", sorted(_DISPLACED_PINS))
-def test_passthrough_supports_displaced_claude_pins(model: str) -> None:
+@pytest.mark.parametrize("model", sorted(_NON_DEFAULT_PINS))
+def test_passthrough_supports_non_default_claude_pins(model: str) -> None:
     cfg = _passthrough_cfg()
     pin = resolve_direct_model_pin(model)
 
     assert _proxy_supports_model_pin(cfg, pin) is True
 
 
-@pytest.mark.parametrize("model", sorted(_DISPLACED_PINS))
-def test_passthrough_validation_accepts_displaced_pins(model: str) -> None:
+@pytest.mark.parametrize("model", sorted(_NON_DEFAULT_PINS))
+def test_passthrough_validation_accepts_non_default_pins(model: str) -> None:
     pin = resolve_direct_model_pin(model)
 
     with patch("forge.config.loader.load_proxy_instance_config", return_value=_passthrough_cfg()):
         assert _validate_proxy_model_pin(_PROXY_ID, pin) is None
 
 
-@pytest.mark.parametrize("model,expected", sorted(_DISPLACED_PINS.items()))
+@pytest.mark.parametrize("model,expected", sorted(_NON_DEFAULT_PINS.items()))
 def test_passthrough_env_application_populates_claude_vars(model: str, expected: tuple[str, str]) -> None:
     tier, env_model = expected
     env_vars: dict[str, str] = {}

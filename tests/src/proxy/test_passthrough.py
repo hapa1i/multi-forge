@@ -753,7 +753,8 @@ async def test_passthrough_override_mutates_body_and_records(
 
     sent = anthropic_transport.captured.json
     assert sent["system"][-1]["text"] == "STAY-FOCUSED"  # augment forwarded
-    assert sent["thinking"]["budget_tokens"] == 10000  # reasoning pinned to the 'high' floor
+    assert sent["output_config"]["effort"] == "high"  # native effort pinned to the 'high' floor
+    assert "thinking" not in sent
 
     recs = audit_logger.read_audit_logs(record_type="mutation")
     assert len(recs) == 1
@@ -906,7 +907,34 @@ async def test_passthrough_override_uses_model_tier_not_default(
     await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_t4"), "req_t4")
 
     sent = anthropic_transport.captured.json
-    assert sent["thinking"]["budget_tokens"] == 10000  # opus 'high' floor, not sonnet 'minimal'
+    assert sent["output_config"]["effort"] == "high"  # opus 'high' floor, not sonnet 'minimal'
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_rejects_manual_thinking_for_adaptive_fable(monkeypatch, proxy_runtime_ready):
+    """The proxy returns a useful 400 instead of forwarding a provider-invalid Fable request."""
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="opus", intercept_mode="override")
+    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort="max")}
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    async def _boom(**kwargs):
+        raise AssertionError("provider-invalid adaptive thinking must not be forwarded")
+
+    monkeypatch.setattr("forge.proxy.passthrough.forward", _boom)
+    raw_body = {
+        "model": "claude-fable-5-1",
+        "max_tokens": 64_000,
+        "thinking": {"type": "enabled", "budget_tokens": 10_000},
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_fable"), "req_fable")
+
+    assert response.status_code == 400
+    assert b"requires adaptive thinking" in bytes(response.body)
 
 
 @pytest.mark.asyncio

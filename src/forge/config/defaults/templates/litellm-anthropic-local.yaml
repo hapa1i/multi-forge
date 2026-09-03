@@ -6,8 +6,9 @@
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 #
-# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Use --model to select
-# an alternative (claude-fable-5-1/5, claude-opus-4-8/4-6, claude-sonnet-4-6).
+# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Alternatives are
+# claude-fable-5-1, claude-fable-5, claude-opus-4-8, claude-opus-4-6,
+# and claude-sonnet-4-6.
 #
 # After adding ANTHROPIC_API_KEY, stop the backend so Forge restarts it with the new environment:
 # forge model backend stop litellm-4000

@@ -164,12 +164,6 @@ class TestClaudeFableFamily:
         assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh", "max")
         assert spec.default_reasoning_effort == "high"
 
-    def test_fable_family_is_not_an_opus_catalog_default(self):
-        catalog = load_model_catalog()
-
-        for provider in ("anthropic", "openrouter"):
-            assert catalog.defaults[provider]["opus"] == "claude-opus-5"
-
 
 class TestClaudeOpus5:
     """Tests for the claude-opus-5 catalog entry, aliases, and default status."""
@@ -200,7 +194,7 @@ class TestClaudeOpus5:
         assert spec.supports_sampling_overrides is False
         assert spec.thinking_modes == ("adaptive",)
         assert spec.native_thinking_param == "output_config.effort"
-        assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh")
+        assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh", "max")
         assert spec.token_estimate_multiplier == 1.35
 
 

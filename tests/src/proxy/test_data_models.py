@@ -8,7 +8,8 @@ from forge.proxy.data_models import _detect_tier, map_model_name
 class TestMapModelNameFable:
     """map_model_name must treat Fable as the opus tier, not fall through to sonnet."""
 
-    def test_fable_maps_to_openrouter_opus_tier_model(self, monkeypatch):
+    @pytest.mark.parametrize("model", ["claude-fable-5-1", "claude-fable-5"])
+    def test_fable_maps_to_openrouter_opus_tier_model(self, monkeypatch, model):
         # Regression: without fable handling in _anthropic_flavor, a bare
         # "claude-fable-5-1" fell through to the sonnet default with a misleading
         # "Unknown model" warning instead of mapping to the opus-tier model.
@@ -21,7 +22,7 @@ class TestMapModelNameFable:
         # Fable rides the opus tier, so this tier mapper resolves it to the configured
         # opus default, never sonnet. Explicit Fable selection is honored
         # separately on the request path via model_alternatives, not this mapper.
-        assert map_model_name("claude-fable-5-1") == loaded.proxy.openrouter.tiers.opus
+        assert map_model_name(model) == loaded.proxy.openrouter.tiers.opus
         # opus-tier siblings keep their own pass-through / tier mapping
         assert map_model_name("anthropic/claude-opus-4.8") == "anthropic/claude-opus-4.8"
 

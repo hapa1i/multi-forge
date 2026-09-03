@@ -34,6 +34,7 @@ Await review and merge; keep this card in `doing/` until the change ships.
 | Direct routing     | Model route catalog         | 5.1 starts with the exact direct Claude model ID                     | `tests/src/core/models/test_model_routes.py`             |
 | Direct pin         | Claude launch environment   | Fable 5.1 rides the opus tier and pins its exact model ID            | `tests/src/core/models/test_direct_model.py`             |
 | Proxy alternatives | Three Anthropic templates   | OpenRouter uses dotted slug; LiteLLM uses hyphenated slug            | `tests/src/config/test_loader.py`                        |
+| Local backend      | Generated LiteLLM config    | Every model exposed by the local Anthropic template has a route      | `tests/src/backend/test_creation.py`                     |
 | Required ZDR       | Audited OpenRouter fallback | Both Fable versions route to Opus 5 when non-ZDR is disallowed       | `tests/src/proxy/test_model_alternatives.py`             |
 | Review worker      | Named `claude-fable` worker | Derived direct route selects Fable 5.1                               | `tests/src/review/test_models.py`                        |
 
@@ -46,14 +47,21 @@ Await review and merge; keep this card in `doing/` until the change ships.
 
 ## Verification evidence
 
-- Focused model/config/proxy/review suite: 429 passed.
-- Targeted Docker integration: four installed-package, direct-launch, and offline OpenRouter runtime-truth tests passed.
-- Full unit suite: 10,039 passed and 117 deselected.
-- Full regression suite: 1,107 passed.
+- Review-focused model/config/proxy/routing suite: 432 passed; the final direct-model and catalog rerun passed 140
+  tests.
+- Targeted Docker integration passed the offline OpenRouter health check, local LiteLLM health check, and both direct
+  model launch cases.
+- Full unit suite: 10,149 passed and 117 deselected.
+- Full regression suite: 1,180 passed.
 - The complete pre-commit suite passes, including mypy, pyright, repository file-size limits, Markdown links, and
   mdformat.
 - The final `make build` produced the wheel and sdist; an exact-wheel import outside the checkout loaded the packaged
   catalog, route catalog, and OpenRouter template and resolved `fable` to `claude-fable-5-1`.
-- The pinned LiteLLM runtime recognizes the new Anthropic ID, and its bundled limits, pricing, cache, and reasoning
-  metadata match the catalog profile.
+- The generated LiteLLM backend config exposes every model referenced by `litellm-anthropic-local`; no claim is based on
+  the pinned runtime's stale bundled Fable metadata.
 - Pull request: [#250](https://github.com/hapa1i/multi-forge/pull/250).
+
+## Closeout
+
+- [ ] Merge the pull request to `main`.
+- [ ] Move this card to `done/` and record the merged commit.

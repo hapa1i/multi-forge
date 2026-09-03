@@ -55,7 +55,8 @@ def test_override_with_all_directives_preserves_history_byte_for_byte():
 
     # Mutations did happen on control surfaces (proves the path is live, not skipped).
     assert result.mutation_record is not None
-    assert body["thinking"]["budget_tokens"] == 10000
+    assert body["output_config"]["effort"] == "high"
+    assert "thinking" not in body
     assert body["system"][-1]["text"] == "be extra careful"
 
     # ...but every historical message is byte-identical, signatures intact.

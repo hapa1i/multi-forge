@@ -168,17 +168,30 @@ class TestSessionStart:
         assert result.returncode == 1
         assert "already exists" in result.stdout or "already exists" in result.stderr
 
-    def test_start_with_direct_model_pins_claude_env(self, mock_claude_workspace: ContainerLike) -> None:
+    @pytest.mark.parametrize(
+        ("model_arg", "session_name", "canonical_id"),
+        [
+            ("opus-4-8", "model-test", "claude-opus-4-8"),
+            ("fable", "fable-model-test", "claude-fable-5-1"),
+        ],
+    )
+    def test_start_with_direct_model_pins_claude_env(
+        self,
+        mock_claude_workspace: ContainerLike,
+        model_arg: str,
+        session_name: str,
+        canonical_id: str,
+    ) -> None:
         """--model is stored as direct intent and launched through Claude Code env pins."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session start model-test --model opus-4-8")
+        result = mock_claude_workspace.exec(f"cd /workspace && forge session start {session_name} --model {model_arg}")
 
         assert result.returncode == 0, result.stderr
         assert "Routing: direct" in result.stdout
 
         manifest = json.loads(
-            mock_claude_workspace.read_file("/workspace/.forge/sessions/model-test/forge.session.json")
+            mock_claude_workspace.read_file(f"/workspace/.forge/sessions/{session_name}/forge.session.json")
         )
-        assert manifest["intent"]["launch"]["direct_model"] == "claude-opus-4-8"
+        assert manifest["intent"]["launch"]["direct_model"] == canonical_id
 
         invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
         assert "--model" not in invocations
@@ -187,29 +200,7 @@ class TestSessionStart:
         assert env_path
         env_text = mock_claude_workspace.read_file(env_path)
         assert "ANTHROPIC_MODEL=opus" in env_text
-        assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-8" in env_text
-        assert "ANTHROPIC_BASE_URL=" not in env_text
-
-    def test_start_with_fable_family_default_pins_claude_env(self, mock_claude_workspace: ContainerLike) -> None:
-        """The stable Fable alias is stored and launched as the exact 5.1 direct pin."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session start fable-model-test --model fable")
-
-        assert result.returncode == 0, result.stderr
-        assert "Routing: direct" in result.stdout
-
-        manifest = json.loads(
-            mock_claude_workspace.read_file("/workspace/.forge/sessions/fable-model-test/forge.session.json")
-        )
-        assert manifest["intent"]["launch"]["direct_model"] == "claude-fable-5-1"
-
-        invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
-        assert "--model" not in invocations
-
-        env_path = mock_claude_workspace.exec("ls -1 /tmp/claude_env_*.log | head -n 1").stdout.strip()
-        assert env_path
-        env_text = mock_claude_workspace.read_file(env_path)
-        assert "ANTHROPIC_MODEL=opus" in env_text
-        assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-fable-5-1" in env_text
+        assert f"ANTHROPIC_DEFAULT_OPUS_MODEL={canonical_id}" in env_text
         assert "ANTHROPIC_BASE_URL=" not in env_text
 
     def test_human_courier_authority_flow_uses_independent_sessions(self, mock_claude_workspace: ContainerLike) -> None:

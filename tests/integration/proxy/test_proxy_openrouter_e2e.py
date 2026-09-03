@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+pytestmark = pytest.mark.integration
 
 
 def _anthropic_response_text(data: dict[str, Any]) -> str:
@@ -44,6 +44,7 @@ class TestProxyWithOpenRouter:
             "openai": {"extra_body": {"provider": {"zdr": True}}}
         }
 
+    @pytest.mark.slow
     def test_simple_completion_preserves_system_prompt(self, proxy_server_openrouter: str) -> None:
         """POST /v1/messages routes through OpenRouter and preserves system prompts."""
         with httpx.Client(timeout=60) as client:
@@ -103,6 +104,7 @@ def _assert_tier_completion(
     assert data.get("usage", {}).get("input_tokens", 0) > 0
 
 
+@pytest.mark.slow
 class TestCurrentDefaultsWithOpenRouter:
     """Each current template default resolves to its exact live OpenRouter slug.
 
@@ -189,6 +191,7 @@ class TestCurrentDefaultsWithOpenRouter:
         )
 
 
+@pytest.mark.slow
 class TestOpenAIProxyWithOpenRouter:
     """GPT-family defaults route through the exact OpenRouter Sol slug."""
 

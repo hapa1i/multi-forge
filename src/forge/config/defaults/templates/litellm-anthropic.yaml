@@ -5,8 +5,9 @@
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 # NOTE: the shared LiteLLM instance must serve anthropic/claude-opus-5 and anthropic/claude-sonnet-5.
 #
-# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Use --model to select
-# an alternative (claude-fable-5-1/5, claude-opus-4-8/4-6, claude-sonnet-4-6).
+# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Alternatives are
+# claude-fable-5-1, claude-fable-5, claude-opus-4-8, claude-opus-4-6,
+# and claude-sonnet-4-6.
 # prompt_caching: passthrough respects Anthropic's 4-breakpoint cache_control limit.
 
 proxy:

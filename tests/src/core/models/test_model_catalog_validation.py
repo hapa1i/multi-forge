@@ -368,6 +368,25 @@ class TestClaude48CatalogProfile:
         assert spec.token_estimate_multiplier == 1.35
 
 
+@pytest.mark.parametrize(
+    ("model", "efforts"),
+    [
+        ("claude-fable-5-1", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-fable-5", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-opus-5", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-opus-4-8", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-opus-4-7", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-opus-4-6", ("low", "medium", "high", "max")),
+        ("claude-opus-4-6-1m", ("low", "medium", "high", "max")),
+        ("claude-sonnet-5", ("low", "medium", "high", "xhigh", "max")),
+        ("claude-sonnet-4-6", ("low", "medium", "high", "max")),
+        ("claude-sonnet-4-6-1m", ("low", "medium", "high", "max")),
+    ],
+)
+def test_current_claude_effort_levels_match_anthropic(model: str, efforts: tuple[str, ...]) -> None:
+    assert load_model_catalog(force_reload=True).get(model).litellm_reasoning_efforts == efforts
+
+
 class TestOpenRouterOpenModelsCatalog:
     """Tests for curated OpenRouter open-model catalog entries."""
 
