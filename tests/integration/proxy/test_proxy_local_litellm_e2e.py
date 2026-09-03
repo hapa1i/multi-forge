@@ -69,7 +69,7 @@ class TestGemini37FlashLiteLLMGate:
     full Google AI Studio path on the locked version: routing, thinking usage,
     and the gateway cost header. Cost absence is a hard failure. The offline
     packaged-map expectation is pinned in
-    tests/src/proxy/test_litellm_gemini37_support.py.
+    tests/src/proxy/test_litellm_gemini_flash_support.py.
     """
 
     def test_gemini_37_flash_completion_thinking_and_cost(self, local_litellm_gemini: str) -> None:

@@ -334,6 +334,8 @@ class TestGemini37Flash:
         assert spec.context_window_tokens == 1_048_576
         assert spec.max_output_tokens == 65_536
         assert spec.supports_images is True
+        assert spec.temperature_constraint == "fixed"
+        assert (spec.temperature.min, spec.temperature.default, spec.temperature.max) == (1.0, 1.0, 1.0)
         assert spec.supports_top_p is False
         assert spec.supports_sampling_overrides is False
         assert spec.native_thinking_param == "thinking_level"
@@ -341,6 +343,7 @@ class TestGemini37Flash:
         assert spec.default_thinking_level == "medium"
         assert spec.litellm_reasoning_efforts == ("low", "medium", "high")
         assert spec.default_reasoning_effort == "medium"
+        assert spec.system_prompt_addendum == "system_prompt_addendums/gemini.md"
 
 
 class TestGemini38Flash:
@@ -366,6 +369,8 @@ class TestGemini38Flash:
         assert spec.context_window_tokens == 1_048_576
         assert spec.max_output_tokens == 65_536
         assert spec.supports_images is True
+        assert spec.temperature_constraint == "fixed"
+        assert (spec.temperature.min, spec.temperature.default, spec.temperature.max) == (1.0, 1.0, 1.0)
         assert spec.supports_top_p is False
         assert spec.supports_sampling_overrides is False
         assert spec.native_thinking_param == "thinking_level"
@@ -373,6 +378,7 @@ class TestGemini38Flash:
         assert spec.default_thinking_level == "medium"
         assert spec.litellm_reasoning_efforts == ("low", "medium", "high")
         assert spec.default_reasoning_effort == "medium"
+        assert spec.system_prompt_addendum == "system_prompt_addendums/gemini.md"
 
 
 class TestKimiModels:

@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from forge.core.llm import CompletionResponse
 from forge.policy.semantic.plan_check import (
     _MAX_REASON_CHARS,
@@ -749,18 +751,32 @@ class TestPlanCheckEvaluate:
             assert decision.decision in ("allow", "needs_review")
             assert decision.warnings == []
 
+    @pytest.mark.parametrize(
+        ("provider", "expected_model"),
+        [
+            ("openrouter", "google/gemini-3.8-flash"),
+            ("litellm_local", "gemini/gemini-3.7-flash"),
+            ("litellm_remote", "vertex_ai/gemini-3.7-flash"),
+        ],
+    )
     @patch("forge.policy.semantic.plan_check.run_plan_check")
-    def test_provider_default_and_budget_passed_to_checker(self, mock_check: MagicMock, tmp_path: Path) -> None:
+    def test_provider_default_and_budget_passed_to_checker(
+        self,
+        mock_check: MagicMock,
+        tmp_path: Path,
+        provider: str,
+        expected_model: str,
+    ) -> None:
         mock_check.return_value = PlanCheckVerdict(aligned=True)
         policy = PlanCheckPolicy(
-            config=_config_with_plan(tmp_path, checker_provider="litellm_local", checker_budget_tokens=64_000)
+            config=_config_with_plan(tmp_path, checker_provider=provider, checker_budget_tokens=64_000)
         )
 
         decision = policy.evaluate(_make_context())
 
         assert decision.decision == "allow"
-        assert mock_check.call_args.kwargs["model"] == "gemini/gemini-3.7-flash"
-        assert mock_check.call_args.kwargs["provider"] == "litellm_local"
+        assert mock_check.call_args.kwargs["model"] == expected_model
+        assert mock_check.call_args.kwargs["provider"] == provider
         assert mock_check.call_args.kwargs["budget_tokens"] == 64_000
 
 

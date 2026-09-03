@@ -963,9 +963,9 @@ models:
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
-  # Gemini 3.7 Flash remains the stable LiteLLM Flash route. Google deprecates
-  # temperature/top_p/top_k for this model (values are ignored), so sampling
-  # overrides are off. Cache accounting has not been Forge-probed yet.
+  # Gemini 3.7 Flash remains the stable LiteLLM Flash route. Google's current-model
+  # migration guide deprecates and ignores temperature/top_p/top_k for 3.6 and later,
+  # so sampling overrides are off. Cache accounting has not been Forge-probed yet.
   gemini-3.7-flash:
     friendly_name: Gemini 3.7 Flash
     context_window_tokens: 1048576

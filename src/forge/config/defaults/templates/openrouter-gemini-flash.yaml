@@ -1,9 +1,10 @@
 # Template: openrouter-gemini-flash
-# Gemini 3.8 Flash via OpenRouter (all tiers use Flash)
+# Gemini Flash models via OpenRouter (all tiers use Flash)
 #
 # Requires OPENROUTER_API_KEY in .env (or environment).
 #
 # All tiers use Flash, differentiated by reasoning_effort.
+# Gemini 3.8 is the default; earlier cataloged Flash releases remain selectable.
 
 proxy:
   family: gemini
@@ -17,6 +18,22 @@ proxy:
       haiku: google/gemini-3.8-flash
       sonnet: google/gemini-3.8-flash
       opus: google/gemini-3.8-flash
+    model_alternatives:
+      haiku:
+        gemini-2.5-flash: google/gemini-2.5-flash
+        gemini-3.5-flash: google/gemini-3.5-flash
+        gemini-3.6-flash: google/gemini-3.6-flash
+        gemini-3.7-flash: google/gemini-3.7-flash
+      sonnet:
+        gemini-2.5-flash: google/gemini-2.5-flash
+        gemini-3.5-flash: google/gemini-3.5-flash
+        gemini-3.6-flash: google/gemini-3.6-flash
+        gemini-3.7-flash: google/gemini-3.7-flash
+      opus:
+        gemini-2.5-flash: google/gemini-2.5-flash
+        gemini-3.5-flash: google/gemini-3.5-flash
+        gemini-3.6-flash: google/gemini-3.6-flash
+        gemini-3.7-flash: google/gemini-3.7-flash
     tier_overrides:
       haiku:
         reasoning_effort: low

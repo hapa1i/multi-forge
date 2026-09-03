@@ -174,15 +174,18 @@ New proxies created from the current built-in templates use these defaults:
 
 Gemini 3.8 Flash is the current Gemini Flash family and OpenRouter default. It is a GA model with a 1,048,576-token
 input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default). Google
-documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini 3.7
-Flash remains selectable and stays the local and remote LiteLLM default: LiteLLM 1.99's bundled model catalog has no 3.8
-pricing/capability entry. See Google's
-[3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/)
-and [model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash).
+documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini 2.5,
+3.5, 3.6, and 3.7 Flash remain selectable through the OpenRouter Flash template. Gemini 3.7 also stays the local and
+remote LiteLLM default: LiteLLM 1.99's bundled model catalog has no 3.8 pricing/capability entry. See Google's
+[3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/),
+[3.8 model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
+[3.7 migration guidance](https://ai.google.dev/gemini-api/docs/latest-model), and
+[Gemini API release notes](https://ai.google.dev/gemini-api/docs/changelog).
 
 The tier-1 cascade checker therefore defaults to Gemini 3.8 Flash through OpenRouter and Gemini 3.7 Flash through local
-or remote LiteLLM (see [policy.md](policy.md)). The Kimi template keeps K3 as its default and exposes the
-coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus model alternative.
+LiteLLM as `gemini/gemini-3.7-flash` or remote LiteLLM as `vertex_ai/gemini-3.7-flash` (see [policy.md](policy.md)). The
+Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
+model alternative.
 
 The Anthropic templates retain Opus 5 as their opus-tier default and now expose both Fable 5.1 and Fable 5 as explicit
 alternatives. The unversioned `fable` and `claude-fable` aliases select Fable 5.1; use `claude-fable-5` when you need

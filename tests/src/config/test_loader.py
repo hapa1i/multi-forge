@@ -281,6 +281,15 @@ class TestLoadConfig:
             sonnet="google/gemini-3.8-flash",
             opus="google/gemini-3.8-flash",
         )
+        legacy_flash_models = {
+            "gemini-2.5-flash": "google/gemini-2.5-flash",
+            "gemini-3.5-flash": "google/gemini-3.5-flash",
+            "gemini-3.6-flash": "google/gemini-3.6-flash",
+            "gemini-3.7-flash": "google/gemini-3.7-flash",
+        }
+        assert flash.proxy.openrouter.model_alternatives == {
+            tier: legacy_flash_models for tier in ("haiku", "sonnet", "opus")
+        }
 
     def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter templates intentionally allow the catalog endpoint override."""

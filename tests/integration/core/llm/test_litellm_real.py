@@ -232,7 +232,9 @@ class TestLiteLLMLocalReal:
         client = get_client("gemini/gemini-2.5-flash")
         response = await client.complete(
             [Message(role="user", content="What is 2+2? Reply with just the number.")],
-            hyperparams=ModelHyperparameters(max_tokens=50),
+            # Gemini 2.5 may spend most of a small output budget on internal
+            # reasoning before emitting visible text.
+            hyperparams=ModelHyperparameters(max_tokens=256),
         )
         assert "4" in response.text
 

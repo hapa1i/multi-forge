@@ -398,15 +398,15 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-3.1-pro-preview
+        model_ref: vertex_ai/gemini-3.1-pro-preview
       - kind: proxy
         source_id: litellm-gemini-local
         template: litellm-gemini-flash-local
-        model_ref: google/gemini-3.1-pro-preview
+        model_ref: gemini/gemini-3.1-pro-preview
       - kind: proxy
         source_id: litellm-gemini-local
         template: litellm-gemini-local
-        model_ref: google/gemini-3.1-pro-preview
+        model_ref: gemini/gemini-3.1-pro-preview
   gemini-3.1-pro-preview-customtools:
     routes:
       - kind: proxy
@@ -422,7 +422,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-3-flash-preview
+        model_ref: vertex_ai/gemini-3-flash-preview
   gemini-2.5-pro:
     routes:
       - kind: proxy
@@ -432,7 +432,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-2.5-pro
+        model_ref: vertex_ai/gemini-2.5-pro
   gemini-2.5-flash:
     routes:
       - kind: proxy
@@ -442,7 +442,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-2.5-flash
+        model_ref: vertex_ai/gemini-2.5-flash
   gemini-3.5-flash:
     routes:
       - kind: proxy
@@ -452,7 +452,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-3.5-flash
+        model_ref: vertex_ai/gemini-3.5-flash
   gemini-3.6-flash:
     routes:
       - kind: proxy
@@ -462,7 +462,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-3.6-flash
+        model_ref: vertex_ai/gemini-3.6-flash
   gemini-3.7-flash:
     routes:
       - kind: proxy
@@ -472,7 +472,7 @@ models:
       - kind: proxy
         source_id: litellm-remote
         template: litellm-gemini
-        model_ref: google/gemini-3.7-flash
+        model_ref: vertex_ai/gemini-3.7-flash
       - kind: proxy
         source_id: litellm-gemini-local
         template: litellm-gemini-flash-local
@@ -486,6 +486,10 @@ models:
       - kind: proxy
         source_id: openrouter
         template: openrouter-gemini-flash
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
         model_ref: google/gemini-3.8-flash
   claude-opus-4-6:
     routes:

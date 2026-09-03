@@ -37,6 +37,7 @@ def _valid_raw() -> dict:
 class _Source:
     id: str
     template_names: tuple[str, ...]
+    provider: str = "openrouter"
 
 
 class TestPackagedCatalog:
@@ -84,7 +85,7 @@ class TestPackagedCatalog:
                 kind="proxy",
                 source_id="litellm-remote",
                 template="litellm-gemini",
-                model_ref="google/gemini-3.7-flash",
+                model_ref="vertex_ai/gemini-3.7-flash",
             )
             in routes
         )
@@ -98,7 +99,26 @@ class TestPackagedCatalog:
             in routes
         )
 
-    def test_gemini_38_flash_is_openrouter_only_until_litellm_support_lands(self) -> None:
+    @pytest.mark.parametrize(
+        "model_id",
+        [
+            "gemini-3.1-pro-preview",
+            "gemini-3.1-pro-preview-customtools",
+            "gemini-3-flash-preview",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+        ],
+    )
+    def test_remote_litellm_gemini_routes_use_vertex_ai_refs(self, model_id: str) -> None:
+        routes = load_model_route_catalog().models[model_id]
+        remote_refs = {route.model_ref for route in routes if route.source_id == "litellm-remote"}
+
+        assert remote_refs == {f"vertex_ai/{model_id}"}
+
+    def test_gemini_38_flash_has_both_openrouter_routes_until_litellm_support_lands(self) -> None:
         routes = load_model_route_catalog().models["gemini-3.8-flash"]
 
         assert routes == (
@@ -106,6 +126,12 @@ class TestPackagedCatalog:
                 kind="proxy",
                 source_id="openrouter",
                 template="openrouter-gemini-flash",
+                model_ref="google/gemini-3.8-flash",
+            ),
+            ModelRouteCandidate(
+                kind="proxy",
+                source_id="openrouter",
+                template="openrouter-gemini",
                 model_ref="google/gemini-3.8-flash",
             ),
         )
@@ -301,3 +327,15 @@ class TestIntegrationValidation:
         )
         with pytest.raises(ModelRouteCatalogError, match="does not belong to source 'openrouter'"):
             validate_model_route_catalog_integrations(catalog, sources)
+
+    def test_rejects_model_ref_that_core_llm_cannot_route_for_litellm_source(self) -> None:
+        from forge.backend.sources import list_model_sources
+
+        raw = _valid_raw()
+        routes = raw["models"]["gemini-3.7-flash"]["routes"]
+        remote = next(route for route in routes if route["source_id"] == "litellm-remote")
+        remote["model_ref"] = "google/gemini-3.7-flash"
+        catalog = _validate_and_build_route_catalog(raw)
+
+        with pytest.raises(ModelRouteCatalogError, match="cannot be routed by LiteLLM source 'litellm-remote'"):
+            validate_model_route_catalog_integrations(catalog, list_model_sources())

@@ -175,8 +175,10 @@ dev = [
     "httpx2>=2.3.0",
 ]
 provider-check = [
-    "anthropic>=0.100.0",
-    "google-genai>=2.5.0",
+    # scripts/count-tokens.py imports provider-specific count_tokens surfaces;
+    # keep lock refreshes inside the API families verified by that script.
+    "anthropic>=0.100.0,<2",
+    "google-genai>=2.5.0,<3",
     "openai>=2.0.0",
     "tiktoken>=0.12.0",
 ]

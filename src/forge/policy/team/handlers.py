@@ -16,6 +16,7 @@ import math
 import os
 from collections.abc import Callable
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
 from forge.core.lanes import Consumer, Lane
@@ -34,6 +35,13 @@ from forge.policy.team.prompts import (
 )
 
 _log = logging.getLogger(__name__)
+
+
+class _TaggerStatus(Enum):
+    FAILED = "failed"
+
+
+_TAGGER_FAILED = _TaggerStatus.FAILED
 
 
 # The team supervisor has a different configuration and contract from the semantic supervisor.
@@ -72,6 +80,8 @@ def handle_teammate_idle(
         return cached.get("exit_code", 0), cached.get("feedback", "")
 
     tag = _classify_event(config.tagger_model, IDLE_TAGGER_PROMPT, teammate, team)
+    if tag is _TAGGER_FAILED:
+        return 0, _tagger_failure_feedback(config.tagger_model)
     if tag != "needs-review":
         cache[cache_key] = {"checked_at": now_iso(), "exit_code": 0, "feedback": ""}
         return 0, ""
@@ -128,6 +138,8 @@ def handle_task_completed(
         return cached.get("exit_code", 0), cached.get("feedback", "")
 
     tag = _classify_event(config.tagger_model, TASK_TAGGER_PROMPT, teammate, team, task_subject)
+    if tag is _TAGGER_FAILED:
+        return 0, _tagger_failure_feedback(config.tagger_model)
     if tag != "needs-review":
         cache[cache_key] = {"checked_at": now_iso(), "exit_code": 0, "feedback": ""}
         return 0, ""
@@ -168,8 +180,8 @@ def _classify_event(
     teammate: str,
     team: str,
     task_subject: str | None = None,
-) -> str:
-    """Classify event via cheap LLM call. Returns single tag string."""
+) -> str | _TaggerStatus:
+    """Classify an event, distinguishing provider failures from routine output."""
     # The handler carries no Forge session, so attribute to FORGE_SESSION when the hook set
     # it, else emit ambient/global (emit_direct_llm_usage no-ops without a run identity).
     session = os.environ.get("FORGE_SESSION") or None
@@ -215,7 +227,15 @@ def _classify_event(
             failure_type="exception",
             session=session,
         )
-        return "routine"
+        return _TAGGER_FAILED
+
+
+def _tagger_failure_feedback(model: str) -> str:
+    """Explain a fail-open tagger error without caching or exposing provider details."""
+    return (
+        f"Team tagger could not evaluate this event with model {model!r}; allowing it because team supervision "
+        "fails open. Check that the configured model is available and inspect Forge logs before retrying."
+    )
 
 
 def _run_supervisor(
