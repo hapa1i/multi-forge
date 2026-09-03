@@ -9,8 +9,32 @@ if [[ "$PHASE" != "runtime" && "$PHASE" != "extensions" && "$PHASE" != "all" ]];
     exit 2
 fi
 
-test -f .forge-walkthrough-marker
 test "$PWD" = "$FORGE_TEST_REPO"
+
+marker_is_canonical() {
+    local marker_path="$1"
+    if [ -L "$marker_path" ] || [ ! -f "$marker_path" ]; then
+        return 1
+    fi
+    python3 - "$marker_path" <<'PY'
+import os
+import stat
+import sys
+
+try:
+    descriptor = os.open(sys.argv[1], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as marker:
+        valid = stat.S_ISREG(os.fstat(marker.fileno()).st_mode) and marker.read() == b"forge-walkthrough-marker\n"
+except OSError:
+    valid = False
+raise SystemExit(0 if valid else 1)
+PY
+}
+
+if ! marker_is_canonical .forge-walkthrough-marker; then
+    echo "ERROR: Walkthrough cleanup requires the canonical ownership marker" >&2
+    exit 1
+fi
 
 resolve_forge_python() {
     local forge_launcher
@@ -214,28 +238,138 @@ require_project_registry_readable() {
     return 1
 }
 
-session_is_listed() {
+session_is_owned() {
     local session_name="$1"
-    local rows
-    if ! rows="$(forge session list --scope all --include-incognito --json)"; then
+    local forge_python
+    if ! forge_python="$(resolve_forge_python)"; then
         echo "ERROR: Could not inspect the session index before cleanup" >&2
         return 2
     fi
-    printf '%s\n' "$rows" | python3 -c '
-import json
+    "$forge_python" - "$session_name" "$FORGE_TEST_REPO" <<'PY'
 import sys
 
-name = sys.argv[1]
+from forge.session import IndexStore, SessionStore
+
 try:
-    rows = json.load(sys.stdin)
-except (json.JSONDecodeError, OSError):
+    name = sys.argv[1]
+    expected_root = sys.argv[2]
+    entry = IndexStore().peek_session(name, forge_root=expected_root)
+    if entry is None:
+        raise SystemExit(1)
+    if (
+        entry.forge_root != expected_root
+        or entry.worktree_path != expected_root
+        or entry.project_root != expected_root
+        or entry.checkout_root != expected_root
+        or entry.relative_path != "."
+    ):
+        raise SystemExit(2)
+    state = SessionStore(expected_root, name).read()
+    if state.name != name or state.forge_root != expected_root or state.worktree is None:
+        raise SystemExit(2)
+    if state.worktree.path != expected_root or state.worktree.is_worktree:
+        raise SystemExit(2)
+    if state.confirmed.claude_project_root not in {None, expected_root}:
+        raise SystemExit(2)
+except Exception:
     raise SystemExit(2)
-if not isinstance(rows, list):
-    raise SystemExit(2)
-if any(not isinstance(row, dict) for row in rows):
-    raise SystemExit(2)
-raise SystemExit(0 if any(row.get("name", row.get("session_name")) == name for row in rows) else 1)
-' "$session_name"
+raise SystemExit(0)
+PY
+}
+
+require_shared_path_boundaries() {
+    local path
+    path="$FORGE_TEST_REPO/.git"
+    if [ -L "$path" ] || [ ! -d "$path" ]; then
+        echo "ERROR: Walkthrough cleanup requires a real repository metadata directory: $path" >&2
+        return 1
+    fi
+    for path in \
+        "$FORGE_TEST_REPO/src" \
+        "$FORGE_TEST_REPO/.claude" \
+        "$CLAUDE_HOME"; do
+        if [ -L "$path" ] || { [ -e "$path" ] && [ ! -d "$path" ]; }; then
+            echo "ERROR: Walkthrough cleanup path is not a real directory: $path" >&2
+            return 1
+        fi
+    done
+}
+
+require_runtime_path_boundaries() {
+    local path
+    for path in \
+        "$FORGE_TEST_REPO/.forge" \
+        "$FORGE_TEST_REPO/.forge/sessions" \
+        "$FORGE_TEST_REPO/.forge/artifacts" \
+        "$FORGE_TEST_REPO/.forge/search-index" \
+        "$FORGE_TEST_REPO/.forge/prev_sessions" \
+        "$FORGE_TEST_REPO/.forge/walkthrough" \
+        "$FORGE_HOME" \
+        "$FORGE_HOME/sessions" \
+        "$FORGE_HOME/proxies"; do
+        if [ -L "$path" ] || { [ -e "$path" ] && [ ! -d "$path" ]; }; then
+            echo "ERROR: Walkthrough runtime path is not a real directory: $path" >&2
+            return 1
+        fi
+    done
+
+    local session_name
+    local manifest_path
+    for session_name in \
+        walkthrough-codex \
+        walkthrough-sidecar \
+        walkthrough-continuation \
+        walkthrough-incognito \
+        walkthrough-demo; do
+        path="$FORGE_TEST_REPO/.forge/sessions/$session_name"
+        if [ -L "$path" ] || { [ -e "$path" ] && [ ! -d "$path" ]; }; then
+            echo "ERROR: Walkthrough session path is not a real directory: $path" >&2
+            return 1
+        fi
+        manifest_path="$path/forge.session.json"
+        if [ -L "$manifest_path" ] || { [ -e "$manifest_path" ] && [ ! -f "$manifest_path" ]; }; then
+            echo "ERROR: Walkthrough session manifest is not a regular file: $manifest_path" >&2
+            return 1
+        fi
+    done
+
+    path="$FORGE_HOME/proxies/walkthrough-sidecar-proxy"
+    if [ -L "$path" ] || { [ -e "$path" ] && [ ! -d "$path" ]; }; then
+        echo "ERROR: Walkthrough proxy path is not a real directory: $path" >&2
+        return 1
+    fi
+}
+
+cleanup_runtime_paths() {
+    local artifact_inventory=""
+    local session_name
+    for session_name in \
+        walkthrough-codex \
+        walkthrough-sidecar \
+        walkthrough-continuation \
+        walkthrough-incognito \
+        walkthrough-demo; do
+        rm -rf -- \
+            ".forge/artifacts/$session_name" \
+            ".forge/prev_sessions/$session_name"
+    done
+    rm -rf -- .forge/walkthrough/noop-bin
+
+    # Search stores are project-wide. If foreign artifacts remain, rebuild the
+    # shared index from those surviving transcripts instead of deleting it.
+    if [ -d .forge/artifacts ]; then
+        if ! artifact_inventory="$(find .forge/artifacts -mindepth 1 -maxdepth 1 -print -quit)"; then
+            echo "ERROR: Could not inspect surviving artifact ownership; refusing cleanup" >&2
+            return 1
+        fi
+    fi
+    if [ -n "$artifact_inventory" ]; then
+        if [ -e .forge/search-index ]; then
+            forge search rebuild-index
+        fi
+    else
+        rm -rf -- .forge/artifacts .forge/search-index
+    fi
 }
 
 owned_proxy_status() {
@@ -263,7 +397,14 @@ raise SystemExit(0)
 '
 }
 
-cleanup_runtime() {
+WALKTHROUGH_OWNED_SESSIONS=()
+WALKTHROUGH_OWNED_SESSION_COUNT=0
+WALKTHROUGH_DELETE_PROXY=false
+WALKTHROUGH_DELETE_CONTAINER=false
+
+preflight_runtime_cleanup() {
+    require_runtime_path_boundaries
+
     local session_name
     for session_name in \
         walkthrough-codex \
@@ -271,20 +412,9 @@ cleanup_runtime() {
         walkthrough-continuation \
         walkthrough-incognito \
         walkthrough-demo; do
-        if session_is_listed "$session_name"; then
-            case "$session_name" in
-                walkthrough-demo|walkthrough-continuation)
-                    # Claude Code writes native transcripts under its own
-                    # CLAUDE_CONFIG_DIR, while Forge-owned settings remain in
-                    # the sandbox CLAUDE_HOME. Point deletion at the native
-                    # store only for these two fixed, walkthrough-created ids.
-                    CLAUDE_HOME="$FORGE_WALKTHROUGH_CLAUDE_CONFIG_DIR" \
-                        forge session delete "$session_name" --yes --force
-                    ;;
-                *)
-                    forge session delete "$session_name" --yes --force
-                    ;;
-            esac
+        if session_is_owned "$session_name"; then
+            WALKTHROUGH_OWNED_SESSIONS[$WALKTHROUGH_OWNED_SESSION_COUNT]="$session_name"
+            WALKTHROUGH_OWNED_SESSION_COUNT=$((WALKTHROUGH_OWNED_SESSION_COUNT + 1))
         else
             local lookup_status=$?
             if [ "$lookup_status" -ne 1 ]; then
@@ -300,11 +430,7 @@ cleanup_runtime() {
 
     local proxy_dir="$FORGE_HOME/proxies/walkthrough-sidecar-proxy"
     if owned_proxy_status; then
-        if [ -L "$proxy_dir" ]; then
-            echo "ERROR: Walkthrough sidecar proxy directory is a symlink; refusing cleanup" >&2
-            exit 1
-        fi
-        forge proxy delete walkthrough-sidecar-proxy --yes
+        WALKTHROUGH_DELETE_PROXY=true
     else
         local proxy_status=$?
         if [ "$proxy_status" -eq 2 ]; then
@@ -315,11 +441,12 @@ cleanup_runtime() {
             exit 1
         fi
         if [ -e "$proxy_dir" ] || [ -L "$proxy_dir" ]; then
-            if [ -L "$proxy_dir" ]; then
-                echo "ERROR: Walkthrough sidecar proxy directory is a symlink; refusing cleanup" >&2
-                exit 1
-            fi
-            forge proxy delete walkthrough-sidecar-proxy --yes
+            echo "ERROR: Proxy walkthrough-sidecar-proxy has on-disk state but is absent from the proxy registry; refusing cleanup" >&2
+            printf '  Unregistered path: %s\n' "$proxy_dir" >&2
+            printf '  Inspect it first: ls -la -- %q\n' "$proxy_dir" >&2
+            echo "  If it is foreign, move it outside the sandbox Forge home before retrying reset." >&2
+            printf '  If you verify it is abandoned walkthrough residue, remove it manually: rm -rf -- %q\n' "$proxy_dir" >&2
+            exit 1
         fi
     fi
 
@@ -334,27 +461,71 @@ cleanup_runtime() {
             exit 1
         fi
         if printf '%s\n' "$container_names" | grep -Fxq forge-walkthrough-sidecar; then
+            local mount_inventory
             local project_mount
-            if ! project_mount="$(docker inspect \
-                --format '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}' \
-                forge-walkthrough-sidecar)"; then
+            if ! mount_inventory="$(docker inspect --format '{{json .Mounts}}' forge-walkthrough-sidecar)"; then
                 echo "ERROR: Could not inspect the walkthrough sidecar mount before cleanup" >&2
                 exit 1
             fi
-            project_mount="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$project_mount")"
+            if ! project_mount="$(printf '%s\n' "$mount_inventory" | python3 -c '
+import json
+import os
+import sys
+
+try:
+    mounts = json.load(sys.stdin)
+except (json.JSONDecodeError, OSError, TypeError):
+    raise SystemExit(2)
+if not isinstance(mounts, list) or any(not isinstance(row, dict) for row in mounts):
+    raise SystemExit(2)
+sources = [row.get("Source") for row in mounts if row.get("Destination") == "/workspace"]
+if len(sources) != 1 or not isinstance(sources[0], str) or not os.path.isabs(sources[0]):
+    raise SystemExit(2)
+print(os.path.realpath(sources[0]))
+')"; then
+                echo "ERROR: Container forge-walkthrough-sidecar has no unambiguous /workspace mount; refusing cleanup" >&2
+                exit 1
+            fi
             if [ "$project_mount" != "$FORGE_TEST_REPO" ]; then
                 echo "ERROR: Container forge-walkthrough-sidecar is not mounted from this walkthrough; refusing cleanup" >&2
                 exit 1
             fi
-            docker rm -f forge-walkthrough-sidecar
+            WALKTHROUGH_DELETE_CONTAINER=true
         fi
     fi
 
-    rm -rf \
-        .forge/artifacts \
-        .forge/search-index \
-        .forge/prev_sessions/walkthrough-demo \
-        .forge/walkthrough/noop-bin
+}
+
+cleanup_runtime() {
+    preflight_runtime_cleanup
+
+    local session_name
+    local index
+    for ((index = 0; index < WALKTHROUGH_OWNED_SESSION_COUNT; index++)); do
+        session_name="${WALKTHROUGH_OWNED_SESSIONS[$index]}"
+        case "$session_name" in
+            walkthrough-demo|walkthrough-continuation)
+                # Claude Code writes native transcripts under its own
+                # CLAUDE_CONFIG_DIR, while Forge-owned settings remain in
+                # the sandbox CLAUDE_HOME. Point deletion at the native
+                # store only for these two fixed, walkthrough-created ids.
+                CLAUDE_HOME="$FORGE_WALKTHROUGH_CLAUDE_CONFIG_DIR" \
+                    forge session delete "$session_name" --yes --force
+                ;;
+            *)
+                forge session delete "$session_name" --yes --force
+                ;;
+        esac
+    done
+
+    if [ "$WALKTHROUGH_DELETE_PROXY" = true ]; then
+        forge proxy delete walkthrough-sidecar-proxy --yes
+    fi
+    if [ "$WALKTHROUGH_DELETE_CONTAINER" = true ]; then
+        docker rm -f forge-walkthrough-sidecar
+    fi
+
+    cleanup_runtime_paths
 }
 
 scope_is_installed() {
@@ -400,18 +571,17 @@ cleanup_extensions() {
         fi
         rm -f src/greeting.py
     fi
-    rm -rf .codex-user
-    mkdir -p .codex-user
+    # Preserve the generated home itself so an interrupted extension cleanup
+    # cannot make the wrapper gate needed by reset unrecoverable.
+    find .codex-user -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
     chmod 700 .codex-user
 }
 
-if [[ "$PHASE" == "extensions" || "$PHASE" == "all" ]]; then
-    # Validate the isolated ownership and trust registries before runtime
-    # cleanup can remove evidence. Status queries are CWD-scoped and cannot
-    # expose foreign installation rows.
-    require_registry_state owned-only
-    require_project_registry_readable
-fi
+# Validate the isolated ownership and trust registries before every destructive
+# phase. A runtime-only pass must not erase evidence before extensions run.
+require_shared_path_boundaries
+require_registry_state owned-only
+require_project_registry_readable
 if [[ "$PHASE" == "runtime" || "$PHASE" == "all" ]]; then
     cleanup_runtime
 fi

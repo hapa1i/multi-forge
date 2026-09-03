@@ -169,16 +169,41 @@ Validate preserved Codex ingress before any checklist command:
 The user does not need to re-supply the original auth source on resume. If `--codex-auth` is present, use it only to
 confirm the stored mode was `explicit-file`; do not recopy or record its path.
 
-Then run:
+First prove the wrapper:
 
 ```bash
 bash "$SCRIPTS/run-in-repo.sh" true
+```
+
+For `--report`, after the wrapper proof and before validation, generate a new identity file for this resumed run rather
+than expecting it in the new timestamped directory:
+
+```bash
+python3 "$SCRIPTS/package-identity.py" --skill-root "$CLAUDE_SKILL_DIR" > "$WT_RUN_DIR/package-identity.json"
+```
+
+Require both identity booleans to be true exactly as for a fresh run. Stop before checklist execution if the command
+fails or its identity does not match the answering distribution.
+
+Then validate the resume point:
+
+```bash
 bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/walkthrough-state.py" "$CHECKLIST" validate "$STATE_FILE" --from "$FROM_STEP"
 ```
 
-`status: refused` exits non-zero and leaves state byte-identical. Stop and show its `/walkthrough --reset` recovery.
-`status: ok` preserves verified prefix evidence and clears only the selected suffix. Keep the original start time and
-observed counters.
+Append `--report` to the validation command when report mode is active. The validator combines that active selection
+with the persisted `RUN_OPTIONS`, so any continuation it prints retains `--codex`, `--sidecar`, and `--report` as
+applicable.
+
+`status: refused` exits non-zero and leaves state byte-identical. Stop and show its exact `recovery` value. A requested
+resume point that skips otherwise valid unrecorded prefix steps names `first_unrecorded_step` and recovers with that
+step plus the original active options. Changed, unverifiable, or orphaned evidence recovers through
+`/walkthrough --reset`. Structurally malformed state instead reports `recovery_kind: manual-state-inspection`. Never
+recommend or invoke reset for this refusal, because reset deliberately refuses malformed ownership evidence. Leave that
+sandbox unchanged, show `recovery_state_path`, and offer either manual inspection/preservation or setting
+`FORGE_TEST_REPO` to a different empty path and running `alternate_fresh_command`. Do not choose a replacement path or
+abandon the old sandbox on the user's behalf. `status: ok` preserves verified prefix evidence and clears only the
+selected suffix. Keep the original start time and observed counters.
 
 ## 4. Optional Infrastructure Selection
 
@@ -268,9 +293,11 @@ Before presenting step 13.1 in report mode, copy the current progress file, sele
 step logs, and sandbox Forge logs into the host run directory. Do not copy `$CODEX_HOME`, `env.sh`, credential
 environment, settings contents, or auth material.
 
-After cleanup, copy final logs and state again. If a user stops before section 13, clearly say owned resources remain
-and offer either continuation with `--from 13` or `/walkthrough --reset`. Reset must reclaim resources before it
-discards their manifests; if ownership cannot be proven, it refuses rather than guessing.
+After cleanup, copy final logs and state again. If a user stops before section 13, clearly say owned resources remain.
+Use the ordered checklist index and recorded state to identify the first unrecorded step, then offer either continuation
+with `--from <first-unrecorded-step>` while retaining the active `--codex`, `--sidecar`, and `--report` selections, or
+`/walkthrough --reset`. If every step before section 13 is recorded, section 13 is that continuation point. Reset must
+reclaim resources before it discards their manifests; if ownership cannot be proven, it refuses rather than guessing.
 
 Cleanup is idempotent and names only walkthrough-owned sessions, `walkthrough-sidecar-proxy`, and the exact walkthrough
 sidecar container. Missing owned resources are success. Foreign same-port proxies, containers, sessions, listeners, and

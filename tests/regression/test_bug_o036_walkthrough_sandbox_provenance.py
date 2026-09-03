@@ -69,7 +69,7 @@ def test_missing_marker_rejects_target_before_sourcing_env(tmp_path: Path) -> No
     result = _run(target, home, "true")
 
     assert result.returncode == 1
-    assert "Marker file missing" in result.stderr
+    assert "Canonical marker file missing" in result.stderr
     assert not sentinel.exists()
 
 
@@ -192,6 +192,8 @@ def test_safe_symlink_alias_remains_compatible(tmp_path: Path) -> None:
     (target / "CLAUDE.md").write_text("# walkthrough target\n", encoding="utf-8")
     alias = tmp_path / "walkthrough-alias"
     alias.symlink_to(target, target_is_directory=True)
+    for directory in (".forge-home", ".claude-user", ".codex-user"):
+        (target / directory).mkdir()
     _write_env(target, exported_target=alias)
 
     result = _run(alias, home, "pwd")

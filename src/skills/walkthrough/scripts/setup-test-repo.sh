@@ -66,19 +66,23 @@ else
 fi
 
 FORGE_TEST_REPO="${FORGE_TEST_REPO:-${FORGE_HOME:-$HOME/.forge}/manual-testing/walkthrough/test-repo}"
-FORGE_TEST_REPO="$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$FORGE_TEST_REPO")"
+FORGE_TEST_REPO="$(python3 -c 'import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))' "$FORGE_TEST_REPO")"
 
 # CLAUDE_HOME is Forge's install/test override; Claude Code itself uses
 # CLAUDE_CONFIG_DIR (or ~/.claude). Preserve that native store for auth and
 # transcripts, while the launcher wrapper supplies sandbox hook settings.
 if [ "${CLAUDE_CONFIG_DIR+set}" = "set" ]; then
+    if [ -z "$CLAUDE_CONFIG_DIR" ]; then
+        echo "ERROR: CLAUDE_CONFIG_DIR is explicitly set to empty. Refusing to proceed." >&2
+        exit 2
+    fi
     CLAUDE_CONFIG_DIR_WAS_SET=true
     NATIVE_CLAUDE_CONFIG_DIR="$CLAUDE_CONFIG_DIR"
 else
     CLAUDE_CONFIG_DIR_WAS_SET=false
     NATIVE_CLAUDE_CONFIG_DIR="$HOME/.claude"
 fi
-NATIVE_CLAUDE_CONFIG_DIR="$(python3 -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$NATIVE_CLAUDE_CONFIG_DIR")"
+NATIVE_CLAUDE_CONFIG_DIR="$(python3 -c 'import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))' "$NATIVE_CLAUDE_CONFIG_DIR")"
 
 NATIVE_CLAUDE_BIN="${FORGE_WALKTHROUGH_CLAUDE_BIN:-}"
 if [ -z "$NATIVE_CLAUDE_BIN" ]; then
@@ -101,6 +105,26 @@ fi
 
 MARKER_FILE="$FORGE_TEST_REPO/.forge-walkthrough-marker"
 
+marker_is_canonical() {
+    local marker_path="$1"
+    if [ -L "$marker_path" ] || [ ! -f "$marker_path" ]; then
+        return 1
+    fi
+    python3 - "$marker_path" <<'PY'
+import os
+import stat
+import sys
+
+try:
+    descriptor = os.open(sys.argv[1], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as marker:
+        valid = stat.S_ISREG(os.fstat(marker.fileno()).st_mode) and marker.read() == b"forge-walkthrough-marker\n"
+except OSError:
+    valid = False
+raise SystemExit(0 if valid else 1)
+PY
+}
+
 # Refuse paths that are unsafe to replace.
 check_safe_path() {
     local resolved
@@ -117,24 +141,57 @@ check_safe_path() {
 
 check_safe_path "$FORGE_TEST_REPO"
 
+# Validate every preserved parent and leaf before setup writes generated code.
+preflight_generated_environment_targets() {
+    local wrapper_dir="$FORGE_TEST_REPO/.forge/walkthrough/bin"
+    local wrapper_path="$wrapper_dir/claude"
+    local env_path="$FORGE_TEST_REPO/.forge/walkthrough/env.sh"
+    local forge_home="$FORGE_TEST_REPO/.forge-home"
+    local claude_home="$FORGE_TEST_REPO/.claude-user"
+    local codex_home="$FORGE_TEST_REPO/.codex-user"
+    local claude_settings="$claude_home/settings.json"
+    local directory
+    local file
+
+    for directory in \
+        "$FORGE_TEST_REPO/.forge" \
+        "$FORGE_TEST_REPO/.forge/walkthrough"; do
+        if [ -L "$directory" ] || [ ! -d "$directory" ]; then
+            echo "ERROR: Walkthrough environment parent is not a real directory: $directory" >&2
+            exit 1
+        fi
+    done
+    for directory in "$wrapper_dir" "$forge_home" "$claude_home" "$codex_home"; do
+        if [ -L "$directory" ] || { [ -e "$directory" ] && [ ! -d "$directory" ]; }; then
+            echo "ERROR: Walkthrough environment target is not a real directory: $directory" >&2
+            exit 1
+        fi
+    done
+    for file in "$wrapper_path" "$env_path" "$claude_settings"; do
+        if [ -L "$file" ] || { [ -e "$file" ] && [ ! -f "$file" ]; }; then
+            echo "ERROR: Walkthrough environment target is not a regular file: $file" >&2
+            exit 1
+        fi
+    done
+}
+
 # Both reset and initialization generate env.sh.
 generate_env() {
     local wrapper_dir="$FORGE_TEST_REPO/.forge/walkthrough/bin"
     local wrapper_path="$wrapper_dir/claude"
+    local env_path="$FORGE_TEST_REPO/.forge/walkthrough/env.sh"
+    local claude_home="$FORGE_TEST_REPO/.claude-user"
+    local codex_home="$FORGE_TEST_REPO/.codex-user"
+    local claude_settings="$claude_home/settings.json"
+
+    preflight_generated_environment_targets
+
     mkdir -p "$wrapper_dir" "$FORGE_TEST_REPO/.claude-user" "$FORGE_TEST_REPO/.codex-user"
     chmod 700 "$FORGE_TEST_REPO/.codex-user"
-    if [ -L "$wrapper_path" ] || { [ -e "$wrapper_path" ] && [ ! -f "$wrapper_path" ]; }; then
-        echo "ERROR: Walkthrough Claude wrapper target is not a regular file: $wrapper_path" >&2
-        exit 1
-    fi
     printf '%s\n' "$CLAUDE_WRAPPER_CONTENT" > "$wrapper_path"
     chmod 755 "$wrapper_path"
-    if [ -L "$FORGE_TEST_REPO/.claude-user/settings.json" ]; then
-        echo "ERROR: Sandboxed Claude settings must not be a symlink" >&2
-        exit 1
-    fi
-    if [ ! -e "$FORGE_TEST_REPO/.claude-user/settings.json" ]; then
-        printf '{}\n' > "$FORGE_TEST_REPO/.claude-user/settings.json"
+    if [ ! -e "$claude_settings" ]; then
+        printf '{}\n' > "$claude_settings"
     fi
     {
         cat << 'ENVEOF'
@@ -171,7 +228,7 @@ echo "  Claude settings = sandbox overlay; native auth/store preserved" >&2
 echo "  FORGE_DEBUG = $FORGE_DEBUG (sandbox debug logging)" >&2
 echo "  Codex auth ingress = $FORGE_WALKTHROUGH_CODEX_AUTH_MODE" >&2
 ENVEOF
-    } > "$FORGE_TEST_REPO/.forge/walkthrough/env.sh"
+    } > "$env_path"
 }
 
 prepare_codex_auth() {
@@ -184,8 +241,6 @@ prepare_codex_auth() {
 
 # Remove walkthrough state that must not persist across runs.
 scrub_volatile_state() {
-    rm -rf "$FORGE_TEST_REPO/.forge/artifacts"
-    rm -rf "$FORGE_TEST_REPO/.forge/search-index"
     rm -rf "$FORGE_TEST_REPO/.forge-home/logs"
     rm -f "$FORGE_TEST_REPO/.forge/walkthrough/progress.json"
     rm -f "$FORGE_TEST_REPO/.forge/walkthrough/real-system.json"
@@ -193,36 +248,110 @@ scrub_volatile_state() {
 
 # Reset an existing walkthrough repository.
 if [ "$RESET" = true ]; then
-    if [ -d "$FORGE_TEST_REPO" ] && [ -f "$MARKER_FILE" ]; then
+    if [ -d "$FORGE_TEST_REPO" ]; then
+        if ! marker_is_canonical "$MARKER_FILE"; then
+            echo "ERROR: Directory has no canonical walkthrough marker: $FORGE_TEST_REPO" >&2
+            echo "Refusing --reset because ownership cannot be proven." >&2
+            echo "Remove it manually or choose a different FORGE_TEST_REPO path." >&2
+            exit 1
+        fi
         if [ ! -f "$FORGE_TEST_REPO/src/main.py" ] || [ ! -f "$FORGE_TEST_REPO/CLAUDE.md" ]; then
             echo "ERROR: Expected structure not found (src/main.py, CLAUDE.md)." >&2
             echo "This does not look like a forge-walkthrough repo. Refusing --reset." >&2
             exit 1
         fi
+        preflight_generated_environment_targets
         reset_sidecar_may_exist=false
         progress_file="$FORGE_TEST_REPO/.forge/walkthrough/progress.json"
-        if [ -f "$progress_file" ]; then
-            reset_sidecar_may_exist="$(python3 -c '
+        if [ -e "$progress_file" ] || [ -L "$progress_file" ]; then
+            if [ -L "$progress_file" ] || [ ! -f "$progress_file" ]; then
+                echo "ERROR: Walkthrough progress is not a regular file; refusing --reset." >&2
+                exit 1
+            fi
+            if ! reset_sidecar_may_exist="$(python3 -c '
 import json
 import sys
 
 try:
     state = json.load(open(sys.argv[1], encoding="utf-8"))
-    value = state.get("vars", {}).get("SIDECAR_MAY_EXIST", "false")
-    print("true" if value == "true" else "false")
 except (OSError, ValueError, TypeError):
-    print("false")
-' "$progress_file")"
+    raise SystemExit(2)
+
+if not isinstance(state, dict):
+    raise SystemExit(2)
+
+schema_version = state.get("schema_version")
+if type(schema_version) is not int or schema_version not in {1, 2}:
+    raise SystemExit(2)
+if schema_version == 1:
+    checklist_hash = state.get("checklist_hash")
+    if (
+        not isinstance(checklist_hash, str)
+        or not checklist_hash.startswith("sha256:")
+        or len(checklist_hash) != 71
+        or any(character not in "0123456789abcdef" for character in checklist_hash[7:])
+    ):
+        raise SystemExit(2)
+
+required_types = {
+    "checklist_version": str,
+    "mode": str,
+    "started_at": str,
+    "last_updated": str,
+    "vars": dict,
+    "steps": dict,
+}
+if any(key not in state or not isinstance(state[key], expected) for key, expected in required_types.items()):
+    raise SystemExit(2)
+if "current_step" not in state or not isinstance(state["current_step"], (str, type(None))):
+    raise SystemExit(2)
+if not all(isinstance(key, str) for key in state["vars"]):
+    raise SystemExit(2)
+if not all(isinstance(key, str) and isinstance(step, dict) for key, step in state["steps"].items()):
+    raise SystemExit(2)
+for step in state["steps"].values():
+    results = step.get("results")
+    if not isinstance(results, list) or any(
+        not isinstance(result, str) or result not in {"pass", "fail", "skip"}
+        for result in results
+    ):
+        raise SystemExit(2)
+    if schema_version >= 2 and (
+        "hash" not in step or not isinstance(step["hash"], (str, type(None)))
+    ):
+        raise SystemExit(2)
+    if "scope" in step and not isinstance(step["scope"], str):
+        raise SystemExit(2)
+
+if "SIDECAR_MAY_EXIST" not in state["vars"]:
+    value = "false"
+else:
+    value = state["vars"]["SIDECAR_MAY_EXIST"]
+    if value not in {"true", "false"}:
+        raise SystemExit(2)
+print(value)
+' "$progress_file")"; then
+                echo "ERROR: Walkthrough progress is unreadable or malformed; refusing --reset." >&2
+                exit 1
+            fi
         fi
         if [ -e "$FORGE_TEST_REPO/.forge/sessions/walkthrough-sidecar" ]; then
             reset_sidecar_may_exist=true
         fi
+        # These generated homes may be absent after an interrupted cleanup. Their
+        # paths were proven to be missing or real directories above, so recreate
+        # only the known sandbox leaves before invoking the gated cleanup.
+        mkdir -p \
+            "$FORGE_TEST_REPO/.forge-home" \
+            "$FORGE_TEST_REPO/.claude-user" \
+            "$FORGE_TEST_REPO/.codex-user"
+        chmod 700 "$FORGE_TEST_REPO/.codex-user"
         WALKTHROUGH_SIDECAR_MAY_EXIST="$reset_sidecar_may_exist" \
             FORGE_TEST_REPO="$FORGE_TEST_REPO" \
             bash "$SCRIPT_DIR/run-in-repo.sh" bash "$SCRIPT_DIR/cleanup-owned.sh" all
         echo "Resetting test repo: $FORGE_TEST_REPO" >&2
         cd "$FORGE_TEST_REPO"
-        git clean -fdx -e .forge/walkthrough/ -e .forge-home/ -e .claude-user/ -e .codex-user/
+        git clean -fdx -e .forge/ -e .forge-home/ -e .claude-user/ -e .codex-user/
         git checkout -- .
         mkdir -p .forge-home
         mkdir -p .forge/walkthrough
@@ -232,25 +361,19 @@ except (OSError, ValueError, TypeError):
         prepare_codex_auth
         echo "Reset complete." >&2
         exit 0
-    elif [ -d "$FORGE_TEST_REPO" ]; then
-        echo "ERROR: Directory exists but has no walkthrough marker: $FORGE_TEST_REPO" >&2
-        echo "Refusing --reset because ownership cannot be proven." >&2
-        echo "Remove it manually or choose a different FORGE_TEST_REPO path." >&2
-        exit 1
     fi
 fi
 
 # A fresh setup must not discard evidence or auth from an existing run.
-if [ -d "$FORGE_TEST_REPO" ] && [ -f "$MARKER_FILE" ]; then
-    FORGE_TEST_REPO="$FORGE_TEST_REPO" bash "$SCRIPT_DIR/run-in-repo.sh" true
+if [ -d "$FORGE_TEST_REPO" ] && marker_is_canonical "$MARKER_FILE"; then
     echo "ERROR: Walkthrough repository already exists: $FORGE_TEST_REPO" >&2
     echo "Use --reset to reclaim owned resources and create a fresh baseline." >&2
     exit 1
 fi
 
 # Do not initialize a directory that this script did not create.
-if [ -d "$FORGE_TEST_REPO" ] && [ ! -f "$MARKER_FILE" ]; then
-    echo "ERROR: Directory exists but has no marker: $FORGE_TEST_REPO" >&2
+if [ -d "$FORGE_TEST_REPO" ]; then
+    echo "ERROR: Directory exists but has no canonical marker: $FORGE_TEST_REPO" >&2
     echo "This was not created by setup-test-repo.sh. Refusing to initialize." >&2
     echo "Remove it manually or choose a different FORGE_TEST_REPO path." >&2
     exit 1
