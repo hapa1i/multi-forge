@@ -76,6 +76,28 @@ class TestPackagedCatalog:
                 model_ref=route_key,
             )
 
+    def test_gemini_37_flash_has_remote_and_local_litellm_routes(self) -> None:
+        routes = load_model_route_catalog().models["gemini-3.7-flash"]
+
+        assert (
+            ModelRouteCandidate(
+                kind="proxy",
+                source_id="litellm-remote",
+                template="litellm-gemini",
+                model_ref="google/gemini-3.7-flash",
+            )
+            in routes
+        )
+        assert (
+            ModelRouteCandidate(
+                kind="proxy",
+                source_id="litellm-gemini-local",
+                template="litellm-gemini-flash-local",
+                model_ref="gemini/gemini-3.7-flash",
+            )
+            in routes
+        )
+
 
 class TestRequestNormalization:
     def test_normalizes_canonical_alias_and_claude_transport_identity(self) -> None:

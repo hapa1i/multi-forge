@@ -138,9 +138,9 @@ class TestLoadConfig:
         assert config.proxy.active_template == "litellm-gemini-flash-local"
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_port == 8088
-        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3-flash-preview"
-        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3-flash-preview"
-        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3-flash-preview"
+        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.7-flash"
 
     def test_template_loading_openai_local(self):
         """OpenAI local template loads with correct tier models."""
@@ -240,7 +240,7 @@ class TestLoadConfig:
 
         assert config.proxy.get_model_for_tier("opus") == "gemini/gemini-3.1-pro-preview"
         assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-3.1-pro-preview"
-        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3-flash-preview"
+        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3.7-flash"
 
     def test_template_loading_openrouter_anthropic(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter anthropic template loads with correct provider and tiers."""
@@ -299,6 +299,7 @@ class TestLoadConfig:
 
         assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.env.example.com"
+        assert config.proxy.litellm.tiers.haiku == "vertex_ai/gemini-3.7-flash"
 
     def test_remote_litellm_source_endpoint_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch):
         """Connection-value endpoints can come from the credential file when env is absent."""

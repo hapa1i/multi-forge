@@ -160,21 +160,21 @@ After updating the local adapter, restart each affected proxy with `--smoke-test
 
 New proxies created from the current built-in templates use these defaults:
 
-| Template                                            | New default tiers                                                   |
-| --------------------------------------------------- | ------------------------------------------------------------------- |
-| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                                               |
-| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)                               |
-| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                              |
-| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max                    |
-| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                              |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.7 Flash                                       |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.7 Flash                                           |
-| `litellm-gemini`                                    | haiku -> Gemini 3.6 Flash (unchanged; local LiteLLM route retained) |
+| Template                                            | New default tiers                                |
+| --------------------------------------------------- | ------------------------------------------------ |
+| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                            |
+| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)            |
+| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                           |
+| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max |
+| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                           |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.7 Flash                    |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.7 Flash                        |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.7 Flash                        |
+| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.7 Flash                    |
 
-The OpenRouter tier-1 cascade checker default also moves to Gemini 3.7 Flash (see [policy.md](policy.md)). The local
-LiteLLM checker default remains Gemini 3.6 Flash because the bundled local adapter does not yet expose a 3.7 route. The
-Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
-model alternative.
+The tier-1 cascade checker now defaults to Gemini 3.7 Flash through OpenRouter, local LiteLLM, and remote LiteLLM (see
+[policy.md](policy.md)). The Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code`
+as an explicit Sonnet/Opus model alternative.
 
 The Anthropic templates retain Opus 5 as their opus-tier default and now expose both Fable 5.1 and Fable 5 as explicit
 alternatives. The unversioned `fable` and `claude-fable` aliases select Fable 5.1; use `claude-fable-5` when you need
@@ -188,9 +188,10 @@ endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default
 Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
 rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
 `forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
-LiteLLM path, the required Gemini and Anthropic routes must exist in `~/.forge/backends/litellm/config.yaml` — update
-the materialized config or delete/recreate it, then restart the backend; restarting alone re-reads the old copy. A stale
-Anthropic proxy that does not expose Fable 5.1 fails explicitly on `--model fable`; it is never replaced implicitly.
+LiteLLM path, the required Gemini 3.7 Flash and Anthropic Fable 5.1 routes must exist in
+`~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the backend;
+restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly on
+`--model fable`; it is never replaced implicitly.
 
 ---
 

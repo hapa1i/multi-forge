@@ -17,7 +17,7 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3-flash-preview
+      haiku: gemini/gemini-3.7-flash
       sonnet: gemini/gemini-3.1-pro-preview
       opus: gemini/gemini-3.1-pro-preview
     # Per-tier overrides to differentiate sonnet/opus (both use same model)

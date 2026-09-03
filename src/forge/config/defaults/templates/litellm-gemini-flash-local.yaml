@@ -1,5 +1,5 @@
 # Template: litellm-gemini-flash-local
-# Gemini 3 Flash via local LiteLLM
+# Gemini 3.7 Flash via local LiteLLM
 #
 # Requires:
 #   - GEMINI_API_KEY in .env
@@ -18,9 +18,9 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3-flash-preview
-      sonnet: gemini/gemini-3-flash-preview
-      opus: gemini/gemini-3-flash-preview
+      haiku: gemini/gemini-3.7-flash
+      sonnet: gemini/gemini-3.7-flash
+      opus: gemini/gemini-3.7-flash
     # All tiers use the same model with different reasoning levels.
     tier_overrides:
       haiku:

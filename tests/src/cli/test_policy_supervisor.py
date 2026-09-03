@@ -1582,7 +1582,7 @@ class TestSupervisorCascade:
         sup = _read_supervisor(store)
         assert sup.checker_provider == "litellm_local"
         assert sup.checker_budget_tokens is None
-        assert "gemini/gemini-3.6-flash via litellm_local" in result.output
+        assert "gemini/gemini-3.7-flash via litellm_local" in result.output
 
     def test_checker_budget_is_not_a_cascade_option(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         _make_supervised_project(temp_guard_env, monkeypatch)

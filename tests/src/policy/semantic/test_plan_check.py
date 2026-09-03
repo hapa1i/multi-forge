@@ -759,7 +759,7 @@ class TestPlanCheckEvaluate:
         decision = policy.evaluate(_make_context())
 
         assert decision.decision == "allow"
-        assert mock_check.call_args.kwargs["model"] == "gemini/gemini-3.6-flash"
+        assert mock_check.call_args.kwargs["model"] == "gemini/gemini-3.7-flash"
         assert mock_check.call_args.kwargs["provider"] == "litellm_local"
         assert mock_check.call_args.kwargs["budget_tokens"] == 64_000
 
