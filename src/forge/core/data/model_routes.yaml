@@ -481,6 +481,12 @@ models:
         source_id: litellm-gemini-local
         template: litellm-gemini-local
         model_ref: gemini/gemini-3.7-flash
+  gemini-3.8-flash:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: google/gemini-3.8-flash
   claude-opus-4-6:
     routes:
       - kind: direct

@@ -312,14 +312,14 @@ class TestGemini36Flash:
 
 
 class TestGemini37Flash:
-    """Tests for the Gemini 3.7 Flash catalog entry and family default."""
+    """Tests for the retained Gemini 3.7 Flash LiteLLM model."""
 
-    def test_gemini_37_flash_is_canonical_and_the_haiku_default(self):
+    def test_gemini_37_flash_remains_canonical_but_is_not_the_family_default(self):
         catalog = load_model_catalog()
 
         assert "gemini-3.7-flash" in catalog.models
         assert "gemini-3.7-flash" not in catalog.aliases
-        assert catalog.defaults["gemini"]["haiku"] == "gemini-3.7-flash"
+        assert catalog.defaults["gemini"]["haiku"] == "gemini-3.8-flash"
 
     @pytest.mark.parametrize(
         "alias",
@@ -334,7 +334,40 @@ class TestGemini37Flash:
         assert spec.context_window_tokens == 1_048_576
         assert spec.max_output_tokens == 65_536
         assert spec.supports_images is True
-        assert spec.supports_top_p is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "thinking_level"
+        assert spec.thinking_levels == ("low", "medium", "high")
+        assert spec.default_thinking_level == "medium"
+        assert spec.litellm_reasoning_efforts == ("low", "medium", "high")
+        assert spec.default_reasoning_effort == "medium"
+
+
+class TestGemini38Flash:
+    """Tests for the Gemini 3.8 Flash catalog entry and family default."""
+
+    def test_gemini_38_flash_is_canonical_and_the_haiku_default(self):
+        catalog = load_model_catalog()
+
+        assert "gemini-3.8-flash" in catalog.models
+        assert "gemini-3.8-flash" not in catalog.aliases
+        assert catalog.defaults["gemini"]["haiku"] == "gemini-3.8-flash"
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["vertex_ai/gemini-3.8-flash", "gemini/gemini-3.8-flash", "google/gemini-3.8-flash"],
+    )
+    def test_prefixed_aliases_resolve(self, alias):
+        assert resolve_model_id(alias) == "gemini-3.8-flash"
+
+    def test_gemini_38_flash_intrinsic_properties(self):
+        spec = get_model_spec("gemini-3.8-flash")
+
+        assert spec.context_window_tokens == 1_048_576
+        assert spec.max_output_tokens == 65_536
+        assert spec.supports_images is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
         assert spec.native_thinking_param == "thinking_level"
         assert spec.thinking_levels == ("low", "medium", "high")
         assert spec.default_thinking_level == "medium"

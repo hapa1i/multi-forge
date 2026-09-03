@@ -167,14 +167,22 @@ New proxies created from the current built-in templates use these defaults:
 | `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                           |
 | `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                           |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.7 Flash                    |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.7 Flash                        |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                    |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash                        |
 | `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.7 Flash                        |
 | `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.7 Flash                    |
 
-The tier-1 cascade checker now defaults to Gemini 3.7 Flash through OpenRouter, local LiteLLM, and remote LiteLLM (see
-[policy.md](policy.md)). The Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code`
-as an explicit Sonnet/Opus model alternative.
+Gemini 3.8 Flash is the current Gemini Flash family and OpenRouter default. It is a GA model with a 1,048,576-token
+input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default). Google
+documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini 3.7
+Flash remains selectable and stays the local and remote LiteLLM default: LiteLLM 1.99's bundled model catalog has no 3.8
+pricing/capability entry. See Google's
+[3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/)
+and [model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash).
+
+The tier-1 cascade checker therefore defaults to Gemini 3.8 Flash through OpenRouter and Gemini 3.7 Flash through local
+or remote LiteLLM (see [policy.md](policy.md)). The Kimi template keeps K3 as its default and exposes the
+coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus model alternative.
 
 The Anthropic templates retain Opus 5 as their opus-tier default and now expose both Fable 5.1 and Fable 5 as explicit
 alternatives. The unversioned `fable` and `claude-fable` aliases select Fable 5.1; use `claude-fable-5` when you need
@@ -189,9 +197,9 @@ Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned 
 rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
 `forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
 LiteLLM path, the required Gemini 3.7 Flash and Anthropic Fable 5.1 routes must exist in
-`~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the backend;
-restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly on
-`--model fable`; it is never replaced implicitly.
+`~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
+backend; restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly
+on `--model fable`; it is never replaced implicitly.
 
 ---
 
@@ -276,7 +284,7 @@ Default tiers use Anthropic Claude models on OpenRouter. Edit the proxy to use a
 ```bash
 forge proxy edit <proxy_id>
 # Change tiers to e.g.:
-#   haiku: google/gemini-3.7-flash
+#   haiku: google/gemini-3.8-flash
 #   sonnet: anthropic/claude-sonnet-4.6
 #   opus: openai/gpt-5.5
 ```
@@ -291,10 +299,10 @@ key is absent), Forge sends `provider.zdr: true` on every request. OpenRouter th
 currently marks ZDR-compatible. This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only
 replaces models already known to lack a compatible endpoint before dispatch.
 
-Forge audited all 34 model slugs in the bundled OpenRouter defaults and alternatives against OpenRouter's
+Forge audited the bundled OpenRouter defaults and alternatives against OpenRouter's
 [ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21, then checked the newly added Fable 5.1
-slug on 2026-09-02. The original seven exceptions plus Fable 5.1 had no eligible endpoint and use these required-ZDR
-fallbacks:
+slug on 2026-09-02 and confirmed the new `google/gemini-3.8-flash` route on 2026-09-03. Gemini 3.8 Flash had an eligible
+endpoint; the original seven exceptions plus Fable 5.1 did not and use these required-ZDR fallbacks:
 
 ```yaml
 allow_non_zdr: false

@@ -269,17 +269,17 @@ class TestLoadConfig:
             },
         }
 
-    def test_openrouter_gemini_templates_use_37_flash(self):
+    def test_openrouter_gemini_templates_use_38_flash(self):
         from forge.config.schema import TierModels
 
         family = load_config(template="openrouter-gemini")
         flash = load_config(template="openrouter-gemini-flash")
 
-        assert family.proxy.openrouter.tiers.haiku == "google/gemini-3.7-flash"
+        assert family.proxy.openrouter.tiers.haiku == "google/gemini-3.8-flash"
         assert flash.proxy.openrouter.tiers == TierModels(
-            haiku="google/gemini-3.7-flash",
-            sonnet="google/gemini-3.7-flash",
-            opus="google/gemini-3.7-flash",
+            haiku="google/gemini-3.8-flash",
+            sonnet="google/gemini-3.8-flash",
+            opus="google/gemini-3.8-flash",
         )
 
     def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):

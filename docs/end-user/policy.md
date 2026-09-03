@@ -330,7 +330,7 @@ forge policy supervisor cascade off       # disable (supervisor checks every act
 
 # Optional: pick the tier-1 route
 forge policy supervisor cascade on --checker-provider litellm-local
-forge policy supervisor cascade on --checker-model google/gemini-3.7-flash
+forge policy supervisor cascade on --checker-model google/gemini-3.8-flash
 
 # Advanced: tune the persisted checker prompt budget
 forge session set policy.supervisor.checker_budget_tokens 64000
@@ -341,12 +341,13 @@ How it behaves:
 - The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
   needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search
   `forge policy supervisor reload` uses) and fails with instructions when none exists.
-- The default checker model is Gemini 3.7 Flash: `google/gemini-3.7-flash` through OpenRouter and
-  `gemini/gemini-3.7-flash` through local or remote LiteLLM, with an approximate 32K-token total budget for the tier-1
-  checker prompt. Forge always requires ZDR for the direct OpenRouter call; proxy-level non-ZDR opt-outs do not apply.
-  Local LiteLLM backend configs are one-time copies: backends generated before that model was added need their
-  materialized `litellm` config updated or deleted/recreated, then restarted — restart alone re-reads the old copy.
-  Until then, use `--checker-model gemini/gemini-3.6-flash` (present in the preceding generated config).
+- The default checker model is Gemini 3.8 Flash (`google/gemini-3.8-flash`) through OpenRouter and Gemini 3.7 Flash
+  (`gemini/gemini-3.7-flash`) through local or remote LiteLLM, with an approximate 32K-token total budget for the tier-1
+  checker prompt. The split is deliberate: LiteLLM 1.99's bundled model catalog has no 3.8 pricing/capability entry.
+  Forge always requires ZDR for the direct OpenRouter call; proxy-level non-ZDR opt-outs do not apply. Local LiteLLM
+  backend configs are one-time copies: backends generated before the 3.7 route was added need their materialized
+  `litellm` config updated or deleted/recreated, then restarted — restart alone re-reads the old copy. Until then, use
+  `--checker-model gemini/gemini-3.6-flash` (present in the preceding generated config).
 - `checker_budget_tokens` is intentionally a session config setting rather than a `forge policy supervisor cascade`
   flag; use `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
 - Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include

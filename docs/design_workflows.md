@@ -146,23 +146,23 @@ ambiguities.
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set <target> --cascade` or
 `forge policy supervisor cascade on` routes checks through a cheap tier before the frontier. The direct toggle is
 `%policy supervisor cascade on`. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default Gemini
-3.7 Flash (`google/gemini-3.7-flash` through OpenRouter and `gemini/gemini-3.7-flash` through LiteLLM), configurable per
-provider via `--checker-provider`/`--checker-model`, with a configurable default prompt budget of roughly 32K tokens
-stored as `policy.supervisor.checker_budget_tokens`) evaluates the action against the **approved-plan snapshot text**
-(`plan_override_path`, auto-resolved at wiring time via the `--reload` machinery). The persistent `set ... --cascade`
-and `cascade on` commands fail with an actionable error when no approved snapshot resolves. Launch-time
-`session start|fork --cascade` records the flag only; until a plan resolves, the hook escalates to the frontier instead
-of treating the missing tier-1 input as an allow. Long plans and actions are packed as head+tail excerpts rather than
-first-N slices, unified diffs retain file and hunk headers when truncated, and prompt metadata explicitly marks whether
-the plan or action was truncated. Edit actions include the matched and replacement fragments when available; Write
-actions include path and target existence context. Tier-1 emits only `allow` (clearly aligned; cached per the throttle
-window) or `needs_review` — it never warns or denies, and **every** tier-1 failure (LLM error, parse failure, unreadable
-plan) escalates, so the system degrades to frontier-always, never to unsupervised. In cascade mode the supervisor is
-registered as the engine's **resolver** (see §1.5): it is invoked only when a policy emitted `needs_review` and nothing
-denied, so clearly-aligned actions never pay the frontier call. Tier-1 reasons ride in low-severity violations
-(persisted to the decision log, never printed on resolved allows). Measurement is built in: session-tagged `plan-check`
-usage events plus decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters in
-`forge telemetry activity` expose the short-circuit rate; the supervisor counters are the resolver runs (a tier-1
+3.8 Flash (`google/gemini-3.8-flash`) through OpenRouter and Gemini 3.7 Flash (`gemini/gemini-3.7-flash`) through
+LiteLLM, configurable per provider via `--checker-provider`/`--checker-model`, with a configurable default prompt budget
+of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates the action against the
+**approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the `--reload` machinery). The
+persistent `set ... --cascade` and `cascade on` commands fail with an actionable error when no approved snapshot
+resolves. Launch-time `session start|fork --cascade` records the flag only; until a plan resolves, the hook escalates to
+the frontier instead of treating the missing tier-1 input as an allow. Long plans and actions are packed as head+tail
+excerpts rather than first-N slices, unified diffs retain file and hunk headers when truncated, and prompt metadata
+explicitly marks whether the plan or action was truncated. Edit actions include the matched and replacement fragments
+when available; Write actions include path and target existence context. Tier-1 emits only `allow` (clearly aligned;
+cached per the throttle window) or `needs_review` — it never warns or denies, and **every** tier-1 failure (LLM error,
+parse failure, unreadable plan) escalates, so the system degrades to frontier-always, never to unsupervised. In cascade
+mode the supervisor is registered as the engine's **resolver** (see §1.5): it is invoked only when a policy emitted
+`needs_review` and nothing denied, so clearly-aligned actions never pay the frontier call. Tier-1 reasons ride in
+low-severity violations (persisted to the decision log, never printed on resolved allows). Measurement is built in:
+session-tagged `plan-check` usage events plus decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters
+in `forge telemetry activity` expose the short-circuit rate; the supervisor counters are the resolver runs (a tier-1
 `needs_review` alongside a deterministic deny skips the resolver, so the two can differ). Cascade off (the default) is
 exactly the pre-cascade behavior — the supervisor runs as a regular policy on every throttle-missing check.
 

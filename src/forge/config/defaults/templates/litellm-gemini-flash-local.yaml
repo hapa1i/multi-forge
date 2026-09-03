@@ -6,6 +6,8 @@
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 # All tiers use Flash, differentiated by reasoning_effort.
+# This route remains on 3.7 because LiteLLM 1.99's bundled model catalog has no
+# gemini-3.8-flash pricing/capability entry.
 #
 # After adding GEMINI_API_KEY, stop the backend so Forge restarts it with the new environment:
 # forge model backend stop litellm-4000

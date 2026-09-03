@@ -6,7 +6,7 @@
 #     - gemini/gemini-3.1-pro-preview
 #     - gemini/gemini-3.1-pro-preview-customtools (optimized for custom tools + bash)
 #     - gemini/gemini-3-flash-preview
-#     - gemini/gemini-3.7-flash (Gemini Flash default)
+#     - gemini/gemini-3.7-flash (LiteLLM Flash default; 3.8 is OpenRouter-only for now)
 #     - gemini/gemini-3.6-flash (Gemini 3.6 Flash - efficiency release)
 #     - gemini/gemini-3.5-flash
 #     - gemini/gemini-2.5-flash
@@ -47,7 +47,7 @@ model_list:
       model: gemini/gemini-3-flash-preview
       api_key: os.environ/GEMINI_API_KEY
 
-  # Gemini 3.7 Flash - current Flash default
+  # Gemini 3.7 Flash - current LiteLLM Flash default
   - model_name: gemini/gemini-3.7-flash
     litellm_params:
       model: gemini/gemini-3.7-flash

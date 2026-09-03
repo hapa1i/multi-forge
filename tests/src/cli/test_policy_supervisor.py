@@ -1680,7 +1680,7 @@ class TestSupervisorCascade:
         assert result.exit_code == 0
         assert "Cascade: on" in result.output
         assert "Checker provider: openrouter" in result.output
-        assert "Checker model: google/gemini-3.7-flash" in result.output
+        assert "Checker model: google/gemini-3.8-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
     def test_status_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:

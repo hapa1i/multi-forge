@@ -98,6 +98,18 @@ class TestPackagedCatalog:
             in routes
         )
 
+    def test_gemini_38_flash_is_openrouter_only_until_litellm_support_lands(self) -> None:
+        routes = load_model_route_catalog().models["gemini-3.8-flash"]
+
+        assert routes == (
+            ModelRouteCandidate(
+                kind="proxy",
+                source_id="openrouter",
+                template="openrouter-gemini-flash",
+                model_ref="google/gemini-3.8-flash",
+            ),
+        )
+
 
 class TestRequestNormalization:
     def test_normalizes_canonical_alias_and_claude_transport_identity(self) -> None:
