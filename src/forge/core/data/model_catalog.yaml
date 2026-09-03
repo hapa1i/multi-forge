@@ -1016,7 +1016,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: high
     tags: []
 
@@ -1042,7 +1042,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: [bounded-review, opt-in]
@@ -1070,7 +1070,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []
@@ -1080,7 +1080,7 @@ models:
   # (anthropic + openrouter) and the proxy opus-tier default. Same request
   # surface as Opus 4.8 / Sonnet 5: adaptive-only thinking, sampling overrides
   # removed, native 1M context (default and max), same pricing as Opus 4.8.
-  # Below Fable 5.
+  # Below Fable 5.1.
   claude-opus-5:
     friendly_name: Claude Opus 5
     context_window_tokens: 1000000
@@ -1101,16 +1101,42 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []  # Default opus tier (anthropic + openrouter)
 
   # --- Claude Fable Series ---
-  # Fable 5 is the most capable model (a tier above Opus). Same request surface
-  # as Opus 5 -- adaptive thinking only, sampling overrides removed. Not a
-  # catalog or template default: the opus tier defaults to Opus 5; Fable 5 and
-  # Opus 4.8 stay selectable via --model (opus model_alternatives).
+  # Fable 5.1 is the current Fable family default (unversioned aliases and the
+  # named review worker), but not a catalog tier default: the opus tier remains
+  # on Opus 5. Fable 5.1 adds max effort to Fable 5's adaptive-only request
+  # surface; both versions stay selectable via --model (opus alternatives).
+  claude-fable-5-1:
+    friendly_name: Claude Fable 5.1
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
+    default_reasoning_effort: high
+    token_estimate_multiplier: 1.35
+    tags: [opt-in]
+
+  # Fable 5 is retained as an explicit prior-version pin.
   claude-fable-5:
     friendly_name: Claude Fable 5
     context_window_tokens: 1000000
@@ -1131,7 +1157,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: [opt-in]
@@ -1160,7 +1186,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
-    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     tags: []
@@ -1185,7 +1211,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: medium
     tags: []
 
@@ -1210,7 +1236,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: high
     tags: []
 
@@ -1234,7 +1260,7 @@ models:
       min_tokens: 1024
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
-    litellm_reasoning_efforts: [low, medium, high]
+    litellm_reasoning_efforts: [low, medium, high, max]
     default_reasoning_effort: medium
     tags: []
 
@@ -1954,11 +1980,18 @@ aliases:
   opus-5: claude-opus-5
   opus: claude-opus-5
 
-  # Fable 5 (most capable; opus --model alternative, direct --model fable)
+  # Fable 5.1 (current family default; opus --model alternative)
+  anthropic/claude-fable-5-1: claude-fable-5-1
+  anthropic/claude-fable-5.1: claude-fable-5-1  # OpenRouter slug
+  claude-fable-5.1: claude-fable-5-1
+  claude-fable: claude-fable-5-1
+  fable-5-1: claude-fable-5-1
+  fable-5.1: claude-fable-5-1
+  fable: claude-fable-5-1
+
+  # Fable 5 (retained explicit prior-version aliases)
   anthropic/claude-fable-5: claude-fable-5
-  claude-fable: claude-fable-5
   fable-5: claude-fable-5
-  fable: claude-fable-5
 
   # Sonnet 5 (default sonnet tier; released on Anthropic + OpenRouter, native 1M)
   anthropic/claude-sonnet-5: claude-sonnet-5  # also the OpenRouter slug (no dot)

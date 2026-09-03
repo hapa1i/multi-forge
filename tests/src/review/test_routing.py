@@ -251,7 +251,7 @@ class TestDeriveModelRoutes:
             ("claude-opus-4.6", "claude-opus-4-6"),
             ("claude-opus-4.6-1m", "claude-opus-4-6[1m]"),
             ("claude-opus-4.8", "claude-opus-4-8"),
-            ("claude-fable", "claude-fable-5"),
+            ("claude-fable", "claude-fable-5-1"),
         ],
     )
     def test_fixed_direct_worker_routes(self, name: str, model_ref: str) -> None:

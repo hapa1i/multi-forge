@@ -215,7 +215,8 @@ inline.
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
 (most capable). The default `claude-opus` worker resolves to Opus 5; use `--models claude-opus-4.6,claude-opus-4.8` when
 you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
-model.
+model. The stable `claude-fable` worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model
+with `--model claude-fable-5` but is not a separate workflow worker.
 
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-5.6 Sol and Gemini require
 active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See

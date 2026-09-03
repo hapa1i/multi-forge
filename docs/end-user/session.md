@@ -1015,9 +1015,10 @@ resume or inherited-route fork reuses that route; if it is unavailable, Forge fa
 silently choosing another provider. Fork recovery retains its resolved child name and explicit fork options. Replay also
 refuses a same-URL template substitution or a changed proven source. Use the reported `--model ... --proxy ...` or
 `--model ... --no-proxy` command to replace malformed stored routing; explicit replacement does not depend on reading
-that broken route first. An explicit `--model` authorizes replacement when an otherwise valid inherited route cannot
-serve it. Before an explicit selection launches, one stderr line reports provider, template/proxy, tier, effective
-model, and known billing posture. The billing value remains `unknown` when Forge has no payer evidence.
+that broken route first. `--model` alone never replaces an incompatible inherited proxy: update or recreate the proxy,
+pass a compatible one with `--proxy`, or use `--no-proxy` for direct Claude. Before an explicit selection launches, one
+stderr line reports provider, template/proxy, tier, effective model, and known billing posture. The billing value
+remains `unknown` when Forge has no payer evidence.
 
 Selecting a non-Claude model can create or start a paid proxy. `--no-launch --model ...` still resolves/starts the route
 and persists intent, but invokes no child and writes no route event; the proxy remains independently managed. A

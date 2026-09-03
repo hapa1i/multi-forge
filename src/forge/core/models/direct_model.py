@@ -10,6 +10,7 @@ from forge.core.models.catalog import (
     get_model_spec,
     resolve_model_id,
 )
+from forge.core.tiers import detect_tier_word
 
 ONE_M_SUFFIX = "[1m]"
 PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS = 200_000
@@ -130,14 +131,4 @@ def token_estimate_multiplier_for_direct_model(value: str | None) -> float:
 
 def claude_model_tier(canonical_model: str) -> str | None:
     """Return the Claude Code tier for a canonical direct-model id."""
-    # Fable has no per-tier name of its own; it is the most-capable model and
-    # rides the opus tier (matching the OpenRouter opus-tier default).
-    if canonical_model.startswith("claude-fable-"):
-        return "opus"
-    if canonical_model.startswith("claude-opus-"):
-        return "opus"
-    if canonical_model.startswith("claude-sonnet-"):
-        return "sonnet"
-    if canonical_model.startswith("claude-haiku-"):
-        return "haiku"
-    return None
+    return detect_tier_word(canonical_model)

@@ -117,33 +117,51 @@ class TestSessionModelRoutePlanning:
         assert plan.proxy is not None
         assert plan.proxy.ensure_reference is None
 
-    def test_explicit_incompatible_existing_route_uses_first_admissible_catalog_candidate(
-        self,
-    ) -> None:
+    def test_incompatible_existing_proxy_requires_an_explicit_route_boundary(self) -> None:
         existing = _proxy_snapshot(
             template="openrouter-gemini",
+            proxy_id="old-gemini",
             tiers={"sonnet": "google/gemini-3.1-pro-preview"},
         )
-        inspected: list[str] = []
 
-        def inspect(candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
-            template = candidate.template
-            assert template is not None
-            inspected.append(template)
-            if template == "openrouter-openai":
-                return _proxy_snapshot(ensure_reference=template)
-            return None
+        def unexpected_candidate(_candidate: ModelRouteCandidate) -> ProxyRouteSnapshot | None:
+            raise AssertionError("an incompatible persisted proxy must fail before catalog fallback")
 
-        plan = plan_session_model_route(
-            "gpt-5.6-sol",
-            existing_kind="proxy",
-            existing_proxy=existing,
-            candidate_inspector=inspect,
+        with pytest.raises(
+            SessionModelRoutingError,
+            match=r"persisted proxy instance 'old-gemini'.+update or recreate.+--proxy",
+        ):
+            plan_session_model_route(
+                "gpt-5.6-sol",
+                existing_kind="proxy",
+                existing_proxy=existing,
+                candidate_inspector=unexpected_candidate,
+            )
+
+    def test_repointed_fable_alias_fails_cleanly_on_an_old_proxy_snapshot(self) -> None:
+        existing = _proxy_snapshot(
+            template="openrouter-anthropic",
+            proxy_id="old-anthropic",
+            tiers={"opus": "anthropic/claude-opus-5"},
+            alternatives={"opus": {"claude-fable-5": "anthropic/claude-fable-5"}},
         )
 
-        assert inspected == ["openrouter-openai"]
-        assert plan.proxy is not None
-        assert plan.proxy.ensure_reference == "openrouter-openai"
+        with pytest.raises(
+            SessionModelRoutingError,
+            match=(
+                r"persisted proxy instance 'old-anthropic' \(template 'openrouter-anthropic'\) "
+                r"does not serve model 'claude-fable-5-1'.+--proxy.+--no-proxy"
+            ),
+        ):
+            plan_session_model_route("fable", existing_kind="proxy", existing_proxy=existing)
+
+        direct = plan_session_model_route("fable", no_proxy=True)
+        assert direct.kind == "direct"
+        assert direct.selected_model == "claude-fable-5-1"
+
+        prior = plan_session_model_route("claude-fable-5", existing_kind="proxy", existing_proxy=existing)
+        assert prior.proxy is existing
+        assert prior.selected_model == "anthropic/claude-fable-5"
 
     def test_bare_stored_route_never_falls_back_when_incompatible(self) -> None:
         existing = _proxy_snapshot(
@@ -151,7 +169,7 @@ class TestSessionModelRoutePlanning:
             tiers={"sonnet": "google/gemini-3.1-pro-preview"},
         )
 
-        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+        with pytest.raises(SessionModelRoutingError, match="persisted proxy template.+does not serve model"):
             plan_session_model_route(
                 "gpt-5.6-sol",
                 existing_kind="proxy",

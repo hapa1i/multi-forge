@@ -101,6 +101,15 @@ class TestRequestNormalization:
         assert dotted.transport_1m is True
         assert hyphenated.transport_1m is False
 
+    def test_normalizes_fable_family_alias_to_5_1(self) -> None:
+        family_default = normalize_model_route_request("fable")
+        openrouter_slug = normalize_model_route_request("anthropic/claude-fable-5.1")
+
+        assert family_default == openrouter_slug
+        assert family_default.route_key == "claude-fable-5-1"
+        assert family_default.requested_model == "claude-fable-5-1"
+        assert family_default.claude_tier == "opus"
+
     def test_rejects_unknown_empty_and_non_claude_transport_suffix(self) -> None:
         with pytest.raises(ModelRouteCatalogError, match="cannot be empty"):
             normalize_model_route_request("  ")

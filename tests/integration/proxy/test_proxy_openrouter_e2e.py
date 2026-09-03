@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+pytestmark = pytest.mark.integration
 
 
 def _anthropic_response_text(data: dict[str, Any]) -> str:
@@ -26,10 +26,10 @@ def _anthropic_response_text(data: dict[str, Any]) -> str:
 class TestProxyWithOpenRouter:
     """Integration tests for proxy to OpenRouter flow."""
 
-    def test_health_endpoint(self, proxy_server_openrouter: str) -> None:
+    def test_health_endpoint(self, proxy_server_openrouter_offline: str) -> None:
         """GET / returns OpenRouter proxy runtime truth."""
         with httpx.Client() as client:
-            resp = client.get(f"{proxy_server_openrouter}/")
+            resp = client.get(f"{proxy_server_openrouter_offline}/")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -38,11 +38,13 @@ class TestProxyWithOpenRouter:
         assert data["provider"] == "openrouter"
         assert data["runtime"]["tier_mappings"]["haiku"] == "anthropic/claude-haiku-4.5"
         assert data["runtime"]["configured_tier_mappings"] == data["runtime"]["tier_mappings"]
+        assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-1"] == "anthropic/claude-opus-5"
         assert data["runtime"]["data_policy"] == {"zdr": "required", "zdr_fallbacks": {}}
         assert data["runtime"]["llm_defaults_by_tier"]["haiku"]["extra"] == {
             "openai": {"extra_body": {"provider": {"zdr": True}}}
         }
 
+    @pytest.mark.slow
     def test_simple_completion_preserves_system_prompt(self, proxy_server_openrouter: str) -> None:
         """POST /v1/messages routes through OpenRouter and preserves system prompts."""
         with httpx.Client(timeout=60) as client:
@@ -102,6 +104,7 @@ def _assert_tier_completion(
     assert data.get("usage", {}).get("input_tokens", 0) > 0
 
 
+@pytest.mark.slow
 class TestCurrentDefaultsWithOpenRouter:
     """Each current template default resolves to its exact live OpenRouter slug.
 
@@ -188,6 +191,7 @@ class TestCurrentDefaultsWithOpenRouter:
         )
 
 
+@pytest.mark.slow
 class TestOpenAIProxyWithOpenRouter:
     """GPT-family defaults route through the exact OpenRouter Sol slug."""
 

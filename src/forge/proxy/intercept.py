@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.proxy.audit_logger import hash_system_prompt
+from forge.proxy.reasoning import EFFORT_RANK, clamp_effort_to_supported, max_effort
 
 # Anthropic requires extended-thinking budget_tokens >= 1024 and < max_tokens.
 _ANTHROPIC_MIN_THINKING_BUDGET = 1024
@@ -34,6 +35,10 @@ _EFFORT_BUDGET_FLOOR: dict[str, int] = {
     "high": 10_000,
     "xhigh": 25_000,
 }
+
+
+class ReasoningOverrideError(ValueError):
+    """Raised when a passthrough effort floor cannot be represented safely."""
 
 
 # --- Mutation-safety fingerprint ---------------------------------------------
@@ -154,7 +159,7 @@ def apply_guards(system: Any, guards: list[dict[str, str]]) -> tuple[Any, GuardO
     return blocks, outcome
 
 
-# --- Reasoning-effort pin (in Anthropic thinking-budget units) ---------------
+# --- Reasoning-effort pin helpers --------------------------------------------
 
 
 def effort_to_budget_floor(effort: str | None) -> int | None:
@@ -194,6 +199,58 @@ def pin_reasoning(thinking: Any, floor_effort: str | None, max_tokens: Any) -> t
     pinned["type"] = "enabled"
     pinned["budget_tokens"] = int(target)
     return pinned, True, current_int, int(target)
+
+
+def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None] | None:
+    """Return native Anthropic effort/thinking metadata for a catalogued request model."""
+
+    if not isinstance(model, str) or not model:
+        return None
+
+    from forge.core.models import ModelCatalogError, get_model_spec
+
+    candidates = (model, model.split("/", 1)[-1]) if "/" in model else (model,)
+    for candidate in candidates:
+        try:
+            spec = get_model_spec(candidate)
+        except ModelCatalogError:
+            continue
+        if spec.native_thinking_param == "output_config.effort":
+            return spec.litellm_reasoning_efforts, spec.thinking_modes
+        return None
+    return None
+
+
+def pin_native_effort(
+    output_config: Any,
+    floor_effort: str,
+    *,
+    supported_efforts: tuple[str, ...] | None,
+) -> tuple[Any, bool, str | None, str]:
+    """Raise ``output_config.effort`` to a model-aware floor without lowering it."""
+
+    if output_config is not None and not isinstance(output_config, dict):
+        raise ReasoningOverrideError("output_config must be an object when a passthrough reasoning floor is configured")
+    pinned = dict(output_config) if isinstance(output_config, dict) else {}
+    current = pinned.get("effort")
+    if current is not None and not isinstance(current, str):
+        raise ReasoningOverrideError("output_config.effort must be a string")
+    if current is not None and current not in EFFORT_RANK:
+        raise ReasoningOverrideError(f"unsupported output_config.effort {current!r}")
+    if supported_efforts is not None and current is not None and current not in supported_efforts:
+        raise ReasoningOverrideError(
+            f"output_config.effort {current!r} is not supported by this model "
+            f"(supported: {', '.join(supported_efforts)})"
+        )
+
+    effective_floor = clamp_effort_to_supported(floor_effort, supported_efforts)
+    assert effective_floor is not None
+    target = max_effort(current, effective_floor)
+    assert target is not None
+    if current == target:
+        return output_config, False, current, target
+    pinned["effort"] = target
+    return pinned, True, current, target
 
 
 # --- Orchestration -----------------------------------------------------------
@@ -272,27 +329,67 @@ def apply_override(
     if guard_outcome.stripped_count or system_prompt_augment:
         raw_body["system"] = system
 
-    # 3) Reasoning-effort pin (Anthropic thinking-budget units).
-    new_thinking, pinned, budget_before, budget_after = pin_reasoning(
-        raw_body.get("thinking"), reasoning_floor_effort, raw_body.get("max_tokens")
-    )
-    if pinned:
-        raw_body["thinking"] = new_thinking
-        removed_sampling_parameters = sorted(
-            parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
+    # 3) Reasoning-effort pin. Newer Claude models expose a native effort
+    # control; older/unknown models retain the legacy thinking-budget mapping.
+    native_support = _native_effort_support(raw_body.get("model")) if reasoning_floor_effort else None
+    if native_support is not None and reasoning_floor_effort is not None:
+        supported_efforts, thinking_modes = native_support
+        thinking = raw_body.get("thinking")
+        if thinking_modes == ("adaptive",) and isinstance(thinking, dict):
+            thinking_type = thinking.get("type")
+            if thinking_type == "enabled" or "budget_tokens" in thinking:
+                raise ReasoningOverrideError(
+                    f"model {raw_body.get('model')!r} requires adaptive thinking; "
+                    "remove manual thinking.type/budget_tokens"
+                )
+        output_config, pinned, effort_before, effort_after = pin_native_effort(
+            raw_body.get("output_config"),
+            reasoning_floor_effort,
+            supported_efforts=supported_efforts,
         )
-        for parameter in removed_sampling_parameters:
-            raw_body.pop(parameter)
-        mutations.append(
-            {
-                "target": "thinking",
-                "action": "reasoning_pin",
-                "effort_floor": reasoning_floor_effort,
-                "budget_before": budget_before,
-                "budget_after": budget_after,
-                "removed_sampling_parameters": removed_sampling_parameters,
-            }
+        if pinned:
+            raw_body["output_config"] = output_config
+            removed_sampling_parameters = sorted(
+                parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
+            )
+            for parameter in removed_sampling_parameters:
+                raw_body.pop(parameter)
+            mutations.append(
+                {
+                    "target": "output_config.effort",
+                    "action": "reasoning_pin",
+                    "effort_floor": reasoning_floor_effort,
+                    "effort_before": effort_before,
+                    "effort_after": effort_after,
+                    "removed_sampling_parameters": removed_sampling_parameters,
+                }
+            )
+    else:
+        if reasoning_floor_effort and effort_to_budget_floor(reasoning_floor_effort) is None:
+            raise ReasoningOverrideError(
+                f"reasoning effort floor {reasoning_floor_effort!r} cannot be represented safely for "
+                f"passthrough model {raw_body.get('model')!r}"
+            )
+        new_thinking, pinned, budget_before, budget_after = pin_reasoning(
+            raw_body.get("thinking"), reasoning_floor_effort, raw_body.get("max_tokens")
         )
+        if pinned:
+            raw_body["thinking"] = new_thinking
+            removed_sampling_parameters = sorted(
+                parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
+            )
+            for parameter in removed_sampling_parameters:
+                raw_body.pop(parameter)
+            mutations.append(
+                {
+                    "target": "thinking",
+                    "action": "reasoning_pin",
+                    "effort_floor": reasoning_floor_effort,
+                    "budget_before": budget_before,
+                    "budget_after": budget_after,
+                    "removed_sampling_parameters": removed_sampling_parameters,
+                }
+            )
 
     # 4) Mutation-safety invariant: historical messages must be byte-identical.
     after_fp = messages_fingerprint(raw_body.get("messages"))

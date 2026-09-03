@@ -1,5 +1,5 @@
 # LiteLLM Local Proxy Configuration
-# For use with personal API keys (Gemini and/or OpenAI)
+# For use with personal API keys (Gemini, Anthropic, and/or OpenAI)
 #
 # Supported models:
 #   Gemini (requires GEMINI_API_KEY):
@@ -10,6 +10,11 @@
 #     - gemini/gemini-3.5-flash
 #     - gemini/gemini-2.5-flash
 #     - gemini/gemini-2.5-pro
+#
+#   Anthropic (requires ANTHROPIC_API_KEY):
+#     - anthropic/claude-haiku-4-5, claude-sonnet-5, claude-opus-5
+#     - anthropic/claude-fable-5-1, claude-fable-5
+#     - anthropic/claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 #
 #   OpenAI (requires OPENAI_API_KEY):
 #     - openai/gpt-5, gpt-5-codex, gpt-5-mini, gpt-5-nano, gpt-5-pro
@@ -100,6 +105,50 @@ model_list:
     litellm_params:
       model: gemini/gemini-2.5-pro
       api_key: os.environ/GEMINI_API_KEY
+
+  # =========================================================================
+  # Anthropic Models (requires ANTHROPIC_API_KEY)
+  # =========================================================================
+
+  - model_name: anthropic/claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-sonnet-5
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-opus-5
+    litellm_params:
+      model: anthropic/claude-opus-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-fable-5-1
+    litellm_params:
+      model: anthropic/claude-fable-5-1
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-fable-5
+    litellm_params:
+      model: anthropic/claude-fable-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-opus-4-8
+    litellm_params:
+      model: anthropic/claude-opus-4-8
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-opus-4-6
+    litellm_params:
+      model: anthropic/claude-opus-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic/claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
 
   # =========================================================================
   # OpenAI Models (requires OPENAI_API_KEY)

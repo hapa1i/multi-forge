@@ -879,35 +879,26 @@ def proxy_server_remote_gemini(module_forge_home: Path, tmp_path_factory) -> Gen
 
 
 @pytest.fixture(scope="module")
+def proxy_server_openrouter_offline(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    """Start the OpenRouter template for runtime-truth checks without calling upstream."""
+    yield from _openrouter_family_proxy(
+        "openrouter-anthropic",
+        module_forge_home,
+        tmp_path_factory,
+        "OpenRouter proxy unreachable",
+        preflight=False,
+        require_key=False,
+    )
+
+
+@pytest.fixture(scope="module")
 def proxy_server_openrouter(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        pytest.fail("OPENROUTER_API_KEY not set (required for OpenRouter proxy tests)")
-
-    port = allocate_ephemeral_port()
-    env = os.environ.copy()
-    env["FORGE_HOME"] = str(module_forge_home)
-
-    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
-
-    proc = _start_proxy_subprocess(
-        template="openrouter-anthropic",
-        port=port,
-        forge_home=module_forge_home,
-        env=env,
-        cwd=cwd,
+    yield from _openrouter_family_proxy(
+        "openrouter-anthropic",
+        module_forge_home,
+        tmp_path_factory,
+        "OpenRouter proxy unreachable",
     )
-    proxy_base_url = f"http://localhost:{port}"
-
-    _preflight_proxy(
-        proxy_base_url=proxy_base_url,
-        request_model="claude-3-5-haiku-20241022",
-        max_tokens=8,
-        unreachable_fail_reason="OpenRouter proxy unreachable",
-        template="openrouter-anthropic",
-    )
-
-    yield proxy_base_url
-    kill_process(proc.pid)
 
 
 @pytest.fixture(scope="module")
@@ -950,19 +941,22 @@ def _openrouter_family_proxy(
     unreachable_fail_reason: str,
     *,
     preflight: bool = True,
+    require_key: bool = True,
 ) -> Generator[str, None, None]:
     """Start an OpenRouter family proxy, optionally with a cheap haiku-tier preflight.
 
-    preflight=False boots the proxy without contacting OpenRouter, so
-    routing-metadata assertions still run when an account's data-policy
-    settings block a family's upstream endpoints.
+    ``preflight=False`` boots without contacting OpenRouter. ``require_key=False``
+    supplies a fixture-only placeholder for offline runtime-truth assertions.
     """
-    if not os.environ.get("OPENROUTER_API_KEY"):
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if require_key and not api_key:
         pytest.fail("OPENROUTER_API_KEY not set (required for OpenRouter proxy tests)")
 
     port = allocate_ephemeral_port()
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)
+    if not require_key:
+        env["OPENROUTER_API_KEY"] = "test-openrouter-key"
 
     cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
     proc = _start_proxy_subprocess(

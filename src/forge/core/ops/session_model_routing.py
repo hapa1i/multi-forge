@@ -186,8 +186,17 @@ def plan_session_model_route(
                 raise SessionModelRoutingError("persisted proxy route is missing inspectable template/config identity")
             serving = _serving_proxy_tiers(request, existing_proxy, candidate=None)
             compatible = bool(serving) and (model_tier is None or model_tier in serving)
-            if compatible or not allow_replacement:
+            if compatible:
                 return _plan_proxy_route(request, existing_proxy, model_tier=model_tier)
+            identity = _proxy_route_identity(existing_proxy)
+            recovery = "pass --proxy <proxy_id-or-template> to select a compatible proxy explicitly"
+            if request.claude_tier is not None:
+                recovery += ", or pass --no-proxy to use Anthropic directly"
+            raise SessionModelRoutingError(
+                f"persisted {identity} does not serve model {request.requested_model!r}"
+                + (f" at tier {model_tier!r}" if model_tier is not None else "")
+                + f"; update or recreate that proxy, {recovery}"
+            )
         else:
             raise SessionModelRoutingError(f"unsupported existing route kind: {existing_kind!r}")
 
@@ -526,7 +535,7 @@ def _plan_proxy_route(
     serving = _serving_proxy_tiers(request, proxy, candidate=candidate)
     if not serving:
         raise SessionModelRoutingError(
-            f"proxy template {proxy.template!r} does not serve model {request.requested_model!r}"
+            f"{_proxy_route_identity(proxy)} does not serve model {request.requested_model!r}"
         )
     selected_tier = _select_proxy_tier(request, proxy, serving, model_tier=model_tier)
     selected_model = serving[selected_tier]
@@ -540,6 +549,14 @@ def _plan_proxy_route(
         proxy=proxy,
         candidate=candidate,
     )
+
+
+def _proxy_route_identity(proxy: ProxyRouteSnapshot) -> str:
+    """Describe the concrete proxy identity that failed compatibility checks."""
+
+    if proxy.proxy_id is not None:
+        return f"proxy instance {proxy.proxy_id!r} (template {proxy.template!r})"
+    return f"proxy template {proxy.template!r}"
 
 
 def _serving_proxy_tiers(
