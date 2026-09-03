@@ -193,7 +193,8 @@ and launch route; `--model-tier haiku|sonnet|opus` is an optional tier disambigu
 `--proxy` is a strict route constraint, `--no-proxy` permits only direct Claude models, compatible inherited routing
 wins, and a new Claude request without an explicit proxy stays direct. A non-Claude request may start the first
 admissible packaged-catalog proxy and prints the resolved route on stderr before launch. `--no-launch` may still start
-that proxy and persist route intent. Bare resume reuses stored neutral route intent rather than selecting again.
+that proxy and persist route intent. Bare resume and inherited-route fork reuse stored neutral route intent rather than
+selecting again; recovery preserves the complete intended lifecycle command when an explicit replacement is needed.
 `session adopt --model` remains Claude-only, and Codex rejects these Claude-runtime route flags.
 
 Forge `--model` is not Claude Code's in-conversation `/model`: the former resolves durable session launch routing before

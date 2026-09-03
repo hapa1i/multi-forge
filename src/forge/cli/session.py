@@ -296,6 +296,21 @@ def _get_active_session_entry(session_name: str, forge_root: str | None = None) 
         return None
 
 
+def _peek_active_session_entry(session_name: str, forge_root: str | None = None) -> ActiveSessionEntry | None:
+    """Return live runtime state without repairing the active-session registry."""
+    try:
+        from forge.session.active import ActiveSessionStore
+
+        return ActiveSessionStore().peek_session(session_name, forge_root=forge_root)
+    except Exception:
+        logger.debug(
+            "Failed to inspect active-session registry for '%s'",
+            session_name,
+            exc_info=True,
+        )
+        return None
+
+
 def _print_active_delete_warning(session_name: str, active_entry: ActiveSessionEntry) -> None:
     """Print a warning before deleting a session that still appears live."""
     console.print(

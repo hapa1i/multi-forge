@@ -30,6 +30,14 @@ class SessionModelRoutingError(ValueError):
     """Raised when a session model-route request cannot form valid intent."""
 
 
+class SessionModelRouteHealthError(SessionModelRoutingError):
+    """Raised when a selected proxy fails its identity or health probe."""
+
+    def __init__(self, message: str, *, restartable: bool = False) -> None:
+        super().__init__(message)
+        self.restartable = restartable
+
+
 @dataclass(frozen=True)
 class ProxyRouteSnapshot:
     """Read-only proxy/template facts used during route selection."""
@@ -421,7 +429,10 @@ def realize_session_model_route(
         try:
             healthcheck_fn(base_url, template, proxy_id)
         except Exception as exc:
-            raise SessionModelRoutingError(f"selected proxy route failed identity/health validation: {exc}") from exc
+            raise SessionModelRouteHealthError(
+                f"selected proxy route failed identity/health validation: {exc}",
+                restartable=getattr(exc, "restartable", False) is True,
+            ) from exc
 
     concrete = inspect_persisted_proxy_route(template=template, base_url=base_url, proxy_id=proxy_id)
     if plan.source_id is not None and concrete.source_id != plan.source_id:
@@ -844,6 +855,7 @@ __all__ = [
     "ModelRouteTransition",
     "ProxyRouteSnapshot",
     "ResolvedModelRoute",
+    "SessionModelRouteHealthError",
     "SessionModelRoutePlan",
     "SessionModelRoutingError",
     "apply_model_route_transition",

@@ -62,7 +62,9 @@ def print_tip(
         for line in rest:
             out.print(f"[dim]{line}[/dim]")
     for cmd in commands or ():
-        out.print(f"  {cmd}")
+        # Commands are user-copyable payloads, not Rich markup. In particular,
+        # valid paths can contain bracketed components such as ``[release]``.
+        out.print(f"  {cmd}", markup=False)
 
 
 def print_error(msg: str, *, console: Console | None = None) -> None:

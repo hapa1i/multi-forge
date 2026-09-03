@@ -1979,7 +1979,7 @@ class SessionManager:
     def _find_co_resident_sessions(
         self,
         worktree_path: str,
-        exclude: str,
+        exclude: tuple[str, str],
         *,
         sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
     ) -> list[str]:
@@ -1989,11 +1989,14 @@ class SessionManager:
         supply a non-mutating, manifest-backed snapshot instead.
         """
         normalized = str(Path(worktree_path).resolve())
+        exclude_name, exclude_forge_root = exclude
+        normalized_exclude_root = str(Path(exclude_forge_root).resolve())
         session_entries = sessions if sessions is not None else self.index_store.list_sessions()
         return [
             name
             for name, entry in session_entries
-            if str(Path(entry.worktree_path).resolve()) == normalized and name != exclude
+            if str(Path(entry.worktree_path).resolve()) == normalized
+            and (name, str(Path(entry.root).resolve())) != (exclude_name, normalized_exclude_root)
         ]
 
     def plan_worktree_cleanup(
@@ -2002,8 +2005,10 @@ class SessionManager:
         state: SessionState,
         *,
         delete_worktree: bool,
+        forge_root: str,
+        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
     ) -> WorktreeCleanupPlan:
-        """Plan worktree cleanup for user-facing deletion previews."""
+        """Plan cleanup from the current index or a simulated remaining-session snapshot."""
         worktree = state.worktree
         if worktree is None:
             return WorktreeCleanupPlan(remove=False, reason="not_worktree")
@@ -2013,7 +2018,8 @@ class SessionManager:
             path=worktree.path,
             is_worktree=worktree.is_worktree,
             owns_worktree=getattr(worktree, "owns_worktree", True),
-            sessions=self.index_store.peek_sessions(),
+            forge_root=forge_root,
+            sessions=self.index_store.peek_sessions() if sessions is None else sessions,
         )
 
     def _plan_worktree_cleanup_fields(
@@ -2024,16 +2030,18 @@ class SessionManager:
         path: str,
         is_worktree: bool,
         owns_worktree: bool,
+        forge_root: str,
         sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
     ) -> WorktreeCleanupPlan:
         if not delete_worktree:
             return WorktreeCleanupPlan(remove=False, reason="requested_keep")
         if not is_worktree:
             return WorktreeCleanupPlan(remove=False, reason="not_worktree")
+        exclude = (name, forge_root)
         if sessions is None:
-            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name))
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=exclude))
         else:
-            co_residents = tuple(self._find_co_resident_sessions(path, exclude=name, sessions=sessions))
+            co_residents = tuple(self._find_co_resident_sessions(path, exclude=exclude, sessions=sessions))
         if co_residents:
             return WorktreeCleanupPlan(remove=False, reason="shared", co_residents=co_residents)
         if not owns_worktree:
@@ -2098,6 +2106,18 @@ class SessionManager:
                         break
 
         return {session_id: names for session_id, names in shared.items() if names}
+
+    def repair_stale_session_record(self, name: str, *, forge_root: str) -> bool:
+        """Atomically remove a row-only residue without deleting a replacement.
+
+        Return False when a manifest-backed replacement now owns the scoped name.
+        """
+        return self.index_store.delete_session_txn(
+            name,
+            forge_root=forge_root,
+            expect_manifest_absent=True,
+            delete_manifest=lambda: None,
+        )
 
     def delete_session(
         self,
@@ -2190,6 +2210,7 @@ class SessionManager:
                 path=_worktree_info["path"],
                 is_worktree=_worktree_info["is_worktree"],
                 owns_worktree=_worktree_info["owns_worktree"],
+                forge_root=entry_forge_root,
             )
             _should_cleanup_worktree = cleanup_plan.remove
             if cleanup_plan.reason == "shared":

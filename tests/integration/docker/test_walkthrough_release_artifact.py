@@ -103,6 +103,7 @@ python3 "$skill/scripts/walkthrough-state.py" "$skill/resources/checklist.md" in
 for pair in \
   'RUN_OPTIONS=codex=false,sidecar=false' \
   'RUN_STARTED_EPOCH=1000' \
+  'SIDECAR_MAY_EXIST=false' \
   'CODEX_AUTH_MODE=none' \
   'DECLARED_HUMAN_CHECKPOINTS=7' \
   'HUMAN_CHECKPOINTS_OBSERVED=0' \

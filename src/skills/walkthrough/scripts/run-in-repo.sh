@@ -35,9 +35,29 @@ matches_expected_path() {
     local actual="$1"
     local expected="$2"
     case "$actual" in
-        /*) [ ! -L "$expected" ] && [ "$(resolve_path "$actual")" = "$expected" ] ;;
+        /*) [ ! -L "$expected" ] && [ -d "$expected" ] && [ "$(resolve_path "$actual")" = "$expected" ] ;;
         *) return 1 ;;
     esac
+}
+
+marker_is_canonical() {
+    local marker_path="$1"
+    if [ -L "$marker_path" ] || [ ! -f "$marker_path" ]; then
+        return 1
+    fi
+    python3 - "$marker_path" <<'PY'
+import os
+import stat
+import sys
+
+try:
+    descriptor = os.open(sys.argv[1], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as marker:
+        valid = stat.S_ISREG(os.fstat(marker.fileno()).st_mode) and marker.read() == b"forge-walkthrough-marker\n"
+except OSError:
+    valid = False
+raise SystemExit(0 if valid else 1)
+PY
 }
 
 # Reject an explicitly empty value before applying the default.
@@ -72,9 +92,19 @@ check_safe_path() {
 
 check_safe_path "$WALKTHROUGH_ROOT"
 
-# Gate 1: env.sh exists.
+# Gate 1: the generated-code parent chain is real and env.sh is a regular file.
 ENV_FILE="$WALKTHROUGH_ROOT/.forge/walkthrough/env.sh"
-if [ ! -f "$ENV_FILE" ]; then
+if [ -L "$WALKTHROUGH_ROOT/.forge" ] || [ ! -d "$WALKTHROUGH_ROOT/.forge" ]; then
+    echo "ERROR: Expected real directory missing: $WALKTHROUGH_ROOT/.forge/" >&2
+    echo "  The test repo structure is unsafe or incomplete. Run setup-test-repo.sh." >&2
+    exit 1
+fi
+if [ -L "$WALKTHROUGH_ROOT/.forge/walkthrough" ] || [ ! -d "$WALKTHROUGH_ROOT/.forge/walkthrough" ]; then
+    echo "ERROR: Expected real directory missing: $WALKTHROUGH_ROOT/.forge/walkthrough/" >&2
+    echo "  The test repo structure is unsafe or incomplete. Run setup-test-repo.sh." >&2
+    exit 1
+fi
+if [ -L "$ENV_FILE" ] || [ ! -f "$ENV_FILE" ]; then
     echo "ERROR: env.sh not found at: $ENV_FILE" >&2
     echo "" >&2
     echo "  The test environment is missing. Likely causes:" >&2
@@ -85,22 +115,16 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# Gate 2: the marker file exists.
+# Gate 2: the marker is the exact regular file written by setup.
 MARKER_FILE="$WALKTHROUGH_ROOT/.forge-walkthrough-marker"
-if [ ! -f "$MARKER_FILE" ]; then
-    echo "ERROR: Marker file missing at: $MARKER_FILE" >&2
+if ! marker_is_canonical "$MARKER_FILE"; then
+    echo "ERROR: Canonical marker file missing at: $MARKER_FILE" >&2
     echo "  This directory was not created by setup-test-repo.sh." >&2
     echo "  Refusing to run commands -- your real system may be at risk." >&2
     exit 1
 fi
 
 # Gate 6: the repository structure is valid.
-if [ ! -d "$WALKTHROUGH_ROOT/.forge/walkthrough" ]; then
-    echo "ERROR: Expected directory missing: $WALKTHROUGH_ROOT/.forge/walkthrough/" >&2
-    echo "  The test repo structure is incomplete. Run setup-test-repo.sh." >&2
-    exit 1
-fi
-
 if [ ! -f "$WALKTHROUGH_ROOT/CLAUDE.md" ]; then
     echo "ERROR: Expected file missing: $WALKTHROUGH_ROOT/CLAUDE.md" >&2
     echo "  This doesn't look like a forge walkthrough test repo." >&2

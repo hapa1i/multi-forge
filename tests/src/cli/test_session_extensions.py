@@ -527,7 +527,10 @@ class TestWorktreeDeleteGuard:
             ("session-c", SessionIndexEntry(worktree_path=other_path, project_root=str(tmp_path), last_accessed_at="")),
         ]
 
-        result = mgr._find_co_resident_sessions(wt_path, exclude="session-a")
+        result = mgr._find_co_resident_sessions(
+            wt_path,
+            exclude=("session-a", wt_path),
+        )
         assert result == ["session-b"]
 
     def test_find_co_resident_empty_when_alone(self, tmp_path: Path) -> None:
@@ -543,7 +546,10 @@ class TestWorktreeDeleteGuard:
             ("solo", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
         ]
 
-        result = mgr._find_co_resident_sessions(wt_path, exclude="solo")
+        result = mgr._find_co_resident_sessions(
+            wt_path,
+            exclude=("solo", wt_path),
+        )
         assert result == []
 
     def test_delete_skips_worktree_when_co_residents_exist(self, tmp_path: Path) -> None:

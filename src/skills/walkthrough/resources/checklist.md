@@ -771,11 +771,33 @@ bash "$SCRIPTS/run-in-repo.sh" bash "$SCRIPTS/cleanup-owned.sh" extensions
 bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/protected-paths.py" compare .forge/walkthrough/real-system.json
 bash "$SCRIPTS/run-in-repo.sh" bash -c '
 set -euo pipefail
-test ! -d .forge/sessions/walkthrough-demo
-test ! -d .forge/sessions/walkthrough-continuation
-test ! -d .forge/artifacts
-test ! -d .forge/search-index
-test ! -d .forge/prev_sessions/walkthrough-demo
+for session_name in \
+    walkthrough-codex \
+    walkthrough-sidecar \
+    walkthrough-continuation \
+    walkthrough-incognito \
+    walkthrough-demo; do
+    test ! -e ".forge/sessions/$session_name"
+    test ! -e ".forge/artifacts/$session_name"
+    test ! -e ".forge/prev_sessions/$session_name"
+done
+python3 - << "PY"
+import json
+from pathlib import Path
+
+owned = {
+    "walkthrough-codex",
+    "walkthrough-sidecar",
+    "walkthrough-continuation",
+    "walkthrough-incognito",
+    "walkthrough-demo",
+}
+documents_path = Path(".forge/search-index/documents.json")
+if documents_path.exists():
+    documents = json.loads(documents_path.read_text(encoding="utf-8")).get("documents")
+    assert isinstance(documents, list)
+    assert all(isinstance(row, dict) and row.get("session_name") not in owned for row in documents)
+PY
 test ! -e "$FORGE_HOME/projects.json"
 test ! -e "$CODEX_HOME/auth.json"
 test -d "$CODEX_HOME"
@@ -788,8 +810,8 @@ python3 -c "import json; d=json.load(open(\".claude/settings.local.json\")); ass
 ```
 
 - [ ] All six real-system protected targets still match the baseline
-- [ ] Walkthrough parent and continuation session directories are absent
-- [ ] Walkthrough transcript, transfer, and search state are absent
+- [ ] All fixed-name walkthrough session directories are absent
+- [ ] Walkthrough-owned transcript, transfer, and search state are absent while foreign project state is preserved
 - [ ] The sandboxed Codex home is empty and private, and its Forge project-trust registry is absent
 - [ ] The pre-existing local setting survives
 - [ ] The walkthrough-owned source fixture is absent

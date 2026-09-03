@@ -94,6 +94,26 @@ def test_cleanup_mutations_require_explicit_approval() -> None:
     assert steps["13.4"]["prereqs"] == ["13.2", "13.3"]
 
 
+def test_cleanup_verification_allows_preserved_foreign_artifacts_and_search_state() -> None:
+    steps = {step["id"]: step for step in PARSER.parse_checklist(str(CHECKLIST))["_all_subs"]}
+    verification = "\n".join(block["code"] for block in steps["13.4"]["code_blocks"])
+
+    assert "test ! -d .forge/artifacts" not in verification
+    assert "test ! -d .forge/search-index" not in verification
+    assert '".forge/artifacts/$session_name"' in verification
+    assert '".forge/prev_sessions/$session_name"' in verification
+    assert 'Path(".forge/search-index/documents.json")' in verification
+    assert 'row.get("session_name") not in owned' in verification
+    for name in (
+        "walkthrough-codex",
+        "walkthrough-sidecar",
+        "walkthrough-continuation",
+        "walkthrough-incognito",
+        "walkthrough-demo",
+    ):
+        assert name in verification
+
+
 def test_annotations_use_the_ratified_vocabulary() -> None:
     data = PARSER.parse_checklist(str(CHECKLIST))
 
@@ -302,9 +322,30 @@ def test_driver_resume_refuses_stale_identity_without_initializing() -> None:
     assert "/walkthrough --reset" in resume
     assert "byte-identical" in resume
     assert (
+        'python3 "$SCRIPTS/package-identity.py" --skill-root "$CLAUDE_SKILL_DIR" '
+        '> "$WT_RUN_DIR/package-identity.json"'
+    ) in resume
+    assert "before validation" in resume
+    assert "both identity booleans" in resume
+    assert (
         'bash "$SCRIPTS/run-in-repo.sh" python3 "$SCRIPTS/walkthrough-state.py" '
         '"$CHECKLIST" validate "$STATE_FILE" --from "$FROM_STEP"'
     ) in resume
+    assert "Append `--report` to the validation command" in resume
+    assert "persisted `RUN_OPTIONS`" in resume
+    assert "recovery_kind: manual-state-inspection" in resume
+    assert "recommend or invoke reset for this refusal" in resume
+    assert "alternate_fresh_command" in resume
+
+
+def test_driver_interruption_resumes_from_first_unrecorded_step() -> None:
+    content = SKILL_FILE.read_text()
+    interruption = content.split("## 6. Cleanup and Interruption", 1)[1].split("## 7.", 1)[0]
+
+    assert "ordered checklist index and recorded state" in interruption
+    assert "--from <first-unrecorded-step>" in interruption
+    assert "active `--codex`, `--sidecar`, and `--report` selections" in interruption
+    assert "--from 13" not in interruption
 
 
 def test_driver_wraps_sandbox_state_mutation() -> None:

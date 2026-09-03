@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
+from forge.cli.claude import ProxyNotRunningError
 from forge.cli.main import main
 from forge.config.loader import write_proxy_instance_config
 from forge.config.schema import ProxyInstanceConfig, TierModels
@@ -100,7 +101,7 @@ def test_bare_resume_refuses_dead_persisted_proxy_before_launch(
         patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200_000),
         patch(
             "forge.cli.claude._healthcheck_proxy",
-            side_effect=ValueError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
+            side_effect=ProxyNotRunningError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
         ) as healthcheck,
         patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
     ):
@@ -162,7 +163,7 @@ def test_recovery_lookup_failure_keeps_proxy_refusal_actionable(
         patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200_000),
         patch(
             "forge.cli.claude._healthcheck_proxy",
-            side_effect=ValueError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
+            side_effect=ProxyNotRunningError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
         ),
         patch("forge.config.loader.load_proxy_instance_config", return_value=None),
         patch("forge.config.loader.template_exists", side_effect=OSError("template directory unreadable")),
@@ -197,7 +198,7 @@ def test_force_resume_names_retained_child_after_proxy_refusal(
         patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200_000),
         patch(
             "forge.cli.claude._healthcheck_proxy",
-            side_effect=ValueError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
+            side_effect=ProxyNotRunningError("proxy is not running (connection refused at http://127.0.0.1:65534/)"),
         ),
         patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
     ):

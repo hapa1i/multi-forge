@@ -21,7 +21,7 @@ Usage (state management):
     python3 walkthrough-state.py <checklist> var <state-file> get <key>
     python3 walkthrough-state.py <checklist> prereq-check <state-file> <step_id|section_id>
     python3 walkthrough-state.py <checklist> report <state-file>
-    python3 walkthrough-state.py <checklist> validate <state-file> --from <step_id>
+    python3 walkthrough-state.py <checklist> validate <state-file> --from <step_id> [--report]
 """
 
 import hashlib
@@ -64,6 +64,7 @@ class Subsection(TypedDict):
     code_blocks: list[CodeBlock]
     assertions: list[str]
     prereqs: list[str]
+    section_prereqs: list[str]
     next: Optional[str]
     assertion_count: int
     # Fence parsing uses this transient flag and removes it from returned subsections.
@@ -174,7 +175,10 @@ def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> Checkl
                         file=sys.stderr,
                     )
                 else:
-                    print("Error: section-level prereq must appear immediately before a ## heading.", file=sys.stderr)
+                    print(
+                        "Error: section-level prereq must appear immediately before a ## heading.",
+                        file=sys.stderr,
+                    )
                 sys.exit(1)
 
         if version is None:
@@ -211,6 +215,7 @@ def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> Checkl
                 "code_blocks": [],
                 "assertions": [],
                 "prereqs": [],
+                "section_prereqs": (list(current_section.get("prereqs", [])) if current_section else []),
                 "next": None,
                 "assertion_count": 0,
             }
@@ -283,7 +288,10 @@ def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> Checklis
 
     entries = _parse_index_entries(index_lines)
     if not entries:
-        print(f"Error: index checklist contains no section entries: {index_path}", file=sys.stderr)
+        print(
+            f"Error: index checklist contains no section entries: {index_path}",
+            file=sys.stderr,
+        )
         print("Add one or more: <!-- section: <id> <relative_path> -->", file=sys.stderr)
         sys.exit(1)
 
@@ -299,7 +307,10 @@ def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> Checklis
 
         section_path = index_path.parent / relpath
         if not section_path.exists():
-            print(f"Error: section file not found for section {section_id}: {section_path}", file=sys.stderr)
+            print(
+                f"Error: section file not found for section {section_id}: {section_path}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         parsed = _parse_checklist_lines(section_path.read_text().splitlines(), extract_version=False)
@@ -449,7 +460,10 @@ def checklist_hash(path: str) -> str:
     if any(CHECKLIST_INDEX_RE.match(line) for line in lines):
         entries = _parse_index_entries(lines)
         if not entries:
-            print(f"Error: index checklist contains no section entries: {p}", file=sys.stderr)
+            print(
+                f"Error: index checklist contains no section entries: {p}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         seen_ids: set[str] = set()
@@ -458,13 +472,19 @@ def checklist_hash(path: str) -> str:
         h.update(p.read_bytes())
         for section_id, relpath in entries:
             if section_id in seen_ids:
-                print(f"Error: duplicate section id in index: {section_id}", file=sys.stderr)
+                print(
+                    f"Error: duplicate section id in index: {section_id}",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             seen_ids.add(section_id)
 
             section_path = p.parent / relpath
             if not section_path.exists():
-                print(f"Error: section file not found for section {section_id}: {section_path}", file=sys.stderr)
+                print(
+                    f"Error: section file not found for section {section_id}: {section_path}",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
             h.update(b"\nsection\n")
@@ -496,6 +516,8 @@ def step_hash(step: Subsection) -> str:
         "code_blocks": step.get("code_blocks", []),
         "assertions": [assertion.strip() for assertion in step["assertions"]],
     }
+    if step.get("section_prereqs"):
+        payload["section_prereqs"] = step["section_prereqs"]
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
     return hashlib.sha256(b"forge-step-hash-v2\n" + encoded).hexdigest()
 
@@ -689,7 +711,12 @@ def cmd_init(data: Checklist, checklist_path: str, state_path: str, mode: str, f
 
 
 def cmd_record(
-    data: Checklist, checklist_path: str, state_path: str, step_id: str, results_csv: str, force: bool
+    data: Checklist,
+    checklist_path: str,
+    state_path: str,
+    step_id: str,
+    results_csv: str,
+    force: bool,
 ) -> dict:
     """Record assertion results for a step."""
     state = read_state(state_path)
@@ -703,7 +730,10 @@ def cmd_record(
         sys.exit(1)
 
     if step_id in state["steps"] and not force:
-        print(f"Error: step '{step_id}' already recorded. Use --force to overwrite.", file=sys.stderr)
+        print(
+            f"Error: step '{step_id}' already recorded. Use --force to overwrite.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     codes = [c.strip() for c in results_csv.split(",")]
@@ -718,7 +748,10 @@ def cmd_record(
     results = []
     for c in codes:
         if c not in RESULT_CODES:
-            print(f"Error: invalid result code '{c}'. Use p (pass), f (fail), s (skip).", file=sys.stderr)
+            print(
+                f"Error: invalid result code '{c}'. Use p (pass), f (fail), s (skip).",
+                file=sys.stderr,
+            )
             sys.exit(1)
         results.append(RESULT_CODES[c])
 
@@ -774,10 +807,18 @@ def cmd_var(state_path: str, action: str, key: str, value=None) -> dict:
     elif action == "get":
         if key not in state["vars"]:
             return {"action": "get", "key": key, "exists": False}
-        return {"action": "get", "key": key, "value": state["vars"][key], "exists": True}
+        return {
+            "action": "get",
+            "key": key,
+            "value": state["vars"][key],
+            "exists": True,
+        }
 
     else:
-        print(f"Error: unknown var action '{action}'. Use 'set' or 'get'.", file=sys.stderr)
+        print(
+            f"Error: unknown var action '{action}'. Use 'set' or 'get'.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
@@ -829,7 +870,14 @@ def cmd_prereq_check(data: Checklist, state_path: str, step_id: str) -> dict:
     all_prereqs = list(dict.fromkeys(section_prereqs + sub_prereqs))
 
     if not all_prereqs:
-        return {"ok": True, "required": [], "missing": [], "blocking": [], "resolvable": [], "statuses": {}}
+        return {
+            "ok": True,
+            "required": [],
+            "missing": [],
+            "blocking": [],
+            "resolvable": [],
+            "statuses": {},
+        }
 
     # Evaluate all prerequisites in the current run scope.
     run_scope = _current_run_scope(state)
@@ -942,7 +990,7 @@ def cmd_report(data: Checklist, checklist_path: str, state_path: str) -> dict:
                             "step": sub["id"],
                             "title": sub["title"],
                             "assertion_index": i,
-                            "text": sub["assertions"][i] if i < len(sub["assertions"]) else "?",
+                            "text": (sub["assertions"][i] if i < len(sub["assertions"]) else "?"),
                         }
                     )
                 elif r == "skip":
@@ -989,7 +1037,125 @@ def cmd_report(data: Checklist, checklist_path: str, state_path: str) -> dict:
     return result
 
 
-def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_step: str) -> dict:
+def _resume_recovery(state_mode: object) -> str:
+    """Return the safe fresh-run recovery for a persisted mode."""
+    if state_mode == "walkthrough":
+        return "/walkthrough --reset"
+    if state_mode == "full-qa":
+        return "/qa with the same --wheel, --runtime-track, and --provider-profile arguments; omit --from"
+    return "start a fresh /walkthrough or /qa run"
+
+
+def _resume_refusal(reason: str, recovery: str, **details: object) -> dict[str, object]:
+    """Build one stable, JSON-safe refusal payload."""
+    result: dict[str, object] = {
+        "status": "refused",
+        "reason": reason,
+        "changed_steps": [],
+        "unverified_steps": [],
+        "cleared_steps": [],
+        "orphaned_steps": [],
+        "recovery": recovery,
+    }
+    result.update(details)
+    return result
+
+
+def _walkthrough_command(
+    state: object,
+    *,
+    from_step: Optional[str] = None,
+    include_report: bool = False,
+) -> str:
+    """Build a walkthrough invocation from persisted coverage and active report selection."""
+    command = "/walkthrough"
+    if from_step is not None:
+        command += f" --from {from_step}"
+
+    vars_data = state.get("vars") if isinstance(state, dict) else None
+    run_options = vars_data.get("RUN_OPTIONS") if isinstance(vars_data, dict) else None
+    if isinstance(run_options, str):
+        match = re.fullmatch(r"codex=(true|false),sidecar=(true|false)", run_options)
+        if match is not None:
+            if match.group(1) == "true":
+                command += " --codex"
+            if match.group(2) == "true":
+                command += " --sidecar"
+    if include_report:
+        command += " --report"
+    return command
+
+
+def _malformed_state_refusal(
+    reason: str,
+    state_path: str,
+    state: object,
+    *,
+    include_report: bool,
+    **details: object,
+) -> dict[str, object]:
+    """Refuse malformed state without recommending reset, which also refuses it."""
+    state_mode = state.get("mode") if isinstance(state, dict) else None
+    if state_mode == "full-qa":
+        return _resume_refusal(reason, _resume_recovery(state_mode), **details)
+
+    fresh_command = _walkthrough_command(state, include_report=include_report)
+    return _resume_refusal(
+        reason,
+        (
+            "leave this sandbox unchanged; inspect and preserve the malformed state, or set FORGE_TEST_REPO to a "
+            f"different empty path and run {fresh_command}"
+        ),
+        recovery_kind="manual-state-inspection",
+        recovery_state_path=state_path,
+        reset_safe=False,
+        alternate_fresh_command=fresh_command,
+        **details,
+    )
+
+
+def _resume_state_invalid_field(state: dict, schema_version: int) -> Optional[str]:
+    """Return the first structurally invalid state field needed by validate."""
+    required_types = {
+        "checklist_version": str,
+        "started_at": str,
+        "last_updated": str,
+        "vars": dict,
+        "steps": dict,
+    }
+    for field, expected_type in required_types.items():
+        if field not in state or not isinstance(state[field], expected_type):
+            return field
+    if "current_step" not in state or not isinstance(state["current_step"], (str, type(None))):
+        return "current_step"
+    if not all(isinstance(key, str) for key in state["vars"]):
+        return "vars"
+
+    for step_id, step_data in state["steps"].items():
+        if not isinstance(step_id, str) or not isinstance(step_data, dict):
+            return "steps"
+        results = step_data.get("results")
+        if not isinstance(results, list) or any(
+            not isinstance(result, str) or result not in {"pass", "fail", "skip"} for result in results
+        ):
+            return f"steps.{step_id}.results"
+        if schema_version >= 2 and ("hash" not in step_data or not isinstance(step_data["hash"], (str, type(None)))):
+            return f"steps.{step_id}.hash"
+        if "hash" in step_data and not isinstance(step_data["hash"], (str, type(None))):
+            return f"steps.{step_id}.hash"
+        if "scope" in step_data and not isinstance(step_data["scope"], str):
+            return f"steps.{step_id}.scope"
+    return None
+
+
+def cmd_validate(
+    data: Checklist,
+    checklist_path: str,
+    state_path: str,
+    from_step: str,
+    *,
+    include_report: bool = False,
+) -> dict:
     """Pre-flight validation for resume. Refuse stale evidence before mutation.
 
     Steps before from_step: validate stored hash vs current checklist.
@@ -998,8 +1164,48 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
     rewriting the state file. Otherwise, clear only the requested suffix.
     """
     state = read_state(state_path)
+    if not isinstance(state, dict):
+        return _malformed_state_refusal(
+            "state file root must be a JSON object",
+            state_path,
+            state,
+            include_report=include_report,
+            invalid_state_field="<root>",
+        )
 
-    if state.get("schema_version", 1) < 2:
+    state_mode = state.get("mode")
+    if not isinstance(state_mode, str) or state_mode not in {"walkthrough", "full-qa"}:
+        return _malformed_state_refusal(
+            "state mode is missing or unsupported",
+            state_path,
+            state,
+            include_report=include_report,
+            state_mode=state_mode,
+        )
+    recovery = _resume_recovery(state_mode)
+
+    schema_version = state.get("schema_version", 1)
+    if type(schema_version) is not int or schema_version not in {1, 2}:
+        return _malformed_state_refusal(
+            "state schema version is malformed or unsupported",
+            state_path,
+            state,
+            include_report=include_report,
+            state_schema_version=schema_version,
+            invalid_state_field="schema_version",
+        )
+
+    invalid_state_field = _resume_state_invalid_field(state, schema_version)
+    if invalid_state_field is not None:
+        return _malformed_state_refusal(
+            "state file fields are missing or malformed",
+            state_path,
+            state,
+            include_report=include_report,
+            invalid_state_field=invalid_state_field,
+        )
+
+    if schema_version < 2:
         state = _migrate_v1_to_v2(state, data, checklist_path)
 
     from_step = resolve_step_id(data, from_step)
@@ -1011,11 +1217,13 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
         print(f"Error: step '{from_step}' not found in checklist.", file=sys.stderr)
         sys.exit(1)
 
-    before_steps = set(step_order[:from_index])
+    before_step_order = step_order[:from_index]
+    before_steps = set(before_step_order)
     at_or_after_steps = set(step_order[from_index:])
 
     changed_steps = []
     unverified_steps = []
+    missing_prefix_steps = []
     cleared_steps = []
     orphaned_steps = []
 
@@ -1031,11 +1239,18 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
             "unverified_steps": [],
             "cleared_steps": [],
             "orphaned_steps": [],
-            "recovery": "/walkthrough --reset",
+            "recovery": recovery,
         }
 
     all_checklist_ids = set(step_order)
-    for sid, sdata in state.get("steps", {}).items():
+    state_steps = state.get("steps", {})
+    if state_mode == "walkthrough":
+        for sid in before_step_order:
+            if sid not in state_steps:
+                unverified_steps.append(sid)
+                missing_prefix_steps.append(sid)
+
+    for sid, sdata in state_steps.items():
         if sid not in all_checklist_ids:
             orphaned_steps.append(sid)
             continue
@@ -1055,15 +1270,31 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
                 changed_steps.append({"id": sid, "reason": "step content changed since recorded"})
 
     if changed_steps or unverified_steps or orphaned_steps:
-        return {
+        refusal_recovery = recovery
+        if (
+            state_mode == "walkthrough"
+            and missing_prefix_steps
+            and not changed_steps
+            and not orphaned_steps
+            and unverified_steps == missing_prefix_steps
+        ):
+            refusal_recovery = _walkthrough_command(
+                state,
+                from_step=missing_prefix_steps[0],
+                include_report=include_report,
+            )
+        result = {
             "status": "refused",
             "reason": "recorded prefix cannot be verified against the current checklist",
             "changed_steps": changed_steps,
             "unverified_steps": unverified_steps,
             "cleared_steps": [],
             "orphaned_steps": orphaned_steps,
-            "recovery": "/walkthrough --reset",
+            "recovery": refusal_recovery,
         }
+        if missing_prefix_steps:
+            result["first_unrecorded_step"] = missing_prefix_steps[0]
+        return result
 
     for sid in cleared_steps:
         del state["steps"][sid]
@@ -1083,7 +1314,17 @@ def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_ste
 
 # CLI dispatch
 
-COMMANDS = ["index", "step", "summary", "init", "record", "var", "prereq-check", "report", "validate"]
+COMMANDS = [
+    "index",
+    "step",
+    "summary",
+    "init",
+    "record",
+    "var",
+    "prereq-check",
+    "report",
+    "validate",
+]
 
 
 def main():
@@ -1097,7 +1338,10 @@ def main():
     rest = sys.argv[3:]
 
     if command not in COMMANDS:
-        print(f"Error: unknown command '{command}'. Valid: {', '.join(COMMANDS)}", file=sys.stderr)
+        print(
+            f"Error: unknown command '{command}'. Valid: {', '.join(COMMANDS)}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     data = parse_checklist(checklist_path)
@@ -1138,7 +1382,10 @@ def main():
 
     elif command == "record":
         if len(rest) < 3:
-            print("Error: 'record' requires <state-file> <step_id> <results>", file=sys.stderr)
+            print(
+                "Error: 'record' requires <state-file> <step_id> <results>",
+                file=sys.stderr,
+            )
             sys.exit(1)
         state_path, step_id, results_csv = rest[0], rest[1], rest[2]
         force = "--force" in rest
@@ -1146,7 +1393,10 @@ def main():
 
     elif command == "var":
         if len(rest) < 3:
-            print("Error: 'var' requires <state-file> set|get <key> [<value>]", file=sys.stderr)
+            print(
+                "Error: 'var' requires <state-file> set|get <key> [<value>]",
+                file=sys.stderr,
+            )
             sys.exit(1)
         state_path, action, key = rest[0], rest[1], rest[2]
         value = rest[3] if len(rest) > 3 else None
@@ -1154,7 +1404,10 @@ def main():
 
     elif command == "prereq-check":
         if len(rest) < 2:
-            print("Error: 'prereq-check' requires <state-file> <step_id|section_id>", file=sys.stderr)
+            print(
+                "Error: 'prereq-check' requires <state-file> <step_id|section_id>",
+                file=sys.stderr,
+            )
             sys.exit(1)
         result = cmd_prereq_check(data, rest[0], rest[1])
 
@@ -1166,6 +1419,7 @@ def main():
 
     elif command == "validate":
         from_step = None
+        include_report = False
         positional = []
         skip_next = False
         for i, arg in enumerate(rest):
@@ -1176,6 +1430,9 @@ def main():
                 from_step = rest[i + 1]
                 skip_next = True
                 continue
+            if arg == "--report":
+                include_report = True
+                continue
             positional.append(arg)
         if not positional:
             print("Error: 'validate' requires a state file path.", file=sys.stderr)
@@ -1183,7 +1440,7 @@ def main():
         if not from_step:
             print("Error: 'validate' requires --from <step_id>.", file=sys.stderr)
             sys.exit(1)
-        result = cmd_validate(data, checklist_path, positional[0], from_step)
+        result = cmd_validate(data, checklist_path, positional[0], from_step, include_report=include_report)
     else:
         # Validation above makes this branch unreachable.
         raise AssertionError(f"unhandled command: {command}")

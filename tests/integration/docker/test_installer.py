@@ -234,8 +234,8 @@ print('hooks present')
         assert check.returncode == 0, f"Settings check failed: {check.stderr}"
         assert "hooks present" in check.stdout
 
-    def test_full_profile_memory_passport_assets(self, synced_container: ContainerLike) -> None:
-        """Full installs ship the envelope and explicit-upgrade QA guidance."""
+    def test_full_profile_memory_skill_contracts(self, synced_container: ContainerLike) -> None:
+        """Full installs keep QA schema coverage and walkthrough orientation."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
         result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile full")
@@ -248,17 +248,16 @@ print('hooks present')
             document = synced_container.read_file(f"$HOME/.claude/skills/{skill}/SKILL.md")
             assert yaml.safe_load(document.split("---", 2)[1])["name"] == skill
 
-        for content in (qa, walkthrough):
-            assert "Memory Document" in content
-            assert "forge_memory" in content
-            assert "forge memory passport upgrade" in content
-
+        assert "Memory Document" in qa
+        assert "forge_memory" in qa
+        assert "forge memory passport upgrade" in qa
         assert 'assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))' in qa
-        assert 'forbidden = {"resource", "tags", "timestamp"}' in walkthrough
-        assert "forbidden.isdisjoint" in walkthrough
-        assert "import yaml" not in walkthrough
         assert "cmp -s .forge/memory/legacy-passport.md /tmp/legacy-passport.upgraded" in qa
-        assert "cmp -s .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded" in walkthrough
+
+        assert "Orient Project Memory as Further Reading" in walkthrough
+        assert "forge memory --help" in walkthrough
+        assert "forge session memory report --help" in walkthrough
+        assert "passport upgrade" not in walkthrough
 
     def test_init_is_idempotent(self, synced_container: ContainerLike) -> None:
         """Verify running extension enable twice doesn't error."""
@@ -722,21 +721,32 @@ PY
             assert json.loads(index.stdout)["total_assertions"] > 0
 
         sync_parity = synced_container.exec(
-            _packaged_forge_command("extension sync --scope user", project_root=parity_project, home=parity_home)
+            _packaged_forge_command(
+                "extension sync --scope user",
+                project_root=parity_project,
+                home=parity_home,
+            )
         )
         assert sync_parity.returncode == 0, sync_parity.stderr
         status_parity = synced_container.exec(
             _packaged_forge_command(
-                "extension status --scope user --json", project_root=parity_project, home=parity_home
+                "extension status --scope user --json",
+                project_root=parity_project,
+                home=parity_home,
             )
         )
         assert status_parity.returncode == 0, status_parity.stderr
         parity_packages = json.loads(status_parity.stdout)["installations"][0]["skill_packages"]
-        assert {package["skill"] for package in parity_packages} >= {"walkthrough", "qa"}
+        assert {package["skill"] for package in parity_packages} >= {
+            "walkthrough",
+            "qa",
+        }
 
         disable_parity = synced_container.exec(
             _packaged_forge_command(
-                "extension disable --scope user --yes", project_root=parity_project, home=parity_home
+                "extension disable --scope user --yes",
+                project_root=parity_project,
+                home=parity_home,
             )
         )
         assert disable_parity.returncode == 0, disable_parity.stderr

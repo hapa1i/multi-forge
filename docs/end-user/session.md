@@ -267,7 +267,8 @@ forge session list --older-than 30            # List old sessions before cleanin
 ```
 
 Active sessions are always skipped. Worktrees and branches are preserved by default. Claude transcript files
-(`~/.claude/projects/*.jsonl`) are deleted; Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) are not.
+(`~/.claude/projects/*.jsonl`) are deleted. Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) remain when
+their containing Forge root remains; `--delete-worktree` also removes snapshots inside the worktree it removes.
 
 Compatibility is evaluated per Forge root. Preview output identifies sessions that apply would refuse. On `--yes`,
 manual cleanup skips incompatible roots, continues compatible roots, reports every skipped target, and exits 1 if any
@@ -1010,13 +1011,13 @@ proxied Claude route, the selected tier is what Claude sends to the proxy even w
 intrinsic family.
 
 Forge stores the canonical request and resolved source/template/tier alongside the legacy Claude execution pin. A bare
-resume reuses that route; if it is unavailable, Forge fails with recovery guidance rather than silently choosing another
-provider. Replay also refuses a same-URL template substitution or a changed proven source. Use the reported
-`--model ... --proxy ...` or `--model ... --no-proxy` command to replace malformed stored routing; explicit replacement
-does not depend on reading that broken route first. An explicit `--model` authorizes replacement when an otherwise valid
-inherited route cannot serve it. Before an explicit selection launches, one stderr line reports provider,
-template/proxy, tier, effective model, and known billing posture. The billing value remains `unknown` when Forge has no
-payer evidence.
+resume or inherited-route fork reuses that route; if it is unavailable, Forge fails with recovery guidance rather than
+silently choosing another provider. Fork recovery retains its resolved child name and explicit fork options. Replay also
+refuses a same-URL template substitution or a changed proven source. Use the reported `--model ... --proxy ...` or
+`--model ... --no-proxy` command to replace malformed stored routing; explicit replacement does not depend on reading
+that broken route first. An explicit `--model` authorizes replacement when an otherwise valid inherited route cannot
+serve it. Before an explicit selection launches, one stderr line reports provider, template/proxy, tier, effective
+model, and known billing posture. The billing value remains `unknown` when Forge has no payer evidence.
 
 Selecting a non-Claude model can create or start a paid proxy. `--no-launch --model ...` still resolves/starts the route
 and persists intent, but invokes no child and writes no route event; the proxy remains independently managed. A
@@ -1211,10 +1212,15 @@ same way.
 A bare host `forge session resume <name>` preserves the exact proxy route recorded by the session and healthchecks its
 endpoint and recorded identity before launching Claude. Forge does not silently replace a dead or mismatched proxy. The
 error prints two recovery paths when the corresponding configuration is available: restart the recorded proxy with
-`forge proxy start <proxy-id>`, or explicitly authorize template realization with
-`forge session resume <name> --proxy <template>`. If `--fresh` or `--force` has already created a derived child before
-the launch check fails, the error names the retained child. Resume that child after recovery rather than retrying the
-parent, which would create another child.
+`forge proxy start <proxy-id>`, or explicitly replace the route with the replay-equivalent
+`forge session resume <name> --model <recorded-model> --proxy <template>` command printed by Forge. The command includes
+`--model-tier <recorded-tier>` only when the same model is served by multiple tiers. If `--fresh` or `--force` has
+already created a derived child before the launch check fails, the error names the retained child. Resume that child
+after recovery rather than retrying the parent, which would create another child.
+
+A bare `forge session fork <parent>` applies the same fail-closed rule to an inherited proxy route. Its replacement
+command repeats the complete intended fork action—including the resolved child name and explicit destination, strategy,
+extension, supervision, memory, and authority options—before appending the replacement model and proxy.
 
 ### Sidecar specifics
 

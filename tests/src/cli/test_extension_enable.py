@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +54,9 @@ def test_scope_help_is_shared_across_extension_commands() -> None:
 
 
 @pytest.mark.parametrize("command", ["sync", "disable", "status"])
-def test_lifecycle_help_describes_sidecar_and_tracking_row_discovery(command: str) -> None:
+def test_lifecycle_help_describes_sidecar_and_tracking_row_discovery(
+    command: str,
+) -> None:
     result = CliRunner().invoke(extensions, [command, "--help"])
 
     output = " ".join(result.output.split())
@@ -432,6 +435,41 @@ class TestRuntimeScopedModuleSelection:
         assert "scope_unsupported" in output
         assert "forge extension disable --scope local --runtime codex" in output
         assert "forge extension enable --scope user" in output
+
+    def test_explicit_root_codex_conflict_binds_disable_recovery_to_target(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        caller = tmp_path / "caller"
+        caller.mkdir()
+        project = tmp_path / "[bold] target project"
+        project.mkdir()
+        monkeypatch.chdir(caller)
+        monkeypatch.setenv("COLUMNS", "500")
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            [
+                "enable",
+                "--scope",
+                "local",
+                "--root",
+                str(project),
+                "--runtime",
+                "codex",
+                "--dry-run",
+            ],
+        )
+
+        output = " ".join(result.output.split())
+        expected = (
+            f"cd {shlex.quote(str(project.resolve()))} && " "forge extension disable --scope local --runtime codex"
+        )
+        assert result.exit_code == 1, result.output
+        assert expected in output
+        assert f"cd {shlex.quote(str(caller.resolve()))} &&" not in output
 
     def test_minimal_codex_conflicts_when_runtime_filter_empties_profile(
         self,
@@ -1436,7 +1474,9 @@ def test_status_human_reports_symlinked_runtime_root_without_traversing_it(
     }
 
 
-def test_status_uses_one_tracking_snapshot_for_detection_and_rendering(tmp_path: Path) -> None:
+def test_status_uses_one_tracking_snapshot_for_detection_and_rendering(
+    tmp_path: Path,
+) -> None:
     from unittest.mock import patch
 
     from forge.install.tracking import TrackingStore
@@ -2639,7 +2679,9 @@ class TestEnableCodexHooks:
         assert "Forge cannot verify trust" in result.output
         assert not self._codex_config().exists()
 
-    def test_disable_runtime_codex_renders_exact_plan_and_retrust_consequence(self) -> None:
+    def test_disable_runtime_codex_renders_exact_plan_and_retrust_consequence(
+        self,
+    ) -> None:
         import os
 
         from click.testing import CliRunner
@@ -2690,7 +2732,9 @@ class TestEnableCodexHooks:
         assert installation["codex_config_path"] is None
         assert installation["profile"] == "minimal"
 
-    def test_individual_runtime_flags_that_cover_row_prompt_as_full_disable(self) -> None:
+    def test_individual_runtime_flags_that_cover_row_prompt_as_full_disable(
+        self,
+    ) -> None:
         from click.testing import CliRunner
 
         from forge.cli.extensions import disable_cmd
@@ -2735,7 +2779,12 @@ class TestEnableCodexHooks:
 
         assert bare.exit_code == 0, bare.output
         assert runtime_all.exit_code == 0, runtime_all.output
-        for expected in ("Will disable Forge extensions (user):", "Settings:", "Codex hooks:", "Proceed with disable?"):
+        for expected in (
+            "Will disable Forge extensions (user):",
+            "Settings:",
+            "Codex hooks:",
+            "Proceed with disable?",
+        ):
             assert expected in bare.output
             assert expected in runtime_all.output
         assert "Proceed with full disable?" not in runtime_all.output
@@ -2750,7 +2799,10 @@ class TestEnableCodexHooks:
 
         self._enable(available=True)
         config = self._codex_config()
-        config.write_text(config.read_text(encoding="utf-8") + "\n# >>> forge hooks >>>\n", encoding="utf-8")
+        config.write_text(
+            config.read_text(encoding="utf-8") + "\n# >>> forge hooks >>>\n",
+            encoding="utf-8",
+        )
         tracking_before = TrackingStore().path.read_bytes()
         config_before = config.read_bytes()
 
@@ -2764,7 +2816,9 @@ class TestEnableCodexHooks:
         assert config.read_bytes() == config_before
         assert TrackingStore().path.read_bytes() == tracking_before
 
-    def test_runtime_tracking_write_fault_names_prior_mutation_and_restored_settings(self) -> None:
+    def test_runtime_tracking_write_fault_names_prior_mutation_and_restored_settings(
+        self,
+    ) -> None:
         import os
         from unittest.mock import patch
 
@@ -2779,7 +2833,11 @@ class TestEnableCodexHooks:
         settings_before = settings_path.read_bytes()
         tracking_before = tracking.path.read_bytes()
 
-        with patch.object(TrackingStore, "remove_installation", side_effect=OSError("injected tracking fault")):
+        with patch.object(
+            TrackingStore,
+            "remove_installation",
+            side_effect=OSError("injected tracking fault"),
+        ):
             result = CliRunner().invoke(
                 disable_cmd,
                 ["--scope", "user", "--runtime", "all", "--yes"],

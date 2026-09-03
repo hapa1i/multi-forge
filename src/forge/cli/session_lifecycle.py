@@ -63,6 +63,7 @@ from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.core.ops.session_model_routing import (
     ResolvedModelRoute,
+    SessionModelRouteHealthError,
     SessionModelRoutePlan,
     SessionModelRoutingError,
     plan_model_route_transition,
@@ -118,6 +119,10 @@ from forge.cli.session_codex import (  # noqa: E402
 from forge.cli.session_resume_modes import (  # noqa: E402
     _resume_fresh_native,
     _resume_fresh_rewind,
+)
+from forge.cli.session_route_recovery import (  # noqa: E402
+    _render_persisted_proxy_refusal,
+    _render_replayed_model_route_refusal,
 )
 from forge.cli.session_supervisor_options import (  # noqa: E402
     supervisor_option_error,
@@ -763,7 +768,7 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
         # identity endpoint; preserve its established bare-resume behavior.
         return
 
-    from forge.cli.claude import _healthcheck_proxy
+    from forge.cli.claude import ProxyNotRunningError, _healthcheck_proxy
 
     try:
         _healthcheck_proxy(
@@ -772,50 +777,14 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
             expected_proxy_id=proxy_id,
         )
     except ValueError as e:
-        commands: list[str] = []
-        if proxy_id is not None and template != "":
-            from forge.config.loader import load_proxy_instance_config
-
-            try:
-                recorded_config = load_proxy_instance_config(proxy_id)
-            except Exception:
-                recorded_config = None
-            if (
-                recorded_config is not None
-                and recorded_config.proxy_endpoint.rstrip("/") == base_url.rstrip("/")
-                and (template is None or recorded_config.template == template)
-            ):
-                commands.append(f"forge proxy start {shlex.quote(proxy_id)}")
-        if template:
-            from forge.config.loader import template_exists
-
-            try:
-                template_available = template_exists(template)
-            except Exception:
-                template_available = False
-            if template_available:
-                commands.append(
-                    f"forge session resume {shlex.quote(plan.manifest.name)} --proxy {shlex.quote(template)}"
-                )
-
-        tips = [
-            (
-                "Use an applicable recovery command below, then retry."
-                if commands
-                else "Repair the recorded proxy identity, or retry with --proxy <proxy_id-or-template>."
-            )
-        ]
-        if plan.parent_name is not None:
-            tips.append(
-                f"Child session '{plan.manifest.name}' was created and retained. Resume that child after recovery; "
-                f"retrying parent '{plan.parent_name}' creates another child."
-            )
-        tips.append("Forge did not launch Claude or replace the recorded proxy route.")
-        print_error_with_tip(
-            f"Persisted proxy route for session '{plan.manifest.name}' is unavailable: {e}",
-            *tips,
-            commands=commands,
-            console=err_console,
+        _render_persisted_proxy_refusal(
+            manifest=plan.manifest,
+            error=e,
+            template=template,
+            base_url=base_url,
+            proxy_id=proxy_id,
+            allow_restart=isinstance(e, ProxyNotRunningError),
+            parent_name=plan.parent_name,
         )
         raise SystemExit(1) from None
 
@@ -1617,6 +1586,7 @@ def resume(
     route_model = direct_model
     route_tier = model_tier
     allow_route_replacement = True
+    replaying_model_route = False
     neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(manifest, direct=direct)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
@@ -1630,8 +1600,12 @@ def resume(
             route_model = preserved_model_route_request(manifest)
             route_tier = neutral_route.selected_tier
             allow_route_replacement = False
+            replaying_model_route = True
         except SessionModelRoutingError as e:
-            print_error(str(e))
+            if neutral_route.kind == "proxy":
+                _render_replayed_model_route_refusal(manifest=manifest, error=e)
+            else:
+                print_error(str(e))
             sys.exit(1)
 
     if route_model is not None:
@@ -1655,9 +1629,27 @@ def resume(
                 raise SessionModelRoutingError(
                     "a non-Claude main-session route cannot be combined with persisted subprocess-proxy intent"
                 )
+        except SessionModelRoutingError as e:
+            if replaying_model_route and neutral_route is not None and neutral_route.kind == "proxy":
+                _render_replayed_model_route_refusal(manifest=manifest, error=e)
+            else:
+                print_error(str(e))
+            sys.exit(1)
+        try:
             model_route_selection = _realize_interactive_session_model_route(model_plan)
         except SessionModelRoutingError as e:
-            print_error(str(e))
+            if replaying_model_route and model_plan.kind == "proxy":
+                assert model_plan.proxy is not None
+                _render_persisted_proxy_refusal(
+                    manifest=manifest,
+                    error=e,
+                    template=model_plan.proxy.template,
+                    base_url=model_plan.proxy.base_url,
+                    proxy_id=model_plan.proxy.proxy_id,
+                    allow_restart=isinstance(e, SessionModelRouteHealthError) and e.restartable,
+                )
+            else:
+                print_error(str(e))
             sys.exit(1)
         routing = _routing_from_model_route(model_route_selection)
         direct = model_route_selection.kind == "direct"

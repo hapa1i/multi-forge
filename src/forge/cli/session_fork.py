@@ -37,6 +37,11 @@ from forge.cli.session_lifecycle import (  # noqa: E402
 )
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
 from forge.cli.session_rewind import _prepare_rewind_launch_artifacts  # noqa: E402
+from forge.cli.session_route_recovery import (  # noqa: E402
+    SessionRouteRecoveryAction,
+    _render_persisted_proxy_refusal,
+    _render_replayed_model_route_refusal,
+)
 from forge.cli.session_supervisor_options import supervisor_options
 from forge.core.ops.claude_session import (
     ClaudeForkResult,
@@ -65,6 +70,7 @@ from forge.core.ops.session_fork_preflight import (
 )
 from forge.core.ops.session_model_routing import (
     ResolvedModelRoute,
+    SessionModelRouteHealthError,
     SessionModelRoutingError,
     preserved_model_route_request,
 )
@@ -151,6 +157,62 @@ def _render_fork_preflight_notice(notice: ForkPreflightNotice) -> None:
         print_tip(notice.message, blank_before=False, console=console)
     else:
         console.print(f"[dim]{notice.message}[/dim]")
+
+
+def _fork_model_route_recovery_action(
+    request: ForkPreflightRequest,
+    *,
+    fork_name: str,
+) -> SessionRouteRecoveryAction:
+    """Rebuild the caller's route-neutral fork action for an exact reroute retry."""
+    argv = ["forge", "session", "fork", request.parent_name, "--name", fork_name]
+    if request.is_incognito:
+        argv.append("--incognito")
+    if request.create_worktree:
+        argv.append("--worktree")
+    if request.branch is not None:
+        argv.extend(("--branch", request.branch))
+    if request.no_launch:
+        argv.append("--no-launch")
+    if request.extensions is not None:
+        argv.append("--extensions" if request.extensions else "--no-extensions")
+    if request.strategy_explicit:
+        argv.extend(("--strategy", request.strategy))
+    if request.drop_last_explicit and request.drop_last is not None:
+        argv.extend(("--drop-last", str(request.drop_last)))
+    if request.inline_plan_explicit and request.inline_plan:
+        argv.append("--inline-plan")
+    if request.into_path is not None:
+        argv.extend(("--into", request.into_path))
+    if request.resume_mode is not None:
+        argv.extend(("--resume-mode", request.resume_mode))
+    if request.supervise_target:
+        argv.append("--supervise")
+    if request.supervisor_proxy is not None:
+        argv.extend(("--supervisor-proxy", request.supervisor_proxy))
+    if request.supervisor_direct:
+        argv.append("--no-supervisor-proxy")
+    if request.cascade_flag:
+        argv.append("--cascade")
+    if request.checker_model is not None:
+        argv.extend(("--checker-model", request.checker_model))
+    if request.checker_provider is not None:
+        argv.extend(("--checker-provider", request.checker_provider))
+    if request.checker_effort is not None:
+        argv.extend(("--checker-effort", request.checker_effort))
+    if request.supervisor_effort is not None:
+        argv.extend(("--supervisor-effort", request.supervisor_effort))
+    if request.supervisor_runtime is not None:
+        argv.extend(("--supervisor-runtime", request.supervisor_runtime))
+    if request.force:
+        argv.append("--force")
+    if request.memory_flag is not None:
+        argv.extend(("--memory", request.memory_flag))
+    if request.authority_explicit and request.authority is not None:
+        argv.extend(("--authority", request.authority.role))
+        if request.authority.tier is not None:
+            argv.extend(("--authority-tier", request.authority.tier))
+    return SessionRouteRecoveryAction(tuple(argv))
 
 
 def _render_fork_execution_event(event: ForkExecutionEvent) -> None:
@@ -492,6 +554,8 @@ def fork(
     route_model = direct_model
     route_tier = model_tier
     allow_route_replacement = True
+    replaying_model_route = False
+    route_recovery_action = _fork_model_route_recovery_action(request, fork_name=preflight.fork_name)
     parent_launch = preflight.parent.intent.launch
     neutral_route = parent_launch.model_route if parent_launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(preflight.parent, direct=direct)
@@ -511,8 +575,16 @@ def fork(
             route_model = preserved_model_route_request(preflight.parent)
             route_tier = neutral_route.selected_tier
             allow_route_replacement = False
+            replaying_model_route = True
         except SessionModelRoutingError as e:
-            print_error(str(e))
+            if neutral_route.kind == "proxy":
+                _render_replayed_model_route_refusal(
+                    manifest=preflight.parent,
+                    error=e,
+                    recovery_action=route_recovery_action,
+                )
+            else:
+                print_error(str(e))
             sys.exit(1)
 
     if route_model is not None:
@@ -536,9 +608,32 @@ def fork(
                 raise SessionModelRoutingError(
                     "a non-Claude main-session route cannot be combined with persisted subprocess-proxy intent"
                 )
+        except SessionModelRoutingError as e:
+            if replaying_model_route and neutral_route is not None and neutral_route.kind == "proxy":
+                _render_replayed_model_route_refusal(
+                    manifest=preflight.parent,
+                    error=e,
+                    recovery_action=route_recovery_action,
+                )
+            else:
+                print_error(str(e))
+            sys.exit(1)
+        try:
             model_route_selection = _realize_interactive_session_model_route(model_plan)
         except SessionModelRoutingError as e:
-            print_error(str(e))
+            if replaying_model_route and model_plan.kind == "proxy":
+                assert model_plan.proxy is not None
+                _render_persisted_proxy_refusal(
+                    manifest=preflight.parent,
+                    error=e,
+                    template=model_plan.proxy.template,
+                    base_url=model_plan.proxy.base_url,
+                    proxy_id=model_plan.proxy.proxy_id,
+                    allow_restart=isinstance(e, SessionModelRouteHealthError) and e.restartable,
+                    recovery_action=route_recovery_action,
+                )
+            else:
+                print_error(str(e))
             sys.exit(1)
         preflight_routing = _routing_from_model_route(model_route_selection)
         try:

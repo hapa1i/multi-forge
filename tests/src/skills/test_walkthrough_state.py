@@ -30,7 +30,12 @@ def _load_state_script(skill: str) -> ModuleType:
     return module
 
 
-@pytest.fixture(scope="module", params=tuple(STATE_SCRIPT_PATHS), ids=tuple(STATE_SCRIPT_PATHS), autouse=True)
+@pytest.fixture(
+    scope="module",
+    params=tuple(STATE_SCRIPT_PATHS),
+    ids=tuple(STATE_SCRIPT_PATHS),
+    autouse=True,
+)
 def _state_script(request: pytest.FixtureRequest) -> None:
     """Run every behavioral test against both package-local script copies."""
     global pc
@@ -310,7 +315,11 @@ def indexed_checklist(tmp_path):
     index_path = tmp_path / "index.md"
     index_path.write_text(INDEXED_INDEX)
 
-    return {"index": str(index_path), "section0": str(section0_path), "section1": str(section1_path)}
+    return {
+        "index": str(index_path),
+        "section0": str(section0_path),
+        "section1": str(section1_path),
+    }
 
 
 @pytest.fixture
@@ -743,7 +752,13 @@ class TestCmdPrereqCheck:
         assert result["statuses"] == {"0": "stale_run"}
 
     def test_sub_prereq_blocks_when_not_run(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.3")
         assert result["ok"] is False
@@ -751,36 +766,88 @@ class TestCmdPrereqCheck:
         assert result["statuses"] == {"3.2": "not_run"}
 
     def test_sub_prereq_allows_when_passed(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
-        pc.cmd_record(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "3.2", "p", force=False)
+        pc.cmd_record(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "3.2",
+            "p",
+            force=False,
+        )
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.3")
         assert result["ok"] is True
         assert result["blocking"] == []
         assert result["statuses"] == {"3.2": "passed"}
 
     def test_sub_prereq_blocks_when_failed(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
-        pc.cmd_record(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "3.2", "f", force=False)
+        pc.cmd_record(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "3.2",
+            "f",
+            force=False,
+        )
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.3")
         assert result["ok"] is False
         assert result["blocking"] == ["3.2"]
         assert result["statuses"] == {"3.2": "failed"}
 
     def test_sub_prereq_blocks_when_skipped(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
-        pc.cmd_record(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "3.2", "s", force=False)
+        pc.cmd_record(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "3.2",
+            "s",
+            force=False,
+        )
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.3")
         assert result["ok"] is False
         assert result["blocking"] == ["3.2"]
         assert result["statuses"] == {"3.2": "skipped"}
 
     def test_sub_prereq_blocks_stale_run(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
-        pc.cmd_record(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "3.2", "p", force=False)
+        pc.cmd_record(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "3.2",
+            "p",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-b")
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.3")
         assert result["ok"] is False
@@ -789,7 +856,13 @@ class TestCmdPrereqCheck:
 
     def test_no_prereq_returns_ok(self, sub_prereq_checklist_path, state_path, sub_prereq_parsed):
         """Steps without prereq annotations always pass prereq check."""
-        pc.cmd_init(sub_prereq_parsed, sub_prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            sub_prereq_parsed,
+            sub_prereq_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         result = pc.cmd_prereq_check(sub_prereq_parsed, state_path, "3.1")
         assert result["ok"] is True
         assert result["required"] == []
@@ -801,11 +874,31 @@ class TestCmdPrereqCheck:
         resolvable, the code must use _step_prereq_status for "0.3" and "2.1"
         (not _section_state which only accepts section-level IDs).
         """
-        pc.cmd_init(resolvable_parsed, resolvable_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            resolvable_parsed,
+            resolvable_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
         # Satisfy section 4's prereqs (0.3 and 2.1)
-        pc.cmd_record(resolvable_parsed, resolvable_checklist_path, state_path, "0.3", "p", force=False)
-        pc.cmd_record(resolvable_parsed, resolvable_checklist_path, state_path, "2.1", "p", force=False)
+        pc.cmd_record(
+            resolvable_parsed,
+            resolvable_checklist_path,
+            state_path,
+            "0.3",
+            "p",
+            force=False,
+        )
+        pc.cmd_record(
+            resolvable_parsed,
+            resolvable_checklist_path,
+            state_path,
+            "2.1",
+            "p",
+            force=False,
+        )
         # Check 5.1 which depends on 4.1 (not yet run)
         result = pc.cmd_prereq_check(resolvable_parsed, state_path, "5.1")
         assert result["ok"] is False
@@ -817,10 +910,23 @@ class TestCmdPrereqCheck:
         self, resolvable_checklist_path, state_path, resolvable_parsed
     ):
         """4.1 is NOT resolvable when one of its section's subsection prereqs is missing."""
-        pc.cmd_init(resolvable_parsed, resolvable_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_init(
+            resolvable_parsed,
+            resolvable_checklist_path,
+            state_path,
+            "walkthrough",
+            force=False,
+        )
         pc.cmd_var(state_path, "set", "RUN_SCOPE", "run-a")
         # Only satisfy 0.3, leave 2.1 unsatisfied
-        pc.cmd_record(resolvable_parsed, resolvable_checklist_path, state_path, "0.3", "p", force=False)
+        pc.cmd_record(
+            resolvable_parsed,
+            resolvable_checklist_path,
+            state_path,
+            "0.3",
+            "p",
+            force=False,
+        )
         result = pc.cmd_prereq_check(resolvable_parsed, state_path, "5.1")
         assert result["ok"] is False
         assert "4.1" in result["missing"]
@@ -924,6 +1030,13 @@ class TestStepHash:
         h2 = pc.step_hash(step)
         assert h1 != h2
 
+    def test_changes_on_inherited_section_prerequisite_edit(self, prereq_parsed):
+        step = prereq_parsed["_all_subs"][1]
+        h1 = pc.step_hash(step)
+        step["section_prereqs"] = ["0.1"]
+        h2 = pc.step_hash(step)
+        assert h1 != h2
+
     def test_whitespace_normalized(self, parsed):
         step = parsed["_all_subs"][0]
         h1 = pc.step_hash(step)
@@ -982,6 +1095,22 @@ class TestCmdValidate:
         assert [changed["id"] for changed in result["changed_steps"]] == ["0.1"]
         assert Path(initialized_state).read_bytes() == before
 
+    def test_detects_changed_inherited_section_prerequisite(self, prereq_checklist_path, state_path, prereq_parsed):
+        pc.cmd_init(prereq_parsed, prereq_checklist_path, state_path, "walkthrough", force=False)
+        pc.cmd_record(prereq_parsed, prereq_checklist_path, state_path, "0.1", "p", force=False)
+        pc.cmd_record(prereq_parsed, prereq_checklist_path, state_path, "1.1", "p", force=False)
+        Path(prereq_checklist_path).write_text(
+            PREREQ_CHECKLIST.replace("<!-- prereq: 0 -->\n## 1.", "<!-- prereq: 0.1 -->\n## 1.")
+        )
+        modified_data = pc.parse_checklist(prereq_checklist_path)
+        before = Path(state_path).read_bytes()
+
+        result = pc.cmd_validate(modified_data, prereq_checklist_path, state_path, "1.2")
+
+        assert result["status"] == "refused"
+        assert [changed["id"] for changed in result["changed_steps"]] == ["1.1"]
+        assert Path(state_path).read_bytes() == before
+
     def test_version_mismatch_refuses_without_mutation(self, checklist_path, initialized_state, parsed):
         pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
         pc.cmd_record(parsed, checklist_path, initialized_state, "0.2", "p", force=False)
@@ -994,7 +1123,26 @@ class TestCmdValidate:
         assert result["state_checklist_version"] == "2.0.0"
         assert result["current_checklist_version"] == "2.0.1"
         assert result["cleared_steps"] == []
+        assert result["recovery"] == "/walkthrough --reset"
         assert Path(initialized_state).read_bytes() == before
+
+    def test_full_qa_version_mismatch_names_fresh_qa_recovery(
+        self,
+        checklist_path,
+        state_path,
+        parsed,
+    ):
+        pc.cmd_init(parsed, checklist_path, state_path, "full-qa", force=False)
+        before = Path(state_path).read_bytes()
+        parsed["version"] = "2.0.1"
+
+        result = pc.cmd_validate(parsed, checklist_path, state_path, "0.2")
+
+        assert result["status"] == "refused"
+        assert result["recovery"].startswith("/qa with the same")
+        assert "omit --from" in result["recovery"]
+        assert "--reset" not in result["recovery"]
+        assert Path(state_path).read_bytes() == before
 
     def test_unverified_prefix_refuses_without_mutation(self, checklist_path, initialized_state, parsed):
         pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
@@ -1008,6 +1156,184 @@ class TestCmdValidate:
         assert result["status"] == "refused"
         assert result["unverified_steps"] == ["0.1"]
         assert result["cleared_steps"] == []
+        assert result["recovery"] == "/walkthrough --reset"
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_full_qa_stale_recorded_prefix_names_fresh_qa_recovery(
+        self,
+        checklist_path,
+        state_path,
+        parsed,
+    ):
+        pc.cmd_init(parsed, checklist_path, state_path, "full-qa", force=False)
+        pc.cmd_record(parsed, checklist_path, state_path, "0.1", "p,p", force=False)
+        state = json.loads(Path(state_path).read_text())
+        state["steps"]["0.1"]["hash"] = None
+        Path(state_path).write_text(json.dumps(state, indent=2) + "\n")
+        before = Path(state_path).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, state_path, "0.2")
+
+        assert result["status"] == "refused"
+        assert result["unverified_steps"] == ["0.1"]
+        assert result["recovery"].startswith("/qa with the same")
+        assert "omit --from" in result["recovery"]
+        assert "--reset" not in result["recovery"]
+        assert Path(state_path).read_bytes() == before
+
+    def test_missing_prefix_step_refuses_without_mutation(self, checklist_path, initialized_state, parsed):
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "1.1")
+
+        assert result["status"] == "refused"
+        assert result["unverified_steps"] == ["0.2"]
+        assert result["first_unrecorded_step"] == "0.2"
+        assert result["recovery"] == "/walkthrough --from 0.2"
+        assert result["cleared_steps"] == []
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_missing_prefix_recovery_preserves_coverage_and_report_options(
+        self,
+        checklist_path,
+        initialized_state,
+        parsed,
+    ):
+        pc.cmd_var(initialized_state, "set", "RUN_OPTIONS", "codex=true,sidecar=true")
+        pc.cmd_record(parsed, checklist_path, initialized_state, "0.1", "p,p", force=False)
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(
+            parsed,
+            checklist_path,
+            initialized_state,
+            "1.1",
+            include_report=True,
+        )
+
+        assert result["status"] == "refused"
+        assert result["first_unrecorded_step"] == "0.2"
+        assert result["recovery"] == "/walkthrough --from 0.2 --codex --sidecar --report"
+        assert Path(initialized_state).read_bytes() == before
+
+    @pytest.mark.parametrize(
+        ("field", "value", "invalid_field"),
+        [
+            ("schema_version", "2", "schema_version"),
+            ("mode", [], None),
+            ("vars", [], "vars"),
+            ("steps", [], "steps"),
+            ("current_step", [], "current_step"),
+        ],
+    )
+    def test_validate_refuses_malformed_state_types_without_mutation(
+        self,
+        checklist_path,
+        initialized_state,
+        parsed,
+        field,
+        value,
+        invalid_field,
+    ):
+        state = json.loads(Path(initialized_state).read_text())
+        state[field] = value
+        Path(initialized_state).write_text(json.dumps(state, indent=2) + "\n")
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "1.1")
+
+        assert result["status"] == "refused"
+        assert result["cleared_steps"] == []
+        assert "/walkthrough --reset" not in result["recovery"]
+        if invalid_field is None:
+            assert result["reason"] == "state mode is missing or unsupported"
+        else:
+            assert result["invalid_state_field"] == invalid_field
+        assert result["recovery_kind"] == "manual-state-inspection"
+        assert result["reset_safe"] is False
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_validate_refuses_non_object_state_without_mutation(
+        self,
+        checklist_path,
+        initialized_state,
+        parsed,
+    ):
+        Path(initialized_state).write_text("[]\n")
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "1.1")
+
+        assert result["status"] == "refused"
+        assert result["invalid_state_field"] == "<root>"
+        assert result["recovery_kind"] == "manual-state-inspection"
+        assert result["reset_safe"] is False
+        assert "different empty path" in result["recovery"]
+        assert "/walkthrough --reset" not in result["recovery"]
+        assert Path(initialized_state).read_bytes() == before
+
+    def test_full_qa_malformed_state_names_safe_fresh_qa_recovery(
+        self,
+        checklist_path,
+        state_path,
+        parsed,
+    ):
+        pc.cmd_init(parsed, checklist_path, state_path, "full-qa", force=False)
+        state = json.loads(Path(state_path).read_text())
+        state["steps"] = []
+        Path(state_path).write_text(json.dumps(state, indent=2) + "\n")
+        before = Path(state_path).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, state_path, "1.1")
+
+        assert result["status"] == "refused"
+        assert result["recovery"].startswith("/qa with the same")
+        assert "omit --from" in result["recovery"]
+        assert "/walkthrough --reset" not in result["recovery"]
+        assert "recovery_kind" not in result
+        assert Path(state_path).read_bytes() == before
+
+    def test_subset_mode_allows_unselected_prefix_steps(
+        self,
+        checklist_path,
+        state_path,
+        parsed,
+    ):
+        pc.cmd_init(parsed, checklist_path, state_path, "full-qa", force=False)
+        pc.cmd_record(parsed, checklist_path, state_path, "0.1", "p,p", force=False)
+
+        result = pc.cmd_validate(parsed, checklist_path, state_path, "1.1")
+
+        assert result["status"] == "ok"
+        assert result["unverified_steps"] == []
+        assert result["cleared_steps"] == []
+        assert json.loads(Path(state_path).read_text())["current_step"] == "1.1"
+
+    @pytest.mark.parametrize("invalid_mode", [None, "typo", 7])
+    def test_validate_refuses_missing_or_unknown_mode_without_mutation(
+        self,
+        checklist_path,
+        initialized_state,
+        parsed,
+        invalid_mode,
+    ):
+        state = json.loads(Path(initialized_state).read_text())
+        if invalid_mode is None:
+            state.pop("mode")
+        else:
+            state["mode"] = invalid_mode
+        Path(initialized_state).write_text(json.dumps(state, indent=2) + "\n")
+        before = Path(initialized_state).read_bytes()
+
+        result = pc.cmd_validate(parsed, checklist_path, initialized_state, "1.1")
+
+        assert result["status"] == "refused"
+        assert result["reason"] == "state mode is missing or unsupported"
+        assert result["cleared_steps"] == []
+        assert result["recovery_kind"] == "manual-state-inspection"
+        assert result["reset_safe"] is False
+        assert "/walkthrough --reset" not in result["recovery"]
         assert Path(initialized_state).read_bytes() == before
 
     def test_unknown_from_step(self, checklist_path, initialized_state, parsed):

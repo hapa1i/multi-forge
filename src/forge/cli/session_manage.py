@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import click
+from rich.markup import escape
 from rich.table import Table
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
@@ -22,7 +23,9 @@ from forge.cli.session import (  # noqa: E402
     _get_active_session_entry,
     _get_session_type,
     _hint_cross_project_session,
+    _peek_active_session_entry,
     _print_active_delete_warning,
+    _resolve_session_artifact_root,
     _session_list_location,
     _session_scope_key,
     _template_display_label,
@@ -81,7 +84,7 @@ from forge.session.plan_resolution import (  # noqa: E402
     "--keep-transcripts",
     "-k",
     is_flag=True,
-    help="Keep native Claude transcripts (Forge artifact snapshots are always preserved)",
+    help="Keep native Claude transcripts (does not control Forge artifact snapshots)",
 )
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option("--delete-branch", "-d", is_flag=True, help="Also delete git branch")
@@ -128,16 +131,20 @@ def delete(
                 "Use explicit session names instead, or cd into a Forge project.",
             )
             sys.exit(1)
-        all_sessions = manager.list_sessions(include_incognito=True, forge_root_filter=_fr)
+        if yes:
+            all_sessions = manager.list_sessions(include_incognito=True, forge_root_filter=_fr)
+        else:
+            all_sessions = manager.index_store.peek_sessions(include_incognito=True, forge_root_filter=_fr)
         if not all_sessions:
             console.print("[dim]No sessions to delete.[/dim]")
             return
         targets = [name for name, _ in all_sessions]
 
+        active_lookup = _get_active_session_entry if yes else _peek_active_session_entry
         active_targets = [
             (target, active_entry)
             for target in targets
-            if (active_entry := _get_active_session_entry(target, forge_root=_fr)) is not None
+            if (active_entry := active_lookup(target, forge_root=_fr)) is not None
         ]
 
         # Active sessions are protected unless --force: skip the live ones and
@@ -217,7 +224,10 @@ def delete(
             try:
                 from forge.core.ops.resolution import resolve_session_repo_wide
 
-                resolved = resolve_session_repo_wide(name, _fr, manager=manager)
+                # Keep resolution observational. Confirmed repair belongs to the
+                # target deletion below so row-only residue can still be explained
+                # and handled as a successful repair rather than a later not-found.
+                resolved = resolve_session_repo_wide(name, _fr, manager=manager, repair_stale=False)
                 actual_fr = resolved.forge_root
                 target_has_project_state = True
                 if resolved.is_cross_project:
@@ -232,11 +242,15 @@ def delete(
                 # Manifest corrupt but session exists in index -- resolve the
                 # forge_root from the index so force-delete can clean it up.
                 try:
-                    entry = IndexStore().get_session(name, forge_root=None)
-                    idx_fr = entry.root
-                    if idx_fr:
-                        actual_fr = idx_fr
-                        target_has_project_state = True
+                    index = IndexStore()
+                    entry = (
+                        index.get_session(name, forge_root=None) if yes else index.peek_session(name, forge_root=None)
+                    )
+                    if entry is not None:
+                        idx_fr = entry.root
+                        if idx_fr:
+                            actual_fr = idx_fr
+                            target_has_project_state = True
                 except (SessionNotFoundError, AmbiguousSessionError, ForgeSessionError):
                     pass
 
@@ -354,7 +368,8 @@ def _delete_single_session(
     """
     # Live sessions are protected before any deletion path (index-tracked or
     # orphaned directory) so a running launch cannot lose its state without --force.
-    active_entry = _get_active_session_entry(name, forge_root=forge_root)
+    active_lookup = _get_active_session_entry if yes else _peek_active_session_entry
+    active_entry = active_lookup(name, forge_root=forge_root)
     if active_entry is not None:
         if warn_active:
             _print_active_delete_warning(name, active_entry)
@@ -365,7 +380,8 @@ def _delete_single_session(
             )
             raise SystemExit(1)
 
-    if not manager.session_exists(name, forge_root=forge_root):
+    indexed_session_exists = manager.session_exists(name, forge_root=forge_root)
+    if not indexed_session_exists:
         from forge.session.store import SessionStore
 
         orphan_store = SessionStore(str(Path.cwd()), name)
@@ -397,22 +413,70 @@ def _delete_single_session(
         print_error(f"session '{name}' not found")
         raise SystemExit(1)
 
+    manifest: SessionState | None = None
+    manifest_entry: SessionIndexEntry | None = None
+    manifest_error: ForgeSessionError | None = None
+    row_only_residue = False
     try:
-        manifest = manager.get_session(name, forge_root=forge_root)
+        from forge.session.store import SessionStore
 
-        console.print(f"About to delete session [bold]{name}[/bold]")
+        if yes:
+            try:
+                manifest_entry = manager.index_store.get_session(name, forge_root=forge_root)
+                manifest = SessionStore(manifest_entry.root, name).read()
+            except SessionNotFoundError:
+                # A confirmed read may repair a row-only publication residue.
+                row_only_residue = True
+            except ForgeSessionError as e:
+                if not force:
+                    raise
+                manifest_error = e
+        else:
+            manifest_entry = manager.index_store.peek_session(name, forge_root=forge_root)
+            if manifest_entry is None:
+                row_only_residue = True
+            else:
+                try:
+                    manifest = SessionStore(manifest_entry.root, name).read()
+                except ForgeSessionError as e:
+                    if not force:
+                        raise
+                    manifest_error = e
 
-        if manifest.confirmed.claude_session_id:
+        if row_only_residue:
+            console.print(f"About to repair stale session record [bold]{name}[/bold]")
+            console.print("  [dim]The index row remains, but its session manifest is missing[/dim]")
+        else:
+            console.print(f"About to delete session [bold]{name}[/bold]")
+
+        if manifest_error is not None:
+            console.print(f"  [yellow]Manifest details unavailable: {escape(str(manifest_error))}[/yellow]")
+
+        if manifest is not None and manifest.confirmed.claude_session_id:
             console.print(f"  UUID: {manifest.confirmed.claude_session_id}")
 
-        if manifest.worktree and manifest.worktree.is_worktree:
+        artifact_snapshots_removed = False
+        if manifest is not None and manifest.worktree and manifest.worktree.is_worktree:
+            assert manifest_entry is not None
             cleanup_plan = manager.plan_worktree_cleanup(
                 name,
                 manifest,
                 delete_worktree=not keep_worktree,
+                forge_root=manifest_entry.root,
             )
+            if cleanup_plan.remove and not force and not yes:
+                from forge.session.worktree import is_worktree_dirty
+
+                worktree_path = Path(manifest.worktree.path)
+                if worktree_path.exists() and is_worktree_dirty(worktree_path):
+                    raise DirtyWorktreeError(str(worktree_path))
             if cleanup_plan.remove:
                 console.print(f"  Worktree will be removed: {display_path(manifest.worktree.path)}")
+                artifact_root = _resolve_session_artifact_root(manager=manager, state=manifest)
+                artifact_path = artifact_root / ".forge" / "artifacts" / name
+                artifact_snapshots_removed = artifact_path.resolve().is_relative_to(
+                    Path(manifest.worktree.path).resolve()
+                )
             else:
                 reason = ""
                 if cleanup_plan.reason == "shared":
@@ -426,21 +490,49 @@ def _delete_single_session(
             else:
                 console.print(f"  [dim]Branch will be kept: {manifest.worktree.branch}[/dim]")
 
-        if session_runtime(manifest) == "claude_code":
+        if manifest is not None and session_runtime(manifest) == "claude_code":
             if not keep_transcripts:
                 console.print("  [dim]Native Claude transcript files will be deleted[/dim]")
             else:
                 console.print("  [dim]Native Claude transcript files will be kept[/dim]")
-        console.print("  [dim]Forge artifact snapshots will be kept[/dim]")
+        if manifest is not None:
+            if artifact_snapshots_removed:
+                console.print("  Forge artifact snapshots will be removed with the worktree")
+            else:
+                console.print("  [dim]Forge artifact snapshots will be kept[/dim]")
 
         console.print()
     except ForgeSessionError:
-        pass
+        raise
 
     if not yes:
         if not click.confirm("Are you sure you want to delete this session?"):
             console.print("[dim]Cancelled[/dim]")
             raise SystemExit(0)
+
+    if row_only_residue:
+        if forge_root is None:
+            raise ForgeSessionError(
+                f"cannot safely repair stale session record '{name}' without its Forge root; "
+                "cd to the owning project and retry"
+            )
+        repaired = manager.repair_stale_session_record(name, forge_root=forge_root)
+        if not repaired:
+            raise ForgeSessionError(
+                f"session '{name}' changed while deletion was being prepared; "
+                f"a manifest-backed session now owns the name. Inspect it and retry 'forge session delete {name}'."
+            )
+        try:
+            from forge.session.active import ActiveSessionStore
+
+            ActiveSessionStore().clear_session(name, forge_root=forge_root)
+        except Exception:
+            logger.debug(
+                "Failed to clear active-session entry for repaired residue '%s'",
+                name,
+                exc_info=True,
+            )
+        return
 
     manager.delete_session(
         name,
@@ -646,7 +738,7 @@ def _print_session_list_tips(items: list) -> None:
     "--keep-transcripts",
     "-k",
     is_flag=True,
-    help="Keep Claude transcript files (~/.claude/projects/*.jsonl). Forge artifact snapshots (.forge/artifacts/) are always preserved",
+    help="Keep Claude transcript files (~/.claude/projects/*.jsonl); does not control Forge artifact snapshots",
 )
 @click.option(
     "--delete-worktree",
@@ -688,7 +780,11 @@ def clean(
         sys.exit(1)
 
     if not yes:
-        deletable = _clean_sessions_dry_run(older_than)
+        deletable = _clean_sessions_dry_run(
+            older_than,
+            delete_worktree=delete_worktree,
+            force=force,
+        )
         if deletable:
             print_tip("Use --yes to delete.", console=console)
         return
@@ -750,7 +846,12 @@ def clean(
         sys.exit(1)
 
 
-def _clean_sessions_dry_run(older_than_days: int) -> int:
+def _clean_sessions_dry_run(
+    older_than_days: int,
+    *,
+    delete_worktree: bool,
+    force: bool,
+) -> int:
     """Preview which sessions would be cleaned; return the deletable count.
 
     Iterates all sessions directly (same path as clean_old_sessions) so that
@@ -761,13 +862,14 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
     from forge.session.active import ActiveSessionStore
 
     manager = SessionManager()
-    all_sessions = manager.list_sessions(include_incognito=True)
+    all_sessions = manager.index_store.peek_sessions(include_incognito=True)
+    remaining_sessions = list(all_sessions)
 
     # One-pass active lookup -- fail-closed matches cleanup behavior
     active_store = ActiveSessionStore()
     registry_error = False
     try:
-        active_entries = active_store.list_sessions()
+        active_entries = active_store.peek_sessions()
         active_identities = {(name, ae.forge_root or ae.worktree_path) for name, ae in active_entries}
     except Exception:
         active_identities = set()
@@ -780,12 +882,13 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
 
     deletable = 0
     skipped = 0
+    would_fail = 0
     any_old = False
     compatibility_skips: list[ProjectCompatibilitySkip] = []
     for name, entry in all_sessions:
         try:
             dt = parse_iso(entry.last_accessed_at)
-            age_days = int((datetime.now(UTC) - dt).total_seconds() / 86400)
+            age_days = (datetime.now(UTC) - dt).total_seconds() / 86400
         except (ValueError, TypeError, AttributeError):
             table.add_row(name, "?", "[dim]unparseable timestamp (skip)[/dim]")
             skipped += 1
@@ -796,7 +899,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
             continue
 
         any_old = True
-        age_str = f"{age_days}d"
+        age_str = f"{int(age_days)}d"
         if (name, entry.forge_root or entry.worktree_path) in active_identities:
             table.add_row(name, age_str, "[yellow]active (skip)[/yellow]")
             skipped += 1
@@ -818,8 +921,51 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
                 )
                 skipped += 1
             else:
+                try:
+                    manifest: SessionState | None = None
+                    if not force:
+                        from forge.session.store import SessionStore
+
+                        # Apply always validates the manifest unless --force was
+                        # explicitly selected, even when the worktree is kept.
+                        manifest = SessionStore(forge_root, name).read()
+                    if delete_worktree and not force:
+                        from forge.session.worktree import is_worktree_dirty
+
+                        assert manifest is not None
+                        cleanup_plan = manager.plan_worktree_cleanup(
+                            name,
+                            manifest,
+                            delete_worktree=True,
+                            forge_root=forge_root,
+                            sessions=remaining_sessions,
+                        )
+                        worktree = manifest.worktree
+                        dirty_owned_worktree = (
+                            cleanup_plan.remove
+                            and worktree is not None
+                            and Path(worktree.path).exists()
+                            and is_worktree_dirty(Path(worktree.path))
+                        )
+                        if dirty_owned_worktree:
+                            table.add_row(
+                                name,
+                                age_str,
+                                "[red]dirty worktree (apply failure)[/red]",
+                            )
+                            would_fail += 1
+                            continue
+                except Exception as e:
+                    table.add_row(name, age_str, f"[red]apply failure: {escape(str(e))}[/red]")
+                    would_fail += 1
+                    continue
                 table.add_row(name, age_str, "[green]will delete[/green]")
                 deletable += 1
+                remaining_sessions = [
+                    (other_name, other_entry)
+                    for other_name, other_entry in remaining_sessions
+                    if not (other_name == name and (other_entry.forge_root or other_entry.worktree_path) == forge_root)
+                ]
 
     if not any_old:
         console.print(f"[dim]No sessions older than {older_than_days} days found.[/dim]")
@@ -843,6 +989,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
     console.print(
         f"\n[dim]Would delete {deletable} session{'s' if deletable != 1 else ''}"
         + (f", skip {skipped}" if skipped else "")
+        + (f", fail {would_fail}" if would_fail else "")
         + ".[/dim]"
     )
     return deletable
