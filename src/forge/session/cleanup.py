@@ -129,7 +129,8 @@ def clean_old_sessions(
     Args:
         older_than_days: Age threshold in days.
         delete_transcripts: Delete Claude transcript files (~/.claude/projects/*.jsonl).
-            Forge artifact snapshots (.forge/artifacts/) are never removed.
+            This flag does not control Forge artifact snapshots; snapshots remain
+            unless their containing worktree is removed.
         delete_worktree: Delete git worktree directories (default False for safety).
         delete_branch: Delete git branches (requires delete_worktree=True).
         force: Bypass dirty-worktree protection (only relevant when delete_worktree=True).

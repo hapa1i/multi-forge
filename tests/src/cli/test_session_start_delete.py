@@ -697,6 +697,83 @@ class TestSessionDelete:
         assert "Transcript files will also be deleted" not in result.output
         assert "Cancelled" in result.output
 
+    def test_delete_preview_reports_artifacts_removed_with_containing_worktree(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A nested Forge root cannot outlive removal of its containing worktree."""
+        worktree = temp_env / "owned-worktree"
+        forge_root = worktree / "nested-project"
+        forge_root.mkdir(parents=True)
+        state = create_session_state(
+            "nested-artifacts",
+            worktree_path=str(worktree),
+            worktree_branch="nested-artifacts-branch",
+        )
+        assert state.worktree is not None
+        state.forge_root = str(forge_root)
+        state.worktree.is_worktree = True
+        state.worktree.owns_worktree = True
+        publish_session(
+            IndexStore(),
+            state,
+            temp_env,
+            checkout_root=worktree,
+            forge_root=forge_root,
+        )
+        artifacts = forge_root / ".forge" / "artifacts" / "nested-artifacts"
+        artifacts.mkdir(parents=True)
+        (artifacts / "snapshot.jsonl").write_text("snapshot", encoding="utf-8")
+        monkeypatch.setattr("forge.session.worktree.is_worktree_dirty", lambda _path: False)
+        monkeypatch.chdir(forge_root)
+
+        result = runner.invoke(main, ["session", "delete", "nested-artifacts"], input="n\n")
+
+        assert result.exit_code == 0
+        assert "Worktree will be removed" in result.output
+        assert "Forge artifact snapshots will be removed with the worktree" in result.output
+        assert "Forge artifact snapshots will be kept" not in result.output
+        assert "Cancelled" in result.output
+
+    def test_delete_preview_keeps_artifacts_outside_removed_worktree(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        worktree = temp_env.parent / "artifact-preview-worktree"
+        worktree.mkdir()
+        state = create_session_state(
+            "external-artifacts",
+            worktree_path=str(worktree),
+            worktree_branch="external-artifacts-branch",
+        )
+        assert state.worktree is not None
+        state.forge_root = str(temp_env)
+        state.worktree.is_worktree = True
+        state.worktree.owns_worktree = True
+        publish_session(
+            IndexStore(),
+            state,
+            temp_env,
+            checkout_root=worktree,
+            forge_root=temp_env,
+        )
+        artifacts = temp_env / ".forge" / "artifacts" / "external-artifacts"
+        artifacts.mkdir(parents=True)
+        (artifacts / "snapshot.jsonl").write_text("snapshot", encoding="utf-8")
+        monkeypatch.setattr("forge.session.worktree.is_worktree_dirty", lambda _path: False)
+
+        result = runner.invoke(main, ["session", "delete", "external-artifacts"], input="n\n")
+
+        assert result.exit_code == 0
+        assert "Worktree will be removed" in result.output
+        assert "Forge artifact snapshots will be kept" in result.output
+        assert "removed with the worktree" not in result.output
+        assert "Cancelled" in result.output
+
     def test_delete_preview_keeps_a_guest_session_shared_worktree(
         self,
         runner: CliRunner,

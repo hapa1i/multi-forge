@@ -39,6 +39,7 @@ def resolve_session_repo_wide(
     cwd_forge_root: str | None,
     *,
     manager: SessionManager | None = None,
+    repair_stale: bool = True,
 ) -> ResolvedSession:
     """Resolve a named session with workspace-wide scope and current-project preference.
 
@@ -48,6 +49,9 @@ def resolve_session_repo_wide(
     2. Tier 2: Workspace-scoped scan (project_root_filter) for cross-worktree matches.
 
     Tiebreaker: if multiple matches in the same repo, prefer cwd_forge_root.
+
+    Set ``repair_stale=False`` for pre-confirmation planning. Both tiers then
+    omit rows without manifests without pruning them from the durable index.
 
     Raises:
         SessionNotFoundError: session not found anywhere in the repo.
@@ -59,7 +63,13 @@ def resolve_session_repo_wide(
     # Tier 1: same project (O(1) index lookup)
     if cwd_forge_root is not None:
         try:
-            entry = manager.get_session_entry(name, forge_root=cwd_forge_root)
+            if repair_stale:
+                entry = manager.get_session_entry(name, forge_root=cwd_forge_root)
+            else:
+                preview_entry = manager.index_store.peek_session(name, forge_root=cwd_forge_root)
+                if preview_entry is None:
+                    raise SessionNotFoundError(name)
+                entry = preview_entry
             store = SessionStore(entry.root, name)
             return ResolvedSession(
                 name=name,
@@ -79,7 +89,10 @@ def resolve_session_repo_wide(
     if project_root is None:
         raise SessionNotFoundError(name)
 
-    siblings = manager.list_sessions(project_root_filter=project_root)
+    if repair_stale:
+        siblings = manager.list_sessions(project_root_filter=project_root)
+    else:
+        siblings = manager.index_store.peek_sessions(project_root_filter=project_root)
     matches = [(n, e) for n, e in siblings if n == name]
 
     if not matches:

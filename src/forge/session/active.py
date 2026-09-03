@@ -299,6 +299,27 @@ class ActiveSessionStore:
             key=lambda item: item[0],
         )
 
+    def peek_sessions(self) -> list[tuple[str, ActiveSessionEntry]]:
+        """List live sessions without repairing or pruning the runtime registry."""
+        from forge.session.identity import session_name_from_key
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            try:
+                index = self._read_validated() if self.exists() else ActiveSessionIndex()
+            except (OSError, ValueError, DaciteError):
+                # Match list_sessions()' runtime-only discard policy without
+                # materializing that repair during a preview.
+                index = ActiveSessionIndex()
+
+        return sorted(
+            [
+                (session_name_from_key(key), entry)
+                for key, entry in index.sessions.items()
+                if self._entry_is_live(entry)
+            ],
+            key=lambda item: item[0],
+        )
+
     def is_session_active(self, session_name: str, forge_root: str | None = None) -> bool:
         """Return True when the session still appears to be live.
 

@@ -58,6 +58,10 @@ def is_worktree_dirty(worktree_path: Path) -> bool:
         text=True,
     )
 
+    if result.returncode != 0:
+        reason = result.stderr.strip() or "git returned no diagnostic"
+        raise GitWorktreeError("status", reason, result.returncode)
+
     return bool(result.stdout.strip())
 
 

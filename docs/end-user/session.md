@@ -267,7 +267,8 @@ forge session list --older-than 30            # List old sessions before cleanin
 ```
 
 Active sessions are always skipped. Worktrees and branches are preserved by default. Claude transcript files
-(`~/.claude/projects/*.jsonl`) are deleted; Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) are not.
+(`~/.claude/projects/*.jsonl`) are deleted. Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) remain when
+their containing Forge root remains; `--delete-worktree` also removes snapshots inside the worktree it removes.
 
 Compatibility is evaluated per Forge root. Preview output identifies sessions that apply would refuse. On `--yes`,
 manual cleanup skips incompatible roots, continues compatible roots, reports every skipped target, and exits 1 if any

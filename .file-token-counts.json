@@ -99,10 +99,10 @@
       "tokens": 21297
     },
     "docs/end-user/session.md": {
-      "sha256": "e3ab841f05aaada84534e3c67691a00b4cabe73070dcc2ef9fc060d37d38f6f6",
+      "sha256": "77777b5f4e59f3e708a7e37a5b4bcd770ced26f033342cbfe23465d672c58b40",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24389
+      "tokens": 24426
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "f51d8eda562947797dda7e4b8f28ba88ed984722eabd4ba35669bd298b8a0e91",

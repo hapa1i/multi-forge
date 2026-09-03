@@ -63,6 +63,15 @@ def get_index_path() -> Path:
     return get_forge_home() / INDEX_DIR / INDEX_FILENAME
 
 
+def _session_recency_sort_key(item: tuple[str, SessionIndexEntry]) -> tuple[int, float, str]:
+    """Sort valid timestamps by recency and malformed values last by name."""
+    name, entry = item
+    try:
+        return (0, -iso_to_timestamp(entry.last_accessed_at), name)
+    except (ValueError, TypeError, AttributeError):
+        return (1, 0.0, name)
+
+
 class IndexStore:
     """Manage the global session index at ~/.forge/sessions/index.json.
 
@@ -235,7 +244,7 @@ class IndexStore:
             sessions = [(n, e) for n, e in sessions if e.forge_root == forge_root_filter]
 
         # Sort by last_accessed_at DESC, then name ASC for determinism
-        sessions.sort(key=lambda x: (-iso_to_timestamp(x[1].last_accessed_at), x[0]))
+        sessions.sort(key=_session_recency_sort_key)
         return sessions
 
     def peek_sessions(
@@ -263,7 +272,7 @@ class IndexStore:
             sessions = [(name, entry) for name, entry in sessions if entry.project_root == project_root_filter]
         if forge_root_filter is not None:
             sessions = [(name, entry) for name, entry in sessions if entry.forge_root == forge_root_filter]
-        sessions.sort(key=lambda item: (-iso_to_timestamp(item[1].last_accessed_at), item[0]))
+        sessions.sort(key=_session_recency_sort_key)
         return sessions
 
     def run_session_entries_txn(
