@@ -45,6 +45,6 @@ def test_distribution_metadata_enforces_security_floors() -> None:
     assert not requirements["starlette"].specifier.contains("1.4.1")
     litellm = requirements["litellm"]
     assert litellm.extras == set()
-    _assert_minimum(litellm, "1.88.0")
-    assert litellm.specifier.contains("1.95.0")
-    assert not litellm.specifier.contains("1.95.1")
+    _assert_minimum(litellm, "1.98.0")
+    assert litellm.specifier.contains("1.99.0")
+    assert not litellm.specifier.contains("1.99.1")

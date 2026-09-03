@@ -29,10 +29,12 @@ from forge.session.models import LaneRecord, SupervisorConfig
 _log = logging.getLogger(__name__)
 
 DEFAULT_PLAN_CHECK_PROVIDER: ProviderType = "openrouter"
+# 3.8 is live and ZDR-capable on OpenRouter; LiteLLM 1.99's bundled catalog has
+# no 3.8 pricing/capability entry, so those defaults remain on the verified 3.7 route.
 DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER: dict[ProviderType, str] = {
-    "openrouter": "google/gemini-3.7-flash",
-    "litellm_local": "gemini/gemini-3.6-flash",
-    "litellm_remote": "gemini/gemini-3.6-flash",
+    "openrouter": "google/gemini-3.8-flash",
+    "litellm_local": "gemini/gemini-3.7-flash",
+    "litellm_remote": "vertex_ai/gemini-3.7-flash",
 }
 DEFAULT_PLAN_CHECK_MODEL = DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER[DEFAULT_PLAN_CHECK_PROVIDER]
 DEFAULT_PLAN_CHECK_BUDGET_TOKENS = 32_000

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import subprocess
 import tempfile
 import threading
@@ -63,22 +62,6 @@ class FakeAnthropicUpstream:
     base_url: str
     requests: list[dict[str, Any]]
     response_body: bytes
-
-
-def _check_port(port: int) -> bool:
-    """Check if port is currently in use.
-
-    Args:
-        port: Port number to check.
-
-    Returns:
-        True if port is accepting connections.
-    """
-    try:
-        with socket.create_connection(("localhost", port), timeout=1):
-            return True
-    except OSError:
-        return False
 
 
 def _start_proxy_subprocess(
@@ -178,6 +161,7 @@ def _start_registered_proxy(
     tmp_path_factory,
     required_env_var: str,
     unreachable_fail_reason: str,
+    upstream_base_url: str | None = None,
 ) -> Generator[RegisteredProxyServer, None, None]:
     if not os.environ.get(required_env_var):
         pytest.fail(f"{required_env_var} not set (required for {template} proxy tests)")
@@ -189,10 +173,13 @@ def _start_registered_proxy(
         template=template,
         port=port,
         forge_home=module_forge_home,
+        upstream_base_url=upstream_base_url,
     )
 
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)
+    if upstream_base_url is not None:
+        env["LITELLM_LOCAL_BASE_URL"] = upstream_base_url
 
     cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
     proc = _start_proxy_subprocess(
@@ -284,55 +271,6 @@ def _preflight_proxy(
 
 
 @pytest.fixture(scope="module")
-def local_litellm() -> Generator[str, None, None]:
-    """Start local LiteLLM if GEMINI_API_KEY set, otherwise check if running.
-
-    Uses port 4001 for test isolation (dev uses port 4000).
-
-    This fixture handles three scenarios:
-    1. LiteLLM already running on port 4001 → use it
-    2. GEMINI_API_KEY set → start LiteLLM using our script
-    3. Neither → FAIL tests (dependencies must be available)
-
-    Yields:
-        Base URL for local LiteLLM server.
-    """
-    # Test port (4001) isolates from dev instance (4000)
-    test_port = 4001
-    base_url = f"http://localhost:{test_port}"
-
-    has_key = bool(os.environ.get("GEMINI_API_KEY"))
-    already_running = _check_port(test_port)
-
-    if already_running:
-        yield base_url
-        return
-
-    if not has_key:
-        pytest.fail(f"GEMINI_API_KEY not set and local LiteLLM not running on port {test_port}")
-
-    subprocess.run(["uv", "run", "forge", "model", "backend", "create", "litellm"], check=False)
-
-    result = subprocess.run(
-        ["uv", "run", "forge", "model", "backend", "start", "litellm", "--port", str(test_port)],
-        check=False,
-    )
-
-    if result.returncode != 0:
-        pytest.fail(f"Failed to start local LiteLLM on port {test_port}")
-
-    if not wait_for_port(test_port, timeout=30):
-        pytest.fail(f"Local LiteLLM failed to start on port {test_port}")
-
-    yield base_url
-
-    subprocess.run(
-        ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
-        check=False,
-    )
-
-
-@pytest.fixture(scope="module")
 def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
     """Start an isolated local LiteLLM from the current bundled config."""
     if not os.environ.get("OPENAI_API_KEY"):
@@ -391,11 +329,11 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
 def local_litellm_gemini(tmp_path_factory) -> Generator[str, None, None]:
     """Start an isolated local LiteLLM from the current bundled config (Gemini routes).
 
-    Unlike ``local_litellm``, this never reuses a running instance or a stale
-    materialized config: the bundled backends/litellm.yaml is freshly
-    materialized into a private FORGE_HOME. Private (not module_forge_home)
-    because ``forge model backend create`` rejects an existing config and
-    ``local_litellm_openai`` materializes its own copy in the shared home.
+    This never reuses a running instance or a stale materialized config: the
+    bundled backends/litellm.yaml is freshly materialized into a private
+    FORGE_HOME. Private (not module_forge_home) because ``forge model backend
+    create`` rejects an existing config and ``local_litellm_openai``
+    materializes its own copy in the shared home.
     """
     if not os.environ.get("GEMINI_API_KEY"):
         pytest.fail("GEMINI_API_KEY not set (required for local Gemini LiteLLM tests)")
@@ -576,14 +514,14 @@ def module_forge_home() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope="module")
-def proxy_server(local_litellm: str, module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+def proxy_server(local_litellm_gemini: str, module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
     """Start proxy server for testing.
 
     Runs the proxy subprocess from an isolated temp directory so repo-local
     artifacts (.env, .claude/) do not affect the test.
 
     Args:
-        local_litellm: Dependency ensuring LiteLLM is running.
+        local_litellm_gemini: Isolated LiteLLM upstream URL.
         module_forge_home: Shared forge home directory.
 
     Yields:
@@ -595,7 +533,7 @@ def proxy_server(local_litellm: str, module_forge_home: Path, tmp_path_factory) 
 
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)  # Session config location
-    env["LITELLM_LOCAL_BASE_URL"] = local_litellm  # Override .env dev URL with test URL
+    env["LITELLM_LOCAL_BASE_URL"] = local_litellm_gemini
 
     proc = _start_proxy_subprocess(
         template="litellm-gemini-test",
@@ -607,7 +545,7 @@ def proxy_server(local_litellm: str, module_forge_home: Path, tmp_path_factory) 
 
     proxy_base_url = f"http://localhost:{port}"
 
-    # Local LiteLLM is already gated by local_litellm fixture.
+    # Local LiteLLM is already gated by the isolated fixture.
     _preflight_proxy(
         proxy_base_url=proxy_base_url,
         request_model="claude-3-5-haiku-20241022",
@@ -1037,7 +975,7 @@ def registered_proxy_server_openrouter(
 
 @pytest.fixture(scope="module")
 def registered_proxy_server_local_gemini(
-    local_litellm: str,  # noqa: ARG001 — ensures LiteLLM is running on test port
+    local_litellm_gemini: str,
     module_forge_home: Path,
     tmp_path_factory,
 ) -> Generator[RegisteredProxyServer, None, None]:
@@ -1048,4 +986,5 @@ def registered_proxy_server_local_gemini(
         tmp_path_factory=tmp_path_factory,
         required_env_var="GEMINI_API_KEY",
         unreachable_fail_reason="Local LiteLLM (Gemini) unreachable",
+        upstream_base_url=local_litellm_gemini,
     )

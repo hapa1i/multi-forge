@@ -178,16 +178,16 @@ class TestCurrentDefaultsWithOpenRouter:
         with httpx.Client() as client:
             health = client.get(f"{proxy_server_openrouter_gemini_flash}/").json()
         assert health["runtime"]["tier_mappings"] == {
-            "haiku": "google/gemini-3.7-flash",
-            "sonnet": "google/gemini-3.7-flash",
-            "opus": "google/gemini-3.7-flash",
+            "haiku": "google/gemini-3.8-flash",
+            "sonnet": "google/gemini-3.8-flash",
+            "opus": "google/gemini-3.8-flash",
         }
 
         _assert_tier_completion(
             proxy_server_openrouter_gemini_flash,
             "claude-3-5-haiku-20241022",
             "haiku",
-            "google/gemini-3.7-flash",
+            "google/gemini-3.8-flash",
         )
 
 

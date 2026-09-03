@@ -316,6 +316,9 @@ binding stays on the default `claude_code` runtime, so that particular pin chang
 memory writer and shadow curation accept `--runtime codex` as a real `codex exec` dispatch lane; team supervisor has no
 Codex lane and remains billing-only.
 
+The team event tagger also fails open if its model cannot be reached. That failure emits a diagnostic naming the model
+and is not cached, so the next eligible team event retries instead of silently inheriting a routine verdict.
+
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 
 Every supervisor check replays the planning session's full context — expensive when most checks come back "aligned". The
@@ -330,7 +333,7 @@ forge policy supervisor cascade off       # disable (supervisor checks every act
 
 # Optional: pick the tier-1 route
 forge policy supervisor cascade on --checker-provider litellm-local
-forge policy supervisor cascade on --checker-model google/gemini-3.7-flash
+forge policy supervisor cascade on --checker-model google/gemini-3.8-flash
 
 # Advanced: tune the persisted checker prompt budget
 forge session set policy.supervisor.checker_budget_tokens 64000
@@ -341,12 +344,14 @@ How it behaves:
 - The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
   needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search
   `forge policy supervisor reload` uses) and fails with instructions when none exists.
-- The default checker route is OpenRouter `google/gemini-3.7-flash` with an approximate 32K-token total budget for the
-  tier-1 checker prompt. Forge always requires ZDR for this direct OpenRouter call; proxy-level non-ZDR opt-outs do not
-  apply. Use `--checker-provider litellm-local` to use the local LiteLLM default (`gemini/gemini-3.6-flash`) when
-  OpenRouter is unavailable. Local LiteLLM backend configs are one-time copies: backends generated before that model was
-  added need their materialized `litellm` config updated or deleted/recreated, then restarted — restart alone re-reads
-  the old copy. Until then, use `--checker-model gemini/gemini-3.5-flash` (present in older generated configs).
+- The default checker model is Gemini 3.8 Flash (`google/gemini-3.8-flash`) through OpenRouter and Gemini 3.7 Flash
+  through local LiteLLM (`gemini/gemini-3.7-flash`) or remote LiteLLM (`vertex_ai/gemini-3.7-flash`), with an
+  approximate 32K-token total budget for the tier-1 checker prompt. The split is deliberate: LiteLLM 1.99's bundled
+  model catalog has no 3.8 pricing/capability entry. Forge always requires ZDR for the direct OpenRouter call;
+  proxy-level non-ZDR opt-outs do not apply. Local LiteLLM backend configs are one-time copies: backends generated
+  before the 3.7 route was added need their materialized `litellm` config updated or deleted/recreated, then restarted —
+  restart alone re-reads the old copy. Until then, use `--checker-model gemini/gemini-3.6-flash` for the immediately
+  preceding generated config, or `--checker-model gemini/gemini-3.5-flash` for older generated configs.
 - `checker_budget_tokens` is intentionally a session config setting rather than a `forge policy supervisor cascade`
   flag; use `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
 - Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include

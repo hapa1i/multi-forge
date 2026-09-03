@@ -143,37 +143,38 @@ if ! docker build \
     exit 1
 fi
 
-# Ensure local LiteLLM is running (prerequisite for some integration tests)
-# Uses port 4001 to avoid conflicts with local development LiteLLM (port 4000)
-ensure_local_litellm() {
-    local TEST_PORT=4001
-
-    if lsof -i :${TEST_PORT} -t &>/dev/null; then
-        info "Local LiteLLM already running on port ${TEST_PORT}"
-        return 0
+# A few real-LiteLLM and Docker tests use the host's fixed test endpoint. Own
+# that process and its materialized config for this run; never borrow a process
+# or backend config from the developer's normal FORGE_HOME.
+INTEGRATION_LITELLM_HOME=""
+cleanup_local_litellm() {
+    if [[ -z "$INTEGRATION_LITELLM_HOME" ]]; then
+        return
     fi
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend stop litellm-4001 >/dev/null 2>&1 || true
+    rm -rf "$INTEGRATION_LITELLM_HOME"
+}
+trap cleanup_local_litellm EXIT
 
+start_local_litellm() {
     if [[ -z "${GEMINI_API_KEY:-}" ]]; then
         warn "GEMINI_API_KEY not set - local LiteLLM tests will fail"
-        warn "Add to .env or ~/.forge/.env"
-        return 0  # Don't block tests - let them fail with clear error
+        warn "Add it to .env or ~/.forge/credentials.yaml"
+        return
+    fi
+    if lsof -i :4001 -t &>/dev/null; then
+        error "Port 4001 is already in use; integration tests will not reuse an unowned LiteLLM process"
+        exit 1
     fi
 
-    if ! uv run forge model backend create litellm 2>/dev/null; then
-        # Config already exists or creation failed - either way, try to start
-        :
-    fi
-
-    info "Starting local LiteLLM on port ${TEST_PORT} (test instance)..."
-    if ! uv run forge model backend start litellm --port ${TEST_PORT}; then
-        warn "Failed to start local LiteLLM - tests requiring it will fail"
-        return 0  # Don't block tests
-    fi
-
-    info "Local LiteLLM started successfully on port ${TEST_PORT}"
+    INTEGRATION_LITELLM_HOME="$(mktemp -d "${TMPDIR:-/tmp}/forge-integration-litellm.XXXXXX")"
+    info "Materializing an isolated local LiteLLM config"
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend create litellm
+    info "Starting isolated local LiteLLM on port 4001"
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend start litellm --port 4001
 }
 
-ensure_local_litellm
+start_local_litellm
 
 # Pass through all command-line arguments to pytest
 info "Running integration tests (pytest will spawn Docker containers)..."
@@ -206,4 +207,4 @@ else
     fi
 fi
 
-exec uv run pytest "${PYTEST_ARGS[@]}"
+uv run pytest "${PYTEST_ARGS[@]}"

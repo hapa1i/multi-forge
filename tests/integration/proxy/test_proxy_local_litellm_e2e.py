@@ -62,25 +62,22 @@ class TestProxyWithLocalLiteLLM:
                 assert len(events) > 0
 
 
-class TestGemini36FlashLiteLLMGate:
-    """Version gate: the locked LiteLLM must serve gemini/gemini-3.6-flash.
+class TestGemini37FlashLiteLLMGate:
+    """The locked LiteLLM must serve Gemini 3.7 with thinking and cost data.
 
-    The model (released 2026-07-21) is newer than every stable LiteLLM release
-    (latest: v1.93.0, 2026-07-19); packaged cost-map pricing landed in litellm
-    commit 59ebe043 and first ships in the v1.94 line. Production therefore
-    relies on LiteLLM's default remote cost-map refresh for this model's
-    pricing. This gate proves that production posture end to end on the locked
-    version: routing, thinking accounting, usage, and the cost header — cost
-    absence is a hard failure. The deterministic packaged-map expectation per
-    installed version is pinned in tests/src/proxy/test_litellm_gemini36_support.py.
+    Packaged cost-map support starts in LiteLLM 1.98. This live gate proves the
+    full Google AI Studio path on the locked version: routing, thinking usage,
+    and the gateway cost header. Cost absence is a hard failure. The offline
+    packaged-map expectation is pinned in
+    tests/src/proxy/test_litellm_gemini_flash_support.py.
     """
 
-    def test_gemini_36_flash_completion_thinking_and_cost(self, local_litellm_gemini: str) -> None:
+    def test_gemini_37_flash_completion_thinking_and_cost(self, local_litellm_gemini: str) -> None:
         with httpx.Client(timeout=120) as client:
             resp = client.post(
                 f"{local_litellm_gemini}/chat/completions",
                 json={
-                    "model": "gemini/gemini-3.6-flash",
+                    "model": "gemini/gemini-3.7-flash",
                     "max_tokens": 512,
                     "reasoning_effort": "low",
                     "messages": [{"role": "user", "content": "What is 17*23? Reply with just the number."}],
@@ -100,12 +97,8 @@ class TestGemini36FlashLiteLLMGate:
         cost = resp.headers.get("x-litellm-response-cost")
         assert cost is not None and float(cost) > 0, f"cost header missing/zero: {cost!r}"
 
-    # A cache probe (repeated ~2.8k-token identical prefix, 4 probes over 30s)
-    # was run against this seam on litellm 1.88.0 (2026-07-26): cached_tokens
-    # stayed 0, so the catalog records prompt_caching supports:false for
-    # gemini-3.6-flash (same posture as 3.5-flash). Re-probe before flipping
-    # that field; an always-on absence assert would flake the moment caching
-    # accounting starts working.
+    # Cache accounting for Gemini 3.7 remains conservatively disabled in the
+    # catalog until this exact local LiteLLM path is probed repeatedly.
 
 
 class TestOpenAIProxyWithLocalLiteLLM:

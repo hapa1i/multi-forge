@@ -163,6 +163,60 @@ class TestSessionModelRoutePlanning:
         assert prior.proxy is existing
         assert prior.selected_model == "anthropic/claude-fable-5"
 
+    @pytest.mark.parametrize(
+        "model_id",
+        [
+            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-3.8-flash",
+        ],
+    )
+    def test_automatic_openrouter_route_serves_current_and_earlier_flash_models(
+        self,
+        model_id: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from forge.core.auth import template_secrets
+
+        monkeypatch.setattr(template_secrets, "resolve_env_or_credential", lambda _name: "configured")
+
+        plan = plan_session_model_route(model_id)
+
+        assert plan.kind == "proxy"
+        assert plan.source_id == "openrouter"
+        assert plan.proxy is not None
+        assert plan.proxy.template == "openrouter-gemini-flash"
+        assert plan.selected_tier == "sonnet"
+        assert plan.selected_model == f"google/{model_id}"
+
+    @pytest.mark.parametrize(
+        "model_id",
+        ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash"],
+    )
+    def test_automatic_remote_litellm_fallback_serves_supported_flash_models(
+        self,
+        model_id: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from forge.core.auth import template_secrets
+
+        monkeypatch.setattr(
+            template_secrets,
+            "resolve_env_or_credential",
+            lambda name: None if name == "OPENROUTER_API_KEY" else "configured",
+        )
+
+        plan = plan_session_model_route(model_id)
+
+        assert plan.kind == "proxy"
+        assert plan.source_id == "litellm-remote"
+        assert plan.proxy is not None
+        assert plan.proxy.template == "litellm-gemini"
+        assert plan.selected_tier == "sonnet"
+        assert plan.selected_model == f"vertex_ai/{model_id}"
+
     def test_bare_stored_route_never_falls_back_when_incompatible(self) -> None:
         existing = _proxy_snapshot(
             template="openrouter-gemini",

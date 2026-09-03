@@ -42,7 +42,7 @@ dependencies = [
     # Proxy dependencies (previously optional, now core). Forge owns the
     # default-Uvicorn LiteLLM startup set because the upstream `proxy` extra
     # caps cryptography below Forge's patched floor. This set is start/health
-    # validated through LiteLLM 1.95.0; run scripts/test-wheel-runtime.sh before
+    # validated through LiteLLM 1.99.0; run scripts/test-wheel-runtime.sh before
     # raising the ceiling. Alternate servers, databases, and cloud integrations
     # remain outside Forge's runtime path.
     "aiohttp>=3.14.3,<4",
@@ -53,8 +53,8 @@ dependencies = [
     "cryptography>=50.0.0",
     # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
     "expression>=5.6.0,<6",
-    # LiteLLM's proxy imports an internal FastAPI helper absent from newer
-    # releases; keep the lock-proven FastAPI/Starlette pair together.
+    # Keep the lock-proven FastAPI/Starlette pair while their newer route-tree
+    # behavior is verified separately from this LiteLLM/model-support update.
     "fastapi>=0.136.3,<0.137",
     "fastapi-sso>=0.19.0,<1",
     "orjson>=3.11.6,<4",
@@ -68,10 +68,10 @@ dependencies = [
     "uvloop>=0.21.0,<1; sys_platform != 'win32'",
     "watchfiles>=0.20",
     "websockets>=15.0.1,<16",
-    # Floor = the gate-proven version for gemini-3.6-flash (see
+    # Floor = the first packaged-cost-map version for gemini-3.7-flash (see
     # tests/integration/proxy/test_proxy_local_litellm_e2e.py); packaged
-    # cost-map pricing for that model first ships in the v1.94 line.
-    "litellm>=1.88.0,<=1.95.0",
+    # cost-map pricing for that model first ships in the v1.98 line.
+    "litellm>=1.98.0,<=1.99.0",
 ]
 
 [project.scripts]
@@ -129,6 +129,11 @@ markers = [
 [tool.pytest-asyncio]
 asyncio_mode = "auto"
 
+[tool.ruff.lint]
+# Ruff 0.16 expanded its implicit defaults. Keep the repository's established
+# lint contract explicit so upgrading the executable does not change policy.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.mypy]
 # Same-named standalone scripts in separate skill directories collide in mypy's
 # module map during broad scans. The walkthrough copy is checked directly, while
@@ -170,8 +175,10 @@ dev = [
     "httpx2>=2.3.0",
 ]
 provider-check = [
-    "anthropic>=0.100.0",
-    "google-genai>=2.5.0",
+    # scripts/count-tokens.py imports provider-specific count_tokens surfaces;
+    # keep lock refreshes inside the API families verified by that script.
+    "anthropic>=0.100.0,<2",
+    "google-genai>=2.5.0,<3",
     "openai>=2.0.0",
     "tiktoken>=0.12.0",
 ]

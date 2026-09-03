@@ -138,9 +138,9 @@ class TestLoadConfig:
         assert config.proxy.active_template == "litellm-gemini-flash-local"
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_port == 8088
-        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3-flash-preview"
-        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3-flash-preview"
-        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3-flash-preview"
+        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.7-flash"
 
     def test_template_loading_openai_local(self):
         """OpenAI local template loads with correct tier models."""
@@ -240,7 +240,7 @@ class TestLoadConfig:
 
         assert config.proxy.get_model_for_tier("opus") == "gemini/gemini-3.1-pro-preview"
         assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-3.1-pro-preview"
-        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3-flash-preview"
+        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3.7-flash"
 
     def test_template_loading_openrouter_anthropic(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter anthropic template loads with correct provider and tiers."""
@@ -269,18 +269,27 @@ class TestLoadConfig:
             },
         }
 
-    def test_openrouter_gemini_templates_use_37_flash(self):
+    def test_openrouter_gemini_templates_use_38_flash(self):
         from forge.config.schema import TierModels
 
         family = load_config(template="openrouter-gemini")
         flash = load_config(template="openrouter-gemini-flash")
 
-        assert family.proxy.openrouter.tiers.haiku == "google/gemini-3.7-flash"
+        assert family.proxy.openrouter.tiers.haiku == "google/gemini-3.8-flash"
         assert flash.proxy.openrouter.tiers == TierModels(
-            haiku="google/gemini-3.7-flash",
-            sonnet="google/gemini-3.7-flash",
-            opus="google/gemini-3.7-flash",
+            haiku="google/gemini-3.8-flash",
+            sonnet="google/gemini-3.8-flash",
+            opus="google/gemini-3.8-flash",
         )
+        legacy_flash_models = {
+            "gemini-2.5-flash": "google/gemini-2.5-flash",
+            "gemini-3.5-flash": "google/gemini-3.5-flash",
+            "gemini-3.6-flash": "google/gemini-3.6-flash",
+            "gemini-3.7-flash": "google/gemini-3.7-flash",
+        }
+        assert flash.proxy.openrouter.model_alternatives == {
+            tier: legacy_flash_models for tier in ("haiku", "sonnet", "opus")
+        }
 
     def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter templates intentionally allow the catalog endpoint override."""
@@ -299,6 +308,7 @@ class TestLoadConfig:
 
         assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.env.example.com"
+        assert config.proxy.litellm.tiers.haiku == "vertex_ai/gemini-3.7-flash"
 
     def test_remote_litellm_source_endpoint_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch):
         """Connection-value endpoints can come from the credential file when env is absent."""

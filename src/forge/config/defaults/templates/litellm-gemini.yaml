@@ -1,7 +1,9 @@
 # Template: litellm-gemini
 # Gemini models via remote/shared LiteLLM
 #
-# Default template for Gemini access through a shared LiteLLM gateway.
+# Default template for Gemini access through a shared LiteLLM gateway. Flash
+# remains on 3.7 because LiteLLM 1.99's bundled model catalog has no
+# gemini-3.8-flash pricing/capability entry.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 
 proxy:
@@ -12,9 +14,25 @@ proxy:
 
   litellm:
     tiers:
-      haiku: vertex_ai/gemini-3.6-flash
+      haiku: vertex_ai/gemini-3.7-flash
       sonnet: vertex_ai/gemini-3.1-pro-preview
       opus: vertex_ai/gemini-3.1-pro-preview
+    model_alternatives:
+      haiku:
+        gemini-2.5-flash: vertex_ai/gemini-2.5-flash
+        gemini-3.5-flash: vertex_ai/gemini-3.5-flash
+        gemini-3.6-flash: vertex_ai/gemini-3.6-flash
+        gemini-3.7-flash: vertex_ai/gemini-3.7-flash
+      sonnet:
+        gemini-2.5-flash: vertex_ai/gemini-2.5-flash
+        gemini-3.5-flash: vertex_ai/gemini-3.5-flash
+        gemini-3.6-flash: vertex_ai/gemini-3.6-flash
+        gemini-3.7-flash: vertex_ai/gemini-3.7-flash
+      opus:
+        gemini-2.5-flash: vertex_ai/gemini-2.5-flash
+        gemini-3.5-flash: vertex_ai/gemini-3.5-flash
+        gemini-3.6-flash: vertex_ai/gemini-3.6-flash
+        gemini-3.7-flash: vertex_ai/gemini-3.7-flash
     tier_overrides:
       sonnet:
         reasoning_effort: medium

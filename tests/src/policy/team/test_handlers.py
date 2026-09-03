@@ -13,6 +13,7 @@ from forge.core.state import now_iso
 from forge.core.usage.ledger import read_usage_events
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.policy.team.handlers import (
+    _TAGGER_FAILED,
     _classify_event,
     _is_fresh,
     _run_supervisor,
@@ -150,13 +151,13 @@ class TestClassifyEvent:
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
-    def test_llm_error_returns_routine(self, mock_adapter_cls, mock_get_client):
+    def test_llm_error_returns_failure_status(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
         mock_adapter.complete.side_effect = RuntimeError("LLM down")
         mock_adapter_cls.return_value = mock_adapter
 
         result = _classify_event("test-model", "{teammate_name}", "alice", "team-a")
-        assert result == "routine"
+        assert result is _TAGGER_FAILED
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -198,14 +199,14 @@ class TestClassifyEvent:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_exception_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
-        """A team-tagger LLM exception emits an error event and still returns routine."""
+        """A team-tagger LLM exception emits an error event and a distinct failure status."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
         mock_adapter = MagicMock()
         mock_adapter.complete.side_effect = RuntimeError("LLM down")
         mock_adapter_cls.return_value = mock_adapter
 
-        assert _classify_event("gemini/gemini-2.0-flash", "{teammate_name}", "alice", "team-a") == "routine"
+        assert _classify_event("gemini/gemini-2.0-flash", "{teammate_name}", "alice", "team-a") is _TAGGER_FAILED
 
         events = read_usage_events()
         assert len(events) == 1
@@ -585,6 +586,17 @@ class TestHandleTeammateIdle:
         exit_code, _ = handle_teammate_idle(_idle_event(), _config(), cache)
         assert exit_code == 0
 
+    @patch("forge.policy.team.handlers._classify_event", return_value=_TAGGER_FAILED)
+    def test_tagger_failure_allows_with_uncached_diagnostic(self, _mock_classify):
+        cache: dict = {}
+
+        exit_code, feedback = handle_teammate_idle(_idle_event(), _config(tagger_model="missing-model"), cache)
+
+        assert exit_code == 0
+        assert "missing-model" in feedback
+        assert "fails open" in feedback
+        assert cache == {}
+
     @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Fix the tests"))
     @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_needs_review_escalates(self, _mock_classify, _mock_supervisor):
@@ -635,6 +647,17 @@ class TestHandleTaskCompleted:
         cache: dict = {}
         exit_code, _ = handle_task_completed(_task_event(), _config(), cache)
         assert exit_code == 0
+
+    @patch("forge.policy.team.handlers._classify_event", return_value=_TAGGER_FAILED)
+    def test_tagger_failure_allows_with_uncached_diagnostic(self, _mock_classify):
+        cache: dict = {}
+
+        exit_code, feedback = handle_task_completed(_task_event(), _config(tagger_model="missing-model"), cache)
+
+        assert exit_code == 0
+        assert "missing-model" in feedback
+        assert "fails open" in feedback
+        assert cache == {}
 
     @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Needs rework"))
     @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")

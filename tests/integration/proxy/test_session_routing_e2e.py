@@ -90,8 +90,8 @@ class TestSessionConfigRouting:
             # X-Resolved-Tier header confirms haiku was used (not opus from session)
             assert resp.headers.get("X-Resolved-Tier") == "haiku"
             # X-Resolved-Model confirms haiku's backend model was used
-            # (litellm-gemini-test family: haiku → gemini/gemini-3-flash-preview)
-            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-3-flash-preview"
+            # (litellm-gemini-test family: haiku -> gemini/gemini-3.7-flash)
+            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-3.7-flash"
 
     def test_count_tokens_accepts_default_tier_request(self, proxy_server: str, temp_session: dict[str, Any]) -> None:
         """Token counting should resolve ambiguous requests through proxy.default_tier."""

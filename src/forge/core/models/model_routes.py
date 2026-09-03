@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 import yaml
 
+from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
 from forge.core.models.catalog import (
     ModelCatalogError,
     load_model_catalog,
@@ -196,6 +197,19 @@ def validate_model_route_catalog_integrations(
                 raise ModelRouteCatalogError(
                     f"models.{model_id}.routes[{index}].template {candidate.template!r} does not belong to "
                     f"source {candidate.source_id!r}"
+                )
+            provider = getattr(source, "provider", None)
+            if not isinstance(provider, str) or not provider:
+                raise ModelRouteCatalogError(
+                    f"model-source metadata for {candidate.source_id!r} must expose a non-empty provider"
+                )
+            if provider in {"litellm_local", "litellm_remote"} and not candidate.model_ref.startswith(
+                LITELLM_PROVIDER_PREFIXES
+            ):
+                prefixes = ", ".join(LITELLM_PROVIDER_PREFIXES)
+                raise ModelRouteCatalogError(
+                    f"models.{model_id}.routes[{index}].model_ref {candidate.model_ref!r} cannot be routed by "
+                    f"LiteLLM source {candidate.source_id!r}; expected one of these prefixes: {prefixes}"
                 )
 
 

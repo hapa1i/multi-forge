@@ -265,7 +265,7 @@ def test_policy_supervisor_input_failure_is_stderr_only(command: list[str]) -> N
     assert result.exit_code == 1
     assert result.stdout == ""
     assert "prefixed model id" in result.stderr
-    assert "Example: google/gemini-3.7-flash" in result.stderr
+    assert "Example: google/gemini-3.8-flash" in result.stderr
 
 
 @pytest.mark.parametrize(

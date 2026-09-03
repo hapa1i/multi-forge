@@ -6,6 +6,8 @@
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 # For tests: Use litellm-gemini-test template (port 4001)
+# Flash remains on 3.7 because LiteLLM 1.99's bundled model catalog has no
+# gemini-3.8-flash pricing/capability entry.
 
 proxy:
   family: gemini
@@ -15,7 +17,7 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3-flash-preview
+      haiku: gemini/gemini-3.7-flash
       sonnet: gemini/gemini-3.1-pro-preview
       opus: gemini/gemini-3.1-pro-preview
     # Per-tier overrides to differentiate sonnet/opus (both use same model)
