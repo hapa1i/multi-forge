@@ -21,7 +21,9 @@ reconciliation. Each member remains a distinct contiguous commit series.
 
 ## Shared Contract
 
-- Treat the audited finding list as closed scope; do not add opportunistic refactors.
+- Treat the audited finding list as the fixed delivery scope. A release-safety defect found while reviewing a touched
+  path may join only when it maps to an existing member card and gains a focused regression; do not add opportunistic
+  refactors.
 - Add a focused regression for every corrected mechanism.
 - Require complete verified-prefix evidence for walkthrough `--from` resume.
 - Build and test one final wheel from the integrated head.
