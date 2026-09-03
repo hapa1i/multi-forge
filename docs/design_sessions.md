@@ -401,7 +401,9 @@ then catalog order without side effects. The first candidate whose prerequisites
 compatibility, startup, identity, and health failures from that winner never fall through. After Claude proxy-pin
 validation, the launch environment applies the neutral route's selected tier as `ANTHROPIC_MODEL`. The selected context
 window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written atomically.
-Bare resume reuses that route or fails.
+Bare resume and an inherited-route fork reuse that route or fail. Their refusal output preserves the intended lifecycle
+action when it offers an explicit replacement route; fork recovery pins the resolved child and all explicit fork
+options.
 
 A non-Claude selection may start a paid proxy. `--no-launch` persists it without a route event or child;
 `--subprocess-proxy` is incompatible. Codex, adoption, `default_direct_model`, sidecar/host-proxy modes, and bare

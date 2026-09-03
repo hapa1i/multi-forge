@@ -14,6 +14,7 @@ from forge.core.ops import policy as policy_ops
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.policy.diff import DiffParseError
 from forge.policy.diff import sort_tests_first as _sort_tests_first
 from forge.policy.diff import split_diff_per_file as _split_diff_per_file
 from forge.session import set_override
@@ -1245,7 +1246,19 @@ def _handle_policy_check(argv: list[str]) -> None:
         )
         return
 
-    file_diffs = _split_diff_per_file(diff_output)
+    try:
+        file_diffs = _split_diff_per_file(diff_output)
+    except DiffParseError as e:
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "passed": False,
+                    "reason": f"Error: {e}",
+                }
+            )
+        )
+        return
     if not file_diffs:
         click.echo(
             json.dumps(

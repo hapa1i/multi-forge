@@ -582,13 +582,20 @@ def _resolve_project_root(
     return project_root.resolve()
 
 
-def _print_plan(plan: InstallPlan, dry_run: bool = False, *, output: Console | None = None) -> None:
+def _print_plan(
+    plan: InstallPlan,
+    dry_run: bool = False,
+    *,
+    output: Console | None = None,
+    project_root: Path | None = None,
+) -> None:
     """Print installation plan using Rich.
 
     Args:
         plan: The plan to display.
         dry_run: If True, prefix output with "(dry-run)".
         output: Console that owns the complete plan; defaults to the module result console.
+        project_root: Exact project targeted by a local-scope plan.
     """
     if output is None:
         output = console
@@ -720,10 +727,13 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False, *, output: Console | N
             for package in plan.skill_packages
         )
         if has_local_codex_scope_conflict:
+            disable_command = "forge extension disable --scope local --runtime codex"
+            if project_root is not None:
+                disable_command = f"cd {shlex.quote(str(project_root))} && {disable_command}"
             print_tip(
-                "Codex skill packages do not support local scope. Remove legacy local Codex ownership with "
-                "'forge extension disable --scope local --runtime codex' before syncing; install Codex packages "
-                "separately with 'forge extension enable --scope user --runtime codex'.",
+                "Codex skill packages do not support local scope. Remove legacy local Codex ownership before "
+                "syncing, then install Codex packages separately at user scope.",
+                commands=[disable_command, "forge extension enable --scope user --runtime codex"],
                 console=output,
             )
         elif has_policy_conflicts and has_forceable_conflicts:
@@ -738,7 +748,10 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False, *, output: Console | N
                 console=output,
             )
         else:
-            print_tip("Use --force to override, or resolve conflicts manually.", console=output)
+            print_tip(
+                "Use --force to override, or resolve conflicts manually.",
+                console=output,
+            )
 
 
 def _uninstall_all_installations(
@@ -848,7 +861,10 @@ def _uninstall_all_installations(
             if operation_plan is not None and operation_plan.disposition == "no-op":
                 console.print(f"\n[bold]Skipping {scope}[/bold]", end="")
             elif runtime_ids is not None:
-                console.print(f"\n[bold]Removing selected runtime surfaces from {scope}[/bold]", end="")
+                console.print(
+                    f"\n[bold]Removing selected runtime surfaces from {scope}[/bold]",
+                    end="",
+                )
             else:
                 console.print(f"\n[bold]Disabling {scope}[/bold]", end="")
             if project_path:
@@ -1112,7 +1128,7 @@ def enable_cmd(
                 console.print(f"[dim]Would create {display_path(project_root / '.forge')}[/dim]")
             if needs_create and project_root is not None and plan.requires_claude_version:
                 console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
-            _print_plan(plan, dry_run=True, output=console)
+            _print_plan(plan, dry_run=True, output=console, project_root=project_root)
             if plan.has_conflicts:
                 err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
@@ -1121,7 +1137,7 @@ def enable_cmd(
         else:
             if plan.has_conflicts:
                 _flush_notices(pending_notices, output=err_console)
-                _print_plan(plan, output=err_console)
+                _print_plan(plan, output=err_console, project_root=project_root)
                 err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
             _enforce_claude_version_if_required(
@@ -1141,7 +1157,7 @@ def enable_cmd(
             )
             plan_console = err_console if plan.has_conflicts else console
             _flush_notices(pending_notices, output=plan_console)
-            _print_plan(plan, output=plan_console)
+            _print_plan(plan, output=plan_console, project_root=project_root)
             if plan.has_conflicts:
                 err_console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
@@ -1235,7 +1251,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             if auto_scope_notice:
                 err_console.print(auto_scope_notice)
                 auto_scope_notice = None
-            _print_plan(preview, output=err_console)
+            _print_plan(preview, output=err_console, project_root=project_root)
             err_console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
         _enforce_claude_version_if_required(
@@ -1249,7 +1265,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         if auto_scope_notice:
             plan_console.print(auto_scope_notice)
             auto_scope_notice = None
-        _print_plan(plan, output=plan_console)
+        _print_plan(plan, output=plan_console, project_root=project_root)
         if plan.has_conflicts:
             err_console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
@@ -1756,7 +1772,10 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     try:
         current_skill_names = discover_skill_source_names(get_extensions_root() / InstallModule.SKILLS.value)
     except (OSError, ValueError) as exc:
-        _log.warning("extension status: current skill names unavailable; using historical names only: %s", exc)
+        _log.warning(
+            "extension status: current skill names unavailable; using historical names only: %s",
+            exc,
+        )
         current_skill_names = ()
     scan_roots = runtime_skill_scan_roots(
         scanner_scope_roots,
@@ -1977,7 +1996,11 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
 
     if scope is None and not show_all and anchor is None:
         local_installed = any(
-            (selected_scope.value, str(project_root) if project_root is not None else None) in installations_by_target
+            (
+                selected_scope.value,
+                str(project_root) if project_root is not None else None,
+            )
+            in installations_by_target
             for selected_scope, project_root in scope_contexts
         )
         if not local_installed:

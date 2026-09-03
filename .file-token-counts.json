@@ -75,10 +75,10 @@
       "tokens": 23413
     },
     "docs/design_sessions.md": {
-      "sha256": "21340d31d00a65270dc15b57d5256b1b4f34d50f80376cc916b9d1b9307406f0",
+      "sha256": "c85b75f502e2c3c8d1b0bd1ac507d9bf034d7b7c4e84af430076d4e312c9b4a7",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 25420
+      "tokens": 25483
     },
     "docs/design_telemetry.md": {
       "sha256": "dd7a14243fc7cea2b6122dacd34b237126234ccf79ea137f1ca8d433923051c7",
@@ -99,10 +99,10 @@
       "tokens": 21297
     },
     "docs/end-user/session.md": {
-      "sha256": "97501137aca47eb3c25e88561aa0b0f6c724339f9c4a6d4e28f5ed7b3163ed8d",
+      "sha256": "e3ab841f05aaada84534e3c67691a00b4cabe73070dcc2ef9fc060d37d38f6f6",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24200
+      "tokens": 24389
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "f51d8eda562947797dda7e4b8f28ba88ed984722eabd4ba35669bd298b8a0e91",

@@ -34,6 +34,12 @@ from forge.session.context_limit import _get_context_limit_for_proxy
 console = Console()
 
 
+class ProxyNotRunningError(ValueError):
+    """Raised when the selected local proxy is not accepting connections."""
+
+    restartable = True
+
+
 def _healthcheck_proxy(
     *,
     base_url: str,
@@ -47,7 +53,7 @@ def _healthcheck_proxy(
     try:
         response = httpx.get(url, timeout=2.0)
     except httpx.ConnectError:
-        raise ValueError(f"proxy is not running (connection refused at {url})")
+        raise ProxyNotRunningError(f"proxy is not running (connection refused at {url})")
     except httpx.RequestError as e:
         raise ValueError(f"proxy healthcheck failed at {url}: {e}")
 

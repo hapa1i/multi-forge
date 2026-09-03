@@ -66,6 +66,15 @@ def test_print_tip_commands_block_rendered_indented() -> None:
     assert "  forge model backend start litellm --port 4000" in out
 
 
+def test_print_tip_commands_render_rich_markup_characters_literally() -> None:
+    c, buf = _console()
+    command = "cd '/tmp/[bold]target' && forge extension disable --scope local"
+
+    print_tip("Run:", commands=[command], console=c)
+
+    assert f"  {command}" in buf.getvalue()
+
+
 def test_print_tip_no_args_is_noop() -> None:
     c, buf = _console()
     print_tip(console=c)

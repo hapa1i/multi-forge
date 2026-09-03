@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,10 +10,16 @@ import pytest
 from click.testing import CliRunner
 
 import forge.cli.session as session_cli
+from forge.cli.claude import ProxyNotRunningError
 from forge.cli.main import main
+from forge.core.ops.session_fork_preflight import ForkPreflightRequest
+from forge.core.ops.session_model_routing import (
+    SessionModelRouteHealthError,
+    SessionModelRoutingError,
+)
 from forge.runtime_config import RuntimeConfig
 from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
-from forge.session.models import ModelRouteIntent
+from forge.session.models import AuthorityIntent, ModelRouteIntent, StartedWithProxy
 from tests.src.cli.session_command_support import mocked_model_route_proxy
 
 
@@ -84,7 +91,10 @@ def test_model_route_rejects_configured_sidecar_before_realization(
 ) -> None:
     name = f"{leaf}-configured-sidecar"
     with (
-        patch("forge.runtime_config.get_runtime_config", return_value=RuntimeConfig(proxy_mode="sidecar")),
+        patch(
+            "forge.runtime_config.get_runtime_config",
+            return_value=RuntimeConfig(proxy_mode="sidecar"),
+        ),
         patch("forge.cli.session_lifecycle._plan_interactive_session_model_route") as plan_route,
         patch("forge.proxy.proxy_orchestrator.ensure_proxy") as ensure_proxy,
     ):
@@ -136,12 +146,25 @@ def test_persisted_model_route_rejects_configured_sidecar_before_mutation(
 ) -> None:
     parent_name = f"configured-sidecar-{leaf}"
     with (
-        patch("forge.runtime_config.get_runtime_config", return_value=RuntimeConfig(proxy_mode="sidecar")),
-        patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()),
+        patch(
+            "forge.runtime_config.get_runtime_config",
+            return_value=RuntimeConfig(proxy_mode="sidecar"),
+        ),
+        patch(
+            "forge.cli.session_lifecycle._resolve_routing_from_cli",
+            return_value=_anthropic_routing(),
+        ),
     ):
         created = runner.invoke(
             main,
-            ["session", "start", parent_name, "--proxy", "test-or-proxy", "--no-launch"],
+            [
+                "session",
+                "start",
+                parent_name,
+                "--proxy",
+                "test-or-proxy",
+                "--no-launch",
+            ],
         )
     assert created.exit_code == 0, created.output
 
@@ -182,6 +205,697 @@ def test_persisted_model_route_rejects_configured_sidecar_before_mutation(
     assert store.manifest_path.read_bytes() == before
     if leaf == "fork":
         assert not SessionStore(str(temp_env), child_name).exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "tiers", "expected_reroute"),
+    [
+        pytest.param(
+            "durable-ambiguous-gpt-route",
+            {
+                "sonnet": "openai/gpt-5.6-sol",
+                "opus": "openai/gpt-5.6-sol",
+            },
+            "forge session resume durable-ambiguous-gpt-route --model gpt-5.6-sol "
+            "--model-tier opus --proxy openrouter-openai",
+            id="selected-tier-disambiguates-multiple-serving-tiers",
+        ),
+        pytest.param(
+            "durable-unique-gpt-route",
+            {"sonnet": "openai/gpt-5.6-sol"},
+            "forge session resume durable-unique-gpt-route --model gpt-5.6-sol --proxy openrouter-openai",
+            id="unique-serving-tier-omits-model-tier",
+        ),
+    ],
+)
+def test_persisted_model_route_health_failure_renders_restart_and_exact_reroute(
+    runner: CliRunner,
+    temp_env: Path,
+    name: str,
+    tiers: dict[str, str],
+    expected_reroute: str,
+) -> None:
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="opus",
+        tiers=tiers,
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "openrouter-openai",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+        before = store.manifest_path.read_bytes()
+
+        with (
+            patch(
+                "forge.cli.claude._healthcheck_proxy",
+                side_effect=ProxyNotRunningError("proxy is not running (connection refused at http://localhost:8096/)"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+            patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "Persisted proxy route" in result.stderr
+    assert "connection refused" in result.stderr
+    assert "forge proxy start openrouter-openai-1" in result.stderr
+    assert expected_reroute in result.stderr
+    assert "Forge did not launch Claude or replace the recorded proxy route" in result.stderr
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_persisted_model_route_identity_mismatch_does_not_offer_restart(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "foreign-proxy-at-recorded-endpoint"
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "openrouter-openai",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+        before = store.manifest_path.read_bytes()
+
+        with (
+            patch(
+                "forge.cli.claude._healthcheck_proxy",
+                side_effect=ValueError(
+                    "proxy healthcheck failed: template mismatch "
+                    "(expected 'openrouter-openai', got 'foreign-template')"
+                ),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+            patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "template mismatch" in result.stderr
+    assert "forge proxy start" not in result.stderr
+    assert f"forge session resume {name} --model gpt-5.6-sol --proxy openrouter-openai" in result.stderr
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_persisted_model_route_planning_failure_uses_recovery_without_mutation_or_launch(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "durable-route-planning-failure"
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="opus",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ) as ensure_proxy:
+        created = runner.invoke(main, ["session", "start", name, "--model", "gpt-5.6-sol", "--no-launch"])
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+        before = store.manifest_path.read_bytes()
+        ensure_proxy.reset_mock()
+
+        with (
+            patch(
+                "forge.cli.session_lifecycle._plan_interactive_session_model_route",
+                side_effect=SessionModelRoutingError("stored proxy source is no longer available"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+            patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "Persisted proxy route" in result.stderr
+    assert "stored proxy source is no longer available" in result.stderr
+    assert f"forge session resume {name} --model gpt-5.6-sol --proxy openrouter-openai" in result.stderr
+    assert "Forge did not launch Claude or replace the recorded proxy route" in result.stderr
+    ensure_proxy.assert_not_called()
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_replayed_route_planning_failure_uses_intent_instead_of_stale_confirmation(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "divergent-route-recovery"
+    with mocked_model_route_proxy(
+        template="intent-template",
+        proxy_id="intent-proxy",
+        base_url="http://localhost:8097",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "intent-template",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+
+        def record_stale_confirmation(state) -> None:
+            state.confirmed.started_with_proxy = StartedWithProxy(
+                base_url="http://localhost:8199",
+                proxy_id="confirmed-old-proxy",
+                template="confirmed-old-template",
+            )
+
+        store.update(timeout_s=5.0, mutate=record_stale_confirmation)
+        before = store.manifest_path.read_bytes()
+
+        with (
+            patch(
+                "forge.cli.session_lifecycle._plan_interactive_session_model_route",
+                side_effect=SessionModelRoutingError("stored intent cannot be replayed"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert f"forge session resume {name} --model gpt-5.6-sol --proxy intent-template" in result.stderr
+    assert "confirmed-old-proxy" not in result.stderr
+    assert "confirmed-old-template" not in result.stderr
+    assert store.manifest_path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("preflight_request", "expected_options"),
+    [
+        pytest.param(
+            ForkPreflightRequest(
+                parent_name="parent plan",
+                fork_name="child plan",
+                cwd=Path("/tmp/project"),
+                forge_root="/tmp/project",
+                create_worktree=True,
+                branch="feature/route fix",
+                no_launch=True,
+                extensions=False,
+                strategy="rewind",
+                strategy_explicit=True,
+                drop_last=2,
+                drop_last_explicit=True,
+                resume_mode="native-relocate",
+                force=True,
+                memory_flag="off",
+            ),
+            [
+                "forge",
+                "session",
+                "fork",
+                "parent plan",
+                "--name",
+                "child plan",
+                "--worktree",
+                "--branch",
+                "feature/route fix",
+                "--no-launch",
+                "--no-extensions",
+                "--strategy",
+                "rewind",
+                "--drop-last",
+                "2",
+                "--resume-mode",
+                "native-relocate",
+                "--force",
+                "--memory",
+                "off",
+            ],
+            id="worktree-rewind",
+        ),
+        pytest.param(
+            ForkPreflightRequest(
+                parent_name="planner",
+                fork_name="executor",
+                cwd=Path("/tmp/project"),
+                forge_root="/tmp/project",
+                into_path="/tmp/existing worktree",
+                strategy="full",
+                strategy_explicit=True,
+                inline_plan=True,
+                inline_plan_explicit=True,
+                supervise_target=True,
+                supervisor_proxy="supervisor route",
+                cascade_flag=True,
+                checker_model="openai/gpt-5.6-sol",
+                checker_provider="openrouter",
+                checker_effort="high",
+                supervisor_effort="max",
+                supervisor_runtime="claude_code",
+                authority=AuthorityIntent(role="advisory", tier="named_tools"),
+                authority_explicit=True,
+            ),
+            [
+                "forge",
+                "session",
+                "fork",
+                "planner",
+                "--name",
+                "executor",
+                "--strategy",
+                "full",
+                "--inline-plan",
+                "--into",
+                "/tmp/existing worktree",
+                "--supervise",
+                "--supervisor-proxy",
+                "supervisor route",
+                "--cascade",
+                "--checker-model",
+                "openai/gpt-5.6-sol",
+                "--checker-provider",
+                "openrouter",
+                "--checker-effort",
+                "high",
+                "--supervisor-effort",
+                "max",
+                "--supervisor-runtime",
+                "claude_code",
+                "--authority",
+                "advisory",
+                "--authority-tier",
+                "named_tools",
+            ],
+            id="into-supervised-transfer",
+        ),
+    ],
+)
+def test_fork_route_recovery_action_preserves_the_explicit_fork(
+    preflight_request: ForkPreflightRequest,
+    expected_options: list[str],
+) -> None:
+    from forge.cli.session_fork import _fork_model_route_recovery_action
+
+    action = _fork_model_route_recovery_action(
+        preflight_request,
+        fork_name=preflight_request.fork_name or "generated-child",
+    )
+    command = action.with_proxy_route(
+        model="gpt-5.6-sol",
+        model_tier="sonnet",
+        proxy="replacement proxy",
+    )
+
+    assert shlex.split(command) == [
+        *expected_options,
+        "--model",
+        "gpt-5.6-sol",
+        "--model-tier",
+        "sonnet",
+        "--proxy",
+        "replacement proxy",
+    ]
+
+
+def test_fork_route_recovery_action_pins_an_automatically_generated_child_name() -> None:
+    from forge.cli.session_fork import _fork_model_route_recovery_action
+
+    request = ForkPreflightRequest(
+        parent_name="planner",
+        cwd=Path("/tmp/project"),
+        forge_root="/tmp/project",
+    )
+
+    action = _fork_model_route_recovery_action(request, fork_name="generated-child")
+
+    assert action.argv == (
+        "forge",
+        "session",
+        "fork",
+        "planner",
+        "--name",
+        "generated-child",
+    )
+
+
+def test_fork_persisted_route_planning_failure_preserves_fork_in_replacement_tip(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    parent = "fork-route-planning-parent"
+    child = "fork-route-planning-child"
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ) as ensure_proxy:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                parent,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "openrouter-openai",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), parent)
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda state: setattr(state.confirmed, "claude_session_id", "parent-uuid"),
+        )
+        before = store.manifest_path.read_bytes()
+        ensure_proxy.reset_mock()
+
+        with (
+            patch(
+                "forge.cli.session_fork._plan_interactive_session_model_route",
+                side_effect=SessionModelRoutingError("stored route cannot be planned"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=False),
+            patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "fork", parent, "--name", child, "--no-launch"],
+            )
+
+    assert result.exit_code == 1, result.output
+    assert "stored route cannot be planned" in result.stderr
+    normalized_stderr = " ".join(result.stderr.split())
+    assert (
+        f"forge session fork {parent} --name {child} --no-launch "
+        "--model gpt-5.6-sol --proxy '<proxy_id-or-template>'" in normalized_stderr
+    )
+    ensure_proxy.assert_not_called()
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+    assert not SessionStore(str(temp_env), child).exists()
+
+
+def test_fork_persisted_route_realization_failure_renders_restart_and_exact_fork_recovery(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    parent = "fork-route-realization-parent"
+    child = "fork-route-realization-child"
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ) as ensure_proxy:
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                parent,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "openrouter-openai",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), parent)
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda state: setattr(state.confirmed, "claude_session_id", "parent-uuid"),
+        )
+        before = store.manifest_path.read_bytes()
+        ensure_proxy.reset_mock()
+
+        with (
+            patch(
+                "forge.cli.session_fork._realize_interactive_session_model_route",
+                side_effect=SessionModelRouteHealthError("stored proxy is stopped", restartable=True),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+            patch("forge.core.ops.claude_session.invoke_claude") as invoke_claude,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "fork", parent, "--name", child, "--no-launch"],
+            )
+
+    assert result.exit_code == 1, result.output
+    assert "stored proxy is stopped" in result.stderr
+    assert "forge proxy start openrouter-openai-1" in result.stderr
+    assert (
+        f"forge session fork {parent} --name {child} --no-launch "
+        "--model gpt-5.6-sol --proxy openrouter-openai" in result.stderr
+    )
+    ensure_proxy.assert_not_called()
+    invoke_claude.assert_not_called()
+    assert store.manifest_path.read_bytes() == before
+    assert not SessionStore(str(temp_env), child).exists()
+
+
+def test_invalid_replayed_route_request_does_not_offer_restart_as_sufficient_recovery(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "invalid-replayed-route"
+    with mocked_model_route_proxy(
+        template="intent-template",
+        proxy_id="intent-proxy",
+        base_url="http://localhost:8097",
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "claude-opus-4-6[1m]",
+                "--proxy",
+                "intent-template",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+
+        def corrupt_projection(state) -> None:
+            assert state.intent.launch is not None
+            state.intent.launch.direct_model = "claude-sonnet-4-6[1m]"
+            state.confirmed.started_with_proxy = StartedWithProxy(
+                base_url="http://localhost:8097",
+                proxy_id="intent-proxy",
+                template="intent-template",
+            )
+
+        store.update(timeout_s=5.0, mutate=corrupt_projection)
+        before = store.manifest_path.read_bytes()
+
+        with patch("forge.config.loader.template_exists", return_value=True):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "stored direct model projection" in result.stderr
+    assert "forge proxy start" not in result.stderr
+    assert "Repair the recorded model-route request and proxy identity" in result.stderr
+    assert "--model <catalog-id> --proxy <proxy_id-or-template>" in result.stderr
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_realization_failure_with_only_restart_also_explains_route_replacement(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "drifted-route-recovery"
+    with mocked_model_route_proxy(
+        template="intent-template",
+        proxy_id="intent-proxy",
+        base_url="http://localhost:8097",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "gpt-5.6-sol",
+                "--proxy",
+                "intent-template",
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+        before = store.manifest_path.read_bytes()
+
+        with (
+            patch(
+                "forge.cli.session_lifecycle._realize_interactive_session_model_route",
+                side_effect=SessionModelRoutingError("proxy configuration changed before realization"),
+            ),
+            patch(
+                "forge.core.ops.session_model_routing.inspect_proxy_reference",
+                side_effect=SessionModelRoutingError("template no longer serves the stored model"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "forge proxy start intent-proxy" not in result.stderr
+    assert f"forge session resume {name} --model" not in result.stderr
+    assert "Repair the recorded model-route request and proxy identity" in result.stderr
+    assert "--model gpt-5.6-sol --proxy <proxy_id-or-template>" in result.stderr
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_persisted_model_route_recovery_preserves_1m_execution_projection(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "durable-one-m-route"
+    template = "openrouter-anthropic"
+    with mocked_model_route_proxy(
+        template=template,
+        proxy_id="openrouter-anthropic-1",
+        base_url="http://localhost:8095",
+        default_tier="opus",
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "claude-opus-4-6[1m]",
+                "--proxy",
+                template,
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        store = SessionStore(str(temp_env), name)
+        state = store.read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.model_route is not None
+        assert state.intent.launch.model_route.requested_model == "claude-opus-4-6"
+        assert state.intent.launch.direct_model == "claude-opus-4-6[1m]"
+
+        with (
+            patch(
+                "forge.cli.claude._healthcheck_proxy",
+                side_effect=ValueError("proxy is not running"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert (
+        "forge session resume durable-one-m-route --model 'claude-opus-4-6[1m]' "
+        "--proxy openrouter-anthropic" in result.stderr
+    )
+    assert "--model claude-opus-4-6 --proxy" not in result.stderr
+
+
+def test_persisted_model_route_without_applicable_commands_has_literal_1m_fallback(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    name = "durable-route-no-command"
+    template = "openrouter-anthropic"
+    with mocked_model_route_proxy(
+        template=template,
+        proxy_id="openrouter-anthropic-1",
+        base_url="http://localhost:8095",
+        default_tier="opus",
+        alternatives={},
+    ):
+        created = runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                name,
+                "--model",
+                "claude-opus-4-6[1m]",
+                "--proxy",
+                template,
+                "--no-launch",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+
+        with (
+            patch(
+                "forge.cli.claude._healthcheck_proxy",
+                side_effect=ValueError("proxy is not running"),
+            ),
+            patch(
+                "forge.config.loader.load_proxy_instance_config",
+                side_effect=FileNotFoundError,
+            ),
+            patch("forge.config.loader.template_exists", return_value=False),
+        ):
+            result = runner.invoke(main, ["session", "resume", name])
+
+    assert result.exit_code == 1, result.output
+    assert "Repair the recorded model-route request and proxy identity" in result.stderr
+    assert "--model 'claude-opus-4-6[1m]' --proxy <proxy_id-or-template>" in result.stderr
+    assert "retry with --proxy" not in result.stderr
 
 
 def test_default_direct_model_rejects_non_claude_before_proxy_or_child(

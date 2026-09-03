@@ -672,7 +672,7 @@ def check(
         raise click.UsageError("Options --file and --diff cannot be used together.")
 
     from forge.policy.action_identity import compute_action_fingerprint
-    from forge.policy.diff import sort_tests_first, split_diff_per_file
+    from forge.policy.diff import DiffParseError, sort_tests_first, split_diff_per_file
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, FailMode, extract_added_lines
 
@@ -692,7 +692,11 @@ def check(
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
-        file_diffs = sort_tests_first(split_diff_per_file(raw_input))
+        try:
+            file_diffs = sort_tests_first(split_diff_per_file(raw_input))
+        except DiffParseError as e:
+            print_error(str(e), console=err_console)
+            sys.exit(2)
         if raw_input.strip() and not file_diffs:
             print_error("Diff input could not be parsed into files", console=err_console)
             sys.exit(2)
