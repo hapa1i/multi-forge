@@ -934,7 +934,44 @@ async def test_passthrough_override_rejects_manual_thinking_for_adaptive_fable(m
     response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_fable"), "req_fable")
 
     assert response.status_code == 400
-    assert b"requires adaptive thinking" in bytes(response.body)
+    assert b"Invalid reasoning override" in bytes(response.body)
+    assert b"requires adaptive thinking" not in bytes(response.body)
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_does_not_expose_exception_details(monkeypatch, proxy_runtime_ready, caplog):
+    """Internal validation details stay in logs and never cross the HTTP boundary."""
+    from forge.proxy import intercept
+
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="opus", intercept_mode="override")
+    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort="max")}
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    internal_detail = "sensitive-internal-validation-detail"
+
+    def _raise_override_error(*args, **kwargs):
+        raise intercept.ReasoningOverrideError(internal_detail)
+
+    monkeypatch.setattr(intercept, "apply_override", _raise_override_error)
+    raw_body = {
+        "model": "claude-fable-5-1",
+        "max_tokens": 64_000,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_private"), "req_private")
+    payload = json.loads(bytes(response.body))
+
+    assert response.status_code == 400
+    assert payload["error"]["message"] == (
+        "Invalid reasoning override; use a supported output_config.effort and remove "
+        "manual thinking.type/budget_tokens for adaptive models [req_private]"
+    )
+    assert internal_detail not in bytes(response.body).decode()
+    assert internal_detail in caplog.text
 
 
 @pytest.mark.asyncio

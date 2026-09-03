@@ -23,8 +23,8 @@ Await review and merge; keep this card in `doing/` until the change ships.
 - [x] Cover catalog identity, family-default aliases, capabilities, direct pins, route integration, templates, ZDR, and
   review-worker resolution.
 - [x] Update end-user model-selection, proxy, workflow/skills, README, and packaged QA guidance where behavior changed.
-- [x] Confirm normative design and implementation-note ledgers need no update: ownership and routing semantics did not
-  change, while the version-specific migration constraints belong in the end-user model-selection guide.
+- [x] Update the normative session and proxy-runtime contracts plus end-user routing/intercept guidance for the changed
+  route-boundary and native-effort behavior.
 
 ## Acceptance tests
 
@@ -47,8 +47,8 @@ Await review and merge; keep this card in `doing/` until the change ships.
 
 ## Verification evidence
 
-- Review-focused model/config/proxy/routing suite: 432 passed; the final direct-model and catalog rerun passed 140
-  tests.
+- Review-focused model/config/proxy/routing suite: 432 passed; the final direct-model/catalog rerun passed 140 tests,
+  and the security-boundary proxy rerun passed 68 tests.
 - Targeted Docker integration passed the offline OpenRouter health check, local LiteLLM health check, and both direct
   model launch cases.
 - Full unit suite: 10,149 passed and 117 deselected.
@@ -59,6 +59,8 @@ Await review and merge; keep this card in `doing/` until the change ships.
   catalog, route catalog, and OpenRouter template and resolved `fable` to `claude-fable-5-1`.
 - The generated LiteLLM backend config exposes every model referenced by `litellm-anthropic-local`; no claim is based on
   the pinned runtime's stale bundled Fable metadata.
+- CodeQL's exception-exposure warning is covered by a regression test: detailed validation text remains in server logs
+  and the HTTP response contains only stable guidance plus the Forge request ID.
 - Pull request: [#250](https://github.com/hapa1i/multi-forge/pull/250).
 
 ## Closeout

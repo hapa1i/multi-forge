@@ -829,9 +829,13 @@ Two settings, kept separate:
   metadata), or `override` (inspect plus apply prompt augment/guards and a reasoning-effort floor). `override` requires
   `wire_shape: anthropic_passthrough`.
 
-If an override reasoning floor enables or raises `thinking`, Forge removes `temperature`, `top_p`, and `top_k` from that
-request because Anthropic rejects them together. The audit mutation records only which keys were removed, not their
-values. Requests whose thinking budget already satisfies the floor are not changed.
+For catalogued Claude models with native effort support, an override reasoning floor sets `output_config.effort` without
+lowering a stronger client value. Adaptive-only models reject manual `thinking.type=enabled` or `thinking.budget_tokens`
+with HTTP 400; older models retain the legacy budget mapping when the requested floor can be represented safely. If the
+floor changes either control surface, Forge removes `temperature`, `top_p`, and `top_k` because Anthropic rejects those
+combinations. A no-op floor leaves them unchanged. The client receives a stable, actionable error with the Forge request
+ID; detailed validation text remains in server logs. Audit mutation records include only the changed effort/budget
+values and removed key names, never sampling values.
 
 Anthropic passthrough also preserves safe upstream response metadata. Retry guidance and Anthropic rate-limit headers
 reach the client on both successful and failed requests, including responses to streaming requests. Forge removes

@@ -25,6 +25,11 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
+_REASONING_OVERRIDE_PUBLIC_MESSAGE = (
+    "Invalid reasoning override; use a supported output_config.effort and remove "
+    "manual thinking.type/budget_tokens for adaptive models"
+)
+
 
 async def _apply_passthrough_override(
     raw_body: dict[str, Any],
@@ -56,11 +61,15 @@ async def _apply_passthrough_override(
             reasoning_floor_effort=reasoning_floor,
         )
     except intercept.ReasoningOverrideError as exc:
+        logger.warning("[%s] invalid passthrough reasoning override: %s", request_id, exc)
         return JSONResponse(
             status_code=400,
             content={
                 "type": "error",
-                "error": {"type": "invalid_request_error", "message": f"{exc} [{request_id}]"},
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": f"{_REASONING_OVERRIDE_PUBLIC_MESSAGE} [{request_id}]",
+                },
             },
             headers={"X-Request-ID": request_id},
         )

@@ -326,14 +326,18 @@ only** — the system prompt and generation parameters, **never** historical mes
   byte-identical; markerless appends and flags cache invalidation);
 - `system_prompt_guards` (`warn`/`block`/`strip`; all `block` checks run first, so a strip can't half-mutate a blocked
   request — a block returns HTTP 403 `intercept_guard_blocked`);
-- reasoning-effort pin — **reuses** `tier_overrides.<tier>.reasoning_effort` as a floor (not a new key), in Anthropic
-  `thinking.budget_tokens` units. If the pin changes `thinking`, Forge removes `temperature`, `top_p`, and `top_k` from
-  that request because Anthropic rejects the combination; a no-op pin leaves those fields unchanged.
+- reasoning-effort pin — **reuses** `tier_overrides.<tier>.reasoning_effort` as a floor (not a new key). Catalogued
+  Claude models with native effort use `output_config.effort`; adaptive-only models reject manual
+  `thinking.type=enabled` or `thinking.budget_tokens` with HTTP 400. Older models retain the legacy
+  `thinking.budget_tokens` mapping when the floor can be represented safely. If a pin changes either control surface,
+  Forge removes `temperature`, `top_p`, and `top_k` because Anthropic rejects those combinations; a no-op pin leaves
+  them unchanged. The public 400 response is stable and carries the Forge request ID, while detailed validation text
+  remains server-local.
 
 **Mutation-safety invariant (normative):** override fingerprints the `messages` list (SHA256) before and after apply and
 raises (`RuntimeError`, fail-closed, no forward) if it changed. Override never writes `messages[0..n-1]`, so signed
-reasoning in historical turns is untouched. Mutation records carry hashes/lengths/budgets and removed sampling key names
-only, never sampling values.
+reasoning in historical turns is untouched. Mutation records carry hashes/lengths, effort or budget before/after values,
+and removed sampling key names only, never sampling values.
 
 **Route-bound caveat.** Intercept is a property of the resolved proxy/route, not the session. A direct-mode session has
 no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough").
