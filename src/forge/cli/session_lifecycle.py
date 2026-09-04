@@ -121,6 +121,7 @@ from forge.cli.session_resume_modes import (  # noqa: E402
     _resume_fresh_rewind,
 )
 from forge.cli.session_route_recovery import (  # noqa: E402
+    SessionRouteRecoveryAction,
     _render_persisted_proxy_refusal,
     _render_replayed_model_route_refusal,
 )
@@ -1587,6 +1588,21 @@ def resume(
     route_tier = model_tier
     allow_route_replacement = True
     replaying_model_route = False
+    command_line = click.core.ParameterSource.COMMANDLINE
+    route_recovery_action = SessionRouteRecoveryAction.resume(
+        name,
+        fresh=fresh and ctx.get_parameter_source("fresh") == command_line,
+        child_name=(child_name if ctx.get_parameter_source("child_name") == command_line else None),
+        strategy=strategy if _strategy_explicit else None,
+        drop_last=drop_last if _drop_last_explicit else None,
+        depth=depth if _depth_explicit else None,
+        resume_mode=(resume_mode if ctx.get_parameter_source("resume_mode") == command_line else None),
+        review=review and ctx.get_parameter_source("review") == command_line,
+        force=force and ctx.get_parameter_source("force") == command_line,
+        memory_flag=(memory_flag if ctx.get_parameter_source("memory_flag") == command_line else None),
+        authority_role=(authority_role if ctx.get_parameter_source("authority_role") == command_line else None),
+        authority_tier=(authority_tier if ctx.get_parameter_source("authority_tier") == command_line else None),
+    )
     neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(manifest, direct=direct)
     if route_model is None and proxy_name is None and not direct and neutral_route is not None:
@@ -1603,7 +1619,11 @@ def resume(
             replaying_model_route = True
         except SessionModelRoutingError as e:
             if neutral_route.kind == "proxy":
-                _render_replayed_model_route_refusal(manifest=manifest, error=e)
+                _render_replayed_model_route_refusal(
+                    manifest=manifest,
+                    error=e,
+                    recovery_action=route_recovery_action,
+                )
             else:
                 print_error(str(e))
             sys.exit(1)
@@ -1631,7 +1651,11 @@ def resume(
                 )
         except SessionModelRoutingError as e:
             if replaying_model_route and neutral_route is not None and neutral_route.kind == "proxy":
-                _render_replayed_model_route_refusal(manifest=manifest, error=e)
+                _render_replayed_model_route_refusal(
+                    manifest=manifest,
+                    error=e,
+                    recovery_action=route_recovery_action,
+                )
             else:
                 print_error(str(e))
             sys.exit(1)
@@ -1647,6 +1671,7 @@ def resume(
                     base_url=model_plan.proxy.base_url,
                     proxy_id=model_plan.proxy.proxy_id,
                     allow_restart=isinstance(e, SessionModelRouteHealthError) and e.restartable,
+                    recovery_action=route_recovery_action,
                 )
             else:
                 print_error(str(e))
