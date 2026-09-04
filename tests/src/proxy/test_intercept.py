@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 from forge.proxy import intercept
@@ -159,15 +161,82 @@ class TestApplyOverride:
 
     def test_adaptive_model_rejects_manual_thinking_budget(self):
         body = self._body(model="claude-fable-5-1", thinking={"type": "enabled", "budget_tokens": 10_000})
+        original = dict(body)
 
         with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
-            intercept.apply_override(body, reasoning_floor_effort="high")
+            intercept.apply_override(body, reasoning_floor_effort="low")
+
+        assert body == original
+
+    @pytest.mark.parametrize("floor", [None, "none", "disable"])
+    def test_adaptive_model_rejects_manual_thinking_without_an_active_floor(self, floor):
+        body = self._body(model="claude-fable-5-1", thinking={"type": "enabled", "budget_tokens": 10_000})
+        original = dict(body)
+
+        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+            intercept.apply_override(body, reasoning_floor_effort=floor)
+
+        assert body == original
+
+    def test_adaptive_rejection_precedes_mutating_list_system_guards(self):
+        body = self._body(
+            model="claude-fable-5-1",
+            thinking={"type": "enabled", "budget_tokens": 10_000},
+            system=[{"type": "text", "text": "secret keep"}],
+        )
+        original = deepcopy(body)
+
+        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+            intercept.apply_override(
+                body,
+                system_prompt_guards=[{"pattern": "secret", "action": "strip"}],
+                reasoning_floor_effort="none",
+            )
+
+        assert body == original
+
+    def test_invalid_output_config_does_not_apply_other_mutations(self):
+        body = self._body(
+            model="claude-opus-4-6",
+            system=[{"type": "text", "text": "secret keep"}],
+        )
+        body["output_config"] = "bad"
+        original = deepcopy(body)
+
+        with pytest.raises(intercept.ReasoningOverrideError, match="output_config must be an object"):
+            intercept.apply_override(
+                body,
+                system_prompt_augment="append later",
+                system_prompt_guards=[{"pattern": "secret", "action": "strip"}],
+                reasoning_floor_effort="low",
+            )
+
+        assert body == original
 
     def test_unknown_passthrough_model_rejects_unrepresentable_max_floor(self):
         body = self._body(model="future-claude")
 
         with pytest.raises(intercept.ReasoningOverrideError, match="cannot be represented safely"):
             intercept.apply_override(body, reasoning_floor_effort="max")
+
+    def test_unenforceable_floor_is_a_configuration_error(self):
+        body = self._body()
+
+        with pytest.raises(intercept.ReasoningConfigError, match="must be one of"):
+            intercept.apply_override(body, reasoning_floor_effort="hihg")
+
+    @pytest.mark.parametrize("floor", ["none", "disable"])
+    def test_no_floor_spellings_leave_reasoning_untouched(self, floor):
+        """'none' means no floor -- normalizing it upward would invert the intent."""
+        body = self._body(model="claude-fable-5-1")
+        body["output_config"] = {"effort": "low"}
+        body["temperature"] = 0.7
+
+        result = intercept.apply_override(body, reasoning_floor_effort=floor)
+
+        assert body["output_config"] == {"effort": "low"}
+        assert body["temperature"] == 0.7
+        assert result.mutation_record is None
 
     def test_block_leaves_body_unmutated(self):
         body = self._body()
@@ -237,6 +306,7 @@ def test_apply_override_raises_on_message_mutation(monkeypatch):
         "system": "s",
         "messages": [{"role": "user", "content": "hi"}],
     }
+    original = deepcopy(body)
     # Force a message mutation between the before/after fingerprints.
     calls = {"n": 0}
     real_fp = intercept.messages_fingerprint
@@ -250,3 +320,4 @@ def test_apply_override_raises_on_message_mutation(monkeypatch):
     monkeypatch.setattr(intercept, "messages_fingerprint", _fp)
     with pytest.raises(RuntimeError, match="mutation-safety invariant"):
         intercept.apply_override(body, system_prompt_augment="X")
+    assert body == original

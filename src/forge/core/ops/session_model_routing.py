@@ -15,6 +15,7 @@ from forge.core.models.model_routes import (
     ModelRouteRequest,
     get_model_route_candidates,
     normalize_model_route_request,
+    resolve_model_alternative,
 )
 from forge.session.models import (
     REQUIRED_MODEL_ROUTE_TIERS,
@@ -574,21 +575,14 @@ def _serving_proxy_tiers(
 
     serving: dict[str, str] = {}
     for tier in sorted(REQUIRED_MODEL_ROUTE_TIERS):
-        alternative = _matching_alternative(request, proxy.model_alternatives.get(tier, {}))
-        selected_model = alternative or proxy.tier_mappings.get(tier)
+        alternative = resolve_model_alternative(request.requested_model, proxy.model_alternatives.get(tier, {}))
+        selected_model = alternative if alternative is not None else proxy.tier_mappings.get(tier)
         if selected_model is None:
             continue
         if alternative is None and _route_key(selected_model) != request.route_key:
             continue
         serving[tier] = selected_model
     return serving
-
-
-def _matching_alternative(request: ModelRouteRequest, alternatives: Mapping[str, str]) -> str | None:
-    for requested_model, selected_model in alternatives.items():
-        if _route_key(requested_model) == request.route_key:
-            return selected_model
-    return None
 
 
 def _select_proxy_tier(

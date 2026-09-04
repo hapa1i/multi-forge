@@ -44,11 +44,21 @@ def _create_routed_session(runner: CliRunner, name: str) -> None:
     assert created.exit_code == 0, created.output
 
 
+def _recovery_command_line(result) -> str:
+    """Return the single line carrying the recovery command.
+
+    Deliberately does not join continuation lines: a wrapped command is not
+    copy-pasteable, so re-joining here would hide exactly the defect the
+    narrow-terminal test below pins.
+    """
+    lines = [line.strip() for line in result.stderr.splitlines()]
+    commands = [line for line in lines if line.startswith("forge session resume")]
+    assert len(commands) == 1, result.output
+    return commands[0]
+
+
 def _recovery_command(result) -> list[str]:
-    lines = result.stderr.splitlines()
-    command_starts = [index for index, line in enumerate(lines) if line.strip().startswith("forge session resume")]
-    assert len(command_starts) == 1, result.output
-    return shlex.split(" ".join(line.strip() for line in lines[command_starts[0] :]))
+    return shlex.split(_recovery_command_line(result))
 
 
 @pytest.mark.parametrize(
@@ -241,3 +251,130 @@ def test_bare_resume_keeps_the_existing_recovery_surface(
     assert result.exit_code == 1, result.output
     assert "select a replacement with --model gpt-5.6-sol --proxy <proxy_id-or-template>" in result.stderr
     assert "rerun the intended action" not in result.stderr
+
+
+def test_recovery_command_is_not_wrapped_by_the_error_console(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A wrapped command is not copy-pasteable: each fragment runs as its own command.
+
+    ``err_console`` is a fixed-width console, so the wrap threshold is its own
+    width rather than the user's terminal -- setting COLUMNS does not move it.
+    A fully-specified fresh resume exceeds that width.
+    """
+    from forge.cli.output import err_console
+
+    _prepare_project(tmp_path, monkeypatch)
+    runner = CliRunner()
+    name = "narrow-parent"
+    child_name = "chosen-child"
+
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ):
+        _create_routed_session(runner, name)
+        with (
+            patch(
+                "forge.cli.session_lifecycle._plan_interactive_session_model_route",
+                side_effect=SessionModelRoutingError("stored route unavailable"),
+            ),
+            patch("forge.config.loader.template_exists", return_value=True),
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "resume",
+                    name,
+                    "--fresh",
+                    "--child-name",
+                    child_name,
+                    "--strategy",
+                    "full",
+                    "--depth",
+                    "all",
+                    "--resume-mode",
+                    "transfer",
+                    "--review",
+                    "--force",
+                    "--memory",
+                    "off",
+                    "--authority",
+                    "advisory",
+                    "--authority-tier",
+                    "named_tools",
+                ],
+            )
+
+    assert result.exit_code == 1, result.output
+    command = _recovery_command_line(result)
+    assert len(command) > err_console.width  # the command really does exceed the wrap point
+    assert command.endswith("--proxy openrouter-openai")
+    assert shlex.split(command)[:4] == ["forge", "session", "resume", name]
+
+
+def test_explicitness_is_stated_by_the_producer_not_inferred_from_argv() -> None:
+    """A caller action that serializes like the default must still count as explicit."""
+    from forge.cli.session_route_recovery import SessionRouteRecoveryAction
+
+    bare = SessionRouteRecoveryAction.resume("s")
+    assert bare.has_explicit_options is False
+    assert SessionRouteRecoveryAction.resume("s", fresh=True).has_explicit_options is True
+
+    # A future caller whose route-neutral action happens to match the bare resume
+    # argv is still a supplied action; argv equality cannot tell the two apart.
+    colliding = SessionRouteRecoveryAction(bare.argv, has_explicit_options=True)
+    assert colliding.argv == bare.argv
+    assert colliding.has_explicit_options is True
+
+
+def test_explicit_action_that_matches_bare_resume_keeps_intended_action_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Producer provenance, not argv equality, selects the recovery wording."""
+    from forge.cli.session_route_recovery import (
+        SessionRouteRecoveryAction,
+        _render_persisted_proxy_refusal,
+    )
+
+    project = _prepare_project(tmp_path, monkeypatch)
+    runner = CliRunner()
+    name = "colliding-action"
+
+    with mocked_model_route_proxy(
+        template="openrouter-openai",
+        proxy_id="openrouter-openai-1",
+        base_url="http://localhost:8096",
+        default_tier="sonnet",
+        tiers={"sonnet": "openai/gpt-5.6-sol"},
+        alternatives={},
+    ):
+        _create_routed_session(runner, name)
+
+    manifest = SessionStore(str(project), name).read()
+    bare = SessionRouteRecoveryAction.resume(name)
+    colliding = SessionRouteRecoveryAction(bare.argv, has_explicit_options=True)
+    with (
+        patch("forge.config.loader.template_exists", return_value=False),
+        patch("forge.cli.session_route_recovery.print_error_with_tip") as print_refusal,
+    ):
+        _render_persisted_proxy_refusal(
+            manifest=manifest,
+            error=SessionModelRoutingError("stored route unavailable"),
+            template="openrouter-openai",
+            base_url=None,
+            proxy_id=None,
+            allow_restart=False,
+            recovery_action=colliding,
+        )
+
+    rendered = "\n".join(str(value) for value in print_refusal.call_args.args)
+    assert "rerun the intended action" in rendered
+    assert "forge session resume colliding-action --model gpt-5.6-sol --proxy" in rendered

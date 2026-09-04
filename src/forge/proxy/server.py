@@ -44,6 +44,8 @@ from forge.core.logging import (
     get_effective_log_level,
 )
 from forge.core.models.model_reference import strip_transport_model_suffix
+from forge.core.models.model_routes import resolve_model_alternative
+from forge.core.models.types import REQUIRED_TIERS
 from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
     FORGE_MODEL_TIER_HEADER,
@@ -649,21 +651,40 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
         alt_models = provider_cfg.model_alternatives.get(tier, {})
         if original_model_name and alt_models:
             lookup = strip_transport_model_suffix(original_model_name)
-            if lookup in alt_models:
-                return alt_models[lookup]
+            alternative = resolve_model_alternative(lookup, alt_models)
+            if alternative is not None:
+                return alternative
     except Exception:
         # Best-effort: degrade to fallback_model if provider config is unavailable
         logger.debug("model_alternatives lookup failed, using tier default", exc_info=True)
     return fallback_model
 
 
+# Distinguishes "middleware ran and saw no header" from "middleware never ran".
+_TIER_STATE_UNSET: Any = object()
+
+
+def is_valid_model_tier(tier: str) -> bool:
+    """Report whether a value names a Forge routing tier."""
+    return tier in REQUIRED_TIERS
+
+
 def _projected_model_tier(raw_request: Request) -> str | None:
-    """Read the Forge-owned tier projection from one downstream request."""
-    return raw_request.headers.get(FORGE_MODEL_TIER_HEADER)
+    """Read the Forge-owned tier projection recorded at header ingress.
+
+    ``log_requests_middleware`` stashes the raw header on ``request.state`` so
+    both wire shapes read one value; the header fallback keeps direct handler
+    calls (tests, and any future route that bypasses the middleware) working.
+    """
+    state = getattr(raw_request, "state", None)
+    projected = getattr(state, "forge_model_tier", _TIER_STATE_UNSET) if state is not None else _TIER_STATE_UNSET
+    if projected is _TIER_STATE_UNSET:
+        return raw_request.headers.get(FORGE_MODEL_TIER_HEADER)
+    return projected
 
 
 def _validate_projected_model_tier(projected_tier: str) -> str:
-    if projected_tier not in {"haiku", "sonnet", "opus"}:
+    if not is_valid_model_tier(projected_tier):
         raise HTTPException(
             status_code=400,
             detail={
@@ -1960,6 +1981,12 @@ async def log_requests_middleware(request: Request, call_next):
     # internal Forge<->proxy headers; the proxy consumes them and never forwards upstream.
     request.state.forge_session = _valid_session_header(request.headers.get(FORGE_SESSION_HEADER))
     request.state.forge_command = _valid_command_header(request.headers.get(FORGE_COMMAND_HEADER))
+    # Forge's own tier projection. Read here so BOTH wire shapes see one value —
+    # the passthrough branch below never reaches the translated handlers. Stored
+    # raw rather than degraded to None like the telemetry headers above: this one
+    # selects a route, so an unrecognized value must fail closed at the point of
+    # use instead of silently resolving to the proxy default.
+    request.state.forge_model_tier = request.headers.get(FORGE_MODEL_TIER_HEADER)
 
     # Transparent Anthropic passthrough is intercepted HERE, before the route's
     # MessagesRequest binding runs — FastAPI validates the body against a closed

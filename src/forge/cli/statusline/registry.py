@@ -377,7 +377,9 @@ def _produce_marking(ctx: RenderContext) -> Optional[str]:
             alternatives = ctx.runtime.model_alternatives.get(tier, {})
             if not isinstance(alternatives, dict):
                 return fmt.format_marking("unknown")
-            route_model = alternatives.get(request_model)
+            from forge.core.models.model_routes import resolve_model_alternative
+
+            route_model = resolve_model_alternative(request_model, alternatives)
             if not isinstance(route_model, str) or not route_model:
                 route_model = ctx.runtime.tier_mappings.get(tier)
             if not isinstance(route_model, str) or not route_model:

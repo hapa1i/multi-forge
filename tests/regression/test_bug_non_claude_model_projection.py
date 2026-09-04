@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 
+import forge.core.ops.session_routing as session_routing_ops
 import forge.proxy.data_models as proxy_data_models
 import forge.proxy.server as proxy_server
 from forge.config.loader import load_config
@@ -16,12 +17,19 @@ from forge.core.ops.session_model_routing import (
     ProxyRouteSnapshot,
     plan_session_model_route,
 )
+from forge.core.reactive.env import new_root_run_identity
 from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, FORGE_MODEL_TIER_HEADER
 from forge.proxy.data_models import MessagesRequest
 from forge.proxy.model_routes import effective_proxy_model_maps
 from forge.session import SessionStore, create_session_state
 from forge.session.claude.invoke import _build_environment
 from forge.session.models import ModelRouteIntent
+from forge.session.routing import (
+    ROUTING_COMMIT_EVENT,
+    append_routing_event,
+    new_routing_event,
+    read_routing_events,
+)
 
 pytestmark = pytest.mark.regression
 
@@ -155,3 +163,96 @@ def test_non_claude_alternative_survives_launcher_to_proxy_dispatch(
     assert request.original_model_name == plan.request.requested_model
     assert dispatched.tier == plan.selected_tier
     assert dispatched.model == plan.selected_model
+
+
+def test_alias_keyed_alternative_survives_planning_journal_and_dispatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An alias on either side of model_alternatives must not fall back to the tier default.
+
+    Route planning matches alternatives by normalized catalog identity, so a
+    provider-prefixed key such as ``vertex_ai/gemini-3.7-flash`` selects the
+    tier. The proxy used to match that map by exact key only, silently
+    dispatching the tier default instead of the model the planner chose.
+    """
+    loaded = load_config(template="litellm-gemini")
+    provider_cfg = loaded.proxy.get_provider()
+    alias_key = "vertex_ai/gemini-3.7-flash"
+    canonical = "gemini-3.7-flash"
+    assert alias_key != canonical
+    provider_cfg.model_alternatives = {"opus": {alias_key: alias_key}}
+    tier_mappings, alternatives = effective_proxy_model_maps(loaded.proxy)
+    proxy = ProxyRouteSnapshot(
+        template="litellm-gemini",
+        base_url="http://127.0.0.1:65530",
+        proxy_id=None,
+        source_id=None,
+        default_tier=loaded.proxy.default_tier,
+        tier_mappings=tier_mappings,
+        model_alternatives=alternatives,
+        wire_shape=loaded.proxy.wire_shape,
+    )
+    plan = plan_session_model_route(canonical, model_tier="opus", explicit_proxy=proxy)
+    assert plan.selected_model == alias_key
+
+    worktree = tmp_path / "alias-route"
+    worktree.mkdir()
+    state = create_session_state(
+        "alias-route",
+        proxy_template="litellm-gemini",
+        proxy_base_url=proxy.base_url,
+        worktree_path=str(worktree),
+        model_route=ModelRouteIntent(
+            requested_model=plan.request.requested_model,
+            selected_tier=plan.selected_tier,
+            kind="proxy",
+            source_id=plan.source_id,
+        ),
+    )
+    state.forge_root = str(worktree)
+    monkeypatch.setattr(session_routing_ops, "load_config", lambda **_kwargs: loaded)
+    payload = session_routing_ops.build_claude_routing_payload(
+        state,
+        effective_template="litellm-gemini",
+        runtime_base_url=proxy.base_url,
+        proxy_id=None,
+    )
+    assert payload["model_alternatives"]["opus"] == {
+        alias_key: alias_key,
+        canonical: alias_key,
+    }
+    event = new_routing_event(
+        state,
+        event_type=ROUTING_COMMIT_EVENT,
+        run_id=new_root_run_identity().run_id,
+        operation="start",
+        payload=payload,
+    )
+    append_routing_event(worktree, event)
+    assert read_routing_events(worktree, state)[0].payload["selected_model"] == alias_key
+
+    monkeypatch.setattr(proxy_server, "config", loaded)
+    monkeypatch.setattr(proxy_data_models, "config", loaded)
+
+    # The launcher projects the canonical id into ANTHROPIC_DEFAULT_OPUS_MODEL.
+    request = MessagesRequest(model=canonical, messages=[], max_tokens=1)
+    dispatched = proxy_server._resolve_model_with_alternatives(request, projected_tier="opus")
+
+    assert dispatched.tier == "opus"
+    assert dispatched.model == alias_key
+    assert dispatched.model != loaded.proxy.get_model_for_tier("opus")
+
+
+def test_uncatalogued_alternative_key_does_not_match_an_unrelated_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Normalization must not turn two unresolvable slugs into the same route key."""
+    loaded = load_config(template="litellm-gemini")
+    provider_cfg = loaded.proxy.get_provider()
+    provider_cfg.model_alternatives = {"opus": {"vendor/private-slug-a": "served-a"}}
+    monkeypatch.setattr(proxy_server, "config", loaded)
+    monkeypatch.setattr(proxy_data_models, "config", loaded)
+
+    request = MessagesRequest(model="vendor/private-slug-b", messages=[], max_tokens=1)
+    dispatched = proxy_server._resolve_model_with_alternatives(request, projected_tier="opus")
+
+    assert dispatched.model != "served-a"

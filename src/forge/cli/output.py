@@ -64,7 +64,10 @@ def print_tip(
     for cmd in commands or ():
         # Commands are user-copyable payloads, not Rich markup. In particular,
         # valid paths can contain bracketed components such as ``[release]``.
-        out.print(f"  {cmd}", markup=False)
+        # soft_wrap keeps a long command on one line: Rich's default word wrap
+        # would split it at the terminal width, and pasting the wrapped block
+        # runs each fragment as a separate command.
+        out.print(f"  {cmd}", markup=False, soft_wrap=True)
 
 
 def print_error(msg: str, *, console: Console | None = None) -> None:

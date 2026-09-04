@@ -31,12 +31,20 @@ and closeout.
 - [x] Run targeted session/proxy integration tests.
 - [x] Run `make test-unit`, `make test-regression`, `make pre-commit`, build, link, size, and diff checks.
 
+Review follow-ups:
+
+- [x] Keep adaptive-only manual-thinking requests on the documented sanitized HTTP 400 path.
+- [x] Use one model-alternative resolver across planning, launch evidence, dispatch, and status reporting.
+- [x] Reject conflicting catalog-equivalent alternative keys while preserving exact private-slug matching.
+- [x] Make recovery-action provenance explicit and cover long copyable commands at the renderer boundary.
+
 Evidence on the final pre-commit tree:
 
-- Focused changed tests: `275 passed`.
-- Unit: `10,200 passed, 117 deselected`.
-- Regression: `1,193 passed`.
-- Targeted Docker integration: `5 passed` across session routing, persisted-route resume, and passthrough headers.
+- Focused changed tests: `403 passed`.
+- Unit: `10,216 passed, 117 deselected`.
+- Regression: `1,211 passed`.
+- Targeted Docker integration: `6 passed` across session routing, persisted-route resume, packaged route loading, and
+  passthrough headers.
 - `make pre-commit`: passed all hooks, including Ruff, Black, mypy, Pyright, file-size limits, and Markdown links.
 - `make build`: produced the 0.9.4 wheel and source distribution.
 - `git diff --check`: passed.

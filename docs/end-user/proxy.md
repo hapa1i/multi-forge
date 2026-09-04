@@ -371,9 +371,11 @@ forge session start my-session --proxy openrouter-anthropic --model claude-fable
 ```
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
-`model_alternatives[tier][model]` and routes to the configured backend model. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5.1 and
-Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
+`model_alternatives[tier][model]` and routes to the configured backend model. Catalog aliases and provider-prefixed
+spellings of the same model share one route identity; private model slugs not known to the catalog still work, but only
+by exact key. Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level
+hyperparameters (reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR,
+Fable 5.1 and Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
 
 For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
 exactly as before. The same flag accepts any Forge catalog model: non-Claude requests resolve a compatible

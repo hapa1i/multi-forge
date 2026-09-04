@@ -321,6 +321,56 @@ def test_anthropic_passthrough_records_applied_client_model_not_tier_default(
     assert event.payload == payload
 
 
+def test_translated_proxy_journal_materializes_exact_one_m_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, state = _store(tmp_path, runtime="claude_code")
+    assert state.intent.launch is not None
+    state.intent.launch.model_route = ModelRouteIntent(
+        requested_model="claude-opus-4-6-1m",
+        selected_tier="opus",
+        kind="proxy",
+        source_id=None,
+    )
+    provider = SimpleNamespace(
+        tiers={"opus": "anthropic/claude-opus-5"},
+        model_alternatives={"opus": {"anthropic/claude-opus-4-6": "anthropic/claude-opus-4-6-1m"}},
+        allow_non_zdr=True,
+        zdr_fallbacks={},
+    )
+    proxy = SimpleNamespace(
+        preferred_provider="litellm",
+        get_provider=lambda _provider: provider,
+        default_tier="opus",
+        active_template="litellm-anthropic",
+        backend="litellm",
+        wire_shape="openai_translated",
+    )
+    monkeypatch.setattr(ops, "load_config", lambda **_kwargs: SimpleNamespace(proxy=proxy))
+
+    payload = ops.build_claude_routing_payload(
+        state,
+        effective_template="litellm-anthropic",
+        runtime_base_url="http://localhost:8096",
+        proxy_id="anthropic-1",
+    )
+
+    assert payload["selected_model"] == "anthropic/claude-opus-4-6-1m"
+    assert payload["model_alternatives"]["opus"] == {
+        "anthropic/claude-opus-4-6": "anthropic/claude-opus-4-6-1m",
+        "claude-opus-4-6-1m": "anthropic/claude-opus-4-6-1m",
+    }
+    event = new_routing_event(
+        state,
+        event_type=ROUTING_COMMIT_EVENT,
+        run_id=new_root_run_identity().run_id,
+        operation="resume",
+        payload=payload,
+    )
+    assert event.payload == payload
+
+
 @pytest.mark.parametrize("launch_mode", ["host", "sidecar"])
 def test_template_route_preserves_unknown_proxy_id(
     launch_mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

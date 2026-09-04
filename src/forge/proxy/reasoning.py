@@ -121,6 +121,23 @@ def clamp_effort_to_supported(effort: str | None, supported: tuple[str, ...] | N
     return at_or_below[-1] if at_or_below else ranked[0]
 
 
+def raise_effort_to_supported(effort: str, supported: tuple[str, ...] | None) -> str | None:
+    """Raise an effort floor to the model's supported levels without weakening it.
+
+    The upward sibling of :func:`clamp_effort_to_supported`, for callers that
+    enforce a floor rather than honor a request: picks the lowest supported
+    level at or above ``effort``, so a floor the model cannot express exactly is
+    never silently downgraded. Returns ``None`` when every supported level sits
+    below the floor; the caller decides how to classify that incompatibility.
+    """
+    if supported is None or effort in supported:
+        return effort
+    floor_rank = EFFORT_RANK.get(effort, 3)
+    ranked = sorted(supported, key=lambda level: EFFORT_RANK.get(level, 3))
+    at_or_above = [level for level in ranked if EFFORT_RANK.get(level, 3) >= floor_rank]
+    return at_or_above[0] if at_or_above else None
+
+
 def resolve_reasoning_effort(
     request_data: object,
     *,

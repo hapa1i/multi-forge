@@ -55,6 +55,32 @@ def test_unknown_model_max_floor_remains_safely_rejected() -> None:
         intercept.apply_override(_body("future-claude"), reasoning_floor_effort="max")
 
 
+@pytest.mark.parametrize("model", ["claude-opus-5[1m]", "anthropic/claude-fable-5.1[1m]"])
+def test_one_m_adaptive_request_with_manual_thinking_is_rejected(model: str) -> None:
+    """Transport suffix normalization must preserve the adaptive-only validation."""
+    body = _body(model)
+    body["thinking"] = {"type": "enabled", "budget_tokens": 16_000}
+    before = deepcopy(body)
+
+    with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+        intercept.apply_override(body, reasoning_floor_effort="low")
+
+    assert body == before
+
+
+@pytest.mark.parametrize("floor", ["none", "disable"])
+def test_no_floor_spelling_does_not_pin_the_lowest_supported_effort(floor: str) -> None:
+    """A 'no reasoning' floor must not normalize upward into the weakest supported level."""
+    body = _body("claude-opus-4-6")
+    body["temperature"] = 0.7
+
+    result = intercept.apply_override(body, reasoning_floor_effort=floor)
+
+    assert "output_config" not in body
+    assert body["temperature"] == 0.7
+    assert result.mutation_record is None
+
+
 def test_unknown_native_effort_floor_is_rejected_before_dispatch_or_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
