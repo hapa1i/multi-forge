@@ -399,11 +399,13 @@ through `--model`; `--model-tier` disambiguates proxy tiers. Unlike Claude's in-
 prelaunch intent. The shared planner applies explicit constraints, a compatible stored route, new-Claude direct routing,
 then catalog order without side effects. The first candidate whose prerequisites pass admission is the winner;
 compatibility, startup, identity, and health failures from that winner never fall through. After Claude proxy-pin
-validation, the launch environment applies the neutral route's selected tier as `ANTHROPIC_MODEL`. The selected context
-window preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written atomically.
-Bare resume and an inherited-route fork reuse that route or fail. Their refusal output preserves the intended lifecycle
-action when it offers an explicit replacement route; fork recovery pins the resolved child and all explicit fork
-options.
+validation, the launch environment applies the neutral route's selected tier as `ANTHROPIC_MODEL`. Non-Claude routes
+also project the canonical requested model through that tier's `ANTHROPIC_DEFAULT_*_MODEL` and carry the selected tier
+in the Forge-owned `X-Forge-Model-Tier` custom header. The proxy resolves an explicit tier in the request model first,
+then that validated header, then its configured default; it consumes the header locally. The selected context window
+preflights resume/fork before the proxy, legacy direct pin, and `model_route` transition is written atomically. Bare
+resume and an inherited-route fork reuse that route or fail. Their refusal output preserves the intended lifecycle
+action when it offers an explicit replacement route, including explicit fresh-resume or fork options.
 
 A non-Claude selection may start a paid proxy. `--no-launch` persists it without a route event or child;
 `--subprocess-proxy` is incompatible. Codex, adoption, `default_direct_model`, sidecar/host-proxy modes, and bare
