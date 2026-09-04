@@ -38,6 +38,7 @@ class _DummyRequestState:
 class _DummyRawRequest:
     def __init__(self, request_id: str) -> None:
         self.state = _DummyRequestState(request_id)
+        self.headers: dict[str, str] = {}
 
 
 class _DummyAnthropicResponse:

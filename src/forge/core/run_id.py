@@ -1,11 +1,9 @@
-"""Forge run-tree id format — single source of truth for minting and validating.
+"""Forge run-tree identities and shared internal request-header names.
 
-A run id is ``run_`` + 12 lowercase hex chars. This is a dependency-free leaf module
-so both the env builder (`forge.core.reactive.env`, which mints ids and stamps the
-``X-Forge-Run-ID`` header onto proxy-routed subprocess requests) and the proxy
-(`forge.proxy.server`, which validates the inbound header before logging it) share
-one format without dragging the heavier ``core.reactive`` package (which eagerly
-imports the tagger and session runner).
+A run id is ``run_`` + 12 lowercase hex chars. This dependency-free leaf keeps run-id
+validation and the ``ANTHROPIC_CUSTOM_HEADERS``/``X-Forge-*`` names shared by env
+builders and proxy ingress without dragging in the heavier ``core.reactive`` package
+(which eagerly imports the tagger and session runner).
 """
 
 from __future__ import annotations
@@ -18,14 +16,18 @@ import uuid
 # the proxy's X-Forge-Run-ID guard (Slice 4g) can never drift from ``mint_run_id``.
 RUN_ID_RE = re.compile(r"^run_[0-9a-f]{12}$")
 
-# Run-tree correlation headers (Slice 4g). Forge stamps these onto a proxy-routed
-# headless subprocess's outbound requests via ANTHROPIC_CUSTOM_HEADERS; the Forge
-# proxy reads + validates them and records them on each cost record, so proxied
-# ``claude -p`` cost joins exactly to the run tree. Opaque, non-secret run ids —
-# consumed by the proxy, never forwarded upstream.
+# Claude Code transports Forge-owned request metadata through this environment value.
 ANTHROPIC_CUSTOM_HEADERS_VAR = "ANTHROPIC_CUSTOM_HEADERS"
+
+# Run-tree correlation headers (Slice 4g). Forge stamps these onto a proxy-routed
+# headless subprocess's outbound requests; the proxy validates and records them so
+# proxied ``claude -p`` cost joins exactly to the run tree. Opaque, non-secret run ids
+# consumed by the proxy and never forwarded upstream.
 FORGE_RUN_ID_HEADER = "X-Forge-Run-ID"
 FORGE_ROOT_RUN_ID_HEADER = "X-Forge-Root-Run-ID"
+
+# Model-route projection metadata consumed by the Forge proxy and never forwarded.
+FORGE_MODEL_TIER_HEADER = "X-Forge-Model-Tier"
 
 # Provider session/command correlation headers.
 # Forge stamps these alongside the run-id headers onto a proven-proxy-routed headless

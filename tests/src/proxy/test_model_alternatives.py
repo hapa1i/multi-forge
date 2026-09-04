@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 import forge.proxy.server as server
 
@@ -22,6 +23,7 @@ def _ensure_runtime(monkeypatch):
             self.model_alternatives = {
                 "opus": {
                     "claude-opus-4-8": "anthropic/claude-opus-4.8",
+                    "gemini-3.7-flash": "google/gemini-3.7-flash",
                 },
             }
 
@@ -45,9 +47,15 @@ class TestResolveModelWithAlternatives:
     """Tests for _resolve_model_with_alternatives shared helper."""
 
     @staticmethod
-    def _request(model: str, *, tier: str = "opus", original_model_name: str | None | object = _UNSET):
+    def _request(
+        model: str,
+        *,
+        tier: str = "opus",
+        original_model_name: str | None | object = _UNSET,
+        has_explicit_tier: bool = True,
+    ):
         return SimpleNamespace(
-            has_explicit_tier=True,
+            has_explicit_tier=has_explicit_tier,
             tier=tier,
             original_model_name=model if original_model_name is _UNSET else original_model_name,
             model=model,
@@ -70,6 +78,32 @@ class TestResolveModelWithAlternatives:
     def test_routes_to_fallback_for_tier_without_alternatives(self):
         result = server._resolve_model_with_alternatives(self._request("claude-sonnet-4-6", tier="sonnet"))
         assert result.model == "s-model"
+
+    def test_projected_tier_precedes_proxy_default_for_non_claude_alternative(self):
+        request = self._request("gemini-3.7-flash", tier=None, has_explicit_tier=False)
+
+        result = server._resolve_model_with_alternatives(request, projected_tier="opus")
+
+        assert result.model == "google/gemini-3.7-flash"
+        assert result.tier == "opus"
+        assert result.tier_source == "forge.model_tier_header"
+
+    def test_explicit_request_tier_precedes_projected_tier(self):
+        request = self._request("claude-sonnet-4-6", tier="sonnet")
+
+        result = server._resolve_model_with_alternatives(request, projected_tier="turbo")
+
+        assert result.tier == "sonnet"
+        assert result.tier_source == "request"
+
+    def test_invalid_projected_tier_is_rejected(self):
+        request = self._request("gemini-3.7-flash", tier=None, has_explicit_tier=False)
+
+        with pytest.raises(HTTPException) as exc_info:
+            server._resolve_model_with_alternatives(request, projected_tier="turbo")
+
+        assert exc_info.value.status_code == 400
+        assert "X-Forge-Model-Tier must be one of" in exc_info.value.detail["message"]
 
     def test_strips_1m_suffix_before_lookup(self):
         result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8[1m]"))

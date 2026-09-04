@@ -33,6 +33,7 @@ def invoke_claude(
     cwd: str | None = None,
     extra_args: list[str] | None = None,
     run_identity: RunIdentity | None = None,
+    projected_model_tier: str | None = None,
 ) -> int:
     """Invoke the Claude Code CLI binary.
 
@@ -50,6 +51,7 @@ def invoke_claude(
         unset_env_vars: Environment variables to remove from the child process.
         cwd: Working directory for Claude process.
         extra_args: Additional CLI arguments to pass through to Claude.
+        projected_model_tier: Forge-owned proxy tier to send on each request.
 
     Returns:
         Claude's exit code.
@@ -95,9 +97,14 @@ def invoke_claude(
     cmd[0] = claude_binary
 
     env = (
-        _build_environment(env_vars, unset_env_vars)
+        _build_environment(env_vars, unset_env_vars, projected_model_tier=projected_model_tier)
         if run_identity is None
-        else _build_environment(env_vars, unset_env_vars, run_identity=run_identity)
+        else _build_environment(
+            env_vars,
+            unset_env_vars,
+            run_identity=run_identity,
+            projected_model_tier=projected_model_tier,
+        )
     )
 
     try:
@@ -187,6 +194,7 @@ def _build_environment(
     unset_vars: list[str] | None = None,
     *,
     run_identity: RunIdentity | None = None,
+    projected_model_tier: str | None = None,
 ) -> dict[str, str]:
     """Build the environment for an interactive Claude process.
 
@@ -208,6 +216,7 @@ def _build_environment(
     from forge.core.reactive.env import (
         FORGE_PARENT_RUN_ID_VAR,
         apply_attribution_header_policy,
+        apply_forge_model_tier_header,
         apply_interactive_api_key,
         build_claude_env,
         new_root_run_identity,
@@ -221,6 +230,7 @@ def _build_environment(
         env.pop(FORGE_AUTHORITY_MARKER_VAR, None)
     for key in unset_vars or ():
         env.pop(key, None)
+    apply_forge_model_tier_header(env, projected_model_tier)
     apply_attribution_header_policy(env)
     # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
     # interactive_anthropic_api_key policy wins over anything merged above.

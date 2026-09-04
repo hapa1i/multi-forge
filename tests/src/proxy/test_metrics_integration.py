@@ -39,6 +39,7 @@ class _DummyRequestState:
 class _DummyRawRequest:
     def __init__(self, request_id: str = "req_test") -> None:
         self.state = _DummyRequestState(request_id)
+        self.headers: dict[str, str] = {}
 
 
 class _DummyAnthropicResponse:
@@ -211,6 +212,7 @@ def test_python_m_proxy_app_import_initializes_spend_caps(tmp_path: Path):
 
             class RawRequest:
                 state = State()
+                headers: dict[str, str] = {}
 
             response = asyncio.run(
                 mod.create_message(

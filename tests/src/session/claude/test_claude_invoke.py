@@ -16,6 +16,7 @@ from forge.core.reactive.env import (
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
 )
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, FORGE_MODEL_TIER_HEADER
 from forge.session.claude.invoke import (
     ClaudeBinaryNotFoundError,
     _build_command,
@@ -123,6 +124,37 @@ class TestBuildEnvironment:
 
         assert "ANTHROPIC_BASE_URL" not in env
         assert "ACTIVE_TEMPLATE" not in env
+
+    def test_projected_model_tier_replaces_stale_header_and_preserves_user_lines(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            f"X-User-Header: keep\n{FORGE_MODEL_TIER_HEADER.lower()}: haiku",
+        )
+
+        env = _build_environment(projected_model_tier="opus")
+
+        assert env[ANTHROPIC_CUSTOM_HEADERS_VAR].splitlines() == [
+            "X-User-Header: keep",
+            f"{FORGE_MODEL_TIER_HEADER}: opus",
+        ]
+
+    def test_default_launch_scrubs_inherited_model_tier_and_preserves_user_lines(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            f"X-User-Header: keep\n{FORGE_MODEL_TIER_HEADER}: opus",
+        )
+
+        env = _build_environment()
+
+        assert env[ANTHROPIC_CUSTOM_HEADERS_VAR] == "X-User-Header: keep"
+
+    def test_projected_model_tier_rejects_invalid_value(self) -> None:
+        with pytest.raises(ValueError, match="projected model tier must be one of"):
+            _build_environment(projected_model_tier="turbo")
 
     def test_direct_unset_vars_scrub_inherited_attribution_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Interactive direct launches must not inherit the proxy cache workaround."""
@@ -302,6 +334,22 @@ class TestInvokeClaude:
 
         _, kwargs = mock_run.call_args
         assert kwargs["env"]["FORGE_SESSION"] == "my-session"
+
+    def test_passes_projected_model_tier_as_merged_custom_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_run = Mock(return_value=Mock(returncode=0))
+        monkeypatch.setattr("subprocess.run", mock_run)
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            f"X-User-Header: keep\n{FORGE_MODEL_TIER_HEADER}: haiku",
+        )
+
+        invoke_claude(session_id="test", projected_model_tier="opus")
+
+        _, kwargs = mock_run.call_args
+        assert kwargs["env"][ANTHROPIC_CUSTOM_HEADERS_VAR].splitlines() == [
+            "X-User-Header: keep",
+            f"{FORGE_MODEL_TIER_HEADER}: opus",
+        ]
 
     def test_unset_env_vars_are_removed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """invoke_claude should remove requested env vars before spawning Claude."""

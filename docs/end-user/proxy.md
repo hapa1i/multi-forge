@@ -371,14 +371,19 @@ forge session start my-session --proxy openrouter-anthropic --model claude-fable
 ```
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
-`model_alternatives[tier][model]` and routes to the configured backend model. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5.1 and
-Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
+`model_alternatives[tier][model]` and routes to the configured backend model. Catalog aliases and provider-prefixed
+spellings of the same model share one route identity; private model slugs not known to the catalog still work, but only
+by exact key. Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level
+hyperparameters (reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR,
+Fable 5.1 and Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
 
 For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
-exactly as before. The same flag now accepts any Forge catalog model: non-Claude requests resolve a compatible
-source/template from the packaged route catalog, then select a serving proxy tier. Use `--model-tier haiku|sonnet|opus`
-only when tier selection is ambiguous; proxy-owned tier mappings and hyperparameters are not mutated.
+exactly as before. The same flag accepts any Forge catalog model: non-Claude requests resolve a compatible
+source/template from the packaged route catalog, then select a serving proxy tier. The launch sends the canonical model
+name and a Forge-owned tier header so an explicit `--model-tier` continues to select that tier's hyperparameters even
+when the model name itself contains no Claude tier word. The proxy gives an explicit tier in a request model precedence,
+then uses the validated Forge header, then its configured default. Use `--model-tier haiku|sonnet|opus` only when tier
+selection is ambiguous; proxy-owned tier mappings and hyperparameters are not mutated.
 
 To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 

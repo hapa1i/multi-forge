@@ -16,11 +16,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
+from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.proxy.audit_logger import hash_system_prompt
-from forge.proxy.reasoning import EFFORT_RANK, clamp_effort_to_supported, max_effort
+from forge.proxy.reasoning import EFFORT_RANK, max_effort, raise_effort_to_supported
 
 # Anthropic requires extended-thinking budget_tokens >= 1024 and < max_tokens.
 _ANTHROPIC_MIN_THINKING_BUDGET = 1024
@@ -37,8 +39,45 @@ _EFFORT_BUDGET_FLOOR: dict[str, int] = {
 }
 
 
+# Effort floors an override-mode proxy can actually enforce, weakest to
+# strongest. The native path pins ``output_config.effort``; the legacy path maps
+# the floor to a thinking budget through _EFFORT_BUDGET_FLOOR. Values outside
+# this tuple are configuration errors rather than silently normalized floors.
+SUPPORTED_FLOOR_EFFORTS: tuple[str, ...] = ("minimal", "low", "medium", "high", "xhigh", "max")
+
+# Accepted spellings for "no floor". Normalizing these upward would pin the
+# lowest supported level and invert the operator's intent, so they resolve to
+# None (leave the client's own reasoning fields alone) instead.
+_NO_FLOOR_EFFORTS = frozenset({"none", "disable"})
+
+
 class ReasoningOverrideError(ValueError):
-    """Raised when a passthrough effort floor cannot be represented safely."""
+    """Raised when a client's reasoning fields cannot be honored under override mode."""
+
+
+class ReasoningConfigError(ReasoningOverrideError):
+    """Raised when the proxy's configured effort floor is invalid.
+
+    Subclasses ReasoningOverrideError so existing fail-closed handlers keep
+    catching it; responders that distinguish blame catch this first and report a
+    configuration fault instead of telling the client to fix its request body.
+    """
+
+
+def _validate_reasoning_floor_effort(value: object | None) -> str | None:
+    """Return an enforceable effort floor, or None when no floor is configured."""
+
+    if value is None:
+        return None
+    if isinstance(value, str) and value in _NO_FLOOR_EFFORTS:
+        return None
+    if not isinstance(value, str) or value not in SUPPORTED_FLOOR_EFFORTS:
+        supported = ", ".join(SUPPORTED_FLOOR_EFFORTS)
+        raise ReasoningConfigError(
+            f"reasoning effort floor must be one of: {supported} "
+            f"(or {', '.join(sorted(_NO_FLOOR_EFFORTS))} for no floor)"
+        )
+    return value
 
 
 # --- Mutation-safety fingerprint ---------------------------------------------
@@ -209,7 +248,8 @@ def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[st
 
     from forge.core.models import ModelCatalogError, get_model_spec
 
-    candidates = (model, model.split("/", 1)[-1]) if "/" in model else (model,)
+    lookup_model = strip_transport_model_suffix(model)
+    candidates = (lookup_model, lookup_model.split("/", 1)[-1]) if "/" in lookup_model else (lookup_model,)
     for candidate in candidates:
         try:
             spec = get_model_spec(candidate)
@@ -219,6 +259,21 @@ def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[st
             return spec.litellm_reasoning_efforts, spec.thinking_modes
         return None
     return None
+
+
+def _normalize_native_effort_floor(
+    floor_effort: str,
+    supported_efforts: tuple[str, ...] | None,
+) -> str:
+    """Normalize a native effort floor upward without weakening the guarantee."""
+
+    normalized = raise_effort_to_supported(floor_effort, supported_efforts)
+    if normalized is None:
+        raise ReasoningOverrideError(
+            f"reasoning effort floor {floor_effort!r} cannot be represented safely "
+            f"(model supports: {', '.join(supported_efforts or ())})"
+        )
+    return normalized
 
 
 def pin_native_effort(
@@ -243,8 +298,7 @@ def pin_native_effort(
             f"(supported: {', '.join(supported_efforts)})"
         )
 
-    effective_floor = clamp_effort_to_supported(floor_effort, supported_efforts)
-    assert effective_floor is not None
+    effective_floor = _normalize_native_effort_floor(floor_effort, supported_efforts)
     target = max_effort(current, effective_floor)
     assert target is not None
     if current == target:
@@ -272,7 +326,7 @@ def apply_override(
     *,
     system_prompt_augment: str = "",
     system_prompt_guards: list[dict[str, str]] | None = None,
-    reasoning_floor_effort: str | None = None,
+    reasoning_floor_effort: object | None = None,
 ) -> OverrideResult:
     """Build, validate, and apply the override plan to ``raw_body`` (mutated in place).
 
@@ -281,14 +335,33 @@ def apply_override(
     (messages fingerprint unchanged). Returns the mutated body plus a redacted
     mutation record, or a block decision (body left unmutated).
     """
+    reasoning_floor_effort = _validate_reasoning_floor_effort(reasoning_floor_effort)
+
+    # Request/model compatibility is independent of whether the operator set a
+    # reasoning floor. Validate it before guard planning, whose list-form
+    # normalization may reuse mutable system-block dictionaries.
+    native_support = _native_effort_support(raw_body.get("model"))
+    if native_support is not None:
+        _, thinking_modes = native_support
+        thinking = raw_body.get("thinking")
+        if thinking_modes == ("adaptive",) and isinstance(thinking, dict):
+            thinking_type = thinking.get("type")
+            if thinking_type == "enabled" or "budget_tokens" in thinking:
+                raise ReasoningOverrideError(
+                    f"model {raw_body.get('model')!r} requires adaptive thinking; "
+                    "remove manual thinking.type/budget_tokens"
+                )
+
     guards = system_prompt_guards or []
     before_fp = messages_fingerprint(raw_body.get("messages"))
     system_hash_before = hash_system_prompt(raw_body.get("system"))
     mutations: list[dict[str, Any]] = []
     warnings: list[str] = []
+    pending_reasoning: tuple[str, Any] | None = None
+    removed_sampling_parameters: list[str] = []
 
     # 1) Guards (block short-circuits before any mutation).
-    system, guard_outcome = apply_guards(raw_body.get("system"), guards)
+    system, guard_outcome = apply_guards(deepcopy(raw_body.get("system")), guards)
     if guard_outcome.blocked:
         return OverrideResult(
             body=raw_body,
@@ -305,6 +378,7 @@ def apply_override(
                 ],
             },
         )
+
     for pattern in guard_outcome.warned_patterns:
         warnings.append(f"system_prompt_guard matched (warn): {_pattern_hash(pattern)}")
         mutations.append({"target": "system_prompt", "action": "warn", "pattern_hash": _pattern_hash(pattern)})
@@ -326,34 +400,20 @@ def apply_override(
         if cache_invalidation:
             warnings.append("system_prompt_augment: no post-cache anchor, expected cache invalidation")
 
-    if guard_outcome.stripped_count or system_prompt_augment:
-        raw_body["system"] = system
-
     # 3) Reasoning-effort pin. Newer Claude models expose a native effort
     # control; older/unknown models retain the legacy thinking-budget mapping.
-    native_support = _native_effort_support(raw_body.get("model")) if reasoning_floor_effort else None
     if native_support is not None and reasoning_floor_effort is not None:
-        supported_efforts, thinking_modes = native_support
-        thinking = raw_body.get("thinking")
-        if thinking_modes == ("adaptive",) and isinstance(thinking, dict):
-            thinking_type = thinking.get("type")
-            if thinking_type == "enabled" or "budget_tokens" in thinking:
-                raise ReasoningOverrideError(
-                    f"model {raw_body.get('model')!r} requires adaptive thinking; "
-                    "remove manual thinking.type/budget_tokens"
-                )
+        supported_efforts, _ = native_support
         output_config, pinned, effort_before, effort_after = pin_native_effort(
             raw_body.get("output_config"),
             reasoning_floor_effort,
             supported_efforts=supported_efforts,
         )
         if pinned:
-            raw_body["output_config"] = output_config
             removed_sampling_parameters = sorted(
                 parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
             )
-            for parameter in removed_sampling_parameters:
-                raw_body.pop(parameter)
+            pending_reasoning = ("output_config", output_config)
             mutations.append(
                 {
                     "target": "output_config.effort",
@@ -364,8 +424,8 @@ def apply_override(
                     "removed_sampling_parameters": removed_sampling_parameters,
                 }
             )
-    else:
-        if reasoning_floor_effort and effort_to_budget_floor(reasoning_floor_effort) is None:
+    elif reasoning_floor_effort is not None:
+        if effort_to_budget_floor(reasoning_floor_effort) is None:
             raise ReasoningOverrideError(
                 f"reasoning effort floor {reasoning_floor_effort!r} cannot be represented safely for "
                 f"passthrough model {raw_body.get('model')!r}"
@@ -374,12 +434,10 @@ def apply_override(
             raw_body.get("thinking"), reasoning_floor_effort, raw_body.get("max_tokens")
         )
         if pinned:
-            raw_body["thinking"] = new_thinking
             removed_sampling_parameters = sorted(
                 parameter for parameter in ("temperature", "top_p", "top_k") if parameter in raw_body
             )
-            for parameter in removed_sampling_parameters:
-                raw_body.pop(parameter)
+            pending_reasoning = ("thinking", new_thinking)
             mutations.append(
                 {
                     "target": "thinking",
@@ -391,14 +449,26 @@ def apply_override(
                 }
             )
 
-    # 4) Mutation-safety invariant: historical messages must be byte-identical.
-    after_fp = messages_fingerprint(raw_body.get("messages"))
+    # 4) Apply the validated plan to a candidate body, then enforce the
+    # mutation-safety invariant before committing it to the caller's object.
+    candidate_body = dict(raw_body)
+    if guard_outcome.stripped_count or system_prompt_augment:
+        candidate_body["system"] = system
+    if pending_reasoning is not None:
+        field_name, value = pending_reasoning
+        candidate_body[field_name] = value
+        for parameter in removed_sampling_parameters:
+            candidate_body.pop(parameter)
+
+    after_fp = messages_fingerprint(candidate_body.get("messages"))
     if before_fp != after_fp:
         raise RuntimeError("mutation-safety invariant violated: override altered historical messages")
 
     if not mutations:
         return OverrideResult(body=raw_body, warnings=warnings)
 
+    raw_body.clear()
+    raw_body.update(candidate_body)
     return OverrideResult(
         body=raw_body,
         mutation_record={

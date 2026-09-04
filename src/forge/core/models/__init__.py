@@ -61,6 +61,7 @@ from forge.core.models.model_routes import (
     get_model_route_candidates,
     load_model_route_catalog,
     normalize_model_route_request,
+    resolve_model_alternative,
 )
 from forge.core.models.types import (
     ModelCatalog,
@@ -99,6 +100,7 @@ __all__ = [
     "clear_model_route_catalog_cache",
     "get_model_route_candidates",
     "normalize_model_route_request",
+    "resolve_model_alternative",
     "normalize_model_reference",
     "strip_transport_model_suffix",
 ]

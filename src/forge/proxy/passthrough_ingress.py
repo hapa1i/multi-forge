@@ -30,6 +30,13 @@ _REASONING_OVERRIDE_PUBLIC_MESSAGE = (
     "manual thinking.type/budget_tokens for adaptive models"
 )
 
+# A bad effort floor comes from proxy.yaml, which the caller never sees. Blaming
+# the request body would send the operator hunting through their client.
+_REASONING_CONFIG_PUBLIC_MESSAGE = (
+    "Proxy reasoning override is misconfigured; fix intercept override "
+    "tier_overrides.<tier>.reasoning_effort in this proxy's proxy.yaml"
+)
+
 
 async def _apply_passthrough_override(
     raw_body: dict[str, Any],
@@ -59,6 +66,20 @@ async def _apply_passthrough_override(
             system_prompt_augment=getattr(override_cfg, "system_prompt_augment", "") if override_cfg else "",
             system_prompt_guards=getattr(override_cfg, "system_prompt_guards", []) if override_cfg else [],
             reasoning_floor_effort=reasoning_floor,
+        )
+    except intercept.ReasoningConfigError as exc:
+        # Subclass of ReasoningOverrideError, so this branch must stay first.
+        logger.error("[%s] misconfigured passthrough reasoning floor: %s", request_id, exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "error",
+                "error": {
+                    "type": "configuration_error",
+                    "message": f"{_REASONING_CONFIG_PUBLIC_MESSAGE} [{request_id}]",
+                },
+            },
+            headers={"X-Request-ID": request_id},
         )
     except intercept.ReasoningOverrideError as exc:
         logger.warning("[%s] invalid passthrough reasoning override: %s", request_id, exc)
@@ -191,11 +212,27 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
         )
 
     model = str(raw_body.get("model") or "unknown")
-    # Prefer the request's explicit tier (from the model name) over the proxy default,
-    # so tier_overrides.<tier> (e.g. reasoning_effort) match an explicit opus request.
-    resolved_tier = (
-        server._tier_from_model_name(model) or getattr(server.config.proxy, "default_tier", None) or "sonnet"
-    )
+    # Same precedence as the translated route: the request's explicit tier (from the
+    # model name), then Forge's own tier projection, then the proxy default. Without
+    # the projection this wire shape would pick tier_overrides.<tier> (e.g.
+    # reasoning_effort) for a different tier than the launcher routed the session to.
+    explicit_tier = server._tier_from_model_name(model)
+    projected_tier = server._projected_model_tier(raw_request)
+    if explicit_tier is None and projected_tier is not None and not server.is_valid_model_tier(projected_tier):
+        # Raising HTTPException here would be swallowed by the middleware's
+        # passthrough guard and reported as an opaque 500.
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": f"{server.FORGE_MODEL_TIER_HEADER} must be one of: haiku, opus, sonnet",
+                },
+            },
+            headers={"X-Request-ID": request_id},
+        )
+    resolved_tier = explicit_tier or projected_tier or getattr(server.config.proxy, "default_tier", None) or "sonnet"
     req_headers = dict(raw_request.headers)
 
     # Spend-cap check — same cross-request accumulation as the translated path, so caps

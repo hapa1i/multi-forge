@@ -1007,8 +1007,8 @@ normalizes the request and chooses a launch route before starting Claude Code:
 If more than one proxy tier serves the request and no default decides it, add `--model-tier haiku|sonnet|opus`. It
 requires `--model`; it does not select a second model. Direct Claude requests must use their intrinsic tier. Claude
 `[1m]` aliases keep their transport behavior on bare resume and inherited fork; non-Claude `[1m]` is invalid. For a
-proxied Claude route, the selected tier is what Claude sends to the proxy even when that tier differs from the model's
-intrinsic family.
+proxy route, Forge sends both the selected tier and the canonical requested model to the proxy, so historical or
+non-Claude alternatives retain the planned model and tier-specific hyperparameters across launch.
 
 Forge stores the canonical request and resolved source/template/tier alongside the legacy Claude execution pin. A bare
 resume or inherited-route fork reuses that route; if it is unavailable, Forge fails with recovery guidance rather than
@@ -1215,9 +1215,12 @@ endpoint and recorded identity before launching Claude. Forge does not silently 
 error prints two recovery paths when the corresponding configuration is available: restart the recorded proxy with
 `forge proxy start <proxy-id>`, or explicitly replace the route with the replay-equivalent
 `forge session resume <name> --model <recorded-model> --proxy <template>` command printed by Forge. The command includes
-`--model-tier <recorded-tier>` only when the same model is served by multiple tiers. If `--fresh` or `--force` has
-already created a derived child before the launch check fails, the error names the retained child. Resume that child
-after recovery rather than retrying the parent, which would create another child.
+`--model-tier <recorded-tier>` only when the same model is served by multiple tiers. When route replay fails before a
+fresh child is created, that replacement command retains every explicitly supplied lifecycle flag: `--fresh`,
+`--child-name`, `--strategy`, `--drop-last`, `--depth`, `--resume-mode`, `--review`, `--force`, `--memory`,
+`--authority`, and `--authority-tier`. If `--fresh` or `--force` has already created a derived child before the launch
+check fails, the error names the retained child. Resume that child after recovery rather than retrying the parent, which
+would create another child.
 
 A bare `forge session fork <parent>` applies the same fail-closed rule to an inherited proxy route. Its replacement
 command repeats the complete intended fork action—including the resolved child name and explicit destination, strategy,

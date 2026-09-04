@@ -49,6 +49,17 @@ _MALFORMED_DIRECT_FIELDS: tuple[tuple[str, object], ...] = (
     ("model_alternatives", {"opus": []}),
     ("model_alternatives", {"opus": {1: "anthropic/claude-opus-4.8"}}),
     ("model_alternatives", {"opus": {"claude-opus-4-8": 42}}),
+    ("model_alternatives", {"opus": {"": "anthropic/claude-opus-4.8"}}),
+    ("model_alternatives", {"opus": {"claude-opus-4-8": ""}}),
+    (
+        "model_alternatives",
+        {
+            "opus": {
+                "gemini-3.7-flash": "vertex_ai/gemini-3.7-flash-a",
+                "vertex_ai/gemini-3.7-flash": "vertex_ai/gemini-3.7-flash-b",
+            }
+        },
+    ),
     ("prompt_caching", 42),
     ("prompt_caching", "sometimes"),
     ("auto_cache_min_tokens", "4096"),
@@ -120,6 +131,41 @@ def test_d054_valid_direct_fields_survive_instance_loading() -> None:
     assert config.model_alternatives["opus"]["claude-opus-4-8"] == "anthropic/claude-opus-4.8"
     assert config.prompt_caching == "auto_inject"
     assert config.auto_cache_min_tokens == 4096
+
+
+def test_d054_conflicting_catalog_aliases_report_the_tier_and_identity() -> None:
+    alternatives = {
+        "opus": {
+            "gemini-3.7-flash": "vertex_ai/gemini-3.7-flash-a",
+            "vertex_ai/gemini-3.7-flash": "vertex_ai/gemini-3.7-flash-b",
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match=r"model_alternatives\.opus: .* both resolve to catalog model 'gemini-3\.7-flash'.*different backend",
+    ):
+        load_proxy_instance_config_from_dict({**_VALID_PROXY, "model_alternatives": alternatives})
+
+
+def test_d054_equivalent_catalog_aliases_may_repeat_the_same_backend() -> None:
+    backend = "vertex_ai/gemini-3.7-flash"
+    config = load_proxy_instance_config_from_dict(
+        {
+            **_VALID_PROXY,
+            "model_alternatives": {
+                "opus": {
+                    "gemini-3.7-flash": backend,
+                    "vertex_ai/gemini-3.7-flash": backend,
+                }
+            },
+        }
+    )
+
+    assert config.model_alternatives["opus"] == {
+        "gemini-3.7-flash": backend,
+        "vertex_ai/gemini-3.7-flash": backend,
+    }
 
 
 def _inject_failed_spawn(

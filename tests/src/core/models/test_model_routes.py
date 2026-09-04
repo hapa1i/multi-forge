@@ -18,6 +18,7 @@ from forge.core.models.model_routes import (
     clear_model_route_catalog_cache,
     load_model_route_catalog,
     normalize_model_route_request,
+    resolve_model_alternative,
     validate_model_route_catalog_integrations,
 )
 
@@ -177,6 +178,16 @@ class TestRequestNormalization:
             normalize_model_route_request("not-a-model")
         with pytest.raises(ModelRouteCatalogError, match="only supported for Claude"):
             normalize_model_route_request("gpt-5.6-sol[1m]")
+
+    def test_alternative_resolution_shares_catalog_identity_but_not_unknown_identity(self) -> None:
+        alternatives = {
+            "vertex_ai/gemini-3.7-flash": "vertex_ai/gemini-3.7-flash-served",
+            "vendor/private-slug-a": "served-private-a",
+        }
+
+        assert resolve_model_alternative("gemini-3.7-flash", alternatives) == "vertex_ai/gemini-3.7-flash-served"
+        assert resolve_model_alternative("vendor/private-slug-a", alternatives) == "served-private-a"
+        assert resolve_model_alternative("vendor/private-slug-b", alternatives) is None
 
 
 class TestSchemaValidation:
