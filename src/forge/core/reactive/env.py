@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from forge.core.run_id import (
     ANTHROPIC_CUSTOM_HEADERS_VAR,
     FORGE_COMMAND_HEADER,
+    FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
     FORGE_SESSION_HEADER,
@@ -454,18 +455,21 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
     Inherited Forge-owned lines are always stripped (the env starts from
     ``os.environ.copy()``, so a nested child inherits the parent's values). Fresh values are
     stamped only when the subprocess is proxy-routed to a *proven* Forge proxy, so the opaque
-    ids never reach a non-Forge gateway. Up to four Forge-owned headers are stamped: the
-    run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
+    ids never reach a non-Forge gateway. Up to four Forge-owned correlation headers are stamped:
+    the run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
     (``X-Forge-Session`` -- an opaque hash of the session name + role, always emittable via
     the ``forge_run_<hash>`` fallback; ``X-Forge-Command`` -- the sanitized role, only when
-    a role is set). All other (user) header lines are preserved. These headers are consumed
-    by the proxy and never forwarded upstream (the passthrough allowlist drops them).
+    a role is set). An inherited ``X-Forge-Model-Tier`` line is also scrubbed here; the
+    route projection layer replaces it separately when required. All other (user) header
+    lines are preserved. Forge-owned headers are consumed by the proxy and never forwarded
+    upstream (the passthrough allowlist drops them).
     """
     forge_owned = {
         FORGE_RUN_ID_HEADER.lower(),
         FORGE_ROOT_RUN_ID_HEADER.lower(),
         FORGE_SESSION_HEADER.lower(),
         FORGE_COMMAND_HEADER.lower(),
+        FORGE_MODEL_TIER_HEADER.lower(),
     }
     kept: list[str] = []
     for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
@@ -497,6 +501,28 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
     if command:
         kept.append(f"{FORGE_COMMAND_HEADER}: {command}")
     env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)
+
+
+def apply_forge_model_tier_header(env: dict[str, str], tier: str | None) -> None:
+    """Replace the Forge-owned model-tier header while preserving user lines."""
+    if tier is not None and tier not in {"haiku", "sonnet", "opus"}:
+        raise ValueError("projected model tier must be one of: haiku, opus, sonnet")
+
+    kept: list[str] = []
+    for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        name = line.split(":", 1)[0].strip().lower()
+        if name != FORGE_MODEL_TIER_HEADER.lower():
+            kept.append(line)
+    if tier is not None:
+        kept.append(f"{FORGE_MODEL_TIER_HEADER}: {tier}")
+
+    if kept:
+        env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)
+    else:
+        env.pop(ANTHROPIC_CUSTOM_HEADERS_VAR, None)
 
 
 @dataclass(frozen=True)

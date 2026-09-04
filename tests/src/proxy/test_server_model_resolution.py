@@ -8,7 +8,9 @@ from types import SimpleNamespace
 from typing import Any, Callable, cast
 
 import pytest
+from fastapi import HTTPException
 
+from forge.core.run_id import FORGE_MODEL_TIER_HEADER
 from forge.proxy.data_models import Message, MessagesRequest, TokenCountRequest
 
 
@@ -20,6 +22,7 @@ class ResolutionCase:
     default_tier: str
     expected_tier: str
     expected_model: str
+    projected_tier: str | None = None
 
 
 RESOLUTION_CASES = [
@@ -55,6 +58,24 @@ RESOLUTION_CASES = [
         expected_tier="haiku",
         expected_model="openai/gpt-haiku-test",
     ),
+    ResolutionCase(
+        name="projected-non-claude-tier",
+        model="gemini-3.7-flash",
+        preferred_provider="openrouter",
+        default_tier="sonnet",
+        expected_tier="opus",
+        expected_model="google/gemini-3.7-flash",
+        projected_tier="opus",
+    ),
+    ResolutionCase(
+        name="explicit-tier-ignores-invalid-projection",
+        model="claude-opus",
+        preferred_provider="openrouter",
+        default_tier="sonnet",
+        expected_tier="opus",
+        expected_model="openai/gpt-opus-test",
+        projected_tier="turbo",
+    ),
 ]
 
 
@@ -69,7 +90,9 @@ class _RequestState:
 
 class _RawRequest:
     state = _RequestState()
-    headers: dict[str, str] = {}
+
+    def __init__(self, headers: dict[str, str] | None = None) -> None:
+        self.headers = headers or {}
 
 
 class _AnthropicResponse:
@@ -85,7 +108,12 @@ class _ProviderCfg:
     )
     allow_non_zdr = False
     zdr_fallbacks: dict[str, str] = {}
-    model_alternatives = {"opus": {"claude-fable": "anthropic/claude-opus-special"}}
+    model_alternatives = {
+        "opus": {
+            "claude-fable": "anthropic/claude-opus-special",
+            "gemini-3.7-flash": "google/gemini-3.7-flash",
+        }
+    }
 
 
 class _ProxyCfg:
@@ -179,7 +207,8 @@ async def test_create_message_resolves_model_tier_and_cost_target(
         messages=[Message(role="user", content="hello")],
     )
 
-    response = await server.create_message(request_data, cast(Any, _RawRequest()))
+    headers = {FORGE_MODEL_TIER_HEADER: case.projected_tier} if case.projected_tier is not None else {}
+    response = await server.create_message(request_data, cast(Any, _RawRequest(headers)))
 
     assert response.status_code == 200
     assert response.headers["X-Resolved-Tier"] == case.expected_tier
@@ -215,10 +244,52 @@ async def test_count_tokens_resolves_model_and_tier_like_messages(
         messages=[Message(role="user", content="hello")],
     )
 
-    response = await server.count_tokens(request_data, cast(Any, _RawRequest()))
+    headers = {FORGE_MODEL_TIER_HEADER: case.projected_tier} if case.projected_tier is not None else {}
+    response = await server.count_tokens(request_data, cast(Any, _RawRequest(headers)))
 
     assert response.status_code == 200
     assert json.loads(response.body) == {"input_tokens": 42}
     assert request_data.tier == case.expected_tier
     assert captured["client_calls"] == [{"model": case.expected_model, "tier": case.expected_tier}]
     assert captured["count_messages"] == [{"role": "user"}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["messages", "count_tokens"])
+async def test_invalid_projected_tier_is_a_client_error_for_both_routes(
+    monkeypatch: pytest.MonkeyPatch,
+    endpoint: str,
+) -> None:
+    import forge.proxy.server as server
+
+    case = ResolutionCase(
+        name="invalid-projected-tier",
+        model="gemini-3.7-flash",
+        preferred_provider="openrouter",
+        default_tier="sonnet",
+        expected_tier="sonnet",
+        expected_model="openai/gpt-sonnet-test",
+    )
+    _install_server_stubs(monkeypatch, case)
+    raw_request = cast(Any, _RawRequest({FORGE_MODEL_TIER_HEADER: "turbo"}))
+    if endpoint == "messages":
+        request_data = MessagesRequest(
+            model=case.model,
+            max_tokens=1,
+            messages=[Message(role="user", content="hello")],
+        )
+        call = server.create_message(request_data, raw_request)
+    else:
+        token_request = TokenCountRequest(
+            model=case.model,
+            messages=[Message(role="user", content="hello")],
+        )
+        call = server.count_tokens(token_request, raw_request)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await call
+
+    assert exc_info.value.status_code == 400
+    detail = exc_info.value.detail
+    assert isinstance(detail, dict)
+    assert "X-Forge-Model-Tier must be one of" in detail["message"]

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from forge.core.run_id import FORGE_MODEL_TIER_HEADER
 from forge.proxy import passthrough
 from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
@@ -47,6 +48,7 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
         "anthropic-version": "2023-06-01",
         "anthropic-beta": "prompt-caching-2024-07-31",
         "user-agent": "claude-cli/2.1",
+        FORGE_MODEL_TIER_HEADER: "opus",
     }
     headers = passthrough.build_upstream_headers(inbound, "UPSTREAM-KEY")
 
@@ -55,6 +57,7 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
     assert headers["anthropic-beta"] == "prompt-caching-2024-07-31"
     # Client credentials are never forwarded upstream.
     assert "authorization" not in headers
+    assert FORGE_MODEL_TIER_HEADER.lower() not in headers
 
 
 def test_build_upstream_headers_defaults_anthropic_version():

@@ -46,6 +46,7 @@ from forge.core.logging import (
 from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
+    FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
     FORGE_SESSION_HEADER,
@@ -656,6 +657,23 @@ def _model_alternative_or_default(tier: str, original_model_name: str | None, fa
     return fallback_model
 
 
+def _projected_model_tier(raw_request: Request) -> str | None:
+    """Read the Forge-owned tier projection from one downstream request."""
+    return raw_request.headers.get(FORGE_MODEL_TIER_HEADER)
+
+
+def _validate_projected_model_tier(projected_tier: str) -> str:
+    if projected_tier not in {"haiku", "sonnet", "opus"}:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "invalid_request_error",
+                "message": f"{FORGE_MODEL_TIER_HEADER} must be one of: haiku, opus, sonnet",
+            },
+        )
+    return projected_tier
+
+
 def _openrouter_zdr_fallbacks(provider_cfg: object) -> dict[str, str]:
     """Return built-in ZDR fallbacks plus user-owned replacements."""
     return openrouter_zdr_fallbacks(provider_cfg)
@@ -680,11 +698,16 @@ def _model_for_zdr_policy(model_name: str) -> str:
 
 def _resolve_model_with_alternatives(
     request_data: MessagesRequest | TokenCountRequest,
+    *,
+    projected_tier: str | None = None,
 ) -> _ResolvedModelRoute:
     """Resolve request tier and backend model for message and token-count routes."""
     if request_data.has_explicit_tier and request_data.tier:
         resolved_tier: str = request_data.tier
         resolved_tier_source = "request"
+    elif projected_tier is not None:
+        resolved_tier = _validate_projected_model_tier(projected_tier)
+        resolved_tier_source = "forge.model_tier_header"
     elif config.proxy.default_tier:
         resolved_tier = config.proxy.default_tier
         resolved_tier_source = "proxy.default_tier"
@@ -977,7 +1000,10 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
     provider_response_received = False
     _trace_ctx: dict[str, Any] = {}
 
-    resolved_route = _resolve_model_with_alternatives(request_data)
+    resolved_route = _resolve_model_with_alternatives(
+        request_data,
+        projected_tier=_projected_model_tier(raw_request),
+    )
     resolved_tier = resolved_route.tier
     resolved_tier_source = resolved_route.tier_source
     actual_model_id = resolved_route.model
@@ -1637,7 +1663,10 @@ async def count_tokens(request_data: TokenCountRequest, raw_request: Request):
 
     try:
         original_model_name = request_data.original_model_name
-        resolved_route = _resolve_model_with_alternatives(request_data)
+        resolved_route = _resolve_model_with_alternatives(
+            request_data,
+            projected_tier=_projected_model_tier(raw_request),
+        )
         resolved_tier = resolved_route.tier
         resolved_tier_source = resolved_route.tier_source
         actual_model_id = resolved_route.model
@@ -1663,6 +1692,8 @@ async def count_tokens(request_data: TokenCountRequest, raw_request: Request):
         response = TokenCountResponse(input_tokens=token_count)
         return JSONResponse(content=response.model_dump(), headers={"X-Request-ID": request_id})
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[{request_id}] Token counting failed: {e}")
         raise HTTPException(

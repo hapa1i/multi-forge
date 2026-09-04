@@ -110,7 +110,7 @@ def _install_message_stubs(
     monkeypatch.setattr(
         server,
         "_resolve_model_with_alternatives",
-        lambda _request: SimpleNamespace(
+        lambda _request, **_kwargs: SimpleNamespace(
             tier="sonnet",
             tier_source="explicit",
             model="openai/gpt-5.5",

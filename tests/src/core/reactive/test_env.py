@@ -582,6 +582,7 @@ class TestCorrelationHeaders:
 
     from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR as _H
     from forge.core.run_id import FORGE_COMMAND_HEADER as _CMD_H
+    from forge.core.run_id import FORGE_MODEL_TIER_HEADER as _MODEL_TIER_H
     from forge.core.run_id import FORGE_ROOT_RUN_ID_HEADER as _ROOT_H
     from forge.core.run_id import FORGE_RUN_ID_HEADER as _RUN_H
     from forge.core.run_id import FORGE_SESSION_HEADER as _SESS_H
@@ -623,6 +624,16 @@ class TestCorrelationHeaders:
         run_lines = [ln for ln in lines if ln.lower().startswith(self._RUN_H.lower())]
         assert len(run_lines) == 1  # exactly one (no duplicate)
         assert "run_stale0000000" not in env[self._H]  # stale value replaced
+
+    def test_headless_child_strips_inherited_interactive_model_tier(self) -> None:
+        vars_ = self._marker_vars()
+        vars_[self._H] = f"X-User: keep\n{self._MODEL_TIER_H}: opus"
+
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+
+        lines = env[self._H].splitlines()
+        assert "X-User: keep" in lines
+        assert not any(line.lower().startswith(f"{self._MODEL_TIER_H.lower()}:") for line in lines)
 
     def test_header_run_id_matches_env_run_id(self) -> None:
         env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
