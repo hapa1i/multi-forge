@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from forge.core.models.model_routes import ModelRouteCatalogError
 from forge.session.events import SessionEventValidationError, append_session_event
 from forge.session.models import (
     LaunchIntent,
@@ -208,6 +209,64 @@ def test_historical_proxy_route_without_wire_shape_uses_translated_mapping(tmp_p
     events = read_routing_events(tmp_path, state)
     assert events[0].payload["route"].get("wire_shape") is None
     assert events[0].payload["selected_model"] == "anthropic/claude-sonnet-5"
+
+
+def test_historical_proxy_alias_does_not_depend_on_the_current_catalog(tmp_path: Path) -> None:
+    state = _state()
+    payload = _proxy_payload()
+    payload["requested_model"] = "claude-sonnet-5"
+    payload["selected_tier"] = "sonnet"
+    payload["selected_model"] = "anthropic/claude-opus-5"
+    payload["model_alternatives"] = {
+        "sonnet": {
+            "anthropic/claude-sonnet-5": "anthropic/claude-opus-5",
+            "claude-sonnet-5": "anthropic/claude-opus-5",
+        }
+    }
+    for request_model in payload["model_alternatives"]["sonnet"]:
+        payload["marking_snapshots"].append(
+            {
+                **payload["marking_snapshots"][0],
+                "slot": "model_alternative",
+                "request_model": request_model,
+                "route_model": "anthropic/claude-opus-5",
+                "canonical_model": "claude-opus-5",
+            }
+        )
+    append_routing_event(tmp_path, _commit(state, "run_000000000001", payload))
+
+    with patch(
+        "forge.core.models.model_routes.normalize_model_route_request",
+        side_effect=ModelRouteCatalogError("removed test alias"),
+    ):
+        events = read_routing_events(tmp_path, state)
+
+    assert events[0].payload["selected_model"] == "anthropic/claude-opus-5"
+
+
+def test_historical_proxy_route_rejects_an_unrelated_alternative(tmp_path: Path) -> None:
+    state = _state()
+    payload = _proxy_payload()
+    payload["requested_model"] = "claude-sonnet-5"
+    payload["selected_tier"] = "sonnet"
+    payload["selected_model"] = "anthropic/claude-opus-5"
+    payload["model_alternatives"] = {"sonnet": {"claude-sonnet-5": "anthropic/claude-opus-5"}}
+    payload["marking_snapshots"].append(
+        {
+            **payload["marking_snapshots"][0],
+            "slot": "model_alternative",
+            "request_model": "claude-sonnet-5",
+            "route_model": "anthropic/claude-opus-5",
+            "canonical_model": "claude-opus-5",
+        }
+    )
+    raw = asdict(_commit(state, "run_000000000001", payload))
+    raw["payload"]["model_alternatives"]["sonnet"] = {"vendor/unrelated": "anthropic/claude-opus-5"}
+    raw["payload"]["marking_snapshots"][-1]["request_model"] = "vendor/unrelated"
+    append_session_event(tmp_path, "routing", raw)
+
+    with pytest.raises(SessionEventValidationError, match="selected_model does not match"):
+        read_routing_events(tmp_path, state)
 
 
 def test_new_proxy_route_requires_wire_shape() -> None:

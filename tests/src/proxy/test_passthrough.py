@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from forge.core.run_id import FORGE_MODEL_TIER_HEADER
 from forge.proxy import passthrough
 from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
@@ -47,6 +48,7 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
         "anthropic-version": "2023-06-01",
         "anthropic-beta": "prompt-caching-2024-07-31",
         "user-agent": "claude-cli/2.1",
+        FORGE_MODEL_TIER_HEADER: "opus",
     }
     headers = passthrough.build_upstream_headers(inbound, "UPSTREAM-KEY")
 
@@ -55,6 +57,7 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
     assert headers["anthropic-beta"] == "prompt-caching-2024-07-31"
     # Client credentials are never forwarded upstream.
     assert "authorization" not in headers
+    assert FORGE_MODEL_TIER_HEADER.lower() not in headers
 
 
 def test_build_upstream_headers_defaults_anthropic_version():
@@ -916,7 +919,7 @@ async def test_passthrough_override_rejects_manual_thinking_for_adaptive_fable(m
     server = proxy_runtime_ready
     monkeypatch.setattr(server, "PROXY_ID", "pt")
     cfg = _passthrough_config(default_tier="opus", intercept_mode="override")
-    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort="max")}
+    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort=None)}
     monkeypatch.setattr(server.config, "proxy", cfg.proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
 
@@ -924,6 +927,7 @@ async def test_passthrough_override_rejects_manual_thinking_for_adaptive_fable(m
         raise AssertionError("provider-invalid adaptive thinking must not be forwarded")
 
     monkeypatch.setattr("forge.proxy.passthrough.forward", _boom)
+
     raw_body = {
         "model": "claude-fable-5-1",
         "max_tokens": 64_000,
@@ -936,6 +940,100 @@ async def test_passthrough_override_rejects_manual_thinking_for_adaptive_fable(m
     assert response.status_code == 400
     assert b"Invalid reasoning override" in bytes(response.body)
     assert b"requires adaptive thinking" not in bytes(response.body)
+
+
+@pytest.mark.asyncio
+async def test_passthrough_explicit_model_incompatible_with_valid_floor_returns_400(monkeypatch, proxy_runtime_ready):
+    """A valid tier floor that the requested model cannot express is a request conflict, not bad proxy config."""
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="opus", intercept_mode="override")
+    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort="max")}
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    async def _boom(**kwargs):
+        raise AssertionError("incompatible reasoning floor must not be forwarded")
+
+    monkeypatch.setattr("forge.proxy.passthrough.forward", _boom)
+    raw_body = {
+        "model": "claude-opus-4-5",
+        "max_tokens": 64_000,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_incompatible"), "req_incompatible")
+
+    assert response.status_code == 400
+    body = bytes(response.body)
+    assert b"invalid_request_error" in body
+    assert b"Invalid reasoning override" in body
+    assert b"claude-opus-4-5" not in body
+
+
+@pytest.mark.asyncio
+async def test_passthrough_honors_the_forge_tier_projection(monkeypatch, proxy_runtime_ready, anthropic_transport):
+    """This wire shape is dispatched from middleware, so it must read the tier header too."""
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="sonnet", intercept_mode="override")
+    cfg.proxy.get_provider().tier_overrides = {
+        "opus": SimpleNamespace(reasoning_effort="high"),
+        "sonnet": SimpleNamespace(reasoning_effort="minimal"),
+    }
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    anthropic_transport.response = FakeResponse(content=_USAGE_RESPONSE)
+
+    # No tier word in the model name, so only the projection can select opus.
+    raw_body = {"model": "gemini-3.7-flash", "max_tokens": 64_000, "messages": [{"role": "user", "content": "hi"}]}
+    headers = {"anthropic-version": "2023-06-01", FORGE_MODEL_TIER_HEADER: "opus"}
+
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_proj", headers=headers), "req_proj")
+
+    sent = anthropic_transport.captured.json
+    # opus 'high' -> a 10k budget floor; the sonnet default would have pinned the 1024 minimum.
+    assert sent["thinking"]["budget_tokens"] >= 10_000
+
+
+@pytest.mark.asyncio
+async def test_passthrough_rejects_an_invalid_tier_projection(monkeypatch, proxy_runtime_ready):
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="sonnet", intercept_mode="override")
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    raw_body = {"model": "gemini-3.7-flash", "max_tokens": 64_000, "messages": [{"role": "user", "content": "hi"}]}
+    headers = {"anthropic-version": "2023-06-01", FORGE_MODEL_TIER_HEADER: "turbo"}
+
+    response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_bad", headers=headers), "req_bad")
+
+    # A raised HTTPException would surface as an opaque 500 from the middleware guard.
+    assert response.status_code == 400
+    assert b"X-Forge-Model-Tier must be one of" in bytes(response.body)
+
+
+@pytest.mark.asyncio
+async def test_passthrough_misconfigured_floor_is_a_configuration_error(monkeypatch, proxy_runtime_ready):
+    """A typo in proxy.yaml must not be reported to the caller as a bad request body."""
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    cfg = _passthrough_config(default_tier="opus", intercept_mode="override")
+    cfg.proxy.get_provider().tier_overrides = {"opus": SimpleNamespace(reasoning_effort="hihg")}
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    raw_body = {"model": "claude-opus-4-6", "max_tokens": 64_000, "messages": [{"role": "user", "content": "hi"}]}
+
+    response = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_cfg"), "req_cfg")
+
+    assert response.status_code == 500
+    body = bytes(response.body)
+    assert b"configuration_error" in body
+    assert b"proxy.yaml" in body
+    assert b"output_config" not in body  # never blame the caller's request body
+    assert b"hihg" not in body  # never reflect the raw configured value
 
 
 @pytest.mark.asyncio

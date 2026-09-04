@@ -1597,6 +1597,27 @@ def _stage_sidecar_hook_settings(sidecar_home: Path) -> Path:
     return settings_path
 
 
+def _apply_proxy_model_route_env(
+    env_vars: dict[str, str],
+    *,
+    model_route: ModelRouteIntent | None,
+    direct_model: str | None,
+) -> str | None:
+    """Project a durable proxy route into Claude Code's model environment."""
+    if model_route is None or model_route.kind != "proxy":
+        return None
+
+    selected_tier = model_route.selected_tier
+    env_vars["ANTHROPIC_MODEL"] = selected_tier
+    # Route transitions reserve ``direct_model`` for Claude requests. Other
+    # models must travel through the selected tier's Claude Code alias so the
+    # proxy receives the canonical alternative key instead of the tier name.
+    if direct_model is None:
+        env_vars[f"ANTHROPIC_DEFAULT_{selected_tier.upper()}_MODEL"] = model_route.requested_model
+        return selected_tier
+    return None
+
+
 def _run_host_claude_session(
     *,
     manifest: SessionState,
@@ -1656,15 +1677,16 @@ def _run_host_claude_session(
         if application.error:
             raise ForgeOpError(application.error)
         applied_direct_model = application.pin
-    if (
-        runtime_base_url is not None
-        and manifest.intent.launch
-        and manifest.intent.launch.model_route is not None
-        and manifest.intent.launch.model_route.kind == "proxy"
-    ):
-        # The route tier controls Claude Code's proxy-facing model selector. A
-        # direct-model pin may still populate the per-tier provider mappings.
-        env_vars["ANTHROPIC_MODEL"] = manifest.intent.launch.model_route.selected_tier
+    projected_model_tier = None
+    if runtime_base_url is not None and manifest.intent.launch:
+        # The route tier controls Claude Code's proxy-facing selector. Non-Claude
+        # alternatives also need their canonical request projected through that
+        # tier so the proxy can reproduce the planner's exact selection.
+        projected_model_tier = _apply_proxy_model_route_env(
+            env_vars,
+            model_route=manifest.intent.launch.model_route,
+            direct_model=manifest.intent.launch.direct_model,
+        )
 
     routing_mode = _routing_mode_for(runtime_base_url, proxy_id)
     _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
@@ -1692,6 +1714,8 @@ def _run_host_claude_session(
     }
     if fork_session is not None:
         invoke_kwargs["fork_session"] = fork_session
+    if projected_model_tier is not None:
+        invoke_kwargs["projected_model_tier"] = projected_model_tier
 
     routing_payload = build_claude_routing_payload(
         manifest,

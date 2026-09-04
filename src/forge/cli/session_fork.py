@@ -212,7 +212,7 @@ def _fork_model_route_recovery_action(
         argv.extend(("--authority", request.authority.role))
         if request.authority.tier is not None:
             argv.extend(("--authority-tier", request.authority.tier))
-    return SessionRouteRecoveryAction(tuple(argv))
+    return SessionRouteRecoveryAction(tuple(argv), has_explicit_options=True)
 
 
 def _render_fork_execution_event(event: ForkExecutionEvent) -> None:

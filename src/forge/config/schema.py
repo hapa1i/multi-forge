@@ -27,6 +27,10 @@ from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
 from forge.core.identifiers import is_lowercase_identifier
+from forge.core.models.model_routes import (
+    ModelRouteCatalogError,
+    normalize_model_route_request,
+)
 from forge.core.wire_shapes import (
     ANTHROPIC_PASSTHROUGH,
     DEFAULT_WIRE_SHAPE,
@@ -232,8 +236,27 @@ def _validate_model_alternatives(value: Any) -> None:
     for tier, alternatives in value.items():
         if not isinstance(tier, str) or not isinstance(alternatives, dict):
             raise ValueError("Invalid model_alternatives: must be a mapping of tier mappings")
-        if any(not isinstance(alias, str) or not isinstance(model, str) for alias, model in alternatives.items()):
-            raise ValueError("Invalid model_alternatives: aliases and backend models must be strings")
+        if any(
+            not isinstance(alias, str) or not alias or not isinstance(model, str) or not model
+            for alias, model in alternatives.items()
+        ):
+            raise ValueError("Invalid model_alternatives: aliases and backend models must be non-empty strings")
+        catalog_routes: dict[str, tuple[str, str]] = {}
+        for alias, model in alternatives.items():
+            try:
+                route_key = normalize_model_route_request(alias).route_key
+            except ModelRouteCatalogError:
+                # Private backend slugs remain legal and retain exact-key semantics.
+                continue
+            prior = catalog_routes.get(route_key)
+            if prior is not None and prior[1] != model:
+                prior_alias, prior_model = prior
+                raise ValueError(
+                    f"Invalid model_alternatives.{tier}: {prior_alias!r} and {alias!r} both resolve to "
+                    f"catalog model {route_key!r} but select different backend models "
+                    f"({prior_model!r} and {model!r})"
+                )
+            catalog_routes[route_key] = (alias, model)
 
 
 def _validate_zdr_fallbacks(value: Any) -> None:

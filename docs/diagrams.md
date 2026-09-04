@@ -284,7 +284,7 @@ sequenceDiagram
     Proxy->>Config: Load effective proxy config<br/>(proxy.yaml + secret envs)
     Config-->>Proxy: default_tier, tiers,<br/>tier_overrides, provider_settings
 
-    Note over Proxy: Precedence:<br/>1. request explicit model/tier<br/>2. proxy.default_tier
+    Note over Proxy: Precedence:<br/>1. request explicit model/tier<br/>2. validated X-Forge-Model-Tier<br/>3. proxy.default_tier
 
     Proxy->>Proxy: Resolve tier → backend model
     Proxy->>Proxy: Apply proxy-owned defaults<br/>(tier_overrides, prompt_caching, provider settings)

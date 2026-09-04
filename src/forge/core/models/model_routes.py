@@ -137,6 +137,34 @@ def normalize_model_route_request(value: str) -> ModelRouteRequest:
     )
 
 
+def resolve_model_alternative(requested_model: str, alternatives: Mapping[str, str]) -> str | None:
+    """Resolve one alternative by exact key or shared catalog identity.
+
+    Exact lookup keeps user-owned, uncatalogued backend slugs usable. Catalogued
+    aliases additionally match any configured spelling with the same route key,
+    so launch planning, journal validation, and proxy dispatch make one choice.
+    """
+    exact = alternatives.get(requested_model)
+    if exact is not None:
+        return exact
+
+    requested_route_key = _known_route_key(requested_model)
+    if requested_route_key is None:
+        return None
+    for alternative_key, selected_model in alternatives.items():
+        if _known_route_key(alternative_key) == requested_route_key:
+            return selected_model
+    return None
+
+
+def _known_route_key(model_ref: str) -> str | None:
+    """Return a catalog route key without inventing identity for unknown slugs."""
+    try:
+        return normalize_model_route_request(model_ref).route_key
+    except ModelRouteCatalogError:
+        return None
+
+
 def load_model_route_catalog(*, force_reload: bool = False) -> ModelRouteCatalog:
     """Load, strictly validate, and cache the packaged route catalog."""
 
@@ -397,5 +425,6 @@ __all__ = [
     "get_model_route_candidates",
     "load_model_route_catalog",
     "normalize_model_route_request",
+    "resolve_model_alternative",
     "validate_model_route_catalog_integrations",
 ]

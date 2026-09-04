@@ -12,6 +12,7 @@ from forge.core.models.model_practices import (
     resolve_model_practice,
 )
 from forge.core.models.model_reference import normalize_model_reference
+from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.reactive.env import RunIdentity
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.model_routes import effective_proxy_model_maps
@@ -132,14 +133,6 @@ def build_claude_routing_payload(
         scope.append(f"backend:{backend_id}")
     scope.sort()
     wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
-    snapshots = [
-        _marking_snapshot("tier_default", tier, None, model, scope, catalog) for tier, model in tier_mappings.items()
-    ]
-    snapshots.extend(
-        _marking_snapshot("model_alternative", tier, request_model, route_model, scope, catalog)
-        for tier, alternatives in model_alternatives.items()
-        for request_model, route_model in alternatives.items()
-    )
     selected_model = None
     selected_tier = (
         model_route.selected_tier
@@ -161,10 +154,36 @@ def build_claude_routing_payload(
         if wire_shape == ANTHROPIC_PASSTHROUGH:
             selected_model = applied_direct_model.canonical_model
         else:
-            selected_model = model_alternatives.get(applied_direct_model.tier, {}).get(
-                applied_direct_model.canonical_model
+            selected_model = resolve_model_alternative(
+                applied_direct_model.canonical_model,
+                model_alternatives.get(applied_direct_model.tier, {}),
             )
-            selected_model = selected_model or tier_mappings.get(applied_direct_model.tier)
+            if selected_model is None:
+                selected_model = tier_mappings.get(applied_direct_model.tier)
+
+    # Journal the launch request under its exact persisted spelling after the
+    # shared resolver selects an alias. Historical validation can then prove the
+    # choice without reinterpreting it through a future model catalog.
+    if (
+        wire_shape != ANTHROPIC_PASSTHROUGH
+        and requested_model is not None
+        and selected_tier is not None
+        and selected_model is not None
+    ):
+        tier_alternatives = model_alternatives.get(selected_tier, {})
+        selected_alternative = resolve_model_alternative(requested_model, tier_alternatives)
+        if selected_alternative == selected_model and requested_model not in tier_alternatives:
+            model_alternatives = {tier: dict(alternatives) for tier, alternatives in model_alternatives.items()}
+            model_alternatives.setdefault(selected_tier, {})[requested_model] = selected_model
+
+    snapshots = [
+        _marking_snapshot("tier_default", tier, None, model, scope, catalog) for tier, model in tier_mappings.items()
+    ]
+    snapshots.extend(
+        _marking_snapshot("model_alternative", tier, request_model, route_model, scope, catalog)
+        for tier, alternatives in model_alternatives.items()
+        for request_model, route_model in alternatives.items()
+    )
     return _payload(
         kind="proxy",
         backend_id=backend_id,

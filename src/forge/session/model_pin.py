@@ -10,6 +10,7 @@ from forge.core.models.direct_model import (
     apply_direct_model_env,
     resolve_direct_model_pin,
 )
+from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
 
 
@@ -35,7 +36,7 @@ def _routing_supports_model_pin(
     if wire_shape == ANTHROPIC_PASSTHROUGH:
         return True
     alt_models = model_alternatives.get(pin.tier, {})
-    if pin.canonical_model in alt_models:
+    if resolve_model_alternative(pin.canonical_model, alt_models) is not None:
         return True
 
     tier_model = tiers.get(pin.tier)

@@ -46,7 +46,7 @@ async def test_bug_o001_translated_litellm_route_carries_user_agent(monkeypatch:
     monkeypatch.setattr(
         server,
         "_resolve_model_with_alternatives",
-        lambda _request: SimpleNamespace(
+        lambda _request, **_kwargs: SimpleNamespace(
             tier="sonnet",
             tier_source="explicit",
             model="openai/gpt-5.6-sol",

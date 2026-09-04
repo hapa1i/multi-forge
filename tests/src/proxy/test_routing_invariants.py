@@ -25,8 +25,9 @@ class DummyRequestState:
 
 
 class DummyRequest:
-    def __init__(self, request_id: str) -> None:
+    def __init__(self, request_id: str, headers: dict[str, str] | None = None) -> None:
         self.state = DummyRequestState(request_id)
+        self.headers = headers or {}
 
 
 class DummyAnthropicResponse:

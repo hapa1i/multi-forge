@@ -457,8 +457,13 @@ def _require_proxy(
         if wire_shape == ANTHROPIC_PASSTHROUGH:
             expected_model = requested
         else:
-            expected_model = payload["model_alternatives"].get(selected_tier, {}).get(requested)
-            expected_model = expected_model or payload["tier_mappings"].get(selected_tier)
+            alternatives = payload["model_alternatives"].get(selected_tier, {})
+            # The launch payload materializes any catalog-alias match under the
+            # exact persisted request spelling. Do not reinterpret historical
+            # route facts through the current catalog here.
+            expected_model = alternatives.get(requested)
+            if expected_model is None:
+                expected_model = payload["tier_mappings"].get(selected_tier)
         if expected_model is None or payload["selected_model"] != expected_model:
             raise SessionEventValidationError(
                 "proxy selected_model does not match the effective route",

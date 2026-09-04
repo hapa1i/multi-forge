@@ -486,7 +486,7 @@ class TestLazyContext:
                         "opus": "anthropic/default-opus",
                         "sonnet": "anthropic/default-sonnet",
                     },
-                    "model_alternatives": {"opus": {"claude-opus-5": "anthropic/claude-opus-5"}},
+                    "model_alternatives": {"opus": {"anthropic/claude-opus-5": "anthropic/claude-opus-5"}},
                 },
             }
         )

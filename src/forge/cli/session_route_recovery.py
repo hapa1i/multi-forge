@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from rich.markup import escape
 
@@ -21,10 +21,55 @@ class SessionRouteRecoveryAction:
     """A route-neutral lifecycle action that can be retried with a replacement proxy route."""
 
     argv: tuple[str, ...]
+    # Whether the caller supplied options worth reproducing in the retry command.
+    # Stated by the producer, which knows the parameter sources, rather than
+    # inferred by the renderer from argv equality: two different actions can
+    # serialize identically, and the renderer cannot tell them apart.
+    has_explicit_options: bool = field(kw_only=True)
 
     @classmethod
-    def resume(cls, session_name: str) -> SessionRouteRecoveryAction:
-        return cls(("forge", "session", "resume", session_name))
+    def resume(
+        cls,
+        session_name: str,
+        *,
+        fresh: bool = False,
+        child_name: str | None = None,
+        strategy: str | None = None,
+        drop_last: int | None = None,
+        depth: str | None = None,
+        resume_mode: str | None = None,
+        review: bool = False,
+        force: bool = False,
+        memory_flag: str | None = None,
+        authority_role: str | None = None,
+        authority_tier: str | None = None,
+    ) -> SessionRouteRecoveryAction:
+        """Build a route-neutral resume action from explicitly supplied options."""
+        argv = ["forge", "session", "resume", session_name]
+        bare_length = len(argv)
+        if fresh:
+            argv.append("--fresh")
+        if child_name is not None:
+            argv.extend(("--child-name", child_name))
+        if strategy is not None:
+            argv.extend(("--strategy", strategy))
+        if drop_last is not None:
+            argv.extend(("--drop-last", str(drop_last)))
+        if depth is not None:
+            argv.extend(("--depth", depth))
+        if resume_mode is not None:
+            argv.extend(("--resume-mode", resume_mode))
+        if review:
+            argv.append("--review")
+        if force:
+            argv.append("--force")
+        if memory_flag is not None:
+            argv.extend(("--memory", memory_flag))
+        if authority_role is not None:
+            argv.extend(("--authority", authority_role))
+        if authority_tier is not None:
+            argv.extend(("--authority-tier", authority_tier))
+        return cls(tuple(argv), has_explicit_options=len(argv) > bare_length)
 
     def with_proxy(self, proxy: str) -> str:
         return shlex.join((*self.argv, "--proxy", proxy))
@@ -131,8 +176,8 @@ def _render_persisted_proxy_refusal(
     recovery_action: SessionRouteRecoveryAction | None = None,
 ) -> None:
     """Render the shared fail-closed recovery surface for a persisted proxy route."""
-    caller_action_supplied = recovery_action is not None
     action = recovery_action or SessionRouteRecoveryAction.resume(manifest.name)
+    caller_action_supplied = action.has_explicit_options
     commands, has_reroute_command = _persisted_proxy_recovery_commands(
         manifest=manifest,
         template=template,

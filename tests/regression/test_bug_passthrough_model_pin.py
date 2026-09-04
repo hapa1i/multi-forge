@@ -88,3 +88,19 @@ def test_passthrough_env_application_populates_claude_vars(model: str, expected:
         "ANTHROPIC_MODEL": tier,
         f"ANTHROPIC_DEFAULT_{tier.upper()}_MODEL": env_model,
     }
+
+
+def test_translated_proxy_pin_accepts_provider_prefixed_alternative_key() -> None:
+    cfg = ProxyInstanceConfig(
+        proxy_format=1,
+        template="litellm-anthropic",
+        template_digest="abc",
+        provider="litellm",
+        proxy_endpoint="http://localhost:8096",
+        port=8096,
+        upstream_base_url="https://litellm.example.com",
+        tiers=TierModels(sonnet="anthropic/claude-sonnet-5", opus="anthropic/claude-opus-5"),
+        model_alternatives={"opus": {"anthropic/claude-opus-4-6": "anthropic/claude-opus-4-6"}},
+    )
+
+    assert _proxy_supports_model_pin(cfg, resolve_direct_model_pin("claude-opus-4-6")) is True
