@@ -47,7 +47,8 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-unit` runs tests.
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
 - `./scripts/test-integration.sh <path-or-pytest-args>` runs targeted integration tests with the same Docker/LiteLLM
-  prerequisites; paths, `-k`, and other pytest flags pass through.
+  prerequisites; paths, `-k`, and other pytest flags pass through. When `GEMINI_API_KEY` is available, the script owns a
+  temporary `FORGE_HOME` LiteLLM process on port 4001 and removes it on exit, so that port must be free.
 - `./scripts/test-wheel-runtime.sh` builds and installs a clean wheel with dependencies resolved outside `uv.lock`, then
   smoke-tests packaged LiteLLM start/health/stop; run it when the LiteLLM compatibility ceiling or Forge-owned proxy
   dependency set changes.
@@ -97,7 +98,9 @@ and workflow preflight should fail fast when required auth or proxies are missin
 confirms the local proxy process is reachable; use `forge proxy start <proxy_id> --smoke-test` to verify upstream LLM
 connectivity after first setup, credential changes, or proxy auth changes. For create-path changes, also verify
 `forge proxy create <template> --json --smoke-test`: it emits one result object, and a failed probe exits non-zero while
-retaining the created, reused, or adopted proxy for inspection and retry.
+retaining the created, reused, or adopted proxy for inspection and retry. For packaged model/template updates, verify a
+fresh realization and a pre-existing user-owned snapshot: upgrades must not rewrite `proxy.yaml` or materialized LiteLLM
+config, and new routes require `forge proxy edit <proxy_id>` or recreation of the affected proxy/backend before restart.
 
 For downstream-telemetry retention or config-ownership changes, inspect configured, effective, and source state with
 `forge config show --json`; preview legacy proxy-key migration with `forge config migrate-retention [--json]`, apply it
@@ -115,9 +118,11 @@ For policy CLI or hook changes, exercise `forge policy check --bundle coding_sta
 `git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown policy
 bundle names, unknown `bundle_config` owners, and invalid supported-bundle field types must fail atomic engine
 construction. The diff path splits multi-file patches into per-file contexts, evaluates tests before implementation
-through one engine, and reports `files_checked` plus each violation's `file_path` in JSON. The removed `workflow` bundle
-diagnostic must name both `policy.bundles` and `policy.bundle_config.workflow`. Claude and Codex hooks report that build
-error and allow the action before the configured fail mode applies.
+through one engine, and reports `files_checked` plus each violation's `file_path` in JSON. It must preserve boundaries
+for Git C-quoted paths, renames, copies, binary patches, and combined diffs, and fail closed when a non-deletion chunk
+cannot be attributed. The removed `workflow` bundle diagnostic must name both `policy.bundles` and
+`policy.bundle_config.workflow`. Claude and Codex hooks report that build error and allow the action before the
+configured fail mode applies.
 
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status
@@ -156,11 +161,20 @@ membership and session occupancy with `forge workspace worktrees [--json]`. Repa
 it must never recreate missing worktrees or accept collision/corrupt records. Valid missing-worktree sessions remain
 visible but unlaunchable until the checkout returns.
 
+For session deletion or cleanup changes, cancel an unconfirmed `forge session delete <name>` and compare the default
+`forge session clean --older-than <days>` preview with the corresponding `--yes` apply, including `--delete-worktree`
+cases. Pre-confirmation reads must not rewrite session or active indexes, preview and apply must agree on targets and
+refusals, and artifact-retention output is valid only when the containing Forge root survives. Confirmed deletion may
+still repair derived index state.
+
 For Claude model-route changes, exercise `forge session start|resume|fork|incognito --model <catalog-id-or-alias>` and
 use `--model-tier haiku|sonnet|opus` only to disambiguate a multi-tier proxy match. Inspect intent, durable commitment,
 current proxy facts, and the validated event sequence with `forge session model show|history <session> --json`. Explicit
-`--proxy` is strict, `--no-proxy` accepts only direct Claude models, bare resume reuses stored route intent, and a
-non-Claude `--model` may start a paid proxy even with `--no-launch`; Codex sessions reject these route-selection flags.
+`--proxy` is strict, `--no-proxy` accepts only direct Claude models, and bare resume or inherited-route fork reuses
+stored route intent. `--model` alone cannot cross an inherited proxy boundary; refusal recovery must offer only
+applicable restart or reroute commands, preserve the exact resume target and complete intended fork action, and add
+`--model-tier` only when disambiguation is needed. A non-Claude `--model` may start a paid proxy even with
+`--no-launch`; Codex sessions reject these route-selection flags.
 
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
