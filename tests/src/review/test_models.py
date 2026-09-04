@@ -98,6 +98,14 @@ class TestModelSpec:
 
 
 class TestDefaultModels:
+    def test_astra_is_default_and_pro_and_sol_are_explicit_choices(self):
+        assert OPENAI_DEFAULT == "gpt-6-astra"
+        assert "gpt-6-astra" in DEFAULT_MODELS
+        specs = resolve_model_specs("gpt-6-astra-pro,gpt-5.6-sol")
+        assert [spec.model_id for spec in specs] == ["gpt-6-astra-pro", "gpt-5.6-sol"]
+        assert all(spec.name not in DEFAULT_MODELS for spec in specs)
+        assert {route.provider for route in derive_model_routes(specs[0])} == {"openrouter"}
+
     def test_default_quorum_names_are_explicit(self):
         assert list(DEFAULT_MODELS) == [OPENAI_DEFAULT, GEMINI_DEFAULT, "claude-opus"]
 

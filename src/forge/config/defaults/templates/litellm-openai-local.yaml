@@ -18,8 +18,13 @@ proxy:
   litellm:
     tiers:
       haiku: openai/gpt-5.4-mini
-      sonnet: openai/gpt-5.6-sol
-      opus: openai/gpt-5.6-sol
+      sonnet: openai/gpt-6-astra
+      opus: openai/gpt-6-astra
+    model_alternatives:
+      sonnet:
+        gpt-5.6-sol: openai/gpt-5.6-sol
+      opus:
+        gpt-5.6-sol: openai/gpt-5.6-sol
     # Per-tier overrides to differentiate sonnet/opus (both use same model)
     tier_overrides:
       sonnet:

@@ -280,6 +280,7 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
     base_url = f"http://localhost:{test_port}"
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)
+    env["LITELLM_LOCAL_MODEL_COST_MAP"] = "true"
 
     create_result = subprocess.run(
         ["uv", "run", "forge", "model", "backend", "create", "litellm"],

@@ -1,10 +1,10 @@
 # Template: litellm-openai
 # OpenAI models via remote/shared LiteLLM
 #
-# Access to GPT-4o, GPT-5, and O-series models.
+# Access to GPT-6 Astra and retained GPT/O-series models.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 #
-# Haiku uses gpt-5.4-mini; sonnet and opus both use gpt-5.6-sol,
+# Haiku uses gpt-5.4-mini; sonnet and opus both use gpt-6-astra,
 # differentiated by tier_overrides (reasoning_effort and verbosity).
 
 proxy:
@@ -16,8 +16,13 @@ proxy:
   litellm:
     tiers:
       haiku: openai/gpt-5.4-mini
-      sonnet: openai/gpt-5.6-sol
-      opus: openai/gpt-5.6-sol
+      sonnet: openai/gpt-6-astra
+      opus: openai/gpt-6-astra
+    model_alternatives:
+      sonnet:
+        gpt-5.6-sol: openai/gpt-5.6-sol
+      opus:
+        gpt-5.6-sol: openai/gpt-5.6-sol
     tier_overrides:
       sonnet:
         reasoning_effort: medium

@@ -90,7 +90,10 @@ def test_create_existing_config_errors_with_tip(runner: CliRunner, tmp_path: Pat
     """create on an existing config is a hard error (exit 1) with a start tip."""
     cfg = tmp_path / "litellm" / "config.yaml"
     cfg.parent.mkdir(parents=True)
-    cfg.write_text("model_list: []\n")
+    existing = (
+        b"model_list:\n  - model_name: openai/gpt-5.6-sol\n    litellm_params:\n      model: openai/gpt-5.6-sol\n"
+    )
+    cfg.write_bytes(existing)
 
     with patch("forge.cli.backend.get_backend_config_path", return_value=cfg):
         result = runner.invoke(main, _backend_args("create", "litellm"))
@@ -99,6 +102,7 @@ def test_create_existing_config_errors_with_tip(runner: CliRunner, tmp_path: Pat
     assert "already exists" in result.output
     assert "Tip:" in result.output
     assert "forge model backend start litellm" in result.output
+    assert cfg.read_bytes() == existing
 
 
 def test_create_is_global_under_incompatible_project_pin(

@@ -65,6 +65,52 @@ def _proxy_snapshot(
 
 
 class TestSessionModelRoutePlanning:
+    @pytest.mark.parametrize(
+        ("template", "tier"),
+        [
+            ("openrouter-openai", "sonnet"),
+            ("openrouter-openai-codex", "opus"),
+            ("litellm-openai", "sonnet"),
+            ("litellm-openai-local", "sonnet"),
+            ("litellm-openai-codex-local", "opus"),
+            ("codex-responses-local", "sonnet"),
+        ],
+    )
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-5.6-sol"])
+    def test_current_gpt_templates_serve_astra_and_retained_sol(self, template: str, tier: str, model: str) -> None:
+        snapshot = inspect_proxy_reference(template)
+
+        plan = plan_session_model_route(model, explicit_proxy=snapshot, model_tier=tier)
+
+        assert plan.selected_model == f"openai/{model}"
+        assert plan.selected_tier == tier
+
+    @pytest.mark.parametrize("template", ["openrouter-openai", "openrouter-openai-codex"])
+    def test_astra_pro_alias_selects_the_openrouter_alternative(self, template: str) -> None:
+        snapshot = inspect_proxy_reference(template)
+
+        plan = plan_session_model_route("astra-pro", explicit_proxy=snapshot, model_tier="opus")
+
+        assert plan.request.requested_model == "gpt-6-astra-pro"
+        assert plan.selected_model == "openai/gpt-6-astra-pro"
+
+    def test_astra_pro_has_no_native_litellm_route(self) -> None:
+        snapshot = inspect_proxy_reference("litellm-openai-local")
+
+        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+            plan_session_model_route("astra-pro", explicit_proxy=snapshot)
+
+    def test_astra_request_does_not_rewrite_an_existing_sol_snapshot(self) -> None:
+        snapshot = _proxy_snapshot(proxy_id="existing-sol")
+
+        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+            plan_session_model_route("astra", explicit_proxy=snapshot)
+
+        assert snapshot.tier_mappings == {
+            "sonnet": "openai/gpt-5.6-sol",
+            "opus": "openai/gpt-5.6-sol",
+        }
+
     def test_explicit_proxy_is_strict_and_wins_before_existing_route(self) -> None:
         explicit = _proxy_snapshot(default_tier="opus")
         existing = _proxy_snapshot(

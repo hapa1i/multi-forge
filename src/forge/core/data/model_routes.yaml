@@ -4,6 +4,76 @@
 
 schema_version: 1
 models:
+  gpt-6-astra:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6-astra
+      # Dual ingress: raw Responses for Codex; translated Messages for Claude.
+      - kind: proxy
+        source_id: codex-responses-local
+        template: codex-responses-local
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-openai
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-codex-local
+        model_ref: openai/gpt-6-astra
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-local
+        model_ref: openai/gpt-6-astra
+  gpt-6-astra-pro:
+    # OpenAI uses reasoning.mode=pro, not this OpenRouter model slug.
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-astra-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-astra-pro
   gpt-5.6-sol:
     routes:
       - kind: proxy

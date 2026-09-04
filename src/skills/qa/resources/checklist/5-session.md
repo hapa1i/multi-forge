@@ -906,7 +906,7 @@ cd "$FORGE_TEST_REPO"
 forge session delete qa-route-authority --yes --force 2>/dev/null || true
 forge session start qa-route-authority \
   --proxy "$FORGE_QA_OPENAI_PROXY" \
-  --model gpt-5.6-sol \
+  --model gpt-6-astra \
   --no-launch
 forge session authority set qa-route-authority --role advisory
 
@@ -938,7 +938,7 @@ PATH="/tmp/forge-qa-authority-bin:$PATH" forge session resume qa-route-authority
 test "$(cat /tmp/qa-authority-hook.rc)" = 'read=0 write=2'
 rg 'Artifact authority denied' /tmp/qa-authority-write.stderr
 forge session model show qa-route-authority --json | jq -e '
-  .route_intent.requested_model == "gpt-5.6-sol"
+  .route_intent.requested_model == "gpt-6-astra"
   and .route_intent.kind == "proxy"
   and .route_commit.kind == "proxy"
   and .route_commit.evidence_source == "route_commit"
@@ -955,7 +955,7 @@ forge session authority show qa-route-authority --json | jq -e '
 '
 ```
 
-- [ ] `--model gpt-5.6-sol` resolves to and commits the selected proxy route
+- [ ] `--model gpt-6-astra` resolves to and commits the selected proxy route
 - [ ] Model show and history expose the committed event rather than intent alone
 - [ ] Authority set/show reports the advisory `shell_closed` contract
 - [ ] The launch-marked hook allows Read, denies Write with exit 2, and journals one denial

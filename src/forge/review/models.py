@@ -120,6 +120,18 @@ def _build_available_models() -> dict[str, ModelSpec]:
             family="openai",
             description="Logical problems, systematic code review",
         ),
+        "gpt-6-astra-pro": ModelSpec(
+            name="gpt-6-astra-pro",
+            model_id="gpt-6-astra-pro",
+            family="openai",
+            description="Explicit Astra Pro review through OpenRouter",
+        ),
+        "gpt-5.6-sol": ModelSpec(
+            name="gpt-5.6-sol",
+            model_id="gpt-5.6-sol",
+            family="openai",
+            description="Explicit GPT-5.6 Sol review",
+        ),
         gemini_opus: ModelSpec(
             name=gemini_opus,
             model_id=gemini_opus,

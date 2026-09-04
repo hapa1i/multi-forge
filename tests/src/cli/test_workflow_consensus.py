@@ -113,7 +113,7 @@ class TestConsensusHelp:
         assert "--code" in result.output
         assert "--worker" in result.output
         assert "--json" in result.output
-        assert "gpt-5.6-sol:security" in result.output
+        assert "gpt-6-astra:security" in result.output
         assert "gpt-5.5:security" not in result.output
         # No --context flag (blinding is mandatory)
         assert "--context" not in result.output
