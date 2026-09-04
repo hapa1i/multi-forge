@@ -19,8 +19,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.proxy.audit_logger import hash_system_prompt
-from forge.proxy.reasoning import EFFORT_RANK, clamp_effort_to_supported, max_effort
+from forge.proxy.reasoning import EFFORT_RANK, max_effort
 
 # Anthropic requires extended-thinking budget_tokens >= 1024 and < max_tokens.
 _ANTHROPIC_MIN_THINKING_BUDGET = 1024
@@ -39,6 +40,17 @@ _EFFORT_BUDGET_FLOOR: dict[str, int] = {
 
 class ReasoningOverrideError(ValueError):
     """Raised when a passthrough effort floor cannot be represented safely."""
+
+
+def _validate_reasoning_floor_effort(value: object | None) -> str | None:
+    """Return a recognized effort floor without reflecting invalid input."""
+
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in EFFORT_RANK:
+        supported = ", ".join(sorted(effort for effort in EFFORT_RANK if effort is not None))
+        raise ReasoningOverrideError(f"reasoning effort floor must be one of: {supported}")
+    return value
 
 
 # --- Mutation-safety fingerprint ---------------------------------------------
@@ -209,7 +221,8 @@ def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[st
 
     from forge.core.models import ModelCatalogError, get_model_spec
 
-    candidates = (model, model.split("/", 1)[-1]) if "/" in model else (model,)
+    lookup_model = strip_transport_model_suffix(model)
+    candidates = (lookup_model, lookup_model.split("/", 1)[-1]) if "/" in lookup_model else (lookup_model,)
     for candidate in candidates:
         try:
             spec = get_model_spec(candidate)
@@ -219,6 +232,26 @@ def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[st
             return spec.litellm_reasoning_efforts, spec.thinking_modes
         return None
     return None
+
+
+def _normalize_native_effort_floor(
+    floor_effort: str,
+    supported_efforts: tuple[str, ...] | None,
+) -> str:
+    """Normalize a native effort floor upward without weakening the guarantee."""
+
+    if supported_efforts is None or floor_effort in supported_efforts:
+        return floor_effort
+
+    floor_rank = EFFORT_RANK.get(floor_effort, 3)
+    ranked = sorted(supported_efforts, key=lambda effort: EFFORT_RANK.get(effort, 3))
+    at_or_above = [effort for effort in ranked if EFFORT_RANK.get(effort, 3) >= floor_rank]
+    if at_or_above:
+        return at_or_above[0]
+    raise ReasoningOverrideError(
+        f"reasoning effort floor {floor_effort!r} cannot be represented safely "
+        f"(supported: {', '.join(supported_efforts)})"
+    )
 
 
 def pin_native_effort(
@@ -243,8 +276,7 @@ def pin_native_effort(
             f"(supported: {', '.join(supported_efforts)})"
         )
 
-    effective_floor = clamp_effort_to_supported(floor_effort, supported_efforts)
-    assert effective_floor is not None
+    effective_floor = _normalize_native_effort_floor(floor_effort, supported_efforts)
     target = max_effort(current, effective_floor)
     assert target is not None
     if current == target:
@@ -272,7 +304,7 @@ def apply_override(
     *,
     system_prompt_augment: str = "",
     system_prompt_guards: list[dict[str, str]] | None = None,
-    reasoning_floor_effort: str | None = None,
+    reasoning_floor_effort: object | None = None,
 ) -> OverrideResult:
     """Build, validate, and apply the override plan to ``raw_body`` (mutated in place).
 
@@ -281,6 +313,7 @@ def apply_override(
     (messages fingerprint unchanged). Returns the mutated body plus a redacted
     mutation record, or a block decision (body left unmutated).
     """
+    reasoning_floor_effort = _validate_reasoning_floor_effort(reasoning_floor_effort)
     guards = system_prompt_guards or []
     before_fp = messages_fingerprint(raw_body.get("messages"))
     system_hash_before = hash_system_prompt(raw_body.get("system"))
