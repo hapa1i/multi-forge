@@ -28,20 +28,21 @@ class TestCreateBackendConfig:
     @pytest.mark.parametrize(
         ("model_name", "upstream_model"),
         [
+            ("openai/gpt-6-astra", "openai/gpt-6-astra"),
             ("openai/gpt-5.6", "openai/gpt-5.6"),
             ("openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
             ("openai/gpt-5.6-terra", "openai/gpt-5.6-terra"),
             ("openai/gpt-5.6-luna", "openai/gpt-5.6-luna"),
         ],
     )
-    def test_default_config_has_gpt_5_6_model_route(
+    def test_default_config_has_current_and_retained_gpt_model_route(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
         model_name: str,
         upstream_model: str,
     ) -> None:
-        """The generated LiteLLM config exposes each GPT-5.6 model route."""
+        """The generated LiteLLM config exposes Astra and retained GPT-5.6 model routes."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
         config_path = create_backend_config(adapter_type="litellm")
@@ -49,6 +50,42 @@ class TestCreateBackendConfig:
         model_pairs = {(entry["model_name"], entry["litellm_params"]["model"]) for entry in config["model_list"]}
 
         assert (model_name, upstream_model) in model_pairs
+
+    @pytest.mark.parametrize(
+        ("prompt_tokens", "cached_tokens", "expected_input", "expected_output"),
+        [
+            (100, 0, 0.001, 0.0005),
+            (100, 80, 0.00028, 0.0005),
+            (272_000, 1_000, 2.711, 0.0005),
+            (272_001, 1_000, 5.42202, 0.00075),
+        ],
+    )
+    def test_astra_pricing_without_remote_model_metadata(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        prompt_tokens: int,
+        cached_tokens: int,
+        expected_input: float,
+        expected_output: float,
+    ) -> None:
+        import litellm
+
+        config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
+        entry = next(model for model in config["model_list"] if model["model_name"] == "openai/gpt-6-astra")
+        entry["litellm_params"]["api_key"] = "test-key"
+        monkeypatch.setattr(litellm, "model_cost", {})
+        router = litellm.Router(model_list=[entry])
+        deployment_id = router.model_list[0]["model_info"]["id"]
+
+        costs = litellm.cost_per_token(
+            model=deployment_id,
+            custom_llm_provider="openai",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=10,
+            cache_read_input_tokens=cached_tokens,
+        )
+
+        assert costs == pytest.approx((expected_input, expected_output))
 
     @pytest.mark.parametrize(
         ("model_name", "upstream_model"),

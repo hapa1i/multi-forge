@@ -208,7 +208,7 @@ inline.
 
 | Model                    | Strength                            | Via                     |
 | ------------------------ | ----------------------------------- | ----------------------- |
-| `gpt-5.6-sol`            | Logical problems, systematic review | openrouter-openai proxy |
+| `gpt-6-astra`            | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
 | `claude-opus`            | Default Claude Opus 5 reasoning     | Direct Anthropic        |
 
@@ -218,7 +218,7 @@ you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or a
 model. The stable `claude-fable` worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model
 with `--model claude-fable-5` but is not a separate workflow worker.
 
-**Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-5.6 Sol and Gemini require
+**Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-6 Astra and Gemini require
 active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
@@ -250,7 +250,7 @@ key disagreements, and an evidence-weighted recommendation.
 
 | Model                    | Stance  | Role                     | Via                     |
 | ------------------------ | ------- | ------------------------ | ----------------------- |
-| `gpt-5.6-sol`            | FOR     | Supporter -- strengths   | openrouter-openai proxy |
+| `gpt-6-astra`            | FOR     | Supporter -- strengths   | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | AGAINST | Critic -- risks          | openrouter-gemini       |
 | `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
@@ -451,7 +451,7 @@ See [design_installation.md §C.5](../design_installation.md#c5-multi-scope-inst
 
 ### Panel fails with "No active proxy found"
 
-The panel's default model set includes `gpt-5.6-sol` and `gemini-3.1-pro-preview`, which require active proxies:
+The panel's default model set includes `gpt-6-astra` and `gemini-3.1-pro-preview`, which require active proxies:
 
 ```bash
 forge proxy create openrouter-openai

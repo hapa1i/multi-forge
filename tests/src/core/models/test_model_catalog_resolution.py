@@ -62,6 +62,28 @@ class TestGetModelSpec:
             get_model_spec("nonexistent-model")
 
 
+class TestGPTAstraFamily:
+    """Pin Astra's distinct provider identities and mandatory reasoning contract."""
+
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6-astra-pro"])
+    def test_profiles_and_aliases(self, model):
+        catalog = load_model_catalog()
+        assert model in catalog.models
+        assert resolve_model_id(f"openai/{model}") == model
+        assert resolve_model_id(model.removeprefix("gpt-6-")) == model
+        spec = get_model_spec(model)
+        assert spec.context_window_tokens == 1_050_000
+        assert spec.max_output_tokens == 128_000
+        assert spec.supports_images is True
+        assert spec.supports_thinking is True
+        assert spec.supports_sampling_overrides is False
+        assert spec.supports_top_p is False
+        assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh", "max")
+        assert spec.default_reasoning_effort == "medium"
+        assert spec.use_responses_api is True
+        assert spec.system_prompt_addendum == "system_prompt_addendums/openai.md"
+
+
 class TestGPT56Family:
     """Tests for the GPT-5.6 Sol, Terra, and Luna catalog profiles."""
 

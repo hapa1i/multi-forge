@@ -117,11 +117,11 @@ local backend whose credential it is configured for. The default config serves G
 it `(shared)`; starting a second matching backend reuses the running process rather than launching a new one. This is
 expected -- there is one local LiteLLM process, not one per backend.
 
-### Picking up GPT-5.6 Sol defaults after an upgrade
+### Picking up GPT-6 Astra defaults after an upgrade
 
-New proxies created from the current built-in OpenAI templates use GPT-5.6 Sol as follows:
+New proxies created from the current built-in OpenAI templates use GPT-6 Astra as follows:
 
-| Template                     | GPT-5.6 Sol tiers |
+| Template                     | GPT-6 Astra tiers |
 | ---------------------------- | ----------------- |
 | `openrouter-openai`          | sonnet, opus      |
 | `litellm-openai`             | sonnet, opus      |
@@ -130,8 +130,23 @@ New proxies created from the current built-in OpenAI templates use GPT-5.6 Sol a
 | `litellm-openai-codex-local` | opus              |
 | `codex-responses-local`      | sonnet, opus      |
 
+The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models.
+GPT-5.6 Sol remains an explicit alternative in the affected tiers. On `openrouter-openai` and `openrouter-openai-codex`,
+`gpt-6-astra-pro` is also an explicit alternative. For example:
+
+```bash
+forge session start astra-review --model astra-pro --proxy openrouter-openai
+```
+
+Both Astra variants require reasoning; supported efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Remove
+temperature overrides when migrating an older custom configuration. Forge routes standard Astra through Responses on
+LiteLLM backends. Pro is available through OpenRouter in Forge; OpenAI's native API uses a reasoning mode on
+`gpt-6-astra` rather than a separate Pro model ID. See the
+[OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
+[reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+
 An existing `proxy.yaml` is a user-owned snapshot, so upgrading Forge does not rewrite its tiers. Either edit the
-affected tiers to `openai/gpt-5.6-sol` with `forge proxy edit <proxy_id>`, or create a fresh proxy from the built-in
+affected tiers to `openai/gpt-6-astra` with `forge proxy edit <proxy_id>`, or create a fresh proxy from the built-in
 template with `forge proxy create <template> --name <new_proxy_id>`. Then restart the affected proxy and verify real
 upstream access:
 
@@ -141,8 +156,8 @@ forge proxy start <proxy_id> --smoke-test
 ```
 
 Local LiteLLM adapter configuration is also user-owned. For `litellm-openai-local`, `litellm-openai-codex-local`, or
-`codex-responses-local`, add the GPT-5.6 routes to `~/.forge/backends/litellm/config.yaml`; alternatively, back up
-customizations and recreate the adapter config from the current built-in default:
+`codex-responses-local`, add the `openai/gpt-6-astra` route to `~/.forge/backends/litellm/config.yaml`; alternatively,
+back up customizations and recreate the adapter config from the current built-in default:
 
 ```bash
 forge model backend list
@@ -155,6 +170,11 @@ forge model backend start litellm --port 4000
 
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
+
+The bundled Astra route includes standard pricing under `model_info` because LiteLLM 1.99 does not package Astra's cost
+metadata. Copy that block along with the route when editing an existing adapter; it covers cache tokens and the
+above-272K input premium without requiring a metadata download. For remote LiteLLM, its operator must add the route and
+pricing to that server's configuration.
 
 ### Picking up current model defaults and alternatives after an upgrade
 
@@ -197,7 +217,7 @@ endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default
 [OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
 
 Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
-rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
+rewrite them. Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with
 `forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
 LiteLLM path, the required Gemini 3.7 Flash and Anthropic Fable 5.1 routes must exist in
 `~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
@@ -297,10 +317,11 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 
 ### OpenRouter zero data retention (ZDR)
 
-Direct OpenRouter proxies require ZDR by default. With `allow_non_zdr: false` (also the compatibility default when the
-key is absent), Forge sends `provider.zdr: true` on every request. OpenRouter then restricts routing to endpoints it
-currently marks ZDR-compatible. This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only
-replaces models already known to lack a compatible endpoint before dispatch.
+Direct OpenRouter proxies require ZDR by default. Astra and Astra Pro both had eligible ZDR endpoints when checked on
+2026-09-05. With `allow_non_zdr: false` (also the compatibility default when the key is absent), Forge sends
+`provider.zdr: true` on every request. OpenRouter then restricts routing to endpoints it currently marks ZDR-compatible.
+This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only replaces models already known to
+lack a compatible endpoint before dispatch.
 
 Forge audited the bundled OpenRouter defaults and alternatives against OpenRouter's
 [ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21, then checked the newly added Fable 5.1
@@ -592,8 +613,8 @@ zdr_fallbacks: {}
 
 tiers:
   haiku: openai/gpt-5.4-mini
-  sonnet: openai/gpt-5.6-sol
-  opus: openai/gpt-5.6-sol
+  sonnet: openai/gpt-6-astra
+  opus: openai/gpt-6-astra
 
 default_tier: sonnet
 tool_prefixes_to_ignore: []

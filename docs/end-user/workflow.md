@@ -23,7 +23,7 @@ forge runtime preflight codex
 # Deep analysis on a topic (single model, default: claude-opus)
 forge workflow analyze "Should we use event sourcing for the audit log?"
 
-# Multi-model code review (default worker set: gpt-5.6-sol, gemini-3.1-pro-preview, claude-opus)
+# Multi-model code review (default worker set: gpt-6-astra, gemini-3.1-pro-preview, claude-opus)
 forge workflow panel src/forge/session/store.py --code
 
 # Multi-model document review
@@ -44,12 +44,16 @@ forge workflow consensus "Should we adopt gRPC for internal services?"
 
 Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
-- `gpt-5.6-sol` -- OpenRouter (preferred proxy: `openrouter-openai`)
+- `gpt-6-astra` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 5
 
-This default set is unchanged and entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex
-worker. Codex selects its own model; Forge does not pass a model pin.
+This default set is entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex worker. Codex
+selects its own model; Forge does not pass a model pin.
+
+`gpt-6-astra-pro` is an explicit OpenRouter worker, and `gpt-5.6-sol` remains selectable for previous-model comparisons.
+Existing GPT proxies need the [Astra upgrade steps](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) before
+they can serve the new default.
 
 Routing is **capability-based**: models declare what they are (family, provider refs), and Forge derives routes at
 runtime from proxy templates and credentials. The preferred proxy is a catalog hint, not a hard requirement -- any
@@ -63,7 +67,7 @@ fallback; see [OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr) befo
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)
-forge workflow panel src/ --code -m gpt-5.6-sol,deepseek-v4-pro --proxy openrouter-openai
+forge workflow panel src/ --code -m gpt-6-astra,deepseek-v4-pro --proxy openrouter-openai
 
 # Explicit direct Claude workers
 forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.8
@@ -118,7 +122,7 @@ forge workflow panel src/ --code --review-type security --severity high
 - `--code` -- use code review framework (default: document review)
 - `-p` -- custom review prompt (overrides target+framework and --review-type)
 - `--context` -- `blind` (default: fresh subprocess) or `resume:<uuid>` (fork session context)
-- `-m` -- models to use (default: `gpt-5.6-sol,gemini-3.1-pro-preview,claude-opus`)
+- `-m` -- models to use (default: `gpt-6-astra,gemini-3.1-pro-preview,claude-opus`)
 - `--roles` -- comma-separated reviewer roles (security, performance, architecture, maintainability, correctness)
 - `--review-type` -- review focus: `full` (default), `security`, `performance`, `quick` (security/performance need
   --code)
@@ -135,7 +139,7 @@ to code evaluation.
 forge workflow debate "Should we use event sourcing?"                    # proposal evaluation (default)
 forge workflow debate src/forge/session/ --code                          # code evaluation
 forge workflow debate "Evaluate the auth module" --check
-forge workflow debate --worker gpt-5.6-sol:for --worker "claude-opus:Focus on security" "proposal"
+forge workflow debate --worker gpt-6-astra:for --worker "claude-opus:Focus on security" "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)
@@ -159,7 +163,7 @@ shared recommendation in round 2. Uses proposal evaluation by default; `--code` 
 forge workflow consensus "Should we adopt gRPC for internal services?"      # proposal evaluation
 forge workflow consensus src/forge/proxy/ --code                             # code evaluation
 forge workflow consensus "Evaluate the caching strategy" --check
-forge workflow consensus --worker gpt-5.6-sol:architect --worker claude-opus:security "proposal"
+forge workflow consensus --worker gpt-6-astra:architect --worker claude-opus:security "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)

@@ -1239,7 +1239,7 @@ class TestRunDebate:
         assert result.exit_code == 0
         assert "--check" in result.output
         assert "--code" in result.output
-        assert "gpt-5.6-sol:for" in result.output
+        assert "gpt-6-astra:for" in result.output
         assert "gpt-5.5:for" not in result.output
         # No --context flag for debate (blinding is mandatory)
         assert "--context" not in result.output
@@ -1349,7 +1349,7 @@ class TestRunDebate:
         """Each result record should include its stance for JSON consumers."""
         mock_run.return_value = _mock_output(
             results=[
-                ReviewResult("gpt-5.6-sol-for", "analysis", "", True, 1.0),
+                ReviewResult("gpt-6-astra-for", "analysis", "", True, 1.0),
             ]
         )
         runner = CliRunner()
@@ -1359,7 +1359,7 @@ class TestRunDebate:
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["results"]["gpt-5.6-sol-for"]["stance"] == "for"
+        assert data["results"]["gpt-6-astra-for"]["stance"] == "for"
 
     @patch(
         "forge.review.routing.resolve_invocation_routing",
@@ -1543,7 +1543,7 @@ class TestRunDebateCode:
     def test_code_mode_json_output(self, mock_run, _mock_routing):
         mock_run.return_value = _mock_output(
             results=[
-                ReviewResult("gpt-5.6-sol-for", "analysis", "", True, 1.0),
+                ReviewResult("gpt-6-astra-for", "analysis", "", True, 1.0),
             ]
         )
         runner = CliRunner()
@@ -1553,7 +1553,7 @@ class TestRunDebateCode:
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["results"]["gpt-5.6-sol-for"]["stance"] == "for"
+        assert data["results"]["gpt-6-astra-for"]["stance"] == "for"
         assert data["resource_path"] == "(generated)"
 
     @patch(

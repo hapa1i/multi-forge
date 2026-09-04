@@ -132,6 +132,26 @@ class _StubModelSpec:
 
 
 _EXPECTED_WORKFLOW_ROUTES = {
+    "gpt-6-astra": (
+        "openrouter-openai",
+        "openrouter-openai-codex",
+        "openrouter-anthropic",
+        "openrouter-deepseek",
+        "openrouter-gemini",
+        "openrouter-gemini-flash",
+        "openrouter-glm",
+        "openrouter-kimi",
+        "openrouter-minimax",
+        "openrouter-qwen",
+        "codex-responses-local",
+        "litellm-openai",
+        "litellm-openai-codex-local",
+        "litellm-openai-local",
+    ),
+    "gpt-6-astra-pro": (
+        "openrouter-openai",
+        "openrouter-openai-codex",
+    ),
     "gpt-5.6-sol": (
         "openrouter-openai",
         "openrouter-openai-codex",

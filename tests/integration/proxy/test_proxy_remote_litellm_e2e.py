@@ -103,8 +103,8 @@ class TestProxyWithRemoteLiteLLM:
                 assert len(events) > 0
 
 
-def test_openai_sonnet_routes_to_gpt_56_sol(proxy_server_remote_openai: str) -> None:
-    """The remote OpenAI template's promoted sonnet tier resolves to GPT-5.6 Sol."""
+def test_openai_sonnet_routes_to_gpt_6_astra(proxy_server_remote_openai: str) -> None:
+    """The remote OpenAI template's promoted sonnet tier resolves to GPT-6 Astra."""
     with httpx.Client(timeout=90) as client:
         resp = client.post(
             f"{proxy_server_remote_openai}/v1/messages",
@@ -118,4 +118,4 @@ def test_openai_sonnet_routes_to_gpt_56_sol(proxy_server_remote_openai: str) -> 
 
     assert resp.status_code == 200, resp.text[:500]
     assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-    assert resp.headers.get("X-Resolved-Model") == "openai/gpt-5.6-sol"
+    assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
