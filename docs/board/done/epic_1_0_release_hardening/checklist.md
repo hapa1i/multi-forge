@@ -2,8 +2,8 @@
 
 Activation base: `15cbe45e` (`origin/main`, 2026-09-02).
 
-Current focus: post-review fixes and automated verification are complete; refreshed PR CI and the two manual
-release-candidate gates remain.
+Status: completed 2026-09-06. [PR #251](https://github.com/hapa1i/multi-forge/pull/251) merged as `6f7cb64e` with all
+five GitHub checks passing. The maintainer closed the manual repetition gates by the disposition below.
 
 ## Coordination
 
@@ -20,15 +20,15 @@ release-candidate gates remain.
 - [x] Run targeted policy, session deletion/routing, walkthrough, installer, and Docker integration tests.
 - [x] Run `make test-unit`, `make test-regression`, and `make pre-commit`.
 - [x] Build the wheel and verify the packaged walkthrough from a clean install boundary.
-- [ ] Run `/walkthrough --report --reset` against the final candidate.
-- [ ] Run pinned release QA against the same final wheel and SHA.
+- [x] Resolve final walkthrough repetition: waived by the maintainer for 1.0.0; no new manual run is claimed.
+- [x] Resolve pinned QA repetition: waived by the maintainer for 1.0.0; no new manual run is claimed.
 - [x] Run board/link checks and `git diff --check`.
 
 ## Delivery
 
 - [x] Open one PR containing the three complete card series.
-- [ ] Confirm all required PR checks pass without a post-evidence code change.
-- [ ] Record closeout and move the epic and members to `done/` after merge.
+- [x] Confirm all required PR checks pass on merged PR head `4791e46a`.
+- [x] Record closeout and move the epic and members to `done/` after merge.
 
 ## Evidence
 
@@ -44,5 +44,17 @@ integration commands.
 - `bash -n` for the changed walkthrough shell scripts and `git diff --check` passed. The QA and walkthrough state
   engines differ only in their two documented skill-identity lines.
 
-`/walkthrough --report --reset` and pinned release QA are intentionally not claimed here. They remain manual gates for
-the final release candidate after PR review and CI.
+`/walkthrough --report --reset` and pinned release QA were not repeated for the final release candidate.
+
+## Release disposition
+
+The maintainer declined another full manual walkthrough and QA run when reviewing 1.0.0 readiness. Release sign-off uses
+the saved passing QA run from 2026-09-01 and walkthrough from 2026-09-02 together with later automated and scoped
+integration evidence. Those saved runs retain their original wheel identities and are not presented as runs of 1.0.0.
+
+Changes after those manual runs include policy enforcement, deletion, and walkthrough hardening as well as model
+updates. This epic records 11 scoped Docker integrations for its changed paths. The final product tree also passed
+10,257 unit tests, 1,221 regressions, 13 model/proxy/session integrations, full pre-commit, and installed-wheel checks
+as recorded in the [Astra closeout](../gpt_astra_defaults/checklist.md).
+
+This is a maintainer disposition for this release, not a change to future QA verdict or artifact-identity rules.

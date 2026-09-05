@@ -1,6 +1,8 @@
 # Close Daily Bug Scan Follow-ups 2026-09-04
 
-**Lane**: `doing/`
+**Lane**: `done/`
+
+Completed 2026-09-06. [PR #253](https://github.com/hapa1i/multi-forge/pull/253) merged as `aedda8d7`.
 
 ## Goal
 

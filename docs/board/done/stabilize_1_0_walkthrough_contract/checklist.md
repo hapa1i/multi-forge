@@ -1,7 +1,8 @@
 # Stabilize the 1.0 Walkthrough Contract Checklist
 
-Current focus: post-review implementation and final-SHA focused, packaged, and Docker verification are complete;
-refreshed CI and the release-candidate walkthrough and QA gates remain.
+Status: completed 2026-09-06. PR #251 merged as `6f7cb64e` with all five GitHub checks passing. The maintainer resolved
+the manual repetition gates in the
+[epic release disposition](../epic_1_0_release_hardening/checklist.md#release-disposition).
 
 ## Cleanup Ownership
 

@@ -1271,7 +1271,7 @@ wheels = [
 
 [[package]]
 name = "multi-forge"
-version = "0.9.4"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

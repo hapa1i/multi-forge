@@ -4,7 +4,8 @@
 
 ## Current focus
 
-Await review and merge; keep this card in `doing/` until the change ships.
+Completed 2026-09-06. [PR #250](https://github.com/hapa1i/multi-forge/pull/250) merged as `c3b7aa50` with all five
+GitHub checks passing.
 
 ## Catalog and direct routing
 
@@ -65,5 +66,5 @@ Await review and merge; keep this card in `doing/` until the change ships.
 
 ## Closeout
 
-- [ ] Merge the pull request to `main`.
-- [ ] Move this card to `done/` and record the merged commit.
+- [x] Merge the pull request to `main`.
+- [x] Move this card to `done/` and record the merged commit.

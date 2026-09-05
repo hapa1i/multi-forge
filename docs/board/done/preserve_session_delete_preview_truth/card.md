@@ -1,6 +1,8 @@
 # Preserve Session Delete Preview Truth
 
-**Lane**: `doing/`
+**Lane**: `done/`
+
+Completed 2026-09-06 after [PR #251](https://github.com/hapa1i/multi-forge/pull/251) merged as `6f7cb64e`.
 
 **Epic**: [`1.0 Release Hardening`](../epic_1_0_release_hardening/card.md)
 

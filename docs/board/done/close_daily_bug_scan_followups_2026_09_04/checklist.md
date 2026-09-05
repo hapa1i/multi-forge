@@ -2,8 +2,8 @@
 
 Activation base: `0087e81e` (`origin/main`, 2026-09-04).
 
-Current focus: review [PR #253](https://github.com/hapa1i/multi-forge/pull/253); keep the card in `doing/` until merge
-and closeout.
+Status: completed 2026-09-06. [PR #253](https://github.com/hapa1i/multi-forge/pull/253) merged as `aedda8d7` with all
+five GitHub checks passing.
 
 ## Model Route Execution Projection
 
@@ -61,7 +61,7 @@ Evidence on the final pre-commit tree:
 ## Delivery
 
 - [x] Review the integrated diff for scope and architecture conformance.
-- [ ] Add the completed-work change-log entry and close the card.
+- [x] Add the completed-work change-log entry and close the card.
 - [x] Commit, push, open one PR against `main`, and add available `bug`, `codex`, and `codex-automation` labels.
 
 Delivery evidence:

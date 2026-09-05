@@ -7,6 +7,49 @@ and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
 ## 2026-09-06
 
+### Close 1.0 release hardening
+
+**Goal**: Close the merged enforcement, deletion-preview, and walkthrough hardening batch for release.
+
+**Key changes**:
+
+- Corrected Git diff attribution and exact-target recovery commands; preserved non-mutating deletion previews and
+  truthful cleanup/retention results.
+- Hardened walkthrough ownership, reset, package identity, and resume evidence, with matching QA state behavior.
+- Closed the epic and its three members after PR #251 merged as `6f7cb64e`. The maintainer declined repeating the full
+  manual walkthrough and QA runs for 1.0.0; their historical reports retain their original artifact identities.
+
+**Verification**: The batch passed focused and aggregate suites, 11 targeted Docker integrations, build, installed wheel
+checks, and all five PR checks. The final product tree passed 10,257 unit tests, 1,221 regressions, and 13
+model/proxy/session integrations. The
+[release disposition](done/epic_1_0_release_hardening/checklist.md#release-disposition) records the evidence accepted
+instead of new manual runs.
+
+### Add Claude Fable 5.1
+
+**Goal**: Expose Fable 5.1 through direct Claude, proxy alternatives, and the named workflow worker.
+
+**Key changes**:
+
+- Added catalog and provider routes, repointed unversioned Fable aliases, and retained explicit Fable 5 selection.
+- Preserved required-ZDR OpenRouter fallback behavior and synchronized model-selection guidance.
+
+**Verification**: 10,149 unit tests, 1,180 regressions, targeted Docker tests, build, wheel-runtime checks, and all five
+PR checks passed. PR #250 merged as `c3b7aa50`; the [card](done/claude_fable_5_1/checklist.md) is closed.
+
+### Preserve explicit model selection and resume recovery
+
+**Goal**: Preserve selected models, native effort, and complete recovery intent across proxy and session boundaries.
+
+**Key changes**:
+
+- Shared model-alternative resolution across planning and dispatch, normalized native `[1m]` effort, and retained
+  complete fresh-resume options in recovery commands.
+
+**Verification**: 403 focused tests, 10,216 unit tests, 1,211 regressions, six scoped Docker integrations, build,
+pre-commit, and all five PR checks passed. PR #253 merged as `aedda8d7`; the
+[card](done/close_daily_bug_scan_followups_2026_09_04/checklist.md) is closed.
+
 ### Make GPT-6 Astra the default GPT model
 
 **Goal**: Add Astra and Astra Pro to the model catalog and promote standard Astra in existing GPT default roles.

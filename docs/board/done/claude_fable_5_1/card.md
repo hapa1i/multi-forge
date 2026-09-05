@@ -1,5 +1,7 @@
 # Claude Fable 5.1 support
 
+Completed 2026-09-06. [PR #250](https://github.com/hapa1i/multi-forge/pull/250) merged as `c3b7aa50`.
+
 ## Goal
 
 Add Anthropic's Claude Fable 5.1 to Forge's model catalog and routing surfaces, and make it the default model selected

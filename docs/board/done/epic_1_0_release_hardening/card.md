@@ -1,6 +1,10 @@
 # Epic: 1.0 Release Hardening
 
-**Lane**: `doing/`
+**Lane**: `done/`
+
+Completed 2026-09-06. [PR #251](https://github.com/hapa1i/multi-forge/pull/251) merged as `6f7cb64e`. The maintainer
+accepted existing verification for release without repeating the manual runs; see the
+[release disposition](checklist.md#release-disposition).
 
 ## Goal
 

@@ -1,6 +1,7 @@
 # Preserve Session Delete Preview Truth Checklist
 
-Current focus: post-review implementation and final-SHA verification are complete; refreshed CI remains.
+Status: completed 2026-09-06. PR #251 merged as `6f7cb64e` with all five GitHub checks passing. See the
+[epic closeout](../epic_1_0_release_hardening/checklist.md#release-disposition).
 
 ## Read-Only Preview
 
