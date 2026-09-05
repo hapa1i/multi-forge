@@ -21,11 +21,14 @@ def _read_tool_event_records(forge_home: Path) -> list[dict]:
     return [json.loads(line) for line in event_files[0].read_text(encoding="utf-8").splitlines()]
 
 
-def test_litellm_openai_sonnet_forwards_exact_sol_model(
+@pytest.mark.parametrize("stream", [False, True])
+def test_litellm_openai_sonnet_forwards_exact_astra_model(
     proxy_server_fake_litellm_openai: tuple[str, FakeOpenAIUpstream],
+    stream: bool,
 ) -> None:
-    """The bundled remote LiteLLM template forwards sonnet to the exact Sol slug."""
+    """The bundled remote LiteLLM template forwards sonnet to the exact Astra slug."""
     proxy_base_url, fake_upstream = proxy_server_fake_litellm_openai
+    fake_upstream.requests.clear()
     inbound_user_agent = "claude-code/integration-" + "x" * 300
 
     with httpx.Client(timeout=30) as client:
@@ -34,6 +37,9 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
             json={
                 "model": "claude-sonnet-4-6",
                 "max_tokens": 16,
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "stream": stream,
                 "messages": [{"role": "user", "content": "Say hello"}],
             },
             headers={"x-api-key": "test", "user-agent": inbound_user_agent},
@@ -41,16 +47,22 @@ def test_litellm_openai_sonnet_forwards_exact_sol_model(
 
     assert response.status_code == 200, response.text[:500]
     assert response.headers.get("X-Resolved-Tier") == "sonnet"
-    assert response.headers.get("X-Resolved-Model") == "openai/gpt-5.6-sol"
-    assert response.json()["content"][0]["text"] == "FAKE-SOL-OK"
+    assert response.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
+    if stream:
+        assert "event: content_block_delta" in response.text
+        assert '"text": "FAKE-SOL-OK"' in response.text
+    else:
+        assert response.json()["content"][0]["text"] == "FAKE-SOL-OK"
 
     assert len(fake_upstream.requests) == 1
     upstream_request = fake_upstream.requests[0]
     assert upstream_request["path"] == "/v1/responses"
     assert upstream_request["body"]["input"] == [{"role": "user", "content": "Say hello"}]
     assert upstream_request["body"]["max_output_tokens"] == 16
-    assert upstream_request["body"]["model"] == "openai/gpt-5.6-sol"
+    assert upstream_request["body"]["model"] == "openai/gpt-6-astra"
     assert upstream_request["body"]["reasoning"] == {"effort": "medium"}
+    assert "temperature" not in upstream_request["body"]
+    assert "top_p" not in upstream_request["body"]
     assert upstream_request["body"]["text"] == {"verbosity": "high"}
     assert upstream_request["headers"]["User-Agent"] == inbound_user_agent[:256]
 

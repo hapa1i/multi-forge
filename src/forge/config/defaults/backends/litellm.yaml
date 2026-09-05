@@ -25,6 +25,7 @@
 #     - openai/gpt-5.4, gpt-5.4-pro
 #     - openai/gpt-5.5
 #     - openai/gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
+#     - openai/gpt-6-astra
 #
 # Start with: forge model backend start litellm --port 4000
 
@@ -282,6 +283,25 @@ model_list:
     litellm_params:
       model: openai/gpt-5.6-luna
       api_key: os.environ/OPENAI_API_KEY
+
+  # LiteLLM 1.99 lacks packaged Astra pricing. Keep this route usable without a cost-map refresh.
+  # Remove the pricing override once LiteLLM bundles it; test_astra_pricing pins this boundary.
+  # Standard rates, including the >272k-token premium, verified 2026-09-05:
+  # https://developers.openai.com/api/docs/models/gpt-6-astra
+  - model_name: openai/gpt-6-astra
+    litellm_params:
+      model: openai/gpt-6-astra
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      base_model: gpt-6-astra
+      input_cost_per_token: 0.000010
+      output_cost_per_token: 0.000050
+      cache_read_input_token_cost: 0.000001
+      cache_creation_input_token_cost: 0.0000125
+      input_cost_per_token_above_272k_tokens: 0.000020
+      output_cost_per_token_above_272k_tokens: 0.000075
+      cache_read_input_token_cost_above_272k_tokens: 0.000002
+      cache_creation_input_token_cost_above_272k_tokens: 0.000025
 
 litellm_settings:
   # Drop unmapped params instead of erroring

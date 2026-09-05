@@ -11,6 +11,10 @@ from typing import Any
 import httpx
 import pytest
 
+from forge.core.reactive.routing import _live_advisory_warning, _probe_proxy_metadata
+from forge.review.models import resolve_model_specs
+from forge.review.routing import derive_model_routes
+
 pytestmark = pytest.mark.integration
 
 
@@ -193,14 +197,30 @@ class TestCurrentDefaultsWithOpenRouter:
 
 @pytest.mark.slow
 class TestOpenAIProxyWithOpenRouter:
-    """GPT-family defaults route through the exact OpenRouter Sol slug."""
+    """GPT-family defaults and alternatives route through their exact OpenRouter slugs."""
 
-    def test_sonnet_completion_resolves_to_gpt_56_sol(self, proxy_server_openrouter_openai: str) -> None:
+    @pytest.mark.parametrize("model", ["gpt-6-astra-pro", "gpt-5.6-sol"])
+    def test_alternative_worker_is_advertised_without_warning(
+        self, proxy_server_openrouter_openai: str, model: str
+    ) -> None:
+        metadata = _probe_proxy_metadata(proxy_server_openrouter_openai)
+        assert metadata is not None
+        assert f"openai/{model}" in metadata["advertised_models"]
+        route = next(
+            route
+            for route in derive_model_routes(resolve_model_specs(model)[0])
+            if route.template_id == "openrouter-openai"
+        )
+
+        assert _live_advisory_warning(proxy_server_openrouter_openai, route, metadata) is None
+
+    @pytest.mark.parametrize("model", ["claude-sonnet-4-6", "gpt-6-astra-pro"])
+    def test_astra_completion_resolves_to_exact_model(self, proxy_server_openrouter_openai: str, model: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{proxy_server_openrouter_openai}/v1/messages",
                 json={
-                    "model": "claude-sonnet-4-6",
+                    "model": model,
                     "max_tokens": 16,
                     "messages": [{"role": "user", "content": "Say hello"}],
                 },
@@ -212,4 +232,5 @@ class TestOpenAIProxyWithOpenRouter:
 
         assert resp.status_code == 200, resp.text[:500]
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-5.6-sol"
+        expected_model = "gpt-6-astra" if model == "claude-sonnet-4-6" else model
+        assert resp.headers.get("X-Resolved-Model") == f"openai/{expected_model}"

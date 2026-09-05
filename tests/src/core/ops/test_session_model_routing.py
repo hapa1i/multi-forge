@@ -6,6 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from forge.config.loader import (
+    load_proxy_instance_config_from_dict,
+    write_proxy_instance_config,
+)
 from forge.core.models.model_routes import (
     ModelRouteCandidate,
     get_model_route_candidates,
@@ -26,6 +30,7 @@ from forge.core.ops.session_model_routing import (
     realize_session_model_route,
     validate_model_tier_option,
 )
+from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
 from forge.session import create_session_state
 from forge.session.models import (
     LaunchIntent,
@@ -65,6 +70,94 @@ def _proxy_snapshot(
 
 
 class TestSessionModelRoutePlanning:
+    @pytest.mark.parametrize(
+        ("template", "tier"),
+        [
+            ("openrouter-openai", "sonnet"),
+            ("openrouter-openai", "opus"),
+            ("openrouter-openai-codex", "opus"),
+            ("litellm-openai", "sonnet"),
+            ("litellm-openai", "opus"),
+            ("litellm-openai-local", "sonnet"),
+            ("litellm-openai-local", "opus"),
+            ("litellm-openai-codex-local", "opus"),
+            ("codex-responses-local", "sonnet"),
+            ("codex-responses-local", "opus"),
+        ],
+    )
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-5.6-sol"])
+    def test_current_gpt_templates_serve_astra_and_retained_sol(self, template: str, tier: str, model: str) -> None:
+        snapshot = inspect_proxy_reference(template)
+
+        plan = plan_session_model_route(model, explicit_proxy=snapshot, model_tier=tier)
+
+        assert plan.selected_model == f"openai/{model}"
+        assert plan.selected_tier == tier
+
+    @pytest.mark.parametrize(
+        ("template", "tier"),
+        [("openrouter-openai", "sonnet"), ("openrouter-openai", "opus"), ("openrouter-openai-codex", "opus")],
+    )
+    def test_astra_pro_alias_selects_the_openrouter_alternative(self, template: str, tier: str) -> None:
+        snapshot = inspect_proxy_reference(template)
+
+        plan = plan_session_model_route("astra-pro", explicit_proxy=snapshot, model_tier=tier)
+
+        assert plan.request.requested_model == "gpt-6-astra-pro"
+        assert plan.selected_model == "openai/gpt-6-astra-pro"
+        assert plan.selected_tier == tier
+
+    def test_astra_pro_has_no_native_litellm_route(self) -> None:
+        snapshot = inspect_proxy_reference("litellm-openai-local")
+
+        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+            plan_session_model_route("astra-pro", explicit_proxy=snapshot)
+
+    def test_astra_request_does_not_rewrite_an_existing_sol_snapshot(self) -> None:
+        config = load_proxy_instance_config_from_dict(
+            {
+                "proxy_format": 1,
+                "template": "openrouter-openai",
+                "template_digest": "prior-sol-template",
+                "provider": "openrouter",
+                "backend": "openrouter",
+                "proxy_endpoint": "http://localhost:8096",
+                "port": 8096,
+                "upstream_base_url": "https://openrouter.ai/api/v1",
+                "tiers": {
+                    "haiku": "openai/gpt-5.4-mini",
+                    "sonnet": "openai/gpt-5.6-sol",
+                    "opus": "openai/gpt-5.6-sol",
+                },
+                "tier_overrides": {"sonnet": {"verbosity": "low"}},
+            }
+        )
+        config_path = write_proxy_instance_config("existing-sol", config)
+        config_path.write_text(config_path.read_text() + "\n# Preserve my custom Sol configuration.\n")
+        original = config_path.read_bytes()
+        original_mtime = config_path.stat().st_mtime_ns
+        ProxyRegistryStore().write(
+            ProxyRegistry(
+                proxies={
+                    "existing-sol": ProxyEntry(
+                        proxy_id="existing-sol",
+                        template="openrouter-openai",
+                        base_url="http://localhost:8096",
+                        port=8096,
+                    )
+                }
+            )
+        )
+        snapshot = inspect_proxy_reference("existing-sol")
+
+        with pytest.raises(SessionModelRoutingError, match="does not serve model"):
+            plan_session_model_route("astra", explicit_proxy=snapshot)
+
+        plan = plan_session_model_route("gpt-5.6-sol", explicit_proxy=snapshot)
+        assert plan.selected_model == "openai/gpt-5.6-sol"
+        assert config_path.read_bytes() == original
+        assert config_path.stat().st_mtime_ns == original_mtime
+
     def test_explicit_proxy_is_strict_and_wins_before_existing_route(self) -> None:
         explicit = _proxy_snapshot(default_tier="opus")
         existing = _proxy_snapshot(

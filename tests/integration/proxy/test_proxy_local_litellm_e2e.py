@@ -102,15 +102,17 @@ class TestGemini37FlashLiteLLMGate:
 
 
 class TestOpenAIProxyWithLocalLiteLLM:
-    """The local OpenAI template can serve its promoted GPT-5.6 Sol tier."""
+    """The local OpenAI template can serve its promoted GPT-6 Astra tier."""
 
-    def test_sonnet_completion_resolves_to_gpt_56_sol(self, proxy_server_local_openai: str) -> None:
+    def test_sonnet_completion_resolves_to_gpt_6_astra(self, proxy_server_local_openai: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{proxy_server_local_openai}/v1/messages",
                 json={
                     "model": "claude-sonnet-4-6",
                     "max_tokens": 16,
+                    "temperature": 0.7,
+                    "top_p": 0.8,
                     "messages": [{"role": "user", "content": "Say hello"}],
                 },
                 headers={"x-api-key": "test"},
@@ -118,4 +120,20 @@ class TestOpenAIProxyWithLocalLiteLLM:
 
         assert resp.status_code == 200, resp.text[:500]
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-5.6-sol"
+        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
+
+    def test_astra_responses_cost_without_model_metadata_refresh(self, local_litellm_openai: str) -> None:
+        with httpx.Client(timeout=90) as client:
+            resp = client.post(
+                f"{local_litellm_openai}/v1/responses",
+                json={
+                    "model": "openai/gpt-6-astra",
+                    "input": "Say hello",
+                    "max_output_tokens": 16,
+                    "reasoning": {"effort": "low"},
+                },
+            )
+
+        assert resp.status_code == 200, resp.text[:500]
+        cost = resp.headers.get("x-litellm-response-cost")
+        assert cost is not None and float(cost) > 0, f"Astra cost missing without metadata refresh: {cost!r}"

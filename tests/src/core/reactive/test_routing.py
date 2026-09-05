@@ -12,9 +12,31 @@ from forge.core.reactive.routing import (
     ProxyRoutingError,
     RoutingResult,
     RoutingSource,
+    _extract_advertised_models,
     resolve_subprocess_routing,
 )
 from forge.proxy.proxies import ProxyRegistry
+
+
+def test_advertised_models_include_effective_alternatives_and_legacy_tiers() -> None:
+    body = {
+        "tiers": {"haiku": {"model": "legacy/model"}},
+        "runtime": {
+            "tier_mappings": {"sonnet": "current/default"},
+            "configured_tier_mappings": {"sonnet": "unavailable/model"},
+            "model_alternatives": {"sonnet": {"alternative-alias": "effective/alternative"}},
+        },
+    }
+
+    assert _extract_advertised_models(body) == {"legacy/model", "current/default", "effective/alternative"}
+
+
+@pytest.mark.parametrize("alternatives", [None, [], "invalid", {"sonnet": ["invalid"]}, {"sonnet": {"bad": 7}}])
+def test_malformed_alternative_metadata_does_not_hide_valid_tiers(alternatives: object) -> None:
+    body = {"runtime": {"tier_mappings": {"sonnet": "current/default"}, "model_alternatives": alternatives}}
+
+    assert _extract_advertised_models(body) == {"current/default"}
+
 
 # ── ModelRoute ───────────────────────────────────────────────────
 
@@ -246,7 +268,7 @@ class TestResolveSubprocessRouting:
 
         assert result.source == "explicit"
         assert result.warning is not None
-        assert "tier mappings do not advertise model 'openai/gpt-5.5'" in result.warning
+        assert "tiers and alternatives do not advertise model 'openai/gpt-5.5'" in result.warning
         mock_probe.assert_called_once_with("http://localhost:8096")
 
     @patch("forge.core.reactive.routing._check_proxy_reachable", return_value=True)

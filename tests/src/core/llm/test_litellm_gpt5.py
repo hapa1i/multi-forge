@@ -101,6 +101,26 @@ class TestResponsesApiSelection:
         params = ModelHyperparameters(verbosity="high")
         assert not non_gpt5_client._should_use_responses_api(None, params)
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("model", ["openai/gpt-5.4", "openai/gpt-5.6-sol"])
+    async def test_sampling_capable_responses_models_keep_temperature(self, model: str) -> None:
+        client = LiteLLMClient(model=model, provider="litellm_remote")
+        sdk_client = MagicMock()
+        create = AsyncMock(return_value=MagicMock())
+        sdk_client.responses.with_raw_response.create = create
+        with (
+            patch.object(client, "_get_client", new=AsyncMock(return_value=sdk_client)),
+            patch.object(client, "_parse_responses_output", return_value=CompletionResponse(text="ok")),
+            patch.object(client, "_merge_response_metadata", side_effect=lambda completion, _headers: completion),
+        ):
+            await client.complete(
+                [Message(role="user", content="hello")],
+                hyperparams=ModelHyperparameters(temperature=0.7, reasoning_effort="none"),
+            )
+
+        assert create.await_args is not None
+        assert create.await_args.kwargs["temperature"] == 0.7
+
 
 class TestConvertMessagesForResponses:
     """Tests for _convert_messages_for_responses."""

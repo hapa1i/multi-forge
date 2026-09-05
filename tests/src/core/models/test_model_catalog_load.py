@@ -165,10 +165,10 @@ class TestCatalogDefaults:
         catalog = load_model_catalog()
         assert model in catalog.models
 
-    def test_openai_default_tiers_use_gpt_5_6_sol(self):
-        """Regression: sonnet/opus use Sol while haiku stays on gpt-5.4-mini."""
-        assert get_default_model("openai", "sonnet") == "gpt-5.6-sol"
-        assert get_default_model("openai", "opus") == "gpt-5.6-sol"
+    def test_openai_default_tiers_use_gpt_6_astra(self):
+        """Sonnet/opus use standard Astra while haiku stays on gpt-5.4-mini."""
+        assert get_default_model("openai", "sonnet") == "gpt-6-astra"
+        assert get_default_model("openai", "opus") == "gpt-6-astra"
         assert get_default_model("openai", "haiku") == "gpt-5.4-mini"
 
     def test_get_default_model_unknown_provider(self):

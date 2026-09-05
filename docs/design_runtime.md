@@ -609,6 +609,19 @@ The model catalog is **authoritative internal data**:
 - Defines: intrinsic model capabilities, context windows, aliases, and per-family defaults
 - **NOT a user edit surface**
 
+GPT-6 Astra is the OpenAI Sonnet/Opus family default and default GPT workflow worker. GPT-5.4 Mini remains the general
+Haiku default; Codex-specialized templates retain their coding Sonnet model. Astra uses Responses on LiteLLM routes,
+requires reasoning (`low`, `medium`, `high`, `xhigh`, or `max`), and does not support sampling overrides. The translated
+Responses builder omits client sampling parameters according to the catalog's `supports_sampling_overrides` capability.
+The explicit `gpt-6-astra-pro` catalog entry has OpenRouter routes only: OpenRouter publishes a separate slug, while
+native OpenAI exposes Pro as a reasoning mode. Updated templates keep Sol alternatives. Existing proxy and backend files
+remain user-owned snapshots; upgrades do not rewrite their model selections.
+
+The bundled LiteLLM Astra deployment supplies standard token/cache pricing and the above-272K premium in `model_info`.
+LiteLLM 1.99 can serve Astra via Responses but lacks packaged pricing; deployment metadata keeps cost reporting usable
+without a remote cost-map refresh. A packaged-cost-map boundary test requires removing this override once LiteLLM
+includes Astra pricing. Price data stays in backend configuration, outside the intrinsic model catalog.
+
 The model route catalog is separate **authoritative operational data**:
 
 - Location: `src/forge/core/data/model_routes.yaml`
@@ -641,11 +654,14 @@ ModelSpec(name, model_id, family, description,
           prompt=None, prompt_mode="override", worker_id=None, runtime="claude_code")
 ```
 
-`model_id` is Forge-canonical (for example, `gpt-5.6-sol`, not a provider slug), and `family` is the model's intrinsic
+`model_id` is Forge-canonical (for example, `gpt-6-astra`, not a provider slug), and `family` is the model's intrinsic
 family. A spec owns worker identity, description, prompt, and runtime only. `derive_model_routes()` normalizes
 `model_id`, reads the shared route catalog's already ordered candidates, and combines them with static template/source
 metadata to produce `ModelRoute` values. It does not scan or mutate the proxy registry. Runtime-native workers such as
 Codex bypass the catalog deliberately.
+
+Live workflow routing advisories compare provider model refs with both effective `runtime.tier_mappings` and
+`runtime.model_alternatives` from the proxy's `GET /` response.
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 

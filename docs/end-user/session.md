@@ -987,10 +987,10 @@ still routes requests to the configured backend tier, such as Gemini or OpenAI.
 ```bash
 forge session start review-pass --model claude-opus-4-8
 forge session start long-sonnet --model claude-sonnet-5[1m]
-forge session start analyst --model gpt-5.6-sol
+forge session start analyst --model gpt-6-astra
 forge session resume analyst --model gemini-3.1-pro-preview
-forge session fork planner --name executor --model gpt-5.6-sol --model-tier opus
-forge session incognito --model gpt-5.6-sol
+forge session fork planner --name executor --model gpt-6-astra --model-tier opus
+forge session incognito --model gpt-6-astra
 ```
 
 On Claude-runtime `start`, `resume`, `fork`, and `incognito`, `--model` accepts a Forge catalog model id or alias. Forge
