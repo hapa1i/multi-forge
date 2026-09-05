@@ -152,7 +152,7 @@ def _probe_proxy_metadata(base_url: str, timeout_s: float = 1.0) -> dict[str, An
 
 
 def _extract_advertised_models(data: dict[str, Any]) -> set[str]:
-    """Extract model refs advertised by GET / tier mappings."""
+    """Extract model refs advertised by GET / tiers and alternatives."""
     models: set[str] = set()
 
     def collect(mapping: Any) -> None:
@@ -170,6 +170,10 @@ def _extract_advertised_models(data: dict[str, Any]) -> set[str]:
     runtime = data.get("runtime")
     if isinstance(runtime, dict):
         collect(runtime.get("tier_mappings"))
+        alternatives = runtime.get("model_alternatives")
+        if isinstance(alternatives, dict):
+            for tier_alternatives in alternatives.values():
+                collect(tier_alternatives)
 
     return models
 
@@ -255,7 +259,7 @@ def _live_advisory_warning(
     advertised_models = {str(model) for model in advertised if model}
     if advertised_models and route.model_ref not in advertised_models:
         return (
-            f"Proxy tier mappings do not advertise model '{route.model_ref}'; "
+            f"Proxy tiers and alternatives do not advertise model '{route.model_ref}'; "
             "request routing may still work, but tier overrides may not apply."
         )
     return None

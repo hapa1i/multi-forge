@@ -17,6 +17,7 @@ from forge.review.models import (
     ModelSpec,
     MultiReviewOutput,
     ReviewResult,
+    _build_available_models,
     available_model_specs,
     check_model_availability,
     resolve_model_specs,
@@ -98,6 +99,18 @@ class TestModelSpec:
 
 
 class TestDefaultModels:
+    @pytest.mark.parametrize("default", ["gpt-6-astra-pro", "gpt-5.6-sol"])
+    def test_explicit_gpt_choices_do_not_replace_the_default_worker(self, default: str) -> None:
+        with patch(
+            "forge.core.models.catalog.get_default_model",
+            side_effect=lambda family, tier: default if family == "openai" else get_default_model(family, tier),
+        ):
+            models = _build_available_models()
+
+        assert models[default].description == "Logical problems, systematic code review"
+        assert models[default].model_id == default
+        assert {"gpt-6-astra-pro", "gpt-5.6-sol"} <= models.keys()
+
     def test_astra_is_default_and_pro_and_sol_are_explicit_choices(self):
         assert OPENAI_DEFAULT == "gpt-6-astra"
         assert "gpt-6-astra" in DEFAULT_MODELS

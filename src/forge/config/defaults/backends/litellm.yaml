@@ -285,6 +285,7 @@ model_list:
       api_key: os.environ/OPENAI_API_KEY
 
   # LiteLLM 1.99 lacks packaged Astra pricing. Keep this route usable without a cost-map refresh.
+  # Remove the pricing override once LiteLLM bundles it; test_astra_pricing pins this boundary.
   # Standard rates, including the >272k-token premium, verified 2026-09-05:
   # https://developers.openai.com/api/docs/models/gpt-6-astra
   - model_name: openai/gpt-6-astra

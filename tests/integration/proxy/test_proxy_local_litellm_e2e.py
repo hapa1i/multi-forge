@@ -111,6 +111,8 @@ class TestOpenAIProxyWithLocalLiteLLM:
                 json={
                     "model": "claude-sonnet-4-6",
                     "max_tokens": 16,
+                    "temperature": 0.7,
+                    "top_p": 0.8,
                     "messages": [{"role": "user", "content": "Say hello"}],
                 },
                 headers={"x-api-key": "test"},

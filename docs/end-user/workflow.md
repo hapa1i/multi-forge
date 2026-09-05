@@ -52,8 +52,10 @@ This default set is entirely Claude-backed. Add `-m codex` explicitly to run the
 selects its own model; Forge does not pass a model pin.
 
 `gpt-6-astra-pro` is an explicit OpenRouter worker, and `gpt-5.6-sol` remains selectable for previous-model comparisons.
-Existing GPT proxies need the [Astra upgrade steps](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) before
-they can serve the new default.
+Existing OpenRouter proxies can forward these explicit worker model IDs without changing their tier defaults. LiteLLM
+backends must serve the Astra route; see the
+[Astra upgrade steps](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and for
+adopting the new proxy tier defaults.
 
 Routing is **capability-based**: models declare what they are (family, provider refs), and Forge derives routes at
 runtime from proxy templates and credentials. The preferred proxy is a catalog hint, not a hard requirement -- any

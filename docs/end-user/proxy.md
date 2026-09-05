@@ -138,11 +138,11 @@ GPT-5.6 Sol remains an explicit alternative in the affected tiers. On `openroute
 forge session start astra-review --model astra-pro --proxy openrouter-openai
 ```
 
-Both Astra variants require reasoning; supported efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Remove
-temperature overrides when migrating an older custom configuration. Forge routes standard Astra through Responses on
-LiteLLM backends. Pro is available through OpenRouter in Forge; OpenAI's native API uses a reasoning mode on
-`gpt-6-astra` rather than a separate Pro model ID. See the
-[OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
+Both Astra variants require reasoning; supported efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Replace
+`reasoning_effort: none` with `low` or another supported effort, and remove temperature overrides when migrating an
+older custom configuration. Forge routes standard Astra through Responses on LiteLLM backends. Pro is available through
+OpenRouter in Forge; OpenAI's native API uses a reasoning mode on `gpt-6-astra` rather than a separate Pro model ID. See
+the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
 
 An existing `proxy.yaml` is a user-owned snapshot, so upgrading Forge does not rewrite its tiers. Either edit the
@@ -568,8 +568,7 @@ Specify per-tier overrides when creating a proxy:
 ```bash
 forge proxy create openrouter-openai \
   --opus-reasoning high \
-  --sonnet-reasoning medium \
-  --sonnet-temperature 0.7
+  --sonnet-reasoning medium
 ```
 
 These overrides are saved to the proxy file (`~/.forge/proxies/<proxy_id>/proxy.yaml`).
@@ -622,10 +621,10 @@ tool_prefixes_to_ignore: []
 tier_overrides:
   sonnet:
     reasoning_effort: medium
-    temperature: 0.7
+    verbosity: medium
   opus:
     reasoning_effort: high
-    thinking_budget_tokens: 16384
+    verbosity: high
 
 provider_settings: {}
 prompt_caching: passthrough
@@ -656,7 +655,7 @@ from existing `proxy.yaml` files, and remove `session.manifest_filename` from ol
 `wire_shape` already select the proxy transport; session manifests always use `forge.session.json`. Their old values
 never changed runtime behavior.
 
-**Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
+**Available tier_override keys:** `reasoning_effort`, `verbosity`, `temperature`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.
 
 **Precedence chain** (first non-null wins):
@@ -665,7 +664,9 @@ per-tier because each model has different limits and optimal defaults.
 2. Per-tier override (`tier_overrides.<tier>.*`)
 3. Model catalog default (built-in per-model defaults)
 
-**Example:** If a request includes `temperature=0.5`, it overrides the proxy's `tier_overrides.opus.temperature`.
+**Example:** For a model that supports sampling, a request's `temperature=0.5` overrides
+`tier_overrides.opus.temperature`. The translated Responses path omits sampling parameters for models such as Astra that
+do not support them.
 
 Tier hyperparameters do not have an environment-variable override layer. Environment variables remain supported for
 documented credentials and connection values, such as `OPENROUTER_API_KEY` and `LITELLM_BASE_URL`; use the proxy file

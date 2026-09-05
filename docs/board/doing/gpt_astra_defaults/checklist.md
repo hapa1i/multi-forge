@@ -2,7 +2,7 @@
 
 Branch: `feat/gpt-astra-defaults`.
 
-Current focus: ready for review; merge and closeout remain.
+Current focus: review fixes verified; merge and closeout remain.
 
 ## Implementation
 
@@ -11,6 +11,15 @@ Current focus: ready for review; merge and closeout remain.
 - [x] Promote existing GPT default roles and retain explicit historical model selection.
 - [x] Update bundled local backend configuration and selectable review workers.
 - [x] Synchronize normative and end-user documentation plus packaged QA guidance.
+
+## Review fixes
+
+- [x] Omit unsupported client sampling fields in Responses; exercise both complete and streaming requests.
+- [x] Include effective model alternatives in workflow route advertisements without hiding real mismatch warnings.
+- [x] Validate both copied proxy examples; correct OpenRouter upgrade scope and the removed `none` reasoning effort.
+- [x] Pin the missing packaged Astra pricing premise and isolate LiteLLM cost registration in a child process.
+- [x] Cover all retained Sol/Pro tier routes and inspect a real saved Sol configuration for preservation.
+- [x] Preserve the default worker specification when the configured default becomes Pro or Sol.
 
 ## Acceptance
 
@@ -34,14 +43,18 @@ Current focus: ready for review; merge and closeout remain.
 
 - Focused catalog/config/backend/workflow suite: 646 passed.
 - New routing, backend pricing, and retained-model checks: 185 passed.
-- Proxy and Docker session integrations: 9 passed, including live Astra on local LiteLLM and Astra/Pro on OpenRouter.
+- Proxy and Docker session integrations: 13 passed, including client sampling on both complete/stream paths, live Astra
+  on local LiteLLM, Astra/Pro on OpenRouter, and advertised alternative workers without warnings.
 - Local LiteLLM rerun with metadata refresh disabled: 2 passed, including a nonzero gateway cost header.
-- `make test-unit`: 10,240 passed; 117 integration cases deselected by the unit target.
-- `make test-regression`: 1,211 passed. Both suites emit the existing Starlette/AnyIO deprecation warning.
+- `make test-unit`: 10,257 passed; 117 integration cases deselected by the unit target.
+- `make test-regression`: 1,221 passed. Both suites emit the existing Starlette/AnyIO deprecation warning.
+- Before the review fixes, 10 new regression cases reproduced forwarded sampling, alternative-worker warnings, and
+  invalid documentation examples; both future-default collision cases also failed. All now pass.
 - `make pre-commit`: passed, including types, formatting, file limits, secrets, and Markdown links.
 - `make build`: wheel and sdist built. Clean wheel installed into a fresh venv with dependencies resolved outside the
   lock; catalog/aliases/defaults/routes/templates/workers and backend create/preserve/start/health/stop checks passed.
-- Initial stale Sol expectations and documentation token-cache hashes were updated; final checks pass.
+  The rebuilt wheel was reinstalled there after review fixes; sampling and alternative advertisement checks also pass.
+- Initial type-narrowing, formatting, and documentation token-cache failures were corrected; final checks pass.
 
 Integration commands:
 

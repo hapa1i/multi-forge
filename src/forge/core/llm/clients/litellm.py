@@ -3,11 +3,8 @@
 Uses OpenAI SDK to communicate with LiteLLM endpoints (remote or local).
 Supports both non-streaming and streaming completions with tool support.
 
-GPT-5 Models:
-    GPT-5 family models use the Responses API which supports tools, verbosity
-    control, and reasoning_effort together. Chat Completions API is only used
-    for non-GPT-5 models (it does NOT support reasoning_effort with function
-    tools for GPT-5).
+The model catalog selects Responses or Chat Completions. Responses supports
+tools, verbosity, and reasoning together for GPT-5 and Astra models.
 """
 
 import asyncio
@@ -84,8 +81,8 @@ class LiteLLMClient:
     """LiteLLM client using OpenAI SDK.
 
     Supports both remote LiteLLM and local LiteLLM instances.
-    Uses Chat Completions API for standard models, and Responses API for GPT-5
-    family models (which supports tools, verbosity, and reasoning_effort together).
+    Uses the model catalog to select Chat Completions or Responses and to
+    enforce Responses sampling capabilities.
     """
 
     def __init__(
@@ -420,7 +417,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
     ) -> CompletionResponse:
-        """Complete using GPT-5 Responses API.
+        """Complete using the Responses API.
 
         The Responses API supports tools, verbosity, and reasoning_effort together.
         This is extracted as a separate method (without retry decorator) so that
@@ -443,7 +440,9 @@ class LiteLLMClient:
         if hyperparams.reasoning_effort is not None:
             request_params["reasoning"] = {"effort": hyperparams.reasoning_effort}
 
-        if hyperparams.temperature is not None:
+        model_name = self._model.split("/")[-1].lower()
+        supports_sampling = not model_exists(model_name) or get_model_spec(model_name).supports_sampling_overrides
+        if hyperparams.temperature is not None and supports_sampling:
             request_params["temperature"] = hyperparams.temperature
 
         if tools:
@@ -460,7 +459,7 @@ class LiteLLMClient:
 
         tools_log = f", tools={len(tools)}" if tools else ""
         logger.info(
-            f"GPT-5 Responses API call: model={self._model}, "
+            f"Responses API call: model={self._model}, "
             f"verbosity={hyperparams.verbosity}, reasoning={hyperparams.reasoning_effort}{tools_log}"
         )
 
@@ -518,7 +517,7 @@ class LiteLLMClient:
     ) -> CompletionResponse:
         """Non-streaming completion.
 
-        For GPT-5 models, uses Responses API. Otherwise, uses Chat Completions API.
+        Uses Responses or Chat Completions according to the model catalog.
 
         Args:
             messages: List of messages in the conversation.
@@ -580,8 +579,7 @@ class LiteLLMClient:
     ) -> AsyncGenerator[StreamEvent, None]:
         """Streaming completion.
 
-        For GPT-5 models, falls back to non-streaming Responses API
-        since it doesn't support streaming.
+        Models using Responses emit synthetic events from a non-streaming request.
 
         Yields canonical StreamEvent objects. For tool calls, accumulate
         ToolCallDelta events until response_end.
@@ -598,13 +596,11 @@ class LiteLLMClient:
         merged_params = merge_hyperparams(self._default_hyperparams, hyperparams)
         client = await self._get_client()
 
-        # GPT-5 models use Responses API (doesn't support streaming),
-        # so we fall back to non-streaming and emit synthetic stream events
+        # This client's Responses path emits synthetic events from a complete response.
         if self._should_use_responses_api(tools, merged_params):
             try:
                 logger.info(
-                    f"GPT-5 Responses API (streaming fallback): model={self._model}, "
-                    f"verbosity={merged_params.verbosity}"
+                    f"Responses API (streaming fallback): model={self._model}, " f"verbosity={merged_params.verbosity}"
                 )
                 response = await self._complete_with_responses_api(
                     client,

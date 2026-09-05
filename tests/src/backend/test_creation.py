@@ -52,42 +52,6 @@ class TestCreateBackendConfig:
         assert (model_name, upstream_model) in model_pairs
 
     @pytest.mark.parametrize(
-        ("prompt_tokens", "cached_tokens", "expected_input", "expected_output"),
-        [
-            (100, 0, 0.001, 0.0005),
-            (100, 80, 0.00028, 0.0005),
-            (272_000, 1_000, 2.711, 0.0005),
-            (272_001, 1_000, 5.42202, 0.00075),
-        ],
-    )
-    def test_astra_pricing_without_remote_model_metadata(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        prompt_tokens: int,
-        cached_tokens: int,
-        expected_input: float,
-        expected_output: float,
-    ) -> None:
-        import litellm
-
-        config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
-        entry = next(model for model in config["model_list"] if model["model_name"] == "openai/gpt-6-astra")
-        entry["litellm_params"]["api_key"] = "test-key"
-        monkeypatch.setattr(litellm, "model_cost", {})
-        router = litellm.Router(model_list=[entry])
-        deployment_id = router.model_list[0]["model_info"]["id"]
-
-        costs = litellm.cost_per_token(
-            model=deployment_id,
-            custom_llm_provider="openai",
-            prompt_tokens=prompt_tokens,
-            completion_tokens=10,
-            cache_read_input_tokens=cached_tokens,
-        )
-
-        assert costs == pytest.approx((expected_input, expected_output))
-
-    @pytest.mark.parametrize(
         ("model_name", "upstream_model"),
         [
             ("gemini/gemini-3.7-flash", "gemini/gemini-3.7-flash"),

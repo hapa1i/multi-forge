@@ -113,25 +113,23 @@ def _build_available_models() -> dict[str, ModelSpec]:
     glm_opus = get_default_model("glm", "opus")
     kimi_opus = get_default_model("kimi", "opus")
 
-    return {
+    openai_models = {
         openai_opus: ModelSpec(
             name=openai_opus,
             model_id=openai_opus,
             family="openai",
             description="Logical problems, systematic code review",
         ),
-        "gpt-6-astra-pro": ModelSpec(
-            name="gpt-6-astra-pro",
-            model_id="gpt-6-astra-pro",
-            family="openai",
-            description="Explicit Astra Pro review through OpenRouter",
-        ),
-        "gpt-5.6-sol": ModelSpec(
-            name="gpt-5.6-sol",
-            model_id="gpt-5.6-sol",
-            family="openai",
-            description="Explicit GPT-5.6 Sol review",
-        ),
+    }
+    for name, description in (
+        ("gpt-6-astra-pro", "Explicit Astra Pro review through OpenRouter"),
+        ("gpt-5.6-sol", "Explicit GPT-5.6 Sol review"),
+    ):
+        # A future default flip must preserve the default worker's specification.
+        openai_models.setdefault(name, ModelSpec(name=name, model_id=name, family="openai", description=description))
+
+    return {
+        **openai_models,
         gemini_opus: ModelSpec(
             name=gemini_opus,
             model_id=gemini_opus,

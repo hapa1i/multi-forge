@@ -11,6 +11,10 @@ from typing import Any
 import httpx
 import pytest
 
+from forge.core.reactive.routing import _live_advisory_warning, _probe_proxy_metadata
+from forge.review.models import resolve_model_specs
+from forge.review.routing import derive_model_routes
+
 pytestmark = pytest.mark.integration
 
 
@@ -194,6 +198,21 @@ class TestCurrentDefaultsWithOpenRouter:
 @pytest.mark.slow
 class TestOpenAIProxyWithOpenRouter:
     """GPT-family defaults and alternatives route through their exact OpenRouter slugs."""
+
+    @pytest.mark.parametrize("model", ["gpt-6-astra-pro", "gpt-5.6-sol"])
+    def test_alternative_worker_is_advertised_without_warning(
+        self, proxy_server_openrouter_openai: str, model: str
+    ) -> None:
+        metadata = _probe_proxy_metadata(proxy_server_openrouter_openai)
+        assert metadata is not None
+        assert f"openai/{model}" in metadata["advertised_models"]
+        route = next(
+            route
+            for route in derive_model_routes(resolve_model_specs(model)[0])
+            if route.template_id == "openrouter-openai"
+        )
+
+        assert _live_advisory_warning(proxy_server_openrouter_openai, route, metadata) is None
 
     @pytest.mark.parametrize("model", ["claude-sonnet-4-6", "gpt-6-astra-pro"])
     def test_astra_completion_resolves_to_exact_model(self, proxy_server_openrouter_openai: str, model: str) -> None:
