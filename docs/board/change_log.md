@@ -5,6 +5,26 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-09-06
+
+### Make GPT-6 Astra the default GPT model
+
+**Goal**: Add Astra and Astra Pro to the model catalog and promote standard Astra in existing GPT default roles.
+
+**Key changes**:
+
+- Updated OpenAI Sonnet/Opus tiers and workflow workers while retaining lightweight Mini, specialized Codex, and
+  explicit Sol choices; Astra Pro routes through OpenRouter.
+- Enforced catalog sampling capabilities on Responses requests and included effective model alternatives in workflow
+  routing advisories. Added coverage for copied configuration examples, saved snapshots, and future default flips.
+- Bundled offline Astra pricing with a LiteLLM support boundary test and isolated cost-cache tests; documented
+  user-owned configuration upgrades and the removal of the `none` reasoning effort.
+
+**Verification**: 10,257 unit tests, 1,221 regressions, 13 scoped proxy/Docker integrations, full pre-commit,
+wheel/sdist build, and installed-wheel checks passed. [PR #254](https://github.com/hapa1i/multi-forge/pull/254) merged
+as `2c1294d6` with all five GitHub checks passing; its tree matches the verified branch head `b7a4f97d`. The
+[completed card](done/gpt_astra_defaults/checklist.md) records the commands and review-fix evidence.
+
 ## 2026-09-02
 
 ### Refresh the Day 1 walkthrough for v1.0.0

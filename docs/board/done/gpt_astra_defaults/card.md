@@ -1,5 +1,8 @@
 # Add GPT-6 Astra and promote the GPT default
 
+Completed 2026-09-06. [PR #254](https://github.com/hapa1i/multi-forge/pull/254) merged to `main` as `2c1294d6`.
+Verification and review fixes are recorded in the [checklist](checklist.md).
+
 ## Goal
 
 Add GPT-6 Astra and OpenRouter's Astra Pro model to the catalog, and make standard Astra the default OpenAI model for

@@ -8,6 +8,22 @@ Durable routing, backend, consumer, proxy, policy, and telemetry decisions.
 
 ## Notes
 
+### Model migrations must verify request capabilities and gateway metadata (gpt_astra_defaults, shipped 2026-09-06)
+
+- Enforce sampling support from the catalog at the request builder. A gateway's model-name guard can stop applying when
+  a new generation changes the prefix. Integration requests must actually contain the unsupported parameters, including
+  on the streaming path; asserting their absence after a request that omitted them proves nothing.
+- LiteLLM deployment pricing overrides its refreshed cost map. Pin the need for an override against the packaged map so
+  dependency upgrades require reassessment. Run cost-registration tests in a child process: restoring `model_cost` alone
+  leaves derived process-global caches populated.
+- Workflow routing advisories must compare provider model refs against effective tier defaults and alternatives.
+  OpenRouter forwarding of explicit model refs does not itself require migrating a saved proxy's tier defaults.
+
+Sources: [reviewed closeout](../done/gpt_astra_defaults/checklist.md),
+[runtime contract](../../design_runtime.md#a5-model-catalog-368),
+[sampling regression](../../../tests/regression/test_bug_astra_responses_sampling.py), and
+[pricing boundary tests](../../../tests/src/backend/test_astra_pricing.py).
+
 ### Mixed headless runtime workflows separate execution from routing (runtime_neutral_workflow_workers, shipped 2026-07-23)
 
 - **Execution runtime and model routing are separate axes.** Give runtime-owned transports an explicit routing source

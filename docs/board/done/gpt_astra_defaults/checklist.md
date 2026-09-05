@@ -2,7 +2,8 @@
 
 Branch: `feat/gpt-astra-defaults`.
 
-Current focus: review fixes verified; merge and closeout remain.
+Status: completed 2026-09-06. [PR #254](https://github.com/hapa1i/multi-forge/pull/254) merged as `2c1294d6`; all five
+GitHub checks passed. The merged tree matches the verified branch head `b7a4f97d`.
 
 ## Implementation
 
@@ -37,7 +38,15 @@ Current focus: review fixes verified; merge and closeout remain.
 - [x] Run unit, regression, full pre-commit, build, and clean-wheel resource checks.
 - [x] Review the final diff and record verification evidence.
 - [x] Commit and prepare the branch for review.
-- [ ] Record merge closeout and move the card to `done/` after shipping.
+- [x] Record merge closeout and move the card to `done/` after shipping.
+
+## Closeout
+
+- Recorded the completed outcome in the [change log](../../change_log.md#2026-09-06).
+- Preserved the reviewed model-migration lessons in
+  [runtime implementation notes](../../impl_notes/runtime_telemetry.md).
+- Confirmed the runtime design and end-user proxy/workflow guides describe the merged behavior and migration path.
+- Moved the card to `done/`; no inbound repository links used its former `doing/` path.
 
 ## Evidence
 
