@@ -24,7 +24,7 @@ Verified against `main` at `0435e561`; review corrections are marked CORRECTED.
   two-line body (`supervisor.py:731-732`). Slice 3 is a two-line delegation.
 - [x] UUID regex duplication confirmed: `supervisor.py:41` vs `policy/queries.py:16`.
 - [x] CORRECTED -- team block bar is **not an established defect**. The team design card
-  (`docs/board/proposed/team_orchestration/card.md:127-146,158-163`) documents `divergent -> exit 2` and the minimal
+  (`docs/board/retired/team_orchestration/card.md:127-146,158-163`) documents `divergent -> exit 2` and the minimal
   `{verdict, confidence, feedback}` schema as current design; design_workflows.md §1.2's bar is scoped to the semantic
   supervisor. That card is `proposed/` (non-normative per board_contract), so no authority exists either way -- the
   prompt requests a `confidence` the handler never reads (`prompts.py:38`, `handlers.py:289-294`). Reclassified as
@@ -154,7 +154,7 @@ upstream recording all stay at call sites per the matrix.
 - [x] Design sync (per-phase): design_workflows.md §1.2 team-extension note documents the confidence-only team bar +
   exit-0 warn channel as the team contract; design.md §3.6.12 fail-behavior table gains a team-supervisor row
   (fail-open; unresolved -> direct), the D3 early-resolution/strict-validation deltas, and the no-opus-pin divergence.
-  Update the linked `docs/board/proposed/team_orchestration/card.md` "current implementation" reference when the code
+  Update the linked `docs/board/retired/team_orchestration/card.md` "current implementation" reference when the code
   ships so it does not contradict the normative design.
 
 ## D3 routing matrix (decided contract)

@@ -282,8 +282,9 @@ events. Its block bar is deliberately narrower than the semantic supervisor's: a
 when `confidence` meets the shared threshold (default `0.8`), without a citation predicate. Low, missing, or malformed
 confidence allows the event but preserves the supervisor's feedback as diagnostic stderr; only exit-2 feedback is
 guaranteed to reach the teammate on the Claude hook wire. A tagger provider failure also allows the event, but returns a
-diagnostic naming the failed model and leaves the throttle cache untouched so a later event retries. See
-[team_design.md](board/proposed/team_orchestration/card.md) §3.
+diagnostic naming the failed model and leaves the throttle cache untouched so a later event retries. See the retired
+design sketch [team_orchestration](board/retired/team_orchestration/card.md) §3; the current direction is
+[epic_native_multiagent](board/proposed/epic_native_multiagent/card.md).
 
 ### 1.3 Verification Policy (Feedback Loop)
 

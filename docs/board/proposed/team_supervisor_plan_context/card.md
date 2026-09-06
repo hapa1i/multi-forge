@@ -8,8 +8,9 @@ the context-delivery mechanism is chosen.
 epic proved and shipped the contract. A codex team-supervisor lane is blocked on a *different* abstraction --
 runtime-neutral plan/context delivery -- which belongs to team-orchestration / context design, not the lane substrate.
 
-**Related**: `docs/board/proposed/team_orchestration/` (sibling domain); `docs/board/done/codex_exec_supervisor_lane/`
-and `docs/board/done/aux_consumer_codex_dispatch/` (the blind / in-band codex arms this consumer cannot copy);
+**Related**: `docs/board/retired/team_orchestration/` (retired sibling sketch; superseded by
+`docs/board/proposed/epic_native_multiagent/`); `docs/board/done/codex_exec_supervisor_lane/` and
+`docs/board/done/aux_consumer_codex_dispatch/` (the blind / in-band codex arms this consumer cannot copy);
 `docs/board/done/policy_shared_library_seam/` (PR #111 -- last change to `handlers.py`; owns the three shipped
 constraints below).
 

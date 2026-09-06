@@ -1,5 +1,13 @@
 # Forge Team Orchestration — Design Sketch
 
+> [!NOTE]
+> **Retired** (`superseded`, 2026-09-06). Historical, non-implementable reference material. The parts that shipped (the
+> `TeammateIdle`/`TaskCompleted` quality gates, the cross-team supervisor, the `team_supervisor` consumer lane) stay
+> normative in `docs/design_workflows.md` §1.2 and `src/forge/policy/team/`. The unshipped directions (topology
+> templates, generated team instructions, HTTP hook deployment, three-outcome teammate termination, per-role
+> `PreToolUse` enforcement) are superseded by [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md),
+> which records the verified 2026-09 upstream state and the replacement design. No checklist existed for this card.
+
 **Status**: Draft (updated for Claude Code v2.1.x, 2026-03-05).
 
 **Prerequisite**: Claude Code native [Agent Teams](https://code.claude.com/docs/en/agent-teams) (experimental). Changes
