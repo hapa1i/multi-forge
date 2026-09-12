@@ -100,7 +100,11 @@ connectivity after first setup, credential changes, or proxy auth changes. For c
 `forge proxy create <template> --json --smoke-test`: it emits one result object, and a failed probe exits non-zero while
 retaining the created, reused, or adopted proxy for inspection and retry. For packaged model/template updates, verify a
 fresh realization and a pre-existing user-owned snapshot: upgrades must not rewrite `proxy.yaml` or materialized LiteLLM
-config, and new routes require `forge proxy edit <proxy_id>` or recreation of the affected proxy/backend before restart.
+config. Adopting new tier defaults requires `forge proxy edit <proxy_id>` or recreation of the affected proxy/backend
+before restart. For GPT-6 Astra upgrades, follow `docs/end-user/proxy.md` for the required reasoning/sampling changes
+and bundled LiteLLM `model_info` pricing. Stop affected proxies with `forge proxy stop <proxy_id>` before restarting
+with `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward explicit Astra workflow
+workers without changing their tier defaults; LiteLLM backends must serve the Astra route.
 
 For downstream-telemetry retention or config-ownership changes, inspect configured, effective, and source state with
 `forge config show --json`; preview legacy proxy-key migration with `forge config migrate-retention [--json]`, apply it
@@ -172,9 +176,11 @@ use `--model-tier haiku|sonnet|opus` only to disambiguate a multi-tier proxy mat
 current proxy facts, and the validated event sequence with `forge session model show|history <session> --json`. Explicit
 `--proxy` is strict, `--no-proxy` accepts only direct Claude models, and bare resume or inherited-route fork reuses
 stored route intent. `--model` alone cannot cross an inherited proxy boundary; refusal recovery must offer only
-applicable restart or reroute commands, preserve the exact resume target and complete intended fork action, and add
-`--model-tier` only when disambiguation is needed. A non-Claude `--model` may start a paid proxy even with
-`--no-launch`; Codex sessions reject these route-selection flags.
+applicable restart or reroute commands, preserve the exact resume target and complete intended resume/fork action
+(including explicit lifecycle options), and add `--model-tier` only when disambiguation is needed. If a fresh child
+already exists, recovery must target that child rather than create another from the parent. Verify that historical and
+non-Claude alternatives preserve the requested model and selected tier's hyperparameters through launch. A non-Claude
+`--model` may start a paid proxy even with `--no-launch`; Codex sessions reject these route-selection flags.
 
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
