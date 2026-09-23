@@ -1345,7 +1345,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.136.3,<0.137" },
     { name = "fastapi-sso", specifier = ">=0.19.0,<1" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "litellm", specifier = ">=1.102.0,<=1.102.0" },
+    { name = "litellm", specifier = "==1.102.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "orjson", specifier = ">=3.11.6,<4" },
     { name = "packaging", specifier = ">=21.0" },

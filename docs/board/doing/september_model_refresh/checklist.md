@@ -12,6 +12,8 @@ pending.
 - [x] Build and smoke-test a clean wheel; verify new realization and existing snapshot preservation.
 - [x] Review integrated diff and record verification.
 - [x] Open one PR: [#255](https://github.com/hapa1i/multi-forge/pull/255).
+- [x] Reject invalid Sol/Luna tier temperatures at config load while preserving model-alternative filtering.
+- [x] Spell the LiteLLM pin explicitly and document Opus 5.5's intentional cache-read discount.
 - [ ] Merge and record shipped closeout.
 
 | Test                  | Fixture                                     | Assertion                                                              |
@@ -27,12 +29,15 @@ pending.
 
 - Catalog, routes, configuration, provider requests, and workflow focused checks pass. Mixed-family workers resolve
   through a selected OpenRouter proxy; sampling on Sol/Luna is preserved only at effective effort `none`.
+- Review coverage: 369 focused config/request checks and 10 pricing/metadata checks passed. Regression cases cover
+  template and instance loading, unset and active reasoning, zero temperatures, explicit `none`, and model alternatives.
+  Seven live GPT-6 reasoning/tool/cost checks passed; the rebuilt wheel declares `litellm==1.102.0`.
 - Targeted integration: 34 checks passed on the initial run; all eight Opus checks passed after correcting test
   fixtures. Coverage includes native Anthropic, local LiteLLM, OpenRouter, streamed responses, and Docker session
   routing.
-- `make test-unit`: 10,368 passed, 117 deselected by the unit target. `make test-regression`: 1,229 passed; the
-  subsequently added smoke-log regression also passed. Both full suites report the existing Starlette deprecation
-  warning. `make pre-commit` passed, including type, file-size, and Markdown-link checks.
+- `make test-unit`: 10,368 passed, 117 deselected by the unit target. `make test-regression`: 1,266 passed. Both full
+  suites report the existing Starlette deprecation warning. `make pre-commit` passed, including type, file-size, and
+  Markdown-link checks.
 - Native Codex and mixed `claude-opus,codex` blind panels passed; the latter resolved Opus to `claude-opus-5-5`.
 - Fresh Anthropic/OpenRouter/Gemini proxy realization uses new defaults. Reloading saved Opus 5/Gemini 3.7 selections
   leaves bytes and selections unchanged; an older materialized backend is reported as outdated without being rewritten.

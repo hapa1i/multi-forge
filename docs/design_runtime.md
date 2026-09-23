@@ -615,6 +615,8 @@ requires reasoning (`low`, `medium`, `high`, `xhigh`, or `max`), and does not su
 Responses builder omits client sampling parameters according to the catalog's sampling capabilities and selected effort.
 GPT-6 Sol and Luna are explicit alternatives with native Responses and OpenRouter routes. Both also support `none`
 reasoning, the only effort that permits their sampling overrides (`sampling_requires_no_reasoning` in the catalog).
+Proxy and template validation require explicit `reasoning_effort: none` for a Sol/Luna tier's temperature override.
+Model alternatives retain request-time filtering because the same override can be valid for the tier's default model.
 Reasoning with tool calls requires Responses on their native routes. The three GPT-6 Pro catalog entries have OpenRouter
 routes only: OpenRouter publishes separate slugs, while native OpenAI exposes Pro as a reasoning mode. Existing proxy
 and backend files remain user-owned snapshots; upgrades do not rewrite their model selections.

@@ -161,6 +161,7 @@ model_list:
       output_cost_per_token: 0.000020
       cache_creation_input_token_cost: 0.000005
       cache_creation_input_token_cost_above_1hr: 0.000008
+      # Opus 5.5 cache reads intentionally cost $0.20/MTok (0.05x base input).
       cache_read_input_token_cost: 0.0000002
       supports_vision: true
       supports_function_calling: true

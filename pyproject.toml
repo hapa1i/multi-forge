@@ -69,7 +69,7 @@ dependencies = [
     "watchfiles>=0.20",
     "websockets>=15.0.1,<16",
     # Packaged Gemini 3.8 Flash metadata and the verified proxy runtime.
-    "litellm>=1.102.0,<=1.102.0",
+    "litellm==1.102.0",
 ]
 
 [project.scripts]

@@ -1047,6 +1047,17 @@ def _validate_static_tier_override_constraints(tiers: TierModels, overrides: Tie
                 "remove the override or choose a model that supports sampling overrides"
             )
 
+        if (
+            spec.sampling_requires_no_reasoning
+            and override.temperature is not None
+            and override.reasoning_effort != "none"
+        ):
+            raise ValueError(
+                f"tier_overrides.{tier}.temperature for {canonical_model} requires "
+                f"tier_overrides.{tier}.reasoning_effort='none'; "
+                "set that effort or remove the temperature override"
+            )
+
         if spec.thinking_modes == ("adaptive",) and override.thinking_budget_tokens is not None:
             raise ValueError(
                 f"tier_overrides.{tier}.thinking_budget_tokens is not supported by {canonical_model}; "

@@ -146,9 +146,12 @@ the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
 
 Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium` as
-their model default. They accept temperature and `top_p` overrides only with `none` effort. Forge uses Responses for
-their native OpenAI routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only
-with `reasoning_effort: none`. Their Pro entries are OpenRouter-only alternatives, following Astra Pro's separate-slug
+their model default. They accept temperature and `top_p` overrides only with `none` effort. A tier mapped to Sol or Luna
+must explicitly set `reasoning_effort: none` to configure a temperature override; otherwise proxy and template
+validation reject the configuration. When Sol or Luna is selected as a model alternative, request-time filtering still
+removes sampling overrides that may be valid for the tier's default model. Forge uses Responses for their native OpenAI
+routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only with
+`reasoning_effort: none`. Their Pro entries are OpenRouter-only alternatives, following Astra Pro's separate-slug
 convention. See the [Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) and
 [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) model references. Selecting them explicitly does not
 change the Astra tier defaults.
