@@ -5,8 +5,76 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from forge.core.llm.clients.openai_compat import build_chat_completion_kwargs
 from forge.core.llm.clients.openrouter import OpenRouterClient
-from forge.core.llm.types import CompletionResponse, Message, ModelHyperparameters
+from forge.core.llm.types import (
+    CompletionResponse,
+    Message,
+    ModelHyperparameters,
+    ModelReasoningEffort,
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["openai/gpt-6-sol", "openai/gpt-6-luna"])
+@pytest.mark.parametrize("effort", [None, "none", "medium"])
+@pytest.mark.parametrize("stream", [False, True])
+async def test_sol_and_luna_apply_effort_dependent_sampling(
+    model: str, effort: ModelReasoningEffort | None, stream: bool
+) -> None:
+    client = OpenRouterClient(model=model, provider="openrouter")
+    sdk_client = MagicMock()
+
+    async def empty_stream():
+        for chunk in ():
+            yield chunk
+
+    create = AsyncMock(return_value=empty_stream() if stream else MagicMock())
+    if stream:
+        sdk_client.chat.completions.create = create
+    else:
+        sdk_client.chat.completions.with_raw_response.create = create
+    tools = [{"type": "function", "function": {"name": "report", "parameters": {"type": "object"}}}]
+    params = ModelHyperparameters(temperature=0.7, top_p=0.8, reasoning_effort=effort)
+    messages = [Message(role="user", content="Call report")]
+
+    with (
+        patch.object(client, "_get_client", new=AsyncMock(return_value=sdk_client)),
+        patch(
+            "forge.core.llm.clients.openrouter.openai_response_to_completion",
+            return_value=CompletionResponse(text="ok"),
+        ),
+    ):
+        if stream:
+            assert [event async for event in client.stream(messages, tools=tools, hyperparams=params)]
+        else:
+            assert (await client.complete(messages, tools=tools, hyperparams=params)).text == "ok"
+
+    create.assert_awaited_once()
+    assert create.await_args is not None
+    request = create.await_args.kwargs
+    assert request["model"] == model
+    assert request["tools"] == tools
+    assert request.get("extra_body", {}).get("reasoning") == ({"effort": effort} if effort is not None else None)
+    if effort == "none":
+        assert request["temperature"] == 0.7
+        assert request["top_p"] == 0.8
+    else:
+        assert "temperature" not in request
+        assert "top_p" not in request
+
+
+@pytest.mark.parametrize("effort", ["none", "medium"])
+def test_conditional_sampling_uses_provider_extras_without_mutating_them(effort: str) -> None:
+    extra_body = {"reasoning": {"effort": effort}, "temperature": 0.7, "top_p": 0.8}
+    params = ModelHyperparameters(extra={"openai": {"extra_body": extra_body}})
+
+    kwargs = build_chat_completion_kwargs("openai/gpt-6-sol", [], None, params)
+
+    assert kwargs["extra_body"]["reasoning"] == {"effort": effort}
+    assert ("temperature" in kwargs["extra_body"]) is (effort == "none")
+    assert ("top_p" in kwargs["extra_body"]) is (effort == "none")
+    assert extra_body == {"reasoning": {"effort": effort}, "temperature": 0.7, "top_p": 0.8}
 
 
 @pytest.fixture

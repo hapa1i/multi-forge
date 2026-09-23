@@ -113,23 +113,13 @@ def _build_available_models() -> dict[str, ModelSpec]:
     glm_opus = get_default_model("glm", "opus")
     kimi_opus = get_default_model("kimi", "opus")
 
-    openai_models = {
+    models = {
         openai_opus: ModelSpec(
             name=openai_opus,
             model_id=openai_opus,
             family="openai",
             description="Logical problems, systematic code review",
         ),
-    }
-    for name, description in (
-        ("gpt-6-astra-pro", "Explicit Astra Pro review through OpenRouter"),
-        ("gpt-5.6-sol", "Explicit GPT-5.6 Sol review"),
-    ):
-        # A future default flip must preserve the default worker's specification.
-        openai_models.setdefault(name, ModelSpec(name=name, model_id=name, family="openai", description=description))
-
-    return {
-        **openai_models,
         gemini_opus: ModelSpec(
             name=gemini_opus,
             model_id=gemini_opus,
@@ -206,6 +196,26 @@ def _build_available_models() -> dict[str, ModelSpec]:
             runtime="codex",
         ),
     }
+    for name, family, description in (
+        ("gpt-6-astra-pro", "openai", "Explicit Astra Pro review through OpenRouter"),
+        ("gpt-6-sol", "openai", "Coding and agent workflow review"),
+        ("gpt-6-sol-pro", "openai", "Explicit Sol Pro review through OpenRouter"),
+        ("gpt-6-luna", "openai", "Fast, cost-efficient review"),
+        ("gpt-6-luna-pro", "openai", "Explicit Luna Pro review through OpenRouter"),
+        ("gpt-5.6-sol", "openai", "Explicit GPT-5.6 Sol review"),
+        ("gemini-3.8-flash", "gemini", "Fast multimodal review with large context"),
+        ("deepseek-v4.1-flash", "deepseek", "Multimodal coding and reasoning review"),
+        ("deepseek-v4-pro-0813", "deepseek", "Explicit DeepSeek V4 Pro GA snapshot"),
+        ("qwen3.8-flash", "qwen", "Efficient multimodal review with large context"),
+        ("qwen3.8-max-0902", "qwen", "Explicit Qwen3.8 Max September snapshot"),
+        ("glm-5.3-flash", "glm", "Efficient multimodal coding review"),
+        ("glm-5.3-flashx", "glm", "Fast multimodal coding review"),
+        ("claude-opus-5", "anthropic", "Explicit prior Claude Opus 5 direct worker"),
+        ("claude-opus-5.5", "anthropic", "Explicit Claude Opus 5.5 direct worker"),
+    ):
+        # A future default flip must preserve the default worker's specification.
+        models.setdefault(name, ModelSpec(name=name, model_id=name, family=family, description=description))
+    return models
 
 
 def _build_default_model_names() -> tuple[str, ...]:

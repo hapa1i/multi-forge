@@ -42,7 +42,7 @@ dependencies = [
     # Proxy dependencies (previously optional, now core). Forge owns the
     # default-Uvicorn LiteLLM startup set because the upstream `proxy` extra
     # caps cryptography below Forge's patched floor. This set is start/health
-    # validated through LiteLLM 1.99.0; run scripts/test-wheel-runtime.sh before
+    # validated through LiteLLM 1.102.0; run scripts/test-wheel-runtime.sh before
     # raising the ceiling. Alternate servers, databases, and cloud integrations
     # remain outside Forge's runtime path.
     "aiohttp>=3.14.3,<4",
@@ -68,10 +68,8 @@ dependencies = [
     "uvloop>=0.21.0,<1; sys_platform != 'win32'",
     "watchfiles>=0.20",
     "websockets>=15.0.1,<16",
-    # Floor = the first packaged-cost-map version for gemini-3.7-flash (see
-    # tests/integration/proxy/test_proxy_local_litellm_e2e.py); packaged
-    # cost-map pricing for that model first ships in the v1.98 line.
-    "litellm>=1.98.0,<=1.99.0",
+    # Packaged Gemini 3.8 Flash metadata and the verified proxy runtime.
+    "litellm>=1.102.0,<=1.102.0",
 ]
 
 [project.scripts]

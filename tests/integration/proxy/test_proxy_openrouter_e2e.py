@@ -42,7 +42,7 @@ class TestProxyWithOpenRouter:
         assert data["provider"] == "openrouter"
         assert data["runtime"]["tier_mappings"]["haiku"] == "anthropic/claude-haiku-4.5"
         assert data["runtime"]["configured_tier_mappings"] == data["runtime"]["tier_mappings"]
-        assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-1"] == "anthropic/claude-opus-5"
+        assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-1"] == "anthropic/claude-opus-5.5"
         assert data["runtime"]["data_policy"] == {"zdr": "required", "zdr_fallbacks": {}}
         assert data["runtime"]["llm_defaults_by_tier"]["haiku"]["extra"] == {
             "openai": {"extra_body": {"provider": {"zdr": True}}}
@@ -117,8 +117,10 @@ class TestCurrentDefaultsWithOpenRouter:
     through to each template's tier default.
     """
 
-    def test_anthropic_opus_resolves_to_opus_5(self, proxy_server_openrouter: str) -> None:
-        _assert_tier_completion(proxy_server_openrouter, "claude-opus-4-5-20251101", "opus", "anthropic/claude-opus-5")
+    def test_anthropic_opus_resolves_to_opus_5_5(self, proxy_server_openrouter: str) -> None:
+        _assert_tier_completion(
+            proxy_server_openrouter, "claude-opus-4-5-20251101", "opus", "anthropic/claude-opus-5.5"
+        )
 
     def test_kimi_tiers_and_sonnet_completion(self, proxy_server_openrouter_kimi: str) -> None:
         with httpx.Client() as client:

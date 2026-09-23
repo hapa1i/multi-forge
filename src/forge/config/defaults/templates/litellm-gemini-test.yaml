@@ -17,9 +17,18 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3.7-flash
+      haiku: gemini/gemini-3.8-flash
       sonnet: gemini/gemini-3.1-pro-preview
       opus: gemini/gemini-3.1-pro-preview
+    model_alternatives:
+      haiku:
+        gemini-3.7-flash: gemini/gemini-3.7-flash
+      sonnet:
+        gemini-3.8-flash: gemini/gemini-3.8-flash
+        gemini-3.7-flash: gemini/gemini-3.7-flash
+      opus:
+        gemini-3.8-flash: gemini/gemini-3.8-flash
+        gemini-3.7-flash: gemini/gemini-3.7-flash
     # Per-tier overrides to differentiate sonnet/opus (both use same model)
     tier_overrides:
       sonnet:

@@ -612,15 +612,23 @@ The model catalog is **authoritative internal data**:
 GPT-6 Astra is the OpenAI Sonnet/Opus family default and default GPT workflow worker. GPT-5.4 Mini remains the general
 Haiku default; Codex-specialized templates retain their coding Sonnet model. Astra uses Responses on LiteLLM routes,
 requires reasoning (`low`, `medium`, `high`, `xhigh`, or `max`), and does not support sampling overrides. The translated
-Responses builder omits client sampling parameters according to the catalog's `supports_sampling_overrides` capability.
-The explicit `gpt-6-astra-pro` catalog entry has OpenRouter routes only: OpenRouter publishes a separate slug, while
-native OpenAI exposes Pro as a reasoning mode. Updated templates keep Sol alternatives. Existing proxy and backend files
-remain user-owned snapshots; upgrades do not rewrite their model selections.
+Responses builder omits client sampling parameters according to the catalog's sampling capabilities and selected effort.
+GPT-6 Sol and Luna are explicit alternatives with native Responses and OpenRouter routes. Both also support `none`
+reasoning, the only effort that permits their sampling overrides (`sampling_requires_no_reasoning` in the catalog).
+Reasoning with tool calls requires Responses on their native routes. The three GPT-6 Pro catalog entries have OpenRouter
+routes only: OpenRouter publishes separate slugs, while native OpenAI exposes Pro as a reasoning mode. Existing proxy
+and backend files remain user-owned snapshots; upgrades do not rewrite their model selections.
 
-The bundled LiteLLM Astra deployment supplies standard token/cache pricing and the above-272K premium in `model_info`.
-LiteLLM 1.99 can serve Astra via Responses but lacks packaged pricing; deployment metadata keeps cost reporting usable
-without a remote cost-map refresh. A packaged-cost-map boundary test requires removing this override once LiteLLM
-includes Astra pricing. Price data stays in backend configuration, outside the intrinsic model catalog.
+Claude Opus 5.5 is the Anthropic/OpenRouter Opus default and the stable `claude-opus` workflow worker. Direct aliases
+and large-context proxy estimator pins select `claude-opus-5-5`; explicit Opus 5 pins remain selectable. Opus 5.5 uses
+always-on adaptive thinking with a model default of `medium` effort and accepts only `auto` or `none` tool choice.
+Provider IDs remain route-specific: OpenRouter uses `anthropic/claude-opus-5.5`, while native Anthropic uses
+`claude-opus-5-5`.
+
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. The bundled Sol, Luna, and Opus 5.5 deployments provide
+capability and token/cache pricing in `model_info` until LiteLLM packages these models. Sol/Luna metadata includes the
+above-272K premium. Boundary tests require removing deployment overrides when packaged support arrives; price data stays
+in backend configuration, outside the intrinsic model catalog.
 
 The model route catalog is separate **authoritative operational data**:
 

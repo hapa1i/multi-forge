@@ -29,6 +29,8 @@ class TestCreateBackendConfig:
         ("model_name", "upstream_model"),
         [
             ("openai/gpt-6-astra", "openai/gpt-6-astra"),
+            ("openai/gpt-6-sol", "openai/gpt-6-sol"),
+            ("openai/gpt-6-luna", "openai/gpt-6-luna"),
             ("openai/gpt-5.6", "openai/gpt-5.6"),
             ("openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
             ("openai/gpt-5.6-terra", "openai/gpt-5.6-terra"),
@@ -42,7 +44,7 @@ class TestCreateBackendConfig:
         model_name: str,
         upstream_model: str,
     ) -> None:
-        """The generated LiteLLM config exposes Astra and retained GPT-5.6 model routes."""
+        """The generated LiteLLM config exposes GPT-6 and retained GPT-5.6 model routes."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
         config_path = create_backend_config(adapter_type="litellm")
@@ -51,9 +53,23 @@ class TestCreateBackendConfig:
 
         assert (model_name, upstream_model) in model_pairs
 
+    @pytest.mark.parametrize("model_name", ["openai/gpt-6-sol", "openai/gpt-6-luna"])
+    def test_gpt_6_base_alternatives_use_responses_for_reasoning_and_tools(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model_name: str
+    ) -> None:
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        config_path = create_backend_config(adapter_type="litellm")
+        config = yaml.safe_load(config_path.read_text())
+        route = next(entry for entry in config["model_list"] if entry["model_name"] == model_name)
+
+        assert route["litellm_params"]["use_responses_api"] is True
+
     @pytest.mark.parametrize(
         ("model_name", "upstream_model"),
         [
+            ("gemini/gemini-3.8-flash", "gemini/gemini-3.8-flash"),
+            ("gemini-3.8-flash", "gemini/gemini-3.8-flash"),
             ("gemini/gemini-3.7-flash", "gemini/gemini-3.7-flash"),
             ("gemini-3.7-flash", "gemini/gemini-3.7-flash"),
             ("gemini/gemini-3.6-flash", "gemini/gemini-3.6-flash"),
@@ -81,6 +97,7 @@ class TestCreateBackendConfig:
         [
             "anthropic/claude-haiku-4-5",
             "anthropic/claude-sonnet-5",
+            "anthropic/claude-opus-5-5",
             "anthropic/claude-opus-5",
             "anthropic/claude-fable-5-1",
             "anthropic/claude-fable-5",

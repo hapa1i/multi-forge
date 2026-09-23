@@ -130,9 +130,9 @@ New proxies created from the current built-in OpenAI templates use GPT-6 Astra a
 | `litellm-openai-codex-local` | opus              |
 | `codex-responses-local`      | sonnet, opus      |
 
-The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models.
-GPT-5.6 Sol remains an explicit alternative in the affected tiers. On `openrouter-openai` and `openrouter-openai-codex`,
-`gpt-6-astra-pro` is also an explicit alternative. For example:
+The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models. GPT-6
+Sol and Luna are explicit alternatives alongside GPT-5.6 Sol. The OpenRouter OpenAI templates also expose
+`gpt-6-astra-pro`, `gpt-6-sol-pro`, and `gpt-6-luna-pro`. For example:
 
 ```bash
 forge session start astra-review --model astra-pro --proxy openrouter-openai
@@ -144,6 +144,14 @@ older custom configuration. Forge routes standard Astra through Responses on Lit
 OpenRouter in Forge; OpenAI's native API uses a reasoning mode on `gpt-6-astra` rather than a separate Pro model ID. See
 the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+
+Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium` as
+their model default. They accept temperature and `top_p` overrides only with `none` effort. Forge uses Responses for
+their native OpenAI routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only
+with `reasoning_effort: none`. Their Pro entries are OpenRouter-only alternatives, following Astra Pro's separate-slug
+convention. See the [Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) and
+[Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) model references. Selecting them explicitly does not
+change the Astra tier defaults.
 
 An existing `proxy.yaml` is a user-owned snapshot, so upgrading Forge does not rewrite its tiers. Either edit the
 affected tiers to `openai/gpt-6-astra` with `forge proxy edit <proxy_id>`, or create a fresh proxy from the built-in
@@ -171,10 +179,11 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
-The bundled Astra route includes standard pricing under `model_info` because LiteLLM 1.99 does not package Astra's cost
-metadata. Copy that block along with the route when editing an existing adapter; it covers cache tokens and the
-above-272K input premium without requiring a metadata download. For remote LiteLLM, its operator must add the route and
-pricing to that server's configuration.
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Sol, Luna, and Opus 5.5 still require the bundled routes'
+`model_info` blocks for offline capability and cost support. Copy each complete deployment entry when editing an
+existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input premium. For
+remote LiteLLM, its operator must install compatible support and add these complete entries to that server's
+configuration.
 
 ### Picking up current model defaults and alternatives after an upgrade
 
@@ -182,44 +191,55 @@ New proxies created from the current built-in templates use these defaults:
 
 | Template                                            | New default tiers                                |
 | --------------------------------------------------- | ------------------------------------------------ |
-| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                            |
-| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)            |
+| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5.5                          |
+| `anthropic-passthrough`                             | opus -> Claude Opus 5.5 (informational)          |
 | `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                           |
 | `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                           |
 | `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                    |
 | `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash                        |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.7 Flash                        |
-| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.7 Flash                    |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash                        |
+| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                    |
 
-Gemini 3.8 Flash is the current Gemini Flash family and OpenRouter default. It is a GA model with a 1,048,576-token
-input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default). Google
-documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini 2.5,
-3.5, 3.6, and 3.7 Flash remain selectable through the OpenRouter Flash template. Gemini 3.7 also stays the local and
-remote LiteLLM default: LiteLLM 1.99's bundled model catalog has no 3.8 pricing/capability entry. See Google's
+Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
+1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
+Google documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini
+2.5, 3.5, 3.6, and 3.7 Flash remain selectable through the OpenRouter Flash template. See Google's
 [3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/),
 [3.8 model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
-[3.7 migration guidance](https://ai.google.dev/gemini-api/docs/latest-model), and
 [Gemini API release notes](https://ai.google.dev/gemini-api/docs/changelog).
 
-The tier-1 cascade checker therefore defaults to Gemini 3.8 Flash through OpenRouter and Gemini 3.7 Flash through local
-LiteLLM as `gemini/gemini-3.7-flash` or remote LiteLLM as `vertex_ai/gemini-3.7-flash` (see [policy.md](policy.md)). The
-Kimi template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus
-model alternative.
+The tier-1 cascade checker also defaults to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
+`gemini/gemini-3.8-flash`, and remote LiteLLM as `vertex_ai/gemini-3.8-flash` (see [policy.md](policy.md)). The Kimi
+template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus model
+alternative.
 
-The Anthropic templates retain Opus 5 as their opus-tier default and now expose both Fable 5.1 and Fable 5 as explicit
-alternatives. The unversioned `fable` and `claude-fable` aliases select Fable 5.1; use `claude-fable-5` when you need
-the prior version.
+The Anthropic templates use Opus 5.5 as their opus-tier default. The unversioned `opus` and `claude-opus` aliases also
+select 5.5; explicit `claude-opus-5` pins retain Opus 5. Opus 5.5 uses always-on adaptive thinking with a model default
+of `medium` effort. Custom integrations must use `auto` or `none` tool choice: forced tool choices and disabling
+thinking are rejected. See Anthropic's
+[migration guide](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide). Fable 5.1 and Fable 5 remain
+explicit alternatives, with `fable` and `claude-fable` selecting Fable 5.1.
+
+The existing OpenRouter family templates also expose these explicit alternatives without changing their tier defaults:
+
+| Template              | New alternatives                              |
+| --------------------- | --------------------------------------------- |
+| `openrouter-deepseek` | `deepseek-v4.1-flash`, `deepseek-v4-pro-0813` |
+| `openrouter-qwen`     | `qwen3.8-flash`, `qwen3.8-max-0902`           |
+| `openrouter-glm`      | `glm-5.3-flash`, `glm-5.3-flashx`             |
+
+The dated Qwen Max entry preserves the explicit snapshot identity; `qwen3.8-max` remains separately selectable.
 
 Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
 endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
-`qwen/qwen3.8-2.4t-a95b`: OpenRouter's ZDR endpoint catalog had no compatible Max endpoint in the 2026-08-21 audit. See
+`qwen/qwen3.8-2.4t-a95b`. The September 23 audit also found no ZDR endpoint for the new Flash or Max 0902 routes. See
 [OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
 
 Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
 rewrite them. Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with
 `forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
-LiteLLM path, the required Gemini 3.7 Flash and Anthropic Fable 5.1 routes must exist in
+LiteLLM path, the required Gemini 3.8 Flash, Claude Opus 5.5, and selected GPT-6 routes must exist in
 `~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
 backend; restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly
 on `--model fable`; it is never replaced implicitly.
@@ -317,28 +337,30 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 
 ### OpenRouter zero data retention (ZDR)
 
-Direct OpenRouter proxies require ZDR by default. Astra and Astra Pro both had eligible ZDR endpoints when checked on
-2026-09-05. With `allow_non_zdr: false` (also the compatibility default when the key is absent), Forge sends
+Direct OpenRouter proxies require ZDR by default. All six GPT-6 entries had eligible ZDR endpoints when checked on
+2026-09-23. With `allow_non_zdr: false` (also the compatibility default when the key is absent), Forge sends
 `provider.zdr: true` on every request. OpenRouter then restricts routing to endpoints it currently marks ZDR-compatible.
 This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only replaces models already known to
 lack a compatible endpoint before dispatch.
 
-Forge audited the bundled OpenRouter defaults and alternatives against OpenRouter's
-[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr) on 2026-08-21, then checked the newly added Fable 5.1
-slug on 2026-09-02 and confirmed the new `google/gemini-3.8-flash` route on 2026-09-03. Gemini 3.8 Flash had an eligible
-endpoint; the original seven exceptions plus Fable 5.1 did not and use these required-ZDR fallbacks:
+Forge checks the bundled OpenRouter routes against OpenRouter's
+[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr). The September 2026 refresh confirmed eligible
+endpoints for Opus 5.5, Gemini 3.8 Flash, and the added DeepSeek and GLM models. Fable and the listed Qwen routes use
+these required-ZDR fallbacks:
 
 ```yaml
 allow_non_zdr: false
 zdr_fallbacks:
-  anthropic/claude-fable-5.1: anthropic/claude-opus-5
-  anthropic/claude-fable-5: anthropic/claude-opus-5
+  anthropic/claude-fable-5.1: anthropic/claude-opus-5.5
+  anthropic/claude-fable-5: anthropic/claude-opus-5.5
   qwen/qwen3.6-flash: qwen/qwen3.8-27b
   qwen/qwen3.6-plus: qwen/qwen3.8-27b
   qwen/qwen3.6-max-preview: qwen/qwen3.8-2.4t-a95b
   qwen/qwen3.7-plus: qwen/qwen3.8-27b
   qwen/qwen3.7-max: qwen/qwen3.8-2.4t-a95b
+  qwen/qwen3.8-flash: qwen/qwen3.8-27b
   qwen/qwen3.8-max: qwen/qwen3.8-2.4t-a95b
+  qwen/qwen3.8-max-0902: qwen/qwen3.8-2.4t-a95b
 ```
 
 These built-in rules also protect older proxy snapshots that predate the keys; values in a proxy's own `zdr_fallbacks`
@@ -378,13 +400,13 @@ does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr`
 ## Model alternatives
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
-`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5 and
-their sonnet tier to Sonnet 5, with Fable 5.1, Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
+`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5.5
+and their sonnet tier to Sonnet 5, with Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
 (`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model directly with no
 alternatives map.) Use `--model` to select an alternative:
 
 ```bash
-# Default: opus tier routes to Opus 5, sonnet tier to Sonnet 5
+# Default: opus tier routes to Opus 5.5, sonnet tier to Sonnet 5
 forge session start my-session --proxy openrouter-anthropic
 
 # Select the current Fable family model
@@ -396,7 +418,7 @@ The proxy resolves the alternative at request time -- Claude Code sends the mode
 spellings of the same model share one route identity; private model slugs not known to the catalog still work, but only
 by exact key. Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level
 hyperparameters (reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR,
-Fable 5.1 and Fable 5 resolve to Opus 5 because the dated endpoint checks found no Fable-compatible ZDR route.
+Fable 5.1 and Fable 5 resolve to Opus 5.5 because the dated endpoint checks found no Fable-compatible ZDR route.
 
 For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
 exactly as before. The same flag accepts any Forge catalog model: non-Claude requests resolve a compatible
@@ -413,17 +435,19 @@ model_alternatives:
   opus:
     claude-fable-5-1: anthropic/claude-fable-5.1
     claude-fable-5: anthropic/claude-fable-5
+    claude-opus-5: anthropic/claude-opus-5
     claude-opus-4-8: anthropic/claude-opus-4.8
     claude-opus-4-6: anthropic/claude-opus-4.6
   sonnet:
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-The OpenRouter backend slug uses dotted `5.1`; the direct Anthropic and LiteLLM model ID is `claude-fable-5-1` (with the
-usual `anthropic/` LiteLLM prefix). Fresh proxies receive the correct provider-specific mapping from their template.
-Existing user-owned proxy snapshots must be edited or recreated to gain the new alternative.
+The OpenRouter backend slugs use dotted versions (`anthropic/claude-opus-5.5`, `anthropic/claude-fable-5.1`); direct
+Anthropic uses hyphens (`claude-opus-5-5`, `claude-fable-5-1`), with the usual `anthropic/` prefix on LiteLLM routes.
+Fresh proxies receive the correct provider-specific mapping from their template. Existing user-owned proxy snapshots
+must be edited or recreated to gain the new alternative.
 
-For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable`) vs leave the default Opus 5
+For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable`) vs leave the default Opus 5.5
 mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,
 and per-family cost + multi-needle retrieval data — see [model_selection.md](model_selection.md).
 

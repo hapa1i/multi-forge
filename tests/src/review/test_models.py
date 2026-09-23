@@ -99,7 +99,9 @@ class TestModelSpec:
 
 
 class TestDefaultModels:
-    @pytest.mark.parametrize("default", ["gpt-6-astra-pro", "gpt-5.6-sol"])
+    @pytest.mark.parametrize(
+        "default", ["gpt-6-astra-pro", "gpt-6-sol", "gpt-6-sol-pro", "gpt-6-luna", "gpt-6-luna-pro", "gpt-5.6-sol"]
+    )
     def test_explicit_gpt_choices_do_not_replace_the_default_worker(self, default: str) -> None:
         with patch(
             "forge.core.models.catalog.get_default_model",
@@ -118,6 +120,32 @@ class TestDefaultModels:
         assert [spec.model_id for spec in specs] == ["gpt-6-astra-pro", "gpt-5.6-sol"]
         assert all(spec.name not in DEFAULT_MODELS for spec in specs)
         assert {route.provider for route in derive_model_routes(specs[0])} == {"openrouter"}
+
+    @pytest.mark.parametrize(
+        ("name", "family"),
+        [
+            ("gpt-6-sol", "openai"),
+            ("gpt-6-sol-pro", "openai"),
+            ("gpt-6-luna", "openai"),
+            ("gpt-6-luna-pro", "openai"),
+            ("gemini-3.8-flash", "gemini"),
+            ("deepseek-v4.1-flash", "deepseek"),
+            ("deepseek-v4-pro-0813", "deepseek"),
+            ("qwen3.8-flash", "qwen"),
+            ("qwen3.8-max-0902", "qwen"),
+            ("glm-5.3-flash", "glm"),
+            ("glm-5.3-flashx", "glm"),
+            ("claude-opus-5", "anthropic"),
+            ("claude-opus-5.5", "anthropic"),
+        ],
+    )
+    def test_new_named_workers_are_explicit_choices(self, name: str, family: str) -> None:
+        [spec] = resolve_model_specs(name)
+
+        assert spec.model_id == name
+        assert spec.family == family
+        assert name not in DEFAULT_MODELS
+        assert derive_model_routes(spec)
 
     def test_default_quorum_names_are_explicit(self):
         assert list(DEFAULT_MODELS) == [OPENAI_DEFAULT, GEMINI_DEFAULT, "claude-opus"]

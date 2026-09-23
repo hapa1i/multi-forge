@@ -9,6 +9,7 @@ from forge.core.llm.clients.base import merge_hyperparams
 from forge.core.llm.clients.openai_compat import build_chat_completion_kwargs
 from forge.core.llm.clients.openrouter import OpenRouterClient
 from forge.core.llm.types import Message, ModelHyperparameters
+from forge.proxy.model_routes import effective_proxy_model_maps
 
 
 def _factory_for(monkeypatch: pytest.MonkeyPatch, template: str):
@@ -32,7 +33,9 @@ def test_openrouter_requires_zdr_by_default(monkeypatch: pytest.MonkeyPatch) -> 
     assert hyperparams.extra == {"openai": {"extra_body": {"provider": {"zdr": True}}}}
 
 
-def test_openrouter_explicit_non_zdr_opt_in_omits_request_requirement(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_openrouter_explicit_non_zdr_opt_in_omits_request_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     factory, loaded = _factory_for(monkeypatch, "openrouter-qwen")
     loaded.proxy.openrouter.allow_non_zdr = True
 
@@ -44,6 +47,24 @@ def test_openrouter_explicit_non_zdr_opt_in_omits_request_requirement(monkeypatc
 
     assert hyperparams.extra == {}
     assert "extra" not in hyperparams.model_dump(exclude_unset=True)
+
+
+@pytest.mark.parametrize("allow_non_zdr", [False, True])
+def test_new_qwen_alternatives_resolve_without_rewriting_configured_models(
+    allow_non_zdr: bool,
+) -> None:
+    loaded = load_config(template="openrouter-qwen")
+    provider = loaded.proxy.openrouter
+    provider.allow_non_zdr = allow_non_zdr
+
+    _, alternatives = effective_proxy_model_maps(loaded.proxy)
+
+    assert alternatives["opus"]["qwen3.8-flash"] == ("qwen/qwen3.8-flash" if allow_non_zdr else "qwen/qwen3.8-27b")
+    assert alternatives["opus"]["qwen3.8-max-0902"] == (
+        "qwen/qwen3.8-max-0902" if allow_non_zdr else "qwen/qwen3.8-2.4t-a95b"
+    )
+    assert provider.model_alternatives["opus"]["qwen3.8-flash"] == "qwen/qwen3.8-flash"
+    assert provider.model_alternatives["opus"]["qwen3.8-max-0902"] == "qwen/qwen3.8-max-0902"
 
 
 def test_litellm_has_no_zdr_transport_behavior(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,7 +80,9 @@ def test_litellm_has_no_zdr_transport_behavior(monkeypatch: pytest.MonkeyPatch) 
     assert "extra" not in hyperparams.model_dump(exclude_unset=True)
 
 
-def test_zdr_survives_call_metadata_and_reasoning_translation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_zdr_survives_call_metadata_and_reasoning_translation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     factory, _ = _factory_for(monkeypatch, "openrouter-glm")
     defaults = factory.get_default_hyperparams_for_tier(
         provider="openrouter",

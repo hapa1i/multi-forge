@@ -51,6 +51,7 @@ class ModelSpec:
     supports_verbosity: bool = False
     supports_top_p: bool = True
     supports_sampling_overrides: bool = True
+    sampling_requires_no_reasoning: bool = False
     supports_1m_context: bool = False
 
     # Temperature configuration
@@ -85,6 +86,13 @@ class ModelSpec:
     token_estimate_multiplier: float = 1.0
     system_prompt_addendum: str | None = None
     tags: tuple[str, ...] = field(default_factory=tuple)
+
+    def supports_sampling_at_effort(self, reasoning_effort: str | None) -> bool:
+        """Whether sampling controls are valid at the request's effective effort."""
+        if not self.supports_sampling_overrides:
+            return False
+        effective_effort = reasoning_effort if reasoning_effort is not None else self.default_reasoning_effort
+        return not self.sampling_requires_no_reasoning or effective_effort == "none"
 
     def __post_init__(self) -> None:
         if self.context_window_tokens <= 0:

@@ -12,6 +12,13 @@ SMOKE_PYTHON="${FORGE_WHEEL_SMOKE_PYTHON:->=3.11,<3.14}"
 SMOKE_STARTED=false
 
 cleanup() {
+    local smoke_exit_status=$?
+    local smoke_backend_log="${SMOKE_FORGE_HOME}/logs/backend/litellm-${SMOKE_PORT}.log"
+    if [[ "$smoke_exit_status" -ne 0 && -f "$smoke_backend_log" ]]; then
+        echo "LiteLLM backend log before cleanup:" >&2
+        tail -n 200 "$smoke_backend_log" >&2 || true
+    fi
+
     if [[ "$SMOKE_STARTED" == "true" && -x "${SMOKE_VENV}/bin/forge" ]]; then
         FORGE_HOME="$SMOKE_FORGE_HOME" \
             "${SMOKE_VENV}/bin/forge" model backend stop "litellm-${SMOKE_PORT}" >/dev/null 2>&1 || true

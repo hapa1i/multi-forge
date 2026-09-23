@@ -16,6 +16,16 @@ proxy:
       haiku: z-ai/glm-4.7-flash
       sonnet: z-ai/glm-5.3
       opus: z-ai/glm-5.3
+    model_alternatives:
+      haiku:
+        glm-5.3-flash: z-ai/glm-5.3-flash
+        glm-5.3-flashx: z-ai/glm-5.3-flashx
+      sonnet:
+        glm-5.3-flash: z-ai/glm-5.3-flash
+        glm-5.3-flashx: z-ai/glm-5.3-flashx
+      opus:
+        glm-5.3-flash: z-ai/glm-5.3-flash
+        glm-5.3-flashx: z-ai/glm-5.3-flashx
     tier_overrides:
       sonnet:
         reasoning_effort: high

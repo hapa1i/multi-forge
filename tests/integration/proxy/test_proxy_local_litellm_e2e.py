@@ -5,6 +5,8 @@ These tests verify the full flow: Anthropic API request → proxy → core.llm �
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
@@ -62,22 +64,23 @@ class TestProxyWithLocalLiteLLM:
                 assert len(events) > 0
 
 
-class TestGemini37FlashLiteLLMGate:
-    """The locked LiteLLM must serve Gemini 3.7 with thinking and cost data.
+class TestGeminiFlashLiteLLMGate:
+    """The locked LiteLLM must serve current and retained Flash routes with cost data.
 
-    Packaged cost-map support starts in LiteLLM 1.98. This live gate proves the
+    Packaged Gemini 3.8 support is verified in LiteLLM 1.102. This live gate proves the
     full Google AI Studio path on the locked version: routing, thinking usage,
     and the gateway cost header. Cost absence is a hard failure. The offline
     packaged-map expectation is pinned in
     tests/src/proxy/test_litellm_gemini_flash_support.py.
     """
 
-    def test_gemini_37_flash_completion_thinking_and_cost(self, local_litellm_gemini: str) -> None:
+    @pytest.mark.parametrize("model", ["gemini-3.7-flash", "gemini-3.8-flash"])
+    def test_flash_completion_thinking_and_cost(self, local_litellm_gemini: str, model: str) -> None:
         with httpx.Client(timeout=120) as client:
             resp = client.post(
                 f"{local_litellm_gemini}/chat/completions",
                 json={
-                    "model": "gemini/gemini-3.7-flash",
+                    "model": f"gemini/{model}",
                     "max_tokens": 512,
                     "reasoning_effort": "low",
                     "messages": [{"role": "user", "content": "What is 17*23? Reply with just the number."}],
@@ -97,7 +100,7 @@ class TestGemini37FlashLiteLLMGate:
         cost = resp.headers.get("x-litellm-response-cost")
         assert cost is not None and float(cost) > 0, f"cost header missing/zero: {cost!r}"
 
-    # Cache accounting for Gemini 3.7 remains conservatively disabled in the
+    # Cache accounting for Gemini Flash remains conservatively disabled in the
     # catalog until this exact local LiteLLM path is probed repeatedly.
 
 
@@ -122,12 +125,13 @@ class TestOpenAIProxyWithLocalLiteLLM:
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
         assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
 
-    def test_astra_responses_cost_without_model_metadata_refresh(self, local_litellm_openai: str) -> None:
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"])
+    def test_gpt6_responses_cost_without_model_metadata_refresh(self, local_litellm_openai: str, model: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{local_litellm_openai}/v1/responses",
                 json={
-                    "model": "openai/gpt-6-astra",
+                    "model": f"openai/{model}",
                     "input": "Say hello",
                     "max_output_tokens": 16,
                     "reasoning": {"effort": "low"},
@@ -136,4 +140,57 @@ class TestOpenAIProxyWithLocalLiteLLM:
 
         assert resp.status_code == 200, resp.text[:500]
         cost = resp.headers.get("x-litellm-response-cost")
-        assert cost is not None and float(cost) > 0, f"Astra cost missing without metadata refresh: {cost!r}"
+        assert cost is not None and float(cost) > 0, f"{model} cost missing without metadata refresh: {cost!r}"
+
+    @pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-6-luna"])
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_explicit_gpt6_model_preserves_tool_calls(
+        self, proxy_server_local_openai: str, model: str, stream: bool
+    ) -> None:
+        with httpx.Client(timeout=120) as client:
+            response = client.post(
+                f"{proxy_server_local_openai}/v1/messages",
+                json={
+                    "model": f"openai/{model}",
+                    "max_tokens": 1024,
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "stream": stream,
+                    "messages": [{"role": "user", "content": "Call report with value 391."}],
+                    "tools": [
+                        {
+                            "name": "report",
+                            "description": "Report a numeric result.",
+                            "input_schema": {
+                                "type": "object",
+                                "properties": {"value": {"type": "integer"}},
+                                "required": ["value"],
+                            },
+                        }
+                    ],
+                    "tool_choice": {"type": "any"},
+                },
+                headers={"x-api-key": "test"},
+            )
+
+        assert response.status_code == 200, response.text[:500]
+        assert response.headers.get("X-Resolved-Model") == f"openai/{model}"
+        if stream:
+            events = [
+                json.loads(line.removeprefix("data: "))
+                for line in response.text.splitlines()
+                if line.startswith("data: ")
+            ]
+            assert not any(event.get("type") == "error" for event in events), events
+            assert any(
+                event.get("content_block", {}).get("type") == "tool_use"
+                and event["content_block"].get("name") == "report"
+                for event in events
+            ), events
+            assert any(event.get("type") == "message_stop" for event in events)
+        else:
+            assert response.json()["stop_reason"] == "tool_use"
+            assert any(
+                block.get("type") == "tool_use" and block.get("name") == "report"
+                for block in response.json()["content"]
+            )

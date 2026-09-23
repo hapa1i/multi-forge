@@ -270,16 +270,15 @@ def _preflight_proxy(
         pytest.fail(f"Proxy preflight failed: status={resp.status_code}, body={resp.text[:500]}")
 
 
-@pytest.fixture(scope="module")
-def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
-    """Start an isolated local LiteLLM from the current bundled config."""
-    if not os.environ.get("OPENAI_API_KEY"):
-        pytest.fail("OPENAI_API_KEY not set (required for local OpenAI LiteLLM tests)")
+def _local_litellm_backend(forge_home: Path, required_key: str) -> Generator[str, None, None]:
+    """Serve freshly materialized backend metadata without a remote cost-map refresh."""
+    if not os.environ.get(required_key):
+        pytest.fail(f"{required_key} not set (required for local LiteLLM tests)")
 
     test_port = allocate_ephemeral_port()
     base_url = f"http://localhost:{test_port}"
     env = os.environ.copy()
-    env["FORGE_HOME"] = str(module_forge_home)
+    env["FORGE_HOME"] = str(forge_home)
     env["LITELLM_LOCAL_MODEL_COST_MAP"] = "true"
 
     create_result = subprocess.run(
@@ -327,65 +326,47 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="module")
+def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
+    yield from _local_litellm_backend(module_forge_home, "OPENAI_API_KEY")
+
+
+@pytest.fixture(scope="module")
 def local_litellm_gemini(tmp_path_factory) -> Generator[str, None, None]:
-    """Start an isolated local LiteLLM from the current bundled config (Gemini routes).
+    # Each provider gets a private home because backend creation rejects existing configs.
+    yield from _local_litellm_backend(tmp_path_factory.mktemp("forge_home_gemini_litellm_"), "GEMINI_API_KEY")
 
-    This never reuses a running instance or a stale materialized config: the
-    bundled backends/litellm.yaml is freshly materialized into a private
-    FORGE_HOME. Private (not module_forge_home) because ``forge model backend
-    create`` rejects an existing config and ``local_litellm_openai``
-    materializes its own copy in the shared home.
-    """
-    if not os.environ.get("GEMINI_API_KEY"):
-        pytest.fail("GEMINI_API_KEY not set (required for local Gemini LiteLLM tests)")
 
-    test_port = allocate_ephemeral_port()
-    base_url = f"http://localhost:{test_port}"
-    env = os.environ.copy()
-    env["FORGE_HOME"] = str(tmp_path_factory.mktemp("forge_home_gemini_litellm_"))
+@pytest.fixture(scope="module")
+def local_litellm_anthropic(tmp_path_factory) -> Generator[str, None, None]:
+    yield from _local_litellm_backend(tmp_path_factory.mktemp("forge_home_anthropic_litellm_"), "ANTHROPIC_API_KEY")
 
-    create_result = subprocess.run(
-        ["uv", "run", "forge", "model", "backend", "create", "litellm"],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
+
+@pytest.fixture(scope="module")
+def proxy_server_local_anthropic(
+    local_litellm_anthropic: str, module_forge_home: Path, tmp_path_factory
+) -> Generator[str, None, None]:
+    proxy_id = "litellm-anthropic-refresh"
+    port = allocate_ephemeral_port()
+    _register_proxy_for_test(
+        proxy_id=proxy_id,
+        template="litellm-anthropic-local",
+        port=port,
+        forge_home=module_forge_home,
+        upstream_base_url=local_litellm_anthropic,
     )
-    if create_result.returncode != 0:
-        pytest.fail(f"Failed to create isolated LiteLLM config: {create_result.stderr[-500:]}")
-
-    start_result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "forge",
-            "model",
-            "backend",
-            "start",
-            "litellm",
-            "--port",
-            str(test_port),
-        ],
+    env = {**os.environ, "FORGE_HOME": str(module_forge_home), "LITELLM_LOCAL_BASE_URL": local_litellm_anthropic}
+    proc = _start_proxy_subprocess(
+        template="litellm-anthropic-local",
+        port=port,
+        forge_home=module_forge_home,
         env=env,
-        check=False,
-        capture_output=True,
-        text=True,
+        cwd=tmp_path_factory.mktemp("forge_proxy_cwd_anthropic_"),
+        proxy_id=proxy_id,
     )
-    if start_result.returncode != 0:
-        pytest.fail(f"Failed to start isolated LiteLLM: {start_result.stderr[-500:]}")
-    if not wait_for_port(test_port, timeout=30):
-        pytest.fail(f"Isolated LiteLLM failed to start on port {test_port}")
-
     try:
-        yield base_url
+        yield f"http://localhost:{port}"
     finally:
-        subprocess.run(
-            ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        kill_process(proc.pid)
 
 
 @pytest.fixture(scope="module")

@@ -6,6 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 import forge.proxy.server as server
+from forge.config import load_config
 
 _UNSET = object()
 
@@ -57,7 +58,7 @@ class TestResolveModelWithAlternatives:
         return SimpleNamespace(
             has_explicit_tier=has_explicit_tier,
             tier=tier,
-            original_model_name=model if original_model_name is _UNSET else original_model_name,
+            original_model_name=(model if original_model_name is _UNSET else original_model_name),
             model=model,
         )
 
@@ -123,21 +124,23 @@ class TestResolveModelWithAlternatives:
     @pytest.mark.parametrize(
         ("source", "fallback"),
         [
-            ("anthropic/claude-fable-5.1", "anthropic/claude-opus-5"),
-            ("anthropic/claude-fable-5", "anthropic/claude-opus-5"),
+            ("anthropic/claude-fable-5.1", "anthropic/claude-opus-5.5"),
+            ("anthropic/claude-fable-5", "anthropic/claude-opus-5.5"),
             ("qwen/qwen3.6-flash", "qwen/qwen3.8-27b"),
             ("qwen/qwen3.6-plus", "qwen/qwen3.8-27b"),
             ("qwen/qwen3.6-max-preview", "qwen/qwen3.8-2.4t-a95b"),
             ("qwen/qwen3.7-plus", "qwen/qwen3.8-27b"),
             ("qwen/qwen3.7-max", "qwen/qwen3.8-2.4t-a95b"),
             ("qwen/qwen3.8-max", "qwen/qwen3.8-2.4t-a95b"),
+            ("qwen/qwen3.8-flash", "qwen/qwen3.8-27b"),
+            ("qwen/qwen3.8-max-0902", "qwen/qwen3.8-2.4t-a95b"),
         ],
     )
     def test_builtin_fallbacks_cover_audited_non_zdr_routes(self, source, fallback):
         assert server._model_for_zdr_policy(source) == fallback
 
     def test_zdr_fallback_target_is_exact_and_drops_client_lookup_suffix(self):
-        assert server._model_for_zdr_policy("anthropic/claude-fable-5.1[1m]") == "anthropic/claude-opus-5"
+        assert server._model_for_zdr_policy("anthropic/claude-fable-5.1[1m]") == "anthropic/claude-opus-5.5"
 
     def test_allow_non_zdr_keeps_primary_model(self):
         proxy_cfg = server.config.proxy
@@ -161,6 +164,56 @@ class TestResolveModelWithAlternatives:
         result = server._resolve_model_with_alternatives(self._request("claude-opus"))
 
         assert result.model == "qwen/qwen3.8-27b"
+
+    def test_saved_fable_fallback_keeps_its_selected_opus_version(self):
+        proxy_cfg = server.config.proxy
+        proxy_cfg._provider.zdr_fallbacks = {"anthropic/claude-fable-5.1": "anthropic/claude-opus-5"}
+
+        assert server._model_for_zdr_policy("anthropic/claude-fable-5.1") == "anthropic/claude-opus-5"
+
+    @pytest.mark.parametrize(
+        ("template", "request_model", "expected"),
+        [
+            ("openrouter-anthropic", "claude-opus", "anthropic/claude-opus-5.5"),
+            ("openrouter-anthropic", "claude-opus-5", "anthropic/claude-opus-5"),
+            ("litellm-anthropic-local", "claude-opus", "anthropic/claude-opus-5-5"),
+            ("litellm-anthropic-local", "claude-opus-5", "anthropic/claude-opus-5"),
+            (
+                "litellm-gemini-flash-local",
+                "gemini-3.8-flash",
+                "gemini/gemini-3.8-flash",
+            ),
+            (
+                "litellm-gemini-flash-local",
+                "gemini-3.7-flash",
+                "gemini/gemini-3.7-flash",
+            ),
+            ("openrouter-openai", "gpt-6-sol", "openai/gpt-6-sol"),
+            ("openrouter-openai", "gpt-6-sol-pro", "openai/gpt-6-sol-pro"),
+            ("openrouter-openai", "gpt-6-luna", "openai/gpt-6-luna"),
+            ("openrouter-openai", "gpt-6-luna-pro", "openai/gpt-6-luna-pro"),
+            ("litellm-openai-local", "gpt-6-sol", "openai/gpt-6-sol"),
+            ("litellm-openai-local", "gpt-6-luna", "openai/gpt-6-luna"),
+            (
+                "openrouter-deepseek",
+                "deepseek-v4.1-flash",
+                "deepseek/deepseek-v4.1-flash",
+            ),
+            (
+                "openrouter-deepseek",
+                "deepseek-v4-pro-0813",
+                "deepseek/deepseek-v4-pro-0813",
+            ),
+            ("openrouter-glm", "glm-5.3-flash", "z-ai/glm-5.3-flash"),
+            ("openrouter-glm", "glm-5.3-flashx", "z-ai/glm-5.3-flashx"),
+        ],
+    )
+    def test_refreshed_templates_route_explicit_models(self, monkeypatch, template, request_model, expected):
+        monkeypatch.setattr(server.config, "proxy", load_config(template=template).proxy)
+
+        result = server._resolve_model_with_alternatives(self._request(request_model))
+
+        assert result.model == expected
 
     def test_required_zdr_keeps_unknown_model_for_provider_enforcement(self):
         result = server._resolve_model_with_alternatives(self._request("qwen/unknown-zdr-status"))

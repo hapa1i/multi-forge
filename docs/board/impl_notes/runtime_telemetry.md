@@ -22,7 +22,7 @@ Durable routing, backend, consumer, proxy, policy, and telemetry decisions.
 Sources: [reviewed closeout](../done/gpt_astra_defaults/checklist.md),
 [runtime contract](../../design_runtime.md#a5-model-catalog-368),
 [sampling regression](../../../tests/regression/test_bug_astra_responses_sampling.py), and
-[pricing boundary tests](../../../tests/src/backend/test_astra_pricing.py).
+[pricing boundary tests](../../../tests/src/backend/test_litellm_model_metadata.py).
 
 ### Mixed headless runtime workflows separate execution from routing (runtime_neutral_workflow_workers, shipped 2026-07-23)
 

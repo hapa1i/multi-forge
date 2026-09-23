@@ -15,7 +15,7 @@ from forge.core.tiers import detect_tier_word
 ONE_M_SUFFIX = "[1m]"
 PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS = 200_000
 PROXY_CONTEXT_MODEL_DEFAULTS = {
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": f"claude-opus-5{ONE_M_SUFFIX}",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": f"claude-opus-5-5{ONE_M_SUFFIX}",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": f"claude-sonnet-5{ONE_M_SUFFIX}",
 }
 

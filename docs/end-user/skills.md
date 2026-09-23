@@ -210,13 +210,13 @@ inline.
 | ------------------------ | ----------------------------------- | ----------------------- |
 | `gpt-6-astra`            | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
-| `claude-opus`            | Default Claude Opus 5 reasoning     | Direct Anthropic        |
+| `claude-opus`            | Default Claude Opus 5.5 reasoning   | Direct Anthropic        |
 
-Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
-(most capable). The default `claude-opus` worker resolves to Opus 5; use `--models claude-opus-4.6,claude-opus-4.8` when
-you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
-model. The stable `claude-fable` worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model
-with `--model claude-fable-5` but is not a separate workflow worker.
+Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, `claude-opus-5`,
+`claude-opus-5.5`, and `claude-fable` (most capable). The default `claude-opus` worker resolves to Opus 5.5; use
+`--models claude-opus-4.6,claude-opus-4.8` when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the
+panel, or add `claude-fable` for the top-tier model. The stable `claude-fable` worker resolves to Fable 5.1; the prior
+Fable 5 remains selectable as a session model with `--model claude-fable-5` but is not a separate workflow worker.
 
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-6 Astra and Gemini require
 active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See
@@ -338,9 +338,9 @@ must not change Codex's resource selection.
 **No extra skill configuration is needed.** Claude selects from detected session metadata; Codex uses its
 host-authoritative OpenAI binding.
 
-For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/panel`, and when to
-cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
-long-context retrieval and citation fidelity as the checks to validate locally.
+For per-role guidance on when to use Opus 5.5 or a displaced Opus version, when to mix families for `/panel`, and when
+to cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there
+treats long-context retrieval and citation fidelity as the checks to validate locally.
 
 ---
 

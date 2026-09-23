@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 from unittest.mock import patch, sentinel
 
 import pytest
@@ -245,6 +246,30 @@ _EXPECTED_WORKFLOW_ROUTES = {
     ),
 }
 
+_EXPECTED_WORKFLOW_ROUTES.update(
+    {
+        "gpt-6-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
+        "gpt-6-luna": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
+        "gpt-6-sol-pro": tuple(
+            template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
+        ),
+        "gpt-6-luna-pro": tuple(
+            template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
+        ),
+        "gemini-3.8-flash": (
+            "openrouter-gemini-flash",
+            "openrouter-gemini",
+            *_EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"][2:],
+        ),
+        "deepseek-v4.1-flash": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
+        "deepseek-v4-pro-0813": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
+        "qwen3.8-flash": _EXPECTED_WORKFLOW_ROUTES["qwen3.8-max"],
+        "qwen3.8-max-0902": _EXPECTED_WORKFLOW_ROUTES["qwen3.8-max"],
+        "glm-5.3-flash": _EXPECTED_WORKFLOW_ROUTES["glm-5.3"],
+        "glm-5.3-flashx": _EXPECTED_WORKFLOW_ROUTES["glm-5.3"],
+    }
+)
+
 
 class TestDeriveModelRoutes:
     @pytest.fixture(autouse=True)
@@ -267,7 +292,9 @@ class TestDeriveModelRoutes:
     @pytest.mark.parametrize(
         ("name", "model_ref"),
         [
-            ("claude-opus", "claude-opus-5"),
+            ("claude-opus", "claude-opus-5-5"),
+            ("claude-opus-5.5", "claude-opus-5-5"),
+            ("claude-opus-5", "claude-opus-5"),
             ("claude-opus-4.6", "claude-opus-4-6"),
             ("claude-opus-4.6-1m", "claude-opus-4-6[1m]"),
             ("claude-opus-4.8", "claude-opus-4-8"),
@@ -298,6 +325,43 @@ class TestDeriveModelRoutes:
 
 
 class TestResolveInvocationRouting:
+
+    @pytest.mark.parametrize("proxy", ["openrouter-openai", "openrouter-gemini"])
+    def test_new_models_share_an_explicit_openrouter_proxy(self, proxy: str) -> None:
+        from forge.review.models import resolve_model_specs
+
+        model_refs = (
+            "openai/gpt-6-sol",
+            "openai/gpt-6-sol-pro",
+            "openai/gpt-6-luna",
+            "openai/gpt-6-luna-pro",
+            "google/gemini-3.8-flash",
+            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4-pro-0813",
+            "qwen/qwen3.8-flash",
+            "qwen/qwen3.8-max-0902",
+            "z-ai/glm-5.3-flash",
+            "z-ai/glm-5.3-flashx",
+        )
+        specs = resolve_model_specs(",".join(model_ref.split("/", 1)[1] for model_ref in model_refs))
+        entry = SimpleNamespace(proxy_id=proxy, template=proxy, base_url="http://localhost:8096")
+
+        with (
+            patch("forge.core.reactive.routing._is_sidecar_mode", return_value=False),
+            patch("forge.core.reactive.routing.lookup_proxy_entry_strict", return_value=entry),
+            patch("forge.core.reactive.routing._check_proxy_reachable", return_value=True),
+            patch("forge.core.reactive.routing._probe_proxy_metadata", return_value={}),
+        ):
+            plan = resolve_invocation_routing(specs, via=proxy)
+
+        assert plan.via_override == proxy
+        assert len(plan.routes) == len(model_refs)
+        for result, model_ref in zip(plan.routes, model_refs):
+            assert result.source == "explicit"
+            assert result.proxy_id == proxy
+            assert result.route is not None
+            assert result.route.model_ref == model_ref
+            assert result.route.template_id == proxy
 
     @pytest.fixture(autouse=True)
     def _clear_cache(self):

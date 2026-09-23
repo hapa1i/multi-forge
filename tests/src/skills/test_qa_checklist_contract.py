@@ -109,7 +109,7 @@ def _report_categories() -> list[str]:
 
 def test_declared_assertion_count_matches_all_fragments() -> None:
     parsed = _parsed_checklist()
-    assert _declared_test_count() == parsed["total_assertions"] == 677
+    assert _declared_test_count() == parsed["total_assertions"] == 684
 
 
 def test_section_and_step_ids_are_unique_and_execution_classes_are_explicit() -> None:
