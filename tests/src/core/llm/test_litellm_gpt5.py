@@ -1,4 +1,4 @@
-"""Tests for GPT-5 Responses API support in LiteLLM client."""
+"""Tests for GPT Responses API support in LiteLLM client."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,6 +10,7 @@ from forge.core.llm.types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
+    ModelReasoningEffort,
     ProviderTraceMeta,
     ToolCall,
 )
@@ -120,6 +121,47 @@ class TestResponsesApiSelection:
 
         assert create.await_args is not None
         assert create.await_args.kwargs["temperature"] == 0.7
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("model", ["openai/gpt-6-sol", "openai/gpt-6-luna"])
+    @pytest.mark.parametrize("effort", [None, "none", "medium"])
+    @pytest.mark.parametrize("stream", [False, True])
+    async def test_sol_and_luna_keep_tools_and_apply_effort_dependent_sampling(
+        self, model: str, effort: ModelReasoningEffort | None, stream: bool
+    ) -> None:
+        client = LiteLLMClient(model=model, provider="litellm_remote")
+        sdk_client = MagicMock()
+        create = AsyncMock(return_value=MagicMock())
+        sdk_client.responses.with_raw_response.create = create
+        tools = [{"type": "function", "function": {"name": "report", "parameters": {"type": "object"}}}]
+        params = ModelHyperparameters(temperature=0.7, top_p=0.8, reasoning_effort=effort)
+        messages = [Message(role="user", content="Call report")]
+
+        with (
+            patch.object(client, "_get_client", new=AsyncMock(return_value=sdk_client)),
+            patch.object(client, "_parse_responses_output", return_value=CompletionResponse(text="ok")),
+            patch.object(client, "_merge_response_metadata", side_effect=lambda completion, _headers: completion),
+        ):
+            if stream:
+                events = [event async for event in client.stream(messages, tools=tools, hyperparams=params)]
+                assert events[0].text == "ok"
+            else:
+                response = await client.complete(messages, tools=tools, hyperparams=params)
+                assert response.text == "ok"
+
+        create.assert_awaited_once()
+        assert create.await_args is not None
+        request = create.await_args.kwargs
+        assert request["model"] == model
+        assert request["tools"][0]["name"] == "report"
+        assert request.get("reasoning") == ({"effort": effort} if effort is not None else None)
+        if effort == "none":
+            assert request["temperature"] == 0.7
+            assert request["top_p"] == 0.8
+        else:
+            assert "temperature" not in request
+            assert "top_p" not in request
+        sdk_client.chat.completions.create.assert_not_called()
 
 
 class TestConvertMessagesForResponses:

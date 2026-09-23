@@ -6,8 +6,8 @@
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 #
-# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Alternatives are
-# claude-fable-5-1, claude-fable-5, claude-opus-4-8, claude-opus-4-6,
+# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5.5. Alternatives are
+# claude-opus-5, claude-fable-5-1, claude-fable-5, claude-opus-4-8, claude-opus-4-6,
 # and claude-sonnet-4-6.
 #
 # After adding ANTHROPIC_API_KEY, stop the backend so Forge restarts it with the new environment:
@@ -23,9 +23,10 @@ proxy:
     tiers:
       haiku: anthropic/claude-haiku-4-5
       sonnet: anthropic/claude-sonnet-5
-      opus: anthropic/claude-opus-5
+      opus: anthropic/claude-opus-5-5
     model_alternatives:
       opus:
+        claude-opus-5: anthropic/claude-opus-5
         claude-fable-5-1: anthropic/claude-fable-5-1
         claude-fable-5: anthropic/claude-fable-5
         claude-opus-4-8: anthropic/claude-opus-4-8

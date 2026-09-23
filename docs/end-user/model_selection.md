@@ -116,12 +116,12 @@ runtime launch.
 
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
-The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5 and the `sonnet` tier to Sonnet 5, and
-exposes Fable 5.1, Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives for explicit session pins. You do not
-need separate proxies just to compare Claude versions:
+The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5.5 and the `sonnet` tier to Sonnet 5, and
+exposes Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives for explicit session pins. You do
+not need separate proxies just to compare Claude versions:
 
 ```bash
-# Planner/supervisor source on the proxy's default opus tier (Opus 5)
+# Planner/supervisor source on the proxy's default opus tier (Opus 5.5)
 forge session start planner --proxy openrouter-anthropic
 
 # Executor pinned to a ZDR-compatible alternative exposed by the same proxy
@@ -130,7 +130,7 @@ forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --
 
 `--model claude-fable` and `--model fable` select Fable 5.1, the current family default. Use `--model claude-fable-5` to
 retain the prior version explicitly. OpenRouter's ZDR endpoint catalog had no eligible route for Fable 5 in the
-2026-08-21 audit or Fable 5.1 in the 2026-09-02 check, so Forge's default required-ZDR policy dispatches Opus 5 for
+2026-08-21 audit or Fable 5.1 in the 2026-09-02 check, so Forge's default required-ZDR policy dispatches Opus 5.5 for
 either model. Using Fable itself requires the explicit non-ZDR opt-out described in
 [proxy.md](proxy.md#openrouter-zero-data-retention-zdr).
 

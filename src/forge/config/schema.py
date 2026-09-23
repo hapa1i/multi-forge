@@ -85,6 +85,10 @@ OPENAI_MODELS = [
     "gpt-5.6-luna",
     "gpt-6-astra",
     "gpt-6-astra-pro",
+    "gpt-6-sol",
+    "gpt-6-sol-pro",
+    "gpt-6-luna",
+    "gpt-6-luna-pro",
     "o1",
     "o1-mini",
     "o3",
@@ -1041,6 +1045,17 @@ def _validate_static_tier_override_constraints(tiers: TierModels, overrides: Tie
             raise ValueError(
                 f"tier_overrides.{tier}.temperature is not supported by {canonical_model}; "
                 "remove the override or choose a model that supports sampling overrides"
+            )
+
+        if (
+            spec.sampling_requires_no_reasoning
+            and override.temperature is not None
+            and override.reasoning_effort != "none"
+        ):
+            raise ValueError(
+                f"tier_overrides.{tier}.temperature for {canonical_model} requires "
+                f"tier_overrides.{tier}.reasoning_effort='none'; "
+                "set that effort or remove the temperature override"
             )
 
         if spec.thinking_modes == ("adaptive",) and override.thinking_budget_tokens is not None:

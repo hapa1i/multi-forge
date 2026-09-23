@@ -428,6 +428,8 @@ forge model backend show litellm-4000 --raw
 
 - [ ] Backend config created (or reports it already exists)
 - [ ] `forge model backend show` displays config YAML
+- [ ] A freshly created backend includes Gemini 3.8 Flash, Claude Opus 5.5, GPT-6 Sol, and GPT-6 Luna routes; an
+  existing user-owned config is preserved
 
 ### 4.17 OpenRouter Templates
 
@@ -455,19 +457,24 @@ forge proxy template show openrouter-qwen
 - [ ] `forge proxy template list` shows 20 user-facing templates total (8 LiteLLM + 10 OpenRouter +
   `anthropic-passthrough` + `codex-responses-local`)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
-  opus=claude-opus-5)
+  opus=claude-opus-5.5)
+- [ ] Anthropic templates retain explicit `claude-opus-5` alternatives while unversioned Opus selects 5.5
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
+- [ ] `openrouter-deepseek` exposes `deepseek-v4.1-flash` and `deepseek-v4-pro-0813` alternatives
 - [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.3)
+- [ ] `openrouter-glm` exposes `glm-5.3-flash` and `glm-5.3-flashx` alternatives
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k3)
 - [ ] `openrouter-kimi` exposes `kimi-k2.7-code` as a sonnet/opus model alternative
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
 - [ ] `openrouter-qwen` maps tiers to Qwen models (haiku/sonnet=qwen3.8-27b, opus=qwen3.8-max)
+- [ ] `openrouter-qwen` exposes `qwen3.8-flash` and the distinct `qwen3.8-max-0902` snapshot
 - [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields
-- [ ] The dated ZDR audit fallbacks cover Fable 5.1, Fable 5, and all six bundled non-ZDR Qwen slugs; Qwen3.8 Max maps
-  to `qwen/qwen3.8-2.4t-a95b`
+- [ ] The dated ZDR audit fallbacks map Fable 5.1/Fable 5 to Opus 5.5 and cover all eight bundled non-ZDR Qwen slugs;
+  both Qwen3.8 Max entries map to `qwen/qwen3.8-2.4t-a95b`, and Qwen3.8 Flash maps to `qwen/qwen3.8-27b`
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-6-astra, opus=gpt-6-astra)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-6-astra)
+- [ ] Both OpenRouter OpenAI templates expose GPT-6 Sol/Sol Pro and Luna/Luna Pro alternatives
 - [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.8-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
 - [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.8-flash with tier_overrides for reasoning_effort
@@ -535,10 +542,10 @@ forge proxy delete openrouter-zdr-test --yes
 
 ```bash
 # Check model_alternatives in the openrouter-anthropic template
-forge proxy template show openrouter-anthropic --raw | grep -A3 model_alternatives
+forge proxy template show openrouter-anthropic --raw | grep -A8 model_alternatives
 
 # Check instance inherits alternatives
-forge proxy show openrouter-test --raw | grep -A3 model_alternatives
+forge proxy show openrouter-test --raw | grep -A8 model_alternatives
 
 echo "---"
 
@@ -547,6 +554,7 @@ forge proxy delete openrouter-test --yes 2>/dev/null || true
 ```
 
 - [ ] Template YAML includes `model_alternatives` section under opus tier
+- [ ] Opus 5 remains selectable as `claude-opus-5` while the default selects Opus 5.5
 - [ ] Opus alternative maps `claude-opus-4-8` to `anthropic/claude-opus-4.8`
 - [ ] Proxy instance inherits `model_alternatives` from template
 - [ ] `openrouter-test` proxy cleaned up

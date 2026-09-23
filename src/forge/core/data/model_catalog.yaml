@@ -8,7 +8,8 @@
 #
 # HYPERPARAMETER FIELDS:
 # - temperature_constraint: "fixed" (must be 1.0) or "range" (configurable)
-# - supports_top_p: Whether top_p sampling is supported (reasoning models don't)
+# - supports_top_p: Whether top_p sampling is supported
+# - sampling_requires_no_reasoning: Sampling controls require reasoning effort none
 # - default_timeout_seconds: Safe default timeout (client can override)
 #
 # PROMPT CACHING (via LiteLLM - see docs.litellm.ai/docs/completion/prompt_caching):
@@ -43,11 +44,11 @@ defaults:
   anthropic:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-5
+    opus: claude-opus-5-5
   openrouter:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-5
+    opus: claude-opus-5-5
   deepseek:
     haiku: deepseek-v4-flash
     sonnet: deepseek-v4-pro
@@ -120,6 +121,110 @@ models:
       mechanism: auto
     native_thinking_param: reasoning_effort
     litellm_reasoning_efforts: [low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
+  gpt-6-sol:
+    friendly_name: GPT-6 Sol
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    supports_sampling_overrides: true
+    sampling_requires_no_reasoning: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
+  gpt-6-sol-pro:
+    friendly_name: GPT-6 Sol Pro
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 300
+    prompt_caching:
+      supports: true
+      mechanism: auto
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
+  gpt-6-luna:
+    friendly_name: GPT-6 Luna
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    supports_sampling_overrides: true
+    sampling_requires_no_reasoning: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
+  gpt-6-luna-pro:
+    friendly_name: GPT-6 Luna Pro
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 300
+    prompt_caching:
+      supports: true
+      mechanism: auto
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh, max]
     default_reasoning_effort: medium
     use_responses_api: true
     system_prompt_addendum: system_prompt_addendums/openai.md
@@ -1039,8 +1144,7 @@ models:
 
   # Gemini 3.8 Flash is the current Flash family and OpenRouter default. It is
   # GA with the same 1M/64K multimodal envelope and low/medium/high thinking
-  # levels as 3.7. LiteLLM 1.99's bundled model catalog has no 3.8
-  # pricing/capability entry, so local and remote LiteLLM defaults remain on 3.7.
+  # levels as 3.7, with packaged LiteLLM support in 1.102.0.
   gemini-3.8-flash:
     friendly_name: Gemini 3.8 Flash
     context_window_tokens: 1048576
@@ -1064,7 +1168,7 @@ models:
     tags: []
 
   # ---------------------------------------------------------------------------
-  # Claude Models (5 + 4.8 + 4.7 + 4.6 + 4.5 series)
+  # Claude Models (5.5 + 5 + 4.8 + 4.7 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
 
   # --- Claude 4.6 Series ---
@@ -1093,7 +1197,7 @@ models:
     tags: []
 
   # --- Claude 4.7 Series ---
-  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 5.
+  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 5.5.
   claude-opus-4-7:
     friendly_name: Claude Opus 4.7
     context_window_tokens: 1000000
@@ -1120,7 +1224,7 @@ models:
     tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
-  # Opus 4.8 is the displaced standard opus (Opus 5 is the default); still
+  # Opus 4.8 is the displaced standard opus (Opus 5.5 is the default); still
   # selectable via --model (opus model_alternatives).
   claude-opus-4-8:
     friendly_name: Claude Opus 4.8
@@ -1147,12 +1251,34 @@ models:
     token_estimate_multiplier: 1.35
     tags: []
 
-  # --- Claude Opus 5 ---
-  # Opus 5 replaces Opus 4.8 as the standard opus: catalog opus default
-  # (anthropic + openrouter) and the proxy opus-tier default. Same request
-  # surface as Opus 4.8 / Sonnet 5: adaptive-only thinking, sampling overrides
-  # removed, native 1M context (default and max), same pricing as Opus 4.8.
-  # Below Fable 5.1.
+  # --- Claude Opus 5.5 and 5 ---
+  # Opus 5.5 is the default opus: always-on adaptive thinking and medium effort.
+  claude-opus-5-5:
+    friendly_name: Claude Opus 5.5
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 512
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    token_estimate_multiplier: 1.35
+    tags: []
+
+  # Opus 5 remains selectable as an explicit prior-version pin.
   claude-opus-5:
     friendly_name: Claude Opus 5
     context_window_tokens: 1000000
@@ -1176,12 +1302,12 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    tags: []  # Default opus tier (anthropic + openrouter)
+    tags: []
 
   # --- Claude Fable Series ---
   # Fable 5.1 is the current Fable family default (unversioned aliases and the
   # named review worker), but not a catalog tier default: the opus tier remains
-  # on Opus 5. Fable 5.1 adds max effort to Fable 5's adaptive-only request
+  # on Opus 5.5. Fable 5.1 adds max effort to Fable 5's adaptive-only request
   # surface; both versions stay selectable via --model (opus alternatives).
   claude-fable-5-1:
     friendly_name: Claude Fable 5.1
@@ -1416,6 +1542,52 @@ models:
   # ---------------------------------------------------------------------------
   # Open-source models via OpenRouter
   # ---------------------------------------------------------------------------
+  deepseek-v4.1-flash:
+    friendly_name: DeepSeek V4.1 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 384000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: high
+    tags: [code-gen, vision]
+
+  deepseek-v4-pro-0813:
+    friendly_name: DeepSeek V4 Pro 0813
+    context_window_tokens: 1048576
+    max_output_tokens: 384000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: high
+    tags: [code-gen]
+
   deepseek-v4-flash:
     friendly_name: DeepSeek V4 Flash
     context_window_tokens: 1048576
@@ -1750,6 +1922,52 @@ models:
     default_reasoning_effort: xhigh
     tags: [agentic, code-gen, vision]
 
+  qwen3.8-flash:
+    friendly_name: Qwen3.8 Flash
+    context_window_tokens: 1000000
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    tags: [agentic, code-gen, vision]
+
+  qwen3.8-max-0902:
+    friendly_name: Qwen3.8 Max 0902
+    context_window_tokens: 1000000
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [minimal, low, medium, high, xhigh]
+    default_reasoning_effort: xhigh
+    tags: [agentic, code-gen, vision]
+
   qwen3-coder:
     friendly_name: Qwen3 Coder 480B A35B
     context_window_tokens: 262144
@@ -1934,6 +2152,57 @@ models:
     default_reasoning_effort: max
     tags: [agentic, code-gen]
 
+  # Use Z.ai's documented 1M/128K envelope rather than provider-specific extensions.
+  glm-5.3-flash:
+    friendly_name: GLM 5.3 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenRouter advertises low/high/max; max is provider reasoning effort,
+    # distinct from the core.llm checker vocabulary.
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: max
+    tags: [agentic, code-gen, vision]
+
+  glm-5.3-flashx:
+    friendly_name: GLM 5.3 FlashX
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenRouter advertises low/high/max; max is provider reasoning effort,
+    # distinct from the core.llm checker vocabulary.
+    litellm_reasoning_efforts: [low, high, max]
+    default_reasoning_effort: max
+    tags: [agentic, code-gen, vision]
+
   gemma-4-31b-it:
     friendly_name: Gemma 4 31B
     context_window_tokens: 262144
@@ -1966,6 +2235,18 @@ aliases:
   astra-pro: gpt-6-astra-pro
   gpt-astra-pro: gpt-6-astra-pro
   openai/gpt-6-astra-pro: gpt-6-astra-pro
+  sol: gpt-6-sol
+  gpt-sol: gpt-6-sol
+  openai/gpt-6-sol: gpt-6-sol
+  sol-pro: gpt-6-sol-pro
+  gpt-sol-pro: gpt-6-sol-pro
+  openai/gpt-6-sol-pro: gpt-6-sol-pro
+  luna: gpt-6-luna
+  gpt-luna: gpt-6-luna
+  openai/gpt-6-luna: gpt-6-luna
+  luna-pro: gpt-6-luna-pro
+  gpt-luna-pro: gpt-6-luna-pro
+  openai/gpt-6-luna-pro: gpt-6-luna-pro
   # OpenAI provider prefix (LiteLLM style)
   gpt-5.6: gpt-5.6-sol
   openai/gpt-5.6: gpt-5.6-sol
@@ -2055,11 +2336,17 @@ aliases:
   opus-4-8: claude-opus-4-8
   opus-4.8: claude-opus-4-8
 
-  # Opus 5 (default opus tier)
+  # Opus 5.5 (default opus tier)
+  anthropic/claude-opus-5-5: claude-opus-5-5
+  anthropic/claude-opus-5.5: claude-opus-5-5
+  claude-opus-5.5: claude-opus-5-5
+  opus-5.5: claude-opus-5-5
+  opus-5-5: claude-opus-5-5
+  claude-opus: claude-opus-5-5
+  opus: claude-opus-5-5
+  # Opus 5 remains an explicit pin.
   anthropic/claude-opus-5: claude-opus-5  # also the OpenRouter slug (no dot)
-  claude-opus: claude-opus-5
   opus-5: claude-opus-5
-  opus: claude-opus-5
 
   # Fable 5.1 (current family default; opus --model alternative)
   anthropic/claude-fable-5-1: claude-fable-5-1
@@ -2112,7 +2399,11 @@ aliases:
 
   # DeepSeek (via OpenRouter)
   deepseek/deepseek-v4-pro: deepseek-v4-pro
+  deepseek/deepseek-v4-pro-0813: deepseek-v4-pro-0813
+  v4-pro-0813: deepseek-v4-pro-0813
   deepseek/deepseek-v4-flash: deepseek-v4-flash
+  deepseek/deepseek-v4.1-flash: deepseek-v4.1-flash
+  v4.1-flash: deepseek-v4.1-flash
   deepseek-v4: deepseek-v4-pro
   v4-pro: deepseek-v4-pro
   v4-flash: deepseek-v4-flash
@@ -2135,6 +2426,8 @@ aliases:
   qwen/qwen3.8-27b: qwen3.8-27b
   qwen/qwen3.8-2.4t-a95b: qwen3.8-2.4t-a95b
   qwen/qwen3.8-max: qwen3.8-max
+  qwen/qwen3.8-flash: qwen3.8-flash
+  qwen/qwen3.8-max-0902: qwen3.8-max-0902
   qwen/qwen3-coder: qwen3-coder
   qwen3-6-flash: qwen3.6-flash
   qwen3-6-plus: qwen3.6-plus
@@ -2145,6 +2438,8 @@ aliases:
   qwen3-8-27b: qwen3.8-27b
   qwen3-8-2-4t-a95b: qwen3.8-2.4t-a95b
   qwen3-8-max: qwen3.8-max
+  qwen3-8-flash: qwen3.8-flash
+  qwen3-8-max-0902: qwen3.8-max-0902
   qwen-coder: qwen3-coder
 
   # MiniMax / Z.ai / Google / Mistral (via OpenRouter)
@@ -2157,9 +2452,13 @@ aliases:
   z-ai/glm-5.1: glm-5.1
   z-ai/glm-5.2: glm-5.2
   z-ai/glm-5.3: glm-5.3
+  z-ai/glm-5.3-flash: glm-5.3-flash
+  z-ai/glm-5.3-flashx: glm-5.3-flashx
   glm-4-7-flash: glm-4.7-flash
   glm-5-1: glm-5.1
   glm-5-2: glm-5.2
   glm-5-3: glm-5.3
+  glm-5-3-flash: glm-5.3-flash
+  glm-5-3-flashx: glm-5.3-flashx
   google/gemma-4-31b-it: gemma-4-31b-it
   gemma-4-31b: gemma-4-31b-it

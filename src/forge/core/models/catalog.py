@@ -186,6 +186,7 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
             supports_verbosity=bool(data.get("supports_verbosity", False)),
             supports_top_p=bool(data.get("supports_top_p", True)),
             supports_sampling_overrides=bool(data.get("supports_sampling_overrides", True)),
+            sampling_requires_no_reasoning=bool(data.get("sampling_requires_no_reasoning", False)),
             supports_1m_context=bool(data.get("supports_1m_context", False)),
             temperature_constraint=constraint,
             temperature=temperature,

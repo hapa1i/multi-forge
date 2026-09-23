@@ -1,13 +1,11 @@
 # Template: litellm-gemini-flash-local
-# Gemini 3.7 Flash via local LiteLLM
+# Gemini 3.8 Flash via local LiteLLM
 #
 # Requires:
 #   - GEMINI_API_KEY in .env
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 # All tiers use Flash, differentiated by reasoning_effort.
-# This route remains on 3.7 because LiteLLM 1.99's bundled model catalog has no
-# gemini-3.8-flash pricing/capability entry.
 #
 # After adding GEMINI_API_KEY, stop the backend so Forge restarts it with the new environment:
 # forge model backend stop litellm-4000
@@ -20,9 +18,16 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3.7-flash
-      sonnet: gemini/gemini-3.7-flash
-      opus: gemini/gemini-3.7-flash
+      haiku: gemini/gemini-3.8-flash
+      sonnet: gemini/gemini-3.8-flash
+      opus: gemini/gemini-3.8-flash
+    model_alternatives:
+      haiku:
+        gemini-3.7-flash: gemini/gemini-3.7-flash
+      sonnet:
+        gemini-3.7-flash: gemini/gemini-3.7-flash
+      opus:
+        gemini-3.7-flash: gemini/gemini-3.7-flash
     # All tiers use the same model with different reasoning levels.
     tier_overrides:
       haiku:

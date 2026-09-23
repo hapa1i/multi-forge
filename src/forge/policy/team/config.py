@@ -16,7 +16,7 @@ class TeamSupervisorConfig:
     """
 
     enabled: bool = False
-    tagger_model: str = "gemini/gemini-3.7-flash"
+    tagger_model: str = "gemini/gemini-3.8-flash"
     resume_id: str | None = None
     proxy: str | None = None
     direct: bool = False

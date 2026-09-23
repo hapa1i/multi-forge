@@ -7,7 +7,7 @@
   },
   "expected_blocking": {
     "steps": 163,
-    "assertions": 552,
+    "assertions": 554,
     "human_checkpoints": 8,
     "paid_operations": 8
   },

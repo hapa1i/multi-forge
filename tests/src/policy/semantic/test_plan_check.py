@@ -755,8 +755,8 @@ class TestPlanCheckEvaluate:
         ("provider", "expected_model"),
         [
             ("openrouter", "google/gemini-3.8-flash"),
-            ("litellm_local", "gemini/gemini-3.7-flash"),
-            ("litellm_remote", "vertex_ai/gemini-3.7-flash"),
+            ("litellm_local", "gemini/gemini-3.8-flash"),
+            ("litellm_remote", "vertex_ai/gemini-3.8-flash"),
         ],
     )
     @patch("forge.policy.semantic.plan_check.run_plan_check")

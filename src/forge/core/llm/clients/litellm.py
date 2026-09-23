@@ -441,9 +441,19 @@ class LiteLLMClient:
             request_params["reasoning"] = {"effort": hyperparams.reasoning_effort}
 
         model_name = self._model.split("/")[-1].lower()
-        supports_sampling = not model_exists(model_name) or get_model_spec(model_name).supports_sampling_overrides
+        spec = get_model_spec(model_name) if model_exists(model_name) else None
+        supports_sampling = spec is None or spec.supports_sampling_at_effort(hyperparams.reasoning_effort)
         if hyperparams.temperature is not None and supports_sampling:
             request_params["temperature"] = hyperparams.temperature
+        # Conditional models advertise top_p at none; retain older Responses request behavior.
+        if (
+            hyperparams.top_p is not None
+            and supports_sampling
+            and spec is not None
+            and spec.sampling_requires_no_reasoning
+            and spec.supports_top_p
+        ):
+            request_params["top_p"] = hyperparams.top_p
 
         if tools:
             request_params["tools"] = self._convert_tools_for_responses(tools)

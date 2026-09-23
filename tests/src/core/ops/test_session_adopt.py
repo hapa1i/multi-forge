@@ -270,7 +270,7 @@ class TestModelBasis:
         project = _make_project(tmp_path)
         _write_transcript(project)
         plan = plan_adoption(ExecutionContext.from_cwd(project), _UUID, model_override="opus")
-        assert (plan.model, plan.model_basis) == ("claude-opus-5", MODEL_BASIS_EXPLICIT)
+        assert (plan.model, plan.model_basis) == ("claude-opus-5-5", MODEL_BASIS_EXPLICIT)
 
     @pytest.mark.parametrize(
         ("bad_model", "expected"),

@@ -74,6 +74,206 @@ models:
         source_id: openrouter
         template: openrouter-openai-codex
         model_ref: openai/gpt-6-astra-pro
+  gpt-6-sol:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: codex-responses-local
+        template: codex-responses-local
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-openai
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-codex-local
+        model_ref: openai/gpt-6-sol
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-local
+        model_ref: openai/gpt-6-sol
+  gpt-6-sol-pro:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6-sol-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6-sol-pro
+  gpt-6-luna:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: codex-responses-local
+        template: codex-responses-local
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-openai
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-codex-local
+        model_ref: openai/gpt-6-luna
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-local
+        model_ref: openai/gpt-6-luna
+  gpt-6-luna-pro:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6-luna-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6-luna-pro
   gpt-5.6-sol:
     routes:
       - kind: proxy
@@ -561,6 +761,50 @@ models:
         source_id: openrouter
         template: openrouter-gemini
         model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: google/gemini-3.8-flash
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-gemini
+        model_ref: vertex_ai/gemini-3.8-flash
+      - kind: proxy
+        source_id: litellm-gemini-local
+        template: litellm-gemini-flash-local
+        model_ref: gemini/gemini-3.8-flash
+      - kind: proxy
+        source_id: litellm-gemini-local
+        template: litellm-gemini-local
+        model_ref: gemini/gemini-3.8-flash
   claude-opus-4-6:
     routes:
       - kind: direct
@@ -576,6 +820,11 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-opus-4-8
+  claude-opus-5-5:
+    routes:
+      - kind: direct
+        runtime: claude_code
+        model_ref: claude-opus-5-5
   claude-opus-5:
     routes:
       - kind: direct
@@ -616,6 +865,90 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-haiku-4-5-20251001
+  deepseek-v4.1-flash:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: deepseek/deepseek-v4.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: deepseek/deepseek-v4.1-flash
+  deepseek-v4-pro-0813:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: deepseek/deepseek-v4-pro-0813
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: deepseek/deepseek-v4-pro-0813
   deepseek-v4-flash:
     routes:
       - kind: proxy
@@ -808,6 +1141,90 @@ models:
         source_id: openrouter
         template: openrouter-openai-codex
         model_ref: qwen/qwen3.8-max
+  qwen3.8-flash:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: qwen/qwen3.8-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: qwen/qwen3.8-flash
+  qwen3.8-max-0902:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: qwen/qwen3.8-max-0902
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: qwen/qwen3.8-max-0902
   qwen3-coder:
     routes:
       - kind: proxy
@@ -928,6 +1345,90 @@ models:
         source_id: openrouter
         template: openrouter-qwen
         model_ref: z-ai/glm-5.3
+  glm-5.3-flash:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: z-ai/glm-5.3-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: z-ai/glm-5.3-flash
+  glm-5.3-flashx:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: z-ai/glm-5.3-flashx
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: z-ai/glm-5.3-flashx
   gemma-4-31b-it:
     routes:
       - kind: proxy

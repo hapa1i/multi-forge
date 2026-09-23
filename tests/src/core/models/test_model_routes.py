@@ -78,15 +78,16 @@ class TestPackagedCatalog:
                 model_ref=route_key,
             )
 
-    def test_gemini_37_flash_has_remote_and_local_litellm_routes(self) -> None:
-        routes = load_model_route_catalog().models["gemini-3.7-flash"]
+    @pytest.mark.parametrize("model", ["gemini-3.7-flash", "gemini-3.8-flash"])
+    def test_gemini_flash_has_remote_and_local_litellm_routes(self, model: str) -> None:
+        routes = load_model_route_catalog().models[model]
 
         assert (
             ModelRouteCandidate(
                 kind="proxy",
                 source_id="litellm-remote",
                 template="litellm-gemini",
-                model_ref="vertex_ai/gemini-3.7-flash",
+                model_ref=f"vertex_ai/{model}",
             )
             in routes
         )
@@ -95,7 +96,7 @@ class TestPackagedCatalog:
                 kind="proxy",
                 source_id="litellm-gemini-local",
                 template="litellm-gemini-flash-local",
-                model_ref="gemini/gemini-3.7-flash",
+                model_ref=f"gemini/{model}",
             )
             in routes
         )
@@ -111,6 +112,7 @@ class TestPackagedCatalog:
             "gemini-3.5-flash",
             "gemini-3.6-flash",
             "gemini-3.7-flash",
+            "gemini-3.8-flash",
         ],
     )
     def test_remote_litellm_gemini_routes_use_vertex_ai_refs(self, model_id: str) -> None:
@@ -119,10 +121,10 @@ class TestPackagedCatalog:
 
         assert remote_refs == {f"vertex_ai/{model_id}"}
 
-    def test_gemini_38_flash_has_both_openrouter_routes_until_litellm_support_lands(self) -> None:
+    def test_gemini_38_flash_prefers_existing_openrouter_routes(self) -> None:
         routes = load_model_route_catalog().models["gemini-3.8-flash"]
 
-        assert routes == (
+        assert routes[:2] == (
             ModelRouteCandidate(
                 kind="proxy",
                 source_id="openrouter",

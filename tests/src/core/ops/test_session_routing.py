@@ -65,21 +65,21 @@ def test_direct_payload_uses_shared_catalog_normalization(tmp_path: Path) -> Non
         effective_template=None,
         runtime_base_url=None,
         proxy_id=None,
-        applied_direct_model=resolve_direct_model_pin("anthropic/claude-opus-5[1m]"),
+        applied_direct_model=resolve_direct_model_pin("anthropic/claude-opus-5-5[1m]"),
     )
 
     assert payload["route"]["kind"] == "direct"
-    assert payload["requested_model"] == "claude-opus-5"
+    assert payload["requested_model"] == "claude-opus-5-5"
     assert payload["selected_tier"] == "opus"
-    assert payload["selected_model"] == "claude-opus-5"
-    assert payload["direct_model"] == "claude-opus-5"
+    assert payload["selected_model"] == "claude-opus-5-5"
+    assert payload["direct_model"] == "claude-opus-5-5"
     assert payload["marking_snapshots"] == [
         {
             "slot": "direct",
             "tier": None,
             "request_model": None,
-            "route_model": "claude-opus-5",
-            "canonical_model": "claude-opus-5",
+            "route_model": "claude-opus-5-5",
+            "canonical_model": "claude-opus-5-5",
             "declaration": {
                 "status": "unknown",
                 "basis": None,

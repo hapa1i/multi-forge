@@ -138,9 +138,9 @@ class TestLoadConfig:
         assert config.proxy.active_template == "litellm-gemini-flash-local"
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_port == 8088
-        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3.7-flash"
-        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3.7-flash"
-        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.haiku == "gemini/gemini-3.8-flash"
+        assert config.proxy.litellm.tiers.sonnet == "gemini/gemini-3.8-flash"
+        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.8-flash"
 
     def test_template_loading_openai_local(self):
         """OpenAI local template loads with correct tier models."""
@@ -240,7 +240,7 @@ class TestLoadConfig:
 
         assert config.proxy.get_model_for_tier("opus") == "gemini/gemini-3.1-pro-preview"
         assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-3.1-pro-preview"
-        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3.7-flash"
+        assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3.8-flash"
 
     def test_template_loading_openrouter_anthropic(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter anthropic template loads with correct provider and tiers."""
@@ -254,11 +254,12 @@ class TestLoadConfig:
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5"
-        # Defaults: sonnet -> Sonnet 5, opus -> Opus 5; displaced models stay selectable via --model.
-        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-5"
+        # Displaced models stay selectable via --model.
+        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-5.5"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
         assert config.proxy.openrouter.model_alternatives == {
             "opus": {
+                "claude-opus-5": "anthropic/claude-opus-5",
                 "claude-fable-5-1": "anthropic/claude-fable-5.1",
                 "claude-fable-5": "anthropic/claude-fable-5",
                 "claude-opus-4-8": "anthropic/claude-opus-4.8",
@@ -308,7 +309,7 @@ class TestLoadConfig:
 
         assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.env.example.com"
-        assert config.proxy.litellm.tiers.haiku == "vertex_ai/gemini-3.7-flash"
+        assert config.proxy.litellm.tiers.haiku == "vertex_ai/gemini-3.8-flash"
 
     def test_remote_litellm_source_endpoint_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch):
         """Connection-value endpoints can come from the credential file when env is absent."""
@@ -344,16 +345,17 @@ class TestLoadConfig:
         assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == ""
 
-    def test_litellm_anthropic_templates_default_opus_to_5(self):
-        """LiteLLM Anthropic templates default opus to Opus 5, sonnet to Sonnet 5."""
+    def test_litellm_anthropic_templates_default_opus_to_5_5(self):
+        """LiteLLM Anthropic templates default opus to Opus 5.5, sonnet to Sonnet 5."""
         for template in ("litellm-anthropic", "litellm-anthropic-local"):
             config = load_config(template=template)
 
             assert config.proxy.preferred_provider == "litellm", template
             assert config.proxy.litellm.tiers.sonnet == "anthropic/claude-sonnet-5", template
-            assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-5", template
+            assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-5-5", template
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
+                    "claude-opus-5": "anthropic/claude-opus-5",
                     "claude-fable-5-1": "anthropic/claude-fable-5-1",
                     "claude-fable-5": "anthropic/claude-fable-5",
                     "claude-opus-4-8": "anthropic/claude-opus-4-8",
@@ -364,14 +366,14 @@ class TestLoadConfig:
                 },
             }, template
 
-    def test_anthropic_passthrough_opus_tier_is_5(self):
-        """Passthrough forwards the client model unchanged; opus tier default is Opus 5 (no alternatives map)."""
+    def test_anthropic_passthrough_opus_tier_is_5_5(self):
+        """Passthrough forwards the client model unchanged; opus tier default is Opus 5.5."""
         config = load_config(template="anthropic-passthrough")
 
         assert config.proxy.backend == "anthropic-passthrough"
         assert config.proxy.litellm.base_url == "https://api.anthropic.com"
         assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5"
-        assert config.proxy.litellm.tiers.opus == "claude-opus-5"
+        assert config.proxy.litellm.tiers.opus == "claude-opus-5-5"
         assert config.proxy.litellm.model_alternatives == {}
 
     def test_openrouter_config_placed_on_correct_field(self):
@@ -1198,12 +1200,18 @@ class TestTemplateResolution:
 
         qwen = load_config(template="openrouter-qwen")
         assert qwen.proxy.openrouter.model_alternatives == {
+            "haiku": {
+                "qwen3.8-flash": "qwen/qwen3.8-flash",
+            },
             "sonnet": {
+                "qwen3.8-flash": "qwen/qwen3.8-flash",
                 "qwen3.7-plus": "qwen/qwen3.7-plus",
                 "qwen3.6-plus": "qwen/qwen3.6-plus",
                 "qwen3-coder": "qwen/qwen3-coder",
             },
             "opus": {
+                "qwen3.8-flash": "qwen/qwen3.8-flash",
+                "qwen3.8-max-0902": "qwen/qwen3.8-max-0902",
                 "qwen3.7-max": "qwen/qwen3.7-max",
                 "qwen3.6-max-preview": "qwen/qwen3.6-max-preview",
                 "qwen3-coder": "qwen/qwen3-coder",
@@ -1216,11 +1224,13 @@ class TestTemplateResolution:
             "qwen/qwen3.7-plus": "qwen/qwen3.8-27b",
             "qwen/qwen3.7-max": "qwen/qwen3.8-2.4t-a95b",
             "qwen/qwen3.8-max": "qwen/qwen3.8-2.4t-a95b",
+            "qwen/qwen3.8-flash": "qwen/qwen3.8-27b",
+            "qwen/qwen3.8-max-0902": "qwen/qwen3.8-2.4t-a95b",
         }
         anthropic = load_config(template="openrouter-anthropic")
         assert anthropic.proxy.openrouter.zdr_fallbacks == {
-            "anthropic/claude-fable-5.1": "anthropic/claude-opus-5",
-            "anthropic/claude-fable-5": "anthropic/claude-opus-5",
+            "anthropic/claude-fable-5.1": "anthropic/claude-opus-5.5",
+            "anthropic/claude-fable-5": "anthropic/claude-opus-5.5",
         }
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {

@@ -25,6 +25,26 @@ def test_resolves_opus_48_alias_to_env_pin() -> None:
     }
 
 
+def test_resolves_default_opus_alias_to_55_env_pin() -> None:
+    pin = resolve_direct_model_pin("opus[1m]")
+
+    assert pin.canonical_model == "claude-opus-5-5"
+    assert pin.env_model == "claude-opus-5-5[1m]"
+    assert pin.tier == "opus"
+    assert pin.env() == {
+        "ANTHROPIC_MODEL": "opus",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
+    }
+
+
+def test_preserves_explicit_previous_opus_pin() -> None:
+    pin = resolve_direct_model_pin("claude-opus-5")
+
+    assert pin.canonical_model == "claude-opus-5"
+    assert pin.env_model == "claude-opus-5"
+    assert pin.tier == "opus"
+
+
 def test_resolves_fable_5_1_to_opus_tier_pin() -> None:
     # Fable has no tier word of its own; it rides the opus tier so Claude Code
     # pins ANTHROPIC_DEFAULT_OPUS_MODEL and the proxy routes it as opus.
@@ -51,6 +71,7 @@ def test_resolves_fable_alias_to_opus_tier_pin() -> None:
     [
         ("claude-fable-5-1", "opus"),
         ("claude-fable-5", "opus"),
+        ("claude-opus-5-5", "opus"),
         ("claude-opus-5", "opus"),
         ("claude-sonnet-5", "sonnet"),
         ("claude-haiku-4-5", "haiku"),
@@ -122,7 +143,7 @@ def test_proxy_context_model_defaults_only_for_large_context() -> None:
 
     apply_proxy_context_model_defaults(env_vars, 1000000)
     assert env_vars == {
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
         "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
     }
 

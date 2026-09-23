@@ -188,7 +188,7 @@ class TestClaudeFableFamily:
 
 
 class TestClaudeOpus5:
-    """Tests for the claude-opus-5 catalog entry, aliases, and default status."""
+    """Tests for the retained claude-opus-5 catalog entry and versioned aliases."""
 
     def test_opus_5_is_canonical(self):
         """claude-opus-5 exists as a canonical model, not an alias."""
@@ -199,7 +199,7 @@ class TestClaudeOpus5:
 
     @pytest.mark.parametrize(
         "alias",
-        ["anthropic/claude-opus-5", "claude-opus", "opus", "opus-5"],
+        ["anthropic/claude-opus-5", "opus-5"],
     )
     def test_aliases_resolve_to_opus_5(self, alias):
         """Provider-prefixed and friendly aliases resolve to claude-opus-5."""
@@ -250,13 +250,13 @@ class TestClaudeSonnet5:
         assert spec.native_thinking_param == "output_config.effort"
         assert spec.token_estimate_multiplier == 1.35
 
-    def test_sonnet_5_is_the_sonnet_default_and_opus_is_5(self):
-        """Sonnet 5 is the catalog sonnet default; Opus 5 is the opus default (both layers)."""
+    def test_sonnet_5_is_the_sonnet_default_and_opus_is_55(self):
+        """Sonnet 5 stays the sonnet default while Opus 5.5 becomes the opus default."""
         catalog = load_model_catalog()
 
         for provider in ("anthropic", "openrouter"):
             assert catalog.defaults[provider]["sonnet"] == "claude-sonnet-5"
-            assert catalog.defaults[provider]["opus"] == "claude-opus-5"
+            assert catalog.defaults[provider]["opus"] == "claude-opus-5-5"
 
 
 class TestGemini31ProPreviewIsCanonical:
