@@ -5,6 +5,28 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-09-23
+
+### Refresh the model catalog and default to Opus 5.5
+
+**Goal**: Add the major released models in existing provider families and make Opus 5.5 the default Opus.
+
+**Key changes**:
+
+- Added eleven models across Anthropic, OpenAI, DeepSeek, Qwen, and GLM with catalog routes, template alternatives, and
+  workflow workers; retained explicit older models and existing user-owned proxy/backend snapshots.
+- Completed Gemini 3.8 Flash support on LiteLLM, pinned the validated 1.102.0 runtime, and bundled missing native
+  pricing and capability metadata.
+- Preserved reasoning with tools on Sol/Luna Responses routes and rejected invalid tier temperature overrides at config
+  load while retaining request-time filtering for model alternatives.
+- Updated defaults, migration guidance, and QA expectations; added startup-log preservation to the wheel smoke check.
+
+**Verification**: 10,368 unit tests, 1,266 regressions, 39 targeted integration cases, seven repeated live GPT-6 checks,
+full pre-commit, build, two clean-wheel checks, native/mixed workflow panels, and snapshot-preservation checks passed.
+[PR #255](https://github.com/hapa1i/multi-forge/pull/255) merged as `e107dd13` with all five GitHub checks passing. The
+[completed card](done/september_model_refresh/checklist.md) records the evidence and remaining upstream Batch-pricing
+limitation.
+
 ## 2026-09-06
 
 ### Close 1.0 release hardening

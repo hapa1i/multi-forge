@@ -1,7 +1,7 @@
 # September model refresh checklist
 
-Current focus: review [PR #255](https://github.com/hapa1i/multi-forge/pull/255). Merge and shipped closeout remain
-pending.
+Completed 2026-09-23. [PR #255](https://github.com/hapa1i/multi-forge/pull/255) merged as `e107dd13` with all five
+GitHub checks passing. Its tree matches the verified branch head `6258db15`; design and end-user docs are synchronized.
 
 - [x] Verify releases and exact provider IDs against official sources and OpenRouter.
 - [x] Add intrinsic capabilities, aliases, routes, alternatives, and named workers for all eleven new entries.
@@ -14,7 +14,7 @@ pending.
 - [x] Open one PR: [#255](https://github.com/hapa1i/multi-forge/pull/255).
 - [x] Reject invalid Sol/Luna tier temperatures at config load while preserving model-alternative filtering.
 - [x] Spell the LiteLLM pin explicitly and document Opus 5.5's intentional cache-read discount.
-- [ ] Merge and record shipped closeout.
+- [x] Merge, synchronize documentation, record closeout, and move the card to `done/`.
 
 | Test                  | Fixture                                     | Assertion                                                              |
 | --------------------- | ------------------------------------------- | ---------------------------------------------------------------------- |

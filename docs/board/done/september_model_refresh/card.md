@@ -1,5 +1,8 @@
 # September model refresh
 
+Completed 2026-09-23. [PR #255](https://github.com/hapa1i/multi-forge/pull/255) merged as `e107dd13` with all five
+GitHub checks passing. The merged tree matches verified branch head `6258db15`.
+
 Add the major newly released models in Forge's existing provider families in one PR, and make Claude Opus 5.5 the
 default Opus. Execution branch: `feat/september-model-refresh`, based on `abcefb15`.
 
