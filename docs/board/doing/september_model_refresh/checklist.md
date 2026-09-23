@@ -1,6 +1,7 @@
 # September model refresh checklist
 
-Current focus: open the verified model refresh for PR review. Merge and shipped closeout remain pending.
+Current focus: review [PR #255](https://github.com/hapa1i/multi-forge/pull/255). Merge and shipped closeout remain
+pending.
 
 - [x] Verify releases and exact provider IDs against official sources and OpenRouter.
 - [x] Add intrinsic capabilities, aliases, routes, alternatives, and named workers for all eleven new entries.
@@ -10,7 +11,7 @@ Current focus: open the verified model refresh for PR review. Merge and shipped 
 - [x] Run focused tests, required targeted integration, full unit/regression checks, and pre-commit.
 - [x] Build and smoke-test a clean wheel; verify new realization and existing snapshot preservation.
 - [x] Review integrated diff and record verification.
-- [ ] Open one PR.
+- [x] Open one PR: [#255](https://github.com/hapa1i/multi-forge/pull/255).
 - [ ] Merge and record shipped closeout.
 
 | Test                  | Fixture                                     | Assertion                                                              |
