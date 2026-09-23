@@ -47,3 +47,21 @@ GitHub checks passing. Its tree matches the verified branch head `6258db15`; des
 
 LiteLLM 1.102's Batch cost calculator omits the above-272K premium. Standard, Flex, and Priority Responses pricing is
 covered by isolated cost tests; this change does not add Batch transport variants.
+
+## 1.0.1 release verification
+
+The maintainer explicitly waived fresh manual QA for 1.0.1 and authorized publication using the completed PR and
+exact-wheel checks. This disposition applies only to 1.0.1; no new manual QA pass or reuse of an older artifact identity
+is claimed.
+
+The release candidate is `dist/multi_forge-1.0.1-py3-none-any.whl`, SHA-256
+`9a8a6da9b533badf64cd93792ad37299df72c9607130bc75608e03a8e4005e72`. Its product source matches the verified merged tree;
+only the version, lockfile project version, and board closeout changed afterward.
+
+- `make build` and the full `make pre-commit` suite passed; 39 release metadata, catalog, and QA-contract tests passed.
+- This exact wheel installed into a fresh Python 3.13.11 environment, resolving 86 packages outside `uv.lock`.
+  Dependency compatibility and `forge --version` passed.
+- Packaged checks loaded all 88 catalog models, 86 route entries, and 20 templates, and verified new defaults, retained
+  alternatives, eight Sol/Luna pricing cases, and Opus adaptive effort translation.
+- The isolated LiteLLM backend passed create/start/health/stop on port 49178. Its materialized config and the wheel's
+  SHA-256 were unchanged afterward.
