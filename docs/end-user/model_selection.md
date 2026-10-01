@@ -116,9 +116,9 @@ runtime launch.
 
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
-The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5.5 and the `sonnet` tier to Sonnet 5, and
-exposes Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives for explicit session pins. You do
-not need separate proxies just to compare Claude versions:
+The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5.5 and the `sonnet` tier to Sonnet 5.5, and
+exposes Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, Sonnet 5, and Sonnet 4.6 as alternatives for explicit session
+pins. You do not need separate proxies just to compare Claude versions:
 
 ```bash
 # Planner/supervisor source on the proxy's default opus tier (Opus 5.5)

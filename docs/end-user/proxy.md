@@ -404,12 +404,12 @@ does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr`
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
 `model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5.5
-and their sonnet tier to Sonnet 5, with Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
-(`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model directly with no
-alternatives map.) Use `--model` to select an alternative:
+and their sonnet tier to Sonnet 5.5, with Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, Sonnet 5, and Sonnet 4.6 as
+alternatives. (`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model
+directly with no alternatives map.) Use `--model` to select an alternative:
 
 ```bash
-# Default: opus tier routes to Opus 5.5, sonnet tier to Sonnet 5
+# Default: opus tier routes to Opus 5.5, sonnet tier to Sonnet 5.5
 forge session start my-session --proxy openrouter-anthropic
 
 # Select the current Fable family model
@@ -442,6 +442,7 @@ model_alternatives:
     claude-opus-4-8: anthropic/claude-opus-4.8
     claude-opus-4-6: anthropic/claude-opus-4.6
   sonnet:
+    claude-sonnet-5: anthropic/claude-sonnet-5
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
@@ -449,6 +450,21 @@ The OpenRouter backend slugs use dotted versions (`anthropic/claude-opus-5.5`, `
 Anthropic uses hyphens (`claude-opus-5-5`, `claude-fable-5-1`), with the usual `anthropic/` prefix on LiteLLM routes.
 Fresh proxies receive the correct provider-specific mapping from their template. Existing user-owned proxy snapshots
 must be edited or recreated to gain the new alternative.
+
+To adopt Sonnet 5.5 in an existing proxy, stop it with `forge proxy stop <proxy_id>`, run `forge proxy edit <proxy_id>`,
+and set its Sonnet tier to `anthropic/claude-sonnet-5.5` for OpenRouter or `anthropic/claude-sonnet-5-5` for LiteLLM.
+Retain `claude-sonnet-5` in `model_alternatives.sonnet` when you need the prior version. A saved LiteLLM backend must
+also expose the new native route and its pricing/effort metadata; upgrades do not rewrite that file. Stop its runtime ID
+from `forge model backend list`, then edit `~/.forge/backends/litellm/config.yaml` or back it up and recreate it with
+`forge model backend delete litellm` followed by `forge model backend create litellm`. Restart the backend and run
+`forge proxy start <proxy_id> --smoke-test`.
+
+Sonnet 5.5 rejects manual thinking budgets and sampling overrides. For native Messages requests, use adaptive thinking
+or `thinking: {type: between_tools}` to turn off up-front thinking. `between_tools` accepts no extra fields and works
+only at `low`, `medium`, or `high` effort; it cannot change effort mid-conversation. Use `auto` or `none` tool choice
+and preserve signed thinking blocks with append-only history. Forge's passthrough preserves those native controls;
+translated routes map `between_tools` to their lowest supported reasoning effort. See the
+[Sonnet 5.5 migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
 
 For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable`) vs leave the default Opus 5.5
 mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,

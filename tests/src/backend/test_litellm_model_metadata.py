@@ -46,7 +46,7 @@ def test_astra_uses_packaged_pricing_without_a_deployment_override() -> None:
     assert "model_info" not in _backend_entry("openai/gpt-6-astra")
 
 
-@pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-6-luna", "claude-opus-5-5"])
+@pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5"])
 def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     cost_map = _packaged_cost_map()
     provider = "anthropic" if model.startswith("claude-") else "openai"
@@ -88,6 +88,15 @@ def test_new_model_metadata_override_is_still_needed(model: str) -> None:
                 (100, 0, 100, 0.0000125, 0.000005),
                 (272_000, 1_000, 0, 0.02711, 0.000005),
                 (272_001, 1_000, 500, 0.0542452, 0.0000075),
+            ],
+        ),
+        (
+            "anthropic/claude-sonnet-5-5",
+            [
+                (100, 0, 0, 0.0002, 0.0001),
+                (100, 80, 0, 0.000056, 0.0001),
+                (100, 0, 100, 0.00025, 0.0001),
+                (900_000, 1_000, 0, 1.7982, 0.0001),
             ],
         ),
         (
@@ -157,9 +166,12 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
             assert response_cost == pytest.approx((expected_input + expected_output) * multiplier)
     if model == "anthropic/claude-opus-5-5":
         assert actual["hour_cache_cost"] == pytest.approx((0.0008, 0.0002))
+    elif model == "anthropic/claude-sonnet-5-5":
+        assert actual["hour_cache_cost"] == pytest.approx((0.0004, 0.0001))
 
 
-def test_registered_opus_5_5_uses_native_adaptive_effort_contract() -> None:
+@pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5-5"])
+def test_registered_claude_5_5_uses_native_adaptive_effort_contract(model: str) -> None:
     script = """\
         import json
         import sys
@@ -167,10 +179,11 @@ def test_registered_opus_5_5_uses_native_adaptive_effort_contract() -> None:
         from litellm.llms.anthropic.chat.transformation import AnthropicConfig
 
         entry = json.load(sys.stdin)["entry"]
+        model = entry["model_name"].split("/", 1)[1]
         router = litellm.Router(model_list=[entry])
         config = AnthropicConfig()
         results = {}
-        for effort in ("medium", "xhigh", "max"):
+        for effort in ("low", "medium", "high", "xhigh", "max"):
             params = config.map_openai_params(
                 non_default_params={
                     "reasoning_effort": effort, "max_tokens": 128000, "tool_choice": "auto",
@@ -178,25 +191,33 @@ def test_registered_opus_5_5_uses_native_adaptive_effort_contract() -> None:
                         "name": "lookup", "parameters": {"type": "object", "properties": {}},
                     }}],
                 },
-                optional_params={}, model="claude-opus-5-5", drop_params=False,
+                optional_params={}, model=model, drop_params=False,
             )
             results[effort] = config.transform_request(
-                model="claude-opus-5-5", messages=[{"role": "user", "content": "Hello"}],
+                model=model, messages=[{"role": "user", "content": "Hello"}],
                 optional_params=params, litellm_params={}, headers={},
             )
         disabled = config.map_openai_params(
             non_default_params={"thinking": {"type": "disabled"}}, optional_params={},
-            model="claude-opus-5-5", drop_params=False,
+            model=model, drop_params=False,
         )
         results["disabled"] = config.transform_request(
-            model="claude-opus-5-5", messages=[{"role": "user", "content": "Hello"}],
+            model=model, messages=[{"role": "user", "content": "Hello"}],
             optional_params=disabled, litellm_params={}, headers={},
+        )
+        between_tools = config.map_openai_params(
+            non_default_params={"thinking": {"type": "between_tools"}}, optional_params={},
+            model=model, drop_params=False,
+        )
+        results["between_tools"] = config.transform_request(
+            model=model, messages=[{"role": "user", "content": "Hello"}],
+            optional_params=between_tools, litellm_params={}, headers={},
         )
         print(json.dumps(results))
         """
-    actual = _run_offline(script, {"entry": _backend_entry("anthropic/claude-opus-5-5")})
+    actual = _run_offline(script, {"entry": _backend_entry(f"anthropic/{model}")})
 
-    for effort in ("medium", "xhigh", "max"):
+    for effort in ("low", "medium", "high", "xhigh", "max"):
         assert actual[effort]["thinking"] == {
             "type": "adaptive",
             "display": "summarized",
@@ -205,4 +226,8 @@ def test_registered_opus_5_5_uses_native_adaptive_effort_contract() -> None:
         assert actual[effort]["max_tokens"] == 128_000
         assert actual[effort]["tool_choice"] == {"type": "auto"}
         assert actual[effort]["tools"][0]["name"] == "lookup"
-    assert "thinking" not in actual["disabled"]
+    if model == "claude-opus-5-5":
+        assert "thinking" not in actual["disabled"]
+    else:
+        assert actual["disabled"]["thinking"] == {"type": "disabled"}
+        assert actual["between_tools"]["thinking"] == {"type": "between_tools"}

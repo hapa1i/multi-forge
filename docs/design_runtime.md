@@ -627,10 +627,24 @@ always-on adaptive thinking with a model default of `medium` effort and accepts 
 Provider IDs remain route-specific: OpenRouter uses `anthropic/claude-opus-5.5`, while native Anthropic uses
 `claude-opus-5-5`.
 
+Claude Sonnet 5.5 is the Anthropic/OpenRouter Sonnet default. The `claude-sonnet` workflow worker and direct aliases
+select `claude-sonnet-5-5`; explicit Sonnet 5 pins and the `claude-sonnet-5` worker remain selectable. OpenRouter uses
+`anthropic/claude-sonnet-5.5`. Sonnet 5.5 defaults to `high` adaptive effort and accepts only `auto` or `none` tool
+choice. Native `between_tools` turns off up-front thinking at `low`, `medium`, or `high` effort; `disabled` and manual
+thinking budgets are invalid. Passthrough preserves this mode and signed history. Translated routes approximate
+`between_tools` with their lowest supported effort. Config and passthrough override validation reject manual budgets for
+every catalog model whose declared thinking modes exclude `enabled`, including models with both `adaptive` and
+`between_tools` modes. The shared translated request builder removes unsupported sampling fields after merging provider
+extras, using the intrinsic catalog even when gateway metadata does not yet recognize the model.
+
 LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. The bundled Sol, Luna, and Opus 5.5 deployments provide
 capability and token/cache pricing in `model_info` until LiteLLM packages these models. Sol/Luna metadata includes the
 above-272K premium. Boundary tests require removing deployment overrides when packaged support arrives; price data stays
 in backend configuration, outside the intrinsic model catalog.
+
+The Sonnet 5.5 deployment likewise supplies offline pricing and effort capabilities. Its `thinking_always_on: false`
+prevents LiteLLM 1.102 from silently deleting an invalid `disabled` request and enabling adaptive thinking; native
+validation instead rejects the request and directs the caller to `between_tools`.
 
 The model route catalog is separate **authoritative operational data**:
 

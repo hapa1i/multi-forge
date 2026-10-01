@@ -144,7 +144,7 @@ def test_proxy_context_model_defaults_only_for_large_context() -> None:
     apply_proxy_context_model_defaults(env_vars, 1000000)
     assert env_vars == {
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5[1m]",
     }
 
 
@@ -157,7 +157,7 @@ def test_proxy_context_model_defaults_do_not_force_tier_or_override_explicit_def
 
     assert env_vars == {
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5[1m]",
     }
     assert "ANTHROPIC_MODEL" not in env_vars
 

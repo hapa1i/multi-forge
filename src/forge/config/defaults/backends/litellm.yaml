@@ -14,7 +14,7 @@
 #     - gemini/gemini-2.5-pro
 #
 #   Anthropic (requires ANTHROPIC_API_KEY):
-#     - anthropic/claude-haiku-4-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5
+#     - anthropic/claude-haiku-4-5, claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5
 #     - anthropic/claude-fable-5-1, claude-fable-5
 #     - anthropic/claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 #
@@ -139,6 +139,44 @@ model_list:
     litellm_params:
       model: anthropic/claude-haiku-4-5
       api_key: os.environ/ANTHROPIC_API_KEY
+
+  # LiteLLM 1.102 predates Sonnet 5.5; supply offline pricing and effort capabilities.
+  # https://platform.claude.com/docs/en/models/sonnet-5-5/overview (verified 2026-10-01)
+  - model_name: anthropic/claude-sonnet-5-5
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      base_model: claude-sonnet-5-5
+      mode: chat
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
+      max_tokens: 128000
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.000010
+      cache_creation_input_token_cost: 0.0000025
+      cache_creation_input_token_cost_above_1hr: 0.000004
+      cache_read_input_token_cost: 0.0000002
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 512
+      supports_reasoning: true
+      supports_adaptive_thinking: true
+      supports_legacy_thinking: false
+      # Keep disabled visible to upstream validation; dropping it would turn thinking on.
+      thinking_always_on: false
+      supports_output_config: true
+      supports_xhigh_reasoning_effort: true
+      supports_max_reasoning_effort: true
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh, max]
+      supports_response_schema: true
+      supports_native_structured_output: true
+      supports_assistant_prefill: false
+      provider_specific_entry:
+        us: 1.1
 
   - model_name: anthropic/claude-sonnet-5
     litellm_params:

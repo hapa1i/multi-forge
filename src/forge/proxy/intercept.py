@@ -344,11 +344,11 @@ def apply_override(
     if native_support is not None:
         _, thinking_modes = native_support
         thinking = raw_body.get("thinking")
-        if thinking_modes == ("adaptive",) and isinstance(thinking, dict):
+        if thinking_modes is not None and "enabled" not in thinking_modes and isinstance(thinking, dict):
             thinking_type = thinking.get("type")
             if thinking_type == "enabled" or "budget_tokens" in thinking:
                 raise ReasoningOverrideError(
-                    f"model {raw_body.get('model')!r} requires adaptive thinking; "
+                    f"model {raw_body.get('model')!r} does not support manual thinking; "
                     "remove manual thinking.type/budget_tokens"
                 )
 

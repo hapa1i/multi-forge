@@ -277,7 +277,7 @@ class TestSessionStart:
         env_vars = mock_invoke.call_args.kwargs["env_vars"]
         assert env_vars["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "1048576"
         assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-5-5[1m]"
-        assert env_vars["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-5[1m]"
+        assert env_vars["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-5-5[1m]"
         assert "ANTHROPIC_MODEL" not in env_vars
 
     def test_start_with_model_no_launch_stores_normalized_pin(self, runner: CliRunner, temp_env: Path) -> None:

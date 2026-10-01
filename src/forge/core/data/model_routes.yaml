@@ -840,6 +840,11 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-fable-5
+  claude-sonnet-5-5:
+    routes:
+      - kind: direct
+        runtime: claude_code
+        model_ref: claude-sonnet-5-5
   claude-sonnet-5:
     routes:
       - kind: direct

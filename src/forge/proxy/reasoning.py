@@ -44,6 +44,9 @@ TYPE_TO_EFFORT: dict[str, str] = {
     "enabled": "high",
     "adaptive": "medium",
     "disabled": "none",
+    # Native between-tools thinking has no up-front reasoning; translated
+    # providers approximate it with their lowest supported effort.
+    "between_tools": "none",
 }
 
 

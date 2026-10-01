@@ -428,8 +428,8 @@ forge model backend show litellm-4000 --raw
 
 - [ ] Backend config created (or reports it already exists)
 - [ ] `forge model backend show` displays config YAML
-- [ ] A freshly created backend includes Gemini 3.8 Flash, Claude Opus 5.5, GPT-6 Sol, and GPT-6 Luna routes; an
-  existing user-owned config is preserved
+- [ ] A freshly created backend includes Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5, GPT-6 Sol, and GPT-6 Luna
+  routes; an existing user-owned config is preserved
 
 ### 4.17 OpenRouter Templates
 
@@ -456,7 +456,7 @@ forge proxy template show openrouter-qwen
 
 - [ ] `forge proxy template list` shows 20 user-facing templates total (8 LiteLLM + 10 OpenRouter +
   `anthropic-passthrough` + `codex-responses-local`)
-- [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
+- [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5.5,
   opus=claude-opus-5.5)
 - [ ] Anthropic templates retain explicit `claude-opus-5` alternatives while unversioned Opus selects 5.5
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
