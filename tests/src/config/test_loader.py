@@ -217,6 +217,10 @@ class TestLoadConfig:
         config = load_config(template=template)
         provider_config = getattr(config.proxy, provider)
 
+        for tier in ("sonnet", "opus"):
+            assert provider_config.model_alternatives[tier]["gpt-6.1-sol"] == "openai/gpt-6.1-sol"
+            assert provider_config.model_alternatives[tier]["gpt-6-sol"] == "openai/gpt-6-sol"
+
         assert (
             provider_config.tiers.haiku,
             provider_config.tiers.sonnet,

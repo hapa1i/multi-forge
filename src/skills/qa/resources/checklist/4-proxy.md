@@ -428,8 +428,8 @@ forge model backend show litellm-4000 --raw
 
 - [ ] Backend config created (or reports it already exists)
 - [ ] `forge model backend show` displays config YAML
-- [ ] A freshly created backend includes Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5, GPT-6 Sol, and GPT-6 Luna
-  routes; an existing user-owned config is preserved
+- [ ] A freshly created backend includes Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5, GPT-6.1 Sol, GPT-6 Sol,
+  and GPT-6 Luna routes; an existing user-owned config is preserved
 
 ### 4.17 OpenRouter Templates
 
@@ -474,7 +474,7 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-6-astra, opus=gpt-6-astra)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-6-astra)
-- [ ] Both OpenRouter OpenAI templates expose GPT-6 Sol/Sol Pro and Luna/Luna Pro alternatives
+- [ ] Both OpenRouter OpenAI templates expose GPT-6.1 Sol, GPT-6 Sol/Sol Pro, and Luna/Luna Pro alternatives
 - [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.8-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
 - [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.8-flash with tier_overrides for reasoning_effort

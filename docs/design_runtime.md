@@ -613,13 +613,14 @@ GPT-6 Astra is the OpenAI Sonnet/Opus family default and default GPT workflow wo
 Haiku default; Codex-specialized templates retain their coding Sonnet model. Astra uses Responses on LiteLLM routes,
 requires reasoning (`low`, `medium`, `high`, `xhigh`, or `max`), and does not support sampling overrides. The translated
 Responses builder omits client sampling parameters according to the catalog's sampling capabilities and selected effort.
-GPT-6 Sol and Luna are explicit alternatives with native Responses and OpenRouter routes. Both also support `none`
-reasoning, the only effort that permits their sampling overrides (`sampling_requires_no_reasoning` in the catalog).
-Proxy and template validation require explicit `reasoning_effort: none` for a Sol/Luna tier's temperature override.
-Model alternatives retain request-time filtering because the same override can be valid for the tier's default model.
-Reasoning with tool calls requires Responses on their native routes. The three GPT-6 Pro catalog entries have OpenRouter
-routes only: OpenRouter publishes separate slugs, while native OpenAI exposes Pro as a reasoning mode. Existing proxy
-and backend files remain user-owned snapshots; upgrades do not rewrite their model selections.
+GPT-6.1 Sol is an explicit alternative on the same routes; `sol` and `gpt-sol` resolve to it. Like Astra, it requires
+reasoning and rejects sampling overrides. Explicit GPT-6 Sol and Luna pins retain native Responses and OpenRouter routes
+and support `none` reasoning, the only effort that permits their sampling overrides (`sampling_requires_no_reasoning` in
+the catalog). Proxy and template validation require explicit `reasoning_effort: none` for a GPT-6 Sol/Luna tier's
+temperature override. Model alternatives retain request-time filtering because the same override can be valid for the
+tier's default model. Reasoning with tool calls requires Responses on their native routes. The three GPT-6 Pro catalog
+entries have OpenRouter routes only: OpenRouter publishes separate slugs, while native OpenAI exposes Pro as a reasoning
+mode. Existing proxy and backend files remain user-owned snapshots; upgrades do not rewrite their model selections.
 
 Claude Opus 5.5 is the Anthropic/OpenRouter Opus default and the stable `claude-opus` workflow worker. Direct aliases
 and large-context proxy estimator pins select `claude-opus-5-5`; explicit Opus 5 pins remain selectable. Opus 5.5 uses
@@ -637,14 +638,12 @@ every catalog model whose declared thinking modes exclude `enabled`, including m
 `between_tools` modes. The shared translated request builder removes unsupported sampling fields after merging provider
 extras, using the intrinsic catalog even when gateway metadata does not yet recognize the model.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. The bundled Sol, Luna, and Opus 5.5 deployments provide
-capability and token/cache pricing in `model_info` until LiteLLM packages these models. Sol/Luna metadata includes the
-above-272K premium. Boundary tests require removing deployment overrides when packaged support arrives; price data stays
-in backend configuration, outside the intrinsic model catalog.
-
-The Sonnet 5.5 deployment likewise supplies offline pricing and effort capabilities. Its `thinking_always_on: false`
-prevents LiteLLM 1.102 from silently deleting an invalid `disabled` request and enabling adaptive thinking; native
-validation instead rejects the request and directs the caller to `between_tools`.
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
+deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K premium;
+6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when packaged support arrives.
+Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's `thinking_always_on: false`
+prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive thinking; native validation
+rejects them and directs callers to `between_tools`.
 
 The model route catalog is separate **authoritative operational data**:
 

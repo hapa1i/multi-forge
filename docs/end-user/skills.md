@@ -220,6 +220,11 @@ bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-t
 worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model with `--model claude-fable-5` but
 is not a separate workflow worker.
 
+`gpt-6.1-sol` is an explicit OpenAI worker, for example `forge workflow panel -p "Review these changes" -m gpt-6.1-sol`.
+GPT-6 Astra remains the default; `gpt-6-sol` keeps the prior Sol version. Existing OpenRouter proxies can serve the new
+worker; LiteLLM backends need its deployment entry (see
+[proxy.md](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade)).
+
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-6 Astra and Gemini require
 active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.

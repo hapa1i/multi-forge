@@ -46,7 +46,7 @@ def test_astra_uses_packaged_pricing_without_a_deployment_override() -> None:
     assert "model_info" not in _backend_entry("openai/gpt-6-astra")
 
 
-@pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5"])
+@pytest.mark.parametrize("model", ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5"])
 def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     cost_map = _packaged_cost_map()
     provider = "anthropic" if model.startswith("claude-") else "openai"
@@ -68,6 +68,16 @@ def test_new_model_metadata_override_is_still_needed(model: str) -> None:
                 (100, 0, 100, 0.00125, 0.0005),
                 (272_000, 1_000, 0, 2.711, 0.0005),
                 (272_001, 1_000, 500, 5.42452, 0.00075),
+            ],
+        ),
+        (
+            "openai/gpt-6.1-sol",
+            [
+                (100, 0, 0, 0.0002, 0.0001),
+                (100, 80, 0, 0.000048, 0.0001),
+                (100, 0, 100, 0.00025, 0.0001),
+                (272_000, 1_000, 0, 0.5421, 0.0001),
+                (272_001, 1_000, 500, 1.084704, 0.00015),
             ],
         ),
         (

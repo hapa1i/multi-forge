@@ -15,7 +15,9 @@ def test_gpt6_sol_and_luna_allow_none_but_route_reasoning_through_responses(mode
     spec = get_model_spec(model)
 
     assert resolve_model_id(f"openai/{model}") == model
-    assert resolve_model_id(model.removeprefix("gpt-6-")) == model
+    if model != "gpt-6-sol":
+        assert resolve_model_id(model.removeprefix("gpt-6-")) == model
+    assert resolve_model_id(model) == model
     assert spec.context_window_tokens == 1_050_000
     assert spec.max_output_tokens == 128_000
     assert spec.supports_images is True

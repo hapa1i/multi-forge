@@ -126,6 +126,31 @@ models:
     system_prompt_addendum: system_prompt_addendums/openai.md
     tags: []
 
+  # https://developers.openai.com/api/docs/models/gpt-6.1-sol
+  gpt-6.1-sol:
+    friendly_name: GPT-6.1 Sol
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
   gpt-6-sol:
     friendly_name: GPT-6 Sol
     context_window_tokens: 1050000
@@ -2259,8 +2284,9 @@ aliases:
   astra-pro: gpt-6-astra-pro
   gpt-astra-pro: gpt-6-astra-pro
   openai/gpt-6-astra-pro: gpt-6-astra-pro
-  sol: gpt-6-sol
-  gpt-sol: gpt-6-sol
+  sol: gpt-6.1-sol
+  gpt-sol: gpt-6.1-sol
+  openai/gpt-6.1-sol: gpt-6.1-sol
   openai/gpt-6-sol: gpt-6-sol
   sol-pro: gpt-6-sol-pro
   gpt-sol-pro: gpt-6-sol-pro

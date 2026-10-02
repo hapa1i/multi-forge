@@ -131,7 +131,7 @@ New proxies created from the current built-in OpenAI templates use GPT-6 Astra a
 | `codex-responses-local`      | sonnet, opus      |
 
 The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models. GPT-6
-Sol and Luna are explicit alternatives alongside GPT-5.6 Sol. The OpenRouter OpenAI templates also expose
+Sol and Luna, GPT-6.1 Sol, and GPT-5.6 Sol are explicit alternatives. The OpenRouter OpenAI templates also expose
 `gpt-6-astra-pro`, `gpt-6-sol-pro`, and `gpt-6-luna-pro`. For example:
 
 ```bash
@@ -145,9 +145,15 @@ OpenRouter in Forge; OpenAI's native API uses a reasoning mode on `gpt-6-astra` 
 the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
 
-Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium` as
-their model default. They accept temperature and `top_p` overrides only with `none` effort. A tier mapped to Sol or Luna
-must explicitly set `reasoning_effort: none` to configure a temperature override; otherwise proxy and template
+GPT-6.1 Sol is selectable with `--model gpt-6.1-sol`, `--model sol`, or `--model gpt-sol`; explicit `gpt-6-sol` pins
+retain the prior version. Astra remains the OpenAI tier default. Like Astra, 6.1 Sol requires reasoning (`low` through
+`max`, default `medium`) and rejects sampling overrides; `none` and `minimal` are unsupported. Forge uses Responses for
+its native tool calls. Cache reads cost $0.10 per million tokens, half GPT-6 Sol's rate. See the
+[GPT-6.1 Sol reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+
+GPT-6 Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium`
+as their model default. They accept temperature and `top_p` overrides only with `none` effort. A tier mapped to Sol or
+Luna must explicitly set `reasoning_effort: none` to configure a temperature override; otherwise proxy and template
 validation reject the configuration. When Sol or Luna is selected as a model alternative, request-time filtering still
 removes sampling overrides that may be valid for the tier's default model. Forge uses Responses for their native OpenAI
 routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only with
@@ -182,11 +188,16 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Sol, Luna, and Opus 5.5 still require the bundled routes'
-`model_info` blocks for offline capability and cost support. Copy each complete deployment entry when editing an
-existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input premium. For
-remote LiteLLM, its operator must install compatible support and add these complete entries to that server's
-configuration.
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5 require the
+bundled routes' `model_info` blocks for offline capability and cost support. Copy each complete deployment entry when
+editing an existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input
+premium. For remote LiteLLM, its operator must install compatible support and add these complete entries to that
+server's configuration.
+
+Existing OpenRouter proxies can forward explicit GPT-6.1 Sol workflow requests. To select it as a session alternative,
+edit or recreate the proxy to include `gpt-6.1-sol: openai/gpt-6.1-sol` in the intended tier's `model_alternatives`.
+Existing LiteLLM backends also need the complete `openai/gpt-6.1-sol` deployment, including `use_responses_api: true`
+and `model_info`; upgrading Forge preserves saved proxy and backend files.
 
 ### Picking up current model defaults and alternatives after an upgrade
 

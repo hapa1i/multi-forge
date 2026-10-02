@@ -12,8 +12,11 @@ pytestmark = [pytest.mark.regression, pytest.mark.asyncio]
 
 @pytest.mark.parametrize("temperature", [0.7, 1.0])
 @pytest.mark.parametrize("stream", [False, True])
-async def test_astra_omits_client_sampling_parameters(temperature: float, stream: bool) -> None:
-    client = LiteLLMClient(model="openai/gpt-6-astra", provider="litellm_remote")
+@pytest.mark.parametrize("model", ["openai/gpt-6-astra", "openai/gpt-6.1-sol"])
+async def test_responses_omits_unsupported_client_sampling_parameters(
+    temperature: float, stream: bool, model: str
+) -> None:
+    client = LiteLLMClient(model=model, provider="litellm_remote")
     sdk_client = MagicMock()
     create = AsyncMock(return_value=MagicMock())
     sdk_client.responses.with_raw_response.create = create
@@ -35,7 +38,7 @@ async def test_astra_omits_client_sampling_parameters(temperature: float, stream
     create.assert_awaited_once()
     assert create.await_args is not None
     request = create.await_args.kwargs
-    assert request["model"] == "openai/gpt-6-astra"
+    assert request["model"] == model
     assert request["reasoning"] == {"effort": "medium"}
     assert "temperature" not in request
     assert "top_p" not in request
