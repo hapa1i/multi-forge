@@ -55,6 +55,10 @@ class ReasoningOverrideError(ValueError):
     """Raised when a client's reasoning fields cannot be honored under override mode."""
 
 
+class ReasoningModeConflictError(ReasoningOverrideError):
+    """Raised when an effort floor exceeds the requested thinking mode's limits."""
+
+
 class ReasoningConfigError(ReasoningOverrideError):
     """Raised when the proxy's configured effort floor is invalid.
 
@@ -240,7 +244,9 @@ def pin_reasoning(thinking: Any, floor_effort: str | None, max_tokens: Any) -> t
     return pinned, True, current_int, int(target)
 
 
-def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None] | None:
+def _native_effort_support(
+    model: Any, thinking: Any = None
+) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None] | None:
     """Return native Anthropic effort/thinking metadata for a catalogued request model."""
 
     if not isinstance(model, str) or not model:
@@ -256,6 +262,9 @@ def _native_effort_support(model: Any) -> tuple[tuple[str, ...] | None, tuple[st
         except ModelCatalogError:
             continue
         if spec.native_thinking_param == "output_config.effort":
+            if isinstance(thinking, dict) and thinking.get("type") == "between_tools":
+                if spec.between_tools_reasoning_efforts is not None:
+                    return spec.between_tools_reasoning_efforts, spec.thinking_modes
             return spec.litellm_reasoning_efforts, spec.thinking_modes
         return None
     return None
@@ -340,7 +349,7 @@ def apply_override(
     # Request/model compatibility is independent of whether the operator set a
     # reasoning floor. Validate it before guard planning, whose list-form
     # normalization may reuse mutable system-block dictionaries.
-    native_support = _native_effort_support(raw_body.get("model"))
+    native_support = _native_effort_support(raw_body.get("model"), raw_body.get("thinking"))
     if native_support is not None:
         _, thinking_modes = native_support
         thinking = raw_body.get("thinking")
@@ -404,6 +413,16 @@ def apply_override(
     # control; older/unknown models retain the legacy thinking-budget mapping.
     if native_support is not None and reasoning_floor_effort is not None:
         supported_efforts, _ = native_support
+        thinking = raw_body.get("thinking")
+        if (
+            isinstance(thinking, dict)
+            and thinking.get("type") == "between_tools"
+            and raise_effort_to_supported(reasoning_floor_effort, supported_efforts) is None
+        ):
+            raise ReasoningModeConflictError(
+                f"reasoning effort floor {reasoning_floor_effort!r} conflicts with between_tools; "
+                "use adaptive thinking or lower the proxy's reasoning floor"
+            )
         output_config, pinned, effort_before, effort_after = pin_native_effort(
             raw_body.get("output_config"),
             reasoning_floor_effort,

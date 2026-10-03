@@ -31,6 +31,7 @@ from forge.core.reactive.env import (
     RunIdentity,
     compute_interactive_api_key_decision,
     new_root_run_identity,
+    resolve_proxy_wire_shape,
 )
 from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -526,7 +527,11 @@ def launch_claude_session(
         sidecar=use_sidecar,
     )
     if runtime_base_url is not None:
-        apply_proxy_context_model_defaults(env_vars, context_limit)
+        apply_proxy_context_model_defaults(
+            env_vars,
+            context_limit,
+            wire_shape=resolve_proxy_wire_shape(proxy_id=proxy_id, template=effective_template),
+        )
 
     store = state_context.store
     root = new_root_run_identity()

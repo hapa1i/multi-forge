@@ -11,6 +11,7 @@ from forge.core.models.catalog import (
     resolve_model_id,
 )
 from forge.core.tiers import detect_tier_word
+from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH, OPENAI_TRANSLATED
 
 ONE_M_SUFFIX = "[1m]"
 PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS = 200_000
@@ -108,13 +109,20 @@ def apply_direct_model_env(env_vars: MutableMapping[str, str], value: str | None
 def apply_proxy_context_model_defaults(
     env_vars: MutableMapping[str, str],
     context_limit: int | None,
+    *,
+    wire_shape: str | None,
 ) -> None:
-    """Give Claude Code 1M Claude defaults when a proxy exposes a larger context.
+    """Give Claude Code 1M estimator defaults for translated Messages routes.
 
-    Proxy routing still decides the backend tier/model. These defaults only keep
-    Claude Code's local context estimator aligned with large-context proxies.
+    Anthropic passthrough forwards the client's model unchanged, so an estimator alias
+    would instead select a real upstream model and override native user choices.
+    Responses-capable proxies still translate Claude Code's Messages requests.
     """
-    if context_limit is None or context_limit <= PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS:
+    if (
+        wire_shape not in (OPENAI_TRANSLATED, OPENAI_RESPONSES_PASSTHROUGH)
+        or context_limit is None
+        or context_limit <= PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS
+    ):
         return
 
     for key, value in PROXY_CONTEXT_MODEL_DEFAULTS.items():

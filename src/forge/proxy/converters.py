@@ -328,7 +328,9 @@ def _model_supports_cache_control(model_name: str) -> bool:
     return "anthropic/" in name or "claude" in name or "bedrock/anthropic" in name
 
 
-def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemini") -> Dict[str, Any]:
+def convert_anthropic_to_openai(
+    request: MessagesRequest, provider: str = "gemini", *, resolved_model: str | None = None
+) -> Dict[str, Any]:
     """Convert Anthropic API request to intermediate OpenAI format.
 
     Transforms Anthropic's message-based format into an OpenAI format that's
@@ -338,10 +340,30 @@ def convert_anthropic_to_openai(request: MessagesRequest, provider: str = "gemin
     Args:
         request: The validated Anthropic API request with messages and parameters
         provider: Target provider ("gemini", "openai", "litellm") - affects schema normalization
+        resolved_model: Final backend model after tier and alternative resolution.
 
     Returns:
         Dict[str, Any]: Request in OpenAI-compatible format with mapped parameters
     """
+    if request.tool_choice and request.tool_choice.get("type") in ("any", "tool"):
+        from forge.core.models import (
+            ModelCatalogError,
+            get_model_spec,
+            strip_transport_model_suffix,
+        )
+
+        model = resolved_model or request.model
+        try:
+            spec = get_model_spec(strip_transport_model_suffix(model))
+        except ModelCatalogError:
+            pass  # Unknown provider models retain upstream validation.
+        else:
+            if not spec.supports_forced_tool_choice:
+                raise RequestConversionError(
+                    f"Model {model!r} does not support forced tool_choice; use 'auto' or 'none' "
+                    "or select a model that supports forced tool use"
+                )
+
     openai_messages = []
 
     # system_cache_control is preserved and forwarded for Anthropic models only

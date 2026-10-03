@@ -1298,6 +1298,7 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive]
+    supports_forced_tool_choice: false
     litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: medium
     token_estimate_multiplier: 1.35
@@ -1407,6 +1408,8 @@ models:
       max_cache_blocks: 4
     native_thinking_param: output_config.effort
     thinking_modes: [adaptive, between_tools]
+    supports_forced_tool_choice: false
+    between_tools_reasoning_efforts: [low, medium, high]
     litellm_reasoning_efforts: [low, medium, high, xhigh, max]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35

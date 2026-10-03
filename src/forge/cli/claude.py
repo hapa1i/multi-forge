@@ -129,8 +129,9 @@ def _build_bare_launch_env(
         env_vars["ANTHROPIC_BASE_URL"] = base_url
         if context_limit is not None:
             env_vars["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(context_limit)
-        apply_proxy_context_model_defaults(env_vars, context_limit)
-        if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):
+        wire_shape = resolve_proxy_wire_shape(proxy_id=proxy_id, template=template)
+        apply_proxy_context_model_defaults(env_vars, context_limit, wire_shape=wire_shape)
+        if wire_shape:
             env_vars[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
         if template:
             env_vars["ACTIVE_TEMPLATE"] = template

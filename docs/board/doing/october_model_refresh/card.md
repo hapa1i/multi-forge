@@ -5,9 +5,11 @@ while retaining explicit Sonnet 5 and GPT-6 Sol pins. Astra remains the OpenAI t
 branch: `feat/sonnet-5-5-defaults`, based on `3a5d38eb`; review is PR #256.
 
 Keep the intrinsic catalog, route catalog, direct Claude pins, proxy templates, workflow workers, and packaged backend
-metadata aligned. Existing user-owned proxy and backend snapshots keep their selections and bytes. Gemini defaults stay
-unchanged: Google's September 30 Gemini 4 Argon announcement describes a restricted rollout, and the public Gemini API
-and OpenRouter catalogs did not list it on October 1, 2026.
+metadata aligned. Existing snapshots keep their bytes and translated tier selections; passthrough forwards the native
+client's model without Forge context-estimator pins. Reject unsupported forced choices before translated dispatch and
+incompatible `between_tools` effort floors before native mutation. Gemini defaults stay unchanged: Google's September 30
+Gemini 4 Argon announcement describes a restricted rollout, and the public Gemini API and OpenRouter catalogs did not
+list it on October 1, 2026.
 
 Sonnet 5.5 uses native `claude-sonnet-5-5` and OpenRouter `anthropic/claude-sonnet-5.5`. It has adaptive thinking and a
 `between_tools` mode for disabling up-front thinking; `disabled` and forced tool choices are rejected. Thinking blocks

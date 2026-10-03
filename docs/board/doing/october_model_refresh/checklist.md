@@ -1,7 +1,17 @@
 # October model refresh checklist
 
-Implementation and verification are complete for Sonnet 5.5 and GPT-6.1 Sol. Draft PR #256 is ready for review; Gemini 4
-remains deferred. Shipment and release closeout are pending.
+Review corrections cover passthrough launch pins, upgrade guidance, translated forced tool choices, and native
+`between_tools` effort floors. Gemini 4 remains deferred; shipment and release closeout are pending.
+
+- [x] Restrict context-estimator model pins to translated routes and cover saved passthrough launches.
+
+- [x] Correct Sonnet 5.5 upgrade steps and the general model-upgrade overview.
+
+- [x] Reject unsupported forced tool choices for Sonnet/Opus 5.5 before translated dispatch.
+
+- [x] Reject incompatible native `between_tools` effort floors atomically with an actionable response.
+
+- [x] Verify regressions, required integrations, and packaging for the review corrections.
 
 - [x] Verify GPT-6.1 Sol public IDs, request constraints, pricing, and OpenRouter ZDR availability.
 
@@ -43,6 +53,20 @@ remains deferred. Shipment and release closeout are pending.
 | Native metadata       | Offline LiteLLM process                        | Supported efforts and token/cache costs match the public contract                     |
 | Request compatibility | Adaptive and between-tools requests with tools | Valid controls survive; invalid controls fail accurately; signed history is preserved |
 | Packaging             | Clean wheel installation                       | Catalogs load and the packaged backend starts, reports healthy, and stops             |
+
+Review correction verification on October 3, 2026:
+
+- `make test-unit`: 10,396 passed, 117 deselected. `make test-regression`: 1,315 passed. Both retain the existing
+  Starlette/AnyIO deprecation warning. Documentation token evidence was refreshed before the passing aggregate run.
+- `test_sonnet_55_e2e.py`: all 36 integration cases passed, including translated Sonnet/Opus forced-tool refusals and
+  native `between_tools` floors, with and without streaming. The combined run exposed an invalid field in the new Docker
+  fixture; the corrected `test_session_routing.py` rerun passed all three tests. Saved passthrough launches preserve
+  native selection across bare launch, start, resume, fork, and incognito; model show/history and snapshot bytes agree.
+- The final focused launch/conversion/override run passed 100 tests. Responses-capable proxies retain estimator pins for
+  their translated Messages ingress. Adaptive effort levels and older-model forced tool choices remain supported.
+- The live blind `claude-sonnet` panel used `claude-sonnet-5-5` directly and completed a read-only tool call.
+- `make build` and clean-wheel verification passed: nine fresh templates, ten unchanged saved snapshots, backend
+  start/health/stop, and the installed routing/conversion/override fixes.
 
 Integrated verification on October 2, 2026:
 

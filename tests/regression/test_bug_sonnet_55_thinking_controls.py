@@ -90,3 +90,31 @@ def test_native_thinking_mode_and_history_survive_override(mode: str) -> None:
     original = deepcopy(body)
 
     assert apply_override(body, reasoning_floor_effort="high").body == original
+
+
+@pytest.mark.parametrize("model", ["claude-sonnet-5-5", "anthropic/claude-sonnet-5.5[1m]"])
+@pytest.mark.parametrize("floor", ["xhigh", "max"])
+def test_between_tools_rejects_incompatible_floor_without_any_mutation(model: str, floor: str) -> None:
+    body = {
+        "model": model,
+        "system": [{"type": "text", "text": "Original instructions"}],
+        "thinking": {"type": "between_tools"},
+        "output_config": {"effort": "low"},
+        "messages": [{"role": "assistant", "content": [{"type": "thinking", "signature": "signed", "thinking": ""}]}],
+    }
+    original = deepcopy(body)
+
+    with pytest.raises(ReasoningOverrideError, match="between_tools"):
+        apply_override(body, reasoning_floor_effort=floor, system_prompt_augment="Must not be applied")
+
+    assert body == original
+
+
+@pytest.mark.parametrize("floor", ["low", "medium", "high", "xhigh", "max"])
+def test_adaptive_thinking_retains_all_native_floor_levels(floor: str) -> None:
+    body = {"model": "claude-sonnet-5-5", "thinking": {"type": "adaptive"}, "messages": []}
+
+    result = apply_override(body, reasoning_floor_effort=floor)
+
+    assert result.body["output_config"] == {"effort": floor}
+    assert result.body["thinking"] == {"type": "adaptive"}

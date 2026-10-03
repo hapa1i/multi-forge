@@ -328,11 +328,12 @@ only** — the system prompt and generation parameters, **never** historical mes
   request — a block returns HTTP 403 `intercept_guard_blocked`);
 - reasoning-effort pin — **reuses** `tier_overrides.<tier>.reasoning_effort` as a floor (not a new key). Catalogued
   Claude models with native effort use `output_config.effort`; adaptive-only models reject manual
-  `thinking.type=enabled` or `thinking.budget_tokens` with HTTP 400. Older models retain the legacy
-  `thinking.budget_tokens` mapping when the floor can be represented safely. If a pin changes either control surface,
-  Forge removes `temperature`, `top_p`, and `top_k` because Anthropic rejects those combinations; a no-op pin leaves
-  them unchanged. The public 400 response is stable and carries the Forge request ID, while detailed validation text
-  remains server-local.
+  `thinking.type=enabled` or `thinking.budget_tokens` with HTTP 400. Mode-specific `between_tools_reasoning_efforts`
+  restricts the floor to `low`/`medium`/`high` on Sonnet 5.5; incompatible floors fail before any mutation or forwarding
+  with an actionable HTTP 400. Older models retain the legacy `thinking.budget_tokens` mapping when the floor can be
+  represented safely. If a pin changes either control surface, Forge removes `temperature`, `top_p`, and `top_k` because
+  Anthropic rejects those combinations; a no-op pin leaves them unchanged. The public 400 response is stable and carries
+  the Forge request ID, while detailed validation text remains server-local.
 
 **Mutation-safety invariant (normative):** override fingerprints the `messages` list (SHA256) before and after apply and
 raises (`RuntimeError`, fail-closed, no forward) if it changed. Override never writes `messages[0..n-1]`, so signed
@@ -609,34 +610,35 @@ The model catalog is **authoritative internal data**:
 - Defines: intrinsic model capabilities, context windows, aliases, and per-family defaults
 - **NOT a user edit surface**
 
-GPT-6 Astra is the OpenAI Sonnet/Opus family default and default GPT workflow worker. GPT-5.4 Mini remains the general
-Haiku default; Codex-specialized templates retain their coding Sonnet model. Astra uses Responses on LiteLLM routes,
-requires reasoning (`low`, `medium`, `high`, `xhigh`, or `max`), and does not support sampling overrides. The translated
-Responses builder omits client sampling parameters according to the catalog's sampling capabilities and selected effort.
-GPT-6.1 Sol is an explicit alternative on the same routes; `sol` and `gpt-sol` resolve to it. Like Astra, it requires
-reasoning and rejects sampling overrides. Explicit GPT-6 Sol and Luna pins retain native Responses and OpenRouter routes
-and support `none` reasoning, the only effort that permits their sampling overrides (`sampling_requires_no_reasoning` in
-the catalog). Proxy and template validation require explicit `reasoning_effort: none` for a GPT-6 Sol/Luna tier's
-temperature override. Model alternatives retain request-time filtering because the same override can be valid for the
-tier's default model. Reasoning with tool calls requires Responses on their native routes. The three GPT-6 Pro catalog
-entries have OpenRouter routes only: OpenRouter publishes separate slugs, while native OpenAI exposes Pro as a reasoning
-mode. Existing proxy and backend files remain user-owned snapshots; upgrades do not rewrite their model selections.
+GPT-6 Astra is the OpenAI Sonnet/Opus default and GPT workflow worker. GPT-5.4 Mini remains the general Haiku default;
+Codex templates retain their coding Sonnet model. Astra and the explicit GPT-6.1 Sol alternative require reasoning
+(`low` through `max`) and reject sampling overrides. `sol` and `gpt-sol` select 6.1. Both use Responses on LiteLLM
+routes; the translated builder filters sampling by catalog capabilities and effort.
 
-Claude Opus 5.5 is the Anthropic/OpenRouter Opus default and the stable `claude-opus` workflow worker. Direct aliases
-and large-context proxy estimator pins select `claude-opus-5-5`; explicit Opus 5 pins remain selectable. Opus 5.5 uses
-always-on adaptive thinking with a model default of `medium` effort and accepts only `auto` or `none` tool choice.
-Provider IDs remain route-specific: OpenRouter uses `anthropic/claude-opus-5.5`, while native Anthropic uses
-`claude-opus-5-5`.
+Explicit GPT-6 Sol/Luna pins retain native Responses and OpenRouter routes. Their sampling overrides require `none`
+reasoning (`sampling_requires_no_reasoning`). Proxy/template validation requires explicit `reasoning_effort: none` for
+temperature overrides; alternatives also need request-time filtering because tier defaults can differ. Native reasoning
+with tools requires Responses. The three GPT-6 Pro entries have only OpenRouter routes: native OpenAI exposes Pro as a
+reasoning mode.
+
+Proxy/backend snapshots remain user-owned; upgrades preserve translated tier selections. Passthrough forwards the
+client's model. Context-estimator model pins apply only to translated Messages routes, including Responses-capable
+proxies; Anthropic passthrough and unknown wire shapes receive no pins.
+
+Claude Opus 5.5 is the Anthropic/OpenRouter Opus default, stable `claude-opus` worker, and direct alias target; explicit
+Opus 5 pins remain selectable. It uses always-on adaptive thinking at `medium` effort. OpenRouter uses
+`anthropic/claude-opus-5.5`; native Anthropic uses `claude-opus-5-5`.
 
 Claude Sonnet 5.5 is the Anthropic/OpenRouter Sonnet default. The `claude-sonnet` workflow worker and direct aliases
 select `claude-sonnet-5-5`; explicit Sonnet 5 pins and the `claude-sonnet-5` worker remain selectable. OpenRouter uses
-`anthropic/claude-sonnet-5.5`. Sonnet 5.5 defaults to `high` adaptive effort and accepts only `auto` or `none` tool
-choice. Native `between_tools` turns off up-front thinking at `low`, `medium`, or `high` effort; `disabled` and manual
-thinking budgets are invalid. Passthrough preserves this mode and signed history. Translated routes approximate
-`between_tools` with their lowest supported effort. Config and passthrough override validation reject manual budgets for
-every catalog model whose declared thinking modes exclude `enabled`, including models with both `adaptive` and
-`between_tools` modes. The shared translated request builder removes unsupported sampling fields after merging provider
-extras, using the intrinsic catalog even when gateway metadata does not yet recognize the model.
+`anthropic/claude-sonnet-5.5`. Sonnet 5.5 defaults to `high` adaptive effort. Both Claude 5.5 models declare
+`supports_forced_tool_choice: false`; translated conversion validates the resolved model before dispatch and returns
+HTTP 400 for `any` or named choices, directing callers to `auto`/`none`. Native `between_tools` turns off up-front
+thinking at `low`, `medium`, or `high`; `disabled` and manual budgets are invalid. Passthrough preserves this mode and
+signed history. Translated routes approximate `between_tools` with their lowest supported effort. Config and passthrough
+override validation reject manual budgets for every catalog model whose thinking modes exclude `enabled`. The shared
+translated request builder removes unsupported sampling fields after merging provider extras, using the intrinsic
+catalog even when gateway metadata does not yet recognize the model.
 
 LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K premium;

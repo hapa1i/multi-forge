@@ -143,3 +143,65 @@ def test_passthrough_preserves_sonnet55_signed_tool_history(
     assert len(upstream.requests) == 1
     assert upstream.requests[0]["body"] == body
     assert response.content == upstream.response_body
+
+
+@pytest.mark.parametrize("fixture", ["proxy_server_local_anthropic", "proxy_server_openrouter"])
+@pytest.mark.parametrize("model", ["claude-sonnet", "claude-opus"])
+@pytest.mark.parametrize("choice", [{"type": "any"}, {"type": "tool", "name": "ping"}])
+@pytest.mark.parametrize("stream", [False, True])
+def test_translated_claude55_forced_tools_return_clear_client_error(
+    request: pytest.FixtureRequest, fixture: str, model: str, choice: dict, stream: bool
+) -> None:
+    proxy_url = request.getfixturevalue(fixture)
+    response = httpx.post(
+        f"{proxy_url}/v1/messages",
+        headers={"x-api-key": "test"},
+        json={
+            "model": model,
+            "max_tokens": 128,
+            "stream": stream,
+            "messages": [{"role": "user", "content": "Ping"}],
+            "tools": [{"name": "ping", "input_schema": {"type": "object", "properties": {}}}],
+            "tool_choice": choice,
+        },
+        timeout=30,
+    )
+
+    assert response.status_code == 400, response.text[:500]
+    assert response.json()["detail"]["type"] == "invalid_request_error"
+    assert "tool_choice" in response.json()["detail"]["message"]
+    assert "auto" in response.json()["detail"]["message"]
+
+
+@pytest.mark.parametrize(
+    ("proxy_server_fake_anthropic_passthrough", "expected_status"),
+    [("high", 529), ("xhigh", 400), ("max", 400)],
+    indirect=["proxy_server_fake_anthropic_passthrough"],
+)
+@pytest.mark.parametrize("stream", [False, True])
+def test_passthrough_between_tools_floor_is_validated_before_forwarding(
+    proxy_server_fake_anthropic_passthrough: tuple[str, FakeAnthropicUpstream], expected_status: int, stream: bool
+) -> None:
+    proxy_url, upstream = proxy_server_fake_anthropic_passthrough
+    upstream.requests.clear()
+    body = {
+        "model": "claude-sonnet-5-5",
+        "max_tokens": 128,
+        "stream": stream,
+        "thinking": {"type": "between_tools"},
+        "output_config": {"effort": "low"},
+        "messages": [{"role": "user", "content": "Reply OK"}],
+    }
+    response = httpx.post(f"{proxy_url}/v1/messages", json=body, timeout=30)
+
+    assert response.status_code == expected_status, response.text[:500]
+    if expected_status == 400:
+        assert upstream.requests == []
+        assert response.json()["error"]["type"] == "invalid_request_error"
+        assert "between_tools" in response.json()["error"]["message"]
+        assert "adaptive" in response.json()["error"]["message"]
+    else:
+        assert len(upstream.requests) == 1
+        assert upstream.requests[0]["body"]["output_config"] == {"effort": "high"}
+        assert upstream.requests[0]["body"]["thinking"] == body["thinking"]
+        assert upstream.requests[0]["body"]["messages"] == body["messages"]

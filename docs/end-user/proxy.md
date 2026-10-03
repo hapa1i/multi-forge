@@ -203,17 +203,17 @@ and `model_info`; upgrading Forge preserves saved proxy and backend files.
 
 New proxies created from the current built-in templates use these defaults:
 
-| Template                                            | New default tiers                                |
-| --------------------------------------------------- | ------------------------------------------------ |
-| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5.5                          |
-| `anthropic-passthrough`                             | opus -> Claude Opus 5.5 (informational)          |
-| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                           |
-| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max |
-| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                           |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                    |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash                        |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash                        |
-| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                    |
+| Template                                            | New default tiers                                           |
+| --------------------------------------------------- | ----------------------------------------------------------- |
+| `openrouter-anthropic`, `litellm-anthropic(-local)` | sonnet -> Sonnet 5.5, opus -> Opus 5.5                      |
+| `anthropic-passthrough`                             | Sonnet 5.5 / Opus 5.5 (informational; client selects model) |
+| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                      |
+| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max            |
+| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                      |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                               |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash                                   |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash                                   |
+| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                               |
 
 Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
 1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
@@ -250,10 +250,11 @@ endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default
 `qwen/qwen3.8-2.4t-a95b`. The September 23 audit also found no ZDR endpoint for the new Flash or Max 0902 routes. See
 [OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
 
-Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
-rewrite them. Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with
-`forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
-LiteLLM path, the required Gemini 3.8 Flash, Claude Opus 5.5, and selected GPT-6 routes must exist in
+Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrades preserve translated
+tier selections. Passthrough forwards the client's model; Forge does not inject context-estimator model pins there.
+Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with `forge proxy edit <proxy_id>`
+or recreate the proxy from the template, then restart with `--smoke-test`. For the local LiteLLM path, the required
+Gemini 3.8 Flash, Claude Sonnet/Opus 5.5, and selected GPT-6 routes must exist in
 `~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
 backend; restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly
 on `--model fable`; it is never replaced implicitly.
@@ -413,11 +414,8 @@ does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr`
 
 ## Model alternatives
 
-Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
-`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5.5
-and their sonnet tier to Sonnet 5.5, with Fable 5.1, Fable 5, Opus 5, Opus 4.8, Opus 4.6, Sonnet 5, and Sonnet 4.6 as
-alternatives. (`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model
-directly with no alternatives map.) Use `--model` to select an alternative:
+Anthropic translated templates default to Opus/Sonnet 5.5; `model_alternatives` keeps other Claude versions selectable
+at the same tier. Passthrough forwards the client's model without an alternatives map. Use `--model` to select:
 
 ```bash
 # Default: opus tier routes to Opus 5.5, sonnet tier to Sonnet 5.5
@@ -427,20 +425,19 @@ forge session start my-session --proxy openrouter-anthropic
 forge session start my-session --proxy openrouter-anthropic --model claude-fable
 ```
 
-The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
-`model_alternatives[tier][model]` and routes to the configured backend model. Catalog aliases and provider-prefixed
-spellings of the same model share one route identity; private model slugs not known to the catalog still work, but only
-by exact key. Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level
-hyperparameters (reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR,
-Fable 5.1 and Fable 5 resolve to Opus 5.5 because the dated endpoint checks found no Fable-compatible ZDR route.
+The proxy resolves `model_alternatives[tier][model]` at request time. Catalog aliases and provider-prefixed spellings of
+the same model share one route identity; private model slugs not known to the catalog still work, but only by exact key.
+Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level hyperparameters
+(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5.1 and
+Fable 5 resolve to Opus 5.5 because the dated endpoint checks found no Fable-compatible ZDR route.
 
-For Claude models, `forge session --model` still uses a compatible proxy's tier defaults and `model_alternatives`
-exactly as before. The same flag accepts any Forge catalog model: non-Claude requests resolve a compatible
-source/template from the packaged route catalog, then select a serving proxy tier. The launch sends the canonical model
-name and a Forge-owned tier header so an explicit `--model-tier` continues to select that tier's hyperparameters even
-when the model name itself contains no Claude tier word. The proxy gives an explicit tier in a request model precedence,
-then uses the validated Forge header, then its configured default. Use `--model-tier haiku|sonnet|opus` only when tier
-selection is ambiguous; proxy-owned tier mappings and hyperparameters are not mutated.
+`forge session --model` accepts any Forge catalog model. Claude requests use the proxy's tiers and alternatives;
+non-Claude requests resolve a compatible source/template from the packaged route catalog, then select a serving proxy
+tier. The launch sends the canonical model name and a Forge-owned tier header so an explicit `--model-tier` continues to
+select that tier's hyperparameters even when the model name itself contains no Claude tier word. The proxy gives an
+explicit tier in a request model precedence, then uses the validated Forge header, then its configured default. Use
+`--model-tier haiku|sonnet|opus` only when tier selection is ambiguous; proxy-owned tier mappings and hyperparameters
+are not mutated.
 
 To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 
@@ -457,14 +454,15 @@ model_alternatives:
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-The OpenRouter backend slugs use dotted versions (`anthropic/claude-opus-5.5`, `anthropic/claude-fable-5.1`); direct
-Anthropic uses hyphens (`claude-opus-5-5`, `claude-fable-5-1`), with the usual `anthropic/` prefix on LiteLLM routes.
-Fresh proxies receive the correct provider-specific mapping from their template. Existing user-owned proxy snapshots
-must be edited or recreated to gain the new alternative.
+OpenRouter slugs use dotted versions (`anthropic/claude-opus-5.5`); native Anthropic uses hyphens (`claude-opus-5-5`),
+prefixed with `anthropic/` on LiteLLM routes. Fresh templates supply these mappings; saved proxies require editing or
+recreation to gain alternatives.
 
-To adopt Sonnet 5.5 in an existing proxy, stop it with `forge proxy stop <proxy_id>`, run `forge proxy edit <proxy_id>`,
-and set its Sonnet tier to `anthropic/claude-sonnet-5.5` for OpenRouter or `anthropic/claude-sonnet-5-5` for LiteLLM.
-Retain `claude-sonnet-5` in `model_alternatives.sonnet` when you need the prior version. A saved LiteLLM backend must
+To adopt Sonnet 5.5 in an existing translated proxy, stop it with `forge proxy stop <proxy_id>`, run
+`forge proxy edit <proxy_id>`, and set its Sonnet tier to `anthropic/claude-sonnet-5.5` for OpenRouter or
+`anthropic/claude-sonnet-5-5` for LiteLLM. Add `claude-sonnet-5: anthropic/claude-sonnet-5` under
+`model_alternatives.sonnet` to keep the prior version selectable; older snapshots do not have this alternative.
+Passthrough uses the client's model, so select `--model claude-sonnet-5` to keep Sonnet 5. A saved LiteLLM backend must
 also expose the new native route and its pricing/effort metadata; upgrades do not rewrite that file. Stop its runtime ID
 from `forge model backend list`, then edit `~/.forge/backends/litellm/config.yaml` or back it up and recreate it with
 `forge model backend delete litellm` followed by `forge model backend create litellm`. Restart the backend and run
@@ -472,14 +470,15 @@ from `forge model backend list`, then edit `~/.forge/backends/litellm/config.yam
 
 Sonnet 5.5 rejects manual thinking budgets and sampling overrides. For native Messages requests, use adaptive thinking
 or `thinking: {type: between_tools}` to turn off up-front thinking. `between_tools` accepts no extra fields and works
-only at `low`, `medium`, or `high` effort; it cannot change effort mid-conversation. Use `auto` or `none` tool choice
-and preserve signed thinking blocks with append-only history. Forge's passthrough preserves those native controls;
-translated routes map `between_tools` to their lowest supported reasoning effort. See the
+only at `low`, `medium`, or `high` effort; it cannot change effort mid-conversation. A passthrough override floor of
+`xhigh` or `max` returns HTTP 400 before mutation or forwarding: use adaptive thinking or lower the floor. Use `auto` or
+`none` tool choice; translated Sonnet/Opus 5.5 routes reject forced choices with HTTP 400. Preserve signed thinking
+blocks with append-only history. Forge's passthrough preserves those native controls; translated routes map
+`between_tools` to their lowest supported reasoning effort. See the
 [Sonnet 5.5 migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
 
-For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable`) vs leave the default Opus 5.5
-mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,
-and per-family cost + multi-needle retrieval data — see [model_selection.md](model_selection.md).
+See [model_selection.md](model_selection.md) for supervisor/executor recommendations, cost comparisons, and MRCR
+multi-needle retrieval data.
 
 ---
 

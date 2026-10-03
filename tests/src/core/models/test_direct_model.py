@@ -138,10 +138,10 @@ def test_apply_direct_model_env_returns_error() -> None:
 def test_proxy_context_model_defaults_only_for_large_context() -> None:
     env_vars: dict[str, str] = {}
 
-    apply_proxy_context_model_defaults(env_vars, 200000)
+    apply_proxy_context_model_defaults(env_vars, 200000, wire_shape="openai_translated")
     assert env_vars == {}
 
-    apply_proxy_context_model_defaults(env_vars, 1000000)
+    apply_proxy_context_model_defaults(env_vars, 1000000, wire_shape="openai_translated")
     assert env_vars == {
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
         "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5[1m]",
@@ -153,7 +153,7 @@ def test_proxy_context_model_defaults_do_not_force_tier_or_override_explicit_def
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6",
     }
 
-    apply_proxy_context_model_defaults(env_vars, 1000000)
+    apply_proxy_context_model_defaults(env_vars, 1000000, wire_shape="openai_translated")
 
     assert env_vars == {
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6",
