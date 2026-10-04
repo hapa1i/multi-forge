@@ -1,5 +1,8 @@
 # October model refresh
 
+Completed October 4, 2026. [PR #256](https://github.com/hapa1i/multi-forge/pull/256) merged as `1ba9584c`; its product
+tree matches the verified branch head `ffc1489f`. Runtime design and end-user upgrade guidance are synchronized.
+
 Adopt Claude Sonnet 5.5 as the Anthropic/OpenRouter Sonnet default and add GPT-6.1 Sol. Move `sol` and `gpt-sol` to 6.1
 while retaining explicit Sonnet 5 and GPT-6 Sol pins. Astra remains the OpenAI tier and workflow default. Execution
 branch: `feat/sonnet-5-5-defaults`, based on `3a5d38eb`; review is PR #256.

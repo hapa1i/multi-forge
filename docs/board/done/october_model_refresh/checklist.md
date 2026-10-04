@@ -1,7 +1,7 @@
 # October model refresh checklist
 
-Review corrections cover passthrough launch pins, upgrade guidance, translated forced tool choices, and native
-`between_tools` effort floors. Gemini 4 remains deferred; shipment and release closeout are pending.
+Completed October 4, 2026. PR #256 merged as `1ba9584c`, whose tree matches verified head `ffc1489f`. The card is
+closed; Gemini 4 remains deferred pending public API access. Release 1.0.2 uses the candidate evidence below.
 
 - [x] Restrict context-estimator model pins to translated routes and cover saved passthrough launches.
 
@@ -44,7 +44,11 @@ Review corrections cover passthrough launch pins, upgrade guidance, translated f
 
 - [x] Review the complete diff and record validation and any remaining limitations.
 
-- [ ] Record closeout after shipment.
+- [x] Record closeout after shipment.
+
+Closeout: the merged tree passed the recorded unit, regression, integration, clean-wheel, and live-worker checks. All
+four GitHub checks passed: tests (including clean-wheel runtime), pre-commit, and both CodeQL analyses. Runtime design
+and end-user docs match the shipped routing and control behavior; the change log links this completed card.
 
 | Test                  | Fixture                                        | Assertion                                                                             |
 | --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -108,5 +112,26 @@ The live LiteLLM probe exposed unsupported sampling fields reaching Anthropic. T
 enforces catalog sampling constraints after merging provider extras. Regression coverage preserves caller-owned extras
 while removing temperature, top-p, and top-k for Sonnet 5.5; existing conditional-sampling client tests also pass.
 
-Release QA and publishing are outside this implementation pass. Native `between_tools` remains an approximation on
-translated routes; callers needing its exact semantics and bound thinking history should use Anthropic passthrough.
+Native `between_tools` remains an approximation on translated routes; callers needing its exact semantics and bound
+thinking history should use Anthropic passthrough. The verification above covers the merged implementation; release
+candidate evidence is recorded separately below.
+
+## 1.0.2 release verification
+
+The maintainer explicitly waived fresh manual QA for 1.0.2 and authorized publication using the completed PR and
+exact-wheel checks. This disposition applies only to 1.0.2; no new manual QA pass or reuse of an older artifact identity
+is claimed.
+
+Candidate: `dist/multi_forge-1.0.2-py3-none-any.whl`, SHA-256
+`6b595a661fbeb0f178aecafcc79edb21ab7731d857d23909c267e0f7618b5ac9`.
+
+- `make build` produced the wheel and sdist; `uv lock` changed only the project version to 1.0.2.
+- Full `make pre-commit` passed. The version, Sonnet 5.5, GPT-6.1 Sol, and QA checklist contract selection passed all 56
+  tests.
+- The exact wheel installed into a fresh Python 3.13.11 environment with 86 independently resolved dependencies;
+  `uv pip check` and `forge --version` passed.
+- Installed-wheel checks verified nine fresh templates, ten unchanged saved snapshots, native pin preservation,
+  translated forced-tool validation, and atomic native effort-floor rejection. LiteLLM create/start/health/stop passed.
+
+The unexecuted QA selection contains 163 steps, 554 assertions, eight human checkpoints, and eight planned paid
+operations. Its selection was validated, but no manual QA execution or pass is claimed.

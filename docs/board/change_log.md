@@ -5,6 +5,26 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-04
+
+### Support Sonnet 5.5 and GPT-6.1 Sol
+
+**Goal**: Adopt the current Sonnet model and add GPT-6.1 Sol while preserving saved routing choices.
+
+**Key changes**:
+
+- Promoted Sonnet 5.5 in direct aliases, workflow workers, and fresh Anthropic tiers; retained explicit Sonnet 5.
+- Added GPT-6.1 Sol routes, alternatives, and pricing metadata; moved `sol`/`gpt-sol` to 6.1 and kept Astra defaults.
+- Preserved native passthrough selection by limiting estimator pins to translated Messages routes. Rejected unsupported
+  forced tool choices and incompatible `between_tools` effort floors before upstream dispatch.
+- Corrected model-upgrade guidance and preserved existing proxy/backend snapshots. Gemini 4 remains deferred.
+
+**Verification**: 10,396 unit tests, 1,315 regressions, 39 proxy/session integration cases, live workflow checks,
+pre-commit, build, and clean-wheel snapshot/runtime checks passed.
+[PR #256](https://github.com/hapa1i/multi-forge/pull/256) merged as `1ba9584c`; its tree matches verified head
+`ffc1489f`, with all four GitHub checks passing. The [completed card](done/october_model_refresh/checklist.md) records
+the evidence.
+
 ## 2026-09-23
 
 ### Refresh the model catalog and default to Opus 5.5
