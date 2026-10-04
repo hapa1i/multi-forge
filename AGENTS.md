@@ -101,10 +101,18 @@ connectivity after first setup, credential changes, or proxy auth changes. For c
 retaining the created, reused, or adopted proxy for inspection and retry. For packaged model/template updates, verify a
 fresh realization and a pre-existing user-owned snapshot: upgrades must not rewrite `proxy.yaml` or materialized LiteLLM
 config. Adopting new tier defaults requires `forge proxy edit <proxy_id>` or recreation of the affected proxy/backend
-before restart. For GPT-6 Astra upgrades, follow `docs/end-user/proxy.md` for the required reasoning/sampling changes
-and bundled LiteLLM `model_info` pricing. Stop affected proxies with `forge proxy stop <proxy_id>` before restarting
-with `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward explicit Astra workflow
-workers without changing their tier defaults; LiteLLM backends must serve the Astra route.
+before restart. For model upgrades, follow `docs/end-user/proxy.md` for model-specific reasoning/sampling changes. When
+updating LiteLLM adapters, copy complete bundled deployment entries, including any `model_info` capability and pricing
+metadata; restarting alone reloads the saved config. Stop affected proxies with `forge proxy stop <proxy_id>` before
+restarting with `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward explicit Astra
+workflow workers without changing their tier defaults; LiteLLM backends must serve the Astra route.
+
+For Sonnet 5.5 thinking or translation changes, run
+`./scripts/test-integration.sh tests/integration/proxy/test_sonnet_55_e2e.py` and exercise the direct worker with
+`forge workflow panel -p "<review prompt>" -m claude-sonnet`. The integration gate requires `ANTHROPIC_API_KEY` and
+`OPENROUTER_API_KEY` and covers native thinking/tool-choice refusals, translated streaming and sampling filtering, and
+passthrough preservation of signed tool history. Translated `between_tools` uses the lowest supported effort; exact
+native semantics require Anthropic passthrough.
 
 For downstream-telemetry retention or config-ownership changes, inspect configured, effective, and source state with
 `forge config show --json`; preview legacy proxy-key migration with `forge config migrate-retention [--json]`, apply it
