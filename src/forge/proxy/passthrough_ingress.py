@@ -30,6 +30,11 @@ _REASONING_OVERRIDE_PUBLIC_MESSAGE = (
     "manual thinking.type/budget_tokens for adaptive models"
 )
 
+_REASONING_MODE_PUBLIC_MESSAGE = (
+    "Proxy reasoning floor conflicts with thinking.type 'between_tools'; use adaptive thinking "
+    "or lower tier_overrides.<tier>.reasoning_effort in proxy.yaml to high or below"
+)
+
 # A bad effort floor comes from proxy.yaml, which the caller never sees. Blaming
 # the request body would send the operator hunting through their client.
 _REASONING_CONFIG_PUBLIC_MESSAGE = (
@@ -83,13 +88,18 @@ async def _apply_passthrough_override(
         )
     except intercept.ReasoningOverrideError as exc:
         logger.warning("[%s] invalid passthrough reasoning override: %s", request_id, exc)
+        public_message = (
+            _REASONING_MODE_PUBLIC_MESSAGE
+            if isinstance(exc, intercept.ReasoningModeConflictError)
+            else _REASONING_OVERRIDE_PUBLIC_MESSAGE
+        )
         return JSONResponse(
             status_code=400,
             content={
                 "type": "error",
                 "error": {
                     "type": "invalid_request_error",
-                    "message": f"{_REASONING_OVERRIDE_PUBLIC_MESSAGE} [{request_id}]",
+                    "message": f"{public_message} [{request_id}]",
                 },
             },
             headers={"X-Request-ID": request_id},

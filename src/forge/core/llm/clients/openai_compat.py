@@ -137,18 +137,15 @@ def build_chat_completion_kwargs(
     if "openai" in hyperparams.extra:
         kwargs.update(hyperparams.extra["openai"])
 
-    _apply_conditional_sampling(model, kwargs)
+    _apply_sampling_constraints(model, kwargs)
     return kwargs
 
 
-def _apply_conditional_sampling(model: str, kwargs: dict[str, Any]) -> None:
-    """Enforce effort-dependent sampling after provider extras have been merged."""
+def _apply_sampling_constraints(model: str, kwargs: dict[str, Any]) -> None:
+    """Enforce catalog sampling constraints after provider extras have been merged."""
     if not model_exists(model):
         return
     spec = get_model_spec(model)
-    if not spec.sampling_requires_no_reasoning:
-        return
-
     extra_body = kwargs.get("extra_body")
     reasoning = extra_body.get("reasoning") if isinstance(extra_body, dict) else None
     effort = kwargs.get("reasoning_effort")
@@ -156,7 +153,7 @@ def _apply_conditional_sampling(model: str, kwargs: dict[str, Any]) -> None:
         effort = reasoning.get("effort")
     if spec.supports_sampling_at_effort(effort):
         return
-    for name in ("temperature", "top_p"):
+    for name in ("temperature", "top_p", "top_k"):
         kwargs.pop(name, None)
         if isinstance(extra_body, dict) and name in extra_body:
             # Do not mutate the caller's nested provider extras.

@@ -53,6 +53,7 @@ class ModelSpec:
     supports_sampling_overrides: bool = True
     sampling_requires_no_reasoning: bool = False
     supports_1m_context: bool = False
+    supports_forced_tool_choice: bool = True
 
     # Temperature configuration
     temperature_constraint: Literal["fixed", "range"] = "range"
@@ -77,6 +78,7 @@ class ModelSpec:
     litellm_reasoning_efforts: tuple[str, ...] | None = None
     default_reasoning_effort: str | None = None
     thinking_modes: tuple[str, ...] | None = None
+    between_tools_reasoning_efforts: tuple[str, ...] | None = None
 
     # Gemini 3 specific - thinking levels (different from reasoning_effort)
     thinking_levels: tuple[str, ...] | None = None

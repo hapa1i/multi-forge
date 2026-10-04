@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+import yaml
 
 from tests.fixtures.docker import ContainerLike
 
@@ -20,7 +21,7 @@ if [ "${1:-}" = "--version" ]; then
     exit 0
 fi
 echo "$(date -Iseconds) claude $*" >> /tmp/claude_invocations.log
-env | sort > "/tmp/model_route_claude_env_$$.log"
+env | sort | tee /tmp/model_route_latest_env.log > "/tmp/model_route_claude_env_$$.log"
 exit 0
 """,
     )
@@ -110,9 +111,9 @@ http.server.HTTPServer(("127.0.0.1", {port}), Handler).serve_forever()
     return pid_path
 
 
-def _register_openai_proxy(workspace: ContainerLike, *, proxy_id: str, port: int) -> str:
-    """Register a healthy OpenRouter/OpenAI proxy without requiring upstream traffic."""
-    template = "openrouter-openai"
+def _register_proxy(workspace: ContainerLike, *, proxy_id: str, port: int, native_passthrough: bool = False) -> str:
+    """Register a healthy saved proxy without requiring upstream traffic."""
+    template = "anthropic-passthrough" if native_passthrough else "openrouter-openai"
     base_url = f"http://127.0.0.1:{port}"
     workspace.mkdir(f"$HOME/.forge/proxies/{proxy_id}", parents=True)
     workspace.write_json(
@@ -133,21 +134,27 @@ def _register_openai_proxy(workspace: ContainerLike, *, proxy_id: str, port: int
     )
     workspace.write_file(
         f"$HOME/.forge/proxies/{proxy_id}/proxy.yaml",
-        f"""proxy_format: 1
-template: {template}
-template_digest: sha256:test
-provider: openrouter
-proxy_endpoint: {base_url}
-port: {port}
-upstream_base_url: https://openrouter.ai/api
-backend: openrouter
-tiers:
-  haiku: openai/gpt-5.4-mini
-  sonnet: openai/gpt-5.6-sol
-  opus: openai/gpt-5.6-sol
-default_tier: sonnet
-allow_non_zdr: false
-""",
+        yaml.safe_dump(
+            {
+                "proxy_format": 1,
+                "template": template,
+                "template_digest": "sha256:test",
+                "provider": "litellm" if native_passthrough else "openrouter",
+                "family": "anthropic" if native_passthrough else "openai",
+                "proxy_endpoint": base_url,
+                "port": port,
+                "upstream_base_url": "https://api.anthropic.com" if native_passthrough else "https://openrouter.ai/api",
+                "backend": "anthropic-passthrough" if native_passthrough else "openrouter",
+                "wire_shape": "anthropic_passthrough" if native_passthrough else "openai_translated",
+                "tiers": (
+                    {"haiku": "claude-haiku-4-5", "sonnet": "claude-sonnet-5", "opus": "claude-opus-5"}
+                    if native_passthrough
+                    else {"haiku": "openai/gpt-5.4-mini", "sonnet": "openai/gpt-5.6-sol", "opus": "openai/gpt-5.6-sol"}
+                ),
+                "default_tier": "sonnet",
+                **({} if native_passthrough else {"allow_non_zdr": False}),
+            }
+        ),
     )
 
     payload = json.dumps({"is_proxy": True, "template": template, "proxy": {"proxy_id": proxy_id}})
@@ -226,7 +233,7 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
 
     proxy_id = "model-route-openai"
     port = _allocate_container_port(forge_workspace)
-    pid_path = _register_openai_proxy(forge_workspace, proxy_id=proxy_id, port=port)
+    pid_path = _register_proxy(forge_workspace, proxy_id=proxy_id, port=port)
     try:
         forked = forge_workspace.exec(
             "cd /workspace && forge session fork model-route-parent --name model-route-child "
@@ -271,5 +278,50 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
         assert "Route:" not in resumed.stderr
         replayed = json.loads(forge_workspace.read_file(child_path))
         assert replayed["intent"]["launch"]["model_route"] == child["intent"]["launch"]["model_route"]
+    finally:
+        forge_workspace.exec(f"kill $(cat {pid_path}) 2>/dev/null || true")
+
+
+def test_saved_passthrough_launches_preserve_native_model_selection(forge_workspace: ContainerLike) -> None:
+    _enable_claude_env_capture(forge_workspace)
+    proxy_id = "saved-native-models"
+    pid_path = _register_proxy(
+        forge_workspace, proxy_id=proxy_id, port=_allocate_container_port(forge_workspace), native_passthrough=True
+    )
+    config_path = f"$HOME/.forge/proxies/{proxy_id}/proxy.yaml"
+    saved_config = forge_workspace.read_file(config_path)
+    commands = [
+        (f"claude start --proxy {proxy_id}", None),
+        (f"session start native-default --proxy {proxy_id}", None),
+        (f"session start native-pin --proxy {proxy_id} --model claude-sonnet-5", "claude-sonnet-5"),
+        ("session resume native-pin", "claude-sonnet-5"),
+        ("session fork native-pin --name native-child --model claude-sonnet-5", "claude-sonnet-5"),
+        (f"session incognito --proxy {proxy_id} --model claude-sonnet-5", "claude-sonnet-5"),
+    ]
+    try:
+        shown_proxy = forge_workspace.exec(f"forge proxy show {proxy_id} --json")
+        assert shown_proxy.returncode == 0, shown_proxy.stderr
+        for command, expected_pin in commands:
+            launched = forge_workspace.exec(f"cd /workspace && forge {command}")
+            assert launched.returncode == 0, launched.stdout + launched.stderr
+            env = dict(
+                line.split("=", 1)
+                for line in forge_workspace.read_file("/tmp/model_route_latest_env.log").splitlines()
+                if "=" in line
+            )
+            assert env.get("ANTHROPIC_DEFAULT_SONNET_MODEL") == expected_pin, command
+            assert "ANTHROPIC_DEFAULT_OPUS_MODEL" not in env, command
+            assert int(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"]) > 200_000, command
+
+        for name in ("native-pin", "native-child"):
+            shown = forge_workspace.exec(f"cd /workspace && forge session model show {name} --json")
+            assert shown.returncode == 0, shown.stderr
+            assert json.loads(shown.stdout)["route_intent"]["requested_model"] == "claude-sonnet-5"
+            history = forge_workspace.exec(f"cd /workspace && forge session model history {name} --json")
+            assert history.returncode == 0, history.stderr
+            events = json.loads(history.stdout)["events"]
+            assert events
+            assert all(event["payload"]["requested_model"] == "claude-sonnet-5" for event in events)
+        assert forge_workspace.read_file(config_path) == saved_config
     finally:
         forge_workspace.exec(f"kill $(cat {pid_path}) 2>/dev/null || true")

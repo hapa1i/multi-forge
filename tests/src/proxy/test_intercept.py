@@ -163,7 +163,7 @@ class TestApplyOverride:
         body = self._body(model="claude-fable-5-1", thinking={"type": "enabled", "budget_tokens": 10_000})
         original = dict(body)
 
-        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+        with pytest.raises(intercept.ReasoningOverrideError, match="does not support manual thinking"):
             intercept.apply_override(body, reasoning_floor_effort="low")
 
         assert body == original
@@ -173,7 +173,7 @@ class TestApplyOverride:
         body = self._body(model="claude-fable-5-1", thinking={"type": "enabled", "budget_tokens": 10_000})
         original = dict(body)
 
-        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+        with pytest.raises(intercept.ReasoningOverrideError, match="does not support manual thinking"):
             intercept.apply_override(body, reasoning_floor_effort=floor)
 
         assert body == original
@@ -186,7 +186,7 @@ class TestApplyOverride:
         )
         original = deepcopy(body)
 
-        with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+        with pytest.raises(intercept.ReasoningOverrideError, match="does not support manual thinking"):
             intercept.apply_override(
                 body,
                 system_prompt_guards=[{"pattern": "secret", "action": "strip"}],

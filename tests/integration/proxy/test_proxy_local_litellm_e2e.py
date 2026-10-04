@@ -1,4 +1,4 @@
-"""Basic proxy → local LiteLLM integration tests.
+"""Proxy → local LiteLLM integration tests, with an OpenRouter tool-call cross-check.
 
 These tests verify the full flow: Anthropic API request → proxy → core.llm → LiteLLM → response.
 """
@@ -105,7 +105,7 @@ class TestGeminiFlashLiteLLMGate:
 
 
 class TestOpenAIProxyWithLocalLiteLLM:
-    """The local OpenAI template can serve its promoted GPT-6 Astra tier."""
+    """The OpenAI template serves its Astra tier and explicit Sol/Luna alternatives."""
 
     def test_sonnet_completion_resolves_to_gpt_6_astra(self, proxy_server_local_openai: str) -> None:
         with httpx.Client(timeout=90) as client:
@@ -125,7 +125,7 @@ class TestOpenAIProxyWithLocalLiteLLM:
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
         assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
 
-    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"])
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"])
     def test_gpt6_responses_cost_without_model_metadata_refresh(self, local_litellm_openai: str, model: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
@@ -142,14 +142,23 @@ class TestOpenAIProxyWithLocalLiteLLM:
         cost = resp.headers.get("x-litellm-response-cost")
         assert cost is not None and float(cost) > 0, f"{model} cost missing without metadata refresh: {cost!r}"
 
-    @pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-6-luna"])
+    @pytest.mark.parametrize(
+        ("model", "proxy_fixture"),
+        [
+            ("gpt-6.1-sol", "proxy_server_local_openai"),
+            ("gpt-6.1-sol", "proxy_server_openrouter_openai"),
+            ("gpt-6-sol", "proxy_server_local_openai"),
+            ("gpt-6-luna", "proxy_server_local_openai"),
+        ],
+    )
     @pytest.mark.parametrize("stream", [False, True])
     def test_explicit_gpt6_model_preserves_tool_calls(
-        self, proxy_server_local_openai: str, model: str, stream: bool
+        self, request: pytest.FixtureRequest, model: str, proxy_fixture: str, stream: bool
     ) -> None:
+        proxy_url = request.getfixturevalue(proxy_fixture)
         with httpx.Client(timeout=120) as client:
             response = client.post(
-                f"{proxy_server_local_openai}/v1/messages",
+                f"{proxy_url}/v1/messages",
                 json={
                     "model": f"openai/{model}",
                     "max_tokens": 1024,

@@ -62,7 +62,7 @@ def test_one_m_adaptive_request_with_manual_thinking_is_rejected(model: str) -> 
     body["thinking"] = {"type": "enabled", "budget_tokens": 16_000}
     before = deepcopy(body)
 
-    with pytest.raises(intercept.ReasoningOverrideError, match="requires adaptive thinking"):
+    with pytest.raises(intercept.ReasoningOverrideError, match="does not support manual thinking"):
         intercept.apply_override(body, reasoning_floor_effort="low")
 
     assert body == before

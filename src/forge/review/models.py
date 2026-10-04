@@ -162,6 +162,12 @@ def _build_available_models() -> dict[str, ModelSpec]:
             family="anthropic",
             description="Deep architectural analysis, complex reasoning",
         ),
+        "claude-sonnet": ModelSpec(
+            name="claude-sonnet",
+            model_id="claude-sonnet",
+            family="anthropic",
+            description="Bounded code review and everyday implementation analysis",
+        ),
         "claude-opus-4.6": ModelSpec(
             name="claude-opus-4.6",
             model_id="claude-opus-4.6",
@@ -198,6 +204,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
     }
     for name, family, description in (
         ("gpt-6-astra-pro", "openai", "Explicit Astra Pro review through OpenRouter"),
+        ("gpt-6.1-sol", "openai", "Coding and professional workflow review"),
         ("gpt-6-sol", "openai", "Coding and agent workflow review"),
         ("gpt-6-sol-pro", "openai", "Explicit Sol Pro review through OpenRouter"),
         ("gpt-6-luna", "openai", "Fast, cost-efficient review"),
@@ -212,6 +219,8 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ("glm-5.3-flashx", "glm", "Fast multimodal coding review"),
         ("claude-opus-5", "anthropic", "Explicit prior Claude Opus 5 direct worker"),
         ("claude-opus-5.5", "anthropic", "Explicit Claude Opus 5.5 direct worker"),
+        ("claude-sonnet-5", "anthropic", "Explicit prior Claude Sonnet 5 direct worker"),
+        ("claude-sonnet-5.5", "anthropic", "Explicit Claude Sonnet 5.5 direct worker"),
     ):
         # A future default flip must preserve the default worker's specification.
         models.setdefault(name, ModelSpec(name=name, model_id=name, family=family, description=description))

@@ -217,6 +217,10 @@ class TestLoadConfig:
         config = load_config(template=template)
         provider_config = getattr(config.proxy, provider)
 
+        for tier in ("sonnet", "opus"):
+            assert provider_config.model_alternatives[tier]["gpt-6.1-sol"] == "openai/gpt-6.1-sol"
+            assert provider_config.model_alternatives[tier]["gpt-6-sol"] == "openai/gpt-6-sol"
+
         assert (
             provider_config.tiers.haiku,
             provider_config.tiers.sonnet,
@@ -253,7 +257,7 @@ class TestLoadConfig:
         assert config.proxy.backend == "openrouter"
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
-        assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5"
+        assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5.5"
         # Displaced models stay selectable via --model.
         assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-5.5"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
@@ -266,6 +270,7 @@ class TestLoadConfig:
                 "claude-opus-4-6": "anthropic/claude-opus-4.6",
             },
             "sonnet": {
+                "claude-sonnet-5": "anthropic/claude-sonnet-5",
                 "claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
             },
         }
@@ -346,12 +351,12 @@ class TestLoadConfig:
         assert config.proxy.litellm.base_url == ""
 
     def test_litellm_anthropic_templates_default_opus_to_5_5(self):
-        """LiteLLM Anthropic templates default opus to Opus 5.5, sonnet to Sonnet 5."""
+        """LiteLLM Anthropic templates default opus and sonnet to 5.5."""
         for template in ("litellm-anthropic", "litellm-anthropic-local"):
             config = load_config(template=template)
 
             assert config.proxy.preferred_provider == "litellm", template
-            assert config.proxy.litellm.tiers.sonnet == "anthropic/claude-sonnet-5", template
+            assert config.proxy.litellm.tiers.sonnet == "anthropic/claude-sonnet-5-5", template
             assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-5-5", template
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
@@ -362,6 +367,7 @@ class TestLoadConfig:
                     "claude-opus-4-6": "anthropic/claude-opus-4-6",
                 },
                 "sonnet": {
+                    "claude-sonnet-5": "anthropic/claude-sonnet-5",
                     "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
                 },
             }, template
@@ -372,7 +378,7 @@ class TestLoadConfig:
 
         assert config.proxy.backend == "anthropic-passthrough"
         assert config.proxy.litellm.base_url == "https://api.anthropic.com"
-        assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5"
+        assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5-5"
         assert config.proxy.litellm.tiers.opus == "claude-opus-5-5"
         assert config.proxy.litellm.model_alternatives == {}
 

@@ -188,6 +188,7 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
             supports_sampling_overrides=bool(data.get("supports_sampling_overrides", True)),
             sampling_requires_no_reasoning=bool(data.get("sampling_requires_no_reasoning", False)),
             supports_1m_context=bool(data.get("supports_1m_context", False)),
+            supports_forced_tool_choice=bool(data.get("supports_forced_tool_choice", True)),
             temperature_constraint=constraint,
             temperature=temperature,
             verbosity_levels=verbosity_levels,
@@ -196,6 +197,9 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
             litellm_reasoning_efforts=litellm_reasoning_efforts,
             default_reasoning_effort=data.get("default_reasoning_effort"),
             thinking_modes=thinking_modes,
+            between_tools_reasoning_efforts=_parse_tuple_or_none(
+                model_id, "between_tools_reasoning_efforts", data.get("between_tools_reasoning_efforts")
+            ),
             thinking_levels=thinking_levels,
             default_thinking_level=data.get("default_thinking_level"),
             token_estimate_multiplier=float(data.get("token_estimate_multiplier", 1.0)),

@@ -14,7 +14,7 @@
 #     - gemini/gemini-2.5-pro
 #
 #   Anthropic (requires ANTHROPIC_API_KEY):
-#     - anthropic/claude-haiku-4-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5
+#     - anthropic/claude-haiku-4-5, claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5
 #     - anthropic/claude-fable-5-1, claude-fable-5
 #     - anthropic/claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 #
@@ -26,7 +26,7 @@
 #     - openai/gpt-5.4, gpt-5.4-pro
 #     - openai/gpt-5.5
 #     - openai/gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
-#     - openai/gpt-6-astra, gpt-6-sol, gpt-6-luna
+#     - openai/gpt-6-astra, gpt-6.1-sol, gpt-6-sol, gpt-6-luna
 #
 # Start with: forge model backend start litellm --port 4000
 
@@ -139,6 +139,44 @@ model_list:
     litellm_params:
       model: anthropic/claude-haiku-4-5
       api_key: os.environ/ANTHROPIC_API_KEY
+
+  # LiteLLM 1.102 predates Sonnet 5.5; supply offline pricing and effort capabilities.
+  # https://platform.claude.com/docs/en/models/sonnet-5-5/overview (verified 2026-10-01)
+  - model_name: anthropic/claude-sonnet-5-5
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      base_model: claude-sonnet-5-5
+      mode: chat
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
+      max_tokens: 128000
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.000010
+      cache_creation_input_token_cost: 0.0000025
+      cache_creation_input_token_cost_above_1hr: 0.000004
+      cache_read_input_token_cost: 0.0000002
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 512
+      supports_reasoning: true
+      supports_adaptive_thinking: true
+      supports_legacy_thinking: false
+      # Keep disabled visible to upstream validation; dropping it would turn thinking on.
+      thinking_always_on: false
+      supports_output_config: true
+      supports_xhigh_reasoning_effort: true
+      supports_max_reasoning_effort: true
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh, max]
+      supports_response_schema: true
+      supports_native_structured_output: true
+      supports_assistant_prefill: false
+      provider_specific_entry:
+        us: 1.1
 
   - model_name: anthropic/claude-sonnet-5
     litellm_params:
@@ -339,6 +377,56 @@ model_list:
     litellm_params:
       model: openai/gpt-6-astra
       api_key: os.environ/OPENAI_API_KEY
+
+  # LiteLLM 1.102 predates GPT-6.1 Sol; cached reads are 5% of input, including the >272k premium.
+  # https://developers.openai.com/api/docs/models/gpt-6.1-sol (verified 2026-10-01)
+  - model_name: openai/gpt-6.1-sol
+    litellm_params:
+      model: openai/gpt-6.1-sol
+      api_key: os.environ/OPENAI_API_KEY
+      use_responses_api: true
+    model_info:
+      base_model: gpt-6.1-sol
+      mode: responses
+      max_input_tokens: 922000
+      max_output_tokens: 128000
+      max_tokens: 128000
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.000010
+      cache_read_input_token_cost: 0.0000001
+      cache_creation_input_token_cost: 0.0000025
+      input_cost_per_token_above_272k_tokens: 0.000004
+      output_cost_per_token_above_272k_tokens: 0.000015
+      cache_read_input_token_cost_above_272k_tokens: 0.0000002
+      cache_creation_input_token_cost_above_272k_tokens: 0.000005
+      input_cost_per_token_flex: 0.000001
+      output_cost_per_token_flex: 0.000005
+      cache_read_input_token_cost_flex: 0.00000005
+      cache_creation_input_token_cost_flex: 0.00000125
+      input_cost_per_token_above_272k_tokens_flex: 0.000002
+      output_cost_per_token_above_272k_tokens_flex: 0.0000075
+      cache_read_input_token_cost_above_272k_tokens_flex: 0.0000001
+      cache_creation_input_token_cost_above_272k_tokens_flex: 0.0000025
+      input_cost_per_token_priority: 0.000004
+      output_cost_per_token_priority: 0.000020
+      cache_read_input_token_cost_priority: 0.0000002
+      cache_creation_input_token_cost_priority: 0.000005
+      input_cost_per_token_above_272k_tokens_priority: 0.000008
+      output_cost_per_token_above_272k_tokens_priority: 0.000030
+      cache_read_input_token_cost_above_272k_tokens_priority: 0.0000004
+      cache_creation_input_token_cost_above_272k_tokens_priority: 0.000010
+      supports_vision: true
+      supports_function_calling: true
+      supports_parallel_function_calling: true
+      supports_tool_choice: true
+      supports_prompt_caching: true
+      supports_reasoning: true
+      supports_none_reasoning_effort: false
+      supports_xhigh_reasoning_effort: true
+      supports_max_reasoning_effort: true
+      default_reasoning_effort: medium
+      reasoning_effort_levels: [low, medium, high, xhigh, max]
+      supports_response_schema: true
 
   # LiteLLM 1.102 predates Sol and Luna. Standard, Flex and Fast rates include the >272k-token premium.
   # Flex costs half of standard; Fast (also called priority) costs twice the applicable rate.

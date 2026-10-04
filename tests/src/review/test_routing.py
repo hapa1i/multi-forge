@@ -248,6 +248,7 @@ _EXPECTED_WORKFLOW_ROUTES = {
 
 _EXPECTED_WORKFLOW_ROUTES.update(
     {
+        "gpt-6.1-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-luna": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-sol-pro": tuple(
@@ -331,6 +332,7 @@ class TestResolveInvocationRouting:
         from forge.review.models import resolve_model_specs
 
         model_refs = (
+            "openai/gpt-6.1-sol",
             "openai/gpt-6-sol",
             "openai/gpt-6-sol-pro",
             "openai/gpt-6-luna",

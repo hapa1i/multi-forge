@@ -74,6 +74,64 @@ models:
         source_id: openrouter
         template: openrouter-openai-codex
         model_ref: openai/gpt-6-astra-pro
+  gpt-6.1-sol:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: codex-responses-local
+        template: codex-responses-local
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-openai
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-codex-local
+        model_ref: openai/gpt-6.1-sol
+      - kind: proxy
+        source_id: litellm-openai-local
+        template: litellm-openai-local
+        model_ref: openai/gpt-6.1-sol
   gpt-6-sol:
     routes:
       - kind: proxy
@@ -840,6 +898,11 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-fable-5
+  claude-sonnet-5-5:
+    routes:
+      - kind: direct
+        runtime: claude_code
+        model_ref: claude-sonnet-5-5
   claude-sonnet-5:
     routes:
       - kind: direct

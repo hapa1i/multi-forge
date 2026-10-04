@@ -100,7 +100,8 @@ class TestModelSpec:
 
 class TestDefaultModels:
     @pytest.mark.parametrize(
-        "default", ["gpt-6-astra-pro", "gpt-6-sol", "gpt-6-sol-pro", "gpt-6-luna", "gpt-6-luna-pro", "gpt-5.6-sol"]
+        "default",
+        ["gpt-6-astra-pro", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-sol-pro", "gpt-6-luna", "gpt-6-luna-pro", "gpt-5.6-sol"],
     )
     def test_explicit_gpt_choices_do_not_replace_the_default_worker(self, default: str) -> None:
         with patch(
@@ -124,6 +125,7 @@ class TestDefaultModels:
     @pytest.mark.parametrize(
         ("name", "family"),
         [
+            ("gpt-6.1-sol", "openai"),
             ("gpt-6-sol", "openai"),
             ("gpt-6-sol-pro", "openai"),
             ("gpt-6-luna", "openai"),

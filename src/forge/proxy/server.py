@@ -1082,7 +1082,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         )
 
         try:
-            openai_request_dict = convert_anthropic_to_openai(request_data, provider=provider_name)
+            openai_request_dict = convert_anthropic_to_openai(
+                request_data, provider=provider_name, resolved_model=actual_model_id
+            )
         except RequestConversionError as exc:
             logger.info("[%s] Invalid translated request: %s", request_id, exc)
             raise HTTPException(

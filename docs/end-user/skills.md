@@ -213,10 +213,17 @@ inline.
 | `claude-opus`            | Default Claude Opus 5.5 reasoning   | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, `claude-opus-5`,
-`claude-opus-5.5`, and `claude-fable` (most capable). The default `claude-opus` worker resolves to Opus 5.5; use
-`--models claude-opus-4.6,claude-opus-4.8` when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the
-panel, or add `claude-fable` for the top-tier model. The stable `claude-fable` worker resolves to Fable 5.1; the prior
-Fable 5 remains selectable as a session model with `--model claude-fable-5` but is not a separate workflow worker.
+`claude-opus-5.5`, `claude-sonnet`, `claude-sonnet-5.5`, `claude-sonnet-5`, and `claude-fable` (most capable). The
+`claude-sonnet` worker resolves to Sonnet 5.5; `claude-sonnet-5` retains the prior version. The default `claude-opus`
+worker resolves to Opus 5.5; use `--models claude-opus-4.6,claude-opus-4.8` when you want both Opus 4.6 and the
+bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier model. The stable `claude-fable`
+worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model with `--model claude-fable-5` but
+is not a separate workflow worker.
+
+`gpt-6.1-sol` is an explicit OpenAI worker, for example `forge workflow panel -p "Review these changes" -m gpt-6.1-sol`.
+GPT-6 Astra remains the default; `gpt-6-sol` keeps the prior Sol version. Existing OpenRouter proxies can serve the new
+worker; LiteLLM backends need its deployment entry (see
+[proxy.md](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade)).
 
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-6 Astra and Gemini require
 active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See

@@ -23,6 +23,7 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+import yaml
 from dotenv import load_dotenv
 
 from tests.fixtures.proxy import allocate_ephemeral_port, kill_process, wait_for_port
@@ -684,6 +685,7 @@ def proxy_server_fake_anthropic_passthrough(
     fake_anthropic_upstream: FakeAnthropicUpstream,
     module_forge_home: Path,
     tmp_path_factory,
+    request: pytest.FixtureRequest,
 ) -> Generator[tuple[str, FakeAnthropicUpstream], None, None]:
     """Start Anthropic passthrough against the hermetic error upstream."""
     port = allocate_ephemeral_port()
@@ -695,6 +697,13 @@ def proxy_server_fake_anthropic_passthrough(
         forge_home=module_forge_home,
         upstream_base_url=fake_anthropic_upstream.base_url,
     )
+
+    if floor := getattr(request, "param", None):
+        config_path = module_forge_home / "proxies" / proxy_id / "proxy.yaml"
+        snapshot = yaml.safe_load(config_path.read_text())
+        snapshot["intercept"] = {"mode": "override"}
+        snapshot["tier_overrides"] = {"sonnet": {"reasoning_effort": floor}}
+        config_path.write_text(yaml.safe_dump(snapshot))
 
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)

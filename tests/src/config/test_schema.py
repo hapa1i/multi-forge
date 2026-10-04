@@ -730,7 +730,7 @@ class TestProxyInstanceConfigValidation:
             TierOverrides,
         )
 
-        with pytest.raises(ValueError, match="only supports adaptive thinking"):
+        with pytest.raises(ValueError, match="instead of a manual thinking budget"):
             ProxyInstanceConfig(
                 proxy_format=1,
                 template="test",

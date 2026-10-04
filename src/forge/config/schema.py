@@ -85,6 +85,7 @@ OPENAI_MODELS = [
     "gpt-5.6-luna",
     "gpt-6-astra",
     "gpt-6-astra-pro",
+    "gpt-6.1-sol",
     "gpt-6-sol",
     "gpt-6-sol-pro",
     "gpt-6-luna",
@@ -1058,10 +1059,14 @@ def _validate_static_tier_override_constraints(tiers: TierModels, overrides: Tie
                 "set that effort or remove the temperature override"
             )
 
-        if spec.thinking_modes == ("adaptive",) and override.thinking_budget_tokens is not None:
+        if (
+            spec.thinking_modes is not None
+            and "enabled" not in spec.thinking_modes
+            and override.thinking_budget_tokens is not None
+        ):
             raise ValueError(
                 f"tier_overrides.{tier}.thinking_budget_tokens is not supported by {canonical_model}; "
-                "this model only supports adaptive thinking"
+                "use reasoning_effort instead of a manual thinking budget"
             )
 
         if (
