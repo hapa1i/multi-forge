@@ -1,7 +1,7 @@
 # Once-per-turn Stop review
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B4**. Depends on
-[B1: plan-file supervision](../plan_file_supervision/card.md) and
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
+[B1: plan-file supervision](../../doing/plan_file_supervision/card.md) and
 [B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
 
 ## Problem and outcome

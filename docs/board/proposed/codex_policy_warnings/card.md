@@ -1,6 +1,6 @@
 # Warnings Codex can see
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B3**. Depends on
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3**. Depends on
 [B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
 
 ## Problem and outcome

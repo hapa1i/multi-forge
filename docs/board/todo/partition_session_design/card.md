@@ -2,6 +2,11 @@
 
 **Lane**: `todo/`
 
+Scheduled 2026-10-07 before
+[B1's first normative documentation update](../../doing/plan_file_supervision/checklist.md#documentation-prerequisites),
+on a separate documentation branch/PR. Coordinate links with the
+[runtime partition](../partition_runtime_design/card.md); no shared implementation batch is implied.
+
 ## Goal
 
 Partition `docs/design_sessions.md` into stable session-domain documents that each fit comfortably within the living
@@ -11,6 +16,9 @@ documentation target.
 
 The document reached 25,420 Claude Opus 5 tokens during PR #245. That remains below the 30,000-token hard limit but is
 above the repository's 25,000-token target, leaving too little room for another sessions-domain change.
+
+The current SHA-256-matched `.file-token-counts.json` entry reports 25,797 Claude Opus 5 tokens as of 2026-10-07. A
+warning-only file-size check is not acceptance of additional documentation debt.
 
 ## Scope
 

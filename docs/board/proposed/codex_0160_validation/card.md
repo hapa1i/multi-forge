@@ -1,7 +1,7 @@
 # Codex 0.160.1 test round
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B2**. No new-card dependency; can run alongside
-[B1](../plan_file_supervision/card.md). Supplies evidence for B3, B4 and B5.
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency; can run
+alongside [B1](../../doing/plan_file_supervision/card.md). Supplies evidence for B3, B4 and B5.
 
 ## Problem and outcome
 
@@ -9,9 +9,9 @@ The installed CLI is 0.160.1, while Forge's general validated ceiling is 0.149.1
 expose useful hook and native fork behavior, but availability is not an end-to-end result. Extend the existing
 [Codex probe harness](../../../../scripts/experiments/codex-hooks/README.md) and record which contracts hold on 0.160.1.
 
-The [research](../epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates current
-source claims from local observations. This card is an experiment and compatibility update, not implementation of the
-downstream features.
+The [research](../../doing/epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates
+current source claims from local observations. This card is an experiment and compatibility update, not implementation
+of the downstream features.
 
 ## Probe matrix
 

@@ -3,6 +3,36 @@
 Verified 2026-10-06 against Forge `c2638510`. This supports the [Codex supervisor epic](card.md) and its five cards. No
 model turns, paid probes, or routing smoke runs were performed during this research.
 
+## Planning verification, 2026-10-07
+
+Rechecked source at B1's base `6e0d1f4c` and local Claude 2.1.291 help/version output. No auth-status or inference calls
+were made during this follow-up. The [B1 checklist](../plan_file_supervision/checklist.md) records decisions and
+uncompleted probes; the observations below do not establish runtime isolation or billing guarantees.
+
+- Existing `claude-max` is billing metadata: a resolvable key still selects API billing for all four consumers. B1 now
+  preserves that compatibility and introduces a separate supervisor-local subscription-only opt-in.
+- Both hook commands have conversation-ID presence checks and call shared supervisor registration. Plan-only admission
+  therefore needs explicit host Claude coverage and sidecar refusal, not just Codex executor fixtures.
+- Claude Write/Edit policy hooks also have a 60-second preset. The Claude runner supplies no read-only tool restriction,
+  and its JSON negotiation retry receives a second full timeout. Neither the runtime's signals/kill scope nor reviewer
+  cleanup after hook-only death has been measured. B1's probes cover both executors and macOS child-process lifetime.
+- Shadow v4 already records the plan snapshot/hash and `lane.model`. Its missing/malformed lane fallback can select the
+  default Claude route. The new version must additionally establish source/auth policy and effective model/effort, and
+  refuse reconstruction that cannot prove the dispatch contract.
+
+Forge currently resumes Claude from the planner's checkout, but that is not proof that the runtime requires it. Current
+[CLI documentation](https://code.claude.com/docs/en/cli-reference) says UUID resume can search across projects since
+2.1.223. B1 keeps its existing history lookup until tested; `--add-dir` grants access without choosing which checkout
+the reviewer reads. [Permissions documentation](https://code.claude.com/docs/en/permissions) applies permissions to
+added directories and describes their customization loading, so both directories need read-selection and write-refusal
+evidence.
+
+Current [authentication documentation](https://code.claude.com/docs/en/authentication) describes `CLAUDE_CONFIG_DIR`
+namespacing for claude.ai Keychain credentials, but keyless Console profiles use storage outside that directory. That
+qualifies the blanket isolation concern; it does not prove the installed binary or every credential source is isolated.
+Negative identity/managed-policy cases stay in disposable environments, Keychain tests use a separate macOS user/VM, and
+the positive real-host scenario requires unchanged login/settings assertions.
+
 ## Current Forge support and the missing path
 
 [Codex policy hooks](../../../../src/forge/cli/hooks/codex_policy.py) normalize `apply_patch` file operations into the
@@ -229,10 +259,10 @@ plane. Per-session `forge telemetry activity <session> --period all` can expose 
 classification, but its cost attribution is best-effort. An actual account charge needs provider billing evidence; no
 such account history was inspected here.
 
-Jev requests are separately API-billed. Its [epic](../epic_jev_support/card.md) is opt-in on projects where that spend
-is accepted. The cascade can preserve Claude quota only when it actually avoids a Claude call; warning-only rule packs
-do not establish that saving. Measure avoided calls, model/tokens, review quality and latency. Record quota usage only
-where the provider exposes usable evidence, alongside Jev's reported cost.
+Jev requests are separately API-billed. Its [epic](../../proposed/epic_jev_support/card.md) is opt-in on projects where
+that spend is accepted. The cascade can preserve Claude quota only when it actually avoids a Claude call; warning-only
+rule packs do not establish that saving. Measure avoided calls, model/tokens, review quality and latency. Record quota
+usage only where the provider exposes usable evidence, alongside Jev's reported cost.
 
 ## Existing paid route to smoke-test separately
 

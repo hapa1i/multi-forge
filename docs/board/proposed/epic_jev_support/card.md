@@ -23,8 +23,8 @@ decision-quality result has been measured.
 | A2  | [Jev rule pack, warnings only](../jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
 | A3  | [Jev as the cascade's first tier](../jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
 
-[B1](../plan_file_supervision/card.md) and [B3](../codex_policy_warnings/card.md) belong to the separate
-[Codex supervisor epic](../epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
+[B1](../../doing/plan_file_supervision/card.md) and [B3](../codex_policy_warnings/card.md) belong to the separate
+[Codex supervisor epic](../../doing/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
 prerequisites; A2's fixed-rule quality evidence does not validate A3's plan-alignment questions. Cards use separate
 execution branches when activated.
 

@@ -1,7 +1,13 @@
 # Plan-file supervision with a fresh `claude -p`
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B1**, first product card. Depends on no new card;
-[B2](../codex_0160_validation/card.md) can proceed alongside it.
+Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
+prerequisite; [B2](../../proposed/codex_0160_validation/card.md) can proceed alongside it. The
+[session](../../todo/partition_session_design/card.md) and [runtime](../../todo/partition_runtime_design/card.md) design
+partitions precede B1's normative documentation updates.
+
+Status: active execution planning, activated 2026-10-06 and revised 2026-10-07, on `feat/plan-file-supervision` from
+`main` at `6e0d1f4c`. Product implementation has not started. The [execution checklist](checklist.md) records the
+sequence, unresolved compatibility gates, and acceptance fixtures.
 
 ## Problem and outcome
 
@@ -9,7 +15,8 @@ Supervisor setup currently requires a Claude planning conversation even when an 
 `forge policy supervisor set --plan <file>` without a target, then supervise a Codex executor through a fresh, read-only
 `claude -p` invocation. Add an enforced read-only boundary; the existing Claude supervisor does not have one. The
 everyday route uses the user's Claude login without paid fallback, conditional on usage credits being disabled on the
-account. Explicit paid routes remain available for complex projects.
+account. Subscription-only auth is a separate explicit opt-in; existing `claude-max` bindings retain their inherited
+credential selection and billing semantics. Explicit paid routes remain available for complex projects.
 
 The existing Codex `apply_patch` deny path is the enforcement boundary. This card does not depend on new Codex fork,
 background-hook, or model-visible warning behavior. It does require its own current-runtime deadline and isolation
@@ -27,13 +34,23 @@ tests. Verified source pointers and billing qualifications are in the
   `--plan` consistently with existing plan overrides.
 - Run fresh Claude with the approved plan in the prompt, without resume/fork arguments, in the **action's checkout**.
   Preserve recursion/depth controls, verdict validation and single usage emission. Keep conversation-backed supervision
-  supported, applying the new isolation and billing restrictions to that path too.
+  supported and read-only; its auth restriction applies only when separately opted in. Resumed review, including
+  target-plus-plan, keeps planner-CWD lookup and passes `--add-dir <action checkout>` with absolute action paths. Prove
+  inspection of the executor sentinel and write prevention in both directories; access alone does not choose the correct
+  file context.
+- Support plan-only supervision for both host Claude Write/Edit and host Codex `apply_patch` executors, with either
+  supported reviewer runtime. Refuse plan-file review in a sidecar at setup/launch and guard inherited configurations at
+  dispatch. Do not assume that a host plan path or subscription login exists inside the container.
 - Support `--plan <file> --runtime codex` without a target through the existing fresh, read-only Codex reviewer. Keep
   runtime/backend selection explicit and validate model/effort capabilities; reject incompatible options rather than
   ignoring them. This does not introduce native forks or require B5.
 - Add an explicit supervisor model setting. Pass the selected model to the subprocess and keep actual model identity,
   effort validation, lane binding/freeze rules, cache identity, status and telemetry consistent. Do not add a setting
-  that changes only a nominal lane record.
+  that changes only a nominal lane record. Changes to the shared lane format or other consumers' resolution semantics
+  belong in a separately accepted epic member, not this card.
+- Version shadow candidates to freeze source, concrete reviewer model/effort, and auth policy along with existing plan
+  snapshots and lane identity. Invalid or insufficient old records finalize visibly without a model call; never recover
+  an unverified replay route by choosing the default paid-capable lane.
 - Optionally support source-only feedback: validated plan passages plus fixed Forge diagnostics, omitting Claude's
   generated explanation and suggested fix from Codex's context. Source validation must reject fabricated quotations.
   This option makes no watermark guarantee.
@@ -42,6 +59,9 @@ tests. Verified source pointers and billing qualifications are in the
 
 ## Isolation and subscription-only dispatch
 
+- A supervisor-local auth opt-in defaults to inherited behavior when absent. Keep existing frozen `claude-max` bindings
+  and all three auxiliary consumers unchanged. An explicit change of auth policy after supervisor binding requires
+  remove/reconfigure; migration guidance distinguishes that action from merely upgrading Forge.
 - Restrict both fresh and resumed Claude supervisors to an explicit read-only tool set. On the installed 2.1.291,
   `--tools` can limit built-ins to inspection tools such as `Read`, `Glob` and `Grep`. Disable MCP, delegation and
   executable customizations that could bypass that set. Verify the combined flags against the supported binary.
@@ -74,11 +94,15 @@ tests. Verified source pointers and billing qualifications are in the
 
 ## Deadline and unavailable-review contract
 
-The registered Codex PreToolUse hook has a 60-second timeout. Validate setup and dispatch against the executor's actual
-supported hook registration. Budget the whole invocation: startup, all files, checker/reviewer calls, retries,
-cancellation and durable recording. A per-review timeout below 60 seconds alone is insufficient. Keep a completion
-margin, reject an oversized configured timeout, and stop scheduling reviews when the remaining budget is exhausted.
-Changing the hook timeout requires enrollment of the changed trusted registration; do not raise it silently.
+The Claude policy-check presets and Codex PreToolUse registration use 60-second timeouts. Probe the signal,
+process/group scope, descendant survival, and subsequent tool disposition for both executors. Validate setup and
+dispatch against the executor's actual supported hook registration. Budget the whole invocation: startup, all files,
+checker/reviewer calls, retries, cancellation and durable recording. A per-review timeout below 60 seconds alone is
+insufficient. Keep a completion margin, reject an oversized configured timeout, and stop scheduling reviews when the
+remaining budget is exhausted. Changing Codex's hook timeout requires enrollment of the changed trusted registration; do
+not raise either timeout silently. The execution checklist selects an independently running deadline watchdog to own
+reviewer cleanup; its survival and process-group cancellation must be demonstrated, including a hook-only SIGKILL on
+macOS.
 
 Persist a review-attempt record before dispatch and distinguish completed, unavailable and interrupted/incomplete
 outcomes. A hook killed before finalization must leave detectable incomplete work, not a fabricated verdict or zero-cost
@@ -91,10 +115,15 @@ contract. Model-visible feedback and operator UI warnings are B3.
 
 ## Implementation order
 
-First evaluate auth-status isolation without a model call. The **first inference compatibility probe**, after the
-intended subscription route is established, must resume a disposable planning conversation containing prior successful
-`Edit` and `Bash` tool calls under the proposed read-only tools. Establish whether Claude accepts that history and still
-prevents new writes before committing to `--tools` as the mechanism for both modes.
+First evaluate auth-status isolation without a model call. Run negative auth cases in disposable Docker identities or,
+for Keychain-specific behavior, a separate macOS user/VM. Reserve the maintainer's login for one positive host scenario;
+verify login selection and settings are unchanged afterward. The checklist maps every auth case to its test location.
+
+After establishing the intended subscription route, create a real disposable planning conversation in its recorded
+planner directory, using that same route for successful `Edit` and `Bash` calls. This necessary fixture-creation turn is
+recorded separately; it is not the **first inference compatibility probe**. That probe resumes and forks the real
+history under the proposed read-only tools with the executor checkout added. Do not assume a synthetic transcript is
+resumable. Establish compatibility and write prevention before selecting the mechanism for both modes.
 
 If removing tool definitions breaks resume, evaluate a supported deny/permission mechanism that preserves history while
 blocking new writes. `--disallowedTools` or a permission mode are candidates, not assumed solutions. Prove the same
@@ -110,6 +139,11 @@ conversation and record the tested version, argv policy and outcome in sanitized
 - Unit and regression tests cover the shared predicate at current call sites, model/effort identity, plan changes,
   missing inputs, legacy targets, lane freeze, timeout/quota behavior and recursion suppression. Use coherent session
   fixtures for indexed states. Cover plan-only Claude and Codex reviewers, their failures and incompatible options.
+- Host Claude Write/Edit runs plan-only and target-plus-plan review with either reviewer. Sidecar plan-file and
+  subscription-only setup refuse without mutation; inherited unsupported configurations dispatch no reviewer and report
+  unavailable. Keep a conversation-only sidecar control on its existing explicit route under the read-only restriction.
+- Existing frozen `claude-max` supervisors with API keys retain API selection until explicitly reconfigured. Exercise
+  lane and billing controls for all four consumers; subscription-only remains a supervisor-local opt-in.
 - Targeted integration tests and a hands-on Codex test use trusted Forge hooks: an aligned patch lands; a clearly
   divergent patch is denied and does not land. Put the approved plan file in the main checkout and the executor in a
   worktree with different sentinel content; prove inspection uses the executor worktree. Do not claim coverage of shell
@@ -130,6 +164,6 @@ conversation and record the tested version, argv policy and outcome in sanitized
 
 ## Boundaries
 
-Allowed-action model-visible feedback is [B3](../codex_policy_warnings/card.md), turn-completion review is
-[B4](../codex_stop_review/card.md), and native planning forks are [B5](../codex_fork_supervisor/card.md). Jev and team
-supervision are separate.
+Allowed-action model-visible feedback is [B3](../../proposed/codex_policy_warnings/card.md), turn-completion review is
+[B4](../../proposed/codex_stop_review/card.md), and native planning forks are
+[B5](../../proposed/codex_fork_supervisor/card.md). Jev and team supervision are separate.
