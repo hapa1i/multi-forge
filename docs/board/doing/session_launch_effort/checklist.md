@@ -55,6 +55,17 @@ Review findings addressed and verified; [PR #257](https://github.com/hapa1i/mult
 - [x] Update CLI reference, end-user session/proxy guides, `design.md` §3.4, and the workflow effort note; refresh the
   provider token cache for changed docs.
 
+## Test-client warning follow-up
+
+- [x] Require Starlette `>=1.7.0,<1.8`, which includes the upstream AnyIO `BlockingPortal` fix; retain the existing
+  FastAPI, AnyIO, and LiteLLM lock versions.
+- [x] Reproduce the import warning in a fresh-interpreter regression, then pass 73 HTTP-client tests with deprecation
+  warnings treated as errors after the upgrade.
+- [x] Build the wheel/sdist and pass the clean-wheel LiteLLM start/health/stop smoke outside `uv.lock`.
+- [x] Pass seven proxy integration checks covering health, translated and passthrough requests, streaming, request IDs,
+  and error headers via `./scripts/test-integration.sh`.
+- [x] Full unit and regression suites pass without warnings; full pre-commit and hooks on the new regression pass.
+
 ## Acceptance tests
 
 | Test                 | Fixture                       | Assertion                                                       | Test File                                                         |
@@ -80,6 +91,7 @@ Review findings addressed and verified; [PR #257](https://github.com/hapa1i/mult
 - [x] Review-fix integration run: session commands, Claude command, session routing, Codex session start/resume, and
   real Claude/Codex authority tests pass (57 passed via `./scripts/test-integration.sh`). Codex preflight also passes
   with the integration runner's environment loaded.
-- [x] `make test-unit` (10,539 passed) and `make test-regression` (1,330 passed), including all 15 new regression cases.
+- [x] `make test-unit` (10,539 passed) and `make test-regression` (1,331 passed), including all 15 launch-argument
+  regression cases and the TestClient deprecation regression.
 - [x] `make pre-commit` on the final tree (plus hooks on the untracked card and new files).
 - [x] Commit, push, and open [PR #257](https://github.com/hapa1i/multi-forge/pull/257) with verification evidence.
