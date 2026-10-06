@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +22,12 @@ from forge.cli.session import (  # noqa: E402
 from forge.cli.session_authority_options import (
     authority_creation_options,
     parse_creation_authority,
+)
+from forge.cli.session_launch_args import (
+    RuntimePassthroughCommand,
+    checked_launch_args,
+    effort_option,
+    warn_if_effort_clamped,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
     _MODEL_TIER_HELP,
@@ -75,6 +82,7 @@ from forge.core.ops.session_model_routing import (
     preserved_model_route_request,
 )
 from forge.core.paths import display_path
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.install.project_compat import (
     ProjectCompatibilityError,
 )
@@ -92,6 +100,7 @@ from forge.session.exceptions import (
     SessionNotFoundError,
     WorktreePathExistsError,
 )
+from forge.session.models import inherited_authority
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -163,6 +172,7 @@ def _fork_model_route_recovery_action(
     request: ForkPreflightRequest,
     *,
     fork_name: str,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> SessionRouteRecoveryAction:
     """Rebuild the caller's route-neutral fork action for an exact reroute retry."""
     argv = ["forge", "session", "fork", request.parent_name, "--name", fork_name]
@@ -212,7 +222,9 @@ def _fork_model_route_recovery_action(
         argv.extend(("--authority", request.authority.role))
         if request.authority.tier is not None:
             argv.extend(("--authority-tier", request.authority.tier))
-    return SessionRouteRecoveryAction(tuple(argv), has_explicit_options=True)
+    options, runtime_args = (launch_args or RuntimeLaunchArgs()).recovery_argv()
+    argv.extend(options)
+    return SessionRouteRecoveryAction(tuple(argv), has_explicit_options=True, runtime_args=runtime_args)
 
 
 def _render_fork_execution_event(event: ForkExecutionEvent) -> None:
@@ -281,7 +293,7 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
         print_error(str(error))
 
 
-@session.command()
+@session.command(cls=RuntimePassthroughCommand)
 @click.argument("parent")
 @click.option(
     "--name",
@@ -383,6 +395,7 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@effort_option
 @authority_creation_options
 @click.pass_context
 def fork(
@@ -414,6 +427,7 @@ def fork(
     supervisor_runtime: str | None,
     force: bool,
     memory_flag: str | None,
+    effort: str | None,
     authority_role: str | None,
     authority_tier: str | None,
 ) -> None:
@@ -438,6 +452,7 @@ def fork(
         forge session fork parent-session -w --resume-mode native-relocate  # Byte-faithful resume
         forge session fork parent-session -n child-session     # Custom fork name
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
+        forge session fork parent-session --effort high -- --debug  # Launch-only effort and Claude flags
     """
     ctx = click.get_current_context()
     strategy_explicit = ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
@@ -547,6 +562,10 @@ def fork(
     for notice in preflight.notices:
         _render_fork_preflight_notice(notice)
 
+    # The fork takes explicit authority or inherits the parent's advisory authority.
+    fork_authority = authority if authority_explicit else inherited_authority(preflight.parent.intent.authority)
+    launch_args = checked_launch_args(ctx, runtime="claude_code", authority=fork_authority)
+
     # Runtime realization remains CLI-owned. The read-only plan runs first, so
     # deterministic refusals cannot start a proxy or supervisor process.
     preflight_routing: ResolvedRouting | None = None
@@ -555,7 +574,9 @@ def fork(
     route_tier = model_tier
     allow_route_replacement = True
     replaying_model_route = False
-    route_recovery_action = _fork_model_route_recovery_action(request, fork_name=preflight.fork_name)
+    route_recovery_action = _fork_model_route_recovery_action(
+        request, fork_name=preflight.fork_name, launch_args=launch_args
+    )
     parent_launch = preflight.parent.intent.launch
     neutral_route = parent_launch.model_route if parent_launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(preflight.parent, direct=direct)
@@ -658,6 +679,7 @@ def fork(
         except ForkPreflightError as e:
             _render_fork_preflight_error(e)
             sys.exit(1)
+    warn_if_effort_clamped(launch_args, model_route_selection)
 
     if supervisor_proxy:
         from forge.policy.semantic.supervisor import ensure_supervisor_proxy
@@ -736,7 +758,7 @@ def fork(
 
     result = fork_claude_session(
         manager=manager,
-        plan=execution.launch_plan,
+        plan=replace(execution.launch_plan, launch_args=launch_args),
         presenter=_ClaudeForkCliPresenter(session_name=execution.manifest.name),
     )
     sys.exit(_render_claude_fork_result(result))

@@ -10,6 +10,7 @@ from forge.cli.session_routing import ResolvedRouting
 from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
 from forge.core.ops.session_model_routing import ResolvedModelRoute
 from forge.core.paths import display_path
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.launch import _combine_prompt_files, resolve_manifest_prompt_file
@@ -33,6 +34,7 @@ def _resume_fresh_rewind(
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Create a child session that resumes from a truncated parent transcript copy."""
     from forge.cli.session_lifecycle import (
@@ -139,6 +141,7 @@ def _resume_fresh_rewind(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             parent_name=parent,
         ),
     )
@@ -158,6 +161,7 @@ def _resume_fresh_native(
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Create a child session with native conversation resume."""
     from forge.cli.session_lifecycle import (
@@ -217,6 +221,7 @@ def _resume_fresh_native(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             parent_name=parent,
         ),
     )

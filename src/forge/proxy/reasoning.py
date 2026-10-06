@@ -12,6 +12,7 @@ import logging
 from fastapi import HTTPException
 
 from forge.config import TierOverride
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -141,20 +142,40 @@ def raise_effort_to_supported(effort: str, supported: tuple[str, ...] | None) ->
     return at_or_above[0] if at_or_above else None
 
 
+def client_requested_effort(request_data: object) -> str | None:
+    """Return Claude Code's ``output_config.effort`` when it names an up-front reasoning depth.
+
+    ``between_tools`` and ``disabled`` thinking keep their translated approximation:
+    there the client effort describes between-tool work, not up-front reasoning.
+    """
+    output_config = getattr(request_data, "output_config", None)
+    effort = output_config.get("effort") if isinstance(output_config, dict) else None
+    if effort not in CLAUDE_EFFORT_LEVELS:
+        return None
+    thinking = getattr(request_data, "thinking", None)
+    if isinstance(thinking, dict) and thinking.get("type") in ("between_tools", "disabled"):
+        return None
+    return effort
+
+
 def resolve_reasoning_effort(
     request_data: object,
     *,
     tier_override: TierOverride | None,
     model_id: str,
     request_id: str,
+    honor_client_effort: bool = False,
 ) -> str | None:
     """Resolve the final reasoning_effort for a request.
 
-    Priority: request explicit > thinking-derived > tier_override floor. The
+    Priority: request explicit > opted-in client effort > thinking-derived >
+    tier_override floor. ``honor_client_effort`` is set only when the launch sent
+    ``X-Forge-Effort-Source: client``: Claude Code always sends a default effort,
+    so honoring it unconditionally would override every configured floor. The
     result is normalized against the catalog effort levels for the mapped
     model: an explicit unsupported value is rejected (the caller named an
-    exact level), while derived values clamp (the caller asked for a thinking
-    depth, not a specific level).
+    exact level), while client and derived values clamp (the caller asked for a
+    thinking depth that this model may not express exactly).
     """
     supported = supported_efforts_for_model(model_id)
 
@@ -174,14 +195,19 @@ def resolve_reasoning_effort(
             )
         return explicit
 
-    # Claude Code sends `thinking` (Anthropic-specific) instead of
-    # `reasoning_effort`. Translate to reasoning_effort so litellm can
-    # map it to each provider's native parameter.
-    derived = derive_reasoning_effort(getattr(request_data, "thinking", None))
+    client_effort = client_requested_effort(request_data) if honor_client_effort else None
+    if client_effort is not None:
+        # The user chose this effort for the launch, so the tier floor does not apply.
+        effort: str | None = client_effort
+    else:
+        # Claude Code sends `thinking` (Anthropic-specific) instead of
+        # `reasoning_effort`. Translate to reasoning_effort so litellm can
+        # map it to each provider's native parameter.
+        derived = derive_reasoning_effort(getattr(request_data, "thinking", None))
 
-    # Apply tier_override as a floor: max(derived, tier_override).
-    tier_effort = tier_override.reasoning_effort if tier_override else None
-    effort = max_effort(derived, tier_effort)
+        # Apply tier_override as a floor: max(derived, tier_override).
+        tier_effort = tier_override.reasoning_effort if tier_override else None
+        effort = max_effort(derived, tier_effort)
 
     clamped = clamp_effort_to_supported(effort, supported)
     if clamped != effort:

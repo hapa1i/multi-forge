@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from forge.core.run_id import (
     ANTHROPIC_CUSTOM_HEADERS_VAR,
     FORGE_COMMAND_HEADER,
+    FORGE_EFFORT_SOURCE_CLIENT,
+    FORGE_EFFORT_SOURCE_HEADER,
     FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
@@ -459,8 +461,9 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
     the run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
     (``X-Forge-Session`` -- an opaque hash of the session name + role, always emittable via
     the ``forge_run_<hash>`` fallback; ``X-Forge-Command`` -- the sanitized role, only when
-    a role is set). An inherited ``X-Forge-Model-Tier`` line is also scrubbed here; the
-    route projection layer replaces it separately when required. All other (user) header
+    a role is set). Inherited ``X-Forge-Model-Tier`` and ``X-Forge-Effort-Source`` lines
+    are also scrubbed here: they describe the interactive launch that set them, not this
+    child, and the launch layer re-stamps them only for its own process. All other (user) header
     lines are preserved. Forge-owned headers are consumed by the proxy and never forwarded
     upstream (the passthrough allowlist drops them).
     """
@@ -470,6 +473,7 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
         FORGE_SESSION_HEADER.lower(),
         FORGE_COMMAND_HEADER.lower(),
         FORGE_MODEL_TIER_HEADER.lower(),
+        FORGE_EFFORT_SOURCE_HEADER.lower(),
     }
     kept: list[str] = []
     for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
@@ -507,17 +511,25 @@ def apply_forge_model_tier_header(env: dict[str, str], tier: str | None) -> None
     """Replace the Forge-owned model-tier header while preserving user lines."""
     if tier is not None and tier not in {"haiku", "sonnet", "opus"}:
         raise ValueError("projected model tier must be one of: haiku, opus, sonnet")
+    _replace_custom_header(env, FORGE_MODEL_TIER_HEADER, tier)
 
+
+def apply_forge_effort_source_header(env: dict[str, str], *, client: bool) -> None:
+    """Set or clear the Forge-owned effort-source opt-in while preserving user lines."""
+    _replace_custom_header(env, FORGE_EFFORT_SOURCE_HEADER, FORGE_EFFORT_SOURCE_CLIENT if client else None)
+
+
+def _replace_custom_header(env: dict[str, str], header: str, value: str | None) -> None:
     kept: list[str] = []
     for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
         line = raw.strip()
         if not line:
             continue
         name = line.split(":", 1)[0].strip().lower()
-        if name != FORGE_MODEL_TIER_HEADER.lower():
+        if name != header.lower():
             kept.append(line)
-    if tier is not None:
-        kept.append(f"{FORGE_MODEL_TIER_HEADER}: {tier}")
+    if value is not None:
+        kept.append(f"{header}: {value}")
 
     if kept:
         env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)

@@ -8,10 +8,16 @@ import shlex
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, cast
 
 from forge.core.reactive.env import RunIdentity
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.launch_args import (
+    LaunchArgsError,
+    LaunchRuntime,
+    RuntimeLaunchArgs,
+    validate_launch_args,
+)
 from forge.core.state import FileLockTimeoutError
 from forge.install.hook_dispatcher import (
     diagnose_hook_dispatcher,
@@ -37,6 +43,25 @@ from .session import ForgeOpError
 logger = logging.getLogger(__name__)
 
 AUTHORITY_LAUNCH_LOCK_TIMEOUT_S = 1.0
+
+
+def require_launch_args(
+    args: RuntimeLaunchArgs | None,
+    *,
+    runtime: LaunchRuntime,
+    authority: AuthorityIntent | None,
+) -> RuntimeLaunchArgs:
+    """Validate one launch's runtime arguments against the launched session's authority.
+
+    CLI and ops callers validate early to refuse before mutations. The authority
+    transaction repeats the check against its locked manifest read so a concurrent
+    authority change cannot admit passthrough; refusal records no launch attempt.
+    """
+    args = args or RuntimeLaunchArgs()
+    try:
+        return validate_launch_args(args, runtime=runtime, advisory=authority is not None and authority.is_advisory)
+    except LaunchArgsError as e:
+        raise ForgeOpError(str(e)) from e
 
 
 @dataclass
@@ -92,6 +117,7 @@ def authority_launch_transaction(
     operation: str,
     launch_mode: str,
     worktree_path: Path,
+    launch_args: RuntimeLaunchArgs,
     claude_session_id: str | None = None,
     codex_preflight: CodexPreflight | None = None,
     active_store: ActiveSessionStore | None = None,
@@ -143,6 +169,14 @@ def authority_launch_transaction(
             if not store.exists():
                 raise ForgeOpError(f"cannot launch session: manifest is missing for '{store.session_name}'")
             state = store.read()
+            runtime = session_runtime(state)
+            if runtime not in ("claude_code", "codex"):
+                raise ForgeOpError(f"unsupported launch runtime '{runtime}'")
+            require_launch_args(
+                launch_args,
+                runtime=cast(LaunchRuntime, runtime),
+                authority=state.intent.authority,
+            )
             attempt = (
                 _begin_marked_authority_launch(
                     store=store,

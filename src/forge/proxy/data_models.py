@@ -146,6 +146,8 @@ class MessagesRequest(BaseModel):
     reasoning_effort: Optional[str] = None
     verbosity: Optional[str] = None
     thinking: Optional[Dict[str, Any]] = None
+    # Claude Code's effort request; read only under the launch's effort-source opt-in.
+    output_config: Optional[Dict[str, Any]] = None
     tools: Optional[List[ToolDefinition]] = None
     tool_choice: Optional[Dict[str, Any]] = None
     original_model_name: Optional[str] = None  # Internal field to store original name pre-mapping

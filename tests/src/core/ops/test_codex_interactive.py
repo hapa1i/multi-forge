@@ -33,6 +33,7 @@ from forge.core.ops.codex_session import (
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import FileLockTimeoutError
 from forge.core.usage.ledger import read_usage_events
 from forge.session import SessionManager, SessionStore
@@ -45,7 +46,7 @@ from forge.session.codex_handoff import (
 )
 from forge.session.exceptions import ManifestCorruptedError, ManifestUnreadableError
 from forge.session.index import IndexStore
-from forge.session.models import CodexConfirmed, create_session_state
+from forge.session.models import AuthorityIntent, CodexConfirmed, create_session_state
 from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
 
@@ -709,6 +710,47 @@ class TestReattachCodexSession:
         store = SessionStore(str(proj), "impl")
         assert not store.exists()
         assert not store.session_dir.exists()
+
+
+class TestInteractiveLaunchArgs:
+    def test_reattach_forwards_launch_args_to_the_tui(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+        invoke = _FakeInvoke()
+
+        with _interactive_mocks():
+            reattach_codex_session(
+                ctx=ctx,
+                name="impl",
+                invoke=invoke,
+                launch_args=RuntimeLaunchArgs(effort="high", passthrough=("--search",)),
+            )
+
+        assert invoke.kwargs["extra_args"] == ["-c", 'model_reasoning_effort="high"', "--search"]
+
+    def test_child_of_advisory_parent_refuses_passthrough_before_creation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        planner_store = SessionStore(str(proj), "planner")
+        planner = planner_store.read()
+        planner.intent.authority = AuthorityIntent("advisory")
+        planner_store.write(planner)
+        invoke = _FakeInvoke()
+
+        with patch("forge.core.ops.codex_interactive.assert_codex_ready") as preflight:
+            with pytest.raises(ForgeOpError, match="advisory-authority launches"):
+                start_interactive_codex_session(
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    invoke=invoke,
+                    launch_args=RuntimeLaunchArgs(passthrough=("--search",)),
+                )
+
+        preflight.assert_not_called()
+        assert invoke.calls == []
+        assert not _session_dir(proj).exists()
 
 
 class TestUpdateManifestIfPresent:

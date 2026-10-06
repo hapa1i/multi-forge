@@ -29,6 +29,12 @@ FORGE_ROOT_RUN_ID_HEADER = "X-Forge-Root-Run-ID"
 # Model-route projection metadata consumed by the Forge proxy and never forwarded.
 FORGE_MODEL_TIER_HEADER = "X-Forge-Model-Tier"
 
+# Launch opt-in consumed by the Forge proxy and never forwarded: with this header set
+# to ``client``, a translated route treats the request's ``output_config.effort`` as
+# an explicit effort request. Stamped only for a managed launch that passed ``--effort``.
+FORGE_EFFORT_SOURCE_HEADER = "X-Forge-Effort-Source"
+FORGE_EFFORT_SOURCE_CLIENT = "client"
+
 # Provider session/command correlation headers.
 # Forge stamps these alongside the run-id headers onto a proven-proxy-routed headless
 # child's outbound requests. ``X-Forge-Session`` carries an OPAQUE grouping id derived

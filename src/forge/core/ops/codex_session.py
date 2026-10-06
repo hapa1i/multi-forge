@@ -44,6 +44,7 @@ from forge.core.runtime.codex_preflight import (
     assert_codex_ready,
 )
 from forge.core.runtime.codex_rollouts import find_rollout_path
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import now_iso
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
@@ -67,13 +68,14 @@ from forge.session.models import (
     CodexConfirmed,
     Derivation,
     SessionIndexEntry,
+    inherited_authority,
     session_runtime,
 )
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import MANIFEST_FILENAME, SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
-from .session_authority_launch import authority_launch_transaction
+from .session_authority_launch import authority_launch_transaction, require_launch_args
 from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
@@ -198,6 +200,7 @@ def start_codex_session(
     context_delivery: ContextDeliveryMode = "initial-message",
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> CodexSessionStartResult:
     """Create a Codex-runtime session derived from ``parent`` and run its first turn.
 
@@ -239,6 +242,11 @@ def start_codex_session(
         raise ForgeOpError(str(e)) from e
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
+    launch_args = require_launch_args(
+        launch_args,
+        runtime="codex",
+        authority=authority if authority_explicit else inherited_authority(parent_state.intent.authority),
+    )
 
     # Fail closed before any state exists (runs `codex doctor` ~20s, once).
     try:
@@ -319,6 +327,7 @@ def start_codex_session(
             warnings=warnings,
             context_delivery=context_delivery,
             on_routing_projected=_mark_routing_projected,
+            launch_args=launch_args,
         )
     except Exception:
         if routing_projected:
@@ -361,6 +370,7 @@ def _run_first_codex_turn(
     warnings: list[str],
     context_delivery: ContextDeliveryMode,
     on_routing_projected: Callable[[], None],
+    launch_args: RuntimeLaunchArgs,
 ) -> CodexSessionStartResult:
     """The post-creation half of ``start_codex_session`` (the caller owns rollback)."""
     store = manager.get_session_store(name, forge_root=str(child_forge_root))
@@ -370,6 +380,7 @@ def _run_first_codex_turn(
     root = new_root_run_identity()
     with authority_launch_transaction(
         store=store,
+        launch_args=launch_args,
         root=root,
         operation="start",
         launch_mode="host",
@@ -406,6 +417,7 @@ def _run_first_codex_turn(
             run_identity=root,
             authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
             before_invoke=commit_routing_before_invoke,
+            extra_args=launch_args.runtime_argv("codex"),
         )
         if authority_attempt is not None:
             authority_attempt.complete(bridge.codex.returncode)
@@ -536,6 +548,7 @@ def continue_codex_session(
     task: str,
     sandbox: CodexSandbox = "workspace-write",
     timeout_seconds: int = 600,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> CodexSessionResumeResult:
     """Run one more ``codex exec resume <thread_id>`` turn on an existing Codex session.
 
@@ -546,6 +559,7 @@ def continue_codex_session(
     manager = SessionManager()
     entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
     thread_id = require_codex_thread_id(state, name)
+    launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
     try:
         preflight = assert_codex_ready()
@@ -563,6 +577,7 @@ def continue_codex_session(
     cwd = state.worktree.path if state.worktree else str(ctx.cwd)
     with authority_launch_transaction(
         store=store,
+        launch_args=launch_args,
         root=root,
         operation="resume",
         launch_mode="host",
@@ -590,6 +605,7 @@ def continue_codex_session(
                 timeout_seconds=timeout_seconds,
                 label="codex-resume",
                 resume_thread_id=thread_id,
+                extra_args=launch_args.runtime_argv("codex"),
             )
             commit_launch_routing(
                 store=store,

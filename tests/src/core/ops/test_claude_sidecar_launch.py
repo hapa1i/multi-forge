@@ -24,6 +24,8 @@ from forge.core.reactive.env import (
     FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
 )
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
 from forge.session.models import SessionState
 from forge.session.routing import derive_routing_history
@@ -131,6 +133,7 @@ def _launch_split_root_sidecar(
     *,
     prompt_file: Path | None = None,
     resolved_proxy_id: str | None = None,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> _SidecarFixture:
     forge_root = tmp_path / "main-repo"
     worktree = tmp_path / "checkout"
@@ -205,7 +208,7 @@ def _launch_split_root_sidecar(
             image=None,
             no_launch=False,
             extensions=None,
-            extra_args=None,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             context_limit_override=None,
             proxy_display=None,
             proxy_id=None,
@@ -285,3 +288,24 @@ def test_template_resolution_changes_only_routing_proxy_identity(tmp_path: Path)
     launch = fixture.store.read().confirmed.launch
     assert launch is not None
     assert launch.proxy_id is None
+
+
+def test_sidecar_launch_forwards_launch_args_and_opts_into_client_effort(tmp_path: Path) -> None:
+    fixture = _launch_split_root_sidecar(
+        tmp_path,
+        launch_args=RuntimeLaunchArgs(effort="xhigh", passthrough=("--debug",)),
+    )
+
+    kwargs = fixture.run_sidecar.call_args.kwargs
+    claude_args = kwargs["claude_args"]
+    effort_at = claude_args.index("--effort")
+    assert claude_args[effort_at : effort_at + 3] == ["--effort", "xhigh", "--debug"]
+    assert "X-Forge-Effort-Source: client" in kwargs["env_vars"][ANTHROPIC_CUSTOM_HEADERS_VAR].split("\n")
+
+
+def test_sidecar_launch_without_effort_sends_no_effort_source(tmp_path: Path) -> None:
+    fixture = _launch_split_root_sidecar(tmp_path, launch_args=RuntimeLaunchArgs(passthrough=("--debug",)))
+
+    kwargs = fixture.run_sidecar.call_args.kwargs
+    assert "--effort" not in kwargs["claude_args"]
+    assert "X-Forge-Effort-Source" not in kwargs["env_vars"].get(ANTHROPIC_CUSTOM_HEADERS_VAR, "")

@@ -19,6 +19,7 @@ import click
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import _get_active_session_entry, console
 from forge.cli.session_authority_options import parse_creation_authority
+from forge.cli.session_launch_args import checked_launch_args
 from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.naming import generate_unique_name
@@ -39,6 +40,7 @@ from forge.core.ops.codex_session import (
 )
 from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import SessionManager, SessionState
 from forge.session.models import AuthorityIntent
 from forge.session.transfer import TRANSFER_CONTEXT_STRATEGY_VALUES
@@ -194,6 +196,9 @@ def run_codex_start(ctx: click.Context) -> int:
     if p["branch"] and not p["worktree"]:
         print_error("--branch requires --worktree")
         return 1
+    # A --resume-from child may also inherit advisory authority; the op re-checks
+    # against the parent before creating the session.
+    launch_args = checked_launch_args(ctx, runtime="codex", authority=authority)
 
     authority_kwargs: _AuthorityLaunchKwargs = (
         {"authority": authority, "authority_explicit": True} if authority_explicit else {}
@@ -221,6 +226,7 @@ def run_codex_start(ctx: click.Context) -> int:
             worktree=p["worktree"],
             branch=p["branch"],
             context_delivery=p["context_delivery"] or "initial-message",
+            launch_args=launch_args,
             **authority_kwargs,
         )
     return launch_codex_session(
@@ -233,6 +239,7 @@ def run_codex_start(ctx: click.Context) -> int:
         worktree=p["worktree"],
         branch=p["branch"],
         context_delivery=p["context_delivery"] or "initial-message",
+        launch_args=launch_args,
         **authority_kwargs,
     )
 
@@ -279,8 +286,9 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
         if ctx.get_parameter_source(param) == click.core.ParameterSource.COMMANDLINE:
             print_error(f"{flag} is not supported for Codex sessions")
             return 1
+    launch_args = checked_launch_args(ctx, runtime="codex", authority=manifest.intent.authority)
     if task:
-        return resume_codex_session(name=name, task=task, sandbox="workspace-write")
+        return resume_codex_session(name=name, task=task, sandbox="workspace-write", launch_args=launch_args)
 
     # Claude reconnect parity: refuse while a launch is still registered. No --force
     # escape -- two TUIs on one thread would interleave a single rollout.
@@ -300,7 +308,7 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
         )
         return 1
 
-    return reattach_interactive_codex_session(name=name)
+    return reattach_interactive_codex_session(name=name, launch_args=launch_args)
 
 
 def launch_codex_session(
@@ -316,6 +324,7 @@ def launch_codex_session(
     context_delivery: ContextDeliveryMode = "initial-message",
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> int:
     """Run ``forge session start --runtime codex``; returns the process exit code."""
     try:
@@ -332,6 +341,7 @@ def launch_codex_session(
             context_delivery=context_delivery,
             authority=authority,
             authority_explicit=authority_explicit,
+            launch_args=launch_args,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -352,7 +362,9 @@ def launch_codex_session(
     return 0 if _codex_ok(result.codex) else (result.codex.returncode or 1)
 
 
-def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
+def resume_codex_session(
+    *, name: str, task: str, sandbox: CodexSandbox, launch_args: RuntimeLaunchArgs | None = None
+) -> int:
     """Run ``forge session resume`` for a Codex session; returns the exit code."""
     try:
         result = continue_codex_session(
@@ -360,6 +372,7 @@ def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
             name=name,
             task=task,
             sandbox=sandbox,
+            launch_args=launch_args,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -381,6 +394,7 @@ def launch_interactive_codex_session(
     context_delivery: ContextDeliveryMode = "initial-message",
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> int:
     """Run the interactive (no ``--task``) form of ``session start --runtime codex``."""
     try:
@@ -397,6 +411,7 @@ def launch_interactive_codex_session(
             authority=authority,
             authority_explicit=authority_explicit,
             announce=_render_interactive_launch,
+            launch_args=launch_args,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -405,7 +420,7 @@ def launch_interactive_codex_session(
     return _finish_interactive(result)
 
 
-def reattach_interactive_codex_session(*, name: str) -> int:
+def reattach_interactive_codex_session(*, name: str, launch_args: RuntimeLaunchArgs | None = None) -> int:
     """Reattach a Codex session's thread as a foreground TUI (bare ``session resume``)."""
     try:
         result = reattach_codex_session(
@@ -413,6 +428,7 @@ def reattach_interactive_codex_session(*, name: str) -> int:
             name=name,
             sandbox="workspace-write",
             announce=_render_interactive_launch,
+            launch_args=launch_args,
         )
     except ForgeOpError as e:
         print_error(f"{e}")

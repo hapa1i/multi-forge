@@ -16,7 +16,11 @@ from forge.core.reactive.env import (
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
 )
-from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, FORGE_MODEL_TIER_HEADER
+from forge.core.run_id import (
+    ANTHROPIC_CUSTOM_HEADERS_VAR,
+    FORGE_EFFORT_SOURCE_HEADER,
+    FORGE_MODEL_TIER_HEADER,
+)
 from forge.session.claude.invoke import (
     ClaudeBinaryNotFoundError,
     _build_command,
@@ -146,6 +150,27 @@ class TestBuildEnvironment:
         monkeypatch.setenv(
             ANTHROPIC_CUSTOM_HEADERS_VAR,
             f"X-User-Header: keep\n{FORGE_MODEL_TIER_HEADER}: opus",
+        )
+
+        env = _build_environment()
+
+        assert env[ANTHROPIC_CUSTOM_HEADERS_VAR] == "X-User-Header: keep"
+
+    def test_client_effort_source_stamps_opt_in_and_preserves_user_lines(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(ANTHROPIC_CUSTOM_HEADERS_VAR, "X-User-Header: keep")
+
+        env = _build_environment(projected_model_tier="opus", client_effort_source=True)
+
+        assert env[ANTHROPIC_CUSTOM_HEADERS_VAR].splitlines() == [
+            "X-User-Header: keep",
+            f"{FORGE_MODEL_TIER_HEADER}: opus",
+            f"{FORGE_EFFORT_SOURCE_HEADER}: client",
+        ]
+
+    def test_default_launch_scrubs_inherited_effort_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            f"X-User-Header: keep\n{FORGE_EFFORT_SOURCE_HEADER.lower()}: client",
         )
 
         env = _build_environment()

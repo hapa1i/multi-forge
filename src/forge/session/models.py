@@ -143,6 +143,15 @@ class AuthorityIntent:
         elif self.tier is not None:
             raise ValueError("producer authority does not accept a tier")
 
+    @property
+    def is_advisory(self) -> bool:
+        return self.role == "advisory"
+
+
+def inherited_authority(parent: AuthorityIntent | None) -> AuthorityIntent | None:
+    """Return the authority a derived child inherits: advisory carries over, producer drops."""
+    return deepcopy(parent) if parent is not None and parent.is_advisory else None
+
 
 @dataclass
 class MemoryWriterConfig:

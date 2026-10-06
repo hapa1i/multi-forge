@@ -20,6 +20,7 @@ unreachable for it.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import Literal
 
@@ -161,6 +162,7 @@ def prepare_codex_request(
     timeout_seconds: int = 600,
     label: str | None = None,
     resume_thread_id: str | None = None,
+    extra_args: Sequence[str] = (),
 ) -> HeadlessRequest:
     """Shape one ``codex exec --json`` job into a :class:`HeadlessRequest`.
 
@@ -171,6 +173,8 @@ def prepare_codex_request(
     subcommand. Options go BEFORE the subcommand (probe stage 60 form A:
     ``codex exec --json --sandbox X resume <thread_id>``); the prompt still arrives on
     stdin (probe stage 61 verified the stdin-prompt + resume combination).
+    ``extra_args`` (a managed launch's ``--effort`` and ``--`` tail) join the options
+    before that subcommand.
 
     Codex runs DIRECT to OpenAI: no Forge proxy, no ``ANTHROPIC_*`` env, ``base_url`` is
     ``None``. The child env is **sanitized** so it cannot contradict the preflight: all
@@ -186,6 +190,7 @@ def prepare_codex_request(
     argv = [*get_runtime("codex").headless_cmd, "--json", "--sandbox", sandbox]
     if model:
         argv += ["-m", model]
+    argv += extra_args
     if resume_thread_id:
         argv += ["resume", resume_thread_id]
 

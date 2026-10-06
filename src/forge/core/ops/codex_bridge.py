@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -307,6 +307,7 @@ def bridge_session_to_codex(
     run_identity: RunIdentity | None = None,
     authority_marker: str | None = None,
     before_invoke: Callable[[], None] | None = None,
+    extra_args: Sequence[str] = (),
 ) -> CodexBridgeResult:
     """Hand ``parent``'s curated transfer to a headless ``codex exec`` run implementing ``task``.
 
@@ -404,6 +405,7 @@ def bridge_session_to_codex(
             sandbox=sandbox,
             timeout_seconds=timeout_seconds,
             label="codex-bridge",
+            extra_args=extra_args,
         )
         if before_invoke is not None:
             before_invoke()

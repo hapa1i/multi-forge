@@ -581,6 +581,17 @@ multi-forge/
   - `forge claude start --no-proxy` is a bare launcher (no session state) -- see below.
   - Tier/model routing doesn't apply—it's proxy-only. Claude Code uses Anthropic models directly.
 
+**Launch-only runtime arguments.** Managed launches accept `--effort` and a `--` runtime-flag tail. They live only in
+the launch plan, never in session intent. `forge.core.runtime.launch_args` owns the per-runtime effort vocabulary, the
+denylist of Forge-managed runtime flags, the advisory-authority refusal, and argv projection. The CLI
+(`forge.cli.session_launch_args`) splits `--` before Click parsing and validates against the launched session's
+effective authority before any session, child, or proxy mutation. Claude and Codex ops also validate early;
+`authority_launch_transaction` repeats `require_launch_args` against the locked manifest before any launch event or
+active registration. A proxied Claude launch with `--effort` stamps the Forge-owned `X-Forge-Effort-Source: client`
+header (interactive only; headless children scrub it). Only under that header does the translated proxy treat
+`output_config.effort` as an explicit request that replaces the tier `reasoning_effort` floor, clamped to the mapped
+model. Passthrough never forwards the header.
+
 Interactive model-first selection lives in `forge.core.ops.session_model_routing`, separately from the subprocess
 resolver. Its read-only stage normalizes one explicit model request, applies strict explicit proxy/no-proxy constraints,
 then preserves a compatible persisted route before consulting ordered `model_routes.yaml` candidates. A new Claude

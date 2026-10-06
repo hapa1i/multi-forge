@@ -84,6 +84,16 @@ class TestArgv:
         argv = mock_run.call_args.args[0]
         assert argv == ["codex", "resume", "--sandbox", "workspace-write", _TID]
 
+    def test_launch_args_precede_the_positional_prompt(self, mock_run: MagicMock) -> None:
+        _invoke(mock_run, initial_prompt="BODY", extra_args=["-c", 'model_reasoning_effort="high"'])
+        argv = mock_run.call_args.args[0]
+        assert argv == ["codex", "--sandbox", "workspace-write", "-c", 'model_reasoning_effort="high"', "BODY"]
+
+    def test_launch_args_precede_the_reattached_thread_id(self, mock_run: MagicMock) -> None:
+        _invoke(mock_run, resume_thread_id=_TID, extra_args=["-m", "gpt-x"])
+        argv = mock_run.call_args.args[0]
+        assert argv == ["codex", "resume", "--sandbox", "workspace-write", "-m", "gpt-x", _TID]
+
     def test_resume_and_prompt_are_mutually_exclusive(self, mock_run: MagicMock) -> None:
         with pytest.raises(ValueError, match="mutually exclusive"):
             _invoke(mock_run, resume_thread_id=_TID, initial_prompt="x")

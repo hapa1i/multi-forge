@@ -11,7 +11,7 @@ import json
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -29,10 +29,12 @@ from forge.core.reactive.env import (
     FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
     InteractiveApiKeyDecision,
     RunIdentity,
+    apply_forge_effort_source_header,
     compute_interactive_api_key_decision,
     new_root_run_identity,
     resolve_proxy_wire_shape,
 )
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.project_compat import ProjectCompatibilityError
@@ -89,6 +91,7 @@ from .session import ForgeOpError
 from .session_authority_launch import (
     AuthorityLaunchAttempt,
     authority_launch_transaction,
+    require_launch_args,
 )
 from .session_model_routing import (
     ResolvedModelRoute,
@@ -295,6 +298,7 @@ class ResumeLaunchPlan:
     render_model_route: bool = False
     parent_name: str | None = None
     prompt_warnings: tuple[str, ...] = ()
+    launch_args: RuntimeLaunchArgs = field(default_factory=RuntimeLaunchArgs)
 
 
 @dataclass(frozen=True)
@@ -316,6 +320,7 @@ class ForkLaunchPlan:
     render_post_exit: bool
     model_route_selection: ResolvedModelRoute | None = None
     render_model_route: bool = False
+    launch_args: RuntimeLaunchArgs = field(default_factory=RuntimeLaunchArgs)
 
 
 @dataclass(frozen=True)
@@ -472,7 +477,7 @@ def launch_claude_session(
     register_fork: bool = False,
     system_prompt_file: str | None = None,
     name: str | None = None,
-    extra_args: list[str] | None = None,
+    launch_args: RuntimeLaunchArgs | None = None,
     proxy_id: str | None = None,
     authority_operation: str = "resume",
     before_launch: Callable[[Path], None] | None = None,
@@ -488,6 +493,10 @@ def launch_claude_session(
             f"session '{manifest.name}' has runtime '{_runtime}' "
             "and cannot be launched with Claude. Use the matching runtime command."
         )
+    launch_args = require_launch_args(launch_args, runtime="claude_code", authority=manifest.intent.authority)
+    extra_args = launch_args.runtime_argv("claude_code") or None
+    # Only a proxied launch has a Forge proxy to read the opt-in header.
+    client_effort_source = launch_args.effort is not None and runtime_base_url is not None
 
     preflight_host_claude_binary(use_sidecar=use_sidecar, invoke=invoke)
 
@@ -538,6 +547,7 @@ def launch_claude_session(
     launch_mode = LAUNCH_MODE_SIDECAR if use_sidecar else LAUNCH_MODE_HOST
     with authority_launch_transaction(
         store=store,
+        launch_args=launch_args,
         root=root,
         operation=authority_operation,
         launch_mode=launch_mode,
@@ -590,6 +600,7 @@ def launch_claude_session(
                 system_prompt_file=system_prompt_file,
                 name=name,
                 extra_args=extra_args,
+                client_effort_source=client_effort_source,
                 proxy_id=proxy_id,
                 worktree_path=worktree_path,
                 launch_root=launch_root,
@@ -616,6 +627,7 @@ def launch_claude_session(
                 system_prompt_file=system_prompt_file,
                 name=name,
                 extra_args=extra_args,
+                client_effort_source=client_effort_source,
                 worktree_path=worktree_path,
                 launch_root=launch_root,
                 launch_started_at=launch_started_at,
@@ -650,7 +662,7 @@ def start_claude_session(
     image: str | None,
     no_launch: bool,
     extensions: bool | None,
-    extra_args: list[str] | None,
+    launch_args: RuntimeLaunchArgs,
     context_limit_override: int | None,
     proxy_display: str | None,
     proxy_id: str | None,
@@ -774,7 +786,7 @@ def start_claude_session(
                 image=image,
                 system_prompt_file=prompt_file,
                 name=manifest.name,
-                extra_args=extra_args,
+                launch_args=launch_args,
                 proxy_id=proxy_id,
                 authority_operation="incognito" if incognito else "start",
                 before_launch=presenter.before_launch,
@@ -911,6 +923,7 @@ def resume_claude_session(
             fork_session=plan.fork_session,
             system_prompt_file=(str(plan.prompt_file) if plan.prompt_file is not None else None),
             name=manifest.name,
+            launch_args=plan.launch_args,
             proxy_id=effective_proxy_id,
             authority_operation="resume",
             before_launch=presenter.before_launch,
@@ -979,6 +992,7 @@ def fork_claude_session(
             register_fork=plan.register_fork,
             system_prompt_file=(str(plan.prompt_file) if plan.prompt_file is not None else None),
             name=manifest.name,
+            launch_args=plan.launch_args,
             proxy_id=plan.proxy_id,
             authority_operation="incognito" if plan.incognito else "fork",
             before_launch=presenter.before_launch,
@@ -1381,6 +1395,7 @@ def _run_sidecar_claude_session(
     system_prompt_file: str | None,
     name: str | None,
     extra_args: list[str] | None,
+    client_effort_source: bool,
     proxy_id: str | None,
     worktree_path: Path,
     launch_root: Path,
@@ -1458,6 +1473,8 @@ def _run_sidecar_claude_session(
     container_env[FORGE_FORGE_ROOT_VAR] = "/workspace"
     container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(host_forge_root)
     container_env[FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR] = str(host_launch_root)
+    if client_effort_source:
+        apply_forge_effort_source_header(container_env, client=True)
 
     routing_proxy_id = proxy_id
     if "LITELLM_BASE_URL" not in container_env:
@@ -1636,6 +1653,7 @@ def _run_host_claude_session(
     system_prompt_file: str | None,
     name: str | None,
     extra_args: list[str] | None,
+    client_effort_source: bool,
     worktree_path: Path,
     launch_root: Path,
     launch_started_at: datetime,
@@ -1721,6 +1739,8 @@ def _run_host_claude_session(
         invoke_kwargs["fork_session"] = fork_session
     if projected_model_tier is not None:
         invoke_kwargs["projected_model_tier"] = projected_model_tier
+    if client_effort_source:
+        invoke_kwargs["client_effort_source"] = True
 
     routing_payload = build_claude_routing_payload(
         manifest,

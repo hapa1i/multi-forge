@@ -73,6 +73,7 @@ from forge.core.ops.session_model_routing import (
     validate_model_tier_option,
 )
 from forge.core.paths import display_path
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.policy.semantic.supervisor import validate_checker_model
 from forge.session import (
     LAUNCH_MODE_HOST,
@@ -95,7 +96,7 @@ from forge.session.launch import (
     resolve_manifest_prompt_file,
 )
 from forge.session.model_pin import _validate_proxy_model_pin
-from forge.session.models import AuthorityIntent, session_runtime
+from forge.session.models import AuthorityIntent, inherited_authority, session_runtime
 from forge.session.prev_sessions import (
     ensure_notes_overlay,
     notes_for_snapshot,
@@ -115,6 +116,12 @@ from forge.cli.session_codex import (  # noqa: E402
     reject_codex_flags_for_claude,
     run_codex_resume,
     run_codex_start,
+)
+from forge.cli.session_launch_args import (  # noqa: E402
+    RuntimePassthroughCommand,
+    checked_launch_args,
+    effort_option,
+    warn_if_effort_clamped,
 )
 from forge.cli.session_resume_modes import (  # noqa: E402
     _resume_fresh_native,
@@ -786,6 +793,7 @@ def _preflight_persisted_resume_proxy(plan: ResumeLaunchPlan) -> None:
             proxy_id=proxy_id,
             allow_restart=isinstance(e, ProxyNotRunningError),
             parent_name=plan.parent_name,
+            recovery_action=SessionRouteRecoveryAction.resume(plan.manifest.name, launch_args=plan.launch_args),
         )
         raise SystemExit(1) from None
 
@@ -817,7 +825,7 @@ def launch_new_session(
     image: str | None = None,
     no_launch: bool = False,
     extensions: bool | None = None,
-    extra_args: list[str] | None = None,
+    launch_args: RuntimeLaunchArgs | None = None,
     context_limit_override: int | None = None,
     proxy_display: str | None = None,
     proxy_id: str | None = None,
@@ -968,7 +976,7 @@ def launch_new_session(
             image=image,
             no_launch=no_launch,
             extensions=extensions,
-            extra_args=extra_args,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             context_limit_override=context_limit_override,
             proxy_display=proxy_display,
             proxy_id=proxy_id,
@@ -1001,7 +1009,7 @@ def launch_new_session(
     return result.exit_code
 
 
-@session.command()
+@session.command(cls=RuntimePassthroughCommand)
 @click.argument("name", required=False)
 @click.option(
     "--proxy",
@@ -1075,6 +1083,7 @@ def launch_new_session(
     default=None,
     help="Enable/disable memory auto-update for this session (default: off).",
 )
+@effort_option
 @authority_creation_options
 @codex_start_options
 def start(
@@ -1105,6 +1114,7 @@ def start(
     supervisor_runtime: str | None,
     subprocess_proxy: str | None,
     memory_flag: str | None,
+    effort: str | None,
     authority_role: str | None,
     authority_tier: str | None,
     runtime: str,
@@ -1137,10 +1147,12 @@ def start(
         forge session start my-feature --subprocess-proxy openrouter-anthropic # Direct + proxied subprocesses
         forge session start my-feature --worktree                              # Isolated worktree
         forge session start my-feature --supervise planner                     # With plan supervision
+        forge session start my-feature --effort high -- --debug                # Launch effort + Claude flags
         forge session start impl --runtime codex --resume-from planner --task "Build it"
     """
+    ctx = click.get_current_context()
     if runtime == "codex":
-        sys.exit(run_codex_start(click.get_current_context()))
+        sys.exit(run_codex_start(ctx))
 
     try:
         authority, authority_explicit = parse_creation_authority(authority_role, authority_tier)
@@ -1149,9 +1161,10 @@ def start(
         sys.exit(1)
 
     # Codex-only flags are meaningless on the Claude path: reject, don't ignore.
-    codex_rc = reject_codex_flags_for_claude(click.get_current_context().params)
+    codex_rc = reject_codex_flags_for_claude(ctx.params)
     if codex_rc is not None:
         sys.exit(codex_rc)
+    launch_args = checked_launch_args(ctx, runtime="claude_code", authority=authority)
 
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
@@ -1236,6 +1249,7 @@ def start(
         direct = model_route_selection.kind == "direct"
     elif proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+    warn_if_effort_clamped(launch_args, model_route_selection)
 
     if name is None:
         _fr = _cwd_forge_root()
@@ -1278,11 +1292,12 @@ def start(
             memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             authority=authority,
             authority_explicit=authority_explicit,
+            launch_args=launch_args,
         )
     )
 
 
-@session.command()
+@session.command(cls=RuntimePassthroughCommand)
 @click.argument("name", required=False)
 @click.option(
     "--proxy",
@@ -1372,6 +1387,7 @@ def start(
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@effort_option
 @authority_creation_options
 @codex_resume_options
 @click.pass_context
@@ -1391,6 +1407,7 @@ def resume(
     review: bool,
     force: bool,
     memory_flag: str | None,
+    effort: str | None,
     authority_role: str | None,
     authority_tier: str | None,
     task: str | None,
@@ -1415,6 +1432,7 @@ def resume(
       forge session resume my-session --fresh --resume-mode native  # Full conversation history
       forge session resume my-session --proxy my-proxy   # Reattach with different routing
       forge session resume my-session --fresh --no-proxy # Fresh conversation, direct mode
+      forge session resume my-session --effort max -- --debug  # Launch-only effort and Claude flags
     """
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
@@ -1574,6 +1592,13 @@ def resume(
 
     enforce_target_project_compatibility(Path(target_forge_root))
 
+    # Validate against the session this resume will launch: a --fresh child takes
+    # explicit authority or inherits advisory authority; other modes keep the manifest's.
+    launched_authority = manifest.intent.authority
+    if fresh:
+        launched_authority = authority if authority_explicit else inherited_authority(manifest.intent.authority)
+    launch_args = checked_launch_args(ctx, runtime="claude_code", authority=launched_authority)
+
     try:
         validate_model_tier_option(direct_model, model_tier)
     except SessionModelRoutingError as e:
@@ -1602,6 +1627,7 @@ def resume(
         memory_flag=(memory_flag if ctx.get_parameter_source("memory_flag") == command_line else None),
         authority_role=(authority_role if ctx.get_parameter_source("authority_role") == command_line else None),
         authority_tier=(authority_tier if ctx.get_parameter_source("authority_tier") == command_line else None),
+        launch_args=launch_args,
     )
     neutral_route = manifest.intent.launch.model_route if manifest.intent.launch is not None else None
     uses_sidecar = _uses_persisted_sidecar_launch(manifest, direct=direct)
@@ -1681,6 +1707,7 @@ def resume(
         normalized_direct_model = plan_model_route_transition(model_route_selection).direct_model
     elif proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+    warn_if_effort_clamped(launch_args, model_route_selection)
 
     if fresh:
         effective_resume_mode = ResumeStrategy.REWIND.value if rewind_requested else resume_mode or "transfer"
@@ -1742,6 +1769,7 @@ def resume(
                     memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                     authority=authority,
                     authority_explicit=authority_explicit,
+                    launch_args=launch_args,
                 )
                 return
             assert drop_last is not None
@@ -1759,6 +1787,7 @@ def resume(
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
+                launch_args=launch_args,
             )
         elif effective_resume_mode == "native":
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
@@ -1783,6 +1812,7 @@ def resume(
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
+                launch_args=launch_args,
             )
         else:
             try:
@@ -1806,6 +1836,7 @@ def resume(
                 memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 authority=authority,
                 authority_explicit=authority_explicit,
+                launch_args=launch_args,
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -1817,6 +1848,7 @@ def resume(
             direct_model_override=normalized_direct_model,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args,
         )
     elif _is_resumable_session(manifest):
         active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
@@ -1850,6 +1882,7 @@ def resume(
                 direct_model_override=normalized_direct_model,
                 model_route_selection=model_route_selection,
                 render_model_route=render_model_route,
+                launch_args=launch_args,
             )
         else:
             _reconnect_in_place(
@@ -1861,6 +1894,7 @@ def resume(
                 direct_model_override=normalized_direct_model,
                 model_route_selection=model_route_selection,
                 render_model_route=render_model_route,
+                launch_args=launch_args,
             )
     else:
         _launch_as_child(
@@ -1872,6 +1906,7 @@ def resume(
             direct_model_override=normalized_direct_model,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args,
         )
 
 
@@ -1885,6 +1920,7 @@ def _launch_in_place(
     direct_model_override: str | None = None,
     model_route_selection: ResolvedModelRoute | None = None,
     render_model_route: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Launch a never-used session in place under its existing Forge identity."""
     manager.switch_session(name, forge_root=manifest.forge_root)
@@ -1951,6 +1987,7 @@ def _launch_in_place(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             prompt_warnings=tuple(prompt_warnings),
         ),
     )
@@ -1966,6 +2003,7 @@ def _reconnect_in_place(
     direct_model_override: str | None = None,
     model_route_selection: ResolvedModelRoute | None = None,
     render_model_route: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Reconnect to the same Claude conversation without creating a child.
 
@@ -2011,6 +2049,7 @@ def _reconnect_in_place(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
         ),
     )
 
@@ -2025,6 +2064,7 @@ def _launch_as_child(
     direct_model_override: str | None = None,
     model_route_selection: ResolvedModelRoute | None = None,
     render_model_route: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Create a child session and resume the parent's Claude conversation.
 
@@ -2061,6 +2101,7 @@ def _launch_as_child(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             parent_name=parent_name,
         ),
     )
@@ -2153,6 +2194,7 @@ def _resume_fresh(
     memory_flag: bool | None = None,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
@@ -2260,12 +2302,13 @@ def _resume_fresh(
             direct_model_override=direct_model_override,
             model_route_selection=model_route_selection,
             render_model_route=render_model_route,
+            launch_args=launch_args or RuntimeLaunchArgs(),
             parent_name=parent,
         ),
     )
 
 
-@session.command()
+@session.command(cls=RuntimePassthroughCommand)
 @click.argument("name", required=False)
 @click.option(
     "--proxy",
@@ -2311,6 +2354,7 @@ def _resume_fresh(
     default=None,
     help="Auto-install extensions in worktree (default: inherit from parent)",
 )
+@effort_option
 @authority_creation_options
 def incognito(
     name: str | None,
@@ -2327,6 +2371,7 @@ def incognito(
     mounts: tuple[str, ...],
     image: str | None,
     extensions: bool | None,
+    effort: str | None,
     authority_role: str | None,
     authority_tier: str | None,
 ) -> None:
@@ -2361,6 +2406,7 @@ def incognito(
     except ValueError as e:
         print_error(str(e))
         sys.exit(1)
+    launch_args = checked_launch_args(click.get_current_context(), runtime="claude_code", authority=authority)
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,
     # unless --sidecar or --host-proxy is specified (both imply proxy mode).
@@ -2401,6 +2447,7 @@ def incognito(
         direct = model_route_selection.kind == "direct"
     elif proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+    warn_if_effort_clamped(launch_args, model_route_selection)
 
     if name is None:
         _fr = _cwd_forge_root()
@@ -2434,5 +2481,6 @@ def incognito(
             model_route_selection=model_route_selection,
             authority=authority,
             authority_explicit=authority_explicit,
+            launch_args=launch_args,
         )
     )

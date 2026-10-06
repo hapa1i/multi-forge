@@ -65,6 +65,7 @@ from .models import (
     SessionState,
     SidecarLaunchIntent,
     create_session_state,
+    inherited_authority,
 )
 from .prev_sessions import child_path, child_path_rel, ensure_child, generated_path
 from .store import SessionStore
@@ -166,10 +167,7 @@ def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState
     inherited_launch = _inherited_launch_intent(parent_state)
     if inherited_launch is not None:
         child_state.intent.launch = inherited_launch
-    parent_authority = parent_state.intent.authority
-    child_state.intent.authority = (
-        deepcopy(parent_authority) if parent_authority is not None and parent_authority.role == "advisory" else None
-    )
+    child_state.intent.authority = inherited_authority(parent_state.intent.authority)
 
 
 def _append_created_authority_event(
@@ -692,12 +690,7 @@ class SessionManager:
 
         if parent_session is not None and not authority_explicit:
             parent_state = self.get_session(parent_session, forge_root=_early_fr_str)
-            parent_authority = parent_state.intent.authority
-            authority = (
-                deepcopy(parent_authority)
-                if parent_authority is not None and parent_authority.role == "advisory"
-                else None
-            )
+            authority = inherited_authority(parent_state.intent.authority)
 
         # live_session_exists, not session_exists: a bare row is crash residue that
         # create_session_txn prunes and reuses, so rejecting on it would refuse a
