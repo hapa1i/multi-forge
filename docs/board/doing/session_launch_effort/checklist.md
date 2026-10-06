@@ -4,7 +4,8 @@
 
 ## Current focus
 
-Review findings addressed and verified; ready for commit and PR.
+Review findings addressed and verified; [PR #257](https://github.com/hapa1i/multi-forge/pull/257) is open against
+`main`.
 
 ## Evidence gathered
 
@@ -81,4 +82,4 @@ Review findings addressed and verified; ready for commit and PR.
   with the integration runner's environment loaded.
 - [x] `make test-unit` (10,539 passed) and `make test-regression` (1,330 passed), including all 15 new regression cases.
 - [x] `make pre-commit` on the final tree (plus hooks on the untracked card and new files).
-- [ ] Commit, push, and open the PR with verification evidence.
+- [x] Commit, push, and open [PR #257](https://github.com/hapa1i/multi-forge/pull/257) with verification evidence.
