@@ -1,6 +1,10 @@
 # Session Launch Effort and Runtime Passthrough
 
-**Lane**: `doing/`
+**Lane**: `done/`
+
+Completed 2026-10-06. [PR #257](https://github.com/hapa1i/multi-forge/pull/257) merged as `845811c2`; its tree matches
+verified head `54f320cf`, with all five GitHub checks passing. Design and end-user docs describe the shipped behavior;
+the [checklist](checklist.md) records verification and closeout evidence.
 
 ## Goal
 

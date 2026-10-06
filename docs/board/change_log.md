@@ -5,6 +5,29 @@ Completed-work record for Forge implementation sessions.
 Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
 and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-06
+
+### Set session launch effort and forward guarded runtime arguments
+
+**Goal**: Let managed Claude and Codex sessions choose effort and runtime flags for one launch while preserving
+Forge-owned identity, routing, and artifact authority.
+
+**Key changes**:
+
+- Added per-runtime `--effort` and explicit `--` passthrough, with reserved-flag and advisory-authority refusals before
+  mutation. Revalidated arguments against the locked authority manifest before launch events or active registration.
+- Preserved launch arguments in route-recovery commands and kept them out of persisted session intent.
+- Gated translated client effort on an explicit launch header, clamped it to model support, and scrubbed inherited
+  opt-in headers from headless children.
+- Upgraded Starlette to remove the AnyIO TestClient deprecation warning, with a fresh-interpreter regression.
+
+**Verification**: 10,539 unit tests and 1,331 regressions passed without warnings; 73 HTTP-client tests passed with
+deprecations treated as errors. Targeted session/authority and proxy integrations, pre-commit, build, and the
+clean-wheel LiteLLM smoke passed. One earlier Claude-to-Codex integration attempt was blocked by a missing container API
+key; the [completed checklist](done/session_launch_effort/checklist.md) retains that limitation and the successful
+follow-up coverage. [PR #257](https://github.com/hapa1i/multi-forge/pull/257) merged as `845811c2`; its tree matches
+verified head `54f320cf`, with all five GitHub checks passing.
+
 ## 2026-10-04
 
 ### Support Sonnet 5.5 and GPT-6.1 Sol

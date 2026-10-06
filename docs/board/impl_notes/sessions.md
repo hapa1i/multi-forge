@@ -8,6 +8,18 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Revalidate launch arguments under the authority lock (session_launch_effort, shipped 2026-10-06)
+
+- CLI and ops validation must refuse invalid runtime arguments before session, worktree, or proxy mutation. Repeat
+  validation inside `authority_launch_transaction` using the locked manifest: authority can change to advisory between
+  the early check and launch, making previously allowed passthrough capable of disabling enforcement.
+- The locked check must precede seam validation, launch events, and active registration. Keep launch arguments required
+  at the transaction boundary so every Claude and Codex caller supplies them; an advisory refusal must leave no launch
+  attempt or active row.
+
+Sources: [reviewed closeout](../done/session_launch_effort/checklist.md), [session design](../../design_sessions.md),
+and [authority-race regression](../../../tests/regression/test_bug_launch_args_authority_race.py).
+
 ### Binding a pre-existing conversation is a uniqueness problem, not a write problem (native_session_adoption, shipped 2026-07-27)
 
 - **A lock only excludes what it encloses.** Uniqueness needs its guard at the narrowest scope covering *every* writer.

@@ -4,8 +4,8 @@
 
 ## Current focus
 
-Review findings addressed and verified; [PR #257](https://github.com/hapa1i/multi-forge/pull/257) is open against
-`main`.
+Completed 2026-10-06. [PR #257](https://github.com/hapa1i/multi-forge/pull/257) merged to `main` as `845811c2`; its tree
+matches verified head `54f320cf`, with all five GitHub checks passing.
 
 ## Evidence gathered
 
@@ -95,3 +95,14 @@ Review findings addressed and verified; [PR #257](https://github.com/hapa1i/mult
   regression cases and the TestClient deprecation regression.
 - [x] `make pre-commit` on the final tree (plus hooks on the untracked card and new files).
 - [x] Commit, push, and open [PR #257](https://github.com/hapa1i/multi-forge/pull/257) with verification evidence.
+
+## Closeout
+
+- [x] Confirm the merge tree matches the tested PR head and all GitHub checks passed.
+- [x] Verify the CLI reference, design/session/workflow docs, and end-user session/proxy guides describe the shipped
+  launch-only arguments, authority validation, and translated effort behavior.
+- [x] Record the completed work in the board change log and retain the reviewed authority-lock and effort opt-in
+  invariants in the session and runtime implementation notes.
+- [x] Move the card and checklist to `done/session_launch_effort/`; no inbound repository links used the old lane.
+- [x] `make pre-commit-md` passes, including file-size checks; the repository link audit passes for all 620 Markdown
+  sources. Refreshed provider token counts for the changed board ledgers.

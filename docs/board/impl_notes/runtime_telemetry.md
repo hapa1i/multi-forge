@@ -8,6 +8,18 @@ Durable routing, backend, consumer, proxy, policy, and telemetry decisions.
 
 ## Notes
 
+### Distinguish explicit effort from client defaults (session_launch_effort, shipped 2026-10-06)
+
+- Claude sends `output_config.effort` even when the user did not select effort. Field presence cannot establish intent:
+  translated routes honor it only with the Forge launch opt-in `X-Forge-Effort-Source: client`. Otherwise retain the
+  existing thinking-derived effort and tier floor.
+- Opted-in client effort replaces the tier floor and clamps to the mapped model's supported levels. Keep the opt-in
+  local to that launch: scrub inherited headers from headless children and never forward the Forge header upstream.
+
+Sources: [reviewed closeout](../done/session_launch_effort/checklist.md), [proxy guide](../../end-user/proxy.md),
+[effort tests](../../../tests/src/proxy/test_reasoning_effort.py), and
+[child environment tests](../../../tests/src/core/reactive/test_env.py).
+
 ### Model migrations must verify request capabilities and gateway metadata (gpt_astra_defaults, shipped 2026-09-06)
 
 - Enforce sampling support from the catalog at the request builder. A gateway's model-name guard can stop applying when
@@ -374,14 +386,16 @@ Sources: `src/forge/core/effort.py`, `core/llm/types.py`, `core/reactive/session
 `cli/{session_fork,session_lifecycle,policy,memory}.py`. Each invariant was adversarially verified against the shipped
 code (file:line) before promotion.
 
-- **Two effort vocabularies, two validator homes — do not merge them.** Claude `--effort` =
+- **Claude and checker effort vocabularies have separate validator homes.** Claude `--effort` =
   `{low,medium,high,xhigh,max}` (`validate_claude_effort`, `core/effort.py`); core.llm `ReasoningEffort` =
-  `{none,low,medium,high,xhigh}` (`validate_reasoning_effort`, `core/llm/types.py`). `max` is Claude-only; `none` is
-  checker-only; a drift-guard test asserts they stay unequal. The Claude validator lives in the dependency-light leaf
-  `core/effort.py`, **not** `core/reactive/effort.py`, because `core/reactive/__init__.py` eagerly imports the heavy
-  session runner — importing it from the foundational `session/models.py` would re-create an import cycle. So
-  `session/models.py` keeps an inline `_CHECKER_EFFORT_LEVELS` mirror (drift-guarded by `test_effort.py`) instead of
-  importing the core.llm vocab.
+  `{none,low,medium,high,xhigh}` (`validate_reasoning_effort`, `core/llm/types.py`). Between these two surfaces, `max`
+  is Claude-only and `none` is checker-only; a drift-guard test asserts they stay unequal. Managed Codex launches use
+  `CODEX_EFFORT_LEVELS` (`none|minimal|low|medium|high|xhigh|max`), while provider transports use the catalog-aware
+  `ModelReasoningEffort` union; neither broadens the checker vocabulary. The Claude validator lives in the
+  dependency-light leaf `core/effort.py`, **not** `core/reactive/effort.py`, because `core/reactive/__init__.py` eagerly
+  imports the heavy session runner — importing it from the foundational `session/models.py` would re-create an import
+  cycle. So `session/models.py` keeps an inline `_CHECKER_EFFORT_LEVELS` mirror (drift-guarded by `test_effort.py`)
+  instead of importing the core.llm vocab.
 - **`run_claude_session` `--effort` is fail-loud, NOT retry-latch.** It appends `--effort` after `--model`; if an older
   `claude` rejects the flag (`_is_effort_flag_rejection`) the run fails loud with `call_count == 1` — no silent
   rerun-at-default. This is deliberately the opposite of the `--output-format json` telemetry path, which
