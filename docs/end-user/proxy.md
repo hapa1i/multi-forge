@@ -721,6 +721,14 @@ per-tier because each model has different limits and optimal defaults.
 `tier_overrides.opus.temperature`. The translated Responses path omits sampling parameters for models such as Astra that
 do not support them.
 
+#### Launch effort on translated routes
+
+On translated routes, `reasoning_effort` floors the effort Forge derives from Claude's thinking request. Claude Code's
+own per-request effort is ignored unless the launch passed `--effort`
+([session guide](session.md#set-effort-or-runtime-flags-for-one-launch)); then it replaces both, clamped to the mapped
+model's levels, and a `--model` launch warns first when the model cannot express it. Anthropic passthrough forwards
+Claude's effort unchanged; an `override`-mode floor still applies.
+
 Tier hyperparameters do not have an environment-variable override layer. Environment variables remain supported for
 documented credentials and connection values, such as `OPENROUTER_API_KEY` and `LITELLM_BASE_URL`; use the proxy file
 for tier defaults.

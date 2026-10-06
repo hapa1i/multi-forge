@@ -28,6 +28,7 @@ from forge.core.ops.codex_session import (
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.runtime.codex_preflight import CodexPreflight, HookSeam
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.usage.ledger import read_usage_events
 from forge.session import IndexStore, SessionManager, SessionNotFoundError, SessionStore
 from forge.session.codex_handoff import (
@@ -903,6 +904,29 @@ class TestContinueCodexSession:
         assert [event.operation for event in events] == ["resume"]
         assert state.confirmed.route_commit is not None
         assert state.confirmed.route_commit.run_id == events[0].run_id
+
+    def test_resume_launch_args_precede_resume_subcommand(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+
+        with _codex_mocks() as codex:
+            continue_codex_session(
+                ctx=ctx,
+                name="impl",
+                task="Keep going",
+                launch_args=RuntimeLaunchArgs(effort="low", passthrough=("--enable", "web_search")),
+            )
+
+        assert codex.argv[-6:] == [
+            "-c",
+            'model_reasoning_effort="low"',
+            "--enable",
+            "web_search",
+            "resume",
+            _SUCCESS_TID,
+        ]
 
     def test_deleted_during_resume_returns_result_without_recreating_state(
         self,

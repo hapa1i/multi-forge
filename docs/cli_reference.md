@@ -200,6 +200,14 @@ selecting again; recovery preserves the complete intended lifecycle command when
 Forge `--model` is not Claude Code's in-conversation `/model`: the former resolves durable session launch routing before
 the child starts; the latter changes runtime-native state inside an active Claude conversation.
 
+Claude `start`, `resume`, `fork`, and `incognito`, plus Codex `start` and `resume`, accept launch-only `--effort` and a
+`-- <runtime flags>` tail; neither is persisted. Claude levels are `low/medium/high/xhigh/max` (`claude --effort`);
+Codex levels are `none/minimal/low/medium/high/xhigh/max` (`-c model_reasoning_effort=...`). Runtime flags Forge manages
+(for example session identity, resume target, model, hooks, sandbox, or provider) are refused with the Forge equivalent.
+Advisory-authority launches refuse any `--` tail, `--no-launch` refuses both, and route-recovery commands reproduce
+both. On translated proxy routes `--effort` stamps `X-Forge-Effort-Source: client` so the proxy honors Claude's
+per-request effort over the tier floor ([proxy guide](end-user/proxy.md#launch-effort-on-translated-routes)).
+
 Rewind resume is available on Claude sessions with `--strategy rewind --drop-last N`.
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` may create a same-directory child: Forge writes
 a fresh truncated transcript UUID and resumes that UUID, not the parent's.

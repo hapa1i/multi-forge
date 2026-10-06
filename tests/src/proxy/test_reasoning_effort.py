@@ -286,3 +286,56 @@ class TestResolveReasoningEffort:
             request_id="req-1",
         )
         assert result is None
+
+
+class TestClientEffortOptIn:
+    """`output_config.effort` counts only when the launch sent the effort-source opt-in."""
+
+    @staticmethod
+    def _request(effort: object = "low", thinking: object = None, reasoning_effort: str | None = None):
+        if thinking is None:
+            thinking = {"type": "adaptive"}
+        return SimpleNamespace(
+            reasoning_effort=reasoning_effort,
+            thinking=thinking,
+            output_config={"effort": effort},
+        )
+
+    def _resolve(self, request: object, *, honor: bool, floor: str | None = "high", model: str = "openai/gpt-6-astra"):
+        return resolve_reasoning_effort(
+            request,
+            tier_override=TierOverride(reasoning_effort=floor) if floor is not None else None,
+            model_id=model,
+            request_id="req-1",
+            honor_client_effort=honor,
+        )
+
+    def test_without_opt_in_client_effort_is_ignored(self):
+        # adaptive -> medium, floored to the tier's high: the established behavior.
+        assert self._resolve(self._request(effort="max"), honor=False) == "high"
+        assert self._resolve(self._request(effort="low"), honor=False) == "high"
+
+    def test_opt_in_client_effort_beats_tier_floor_in_both_directions(self):
+        assert self._resolve(self._request(effort="low"), honor=True) == "low"
+        assert self._resolve(self._request(effort="max"), honor=True) == "max"
+
+    def test_opt_in_client_effort_clamps_to_model_levels(self):
+        result = self._resolve(self._request(effort="max"), honor=True, model="google/gemini-3.7-flash")
+        assert result == "high"
+
+    def test_explicit_reasoning_effort_still_wins(self):
+        request = self._request(effort="max", reasoning_effort="medium")
+        assert self._resolve(request, honor=True) == "medium"
+
+    @pytest.mark.parametrize("thinking_type", ["between_tools", "disabled"])
+    def test_non_upfront_thinking_keeps_translated_approximation(self, thinking_type: str):
+        request = self._request(effort="max", thinking={"type": thinking_type})
+        assert self._resolve(request, honor=True, floor=None) == "low"  # gpt-6-astra's lowest level
+
+    @pytest.mark.parametrize("effort", ["ultra", "none", None, 3])
+    def test_invalid_client_effort_falls_back_to_derivation(self, effort: object):
+        assert self._resolve(self._request(effort=effort), honor=True) == "high"
+
+    def test_missing_output_config_falls_back_to_derivation(self):
+        request = SimpleNamespace(reasoning_effort=None, thinking={"type": "adaptive"})
+        assert self._resolve(request, honor=True, floor=None) == "medium"

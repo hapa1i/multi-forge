@@ -479,15 +479,17 @@ stable across resumes. A matching `[1m]` execution projection is inherited with 
 remain compatible with that persisted proxy; `--proxy <name>` or `--no-proxy` is required to cross the route boundary.
 
 **Authority launch transaction:** Every managed launch path mints one root `RunIdentity` before invocation and rereads
-authority intent under the session authority lock. An unmarked launch retains that lock for the complete legacy child
-lifetime, preventing a concurrent control-plane command from assigning authority after the launcher committed to an
-unmarked environment; its existing active registration remains best-effort. A marked launch instead proves the runtime
-seam, requires active registration, and durably appends `launch_preflight` then `run_started` under the lock before
-releasing it and invoking the child. Set/clear use the same lock and turn live-launch contention into a short,
-actionable refusal. The invoker does not remint the identity. Outside an explicitly compensated pre-invocation abort,
-Forge attempts same-run `run_ended` and clears marked active state. A failed preflight produces `launch_aborted` and no
-started claim. A spawn exception after the commit is `child_never_spawned`; a spawned child returning nonzero is
-`child_exited_nonzero`, so `run_started` means “Forge committed to invoke,” not “the child was observed alive.”
+authority intent under the session authority lock. Launch arguments are revalidated against that locked state before
+runtime-seam checks, journal events, or active registration; a late advisory designation therefore refuses passthrough.
+An unmarked launch retains that lock for the complete legacy child lifetime, preventing a concurrent control-plane
+command from assigning authority after the launcher committed to an unmarked environment; its existing active
+registration remains best-effort. A marked launch instead proves the runtime seam, requires active registration, and
+durably appends `launch_preflight` then `run_started` under the lock before releasing it and invoking the child.
+Set/clear use the same lock and turn live-launch contention into a short, actionable refusal. The invoker does not
+remint the identity. Outside an explicitly compensated pre-invocation abort, Forge attempts same-run `run_ended` and
+clears marked active state. A failed preflight produces `launch_aborted` and no started claim. A spawn exception after
+the commit is `child_never_spawned`; a spawned child returning nonzero is `child_exited_nonzero`, so `run_started` means
+“Forge committed to invoke,” not “the child was observed alive.”
 
 Advisory Claude requires the exact catch-all registration and current executable dispatcher. Advisory Codex requires
 exactly one user-scope no-matcher `codex-policy-check` row with the installed command bytes and timeout, then performs

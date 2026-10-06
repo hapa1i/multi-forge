@@ -48,6 +48,8 @@ from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.models.types import REQUIRED_TIERS
 from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
+    FORGE_EFFORT_SOURCE_CLIENT,
+    FORGE_EFFORT_SOURCE_HEADER,
     FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
@@ -669,6 +671,14 @@ def is_valid_model_tier(tier: str) -> bool:
     return tier in REQUIRED_TIERS
 
 
+def _client_effort_requested(raw_request: Request) -> bool:
+    """Whether the launch opted into honoring Claude's ``output_config.effort``.
+
+    Only translated handlers read this; passthrough never forwards Forge headers.
+    """
+    return raw_request.headers.get(FORGE_EFFORT_SOURCE_HEADER) == FORGE_EFFORT_SOURCE_CLIENT
+
+
 def _projected_model_tier(raw_request: Request) -> str | None:
     """Read the Forge-owned tier projection recorded at header ingress.
 
@@ -1135,15 +1145,17 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             openai_request_dict["top_p"] = request_data.top_p
 
         # Optional reasoning/thinking overrides.
-        # Priority: request explicit > thinking-derived > tier_override > model default
-        # tier_override acts as a FLOOR (never go below the user's tier config);
-        # the result is normalized against the catalog's effort levels for the
-        # mapped model (explicit unsupported values reject, derived ones clamp).
+        # Priority: request explicit > opted-in client effort > thinking-derived >
+        # tier_override > model default. tier_override acts as a FLOOR unless the
+        # launch opted into client effort; the result is normalized against the
+        # catalog's effort levels for the mapped model (explicit unsupported
+        # values reject, client and derived ones clamp).
         openai_request_dict["reasoning_effort"] = resolve_reasoning_effort(
             request_data,
             tier_override=tier_override,
             model_id=actual_model_id,
             request_id=request_id,
+            honor_client_effort=_client_effort_requested(raw_request),
         )
 
         # Note: the raw `thinking` dict is NOT forwarded — it's Anthropic-specific.

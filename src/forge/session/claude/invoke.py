@@ -34,6 +34,7 @@ def invoke_claude(
     extra_args: list[str] | None = None,
     run_identity: RunIdentity | None = None,
     projected_model_tier: str | None = None,
+    client_effort_source: bool = False,
 ) -> int:
     """Invoke the Claude Code CLI binary.
 
@@ -52,6 +53,7 @@ def invoke_claude(
         cwd: Working directory for Claude process.
         extra_args: Additional CLI arguments to pass through to Claude.
         projected_model_tier: Forge-owned proxy tier to send on each request.
+        client_effort_source: Ask a translated Forge proxy to honor Claude's effort.
 
     Returns:
         Claude's exit code.
@@ -96,15 +98,12 @@ def invoke_claude(
     )
     cmd[0] = claude_binary
 
-    env = (
-        _build_environment(env_vars, unset_env_vars, projected_model_tier=projected_model_tier)
-        if run_identity is None
-        else _build_environment(
-            env_vars,
-            unset_env_vars,
-            run_identity=run_identity,
-            projected_model_tier=projected_model_tier,
-        )
+    env = _build_environment(
+        env_vars,
+        unset_env_vars,
+        run_identity=run_identity,
+        projected_model_tier=projected_model_tier,
+        client_effort_source=client_effort_source,
     )
 
     try:
@@ -195,6 +194,7 @@ def _build_environment(
     *,
     run_identity: RunIdentity | None = None,
     projected_model_tier: str | None = None,
+    client_effort_source: bool = False,
 ) -> dict[str, str]:
     """Build the environment for an interactive Claude process.
 
@@ -216,6 +216,7 @@ def _build_environment(
     from forge.core.reactive.env import (
         FORGE_PARENT_RUN_ID_VAR,
         apply_attribution_header_policy,
+        apply_forge_effort_source_header,
         apply_forge_model_tier_header,
         apply_interactive_api_key,
         build_claude_env,
@@ -231,6 +232,7 @@ def _build_environment(
     for key in unset_vars or ():
         env.pop(key, None)
     apply_forge_model_tier_header(env, projected_model_tier)
+    apply_forge_effort_source_header(env, client=client_effort_source)
     apply_attribution_header_policy(env)
     # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
     # interactive_anthropic_api_key policy wins over anything merged above.

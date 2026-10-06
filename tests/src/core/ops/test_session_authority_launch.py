@@ -16,6 +16,7 @@ from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import RunIdentity, new_root_run_identity
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.install.codex_hooks import get_builtin_codex_entries, render_codex_block
 from forge.install.hooks import ForgeHookRegistration
 from forge.session.active import ActiveSessionStore
@@ -54,6 +55,7 @@ def test_marked_launch_commits_preflight_and_start_before_runner(
     root = new_root_run_identity()
 
     with launch.authority_launch_transaction(
+        launch_args=RuntimeLaunchArgs(),
         store=store,
         root=root,
         operation="start",
@@ -89,6 +91,7 @@ def test_pre_invocation_abort_skips_run_ended_and_clears_active(tmp_path: Path) 
 
     with pytest.raises(ForgeOpError, match="projection failed"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -130,6 +133,7 @@ def test_pre_invocation_abort_reports_authority_and_active_cleanup_failures(
 
     with pytest.raises(ForgeOpError) as raised:
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -162,6 +166,7 @@ def test_route_preparation_failure_writes_no_routing_history_or_invokes_child(
 
     with pytest.raises(ValueError, match="catalog invalid"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -213,6 +218,7 @@ def test_invalid_proxy_backend_is_actionable_before_routing_or_child(
         match=r"proxy\.yaml for proxy 'edited-proxy' is invalid: Invalid proxy\.backend: 'OpenRouter'",
     ):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -249,6 +255,7 @@ def test_routing_append_failure_compensates_marked_transaction_without_child(
 
     with pytest.raises(ForgeOpError, match="required routing commit append failed"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=root,
             operation="start",
@@ -307,6 +314,7 @@ def test_projection_failure_compensates_routing_then_authority_without_run_ended
 
     with pytest.raises(ForgeOpError, match="route projection failed"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=root,
             operation="resume",
@@ -360,6 +368,7 @@ def test_routing_validation_failure_compensates_authority_without_run_ended(tmp_
 
     with pytest.raises(ForgeOpError, match="routing commit validation failed"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=root,
             operation="start",
@@ -417,6 +426,7 @@ def test_projection_compensation_failures_are_aggregated_and_child_is_suppressed
 
     with pytest.raises(ForgeOpError) as raised:
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=root,
             operation="resume",
@@ -464,6 +474,7 @@ def test_spawn_failure_after_projection_retains_route_with_same_root_run_id(
 
     with pytest.raises(FileNotFoundError, match="missing child"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=root,
             operation="start",
@@ -512,6 +523,7 @@ def test_spawn_failure_is_distinct_from_nonzero_exit(tmp_path: Path) -> None:
     )
     with pytest.raises(FileNotFoundError):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=spawn_store,
             root=new_root_run_identity(),
             operation="start",
@@ -527,6 +539,7 @@ def test_spawn_failure_is_distinct_from_nonzero_exit(tmp_path: Path) -> None:
     nonzero_root.mkdir()
     nonzero_store = _store(nonzero_root)
     with launch.authority_launch_transaction(
+        launch_args=RuntimeLaunchArgs(),
         store=nonzero_store,
         root=new_root_run_identity(),
         operation="resume",
@@ -545,6 +558,7 @@ def test_post_child_oserror_is_not_reported_as_never_spawned(tmp_path: Path) -> 
 
     with pytest.raises(OSError, match="post-child"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -565,6 +579,7 @@ def test_advisory_sidecar_refuses_without_started_claim(tmp_path: Path) -> None:
 
     with pytest.raises(ForgeOpError, match="unsupported"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -600,6 +615,7 @@ def test_marker_failure_happens_before_active_registration_or_started_claim(
 
     with pytest.raises(ForgeOpError, match="construct.*marker"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",
@@ -708,6 +724,7 @@ def test_codex_advisory_verifies_enrollment_on_every_attempt(tmp_path: Path, mon
     markers: list[str] = []
     for _ in range(2):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="resume",
@@ -757,6 +774,7 @@ def test_unmarked_launch_holds_authority_lock_without_using_active_registry(
     errors: list[Exception] = []
 
     with launch.authority_launch_transaction(
+        launch_args=RuntimeLaunchArgs(),
         store=store,
         root=new_root_run_identity(),
         operation="start",
@@ -804,6 +822,7 @@ def test_concurrent_unmarked_launch_has_actionable_lock_contention_error(
     monkeypatch.setattr(launch, "AUTHORITY_LAUNCH_LOCK_TIMEOUT_S", 0.01)
 
     with launch.authority_launch_transaction(
+        launch_args=RuntimeLaunchArgs(),
         store=store,
         root=new_root_run_identity(),
         operation="start",
@@ -813,6 +832,7 @@ def test_concurrent_unmarked_launch_has_actionable_lock_contention_error(
     ):
         with pytest.raises(ForgeOpError, match="another launch or authority change in progress"):
             with launch.authority_launch_transaction(
+                launch_args=RuntimeLaunchArgs(),
                 store=store,
                 root=new_root_run_identity(),
                 operation="resume",
@@ -842,6 +862,7 @@ def test_unmarked_launch_wraps_lock_open_failure_as_actionable_command_error(
         match="could not coordinate launch.*authority lock.*permission denied",
     ):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="start",

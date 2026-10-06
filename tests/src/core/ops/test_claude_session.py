@@ -11,7 +11,10 @@ from forge.core.ops import claude_session as claude_session_ops
 from forge.core.ops import session_fork_execution as fork_execution_ops
 from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import SessionState, SessionStore, create_session_state
+from forge.session.authority import read_authority_events
+from forge.session.models import AuthorityIntent
 
 
 def _resolve(state: SessionState, *, cwd: Path) -> claude_session_ops.ClaudeSessionStateContext:
@@ -280,3 +283,69 @@ def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
     assert result.exit_code == 0
     assert [name for name, _value in observed] == ["route_line", "commit", "child"]
     assert all(value is payload for _name, value in observed)
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expect_opt_in"),
+    [("http://127.0.0.1:65530", True), (None, False)],
+    ids=["proxied", "direct"],
+)
+def test_host_launch_projects_launch_args_and_opts_in_only_when_proxied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str | None,
+    expect_opt_in: bool,
+) -> None:
+    state = create_session_state(
+        "effort",
+        proxy_template="litellm-openai" if base_url else None,
+        proxy_base_url=base_url,
+        worktree_path=str(tmp_path),
+    )
+    state.forge_root = str(tmp_path)
+    SessionStore(str(tmp_path), state.name).write(state)
+    monkeypatch.setattr(claude_session_ops, "build_claude_routing_payload", lambda *_a, **_k: {})
+    monkeypatch.setattr(claude_session_ops, "commit_launch_routing", lambda **_k: None)
+    monkeypatch.setattr(claude_session_ops, "read_proxy_cost_baseline", lambda _base_url: None)
+    captured: dict[str, object] = {}
+
+    def invoke(**kwargs: object) -> int:
+        captured.update(kwargs)
+        return 0
+
+    launch_claude_session(
+        manifest=state,
+        session_id="effort-uuid",
+        resume_id=None,
+        effective_template="litellm-openai" if base_url else None,
+        runtime_base_url=base_url,
+        context_limit=200_000,
+        use_sidecar=False,
+        launch_args=RuntimeLaunchArgs(effort="max", passthrough=("--debug",)),
+        invoke=invoke,
+        run_active=lambda runner, **_kwargs: runner(),
+    )
+
+    assert captured["extra_args"] == ["--effort", "max", "--debug"]
+    assert captured.get("client_effort_source", False) is expect_opt_in
+
+
+def test_launch_refuses_advisory_passthrough_before_authority_attempt(tmp_path: Path) -> None:
+    state = create_session_state("planner", worktree_path=str(tmp_path), authority=AuthorityIntent("advisory"))
+    state.forge_root = str(tmp_path)
+    SessionStore(str(tmp_path), state.name).write(state)
+
+    with pytest.raises(ForgeOpError, match="not accepted for advisory-authority launches"):
+        launch_claude_session(
+            manifest=state,
+            session_id=None,
+            resume_id=None,
+            effective_template=None,
+            runtime_base_url=None,
+            context_limit=200_000,
+            use_sidecar=False,
+            launch_args=RuntimeLaunchArgs(passthrough=("--bare",)),
+            invoke=lambda **_kwargs: pytest.fail("refused launch must not invoke Claude"),
+        )
+
+    assert read_authority_events(str(tmp_path), state.name) == []

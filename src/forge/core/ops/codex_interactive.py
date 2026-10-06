@@ -63,6 +63,7 @@ from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
 from forge.core.runtime.codex_preflight import CodexPreflightError, assert_codex_ready
 from forge.core.runtime.codex_rollouts import find_rollout_path, find_rollouts_since
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import now_iso
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager, SessionState
@@ -83,11 +84,12 @@ from forge.session.models import (
     CodexConfirmed,
     Derivation,
     SessionIndexEntry,
+    inherited_authority,
 )
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
 
-from .session_authority_launch import authority_launch_transaction
+from .session_authority_launch import authority_launch_transaction, require_launch_args
 from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
@@ -144,6 +146,7 @@ def start_interactive_codex_session(
     authority_explicit: bool = False,
     announce: Callable[[CodexInteractiveLaunch], None] | None = None,
     invoke: Callable[..., int] = invoke_codex_interactive,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> CodexInteractiveResult:
     """Create a Codex-runtime session and run it as a foreground ``codex`` TUI.
 
@@ -168,6 +171,7 @@ def start_interactive_codex_session(
 
     manager = SessionManager()
     parent_entry: SessionIndexEntry | None = None
+    launched_authority = authority if authority_explicit else None
     if parent is not None:
         try:
             parse_transfer_context_strategy(strategy)
@@ -186,6 +190,9 @@ def start_interactive_codex_session(
             raise ForgeOpError(str(e)) from e
         except ForgeSessionError as e:
             raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
+        if not authority_explicit:
+            launched_authority = inherited_authority(parent_state.intent.authority)
+    launch_args = require_launch_args(launch_args, runtime="codex", authority=launched_authority)
 
     # Fail closed before any state exists (runs `codex doctor` ~20s, once).
     try:
@@ -292,6 +299,7 @@ def start_interactive_codex_session(
     # The TUI launch: NO rollback past this point -- the session is the user's.
     with authority_launch_transaction(
         store=store,
+        launch_args=launch_args,
         root=root,
         operation="start",
         launch_mode=LAUNCH_MODE_HOST,
@@ -309,6 +317,7 @@ def start_interactive_codex_session(
                 sandbox=sandbox,
                 initial_prompt=initial_prompt,
                 authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+                extra_args=launch_args.runtime_argv("codex"),
             )
 
         commit_launch_routing(
@@ -424,6 +433,7 @@ def reattach_codex_session(
     sandbox: CodexSandbox = "workspace-write",
     announce: Callable[[CodexInteractiveLaunch], None] | None = None,
     invoke: Callable[..., int] = invoke_codex_interactive,
+    launch_args: RuntimeLaunchArgs | None = None,
 ) -> CodexInteractiveResult:
     """Reattach to an existing Codex session as a foreground TUI (``codex resume``).
 
@@ -436,6 +446,7 @@ def reattach_codex_session(
     manager = SessionManager()
     entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
     thread_id = require_codex_thread_id(state, name)
+    launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
     try:
         preflight = assert_codex_ready()
@@ -467,6 +478,7 @@ def reattach_codex_session(
 
     with authority_launch_transaction(
         store=store,
+        launch_args=launch_args,
         root=root,
         operation="resume",
         launch_mode=LAUNCH_MODE_HOST,
@@ -484,6 +496,7 @@ def reattach_codex_session(
                 sandbox=sandbox,
                 resume_thread_id=thread_id,
                 authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+                extra_args=launch_args.runtime_argv("codex"),
             )
 
         commit_launch_routing(

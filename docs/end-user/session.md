@@ -145,7 +145,7 @@ forge session start [name] \
   [--system-prompt/-s <text>] \
   [--system-prompt-file/-S <path>] \
   [--sidecar|--host-proxy] [--mount <host:container>] [--image <name>] \
-  [--no-launch]
+  [--no-launch] [--effort <level>] [-- <runtime flags>...]
 
 # Adopt a conversation you started outside Forge (run from its launch directory)
 forge session adopt [--json]                          # preview unbound conversations here
@@ -575,6 +575,22 @@ the existing conversation in place after the previous launch has ended.
 - `--strategy` and `--depth` shape a fresh transfer child, so explicit uses require `--fresh`; omitted defaults do not
   change ordinary reattach. A positive `--depth N` bounds ancestry traversal, while `--depth all` follows the lineage to
   its terminal ancestor.
+
+### Set effort or runtime flags for one launch
+
+`start`, `resume`, `fork`, and `incognito` accept `--effort` and a `--` tail that Forge appends to the runtime command
+for that launch only. Nothing is saved, so a later bare resume uses the runtime default again.
+
+```bash
+forge session start auth-refactor --effort high -- --add-dir ../shared
+forge session resume impl --effort xhigh -- -m gpt-5.5   # Codex session
+```
+
+Claude accepts `low|medium|high|xhigh|max`; Codex accepts `none|minimal|low|medium|high|xhigh|max`, and the model may
+reject unsupported levels. Forge reserves runtime `--worktree`, Claude `--model`/`--bare`, and Codex sandbox (including
+`--yolo`), provider, remote, and persistence flags. Advisory-authority launches accept only `--effort`, since flags can
+disable authority hooks; `--no-launch` rejects both. For translated proxy routes, see
+[launch effort](proxy.md#launch-effort-on-translated-routes).
 
 ### Adopt a conversation you started outside Forge
 

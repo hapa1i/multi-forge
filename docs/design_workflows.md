@@ -651,17 +651,18 @@ frontmatter. The value overrides Claude's model effort when the skill is invoked
 (`analyze`, `debate`) that benefit from maximum reasoning. This is orthogonal to proxy-level `reasoning_effort`
 hyperparameters, which control the routed model's behavior.
 
-Forge injects `claude --effort` per-caller on its automated `claude -p` subprocesses (never the user's interactive
-session). Each consumer carries its own optional effort field and, where a CLI exists, an `--effort` flag: the Claude
-arm of the supervisor frontier (`supervisor_effort`), memory writer (`MemoryWriterConfig.effort`), shadow curation
-(pass-through), team supervisor (`TeamSupervisorConfig.effort`), and the workflow fan-out
-(`run_multi_review(reasoning_effort=...)`). For consumers with both Claude and Codex arms, this field affects only the
-Claude dispatch; the Codex arm uses its own runtime configuration. The central Claude builder is `run_claude_session`
-(`core/reactive/session_runner.py`); the review fan-out builds its argv in `review/engine.py:_prepare_worker`. These use
-the `claude --effort` vocabulary (`low/medium/high/xhigh/max`), distinct from the tier-1 checker's `core.llm`
-`reasoning_effort` (`none/low/medium/high/xhigh`) — the checker is an API call, not a `-p` subprocess. An older `claude`
-that rejects `--effort` fails loud (no silent rerun at default), unlike the `--output-format` telemetry retry. There is
-no global default effort knob; effort is per-caller by design.
+Forge injects `claude --effort` per-caller on its automated `claude -p` subprocesses; the user's interactive session
+receives it only from an explicit launch `--effort` ([design §3.4](design.md#34-proxy-vs-no-proxy-mode)). Each consumer
+carries its own optional effort field and, where a CLI exists, an `--effort` flag: the Claude arm of the supervisor
+frontier (`supervisor_effort`), memory writer (`MemoryWriterConfig.effort`), shadow curation (pass-through), team
+supervisor (`TeamSupervisorConfig.effort`), and the workflow fan-out (`run_multi_review(reasoning_effort=...)`). For
+consumers with both Claude and Codex arms, this field affects only the Claude dispatch; the Codex arm uses its own
+runtime configuration. The central Claude builder is `run_claude_session` (`core/reactive/session_runner.py`); the
+review fan-out builds its argv in `review/engine.py:_prepare_worker`. These use the `claude --effort` vocabulary
+(`low/medium/high/xhigh/max`), distinct from the tier-1 checker's `core.llm` `reasoning_effort`
+(`none/low/medium/high/xhigh`) — the checker is an API call, not a `-p` subprocess. An older `claude` that rejects
+`--effort` fails loud (no silent rerun at default), unlike the `--output-format` telemetry retry. There is no global
+default effort knob; effort is per-caller by design.
 
 This maps to the three reactive node types in §1.2 (Code, LLM call, headless agent). "Pure text" is a specialization: no
 Python runtime deps, so the prompt is portable across models/runners (the execution environment still has tools).

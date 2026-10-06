@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
     FORGE_COMMAND_VAR,
@@ -582,6 +584,7 @@ class TestCorrelationHeaders:
 
     from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR as _H
     from forge.core.run_id import FORGE_COMMAND_HEADER as _CMD_H
+    from forge.core.run_id import FORGE_EFFORT_SOURCE_HEADER as _EFFORT_H
     from forge.core.run_id import FORGE_MODEL_TIER_HEADER as _MODEL_TIER_H
     from forge.core.run_id import FORGE_ROOT_RUN_ID_HEADER as _ROOT_H
     from forge.core.run_id import FORGE_RUN_ID_HEADER as _RUN_H
@@ -634,6 +637,18 @@ class TestCorrelationHeaders:
         lines = env[self._H].splitlines()
         assert "X-User: keep" in lines
         assert not any(line.lower().startswith(f"{self._MODEL_TIER_H.lower()}:") for line in lines)
+
+    @pytest.mark.parametrize("routed", [True, False], ids=["proxy-routed", "direct"])
+    def test_headless_child_strips_inherited_effort_source(self, routed: bool) -> None:
+        # The opt-in describes the interactive launch's own effort choice, never a child's.
+        vars_ = self._marker_vars() if routed else {}
+        vars_[self._H] = f"X-User: keep\n{self._EFFORT_H}: client"
+
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE if routed else None, direct=not routed)
+
+        lines = env[self._H].splitlines()
+        assert "X-User: keep" in lines
+        assert not any(line.lower().startswith(f"{self._EFFORT_H.lower()}:") for line in lines)
 
     def test_header_run_id_matches_env_run_id(self) -> None:
         env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)

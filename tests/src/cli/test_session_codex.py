@@ -38,6 +38,7 @@ from forge.core.ops.codex_session import (
     CodexSessionStartResult,
 )
 from forge.core.ops.session import ForgeOpError
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import IndexStore
 from forge.session.active import ActiveSessionEntry
 from forge.session.models import CodexConfirmed, create_session_state
@@ -236,6 +237,7 @@ class TestStartCodexDispatch:
             worktree=False,
             branch=None,
             context_delivery="initial-message",
+            launch_args=RuntimeLaunchArgs(),
         )
 
     def test_explicit_options_pass_through(self, runner: CliRunner, project: Path) -> None:
@@ -326,6 +328,7 @@ class TestStartInteractiveDispatch:
             worktree=False,
             branch=None,
             context_delivery="initial-message",
+            launch_args=RuntimeLaunchArgs(),
         )
 
     def test_bridge_without_task_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
@@ -410,6 +413,53 @@ class TestStartInteractiveDispatch:
         interactive.assert_not_called()
 
 
+class TestCodexLaunchArgs:
+    def test_start_forwards_effort_and_passthrough(self, runner: CliRunner, project: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(
+                main, ["session", "start", "impl", "--runtime", "codex", "--effort", "minimal", "--", "-m", "gpt-x"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert launch.call_args.kwargs["launch_args"] == RuntimeLaunchArgs(
+            effort="minimal", passthrough=("-m", "gpt-x")
+        )
+
+    @pytest.mark.parametrize(
+        "tail",
+        [["--sandbox", "danger-full-access"], ["-c", "model_reasoning_effort=high"], ["--profile", "work"]],
+    )
+    def test_start_refuses_forge_owned_codex_flags(self, runner: CliRunner, project: Path, tail: list[str]) -> None:
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex", "--", *tail])
+
+        assert result.exit_code == 1
+        assert "is managed by Forge" in result.output
+        launch.assert_not_called()
+
+    def test_resume_forwards_launch_args_to_reattach(self, runner: CliRunner, tmp_path: Path) -> None:
+        with (
+            patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+        ):
+            mgr_cls.return_value.get_session.return_value = create_session_state(
+                "impl", worktree_path=str(tmp_path), runtime="codex"
+            )
+            result = runner.invoke(main, ["session", "resume", "impl", "--effort", "xhigh", "--", "--search"])
+
+        assert result.exit_code == 0, result.output
+        reattach.assert_called_once_with(
+            name="impl", launch_args=RuntimeLaunchArgs(effort="xhigh", passthrough=("--search",))
+        )
+
+
 class TestResumeCodexDispatch:
     def _codex_state(self, tmp_path: Path) -> object:
         return create_session_state("impl", worktree_path=str(tmp_path), runtime="codex")
@@ -423,7 +473,9 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl", "--task", "next step"])
 
         assert result.exit_code == 0
-        resume.assert_called_once_with(name="impl", task="next step", sandbox="workspace-write")
+        resume.assert_called_once_with(
+            name="impl", task="next step", sandbox="workspace-write", launch_args=RuntimeLaunchArgs()
+        )
 
     def test_dispatch_with_task_falls_back_to_global_codex_session_from_other_project(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -456,7 +508,9 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl", "--task", "next step"])
 
         assert result.exit_code == 0, result.output
-        resume.assert_called_once_with(name="impl", task="next step", sandbox="workspace-write")
+        resume.assert_called_once_with(
+            name="impl", task="next step", sandbox="workspace-write", launch_args=RuntimeLaunchArgs()
+        )
 
     def test_exit_code_propagates(self, runner: CliRunner, tmp_path: Path) -> None:
         with (
@@ -480,7 +534,7 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl"])
 
         assert result.exit_code == 0
-        reattach.assert_called_once_with(name="impl")
+        reattach.assert_called_once_with(name="impl", launch_args=RuntimeLaunchArgs())
 
     def test_bare_resume_refused_while_active(self, runner: CliRunner, tmp_path: Path) -> None:
         """Claude reconnect parity: no second TUI on a live launch (and no --force escape)."""
@@ -552,7 +606,7 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl"])
 
         assert result.exit_code == 0, result.output
-        reattach.assert_called_once_with(name="impl")
+        reattach.assert_called_once_with(name="impl", launch_args=RuntimeLaunchArgs())
 
     def test_bare_codex_resume_cross_project_refuses_incompatible_target(
         self,
@@ -627,7 +681,7 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl"])
 
         assert result.exit_code == 0, result.output
-        reattach.assert_called_once_with(name="impl")
+        reattach.assert_called_once_with(name="impl", launch_args=RuntimeLaunchArgs())
 
     def test_bare_claude_resume_cross_project_keeps_refusal(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

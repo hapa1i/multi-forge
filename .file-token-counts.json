@@ -63,10 +63,10 @@
       "tokens": 19749
     },
     "docs/design.md": {
-      "sha256": "27d1abd7e938188ae0c2b0de166d6f24ec3c5bd87bfb46a3a7f6063aec551eca",
+      "sha256": "c12b6ff1d4d2196ea300d789ade27878c31f9f58df1331c86bc989bccc233188",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20153
+      "tokens": 20520
     },
     "docs/design_installation.md": {
       "sha256": "a192f9547ed9366b5540f035a6e2fd87a5f8c6d4771f2cdc318246daae937fdc",
@@ -81,10 +81,10 @@
       "tokens": 24978
     },
     "docs/design_sessions.md": {
-      "sha256": "f9d7bd2e85bc730c578e1223697ea68aa85d773217d9e7c74ac23d3aff3df8ca",
+      "sha256": "7c77266a02c14cf4a9efe5b91e9be5c99048f9d9ec35dd02a50f37a0ed5e575b",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 25742
+      "tokens": 25797
     },
     "docs/design_telemetry.md": {
       "sha256": "dd7a14243fc7cea2b6122dacd34b237126234ccf79ea137f1ca8d433923051c7",
@@ -93,22 +93,22 @@
       "tokens": 20856
     },
     "docs/design_workflows.md": {
-      "sha256": "16f6086692c596a4fffaae49380e52c2691720e79a88043b0111268472088b7f",
+      "sha256": "ad29edad06b8fa5b3e455c8c993843655c8e4a61da8187d425bdfeddd99b54e9",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 23196
+      "tokens": 23242
     },
     "docs/end-user/proxy.md": {
-      "sha256": "171df4ebab5133c61bb2720ea17729e69045303e7fa3c4e49a4fe537d0693a6e",
+      "sha256": "a7ea0117504fb9c1942f2d276198207898ddd8db7e5f897c322ad76a88b0cb34",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24809
+      "tokens": 24997
     },
     "docs/end-user/session.md": {
-      "sha256": "9614bd472bd94e114eab0341058134ed43e6eff810882e7ce100a23d513bbf85",
+      "sha256": "6c2c84f02a9638ba2572dfa916178f4a2b83e3fee9f628aa2608bc8ca9a5282a",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24590
+      "tokens": 24974
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "f51d8eda562947797dda7e4b8f28ba88ed984722eabd4ba35669bd298b8a0e91",

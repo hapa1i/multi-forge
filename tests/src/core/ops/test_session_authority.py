@@ -13,6 +13,7 @@ import forge.core.ops.session_authority_launch as launch
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
 from forge.session.authority import (
@@ -313,6 +314,7 @@ def test_late_run_started_append_failure_is_reported_as_aborted(
 
     with pytest.raises(ForgeOpError, match="active registry locked"):
         with launch.authority_launch_transaction(
+            launch_args=RuntimeLaunchArgs(),
             store=store,
             root=new_root_run_identity(),
             operation="resume",

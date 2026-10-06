@@ -262,6 +262,16 @@ class TestPrepareCodexRequest:
         ]
         assert req.prompt == "continue"
 
+    def test_launch_args_join_options_before_resume_subcommand(self):
+        req = prepare_codex_request(
+            prompt="continue",
+            preflight=_preflight(),
+            attribution=Attribution(command="codex-resume"),
+            resume_thread_id="tid",
+            extra_args=["-c", 'model_reasoning_effort="low"', "--enable", "web_search"],
+        )
+        assert req.argv[5:] == ["-c", 'model_reasoning_effort="low"', "--enable", "web_search", "resume", "tid"]
+
     def test_no_resume_subcommand_without_thread_id(self):
         req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
         assert "resume" not in req.argv

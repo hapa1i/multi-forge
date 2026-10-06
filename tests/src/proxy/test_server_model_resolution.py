@@ -10,7 +10,12 @@ from typing import Any, Callable, cast
 import pytest
 from fastapi import HTTPException
 
-from forge.core.run_id import FORGE_MODEL_TIER_HEADER
+from forge.config import TierOverride
+from forge.core.run_id import (
+    FORGE_EFFORT_SOURCE_CLIENT,
+    FORGE_EFFORT_SOURCE_HEADER,
+    FORGE_MODEL_TIER_HEADER,
+)
 from forge.proxy.data_models import Message, MessagesRequest, TokenCountRequest
 
 
@@ -293,3 +298,35 @@ async def test_invalid_projected_tier_is_a_client_error_for_both_routes(
     detail = exc_info.value.detail
     assert isinstance(detail, dict)
     assert "X-Forge-Model-Tier must be one of" in detail["message"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("opted_in", "expected_effort"), [(True, "low"), (False, "high")], ids=["opt-in", "default"])
+async def test_create_message_honors_client_effort_only_under_launch_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+    opted_in: bool,
+    expected_effort: str,
+) -> None:
+    import forge.proxy.server as server
+
+    case = RESOLUTION_CASES[4]  # projected-non-claude-tier -> google/gemini-3.7-flash
+    captured = _install_server_stubs(monkeypatch, case)
+    monkeypatch.setattr(server, "_get_tier_override", lambda _tier: TierOverride(reasoning_effort="high"))
+    request_data = MessagesRequest.model_validate(
+        {
+            "model": case.model,
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "hello"}],
+            "thinking": {"type": "adaptive"},
+            "output_config": {"effort": "low"},
+        }
+    )
+    headers = {FORGE_MODEL_TIER_HEADER: "opus"}
+    if opted_in:
+        headers[FORGE_EFFORT_SOURCE_HEADER] = FORGE_EFFORT_SOURCE_CLIENT
+
+    response = await server.create_message(request_data, cast(Any, _RawRequest(headers)))
+
+    assert response.status_code == 200
+    assert captured["openai_request"]["reasoning_effort"] == expected_effort
+    assert "output_config" not in captured["openai_request"]

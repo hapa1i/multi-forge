@@ -1,11 +1,16 @@
-"""Reasoning-effort vocabularies for Forge subprocesses.
+"""Reasoning-effort vocabularies for Forge subprocesses and managed launches.
 
-Two distinct effort vocabularies exist and must not be conflated:
+These effort vocabularies are distinct and must not be conflated:
 
 - ``CLAUDE_EFFORT_LEVELS`` -- the ``claude --effort`` CLI flag accepts
-  ``low/medium/high/xhigh/max`` (``max`` is Claude-only). Used for every Forge
-  ``claude -p`` subprocess: the supervisor frontier, the memory writer, shadow
-  curation, the team supervisor, and the workflow fan-out.
+  ``low/medium/high/xhigh/max``. Used for every Forge ``claude -p``
+  subprocess (the supervisor frontier, the memory writer, shadow curation, the
+  team supervisor, and the workflow fan-out) and for an explicit ``--effort``
+  on a managed Claude session launch.
+- ``CODEX_EFFORT_LEVELS`` -- values for Codex's ``model_reasoning_effort``
+  config key on a managed Codex session launch. Codex selects its own model and
+  forwards the value without local validation, so Forge checks the OpenAI
+  reasoning union and leaves model-specific support to the server.
 - core.llm ``ReasoningEffort`` (``none/low/medium/high/xhigh``; ``none`` is
   API-only) -- the user-facing tier-1 plan-checker vocabulary. Provider
   transports use a separate catalog-aware union that can also include labels
@@ -30,6 +35,12 @@ from typing import Literal, get_args
 ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 
 CLAUDE_EFFORT_LEVELS: tuple[str, ...] = get_args(ClaudeEffort)
+
+# Union of the OpenAI reasoning levels in the model catalog. Codex 0.160 passes any
+# `model_reasoning_effort` string upstream, so this is Forge's only typo guard.
+CodexEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+CODEX_EFFORT_LEVELS: tuple[str, ...] = get_args(CodexEffort)
 
 
 def validate_claude_effort(value: str | None) -> None:

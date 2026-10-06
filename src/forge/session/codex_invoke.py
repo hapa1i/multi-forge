@@ -81,6 +81,7 @@ def invoke_codex_interactive(
     resume_thread_id: str | None = None,
     initial_prompt: str | None = None,
     authority_marker: str | None = None,
+    extra_args: Sequence[str] = (),
 ) -> int:
     """Run the ``codex`` TUI in the foreground; return its exit code.
 
@@ -89,6 +90,8 @@ def invoke_codex_interactive(
     run-tree root -- a mint-when-absent default would silently fork the tree.
     ``resume_thread_id`` reattaches via ``codex resume <thread_id>``; it is never
     combined with ``initial_prompt`` (a reattach has no first message to deliver).
+    ``extra_args`` are launch-only Codex options; they precede the positional thread
+    id or prompt because Codex stops option parsing at the first positional.
 
     ``FORGE_SESSION`` + ``FORGE_FORGE_ROOT`` are set so trust-enrolled Codex hooks
     (``codex-session-start``, ``codex-policy-check``) resolve this session's store
@@ -102,9 +105,9 @@ def invoke_codex_interactive(
     # propagate into the subcommand's flow -- pass it where each form documents it.
     argv: list[str] = ["codex"]
     if resume_thread_id is not None:
-        argv += ["resume", "--sandbox", sandbox, resume_thread_id]
+        argv += ["resume", "--sandbox", sandbox, *extra_args, resume_thread_id]
     else:
-        argv += ["--sandbox", sandbox]
+        argv += ["--sandbox", sandbox, *extra_args]
         if initial_prompt is not None:
             # The positional prompt is visible to same-host process listings (ps,
             # /proc/<pid>/cmdline). For sensitive context on a shared host, prefer

@@ -13,6 +13,7 @@ from forge.core.ops.session_model_routing import (
     plan_session_model_route,
     preserved_model_route_request,
 )
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import SessionState
 
 
@@ -26,6 +27,9 @@ class SessionRouteRecoveryAction:
     # inferred by the renderer from argv equality: two different actions can
     # serialize identically, and the renderer cannot tell them apart.
     has_explicit_options: bool = field(kw_only=True)
+    # Runtime passthrough must follow every Forge option, so retry builders emit
+    # it after `--` once the replacement route options are appended.
+    runtime_args: tuple[str, ...] = field(default=(), kw_only=True)
 
     @classmethod
     def resume(
@@ -43,6 +47,7 @@ class SessionRouteRecoveryAction:
         memory_flag: str | None = None,
         authority_role: str | None = None,
         authority_tier: str | None = None,
+        launch_args: RuntimeLaunchArgs | None = None,
     ) -> SessionRouteRecoveryAction:
         """Build a route-neutral resume action from explicitly supplied options."""
         argv = ["forge", "session", "resume", session_name]
@@ -69,16 +74,27 @@ class SessionRouteRecoveryAction:
             argv.extend(("--authority", authority_role))
         if authority_tier is not None:
             argv.extend(("--authority-tier", authority_tier))
-        return cls(tuple(argv), has_explicit_options=len(argv) > bare_length)
+        options, runtime_args = (launch_args or RuntimeLaunchArgs()).recovery_argv()
+        argv.extend(options)
+        return cls(
+            tuple(argv),
+            has_explicit_options=len(argv) > bare_length or bool(runtime_args),
+            runtime_args=runtime_args,
+        )
 
     def with_proxy(self, proxy: str) -> str:
-        return shlex.join((*self.argv, "--proxy", proxy))
+        return self._join([*self.argv, "--proxy", proxy])
 
     def with_proxy_route(self, *, model: str, model_tier: str | None, proxy: str) -> str:
         argv = [*self.argv, "--model", model]
         if model_tier is not None:
             argv.extend(("--model-tier", model_tier))
         argv.extend(("--proxy", proxy))
+        return self._join(argv)
+
+    def _join(self, argv: list[str]) -> str:
+        if self.runtime_args:
+            argv = [*argv, "--", *self.runtime_args]
         return shlex.join(argv)
 
 
