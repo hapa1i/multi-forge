@@ -545,6 +545,11 @@ def synced_container(
         "run",
         "-d",  # detached
         "--rm",  # remove on stop
+        # Native Codex uses bubblewrap user namespaces even for apply_patch.
+        # Docker's default seccomp blocks them; retain the container boundary
+        # while allowing Codex to enforce its own filesystem sandbox inside it.
+        "--security-opt",
+        "seccomp=unconfined",
         "-w",
         "/forge",
     ]
