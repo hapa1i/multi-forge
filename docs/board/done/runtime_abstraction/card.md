@@ -712,9 +712,10 @@ because such rewrites might be cryptographically allowed.
 ### Curated Transfer as Cross-Runtime Substrate
 
 > **Vocabulary (reconciled with the shipped transfer taxonomy, 2026-05-30).** This card was drafted using "curated
-> handoff." The shipped taxonomy ([design.md §3.9](../../../design_sessions.md#39-session-resume-context-management))
-> calls resume/fork context assembly **transfer** (`transfer.py`, `--resume-mode transfer`,
-> `assemble_transfer_context`), and the separate Stop-time project-doc updater the **memory writer**
+> handoff." The shipped taxonomy
+> ([design.md §3.9](../../../design_session_context.md#39-session-resume-context-management)) calls resume/fork context
+> assembly **transfer** (`transfer.py`, `--resume-mode transfer`, `assemble_transfer_context`), and the separate
+> Stop-time project-doc updater the **memory writer**
 > ([design_memory.md §5](../../../design_memory.md#5-designated-memory-docs)). The concept this card calls "curated
 > handoff" is therefore **curated transfer** -- the `ai-curated` transfer strategy, repositioned as the primary
 > cross-runtime/cross-topology substrate. The removed `forge session handoff` CLI surface is a tombstone (it redirects
@@ -740,8 +741,8 @@ level of decisions, current work, and intent. It:
   explicit.
 
 **Fidelity-vs-agency reframe.** The existing transfer strategies in
-[design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (`minimal`, `structured`, `full`,
-`ai-curated`) are positioned as a fidelity spectrum where native is the lossless ideal and curated is the lossy
+[design.md §3.9](../../../design_session_context.md#39-session-resume-context-management) (`minimal`, `structured`,
+`full`, `ai-curated`) are positioned as a fidelity spectrum where native is the lossless ideal and curated is the lossy
 fallback. This proposal reframes the trade-off:
 
 | Mode                                                            | Strength                                           | Cost                                 |
@@ -835,8 +836,8 @@ the payoff that justifies Phase 4. Phase 6 is reserved for once everything else 
 
 No new architecture; mostly documentation and small CLI additions.
 
-- Reposition `ai-curated` in [design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) as the
-  cross-everything primary substrate rather than one strategy among four.
+- Reposition `ai-curated` in [design.md §3.9](../../../design_session_context.md#39-session-resume-context-management)
+  as the cross-everything primary substrate rather than one strategy among four.
 - Add `forge session resume <parent> --fresh --review` (opens the per-child user-notes overlay in `$EDITOR` before child
   launch; `--review` requires `--fresh` transfer mode). This stays the ergonomic workflow entry point -- a convenience
   on the session lifecycle, not a second canonical namespace -- and should print the follow-up `forge transfer` commands

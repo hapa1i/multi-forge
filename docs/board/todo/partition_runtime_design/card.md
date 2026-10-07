@@ -18,7 +18,7 @@ The current SHA-256-matched `.file-token-counts.json` entry reports 24,978 Claud
 - Move material losslessly, preserving every normative invariant, example, and cross-domain reference.
 - Repoint inbound links, including B1's explicit §G references, and refresh token-count evidence for all changed docs.
 - Execute on a separate documentation branch/PR before B1's first normative runtime update. Coordinate with
-  [Partition the Session Design](../partition_session_design/card.md); no implementation batch is implied.
+  [Partition the Session Design](../../doing/partition_session_design/card.md); no implementation batch is implied.
 
 ## Acceptance
 

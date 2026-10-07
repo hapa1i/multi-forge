@@ -14,10 +14,10 @@ contracts without combining three independently reviewable behavior changes.
 - [`stop_verification_contract`](../../done/stop_verification_contract/card.md) (DG1): exactly
   `completion_promise | test_suite`, with fixed `uv run pytest` as the sole opt-in blocking latency exception and
   visible fail-open handling for legacy unknown values.
-- [`docs/design_sessions.md` §3.8](../../../design_sessions.md#38-session-artifacts-plans-transcripts): transcript
-  artifacts use a stable `session_id`/`copied_path` schema and UUID-named destinations.
-- [`docs/design_sessions.md` §3.10](../../../design_sessions.md#310-hook-handlers): repeated Stop invocations are safe;
-  Forge-owned synchronous work remains under 100 ms outside explicit test-suite wall time.
+- [`docs/design_session_context.md` §3.8](../../../design_session_context.md#38-session-artifacts-plans-transcripts):
+  transcript artifacts use a stable `session_id`/`copied_path` schema and UUID-named destinations.
+- [`docs/design_session_execution.md` §3.10](../../../design_session_execution.md#310-hook-handlers): repeated Stop
+  invocations are safe; Forge-owned synchronous work remains under 100 ms outside explicit test-suite wall time.
 - [`docs/design_runtime.md` §7](../../../design_runtime.md#7-isolation-and-proxy-modes) and
   [`docs/design_workflows.md` §1.2](../../../design_workflows.md#12-semantic-policy-the-supervisor): a sidecar probes
   project artifacts through its mounted path but persists host-resolvable shadow work markers for later host draining.

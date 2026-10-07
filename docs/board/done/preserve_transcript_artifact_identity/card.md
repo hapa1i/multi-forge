@@ -14,10 +14,10 @@ state instead of clobbering it, and prevent PreCompact snapshots from hiding the
 
 ## Design Authority
 
-- [`docs/design_sessions.md` §3.8](../../../design_sessions.md#38-session-artifacts-plans-transcripts): transcript
-  records carry `session_id` and `copied_path`, and UUID-named transcript destinations are idempotent.
-- [`docs/design_sessions.md` §3.10](../../../design_sessions.md#310-hook-handlers): repeated Stop invocation must be
-  safe and artifact capture is idempotent by UUID.
+- [`docs/design_session_context.md` §3.8](../../../design_session_context.md#38-session-artifacts-plans-transcripts):
+  transcript records carry `session_id` and `copied_path`, and UUID-named transcript destinations are idempotent.
+- [`docs/design_session_execution.md` §3.10](../../../design_session_execution.md#310-hook-handlers): repeated Stop
+  invocation must be safe and artifact capture is idempotent by UUID.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#forge-owned-durable-state): malformed manifest state
   is not silently defaulted or skipped; known legacy state is explicitly detected and migrated or surfaced.
 

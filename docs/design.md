@@ -4,7 +4,8 @@
 - **Memory writer usage**: [memory.md](end-user/memory.md) (automatic memory docs guide)
 - **Search usage**: [search.md](end-user/search.md) (transcript search guide)
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)
-- **Session design**: [design_sessions.md](design_sessions.md) (session state, launches, transfer, hooks, queues, Codex)
+- **Session design**: [design_sessions.md](design_sessions.md) (durable state and routing to
+  [context](design_session_context.md) and [execution](design_session_execution.md) contracts)
 - **Runtime design**: [design_runtime.md](design_runtime.md) (proxies, backends, routing, shared clients, isolation)
 - **Telemetry design**: [design_telemetry.md](design_telemetry.md) (status, spend, audit, usage, provider lifecycle)
 - **Installation design**: [design_installation.md](design_installation.md) (configuration, credentials, extensions)
@@ -147,7 +148,8 @@ when no `.claude/` directory exists.
 - **Cross-project resume** (transfer mode only): allowed within the same logical repo
   (`parent_project_root == child.project_root`). Reads parent artifacts by absolute path via `parent_forge_root` in the
   derivation record. **Native resume** (`--resume-mode native`) requires the same `forge_root` -- Claude Code cannot
-  `--resume` across CWD boundaries (see [session design §3.9](design_sessions.md#39-session-resume-context-management)).
+  `--resume` across CWD boundaries (see
+  [session design §3.9](design_session_context.md#39-session-resume-context-management)).
 
 **Exception:** `forge claude start` (bare launcher) works without `.forge/`. It does not create session state, does not
 set `FORGE_SESSION`, and session-specific hooks/status behavior is a no-op. See §3.4.
@@ -167,7 +169,7 @@ at `<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to 
 trades the full conversation for a runtime-neutral, **user-editable** view: it is the only substrate that crosses
 worktree, project, and (later) runtime boundaries, and the user can inspect and prune what propagates — something native
 `--resume` structurally cannot offer (see
-[session design §3.9](design_sessions.md#39-session-resume-context-management)).
+[session design §3.9](design_session_context.md#39-session-resume-context-management)).
 
 The `--strategy` knob controls fidelity: `minimal` (lineage pointer) → `structured` (conversation skeleton, default) →
 `full` (complete transcript) → `ai-curated` (LLM-selected highlights). `--inline-plan` embeds the approved plan content
@@ -394,7 +396,7 @@ To avoid writer conflicts:
     filesystem discovery. Thread/rollout/auth/`last_run_at` refresh per turn; `context_delivery` is a start-turn
     delivery fact resume never rewrites. The `codex-session-start` hook's only writes are small receipt files under the
     session directory — `context-receipt.json` (staged-handoff delivery,
-    [session design §3.9](design_sessions.md#39-session-resume-context-management)) or `observation-receipt.json`
+    [session design §3.9](design_session_context.md#39-session-resume-context-management)) or `observation-receipt.json`
     (nothing-staged turns — interactive thread capture) — and the CLI reconciles them into `confirmed.codex` after the
     turn, so the manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC
     key posture of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes
@@ -629,11 +631,11 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Records `confirmed.proxy` at session start when proxy mode is active
 
 **Codex-runtime sessions** (`forge session start --runtime codex`, see
-[session design §3.9](design_sessions.md#39-session-resume-context-management)) use the same session-managed path, but
-every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs `codex` turns
-direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`) — headless `codex exec` with `--task`, the foreground `codex` TUI
-without it — Claude-only flags are rejected rather than ignored, and `_launch_claude_for_session` refuses codex
-manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests persist registry ids only
+[session design §3.9](design_session_context.md#39-session-resume-context-management)) use the same session-managed
+path, but every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs
+`codex` turns direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`) — headless `codex exec` with `--task`, the foreground
+`codex` TUI without it — Claude-only flags are rejected rather than ignored, and `_launch_claude_for_session` refuses
+codex manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests persist registry ids only
 (`claude_code`/`codex`), mapped at the CLI boundary.
 
 **Bare launch** (`forge claude start`):

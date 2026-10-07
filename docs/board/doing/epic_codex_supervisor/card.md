@@ -76,7 +76,7 @@ supervision. Plan-file Claude supervision is B1, not a third epic. Team supervis
 B1 can ship using the already established `apply_patch` deny path, with its own current-version end-to-end, isolation
 and deadline tests plus host Claude Write/Edit coverage. It does not wait for the broader B2 experiment. Before B1's
 first normative documentation update, complete the separately branched
-[session partition](../../todo/partition_session_design/card.md) and
+[session partition](../../doing/partition_session_design/card.md) and
 [runtime partition](../../todo/partition_runtime_design/card.md). B1 must not silently change the shared `LaneRecord`
 format or other consumers' allowed-lane semantics; such work needs its own member card and dependency decision. B3–B5
 consume only the contracts B2 actually verifies. Update normative design and end-user docs as each card ships; these

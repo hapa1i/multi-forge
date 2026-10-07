@@ -42,7 +42,7 @@ working-tree/staged diff checks pass. B1 retains the unresolved runtime gates in
 | [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
 - [ ] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
-- [ ] Complete the [session](../../todo/partition_session_design/card.md) and
+- [ ] Complete the [session](../../doing/partition_session_design/card.md) and
   [runtime](../../todo/partition_runtime_design/card.md) design partitions on separate documentation branches before
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [ ] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.

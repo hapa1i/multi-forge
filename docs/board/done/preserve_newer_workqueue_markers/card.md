@@ -16,9 +16,9 @@ of rewriting it as a retry failure and eventually moving it out of the live queu
 
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#forge-owned-durable-state): unsupported newer
   schemas require an actionable upgrade error and cannot be silently coerced.
-- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue) and
-  [`docs/design_sessions.md` §B.2](../../../design_sessions.md#b2-processing-contract): retry metadata and poison moves
-  describe handler failures, while skipped work remains pending.
+- [`docs/design_session_execution.md` §3.13](../../../design_session_execution.md#313-async-work-queue) and
+  [`docs/design_session_execution.md` §B.2](../../../design_session_execution.md#b2-processing-contract): retry metadata
+  and poison moves describe handler failures, while skipped work remains pending.
 - PR #139 (`de8adaac`): bounded windows with resident deferred or skipped work advance `.scan-cursor`; D021 must join
   that outcome so future markers cannot pin later actionable work behind the startup cap.
 - Existing telemetry readers provide the repository precedent: newer-schema records are skipped with a one-time warning.

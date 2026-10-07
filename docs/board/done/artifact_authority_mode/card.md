@@ -12,11 +12,11 @@ owns the shared journal envelope, run identity, absence-state vocabulary, and pr
 [Session Route Provenance and Marking](../session_route_provenance/card.md). The cards remain independently shippable;
 authority mode does not require route history, model selection, or marking metadata.
 
-**References**: [design.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (Codex session
-lifecycle), [design.md §3.10](../../../design_sessions.md#310-hook-handlers) (managed hook dispatch),
+**References**: [design.md §3.9](../../../design_session_context.md#39-session-resume-context-management) (Codex session
+lifecycle), [design.md §3.10](../../../design_session_execution.md#310-hook-handlers) (managed hook dispatch),
 [design_workflows.md §1](../../../design_workflows.md#1-policy-enforcement) (policy boundaries),
-[design_sessions.md §I.2](../../../design_sessions.md#i2-codex-runtimespec-declarations) (Codex hook posture),
-`src/forge/cli/hooks/commands.py` and `src/forge/cli/hooks/policy.py` (current hook gates), and
+[design_session_execution.md §I.2](../../../design_session_execution.md#i2-codex-runtimespec-declarations) (Codex hook
+posture), `src/forge/cli/hooks/commands.py` and `src/forge/cli/hooks/policy.py` (current hook gates), and
 `tests/src/install/test_registered_commands_contract.py` (pinned hook matchers). Runtime evidence:
 [Claude Code hooks](https://code.claude.com/docs/en/hooks) (catch-all matchers, timeout posture, and `ExitPlanMode`
 input) and [Claude Code tools](https://code.claude.com/docs/en/tools-reference) (current tool inventory).

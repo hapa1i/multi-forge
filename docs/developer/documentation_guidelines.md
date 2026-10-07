@@ -57,16 +57,18 @@ in [`board_contract.md`](board_contract.md#design-doc-sync).
 
 Route architecture changes to the narrowest authority:
 
-| Document                      | Contract domain                                                   |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `docs/design.md`              | Core architecture, shared state, file ownership, command-core ops |
-| `docs/design_sessions.md`     | Sessions, launch, transfer, hooks, queues, Codex, event journals  |
-| `docs/design_runtime.md`      | Proxies, backends, models, routing, shared clients, isolation     |
-| `docs/design_telemetry.md`    | Status, spend, audit, usage, and provider lifecycle               |
-| `docs/design_installation.md` | Configuration, credentials, extensions, registration, test setup  |
-| `docs/design_workflows.md`    | Policy, skills, and workflow runners                              |
-| `docs/design_memory.md`       | Designated memory, passports, writers, and activation             |
-| `docs/cli_reference.md`       | Terminal and direct-command inventory                             |
+| Document                           | Contract domain                                                   |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `docs/design.md`                   | Core architecture, shared state, file ownership, command-core ops |
+| `docs/design_sessions.md`          | Session state and domain entry point                              |
+| `docs/design_session_context.md`   | Session artifacts, resume, and transfer                           |
+| `docs/design_session_execution.md` | Hooks, queues, Codex runtime, and session journals                |
+| `docs/design_runtime.md`           | Proxies, backends, models, routing, shared clients, isolation     |
+| `docs/design_telemetry.md`         | Status, spend, audit, usage, and provider lifecycle               |
+| `docs/design_installation.md`      | Configuration, credentials, extensions, registration, test setup  |
+| `docs/design_workflows.md`         | Policy, skills, and workflow runners                              |
+| `docs/design_memory.md`            | Designated memory, passports, writers, and activation             |
+| `docs/cli_reference.md`            | Terminal and direct-command inventory                             |
 
 Retired contracts that still carry useful removal rationale live in `docs/design_history.md`; they are evidence, not
 shipped architecture.

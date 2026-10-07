@@ -2,8 +2,8 @@
 
 Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
 prerequisite; [B2](../../proposed/codex_0160_validation/card.md) can proceed alongside it. The
-[session](../../todo/partition_session_design/card.md) and [runtime](../../todo/partition_runtime_design/card.md) design
-partitions precede B1's normative documentation updates.
+[session](../../doing/partition_session_design/card.md) and [runtime](../../todo/partition_runtime_design/card.md)
+design partitions precede B1's normative documentation updates.
 
 Status: active execution planning, activated 2026-10-06 and revised 2026-10-07, on `feat/plan-file-supervision` from
 `main` at `6e0d1f4c`. Product implementation has not started. The [execution checklist](checklist.md) records the

@@ -84,7 +84,7 @@ follows [workflow policy ownership](../../../design_workflows.md#16-policy-state
 The SHA-256-matched Opus cache reports `design_sessions.md` at 25,797 tokens and `design_runtime.md` at 24,978 on
 2026-10-07. The checker warns above 25,000 and fails above 30,000; a green hard-limit check does not satisfy this plan.
 
-- [ ] Complete [Partition the Session Design](../../todo/partition_session_design/card.md) and
+- [ ] Complete [Partition the Session Design](../../doing/partition_session_design/card.md) and
   [Partition the Runtime Design](../../todo/partition_runtime_design/card.md) on separate documentation branches/PRs
   before B1's first normative design update. Phase 1 probes can proceed without these content moves.
 - [ ] Bring the merged partitions into B1 and repoint its design references to the resulting owners. Require the

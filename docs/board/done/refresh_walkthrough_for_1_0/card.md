@@ -9,7 +9,7 @@ exploratory release-evidence boundaries.
 
 - [Interactive manual testing design](../../../design_installation.md#d-interactive-manual-testing)
 - [Interactive manual testing guidelines](../../../developer/testing_guidelines.md#interactive-manual-testing-smoke-test-smoke-test-walkthrough-qa)
-- [Session launch and continuity design](../../../design_sessions.md#39-session-resume-context-management)
+- [Session launch and continuity design](../../../design_session_context.md#39-session-resume-context-management)
 - [Session end-user guide](../../../end-user/session.md)
 - [`harden_walkthrough_sandbox_provenance`](../../done/harden_walkthrough_sandbox_provenance/card.md)
 - [`lock_walkthrough_state_parity`](../../done/lock_walkthrough_state_parity/card.md)

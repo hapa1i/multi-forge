@@ -718,7 +718,7 @@ independent of `install_scopes`: Claude declares user/project/local, while Codex
 Forge local scope onto shared project `.agents/skills`. Limited or planned support is a multi-state `Literal`, not a
 `bool` — a field-reading consumer never mistakes a Codex limit for Claude parity. Codex's load-bearing declarations
 (`enrollment_gated` hooks, `partial` pretool policy, `default` interactive) are enumerated with their probe evidence in
-[design_sessions.md §I.2](design_sessions.md#i2-codex-runtimespec-declarations).
+[design_session_execution.md §I.2](design_session_execution.md#i2-codex-runtimespec-declarations).
 
 `forge runtime list [--json]` renders both scope fields in the matrix. `CodexHeadlessInvoker` and the auth/runtime
 preflight read the same registry (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight
@@ -907,8 +907,8 @@ bare `forge claude start`) and the sidecar instead mint a fresh root (`invoke._b
 `derive_run_identity=False`). Depth guards recursion; identity records who-spawned-whom for the usage ledger — the two
 are independent and `FORGE_DEPTH` is never reinterpreted. The queue-decoupled memory writer is the one spawn where env
 inheritance breaks: the Stop hook snapshots the originating session's run id into the handoff marker
-([design_sessions.md §B.1](design_sessions.md#b1-marker-schema-v1)) and the drain handler re-roots the detached process
-under it, not under the unrelated draining CLI.
+([design_session_execution.md §B.1](design_session_execution.md#b1-marker-schema-v1)) and the drain handler re-roots the
+detached process under it, not under the unrelated draining CLI.
 
 **JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
 never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.

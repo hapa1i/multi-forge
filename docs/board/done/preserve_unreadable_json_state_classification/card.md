@@ -18,8 +18,8 @@ so transient I/O cannot trigger corruption handling or destructive queue outcome
   strict on content and must surface actionable failures without inventing corruption.
 - `src/forge/core/state/exceptions.py`: `StateUnreadableError` already defines failed reads as distinct from
   `StateCorruptedError` and forbids treating them as deletable corruption.
-- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue): queue retries and poison handling
-  apply to work execution failures, not bytes that Forge could not read.
+- [`docs/design_session_execution.md` §3.13](../../../design_session_execution.md#313-async-work-queue): queue retries
+  and poison handling apply to work execution failures, not bytes that Forge could not read.
 
 ## Evidence
 

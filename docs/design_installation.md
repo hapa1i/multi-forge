@@ -112,7 +112,7 @@ command, while only an untracked package receives remove-or-rename guidance. Use
 valid, present tracked project/local package of the same name, even outside the current directory chain, because a new
 user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only after
 the user's one-time interactive trust ceremony
-([session design §3.9](design_sessions.md#39-session-resume-context-management)).
+([session design §3.9](design_session_context.md#39-session-resume-context-management)).
 `forge runtime preflight codex --verify-enrollment` confirms enrollment by effect with one cheap managed turn.
 `~/.forge/installed.json` schema v3 records a sorted `module_owners` relation and a required tagged attribution on every
 file/settings row; v1/v2 migrate in memory through frozen historical readers and persist v3 on the next successful

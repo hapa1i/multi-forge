@@ -14,8 +14,9 @@ supported sibling launch overrides usable.
 
 ## Design Authority
 
-- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management): Codex/Claude
-  launcher dispatch uses immutable raw `intent.launch.runtime`; `forge session set launch.runtime` is rejected.
+- [`docs/design_session_context.md` §3.9](../../../design_session_context.md#39-session-resume-context-management):
+  Codex/Claude launcher dispatch uses immutable raw `intent.launch.runtime`; `forge session set launch.runtime` is
+  rejected.
 - [`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson): effective
   intent is a derived view and cannot replace field-owned launch identity.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#internal-boundaries-module-to-module): invalid

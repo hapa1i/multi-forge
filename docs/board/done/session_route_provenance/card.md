@@ -17,7 +17,8 @@ card does not depend on it.
 **References**: [design.md §3](../../../design.md#3-shared-contracts-file-based-state-system) (session state),
 [design.md §3.4](../../../design.md#34-proxy-vs-no-proxy-mode) (routing ownership),
 [design_runtime.md §3.7](../../../design_runtime.md#37-proxy-runtime-truth) (live proxy facts),
-[design_sessions.md §3.9](../../../design_sessions.md#39-session-resume-context-management) (launch lifecycle),
+[design_session_context.md §3.9](../../../design_session_context.md#39-session-resume-context-management) (launch
+lifecycle),
 [design_runtime.md §A.2.1](../../../design_runtime.md#a21-backend-instance-catalog-365-unified-backend-phase-12)
 (backend identity), [design_runtime.md §A.5](../../../design_runtime.md#a5-model-catalog-368) (intrinsic model catalog),
 [design_telemetry.md §A.8](../../../design_telemetry.md#a8-status-line-guidance-3611) (status-line sources),

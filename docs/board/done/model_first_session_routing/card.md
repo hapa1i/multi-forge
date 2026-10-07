@@ -12,7 +12,7 @@ for interactive Claude sessions. It neither depends on authority mode nor change
 **References**: [design.md §3.4](../../../design.md#34-proxy-vs-no-proxy-mode),
 [design_runtime.md §3.6.12](../../../design_runtime.md#3612-subprocess-routing-resolution-normative),
 [design_sessions.md §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson),
-[design_sessions.md §3.9](../../../design_sessions.md#39-session-resume-context-management),
+[design_session_context.md §3.9](../../../design_session_context.md#39-session-resume-context-management),
 [design_runtime.md §A.5](../../../design_runtime.md#a5-model-catalog-368),
 [design_runtime.md §G](../../../design_runtime.md#g-subprocess-routing-reference),
 `src/forge/core/models/direct_model.py`, `src/forge/backend/sources.py`, `src/forge/session/model_pin.py`,

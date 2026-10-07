@@ -16,11 +16,11 @@ validation, failure, recovery, and concurrent deletion without combining eight i
   reservation, the global index is its discovery cache, and deletion must remain terminal.
 - [`docs/design_sessions.md` §3.3](../../../design_sessions.md#33-session-file-schema-forgesessionjson): session
   manifests are strict durable workflow records with field-owned intent, overrides, and confirmed facts.
-- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management):
+- [`docs/design_session_context.md` §3.9](../../../design_session_context.md#39-session-resume-context-management):
   `intent.launch.runtime` is immutable dispatch identity, and transfer strategies describe what actually ran.
-- [`docs/design_sessions.md` §3.13](../../../design_sessions.md#313-async-work-queue) and
-  [`docs/design_sessions.md` §B](../../../design_sessions.md#b-work-queue-internals): deferred markers are versioned
-  durable work with explicit success, retry, skip, and poison outcomes.
+- [`docs/design_session_execution.md` §3.13](../../../design_session_execution.md#313-async-work-queue) and
+  [`docs/design_session_execution.md` §B](../../../design_session_execution.md#b-work-queue-internals): deferred markers
+  are versioned durable work with explicit success, retry, skip, and poison outcomes.
 - [`coding_standards.md` §5](../../../developer/coding_standards.md#5-interface-changes): malformed, unreadable, and
   newer-schema state are distinct outcomes; internal inputs are rejected rather than silently defaulted.
 - [`missing_worktree_authority`](../../done/missing_worktree_authority/card.md) (DG2): a valid manifest remains a live,
