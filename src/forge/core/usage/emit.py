@@ -102,7 +102,7 @@ def emit_usage_for_session_result(
     that subscription mode (see ``resolve_billing_mode``).
     """
     try:
-        if not result.run_id:
+        if not result.run_id or not result.dispatched:
             return
         status, failure_type = _session_status(result)
 
@@ -137,7 +137,8 @@ def emit_usage_for_session_result(
             session=session,
             workflow=workflow,
             model=model,
-            billing_mode=resolve_billing_mode(
+            billing_mode=result.child_billing_mode
+            or resolve_billing_mode(
                 direct=effective_direct,
                 has_api_key=_anthropic_key_present(),
                 backend_id=backend_id,

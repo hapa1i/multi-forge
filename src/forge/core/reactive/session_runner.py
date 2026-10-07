@@ -13,6 +13,8 @@ from __future__ import annotations
 import logging
 import subprocess
 from dataclasses import dataclass
+from time import monotonic
+from typing import Literal
 
 from forge.core.reactive.env import (
     FORGE_PARENT_RUN_ID_VAR,
@@ -28,7 +30,10 @@ from forge.core.reactive.headless_json import (
     prepare_json_argv,
     treat_is_error_as_failure,
 )
-from forge.core.reactive.structured_output import parse_headless_envelope
+from forge.core.reactive.structured_output import (
+    observed_headless_models,
+    parse_headless_envelope,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -72,6 +77,9 @@ class SessionResult:
     cached_tokens: int | None = None
     envelope_parsed: bool = False
     runtime_is_error: bool = False
+    dispatched: bool = True
+    observed_models: tuple[str, ...] = ()
+    child_billing_mode: Literal["subscription_quota"] | None = None
 
     @property
     def success(self) -> bool:
@@ -109,6 +117,10 @@ def run_claude_session(
     extra_env: dict[str, str] | None = None,
     unset_env_vars: list[str] | tuple[str, ...] | None = None,
     output_format: str | None = "json",
+    read_only: bool = False,
+    additional_dirs: tuple[str, ...] = (),
+    deadline: float | None = None,
+    subscription_only: bool = False,
 ) -> SessionResult:
     """Run ``claude -p`` as a headless subprocess.
 
@@ -140,12 +152,26 @@ def run_claude_session(
             ``--output-format <fmt>`` so the run self-reports cost/usage; the
             envelope is parsed and ``.result`` unwrapped back into ``stdout`` so
             text consumers are unchanged. ``None`` keeps plain text output.
+        read_only: Restrict built-in tools to Read/Glob/Grep and disable customizations.
+        additional_dirs: Explicit additional checkout roots available to file tools.
+        deadline: Optional absolute monotonic deadline shared with the invoking hook.
 
     Returns:
         SessionResult with stdout/stderr/returncode or error details, plus
         runtime-self-reported cost/usage when an envelope was parsed.
     """
-    env = build_claude_env(base_url=base_url, extra_vars=extra_env, direct=direct)
+    expires = min(deadline, monotonic() + timeout_seconds) if deadline is not None else monotonic() + timeout_seconds
+    from forge.core.reactive.supervisor_auth import (
+        READ_ONLY_FLAGS,
+        preflight_subscription,
+        subscription_environment,
+    )
+
+    env = (
+        subscription_environment(extra_env)
+        if subscription_only
+        else build_claude_env(base_url=base_url, extra_vars=extra_env, direct=direct)
+    )
     for key in unset_env_vars or ():
         env.pop(key, None)
 
@@ -155,6 +181,7 @@ def run_claude_session(
     run_id = env.get(FORGE_RUN_ID_VAR)
     parent_run_id = env.get(FORGE_PARENT_RUN_ID_VAR)
     root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR)
+    child_billing_mode: Literal["subscription_quota"] | None = None
 
     def _session_result(
         *,
@@ -169,6 +196,7 @@ def run_claude_session(
         cached_tokens: int | None = None,
         envelope_parsed: bool = False,
         runtime_is_error: bool = False,
+        observed_models: tuple[str, ...] = (),
     ) -> SessionResult:
         return SessionResult(
             stdout=stdout,
@@ -185,12 +213,30 @@ def run_claude_session(
             cached_tokens=cached_tokens,
             envelope_parsed=envelope_parsed,
             runtime_is_error=runtime_is_error,
+            child_billing_mode=child_billing_mode,
+            observed_models=observed_models,
         )
 
+    binary = "claude"
+    if subscription_only:
+        try:
+            if not read_only or not direct or base_url or bare:
+                raise ValueError("Subscription-only review requires read-only direct Claude without bare mode.")
+            binary = preflight_subscription(env=env, cwd=cwd, deadline=expires)
+            child_billing_mode = "subscription_quota"
+        except Exception as exc:
+            refused = _session_result(error=f"Subscription review unavailable: {exc}")
+            refused.dispatched = False
+            return refused
+
     use_bare = bare if bare is not None else can_use_bare(env)
-    cmd = ["claude", "-p"]
+    cmd = [binary, "-p"]
     if use_bare:
         cmd.append("--bare")
+    if read_only:
+        cmd.extend(READ_ONLY_FLAGS)
+    for directory in additional_dirs:
+        cmd.extend(["--add-dir", directory])
     if resume_id:
         cmd.extend(["--resume", resume_id])
         if fork_session:
@@ -252,30 +298,23 @@ def run_claude_session(
             cwd,
         )
 
-        result = subprocess.run(
-            run_cmd,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            cwd=cwd,
-            env=env,
-        )
+        def execute(argv: list[str]) -> subprocess.CompletedProcess[str]:
+            if read_only:
+                from forge.core.reactive.watchdog import run_guarded
+
+                return run_guarded(argv, input=prompt, timeout=_remaining_time(expires), cwd=cwd, env=env)
+            return subprocess.run(
+                argv, input=prompt, capture_output=True, text=True, timeout=_remaining_time(expires), cwd=cwd, env=env
+            )
+
+        result = execute(run_cmd)
 
         # Retry-once backstop: the version gate allowed the flag but this CLI still
         # rejected it. Latch unsupported (siblings skip it) and re-run without it.
         if json_requested and is_json_flag_rejection(result.returncode, result.stderr):
             mark_json_output_unsupported()
             _log.debug("claude rejected --output-format; retrying without it")
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                cwd=cwd,
-                env=env,
-            )
+            result = execute(cmd)
             json_requested = False
 
         # Fail loud on an unsupported --effort: effort changes behavior, so (unlike the
@@ -309,6 +348,7 @@ def run_claude_session(
                     cached_tokens=envelope.cached_tokens,
                     envelope_parsed=True,
                     runtime_is_error=envelope.is_error and treat_is_error_as_failure(),
+                    observed_models=observed_headless_models(result.stdout),
                 )
 
         # No JSON (not requested, or non-envelope output): raw stdout, today's behavior.
@@ -332,3 +372,10 @@ def run_claude_session(
     except Exception as e:
         _log.warning("claude -p failed: %s", e)
         return _session_result(error=str(e))
+
+
+def _remaining_time(deadline: float) -> float:
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise subprocess.TimeoutExpired("claude", 0)
+    return remaining
