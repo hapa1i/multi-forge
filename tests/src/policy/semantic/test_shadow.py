@@ -173,7 +173,7 @@ class TestCaptureCandidate:
         assert data["resume_id"] == "rid"
         assert data["direct"] is False
         assert data["fork_session"] is True
-        assert data["lane"] is None  # v3+ field always serialized; None == claude default lane
+        assert data["lane"] == {"runtime_id": "claude_code", "backend_id": "anthropic-direct", "model": "opus"}
         # dims + audit + lifecycle
         assert data["tier1_reason"] == "looks aligned"
         assert data["checker_model"] == "google/gemini-3.5-flash"
@@ -381,4 +381,4 @@ class TestConfigValidation:
     def test_schema_constant_present(self) -> None:
         # v4 (D005) freezes canonical action identity. Older records reconstruct with a
         # best-effort fingerprint from their stored, possibly truncated action fields.
-        assert shadow.SHADOW_SCHEMA_VERSION == 4
+        assert shadow.SHADOW_SCHEMA_VERSION == 5

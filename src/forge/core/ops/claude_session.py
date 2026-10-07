@@ -487,6 +487,14 @@ def launch_claude_session(
     run_active: Callable[..., int] | None = None,
 ) -> ClaudeSessionLaunchResult:
     """Launch Claude for a session, handling sidecar/host split without rendering."""
+    from forge.policy.semantic.identity import validate_sidecar_supervisor
+    from forge.session.effective import compute_effective_intent
+
+    effective_policy = compute_effective_intent(manifest).policy
+    try:
+        validate_sidecar_supervisor(effective_policy.supervisor if effective_policy else None, sidecar=use_sidecar)
+    except ValueError as exc:
+        raise ForgeOpError(str(exc)) from exc
     _runtime = session_runtime(manifest)
     if _runtime != "claude_code":
         raise ForgeOpError(

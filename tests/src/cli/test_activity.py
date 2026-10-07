@@ -135,6 +135,7 @@ def test_json_shape(monkeypatch) -> None:
         "downstream",
         "shadow",
         "subagents",
+        "supervisor_reviews",
         "notes",
     }
     assert "session_tagging_partial" in data["notes"]

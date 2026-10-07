@@ -180,7 +180,11 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
     # A backend constraint selects the unique lane (claude-max vs the default
     # anthropic-direct, both on claude_code); runtime alone keeps the first match.
     try:
-        if backend is not None:
+        if consumer.id == "supervisor" and (runtime is not None or backend is not None):
+            from forge.policy.semantic.identity import select_supervisor_lane
+
+            lane_record = select_supervisor_lane(runtime=runtime, backend=backend)
+        elif backend is not None:
             lane_record = lane_record_for(consumer, runtime=runtime, backend=backend)
         elif runtime is not None:
             lane_record = lane_record_for_runtime(consumer, runtime)

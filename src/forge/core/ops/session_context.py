@@ -65,6 +65,8 @@ class PolicyContext:
     fail_mode: str = "open"
     bundles: list[str] = field(default_factory=list)
     supervisor_resume_id: str | None = None
+    supervisor_plan_path: str | None = None
+    supervisor_active: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,8 @@ class SessionContext:
                 "fail_mode": self.policy.fail_mode,
                 "bundles": list(self.policy.bundles),
                 "supervisor_resume_id": self.policy.supervisor_resume_id,
+                "supervisor_plan_path": self.policy.supervisor_plan_path,
+                "supervisor_active": self.policy.supervisor_active,
             },
             "overrides": dict(self.overrides),
         }
@@ -396,6 +400,8 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
     fail_mode = "open"
     bundles: list[str] = []
     supervisor_resume_id: str | None = None
+    supervisor_plan_path: str | None = None
+    supervisor_active: bool = False
 
     try:
         effective_intent = compute_effective_intent(state)
@@ -410,12 +416,16 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
         bundles = list(policy.bundles or [])
         if policy.supervisor:
             supervisor_resume_id = policy.supervisor.resume_id
+            supervisor_plan_path = policy.supervisor.plan_override_path
+            supervisor_active = policy.supervisor.active
 
     return PolicyContext(
         enabled=enabled,
         fail_mode=fail_mode,
         bundles=bundles,
         supervisor_resume_id=supervisor_resume_id,
+        supervisor_plan_path=supervisor_plan_path,
+        supervisor_active=supervisor_active,
     )
 
 

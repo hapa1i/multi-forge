@@ -25,7 +25,14 @@ logger = logging.getLogger(__name__)
 
 def get_launch_preferences(state: SessionState) -> tuple[bool, tuple[str, ...], str | None]:
     """Return persisted host/sidecar launch preferences for a session."""
+    from forge.policy.semantic.identity import validate_sidecar_supervisor
+    from forge.session.effective import compute_effective_intent
+
+    effective = compute_effective_intent(state)
     launch = state.intent.launch
+    sidecar = launch.mode == LAUNCH_MODE_SIDECAR if launch else state.confirmed.is_sandboxed
+    sup = effective.policy.supervisor if effective.policy else None
+    validate_sidecar_supervisor(sup, sidecar=sidecar)
     if launch is None:
         return state.confirmed.is_sandboxed, (), None
 

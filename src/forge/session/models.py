@@ -20,7 +20,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 INDEX_VERSION = 1
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -220,6 +220,8 @@ class SupervisorConfig:
     validates executor actions against the approved plan.
     """
 
+    auth_mode: str = "inherit"  # Subscription-only is an explicit supervisor-local opt-in.
+    supervisor_model: str | None = None  # None preserves legacy runtime-selected model behavior.
     resume_id: str | None = None  # Claude session UUID, or a Forge session name resolved to a UUID at runtime
     proxy: str | None = None  # Optional: proxy_id or template name for base_url lookup
     direct: bool = False  # When True, force direct Anthropic routing
@@ -246,6 +248,16 @@ class SupervisorConfig:
     shadow_max_per_session: int = 10  # Hard cap on shadow candidates persisted per session (bounds frontier spend)
     shadow_seed: str | None = None  # Optional salt for deterministic sampling (tests); session_name supplies entropy
 
+    @property
+    def configured(self) -> bool:
+        """Return whether either supported source is configured, even while suspended."""
+        return bool(self.resume_id or self.plan_override_path)
+
+    @property
+    def active(self) -> bool:
+        """Return whether the configured supervisor should participate in policy checks."""
+        return self.configured and not self.suspended
+
     def __post_init__(self) -> None:
         # Range validation lives here (the broadest shared construction path) rather than on the CLI surface: dacite
         # runs __post_init__ on every manifest read / session set / start / fork, and compute_effective_intent's
@@ -255,7 +267,12 @@ class SupervisorConfig:
         if self.shadow_max_per_session < 1:
             raise ValueError(f"shadow_max_per_session must be >= 1, got {self.shadow_max_per_session}")
         # Frontier supervisor runs via `claude -p --effort`; tier-1 checker is a core.llm call.
-        validate_claude_effort(self.supervisor_effort)
+        from forge.core.effort import CODEX_EFFORT_LEVELS
+
+        if self.supervisor_effort is not None and self.supervisor_effort not in CODEX_EFFORT_LEVELS:
+            raise ValueError("Invalid supervisor effort")
+        if self.auth_mode not in {"inherit", "subscription-only"}:
+            raise ValueError("Supervisor auth_mode must be inherit or subscription-only")
         if self.checker_effort is not None and self.checker_effort not in _CHECKER_EFFORT_LEVELS:
             raise ValueError(
                 f"checker_effort must be one of {', '.join(_CHECKER_EFFORT_LEVELS)}, got {self.checker_effort!r}"

@@ -728,7 +728,7 @@ class TestPlanCheckEvaluate:
         decision = policy.evaluate(_make_context())
         assert len(decision.violations[0].message) == _MAX_REASON_CHARS
 
-    @patch("forge.policy.semantic.plan_check.load_plan_override")
+    @patch("forge.policy.semantic.plan_source.read_plan")
     def test_unexpected_exception_escalates(self, mock_load: MagicMock, tmp_path: Path) -> None:
         """An unexpected raise must become needs_review, not propagate to fail-open."""
         mock_load.side_effect = RuntimeError("disk on fire")

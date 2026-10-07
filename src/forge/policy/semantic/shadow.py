@@ -28,21 +28,18 @@ from typing import Any
 
 from forge.core.state import now_iso
 from forge.policy.action_identity import action_fingerprint
+from forge.policy.semantic.plan_source import PlanSnapshot, read_plan
 from forge.policy.types import ActionContext
 from forge.session.artifacts import (
     get_artifact_paths,
     make_content_hash,
-    safe_copy_file,
 )
 from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# v4 (D005): freeze the canonical action fingerprint used by the live cache. Shadow candidates
-# are runtime-only state; an older record simply lacks ``action_fingerprint`` and reconstructs
-# with the best-effort compatibility fallback from its stored action fields. v3 introduced the
-# resolved replay lane; that absent-field fallback remains unchanged.
-SHADOW_SCHEMA_VERSION = 4
+# v5 freezes source, explicit route/model/effort/auth and the exact plan digest.
+SHADOW_SCHEMA_VERSION = 5
 
 # Record-file suffixes (the candidate's lifecycle states). The `.plan.md` sidecar is deliberately excluded so it is
 # never counted toward the cap nor mistaken for a candidate record.
@@ -89,10 +86,15 @@ class ShadowCandidate:
     fork_session: bool
     # Resolved replay lane (T1b): the shadow must replay on the SAME lane production uses, else it
     # audits the wrong frontier (a codex-configured session measured against the claude judge).
-    # A frozen LaneRecord (not a runtime string), so backend/model survive too. No default: only
-    # the capture site constructs ShadowCandidate; stored dicts are read via `.get()` in
-    # reconstruct, so absent old-schema values tolerate cleanly there.
-    lane: LaneRecord | None
+    # The v5 reader requires the complete frozen route; incomplete older records
+    # finish unavailable instead of selecting a default backend.
+    lane: LaneRecord
+    auth_mode: str
+    supervisor_model: str | None
+    supervisor_effort: str | None
+    source_kind: str
+    source_plan_path: str | None
+    source_cwd: str
 
     # Audit + dimensions (so a later prompt/model change does not turn the history into mixed-quality mush).
     tier1_reason: str
@@ -222,6 +224,7 @@ def capture_candidate(
     checker_budget_tokens: int,
     checker_prompt_version: int,
     lane_record: LaneRecord | None = None,
+    snapshot: PlanSnapshot | None = None,
 ) -> Path | None:
     """Freeze a sampled tier-1 allow as a pending shadow candidate.
 
@@ -246,21 +249,24 @@ def capture_candidate(
 
     directory.mkdir(parents=True, exist_ok=True)
 
-    plan_snapshot_hash = ""
-    plan_snapshot_file: str | None = None
-    if config.plan_override_path:
-        # Resolve exactly as load_plan_override (supervisor.py) does: a relative
-        # plan_override_path is anchored at forge_root, NOT the hook's CWD. Without
-        # this, a valid relative config would pass tier-1 yet silently skip the plan
-        # copy here, so the replay would judge the action with no plan.
-        plan_path = Path(config.plan_override_path)
-        if not plan_path.is_absolute() and config.forge_root:
-            plan_path = Path(config.forge_root) / plan_path
-        if plan_path.is_file():
-            plan_snapshot_hash = make_content_hash(plan_path.read_bytes())
-            plan_snapshot_file = f"{cand_hash}.plan.md"
-            safe_copy_file(plan_path, directory / plan_snapshot_file, overwrite=False)
+    snapshot = snapshot or read_plan(config)
+    if config.plan_override_path and snapshot.text is None:
+        return None
+    plan_snapshot_hash = snapshot.digest or ""
+    plan_snapshot_file = None
+    if snapshot.text is not None:
+        plan_snapshot_file = f"{cand_hash}.plan.md"
+        (directory / plan_snapshot_file).write_bytes(snapshot.text.encode("utf-8"))
 
+    from forge.policy.semantic.supervisor import (
+        _resolve_resume_target,
+        resolve_supervisor_lane,
+    )
+
+    lane = resolve_supervisor_lane(lane_record)
+    resolved = _resolve_resume_target(config.resume_id, config.forge_root) if config.resume_id else None
+    if resolved is not None and resolved.warning:
+        return None
     candidate = ShadowCandidate(
         schema_version=SHADOW_SCHEMA_VERSION,
         captured_at=now_iso(),
@@ -277,14 +283,20 @@ def capture_candidate(
         session_name=context.session_name,
         plan_snapshot_hash=plan_snapshot_hash,
         plan_snapshot_file=plan_snapshot_file,
-        resume_id=config.resume_id,
+        resume_id=resolved.resume_id if resolved else None,
         direct=config.direct,
         base_url=config.base_url,
         proxy=config.proxy,
         forge_root=config.forge_root,
         timeout_seconds=config.timeout_seconds,
         fork_session=config.fork_session,
-        lane=lane_record,
+        lane=LaneRecord(lane.runtime_id, lane.backend_id, lane.model),
+        auth_mode=config.auth_mode,
+        supervisor_model=config.supervisor_model,
+        supervisor_effort=config.supervisor_effort,
+        source_kind="conversation+plan" if config.resume_id else "plan",
+        source_plan_path=snapshot.path,
+        source_cwd=(resolved.source_cwd if resolved else None) or context.repo_root,
         tier1_reason=tier1_reason,
         checker_provider=checker_provider,
         checker_model=checker_model,

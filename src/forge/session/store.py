@@ -2,7 +2,7 @@
 
 Path: <forge_root>/.forge/sessions/<session_name>/forge.session.json
 
-Schema: v1/v2 reads; writes emit v2.
+Schema: v1/v2/v3 reads; writes emit v3.
 
 Session manifests are treated as a strict contract:
 - Only explicitly retired fields are stripped from the in-memory read payload
@@ -10,7 +10,8 @@ Session manifests are treated as a strict contract:
 - Invalid manifests fail fast on read
 
 V1 is upgraded in memory with ``intent.launch.model_route=null``. Reads never
-rewrite a manifest; the next ordinary write emits the complete v2 shape.
+rewrite a manifest; the next ordinary write emits v3. V1/v2 supervisors gain
+explicit inherited auth and a null model selector, preserving legacy dispatch.
 
 Invariant: session names are unique within one forge root (enforced by
 IndexStore.create_session_txn). The directory name IS the session name.
@@ -43,7 +44,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -129,16 +130,22 @@ def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "
         )
 
 
-def upgrade_v1_manifest_for_read(data: dict[str, Any]) -> None:
-    """Project a validated v1 manifest into the current in-memory v2 shape."""
+def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
+    """Project validated v1/v2 manifests into v3 without modifying persisted state."""
 
-    if data.get("schema_version") != 1:
+    version = data.get("schema_version")
+    if version not in {1, 2}:
         return
     intent = data.get("intent")
     launch = intent.get("launch") if isinstance(intent, dict) else None
-    if isinstance(launch, dict):
+    if version == 1 and isinstance(launch, dict):
         launch["model_route"] = None
-    data["schema_version"] = 2
+    policy = intent.get("policy") if isinstance(intent, dict) else None
+    supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+    if isinstance(supervisor, dict):
+        supervisor["auth_mode"] = "inherit"
+        supervisor["supervisor_model"] = None
+    data["schema_version"] = 3
 
 
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
@@ -254,7 +261,7 @@ class SessionStore:
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
-        upgrade_v1_manifest_for_read(data)
+        upgrade_manifest_for_read(data)
 
         try:
             manifest = dacite.from_dict(
@@ -533,8 +540,21 @@ class SessionStore:
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version == 2 and "model_route" not in launch:
+            if schema_version in {2, 3} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
+
+        policy = intent.get("policy") if isinstance(intent, dict) else None
+        supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+        if isinstance(supervisor, dict):
+            for field_name in ("auth_mode", "supervisor_model"):
+                if schema_version in {1, 2} and field_name in supervisor:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path), f"schema v{schema_version} cannot contain supervisor.{field_name}"
+                    )
+                if schema_version == 3 and field_name not in supervisor:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path), f"schema v3 requires supervisor.{field_name}"
+                    )
 
         # Strict overrides schema: keys must be valid SessionIntent paths
         overrides = data.get("overrides")
