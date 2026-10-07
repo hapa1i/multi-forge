@@ -43,7 +43,7 @@ working-tree/staged diff checks pass. B1 retains the unresolved runtime gates in
 
 - [ ] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
 - [ ] Complete the [session](../../doing/partition_session_design/card.md) and
-  [runtime](../../todo/partition_runtime_design/card.md) design partitions on separate documentation branches before
+  [runtime](../../doing/partition_runtime_design/card.md) design partitions on separate documentation branches before
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [ ] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.
 - [ ] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.

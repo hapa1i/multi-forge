@@ -221,7 +221,7 @@ rerun).
   persists a sticky degrade overlay and routes subsequent checks to the default `claude -p` lane -- restoring real
   enforcement instead of a silent per-check fail-open. One hop only (codex -> default; no chains), still fail-open on
   the degrade path itself, sticky for the session (reset on `supervisor remove`/re-pin or a fresh process resume). This
-  is the *only* general fallback the consumer-lane epic permits; see design_runtime.md §G for the overlay/reset
+  is the *only* general fallback the consumer-lane epic permits; see design_subprocesses.md §G for the overlay/reset
   mechanics.
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
   configured path prefixes) and MAY cache the last verdict for an identical canonical action.
@@ -824,7 +824,7 @@ Reference details for [Skills Architecture](#3-skills-architecture).
 - Direct Claude workers use `ANTHROPIC_MODEL` plus `ANTHROPIC_DEFAULT_*_MODEL`, not Claude CLI `--model`
 - Parallel via `ThreadPoolExecutor` + process group cleanup
 - Workers receive pre-resolved `RoutingResult` from a `WorkerRoutingPlan` (see
-  [design_runtime.md §G](design_runtime.md#g-subprocess-routing-reference))
+  [design_subprocesses.md §G](design_subprocesses.md#g-subprocess-routing-reference))
 - `/analyze`: single-model fan-out with an analyze resource
 
 ### 4.2 Adversarial runner details (from §3.5)
@@ -848,8 +848,8 @@ collects independent findings for synthesis.
 
 Spawns N `claude -p` subprocesses, each with a different `ANTHROPIC_BASE_URL`. Routing for all panel workers is resolved
 once at invocation start via `resolve_invocation_routing()` (see
-[design_runtime.md §G](design_runtime.md#g-subprocess-routing-reference)). Each reviewer is a full Claude Code agent --
-it can read files, investigate, and find issues with real file:line evidence.
+[design_subprocesses.md §G](design_subprocesses.md#g-subprocess-routing-reference)). Each reviewer is a full Claude Code
+agent -- it can read files, investigate, and find issues with real file:line evidence.
 
 **Execution:** Fork mode gives each reviewer the main agent's full context. Summary mode sends a focused prompt.
 

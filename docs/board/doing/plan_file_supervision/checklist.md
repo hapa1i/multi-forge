@@ -44,7 +44,7 @@ The activation pass checked these source seams at `6e0d1f4c`:
 Read the [epic research](../epic_codex_supervisor/research.md) as dated evidence. Its Claude 2.1.291 / Codex 0.160.1
 observations and auth-status experiments are not a completed inference, isolation, or billing guarantee. Implementation
 follows [workflow policy ownership](../../../design_workflows.md#16-policy-state-and-ownership),
-[runtime routing](../../../design_runtime.md#g-subprocess-routing-reference),
+[runtime routing](../../../design_subprocesses.md#g-subprocess-routing-reference),
 [Codex hook registration](../../../design_installation.md#c6-codex-hook-registration-hooks-codex-owned-half), and
 [activity semantics](../../../design_telemetry.md#per-session-usage-read-surface).
 
@@ -85,7 +85,7 @@ The SHA-256-matched Opus cache reports `design_sessions.md` at 25,797 tokens and
 2026-10-07. The checker warns above 25,000 and fails above 30,000; a green hard-limit check does not satisfy this plan.
 
 - [ ] Complete [Partition the Session Design](../../doing/partition_session_design/card.md) and
-  [Partition the Runtime Design](../../todo/partition_runtime_design/card.md) on separate documentation branches/PRs
+  [Partition the Runtime Design](../../doing/partition_runtime_design/card.md) on separate documentation branches/PRs
   before B1's first normative design update. Phase 1 probes can proceed without these content moves.
 - [ ] Bring the merged partitions into B1 and repoint its design references to the resulting owners. Require the
   lossless-content/link audits and at most 23,000 Opus tokens per partition; after B1 additions, every touched living
@@ -380,8 +380,8 @@ fabricated-quotation and generated-text leakage fixtures before marking it compl
 - [ ] Exercise `forge policy supervisor status --json`, `forge telemetry activity <session>`, and both
   `forge policy check --bundle coding_standards --file <path>` and
   `git diff | forge policy check --bundle coding_standards --diff` to preserve surrounding operator contracts.
-- [ ] After both documentation partitions, update `AGENTS.md`, the relocated owner of `docs/design_runtime.md` §G, and
-  `docs/design_telemetry.md` §3.14 and §A.13 explicitly. Keep the resolvable-key rule for inherited routes/all four
+- [ ] After both documentation partitions, update `AGENTS.md`, the relocated owner of `docs/design_subprocesses.md` §G,
+  and `docs/design_telemetry.md` §3.14 and §A.13 explicitly. Keep the resolvable-key rule for inherited routes/all four
   consumers and describe the supervisor opt-in's final child route; do not redefine `claude-max` globally.
 - [ ] Update `docs/design_workflows.md`, the new session/runtime owners, installation guidance, and
   `docs/cli_reference.md` as their changes ship. Update `docs/end-user/policy.md` and `docs/end-user/session.md` with

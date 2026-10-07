@@ -177,8 +177,8 @@ Removal waits for that test to pass. **Blockers:** None.
 - [x] Replace the temporary legacy-versus-catalog comparison with fixed expected catalog-order assertions for every
   migrated workflow spec so preferred promotion, provider ordering, native/cross-family ranking, and template
   tiebreakers remain guarded after `provider_refs` and `preferred_proxy` are removed.
-- [x] Update `docs/design_runtime.md` §G.4 in this phase when shared catalog ordering becomes authoritative for workflow
-  route derivation.
+- [x] Update `docs/design_subprocesses.md` §G.4 in this phase when shared catalog ordering becomes authoritative for
+  workflow route derivation.
 
 ## Phase 6 -- Documentation, release proof, and closeout
 

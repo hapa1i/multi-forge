@@ -44,7 +44,7 @@ Canonical configuration ownership, credentials, extension, scope, merge, registr
   later re-add starts from the default. The post-eval freeze runs lock-free during the (multi-second) check, so it lands
   only when the fresh under-lock manifest still dispatches the lane it ran on — a concurrent remove/reconfigure drops
   the stale write rather than resurrecting a cleared binding. See
-  [design_runtime.md §G](design_runtime.md#g-subprocess-routing-reference).
+  [design_subprocesses.md §G](design_subprocesses.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 

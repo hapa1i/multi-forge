@@ -6,7 +6,8 @@
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)
 - **Session design**: [design_sessions.md](design_sessions.md) (durable state and routing to
   [context](design_session_context.md) and [execution](design_session_execution.md) contracts)
-- **Runtime design**: [design_runtime.md](design_runtime.md) (proxies, backends, routing, shared clients, isolation)
+- **Runtime design**: [design_runtime.md](design_runtime.md) (proxies, backends, model catalogs, isolation), with
+  [subprocess routing](design_subprocesses.md) for transport selection and consumer lanes
 - **Telemetry design**: [design_telemetry.md](design_telemetry.md) (status, spend, audit, usage, provider lifecycle)
 - **Installation design**: [design_installation.md](design_installation.md) (configuration, credentials, extensions)
 - **Workflow design**: [design_workflows.md](design_workflows.md) (policy, skills, and workflow runners)

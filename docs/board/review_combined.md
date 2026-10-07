@@ -76,8 +76,8 @@ markers control execution eligibility.
 **Refuted (excluded from tables):**
 
 1. *"`lane clear --consumer supervisor` leaves the sticky T7 degrade overlay"* — documented-intentional behavior.
-   design_runtime.md §G states explicitly: "supervisor remove and a re-pin clear it; session lane clear does not (the
-   frozen binding still dispatches codex)". A doc-visibility complaint at most, not a bug.
+   design_subprocesses.md §G states explicitly: "supervisor remove and a re-pin clear it; session lane clear does not
+   (the frozen binding still dispatches codex)". A doc-visibility complaint at most, not a bug.
 2. *"`stream_relay`'s `on_end` after two `__aexit__`s; a teardown raise skips cost/metrics/trace"* — `on_end` is invoked
    inside `finally:` (`proxy/stream_relay.py:91`; module docstring: "invoked exactly once in the relay's `finally` (even
    on early client disconnect)"). A teardown raise cannot skip a `finally`; accounting still runs. (The client-leak

@@ -1,6 +1,7 @@
 # Partition the Runtime Design
 
-**Lane**: `todo/`. Scheduled 2026-10-07 as a prerequisite for
+**Lane**: `doing/`. Branch: `docs/partition-runtime-design`, stacked on the session partition. Scheduled 2026-10-07 as a
+prerequisite for
 [B1's normative documentation work](../../doing/plan_file_supervision/checklist.md#documentation-prerequisites).
 
 ## Goal

@@ -5,7 +5,7 @@
 Scheduled 2026-10-07 before
 [B1's first normative documentation update](../../doing/plan_file_supervision/checklist.md#documentation-prerequisites),
 on a separate documentation branch/PR. Coordinate links with the
-[runtime partition](../../todo/partition_runtime_design/card.md); no shared implementation batch is implied.
+[runtime partition](../../doing/partition_runtime_design/card.md); no shared implementation batch is implied.
 
 ## Goal
 
