@@ -502,9 +502,20 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         validate_timeout(sup.timeout_seconds)
         validate_reviewer(sup, LaneRecord(lane.runtime_id, lane.backend_id, lane.model))
-        effective = compute_effective_intent(manifest)
-        sidecar = effective.launch.mode == "sidecar" if effective.launch else bool(manifest.confirmed.is_sandboxed)
+        from forge.session.launch import is_sidecar_session
+
+        sidecar = is_sidecar_session(manifest)
         validate_sidecar_supervisor(sup, sidecar=sidecar)
+        if not sidecar:
+            from forge.core.reactive.reviewer_runtime import (
+                preflight_supervisor_runtime,
+            )
+
+            preflight_supervisor_runtime(
+                sup,
+                LaneRecord(lane.runtime_id, lane.backend_id, lane.model),
+                cwd=manifest.worktree.path if manifest.worktree else None,
+            )
         if sup.plan_override_path and read_plan(sup).text is None:
             raise ValueError("Approved plan is missing, empty, or unreadable; reload a readable plan file.")
     except ValueError as exc:
@@ -1490,6 +1501,9 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
         sys.exit(1)
     except policy_ops.SupervisorPlanUnavailableError:
         print_error("No approved plan found for supervisor target or related sessions.")
+        sys.exit(1)
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
         sys.exit(1)
 
     console.print(f"Supervisor plan updated from {result.source_desc}")

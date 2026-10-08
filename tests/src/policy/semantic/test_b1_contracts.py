@@ -203,7 +203,7 @@ def test_legacy_frozen_subscription_lane_keeps_api_auth(tmp_path, monkeypatch):
     raw = json.loads(store.manifest_path.read_text())
     raw["schema_version"] = 2
     for name in ("auth_mode", "supervisor_model"):
-        del raw["intent"]["policy"]["supervisor"][name]
+        raw["intent"]["policy"]["supervisor"].pop(name, None)
     store.manifest_path.write_text(json.dumps(raw))
     before = store.manifest_path.read_bytes()
     decoded = store.read()

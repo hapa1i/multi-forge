@@ -102,7 +102,7 @@ class TestSessionStoreWrite:
         with open(store.manifest_path) as f:
             data = json.load(f)
         assert data["name"] == "test-session"
-        assert data["schema_version"] == 3  # Always writes current version
+        assert data["schema_version"] == 2  # No v3-only supervision; old sidecars can read it.
         assert data["intent"]["launch"]["model_route"] is None
 
     def test_write_validates_name(self, store: SessionStore) -> None:
@@ -643,7 +643,7 @@ class TestSessionStoreRead:
             "intent": {"launch": {"model_route": None}},
         }
 
-    def test_first_ordinary_v1_write_emits_complete_v3(
+    def test_first_ordinary_v1_write_emits_compatible_v2(
         self,
         store: SessionStore,
         sample_manifest: SessionState,
@@ -658,7 +658,7 @@ class TestSessionStoreRead:
         persisted = json.loads(store.manifest_path.read_text())
 
         assert updated.schema_version == 3
-        assert persisted["schema_version"] == 3
+        assert persisted["schema_version"] == 2
         assert persisted["intent"]["launch"]["model_route"] is None
 
     def test_read_roundtrip_with_complete_model_route(

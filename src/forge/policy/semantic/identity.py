@@ -9,7 +9,11 @@ import dacite
 
 from forge.core.effort import CODEX_EFFORT_LEVELS, validate_claude_effort
 from forge.core.lanes import Consumer, Lane, resolve_lane
-from forge.core.models.catalog import get_model_spec
+from forge.core.models.catalog import (
+    get_model_spec,
+    load_model_catalog,
+    resolve_model_id,
+)
 from forge.session.models import (
     LaneRecord,
     SessionIntent,
@@ -17,7 +21,12 @@ from forge.session.models import (
     SupervisorConfig,
 )
 
-CLAUDE_MODELS = ("opus", "sonnet", "haiku", "claude-opus-5", "claude-sonnet-5-5")
+CLAUDE_MODELS = (
+    "opus",
+    "sonnet",
+    "haiku",
+    *(model for model in load_model_catalog().models if model.startswith("claude-")),
+)
 CODEX_MODELS = ("gpt-5-codex", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-6-astra")
 
 SUPERVISOR_CONSUMER = Consumer(
@@ -48,6 +57,8 @@ def select_supervisor_lane(
     runtime = runtime or ("codex" if backend == "chatgpt" else "claude_code")
     backend = backend or ("chatgpt" if runtime == "codex" else "anthropic-direct")
     model = model or ("gpt-5-codex" if runtime == "codex" else "opus")
+    if model not in (*CLAUDE_MODELS, *CODEX_MODELS):
+        model = resolve_model_id(model)
     lane = resolve_lane(SUPERVISOR_CONSUMER, override=Lane(runtime, backend, model))
     return LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
 

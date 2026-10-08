@@ -392,7 +392,7 @@ def test_unverified_replay_never_uses_a_paid_default(tmp_path, monkeypatch, chan
     if change == "older":
         candidate["schema_version"] = 4
     elif change == "newer":
-        candidate["schema_version"] = 6
+        candidate["schema_version"] = 999
     elif change == "lane":
         candidate.pop("lane")
     elif change == "model":

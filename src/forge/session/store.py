@@ -2,7 +2,7 @@
 
 Path: <forge_root>/.forge/sessions/<session_name>/forge.session.json
 
-Schema: v1/v2/v3 reads; writes emit v3.
+Schema: v1/v2/v3 reads; writes emit v2 unless v3 supervision fields are required.
 
 Session manifests are treated as a strict contract:
 - Only explicitly retired fields are stripped from the in-memory read payload
@@ -10,7 +10,7 @@ Session manifests are treated as a strict contract:
 - Invalid manifests fail fast on read
 
 V1 is upgraded in memory with ``intent.launch.model_route=null``. Reads never
-rewrite a manifest; the next ordinary write emits v3. V1/v2 supervisors gain
+rewrite a manifest. V1/v2 supervisors gain
 explicit inherited auth and a null model selector, preserving legacy dispatch.
 
 Invariant: session names are unique within one forge root (enforced by
@@ -145,7 +145,41 @@ def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
     if isinstance(supervisor, dict):
         supervisor["auth_mode"] = "inherit"
         supervisor["supervisor_model"] = None
+    # Older supervisors accepted any positive timeout, and Codex ignored Claude
+    # routing fields. Preserve their working behavior under the bounded reviewer.
+    from forge.session.effective import apply_overrides
+
+    overrides = data.get("overrides") or {}
+    effective = apply_overrides(intent or {}, overrides)
+    binding = ((data.get("confirmed") or {}).get("consumer_lanes") or {}).get("supervisor")
+    lane = binding.get("lane") if binding else (effective.get("consumer_lanes") or {}).get("supervisor")
+    override_sup = (overrides.get("policy") or {}).get("supervisor")
+    for config in (supervisor, override_sup):
+        if not isinstance(config, dict):
+            continue
+        timeout = config.get("timeout_seconds")
+        if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 45:
+            config["timeout_seconds"] = 45
+            _store_logger.info("Migrated legacy supervisor timeout %ss to the 45s hook budget", timeout)
+        if lane and lane.get("runtime_id") == "codex":
+            for key in ("proxy", "base_url"):
+                if key in config:
+                    config[key] = None
     data["schema_version"] = 3
+
+
+def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
+    """Use v2 when the state is losslessly readable by existing sidecar images."""
+    data = session_state_to_dict(manifest)
+    supervisor = (data["intent"].get("policy") or {}).get("supervisor")
+    override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
+    new_override = isinstance(override_sup, dict) and bool({"auth_mode", "supervisor_model"} & override_sup.keys())
+    legacy = not supervisor or (supervisor["auth_mode"] == "inherit" and supervisor["supervisor_model"] is None)
+    data["schema_version"] = 2 if legacy and not new_override else SCHEMA_VERSION
+    if data["schema_version"] == 2 and supervisor:
+        del supervisor["auth_mode"]
+        del supervisor["supervisor_model"]
+    return data
 
 
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
@@ -363,8 +397,7 @@ class SessionStore:
                 f"name '{self._session_name}'. This would create a directory/name mismatch."
             )
 
-        data = session_state_to_dict(manifest)
-        data["schema_version"] = SCHEMA_VERSION
+        data = manifest_for_write(manifest)
         atomic_write_json(self._manifest_path, data)
 
     def delete(self) -> bool:

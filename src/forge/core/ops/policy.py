@@ -10,6 +10,7 @@ from typing import cast, get_args
 import forge.policy.semantic.supervisor as supervisor_semantic
 from forge.core.lanes import Consumer
 from forge.policy.deterministic.registry import BUNDLES
+from forge.policy.semantic.identity import snapshot_supervisor_options
 from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
 from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
 from forge.policy.types import FailMode
@@ -212,7 +213,7 @@ def supervisor_set(
             else None
         )
         selected_lane = lane_record or previous_lane or select_supervisor_lane()
-        selected_model = model or (selected_lane.model if not target else None)
+        selected_model = selected_lane.model if model or not target else None
         preview = SupervisorConfig(
             resume_id=target,
             plan_override_path=plan_path,
@@ -233,8 +234,7 @@ def supervisor_set(
         frozen = confirmed_lane_func(state, SUPERVISOR_CONSUMER)
         if frozen is None:
             return
-        old_effective = compute_effective_intent(state)
-        old = old_effective.policy.supervisor if old_effective.policy else None
+        old = snapshot_supervisor_options(state)
         changed_options = old is not None and (
             old.auth_mode != auth_mode
             or old.supervisor_model != selected_model
@@ -280,6 +280,7 @@ def supervisor_set(
         current_proxy_id=current_proxy_id,
         current_template=current_template,
         current_direct=current_direct,
+        runtime=selected_lane.runtime_id,
     )
 
     cascade_source_desc: str | None = None
@@ -307,6 +308,21 @@ def supervisor_set(
         from forge.policy.semantic.identity import validate_sidecar_supervisor
 
         validate_sidecar_supervisor(sup_config, sidecar=_is_sidecar(manifest))
+        if not _is_sidecar(manifest):
+            from forge.core.reactive.reviewer_runtime import (
+                preflight_supervisor_runtime,
+            )
+
+            preflight_supervisor_runtime(
+                sup_config, selected_lane, cwd=manifest.worktree.path if manifest.worktree else None
+            )
+        else:
+            from forge.runtime_config import get_runtime_config
+            from forge.session.launch import get_launch_preferences
+            from forge.sidecar.docker import require_sidecar_contract
+
+            image = get_launch_preferences(manifest)[2] or get_runtime_config().sidecar_image
+            require_sidecar_contract(image, schema_version=3 if selected_model else 2, reviewer=True)
     except ValueError as exc:
         raise SupervisorInputError(str(exc)) from exc
 
@@ -326,7 +342,17 @@ def supervisor_set(
     def _apply(m: SessionState) -> None:
         check_frozen(m)
         validate_sidecar_supervisor(sup_config, sidecar=_is_sidecar(m))
-        supervisor_semantic.apply_supervisor_to_intent(m, sup_config)
+        replacements = tuple(
+            name
+            for name, value in (
+                ("timeout_seconds", timeout_seconds),
+                ("checker_model", checker_model),
+                ("checker_provider", checker_provider),
+                ("checker_effort", checker_effort),
+            )
+            if value is not None
+        )
+        supervisor_semantic.apply_supervisor_to_intent(m, sup_config, replace_overrides=replacements)
         if lane_record is not None:
             set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
             clear_supervisor_degrade(m)
@@ -463,6 +489,8 @@ def supervisor_cascade(
         checker_effort=checker_effort,
     )
     cascade_on = state == "on"
+    if cascade_on and _is_sidecar(manifest):
+        raise SupervisorInputError("Plan-file supervision requires a host executor.")
 
     sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
     if not (sup and sup.configured):
@@ -493,6 +521,8 @@ def supervisor_cascade(
         source_desc = _source_desc(result.source, result.session_name)
 
     def _enable_cascade(m: SessionState) -> None:
+        if _is_sidecar(m):
+            raise SupervisorInputError("Plan-file supervision requires a host executor.")
         if m.intent.policy and m.intent.policy.supervisor:
             if m.intent.policy.supervisor.auth_mode == "subscription-only":
                 raise SupervisorInputError("Subscription-only supervision cannot enable the paid API checker.")
@@ -591,5 +621,6 @@ def _validated_plan_path(path: str | Path) -> str:
 
 
 def _is_sidecar(manifest: SessionState) -> bool:
-    effective = compute_effective_intent(manifest)
-    return effective.launch.mode == "sidecar" if effective.launch else bool(manifest.confirmed.is_sandboxed)
+    from forge.session.launch import is_sidecar_session
+
+    return is_sidecar_session(manifest)

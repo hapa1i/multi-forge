@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +38,8 @@ from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# v5 freezes source, explicit route/model/effort/auth and the exact plan digest.
-SHADOW_SCHEMA_VERSION = 5
+# v6 also freezes the resolved model and its origin for legacy conversation configs.
+SHADOW_SCHEMA_VERSION = 6
 
 # Record-file suffixes (the candidate's lifecycle states). The `.plan.md` sidecar is deliberately excluded so it is
 # never counted toward the cap nor mistaken for a candidate record.
@@ -91,6 +91,7 @@ class ShadowCandidate:
     lane: LaneRecord
     auth_mode: str
     supervisor_model: str | None
+    model_source: str
     supervisor_effort: str | None
     source_kind: str
     source_plan_path: str | None
@@ -151,6 +152,13 @@ def count_existing_candidates(directory: Path) -> int:
         name = entry.name
         for suffix in RECORD_SUFFIXES:
             if name.endswith(suffix):
+                if suffix == ".done":
+                    try:
+                        record = json.loads(entry.read_text())
+                        if record.get("review_state") == "unavailable" and "run_ok" not in record:
+                            continue  # reconstruction failed before a model call
+                    except (OSError, ValueError, AttributeError):
+                        pass
                 stems.add(name[: -len(suffix)])
                 break
     return len(stems)
@@ -241,13 +249,13 @@ def capture_candidate(
     if directory is None:
         return None
 
-    cand_hash = candidate_hash(cache_key)
+    from forge.policy.semantic.identity import reviewer_cache_identity
+
+    cand_hash = candidate_hash(cache_key + reviewer_cache_identity(config, lane_record))
     if _candidate_exists(directory, cand_hash):
         return None  # idempotent: already captured (in any state)
     if count_existing_candidates(directory) >= max_n:
         return None  # cap reached
-
-    directory.mkdir(parents=True, exist_ok=True)
 
     snapshot = snapshot or read_plan(config)
     if config.plan_override_path and snapshot.text is None:
@@ -256,7 +264,6 @@ def capture_candidate(
     plan_snapshot_file = None
     if snapshot.text is not None:
         plan_snapshot_file = f"{cand_hash}.plan.md"
-        (directory / plan_snapshot_file).write_bytes(snapshot.text.encode("utf-8"))
 
     from forge.policy.semantic.supervisor import (
         _resolve_resume_target,
@@ -264,9 +271,25 @@ def capture_candidate(
     )
 
     lane = resolve_supervisor_lane(lane_record)
+    from forge.policy.semantic.identity import validate_reviewer
+
+    validate_reviewer(config, LaneRecord(lane.runtime_id, lane.backend_id, lane.model))
     resolved = _resolve_resume_target(config.resume_id, config.forge_root) if config.resume_id else None
     if resolved is not None and resolved.warning:
         return None
+    model, model_source = _freeze_model(
+        config,
+        lane.runtime_id,
+        lane.model,
+        resolved.resume_id if resolved else None,
+        (resolved.source_cwd if resolved else None) or context.repo_root,
+    )
+    # A legacy lane's nominal opus default may differ from the restored model.
+    # Freeze the model actually selected by that conversation for this audit.
+    lane = replace(lane, model=model)
+    directory.mkdir(parents=True, exist_ok=True)
+    if plan_snapshot_file and snapshot.text is not None:
+        (directory / plan_snapshot_file).write_bytes(snapshot.text.encode("utf-8"))
     candidate = ShadowCandidate(
         schema_version=SHADOW_SCHEMA_VERSION,
         captured_at=now_iso(),
@@ -292,7 +315,8 @@ def capture_candidate(
         fork_session=config.fork_session,
         lane=LaneRecord(lane.runtime_id, lane.backend_id, lane.model),
         auth_mode=config.auth_mode,
-        supervisor_model=config.supervisor_model,
+        supervisor_model=model,
+        model_source=model_source,
         supervisor_effort=config.supervisor_effort,
         source_kind="conversation+plan" if config.resume_id else "plan",
         source_plan_path=snapshot.path,
@@ -308,3 +332,50 @@ def capture_candidate(
     out.write_text(json.dumps(asdict(candidate), indent=2))
     _log.debug("Captured shadow candidate %s for session %s", cand_hash, context.session_name)
     return out
+
+
+def _freeze_model(
+    config: SupervisorConfig, runtime: str, lane_model: str, resume_id: str | None, cwd: str
+) -> tuple[str, str]:
+    if config.supervisor_model:
+        return config.supervisor_model, "explicit"
+    if runtime == "codex":
+        return lane_model, "lane"
+    from forge.core.reactive.env import build_claude_env
+    from forge.core.reactive.reviewer_settings import inherited_auth_settings
+    from forge.core.reactive.routing import resolve_subprocess_routing
+    from forge.core.transcript import parse_jsonl_transcript, resolve_entry_role
+    from forge.session.claude.paths import get_transcript_path
+
+    base_url = (
+        None
+        if config.direct
+        else resolve_subprocess_routing(
+            explicit_base_url=config.base_url, explicit_proxy=config.proxy, require_route=False
+        ).base_url
+    )
+    if base_url:
+        return "opus", "proxy-tier"
+    env = build_claude_env(direct=config.direct)
+    inherited_auth_settings(env, cwd=cwd, direct=config.direct)
+    model = env.get("ANTHROPIC_MODEL")
+    source = "environment"
+    if not model and resume_id:
+        for entry in reversed(parse_jsonl_transcript(get_transcript_path(cwd, resume_id))):
+            message = entry.get("message")
+            if resolve_entry_role(entry) == "assistant" and isinstance(message, dict):
+                value = message.get("model")
+                if isinstance(value, str) and value.startswith("claude-"):
+                    model, source = value, "conversation"
+                    break
+    if not model:
+        raise ValueError(
+            "Cannot freeze the legacy supervisor model; set an explicit supervisor --model before shadowing."
+        )
+    for tier in ("OPUS", "SONNET", "HAIKU"):
+        if tier.lower() in model and env.get(f"ANTHROPIC_DEFAULT_{tier}_MODEL"):
+            model, source = env[f"ANTHROPIC_DEFAULT_{tier}_MODEL"], "environment"
+            break
+    from forge.policy.semantic.identity import select_supervisor_lane
+
+    return select_supervisor_lane(model=model).model, source

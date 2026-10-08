@@ -26,6 +26,14 @@ from forge.session.models import (
 from tests.fixtures.session_state import publish_session
 
 
+@pytest.fixture(autouse=True)
+def _reviewer_capabilities():
+    # CLI state tests do not depend on a host Claude installation. Admission and
+    # its non-inference probes have separate regression and Docker coverage.
+    with patch("forge.core.reactive.reviewer_runtime.preflight_supervisor_runtime"):
+        yield
+
+
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
     index = IndexStore()
 
@@ -112,7 +120,7 @@ def _set_supervisor_resume_id(forge_root: Path, name: str, resume_id: str) -> No
     store.update(timeout_s=5.0, mutate=_mutate)
 
 
-def _apply_supervisor_to_intent(manifest, supervisor) -> None:
+def _apply_supervisor_to_intent(manifest, supervisor, **kwargs) -> None:
     if manifest.intent.policy is None:
         manifest.intent.policy = PolicyIntent(enabled=True, supervisor=supervisor)
         return

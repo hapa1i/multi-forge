@@ -25,14 +25,7 @@ logger = logging.getLogger(__name__)
 
 def get_launch_preferences(state: SessionState) -> tuple[bool, tuple[str, ...], str | None]:
     """Return persisted host/sidecar launch preferences for a session."""
-    from forge.policy.semantic.identity import validate_sidecar_supervisor
-    from forge.session.effective import compute_effective_intent
-
-    effective = compute_effective_intent(state)
     launch = state.intent.launch
-    sidecar = launch.mode == LAUNCH_MODE_SIDECAR if launch else state.confirmed.is_sandboxed
-    sup = effective.policy.supervisor if effective.policy else None
-    validate_sidecar_supervisor(sup, sidecar=sidecar)
     if launch is None:
         return state.confirmed.is_sandboxed, (), None
 
@@ -41,6 +34,16 @@ def get_launch_preferences(state: SessionState) -> tuple[bool, tuple[str, ...], 
         return use_sidecar, (), None
 
     return use_sidecar, tuple(launch.sidecar.mounts), launch.sidecar.image
+
+
+def is_sidecar_session(state: SessionState) -> bool:
+    """Read the effective launch mode without decoding unrelated override sections."""
+    from dataclasses import asdict
+
+    from forge.session.effective import apply_overrides
+
+    launch = apply_overrides(asdict(state.intent), state.overrides).get("launch")
+    return launch.get("mode") == LAUNCH_MODE_SIDECAR if isinstance(launch, dict) else state.confirmed.is_sandboxed
 
 
 def resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:

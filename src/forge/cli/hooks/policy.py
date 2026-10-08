@@ -373,6 +373,15 @@ def _persist_policy_decisions(
             fresh = compute_effective_intent(m)
             fresh_sup = fresh.policy.supervisor if fresh.policy else None
             if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane and fresh_sup == sup:
+                from forge.policy.semantic.identity import (
+                    select_supervisor_lane,
+                    validate_reviewer,
+                )
+
+                try:
+                    validate_reviewer(sup, supervisor_lane or select_supervisor_lane())
+                except ValueError:
+                    return  # persist decisions, but never commit an invalid reviewer identity
                 ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
                 # If a check exhausted the codex subscription during this evaluation,
                 # persist the degrade overlay so subsequent checks route to the default claude

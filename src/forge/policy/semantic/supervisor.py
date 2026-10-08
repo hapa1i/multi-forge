@@ -793,7 +793,14 @@ def run_supervisor_check(
         budget = expires - monotonic()
         lane = SUPERVISOR_CONSUMER.default_lane
         record = lane_record or LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
-        attempt = ReviewAttempt(config, context, snapshot, record, budget=budget)
+        attempt = ReviewAttempt(
+            config,
+            context,
+            snapshot,
+            record,
+            budget=budget,
+            purpose="shadow" if usage_command == "supervisor-shadow" else "live",
+        )
         with review_scope(expires):
             result = _run_supervisor_check(
                 config,
@@ -804,19 +811,26 @@ def run_supervisor_check(
                 snapshot=snapshot,
                 resolved_target=resolved_target,
             )
-        attempt.record.observed_models = list(result.observed_models)
-        attempt.finish(result.decision)
-        return result
     except Exception as exc:
-        return SupervisorRun(
+        result = SupervisorRun(
             _supervisor_fail_open_decision(
                 f"Supervisor evidence or setup unavailable: {exc}",
                 failure_type="review_unavailable",
             )
         )
-    finally:
-        if attempt is not None:
-            attempt.close()
+    # Evidence is downstream of the decision. Even a recorder/cleanup error must
+    # not turn a completed frontier deny into an operational fail-open.
+    if attempt is not None:
+        try:
+            try:
+                attempt.record.observed_models = list(result.observed_models)
+                attempt.finish(result.decision)
+            finally:
+                attempt.close()
+        except Exception as exc:
+            _log.warning("Supervisor evidence finalization failed: %s", exc)
+            result.decision.warnings.append("Supervisor evidence could not be saved; the review verdict is unchanged.")
+    return result
 
 
 def _run_supervisor_check(
@@ -1280,6 +1294,7 @@ def apply_supervisor_routing(
     current_proxy_id: str | None = None,
     current_template: str | None = None,
     current_direct: bool = False,
+    runtime: str | None = None,
 ) -> str | None:
     """Apply explicit or auto-seeded supervisor routing to sup_config.
 
@@ -1291,6 +1306,10 @@ def apply_supervisor_routing(
     Returns a display string for the routing choice (for CLI output), or None
     when routing matched and no override was needed.
     """
+    if runtime == "codex":
+        if supervisor_proxy:
+            raise ValueError("Codex supervision cannot use a Claude supervisor proxy.")
+        return None
     if supervisor_proxy:
         sup_config.proxy = supervisor_proxy
         return supervisor_proxy
@@ -1315,6 +1334,8 @@ def apply_supervisor_routing(
 def apply_supervisor_to_intent(
     manifest: SessionState,
     sup_config: SupervisorConfig,
+    *,
+    replace_overrides: tuple[str, ...] = (),
 ) -> None:
     """Apply supervisor config to manifest intent (not overrides).
 
@@ -1338,7 +1359,23 @@ def apply_supervisor_to_intent(
     # Clear conflicting override so intent.policy.enabled takes effect.
     if manifest.overrides:
         delete_override(manifest.overrides, "policy.enabled")
-        delete_override(manifest.overrides, "policy.supervisor")
+        # Source/routing identity belongs to this replacement. Unrelated tuning
+        # (including shadow sampling and checker defaults) remains user-owned.
+        for key in (
+            "resume_id",
+            "forge_root",
+            "plan_override_path",
+            "proxy",
+            "base_url",
+            "direct",
+            "auth_mode",
+            "supervisor_model",
+            "supervisor_effort",
+            "suspended",
+            "cascade",
+            *replace_overrides,
+        ):
+            delete_override(manifest.overrides, f"policy.supervisor.{key}")
 
 
 def apply_supervisor_and_lane(
@@ -1352,8 +1389,16 @@ def apply_supervisor_and_lane(
     ``--supervisor-runtime`` was given, the already-expanded ``lane_record`` into
     ``intent.consumer_lanes.supervisor``. ``None`` leaves the lane to the consumer default.
     """
+    from forge.policy.semantic.identity import (
+        select_supervisor_lane,
+        validate_reviewer,
+        validate_sidecar_supervisor,
+    )
     from forge.session.consumer_lanes import set_intent_lane
+    from forge.session.launch import is_sidecar_session
 
+    validate_reviewer(sup_config, lane_record or select_supervisor_lane())
+    validate_sidecar_supervisor(sup_config, sidecar=is_sidecar_session(manifest))
     apply_supervisor_to_intent(manifest, sup_config)
     if lane_record is not None:
         set_intent_lane(manifest, SUPERVISOR_CONSUMER, lane_record)

@@ -936,7 +936,7 @@ class TestShadowCapture:
     @patch("forge.policy.semantic.plan_check.run_plan_check")
     def test_fresh_allow_captures(self, mock_run: MagicMock, tmp_path: Path) -> None:
         mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
-        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0, supervisor_model="opus")
         policy = PlanCheckPolicy(config=cfg)
         decision = policy._check(_make_context())
         assert decision.decision == "allow"

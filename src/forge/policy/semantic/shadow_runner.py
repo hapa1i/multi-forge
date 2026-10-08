@@ -109,10 +109,12 @@ def _reconstruct(candidate: dict[str, Any], directory: Path) -> tuple[Supervisor
     live plan), so the frontier judges exactly the plan tier-1 saw.
     """
     if candidate.get("schema_version") != SHADOW_SCHEMA_VERSION:
-        raise ValueError("Shadow route is unverified: only complete schema-v5 candidates may dispatch.")
+        raise ValueError("Shadow route is unverified: only complete schema-v6 candidates may dispatch.")
     frozen = dacite.from_dict(ShadowCandidate, candidate, config=dacite.Config(strict=True))
     if not frozen.supervisor_model:
         raise ValueError("Shadow candidate did not freeze an explicit supervisor model.")
+    if frozen.model_source not in {"explicit", "lane", "proxy-tier", "environment", "conversation"}:
+        raise ValueError("Shadow model source is unverified.")
     if frozen.source_kind not in {"plan", "conversation+plan"}:
         raise ValueError("Shadow source is unverified.")
     if (frozen.source_kind == "conversation+plan") != bool(frozen.resume_id):

@@ -214,6 +214,15 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         current = confirmed_lane(m, consumer)
         if current is not None and current != lane_record:
             raise _LaneFrozen(current)
+        if consumer.id == "supervisor":
+            from forge.policy.semantic.identity import (
+                snapshot_supervisor_options,
+                validate_reviewer,
+            )
+
+            sup = snapshot_supervisor_options(m)
+            if sup and sup.configured:
+                validate_reviewer(sup, lane_record)
         set_intent_lane(m, consumer, lane_record)
         # Re-pinning the supervisor lane signals that codex can be retried. Clear
         # any sticky degrade so the next check dispatches the requested lane, not the default.
@@ -228,6 +237,9 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         result.store.update(timeout_s=5.0, mutate=_apply)
     except _LaneFrozen as exc:
         _reject_frozen(consumer, exc.record)
+    except ValueError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
 
     console.print(f"Lane for [cyan]{consumer.id}[/cyan]: {_lane_str(lane_record)} (freezes on first dispatch).")
 
@@ -259,7 +271,24 @@ def clear_cmd(consumer_id: str, session_name: str | None) -> None:
     enforce_target_project_compatibility(result.store.forge_root)
     frozen = confirmed_lane(result.state, consumer)
 
-    result.store.update(timeout_s=5.0, mutate=lambda m: clear_intent_lane(m, consumer))
+    def clear_checked(m: SessionState) -> None:
+        if consumer.id == "supervisor":
+            from forge.policy.semantic.identity import (
+                select_supervisor_lane,
+                snapshot_supervisor_options,
+                validate_reviewer,
+            )
+
+            sup = snapshot_supervisor_options(m)
+            if sup and sup.configured:
+                validate_reviewer(sup, confirmed_lane(m, consumer) or select_supervisor_lane())
+        clear_intent_lane(m, consumer)
+
+    try:
+        result.store.update(timeout_s=5.0, mutate=clear_checked)
+    except ValueError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
 
     if frozen is not None:
         console.print(
