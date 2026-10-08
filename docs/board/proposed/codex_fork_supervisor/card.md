@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5**. Depends on
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
-[B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -16,8 +16,8 @@ is not a guarantee of complete original conversation history.
 
 A separate planning conversation is the clearest independent source, but planning and implementation can share a thread.
 Support that case only with an explicit approved plan file taking precedence and reduced independence recorded: the fork
-inherits later executor reasoning too. Installed 0.160.1 help exposes no option to fork from an earlier turn; this card
-must not imply a planning-only snapshot.
+inherits later executor reasoning too. B2 must establish the tested binary's fork-boundary controls; until an earlier
+boundary is proven selectable, this card must not imply a planning-only snapshot.
 
 ## Scope
 

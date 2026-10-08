@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
 [B1: plan-file supervision](../../done/plan_file_supervision/card.md) and
-[B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
