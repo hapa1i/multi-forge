@@ -4,7 +4,7 @@ Card: [Partition the Session Design](card.md). Branch: `docs/partition-session-d
 
 ## Current focus
 
-Partition the shipped contracts before B1's normative updates. The entry point retains durable session state;
+Closed on 2026-10-08 after the stack merged to `main`. The entry point retains durable session state;
 `design_session_context.md` owns artifacts/resume/transfer, and `design_session_execution.md` owns
 hooks/queues/Codex/event journals. No runtime behavior changes.
 
@@ -15,11 +15,11 @@ hooks/queues/Codex/event journals. No runtime behavior changes.
 - [x] Verify lossless reconstruction after normalizing only link destinations and formatting whitespace.
 - [x] Record exact-content Claude Opus 5 counts at or below 23,000 for every partition.
 - [x] Run Markdown formatting, size/link checks, and working-tree/staged diff checks.
-- [ ] Commit and open the prerequisite PR; integrate its tested tree into B1.
+- [x] Commit and open the prerequisite PR; integrate its tested tree into B1.
 
 ## Closeout
 
-- [ ] Verify merge/check results, record closeout, move to `done/`, and repoint links.
+- [x] Verify merge/check results, record closeout, move to `done/`, and repoint links.
 
 ## Evidence
 
@@ -30,3 +30,8 @@ Source SHA-256: `7c77266a02c14cf4a9efe5b91e9be5c99048f9d9ec35dd02a50f37a0ed5e575
 the complete source content matches. Exact Opus 5 counts: entry point 4,706; context 10,816; execution 10,541.
 `make pre-commit-md` passes; link audit covers 639 Markdown sources; both diff checks pass. Existing historical-card
 target warnings are unchanged debt, not warnings in the partitioned living designs.
+
+2026-10-08 closeout: [PR #258](https://github.com/hapa1i/multi-forge/pull/258) merged as `56d4b8f5` after the runtime
+and B1 PRs merged into its branch. The main tree matches tested head `2a3e7279`; all five GitHub checks passed,
+including pre-commit and the full unit, regression, and clean-wheel workflow. The
+[B1 closeout](../plan_file_supervision/checklist.md#merged-closeout) records the integrated evidence and limitations.

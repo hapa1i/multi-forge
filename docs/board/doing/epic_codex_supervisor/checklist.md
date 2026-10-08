@@ -5,15 +5,14 @@ belongs in each member's checklist.
 
 ## Current focus
 
-B1 [plan-file supervision](../plan_file_supervision/card.md) is implemented and validated in
-[PR #260](https://github.com/hapa1i/multi-forge/pull/260), on `feat/plan-file-supervision`. Its
-[evidence](../plan_file_supervision/evidence/README.md) covers the host subscription route, resumed inspection of the
-executor checkout, native Claude/Codex enforcement, and bounded reviewer cleanup.
+B1 [plan-file supervision](../../done/plan_file_supervision/card.md) and both documentation prerequisites are closed
+after the stack merged through [PR #258](https://github.com/hapa1i/multi-forge/pull/258) as `56d4b8f5` on 2026-10-08.
+The merged tree matches tested head `2a3e7279`, with all five GitHub checks passing. B1's
+[closeout](../../done/plan_file_supervision/checklist.md#merged-closeout) records the runtime evidence and limitations.
 
-The separate documentation prerequisites are open as [#258](https://github.com/hapa1i/multi-forge/pull/258) and
-[#259](https://github.com/hapa1i/multi-forge/pull/259), with B1 stacked after them. Shared `LaneRecord` and auxiliary
-consumer semantics remain unchanged; no extra model-format member is required. B3 receives the optional source-only
-feedback decision. B2-B5 remain proposed, and no later member has been activated.
+The next coordination step is review and selection of B2's broader runtime experiment. B2-B5 remain proposed; no later
+member is activated by this closeout. B3 receives the optional source-only feedback decision. The epic remains active
+until the coordinated feedback, Stop, and native-fork outcomes also ship.
 
 ## Activation
 
@@ -34,25 +33,25 @@ working-tree/staged diff checks pass. B1 retains the unresolved runtime gates in
 
 ## Sequence and ownership
 
-| Member                                             | State     | Dependency | Owned outcome                                                  |
-| -------------------------------------------------- | --------- | ---------- | -------------------------------------------------------------- |
-| [B1](../plan_file_supervision/card.md)             | In review | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
-| [B2](../../proposed/codex_0160_validation/card.md) | Proposed  | None       | Current-runtime probe evidence                                 |
-| [B3](../../proposed/codex_policy_warnings/card.md) | Proposed  | B2         | Allowed-action feedback delivery                               |
-| [B4](../../proposed/codex_stop_review/card.md)     | Proposed  | B1, B2     | Bounded review at turn completion                              |
-| [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed  | B1, B2     | Native Codex source context                                    |
+| Member                                             | State    | Dependency | Owned outcome                                                  |
+| -------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------- |
+| [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
+| [B2](../../proposed/codex_0160_validation/card.md) | Proposed | None       | Current-runtime probe evidence                                 |
+| [B3](../../proposed/codex_policy_warnings/card.md) | Proposed | B2         | Allowed-action feedback delivery                               |
+| [B4](../../proposed/codex_stop_review/card.md)     | Proposed | B1, B2     | Bounded review at turn completion                              |
+| [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
-- [ ] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
-- [ ] Complete the [session](../../doing/partition_session_design/card.md) and
-  [runtime](../../doing/partition_runtime_design/card.md) design partitions on separate documentation branches before
+- [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
+- [x] Complete the [session](../../done/partition_session_design/card.md) and
+  [runtime](../../done/partition_runtime_design/card.md) design partitions on separate documentation branches before
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [ ] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.
 - [ ] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.
 - [ ] Activate each later member on its own branch and add its own checklist. Record any changed dependency here and in
   both affected cards before implementation relies on it.
-- [ ] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.
-- [ ] If B1 requires shared `LaneRecord` or four-consumer resolution changes, create and accept a separate member,
-  record its dependency/order here, and give it its own branch, checklist, and PR before implementing that change.
+- [x] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.
+- [x] Confirm B1 preserves the shared `LaneRecord` and four-consumer resolution contracts; no separate model-format
+  member was needed. Any later change still requires its own accepted member and dependency decision.
 
 ## Member contract closeout
 
@@ -60,11 +59,29 @@ The [epic card's shared contract](card.md#shared-contract) is the single contrac
 member closes, linking its tested head, applicable contract evidence, limitations, and downstream handoff; these are
 member closeout checks, not assertions that every later member already ships.
 
-- [ ] B1 closeout: review its checklist evidence against the shared contract and record the B3-B5/Jev handoff.
+- [x] B1 closeout: review its checklist evidence against the shared contract and record the B3-B5/Jev handoff.
 - [ ] B2 closeout: review runtime captures and record the supported versions and claims later members may rely on.
 - [ ] B3 closeout: review delivery evidence against the shared contract and record its operator/model-context limits.
 - [ ] B4 closeout: review Stop budget/failure evidence against the shared contract and record unreviewed-work behavior.
 - [ ] B5 closeout: review source-context/checkout evidence against the shared contract and record independence limits.
+
+## B1 handoff
+
+- **B2** remains the next proposed member to review. B1's Claude 2.1.291 / Codex 0.160.1 captures establish only the
+  tested enforcement, auth, read-only, and deadline paths; broader delivery and native-fork claims still need B2.
+- **B3** owns allowed-action model context and operator warnings. B1 supplies status/activity evidence; optional
+  source-only feedback is deferred to B3 and makes no measured watermark claim.
+- **B4** can use the plan-source, reviewer, attempt, and shared-deadline contracts. It must choose and verify its own
+  Stop budget and continuation rules; post-edit review cannot undo an edit or replace the existing pre-edit deny.
+- **B5** can reuse explicit reviewer/model selection and action-checkout inspection. Native context acquisition and
+  reduced independence for a shared source remain unimplemented and depend on B2's captures.
+- **Jev A3** can consume B1's Claude escalation contract after its own dependencies. Jev remains an explicit paid API
+  route, outside subscription-only review; Jev A2 still depends on B3 for Codex-visible feedback.
+
+The [B1 evidence](../../done/plan_file_supervision/evidence/2026-10-08-review-fixes.md) records inherited-credential
+compatibility, supported runtime admission, legacy-state migration, sidecar refusals, and live/audit separation. The
+host subscription probe did not measure invoice or quota changes; unverified auth combinations refuse. No shared lane
+format change or team-supervisor feature was introduced.
 
 ## Closeout
 

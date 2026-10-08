@@ -1,14 +1,15 @@
 # Plan-file supervision with a fresh `claude -p`
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
 prerequisite; [B2](../../proposed/codex_0160_validation/card.md) can proceed alongside it. The
-[session](../../doing/partition_session_design/card.md) and [runtime](../../doing/partition_runtime_design/card.md)
-design partitions precede B1's normative documentation updates.
+[session](../../done/partition_session_design/card.md) and [runtime](../../done/partition_runtime_design/card.md) design
+partitions precede B1's normative documentation updates.
 
-Status: implemented and validated in [PR #260](https://github.com/hapa1i/multi-forge/pull/260), on
-`feat/plan-file-supervision`, stacked on the runtime partition [#259](https://github.com/hapa1i/multi-forge/pull/259).
-The [execution checklist](checklist.md) and [retained evidence](evidence/README.md) record passing checks and runtime
-limits. Optional source-only feedback is deferred to B3. Product closeout awaits merge.
+Status: **done**, 2026-10-08. [PR #260](https://github.com/hapa1i/multi-forge/pull/260) merged into the runtime
+partition [#259](https://github.com/hapa1i/multi-forge/pull/259); the stack reached `main` through
+[#258](https://github.com/hapa1i/multi-forge/pull/258) as `56d4b8f5`. The [closeout](checklist.md#merged-closeout) and
+[retained evidence](evidence/README.md) record passing checks and runtime limits. Optional source-only feedback is
+deferred to B3.
 
 ## Problem and outcome
 
@@ -22,7 +23,7 @@ credential selection and billing semantics. Explicit paid routes remain availabl
 The existing Codex `apply_patch` deny path is the enforcement boundary. This card does not depend on new Codex fork,
 background-hook, or model-visible warning behavior. It does require its own current-runtime deadline and isolation
 tests. Verified source pointers and billing qualifications are in the
-[epic research](../epic_codex_supervisor/research.md).
+[epic research](../../doing/epic_codex_supervisor/research.md).
 
 ## Scope
 

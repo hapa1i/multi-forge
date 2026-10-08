@@ -1,9 +1,9 @@
 # Epic: Codex supervisor
 
-Status: active coordination, 2026-10-06. B1 is selected for execution planning on `feat/plan-file-supervision`, based on
-`main` at `6e0d1f4c`. Product implementation has not started. See the [coordination checklist](checklist.md) and
-[B1 execution checklist](../plan_file_supervision/checklist.md). B2-B5 remain proposed and use separate execution
-branches when selected.
+Status: active coordination, 2026-10-08. B1 and its documentation prerequisites shipped through
+[PR #258](https://github.com/hapa1i/multi-forge/pull/258), merged to `main` as `56d4b8f5`. See the
+[coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
+B2 is the next proposed member to review; B2-B5 remain proposed and use separate execution branches when selected.
 
 ## Problem and outcome
 
@@ -12,20 +12,21 @@ Claude subscription quota; complex projects may use a paid route. Support superv
 requiring a Claude planning conversation, then add visible feedback, review at turn completion, and optional native
 Codex planning context.
 
-Forge already has Codex policy hooks and a Codex supervisor execution lane. The missing contract is independent
-selection of the plan source and reviewer: configuration still requires a Claude-backed planning target. The
-[research](research.md) records the verified code, installed runtime, local usage measurement, and external
-documentation.
+Forge has Codex policy hooks and a Codex supervisor execution lane. B1 now selects the plan source and reviewer
+independently, allowing an approved plan file without a Claude planning target. The remaining members own broader
+runtime evidence, feedback delivery, Stop review, and native planning forks. The [research](research.md) retains dated
+source/runtime observations; the [B1 evidence](../../done/plan_file_supervision/evidence/README.md) records its shipped
+scope and limits.
 
 ## Members and dependencies
 
-| ID  | Card                                                                               | Independently shippable outcome                                                      | Depends on                 |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------- |
-| B1  | [Plan-file supervision with a fresh `claude -p`](../plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card   |
-| B2  | [Codex 0.160.1 test round](../../proposed/codex_0160_validation/card.md)           | Probe evidence for current hooks and native fork contracts                           | None; can run alongside B1 |
-| B3  | [Warnings Codex can see](../../proposed/codex_policy_warnings/card.md)             | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B2                         |
-| B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)              | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                     |
-| B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)              | Review using native Codex context, recording reduced independence for shared sources | B1, B2                     |
+| ID  | Card                                                                                       | Independently shippable outcome                                                      | Depends on               |
+| --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------ |
+| B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
+| B2  | [Codex 0.160.1 test round](../../proposed/codex_0160_validation/card.md)                   | Probe evidence for current hooks and native fork contracts                           | None; next proposed card |
+| B3  | [Warnings Codex can see](../../proposed/codex_policy_warnings/card.md)                     | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B2                       |
+| B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
+| B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
 auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback. B4
@@ -73,14 +74,13 @@ B1 for the Claude escalation target. Jev is a paid API route and is not enabled 
 supervision. Plan-file Claude supervision is B1, not a third epic. Team supervision remains with
 [team supervisor plan context](../../proposed/team_supervisor_plan_context/card.md).
 
-B1 can ship using the already established `apply_patch` deny path, with its own current-version end-to-end, isolation
-and deadline tests plus host Claude Write/Edit coverage. It does not wait for the broader B2 experiment. Before B1's
-first normative documentation update, complete the separately branched
-[session partition](../../doing/partition_session_design/card.md) and
-[runtime partition](../../doing/partition_runtime_design/card.md). B1 must not silently change the shared `LaneRecord`
-format or other consumers' allowed-lane semantics; such work needs its own member card and dependency decision. B3–B5
-consume only the contracts B2 actually verifies. Update normative design and end-user docs as each card ships; these
-member plans do not change current product guarantees.
+B1 shipped using the established `apply_patch` deny path, with current-version end-to-end, isolation and deadline tests
+plus host Claude Write/Edit coverage. Its narrow runtime evidence does not replace the broader B2 experiment. The
+separately branched [session partition](../../done/partition_session_design/card.md) and
+[runtime partition](../../done/partition_runtime_design/card.md) preceded B1's normative documentation updates. B1
+preserved the shared `LaneRecord` format and other consumers' allowed-lane semantics; future changes need their own
+member card and dependency decision. B3–B5 consume only the contracts B2 actually verifies. Update normative design and
+end-user docs as each card ships; these member plans do not change current product guarantees.
 
 ## Completion evidence
 

@@ -246,7 +246,7 @@ quota use and executor waiting time. Call count and token usage are measurable, 
 subscription quota. Only report a quota decrement if the provider exposes usable evidence.
 [Supervisor behavior and billing](../../../end-user/policy.md#semantic-supervisor-advanced)
 
-The everyday constraint is no API spend: [B1](../../doing/plan_file_supervision/card.md) proposes independent direct
+The everyday constraint is no API spend: [B1](../../done/plan_file_supervision/card.md) proposes independent direct
 subscription supervision, with [B4](../codex_stop_review/card.md) reducing review frequency. Jev is a separate paid
 opt-in. A warning-only pack adds checks and API cost; the cascade preserves quota only for requests where it actually
 skips the Claude supervisor. Subscription terms and the difference between a lane label and a guaranteed unbilled route
@@ -380,7 +380,7 @@ own design. [Effort resolution](../../../../src/forge/proxy/reasoning.py),
 The draft scope is [A1: client and probes](../jev_client_probes/card.md),
 [A2: warning-only rule packs](../jev_rule_pack/card.md), and [A3: cascade](../jev_cascade/card.md). A2 needs
 [B3](../codex_policy_warnings/card.md) for Codex-visible warnings; A3 needs
-[B1](../../doing/plan_file_supervision/card.md) for fresh plan-file Claude supervision. Those cards belong to the
+[B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision. Those cards belong to the
 separate Codex supervisor epic. The broader avenues below remain research context, not additional committed members.
 
 | Avenue                           | Main purpose                                   | First useful evidence                          |

@@ -6,7 +6,7 @@ model turns, paid probes, or routing smoke runs were performed during this resea
 ## Planning verification, 2026-10-07
 
 Rechecked source at B1's base `6e0d1f4c` and local Claude 2.1.291 help/version output. No auth-status or inference calls
-were made during this follow-up. The [B1 checklist](../plan_file_supervision/checklist.md) records decisions and
+were made during this follow-up. The [B1 checklist](../../done/plan_file_supervision/checklist.md) records decisions and
 uncompleted probes; the observations below do not establish runtime isolation or billing guarantees.
 
 - Existing `claude-max` is billing metadata: a resolvable key still selects API billing for all four consumers. B1 now

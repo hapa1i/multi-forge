@@ -1,8 +1,9 @@
 # Partition the Runtime Design
 
-**Lane**: `doing/`. Branch: `docs/partition-runtime-design`, stacked on the session partition. Scheduled 2026-10-07 as a
-prerequisite for
-[B1's normative documentation work](../../doing/plan_file_supervision/checklist.md#documentation-prerequisites).
+**Lane**: `done/`, 2026-10-08. [PR #259](https://github.com/hapa1i/multi-forge/pull/259) merged into the session
+partition as `d437efdd`, then reached `main` through [#258](https://github.com/hapa1i/multi-forge/pull/258) at
+`56d4b8f5`. Scheduled 2026-10-07 as a prerequisite for
+[B1's normative documentation work](../../done/plan_file_supervision/checklist.md#documentation-prerequisites).
 
 ## Goal
 
@@ -11,15 +12,15 @@ Keep `docs/design_runtime.md` as the entry point and preserve the user's domain 
 
 ## Evidence and scope
 
-The current SHA-256-matched `.file-token-counts.json` entry reports 24,978 Claude Opus 5 tokens, only 22 below the
-25,000-token living-document target. A passing hard-limit check is not sufficient room for the planned changes.
+The pre-partition SHA-256-matched `.file-token-counts.json` entry reported 24,978 Claude Opus 5 tokens, only 22 below
+the 25,000-token living-document target. A passing hard-limit check is not sufficient room for the planned changes.
 
 - Identify cohesive owners for subprocess/consumer routing, proxy/backend contracts, and isolation; choose boundaries
   from the actual content rather than splitting at an arbitrary line count.
 - Move material losslessly, preserving every normative invariant, example, and cross-domain reference.
 - Repoint inbound links, including B1's explicit §G references, and refresh token-count evidence for all changed docs.
 - Execute on a separate documentation branch/PR before B1's first normative runtime update. Coordinate with
-  [Partition the Session Design](../../doing/partition_session_design/card.md); no implementation batch is implied.
+  [Partition the Session Design](../../done/partition_session_design/card.md); no implementation batch is implied.
 
 ## Acceptance
 

@@ -57,3 +57,11 @@ verified byte-for-byte against the checkout. Automatic review then approved coun
 refreshed cache records **21,611** Opus tokens for telemetry and **24,543** for workflows, both below 25,000.
 `make pre-commit` passes with every hook enabled, and the file-limit tests pass, including the formerly failing
 exact-content assertion. The earlier counts and failed runs above describe the pre-refresh state.
+
+## Final CI and merge
+
+Commit `2a3e7279` isolates seven unit/regression fixtures from host Claude and Docker installations. With those binaries
+excluded from PATH, the final local runs pass **10,594 unit tests** (117 deselected) and **1,382 regressions**; full
+`make pre-commit` also passes. The [GitHub Tests run](https://github.com/hapa1i/multi-forge/actions/runs/37829922970)
+passes unit tests, regressions, and the clean-wheel LiteLLM smoke. Pre-commit and all CodeQL checks pass on the same
+head. PR #258 merged the stack as `56d4b8f5`; the merged tree is byte-identical to `2a3e7279`.

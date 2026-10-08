@@ -2,8 +2,59 @@
 
 Completed-work record for Forge implementation sessions.
 
-Older entries are retained verbatim in [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md)
-and [through 2026-08-04](archive/change_log_through_2026-08-04.md).
+Older entries are retained verbatim in [2026-08-15 through 2026-08-17](archive/change_log_2026-08-15_to_2026-08-17.md),
+[2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
+[through 2026-08-04](archive/change_log_through_2026-08-04.md).
+
+## 2026-10-08
+
+### Supervise approved plans with isolated reviewers
+
+**Goal**: Review host Claude and Codex actions against an approved plan without requiring a planning conversation.
+
+**Key changes**:
+
+- Added plan-only supervision, explicit reviewer/model selection, read-only inspection of the action checkout, and a
+  separate subscription-only auth opt-in that preserves existing bindings' inherited credentials and billing.
+- Shared the hook deadline across reviews and retries, isolated watchdog helpers, retained computed verdicts on
+  evidence-write failure, and separated shadow audits from live decisions.
+- Preserved legacy timeout/proxy/override behavior and lossless v2 manifests; rejected incompatible sidecar images
+  before launch. Recorded migration and recovery guidance in design and end-user docs.
+
+**Verification**: 10,594 unit tests (117 deselected), 1,382 regressions, 41 targeted integration cases, build,
+installed-wheel checks, and full pre-commit passed. Final GitHub CI also passed unit/regression suites and the
+clean-wheel LiteLLM smoke. [PR #260](https://github.com/hapa1i/multi-forge/pull/260) merged through #259 and
+[#258](https://github.com/hapa1i/multi-forge/pull/258) to `main` as `56d4b8f5`, matching tested head `2a3e7279` with all
+five checks passing. The [B1 closeout](done/plan_file_supervision/checklist.md#merged-closeout) records subscription
+probe limits and operational fail-open behavior. B2-B5 remain proposed under the active Codex supervisor epic.
+
+### Partition runtime subprocess contracts
+
+**Goal**: Give runtime routing and consumer-lane contracts room to evolve within the documentation size target.
+
+**Key changes**:
+
+- Moved complete subprocess transport and lane sections to `design_subprocesses.md`, retaining runtime lifecycle and
+  configuration in the entry point; repointed inbound links and context routing.
+
+**Verification**: Lossless reconstruction, Markdown links, and formatting/size checks passed. Partition-time Opus counts
+were 16,864 for the runtime entry point and 8,286 for subprocess contracts, below the 23,000 partition target.
+[PR #259](https://github.com/hapa1i/multi-forge/pull/259) reached `main` through #258; the
+[completed checklist](done/partition_runtime_design/checklist.md) records the merged-stack checks.
+
+### Partition session context and execution contracts
+
+**Goal**: Split the session design into cohesive documents below the documentation size target.
+
+**Key changes**:
+
+- Kept durable session state in `design_sessions.md`; moved artifacts/resume/transfer to `design_session_context.md` and
+  hooks/queues/Codex/journals to `design_session_execution.md`, preserving sections and updating inbound links.
+
+**Verification**: Lossless reconstruction and Markdown formatting/size/link checks passed. Partition-time Opus counts
+were 4,706, 10,816, and 10,541 respectively, all below 23,000. [PR #258](https://github.com/hapa1i/multi-forge/pull/258)
+merged as `56d4b8f5`; the [completed checklist](done/partition_session_design/checklist.md) records the integrated
+result. The oldest three changelog date blocks were archived verbatim during closeout.
 
 ## 2026-10-06
 
@@ -832,312 +883,3 @@ and best-effort behavior.
 targeted Docker proxy-panel test (four deselected), full pre-commit, 29,974/29,990 design-document counts, and the
 359-document/882-link board audit pass. PR #204 merged as `356ea665` with all five GitHub checks passing. No Forge
 workflow command was used.
-
-## 2026-08-17
-
-### Unify resume routing-reference resolution
-
-**Goal/outcome**: Replace three drifted fresh-resume routing calculations with the existing shared reference rule while
-preserving context-budget and launch behavior.
-
-**Key changes**:
-
-- Routed transfer, native, and rewind fresh-resume context-limit lookup through `_resume_context_ref`.
-- Preserved explicit and inherited proxy-ID precedence, template fallback for legacy or injected routing, and
-  direct-mode null routing.
-- Added precedence regressions plus a structural guard against restoring local routing-field reads in the three modes.
-
-**Verification**: 79 focused tests, 9,220 unit tests (one skip, 122 deselected), 921 regressions, 16 targeted Docker
-resume tests (53 deselected), full pre-commit, 29,974/29,990 design-document counts, and the 358-document/882-link board
-audit pass. PR #203 merged as `0d041b83` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Share Codex thread index synchronization
-
-**Goal/outcome**: Replace the duplicated Codex post-turn index writer with one UI-free operation while preserving the
-manifest-first and adoption-safety contracts.
-
-**Key changes**:
-
-- Routed interactive and headless start/resume paths through one writer after successful manifest persistence, retaining
-  the no-thread skip and `IndexStore.update_codex_thread` as the scoped, durable, best-effort authority.
-- Preserved collision logging and live-thread adoption guards, with keyed state assertions that do not depend on index
-  iteration order.
-- Added a shared deleted-identity failure fixture, a guard against restoring the legacy private copies, and real Codex
-  start/resume integration assertions for the durable index column.
-
-**Verification**: 205 focused tests, 504 command-core tests, 9,220 unit tests (one skip, 122 deselected), 915
-regressions, one targeted real Codex start/resume integration, full pre-commit, 29,972/29,990 design-document counts,
-and the 357-document/882-link board audit pass. PR #202 merged as `d1abccc7` with all five GitHub checks passing. No
-Forge workflow command was used.
-
-### Align count-tokens mode and model defaults
-
-**Goal/outcome**: Remove the unread token-count mode field without deleting its public selector, and align the omitted
-model with the repository's canonical Opus default.
-
-**Key changes**:
-
-- Made `--local` and `--provider-api` write one authoritative mode while preserving local default behavior, help, mutual
-  exclusion, output, and provider fallback semantics.
-- Changed the omitted model from `claude-opus-4-6` to `claude-opus-5`; both use the same offline `cl100k_base` fallback,
-  while opt-in provider counting now targets the canonical Opus model by default.
-- Added hermetic subprocess contracts for the model default, omitted and explicit local modes, provider mode,
-  conflicting flags, and help output.
-
-**Verification**: Six focused tests, 9,216 unit tests (one skip, 122 deselected), 915 regressions, real default/local/
-provider token-count smokes, full pre-commit, unchanged 29,986/29,987 design-document counts, and the
-356-document/882-link board audit pass. PR #201 merged as `b350b4d5` with all five GitHub checks passing. No Forge
-workflow command was used.
-
-### Retire test-only settings helpers
-
-**Goal/outcome**: Remove three internal settings helpers that had no supported caller without weakening the live backup,
-rollback, or conflict contracts.
-
-**Key changes**:
-
-- Removed `restore_settings_backup` and `check_scalar_conflict` with their five direct-only tests; the installer
-  continues to use backup snapshots, rollback-state capture/restore, and `set_scalar` conflict handling.
-- Removed the zero-caller `_extract_command_paths` helper while preserving the active canonical hook deduplication path.
-- Reverified that none of the removed symbols was exported, documented as supported, registered as an entry point, or
-  referenced by packaged extension assets.
-
-**Verification**: 106 focused tests, 9,210 unit tests (one skip, 122 deselected), 915 regressions, 23 targeted Docker
-installer tests, the clean-wheel runtime smoke, full pre-commit, design-size checks, and the 355-document/880-link board
-audit pass. PR #200 merged as `63ae0f74` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Wire the transcript reindex guard
-
-**Goal/outcome**: Avoid re-extracting and rewriting unchanged transcript snapshots without allowing optimization
-bookkeeping to gate searchability.
-
-**Key changes**:
-
-- Wired the existing modification-time/size fingerprint into deferred indexing after project, containment, and
-  transcript validation; unchanged snapshots now skip extraction and all three search-store writes.
-- Preserved full idempotent indexing for new, changed, invalidated, and unreadable-state snapshots, with the strict
-  state mark last so failed bookkeeping remains retryable without hiding searchable content.
-- Made explicit full rebuild replace fresh index state once under lock, repairing corrupt/newer bookkeeping and removing
-  the per-transcript read-modify-write loop.
-
-**Verification**: 107 focused tests, 9,215 unit tests (one skip, 122 deselected), 915 regressions, one targeted Docker
-Stop/artifact integration, full pre-commit, design-size checks, and the 354-document/880-link board audit pass. PR #199
-merged as `7b3ac2df` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Deprecate the supervisor verdict compatibility wrapper
-
-**Goal/outcome**: Mark the deliberately exported legacy verdict parser for later removal without changing its return or
-fallback behavior in the first warning release.
-
-**Key changes**:
-
-- Kept `parse_supervisor_verdict` importable and behaviorally identical while issuing a caller-attributed
-  `FutureWarning` that is visible under Python's default filters and names the fully qualified status-bearing
-  replacement.
-- Moved internal parser and regression coverage to `parse_supervisor_verdict_with_status`; retained one focused
-  compatibility contract for the package export, valid and fallback parity, warning count, message, attribution, and a
-  warning-free replacement path.
-- Corrected the execution card's return-type and release-window wording after reverifying production, test, export,
-  resource, extension, documentation, string-target, and history references.
-
-**Verification**: 198 focused tests, 272 semantic-policy tests, 9,207 unit tests (one skip, 122 deselected), 913
-regressions, a fresh-process consumer-module warning smoke, full pre-commit, design-size checks, and board-integrity
-checks pass. PR #198 merged as `7fd701b5` with all five GitHub checks passing. No Forge workflow command was used.
-
-## 2026-08-16
-
-### Remove verified dead session helpers
-
-**Goal/outcome**: Remove three internal-only O092 session residues without changing live discovery or relaunch behavior.
-
-**Key changes**:
-
-- Removed the unused shadow session filter and its private CLI pass-through; live callers continue through the same
-  passport-based project/workspace discovery and deduplication path.
-- Deleted the uncalled session-tip no-op and removed the unused relaunch parent argument while retaining parent lineage
-  and `forge_root`-scoped name generation.
-- Replaced the direct-only filtered-shadow test with controls for live shadow collection, exact relaunch call shape, and
-  project-scoped collision inputs.
-
-**Verification**: 552 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #197 merged as
-`86a83a1d` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Remove the dead session-context retry
-
-**Goal/outcome**: Remove an index-only retry that could not observe the manifest corruption named by its comment.
-
-**Key changes**:
-
-- Explicit session identifiers now perform one scoped and one unscoped name lookup before UUID-index and stale-manifest
-  fallback, without repeating the unscoped lookup.
-- Added direct controls for corruption, unreadable-state, and ambiguity propagation plus both fallback stages and their
-  call order.
-
-**Verification**: 185 focused tests, 9,205 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #196 merged as
-`bc4f3a0c` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Replace legacy environment-based tier inference
-
-**Goal/outcome**: Remove the nonexistent proxy tier environment shim and make the factory's tier provenance explicit.
-
-**Key changes**:
-
-- `get_client` now requires a resolved tier; the dead `_MODEL` lookup and false auto-detection log are gone.
-- Exact-tier authentication retry is unchanged, while the retained all-tier invalidation path rebuilds the configured
-  `proxy.default_tier` instead of guessing from undeclared environment variables.
-- Recorded the provider-scoped authentication-invalidation question as a separate proposed decision instead of widening
-  O051 during review.
-
-**Verification**: 50 focused tests, 794 proxy unit tests, 9,200 full unit tests (one skip, 122 deselected), 913
-regressions, seven targeted Docker proxy-routing tests, full pre-commit, design-size checks, and board-integrity checks
-pass. PR #195 merged as `aca65c7f` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Retire unsafe public index mutators
-
-**Goal/outcome**: Remove row-only public index mutation paths after every supported caller moved to the durable session
-transactions.
-
-**Key changes**:
-
-- Deleted `IndexStore.add_session`, `add_from_state`, and `remove_session` plus their direct-only contracts, leaving
-  durable publication and deletion under the transaction lock and compensation rules.
-- Replaced the temporary direct-call allowlist with a zero-attribute-reference guard, removed stale live references, and
-  added transaction coverage proving a scoped delete preserves the same session name in another Forge root.
-
-**Verification**: 217 focused tests on the final head, 9,199 unit tests (one skip, 122 deselected), 913 regressions, 69
-targeted Docker session tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #194 merged as
-`ae7519fc` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Make durable session test state transactional
-
-**Goal/outcome**: Replace unsafe row-only test setup with shared builders that preserve the production row-plus-manifest
-transaction contract.
-
-**Key changes**:
-
-- Routed ordinary test publication and deletion through transaction-backed builders, with contract coverage for write
-  order, compensation, binding uniqueness, and ownership-aware deletion.
-- Isolated deliberate crash residue, orphan manifests, and race states behind explicit raw helpers, leaving only 18
-  direct mutator-contract calls for the independent API-deletion member.
-
-**Verification**: 1,775 focused session/core-ops tests, 9,211 unit tests (one skip, 122 deselected), 913 regressions, 69
-targeted Docker session tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #193 merged as
-`56dfc27b` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Migrate legacy memory-intent state
-
-**Goal/outcome**: Remove the behaviorless `MemoryIntent.generated_file` field without making Forge-authored legacy
-session manifests unreadable.
-
-**Key changes**:
-
-- Removed the field from current writes and added a narrow, no-rewrite compatibility pass for legacy
-  `intent.memory.generated_file` before strict decoding.
-- Kept malformed containers, unrelated unknown fields, the same key under overrides, and unsupported schema versions
-  strict, with byte-preservation coverage for successful and failed reads.
-
-**Verification**: 243 focused tests, 9,204 unit tests (one skip, 122 deselected), 913 regressions, 23 targeted Docker
-session-lifecycle tests, full pre-commit, design-size checks, and board-integrity checks pass. PR #192 merged as
-`b7a8ad9e` with all five GitHub checks passing. No Forge workflow command was used.
-
-## 2026-08-15
-
-### Deprecate inert configuration fields
-
-**Goal/outcome**: Stop authoring three behaviorless user-config fields while preserving readable 0.9.4-era configuration
-through an explicit warning window.
-
-**Key changes**:
-
-- Raw template, global, and proxy-instance loaders now warn once for explicitly present compatibility keys; omission
-  stays silent, new serialization omits the keys, and runtime transport and manifest-path authorities remain unchanged.
-- The compatibility fields remain accepted for the release carrying the warning, and a schema parity guard keeps the
-  provider scan registry aligned with every `ProviderConfig` block.
-
-**Verification**: 438 focused tests, six O049 regressions, 9,197 unit tests (one skip, 122 deselected), 913 regressions,
-34 targeted Docker proxy tests, wheel/sdist build and clean-wheel smoke, exact-wheel resource checks, full pre-commit,
-and board-integrity checks pass. PR #191 merged as `e0be9a60` with all five GitHub checks passing. No Forge workflow
-command was used.
-
-### Remove obsolete proxy abstractions
-
-**Goal/outcome**: Remove unsupported proxy surfaces after proving they had no production, resource, extension, or
-documentation consumers.
-
-**Key changes**:
-
-- Removed the test-only model-spec module, unused abstract client, unproduced tool-call exception and handlers, and two
-  zero-caller factory diagnostics while preserving the live adapter, streaming error, conversion, cache, and metrics
-  contracts.
-- Moved synthetic failure-metrics coverage to the reachable generic client-error path and pinned its sanitized response
-  plus total, error-type, tier, and model counters.
-
-**Verification**: 829 pre-deletion proxy tests, 808 post-deletion proxy tests, 9,193 unit tests (one skip), 907
-regressions, four hermetic Docker proxy tests, full pre-commit, and board-integrity checks pass. PR #190 merged as
-`ca2f289b` with all five GitHub checks passing. No Forge workflow command was used.
-
-### Honor explicitly empty process timezone
-
-**Goal/outcome**: Restore process-local UTC period boundaries when `TZ` is explicitly empty without changing unset,
-valid non-empty, or invalid non-empty timezone behavior.
-
-**Key changes**:
-
-- Empty `TZ` now selects `datetime.UTC` before dependency or filesystem resolution; unset and invalid values retain the
-  host-local fallback.
-- Host-independent regressions pin UTC identity and exact local-period bounds while retaining the four shared telemetry
-  consumers.
-
-**Verification**: 114 focused tests, 9,214 unit tests (one skip, 122 deselected), 907 regressions, six targeted Docker
-telemetry integrations, full pre-commit, and board-integrity checks pass. An extra cancelled-stream provider-trace test
-failed twice on an untouched lifecycle seam and was disclosed in the PR. PR #189 merged as `f0afc0c4` with all five
-GitHub checks passing. No Forge workflow command was used.
-
-### Lock walkthrough and QA state-script parity
-
-**Goal/outcome**: Keep both installed skills self-contained while preventing their shared state machine from drifting
-silently.
-
-**Key changes**:
-
-- A byte-and-mode parity contract permits only the two skill-identity lines to differ and requires both scripts to stay
-  owner-executable.
-- The complete 93-case behavioral matrix runs against each copy, while clean-wheel lifecycle coverage verifies both
-  packaged scripts through enable, sync, status, and disable.
-
-**Verification**: 188 focused tests, 9,212 unit tests (one skip), 906 regressions, one targeted Docker lifecycle, build,
-clean-wheel smoke, full pre-commit, and board-integrity checks pass. PR #188 merged as `b8e4b32c` with all five GitHub
-checks passing. No Forge workflow command was used.
-
-### Share proxy transport test fakes
-
-**Goal/outcome**: Replace parallel proxy HTTP fake families with one instance-safe test scaffold without changing
-production transport behavior.
-
-**Key changes**:
-
-- Both passthrough suites now configure transport-specific defaults through a shared per-test response, stream, client,
-  request-capture, failure-injection, and teardown fixture.
-- Direct contracts cover instance isolation and request, iteration, read, context-entry, and teardown failures; the
-  original factory-leak claim was corrected because pytest already restored those monkeypatches.
-
-**Verification**: 128 focused tests, 14 targeted regressions, 9,117 unit tests (one skip), 906 regressions, full
-pre-commit and Markdown hooks, and board-integrity checks pass. PR #187 merged as `be321ad2` with all five GitHub checks
-passing. No Forge workflow command was used.
-
-### Remove redundant development dependency metadata
-
-**Goal/outcome**: Remove the duplicate dev `python-dotenv` floor without weakening runtime or test dependencies.
-
-**Key changes**:
-
-- Removed only the redundant dev-group `python-dotenv>=1.2.1` edge; runtime still requires `>=1.2.2`, with no package or
-  version churn in the lockfile.
-- Rejected O071's stale `httpx2` claim after Starlette source, repository history, and a warnings-as-errors control
-  proved it is a live test-client dependency.
-
-**Verification**: 17 focused tests, 9,115 unit tests (one skip, 122 deselected), 906 regressions, build and clean-wheel
-smoke, full pre-commit, and board-integrity checks pass. PR #186 merged as `19dcf9cb` with all five GitHub checks
-passing. No Forge workflow command was used.

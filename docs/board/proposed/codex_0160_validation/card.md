@@ -1,7 +1,8 @@
 # Codex 0.160.1 test round
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency; can run
-alongside [B1](../../doing/plan_file_supervision/card.md). Supplies evidence for B3, B4 and B5.
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
+[B1](../../done/plan_file_supervision/card.md) has shipped; this proposed card supplies broader runtime evidence for B3,
+B4 and B5.
 
 ## Problem and outcome
 

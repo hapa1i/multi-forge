@@ -1,17 +1,18 @@
 # B1: Plan-file supervision execution checklist
 
-Card: [plan-file supervision](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Branch:
-`feat/plan-file-supervision`, originally based on `main` at `6e0d1f4c`, now stacked on `docs/partition-runtime-design`
-at `6529ff38`. Merge order: [#258](https://github.com/hapa1i/multi-forge/pull/258),
-[#259](https://github.com/hapa1i/multi-forge/pull/259), then B1.
+Card: [plan-file supervision](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Branch:
+`feat/plan-file-supervision`, originally based on `main` at `6e0d1f4c`, then stacked on `docs/partition-runtime-design`
+at `6529ff38`. The PRs merged from the top of the stack: #260 into #259, #259 into
+[#258](https://github.com/hapa1i/multi-forge/pull/258), then #258 into `main`.
 
 ## Current focus
 
-Review corrections are in progress on 2026-10-08 for [PR #260](https://github.com/hapa1i/multi-forge/pull/260). The host
-subscription and resumed-read-only gates passed; the user confirmed account usage credits are disabled. The
-[evidence record](evidence/README.md) separates real runtime results, test doubles, and refused unverified auth
-combinations. The [review correction record](evidence/2026-10-08-review-fixes.md) supersedes the original exact-version,
-manifest-write, and shadow-evidence contracts.
+Closed on 2026-10-08 after [PR #258](https://github.com/hapa1i/multi-forge/pull/258) merged the complete stack as
+`56d4b8f5`, matching tested head `2a3e7279`. The host subscription and resumed-read-only gates passed; the user
+confirmed account usage credits are disabled. The [evidence record](evidence/README.md) separates real runtime results,
+test doubles, and refused unverified auth combinations. The
+[review correction record](evidence/2026-10-08-review-fixes.md) supersedes the original exact-version, manifest-write,
+and shadow-evidence contracts.
 
 B1 ships `forge policy supervisor set --plan <file>` without a planning target, for fresh Claude and Codex reviewers. It
 also owns real model selection, isolation of existing Claude supervision, a whole-hook deadline, and durable review
@@ -45,9 +46,9 @@ The activation pass checked these source seams at `6e0d1f4c`:
   [activity aggregation](../../../../src/forge/core/ops/usage_summary.py) does not by itself establish visibility of a
   hook killed before outcome recording.
 
-Read the [epic research](../epic_codex_supervisor/research.md) as dated evidence. Its Claude 2.1.291 / Codex 0.160.1
-observations and auth-status experiments are not a completed inference, isolation, or billing guarantee. Implementation
-follows [workflow policy ownership](../../../design_workflows.md#16-policy-state-and-ownership),
+Read the [epic research](../../doing/epic_codex_supervisor/research.md) as dated evidence. Its Claude 2.1.291 / Codex
+0.160.1 observations and auth-status experiments are not a completed inference, isolation, or billing guarantee.
+Implementation follows [workflow policy ownership](../../../design_workflows.md#16-policy-state-and-ownership),
 [runtime routing](../../../design_subprocesses.md#g-subprocess-routing-reference),
 [Codex hook registration](../../../design_installation.md#c6-codex-hook-registration-hooks-codex-owned-half), and
 [activity semantics](../../../design_telemetry.md#per-session-usage-read-surface).
@@ -69,7 +70,8 @@ follows [workflow policy ownership](../../../design_workflows.md#16-policy-state
   render action-file paths against that checkout. Prove correct reads and no writes in both directories. The flag only
   grants access; it does not select the right branch. If the combined boundary cannot be established, refuse the
   cross-checkout configuration. Current upstream cross-project resume documentation is recorded in the
-  [research update](../epic_codex_supervisor/research.md#planning-verification-2026-10-07); it is not a tested shortcut.
+  [research update](../../doing/epic_codex_supervisor/research.md#planning-verification-2026-10-07); it is not a tested
+  shortcut.
 - **Executor scope:** support plan-only and target-plus-plan review for host Claude Write/Edit and host Codex
   `apply_patch`, with either supported reviewer runtime. Refuse plan-file-backed review in sidecars, including inherited
   configurations. Also refuse subscription-only auth in sidecars; do not mount host login material or silently remap
@@ -85,12 +87,13 @@ follows [workflow policy ownership](../../../design_workflows.md#16-policy-state
 
 ## Documentation prerequisites
 
-The SHA-256-matched Opus cache reports `design_sessions.md` at 25,797 tokens and `design_runtime.md` at 24,978 on
-2026-10-07. The checker warns above 25,000 and fails above 30,000; a green hard-limit check does not satisfy this plan.
+At planning time on 2026-10-07, the SHA-256-matched Opus cache reported `design_sessions.md` at 25,797 tokens and
+`design_runtime.md` at 24,978. The checker warns above 25,000 and fails above 30,000; a green hard-limit check does not
+satisfy this plan.
 
-- [x] Prepare [Partition the Session Design](../../doing/partition_session_design/card.md) and
-  [Partition the Runtime Design](../../doing/partition_runtime_design/card.md) on separate documentation branches/PRs
-  before B1's first normative design update. Both PRs remain open; merge them in stack order before B1.
+- [x] Prepare [Partition the Session Design](../../done/partition_session_design/card.md) and
+  [Partition the Runtime Design](../../done/partition_runtime_design/card.md) on separate documentation branches/PRs
+  before B1's first normative design update. Both prerequisites reached `main` with B1 through the merged stack.
 - [x] Bring the partition commits into B1 and repoint its design references to the resulting owners. Require the
   lossless-content/link audits and at most 23,000 Opus tokens per partition; after B1 additions, every touched living
   design stays at or below 25,000. No target warning is pre-accepted as debt.
@@ -415,10 +418,10 @@ identified before those runs; credentials or fixtures missing from a run are rec
 - [x] Review the final implementation against every required acceptance assertion and resolve the Phase 1 gates and
   inline decisions. Record the explicit disposition of the optional source-only mode.
 - [x] Commit by reviewable intent and open a B1 PR with the actual behavior, verification commands, and material limits.
-- [ ] Verify merge/check results against the tested tree and synchronize normative/end-user docs.
-- [ ] Record completed work in `docs/board/change_log.md`; propose only durable lessons for human review before updating
+- [x] Verify merge/check results against the tested tree and synchronize normative/end-user docs.
+- [x] Record completed work in `docs/board/change_log.md`; propose only durable lessons for human review before updating
   the relevant implementation-note ledger.
-- [ ] Move B1 to `done/`, repoint inbound links, and update the epic's next-member decision. Keep the epic active until
+- [x] Move B1 to `done/`, repoint inbound links, and update the epic's next-member decision. Keep the epic active until
   its coordinated outcome is shipped and verified.
 
 ## PR review corrections
@@ -463,15 +466,41 @@ bug reproductions fail against `6529ff38` and pass with B1. Full regression curr
 integration and formatting results are maintained in the [evidence record](evidence/README.md). The documentation
 partitions are integrated locally and remain separate prerequisite PRs. B1 stays `doing/` until merged and verified.
 
-Final aggregate verification: `make test-unit` passes **10,594 tests** (117 integration selections deselected),
-`make test-regression` passes **1,335**, and `make pre-commit` passes. The native/auth/lifetime Docker suite passes
-**19**; adjacent authority, supervisor, CLI and sidecar suites pass **22**. A clean wheel smoke exercises all four lane
-consumers, plan lifecycle, activity, policy file/diff input and the packaged watchdog. The
-[document counts](evidence/2026-10-07-document-counts.json) are content-matched and below 25,000 tokens for every
-touched living design. Historical completed-card warnings remain unchanged. The [evidence record](evidence/README.md)
-states the unproduced real expired-login/Console/Keychain cases and the unsupported combinations refused by B1.
+Initial implementation aggregate verification, before review corrections: `make test-unit` passes **10,594 tests** (117
+integration selections deselected), `make test-regression` passes **1,335**, and `make pre-commit` passes. The
+native/auth/lifetime Docker suite passes **19**; adjacent authority, supervisor, CLI and sidecar suites pass **22**. A
+clean wheel smoke exercises all four lane consumers, plan lifecycle, activity, policy file/diff input and the packaged
+watchdog. The [document counts](evidence/2026-10-07-document-counts.json) are content-matched and below 25,000 tokens
+for every touched living design. Historical completed-card warnings remain unchanged. The
+[evidence record](evidence/README.md) states the unproduced real expired-login/Console/Keychain cases and the
+unsupported combinations refused by B1.
 
 2026-10-08: opened [PR #260](https://github.com/hapa1i/multi-forge/pull/260), stacked after #258 and #259. Runner
 safeguards are `1e41a0f9`, the integrated feature is `1b0bfb40`, and runtime tests/evidence are `ef3cae7e`; the final
-commit reconciles documentation and this execution record. Merge, post-merge verification, changelog and board closeout
-remain unchecked intentionally.
+commit reconciles documentation and this execution record. Merge and board closeout were pending at PR opening.
+
+## Merged closeout
+
+2026-10-08: #260 merged into #259 as `772de05c`, #259 merged into #258 as `d437efdd`, and
+[#258](https://github.com/hapa1i/multi-forge/pull/258) merged to `main` as `56d4b8f5`. A post-merge tree comparison
+matches tested head `2a3e7279` exactly. Its five GitHub checks passed: pre-commit, Tests, both CodeQL analyses, and the
+CodeQL result. The [Tests run](https://github.com/hapa1i/multi-forge/actions/runs/37829922970) includes unit tests,
+regressions, and the clean-wheel LiteLLM smoke.
+
+Final local verification passes **10,594 unit tests** (117 integration selections deselected), **1,382 regressions**,
+and full `make pre-commit`. Both pytest suites ran with host Claude and Docker excluded from PATH after correcting seven
+fixtures that depended on installed runtimes. The [review evidence](evidence/2026-10-08-review-fixes.md) retains **41
+unique passing integration cases**, build/installed-wheel checks, the real subscription probe, and their limits. No
+invoice or quota decrement was measured; unverified auth combinations refuse, and operational review failures keep the
+existing fail-open policy.
+
+Normative runtime, session, workflow, telemetry, installation, CLI, and end-user policy/session docs describe the
+shipped contracts. The documentation prerequisites and B1 are now in `done/`; inbound links and the changelog are
+updated. Durable decisions already live in those design docs, so this closeout makes no separate implementation-note
+promotion. The [epic handoff](../../doing/epic_codex_supervisor/checklist.md#b1-handoff) identifies the B3-B5/Jev
+boundaries. B2 remains the next proposed member to review; no later member is activated by this closeout.
+
+Closeout validation: **65** file-limit/cache and Markdown-link tests pass; the repository link audit passes for **644**
+sources. Board checks confirm all three closed checklists have no open items, the epic stays active, and B2-B5 remain
+proposed. The archived August 15-17 changelog blocks match the original bytes. The current log and new archive pass the
+12,000-token local screen at **11,301** and **3,845** tokens, so the obsolete changelog provider-cache entry is removed.

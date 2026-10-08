@@ -1,7 +1,8 @@
 # B1 verification, 2026-10-07
 
 This evidence belongs to [B1](../card.md), on `feat/plan-file-supervision` after the documentation partitions at
-`6529ff38`. Final verification and PR coordinates are recorded below. B1 remains in `doing/` pending merge.
+`6529ff38`. The [merged closeout](../checklist.md#merged-closeout) records final verification and PR coordinates; B1
+closed to `done/` on 2026-10-08.
 
 The [2026-10-08 review correction record](2026-10-08-review-fixes.md) supersedes the version-admission, manifest-write,
 and shadow-format statements below. This page preserves the original test results and dated runtime observations.
