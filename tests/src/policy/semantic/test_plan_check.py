@@ -728,7 +728,7 @@ class TestPlanCheckEvaluate:
         decision = policy.evaluate(_make_context())
         assert len(decision.violations[0].message) == _MAX_REASON_CHARS
 
-    @patch("forge.policy.semantic.plan_check.load_plan_override")
+    @patch("forge.policy.semantic.plan_source.read_plan")
     def test_unexpected_exception_escalates(self, mock_load: MagicMock, tmp_path: Path) -> None:
         """An unexpected raise must become needs_review, not propagate to fail-open."""
         mock_load.side_effect = RuntimeError("disk on fire")
@@ -936,7 +936,7 @@ class TestShadowCapture:
     @patch("forge.policy.semantic.plan_check.run_plan_check")
     def test_fresh_allow_captures(self, mock_run: MagicMock, tmp_path: Path) -> None:
         mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
-        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0, supervisor_model="opus")
         policy = PlanCheckPolicy(config=cfg)
         decision = policy._check(_make_context())
         assert decision.decision == "allow"

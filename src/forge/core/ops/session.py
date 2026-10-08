@@ -424,8 +424,20 @@ def set_session_override(
         # Apply + validate + persist atomically under lock.
         # The mutate callback receives the fresh state from disk, avoiding TOCTOU.
         def _mutate(m: SessionState) -> None:
+            from forge.policy.semantic.identity import snapshot_supervisor_options
+
+            old = snapshot_supervisor_options(m)
             set_override(m.overrides, key, parsed_value)
             effective = compute_effective_intent(m, strict=True, override_key=key)
+            if key.split(".", 1)[0] in {"policy", "launch", "*"}:
+                from forge.policy.semantic.identity import (
+                    validate_supervisor_transition,
+                )
+
+                try:
+                    validate_supervisor_transition(m, old, effective)
+                except ValueError as exc:
+                    raise InvalidOverrideValueError(key, str(exc), value_str) from exc
             if key in {"verification", "verification.*", "verification.type"}:
                 validate_verification_type_for_authoring(effective.verification)
             if key in {"verification", "verification.*", "verification.on_incomplete"}:
@@ -486,7 +498,19 @@ def reset_session_overrides(
             result_holder: dict[str, Any] = {}
 
             def _mutate_delete(m: SessionState) -> None:
+                from forge.policy.semantic.identity import snapshot_supervisor_options
+
+                old = snapshot_supervisor_options(m)
                 result_holder["deleted"] = delete_override(m.overrides, key)
+                if key.split(".", 1)[0] in {"policy", "launch", "*"} and old:
+                    from forge.policy.semantic.identity import (
+                        validate_supervisor_transition,
+                    )
+
+                    try:
+                        validate_supervisor_transition(m, old, compute_effective_intent(m))
+                    except ValueError as exc:
+                        raise ForgeOpError(str(exc)) from exc
 
             store.update(timeout_s=5.0, mutate=_mutate_delete)
             return ResetOverridesResult(
@@ -498,10 +522,22 @@ def reset_session_overrides(
             # Peek at current state to report whether overrides existed
             had_overrides = bool(resolved.state.overrides)
             if had_overrides:
-                store.update(
-                    timeout_s=5.0,
-                    mutate=lambda m: clear_overrides(m.overrides),
-                )
+
+                def clear_checked(m: SessionState) -> None:
+                    from forge.policy.semantic.identity import (
+                        snapshot_supervisor_options,
+                        validate_supervisor_transition,
+                    )
+
+                    old = snapshot_supervisor_options(m)
+                    clear_overrides(m.overrides)
+                    if old:
+                        try:
+                            validate_supervisor_transition(m, old, compute_effective_intent(m))
+                        except ValueError as exc:
+                            raise ForgeOpError(str(exc)) from exc
+
+                store.update(timeout_s=5.0, mutate=clear_checked)
             return ResetOverridesResult(cleared_all=True, key=None, was_present=had_overrides)
 
     except InvalidOverrideKeyError as e:

@@ -1659,6 +1659,8 @@ class TestGuardSupervisorToggle:
             "forge.policy.semantic.supervisor.validate_supervisor_target",
             lambda _target, forge_root=None: source_state,
         )
+        preflight = Mock()
+        monkeypatch.setattr("forge.core.reactive.reviewer_runtime.preflight_supervisor_runtime", preflight)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervisor planner", "transcript_path": ""}
@@ -1667,6 +1669,7 @@ class TestGuardSupervisorToggle:
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["reason"] == "Supervisor set to 'planner'"
+        preflight.assert_called_once()
 
         updated = store.read()
         assert updated.intent.policy is not None

@@ -1,0 +1,337 @@
+{
+  "claude_version": "2.1.291",
+  "codex_version": "0.160.1",
+  "route": "Explicit API-backed Docker executors; sleeping fake reviewers for lifetime probes",
+  "native_tests": "8 passed: six executor/tool/reviewer allow-deny combinations plus two Codex sandbox controls",
+  "combined_tests": 19,
+  "hook_expiry": [
+    {
+      "runtime": "claude_code",
+      "mode": "baseline",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791375971.2285976,
+          "pid": 4778,
+          "pgid": 4776,
+          "tool": "Write"
+        },
+        {
+          "kind": "signal",
+          "time": 1791376031.0736344,
+          "pid": 4778,
+          "pgid": 4776,
+          "signal": 15
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 4779,
+          "child": 4780,
+          "pgid": 4776,
+          "parent": 4778
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 69.34,
+      "tool_ran": true,
+      "signal_syscalls": [
+        "12:27:11.071228 kill(-4776, SIGTERM)    = 0",
+        "12:27:12.567667 kill(-4776, SIGKILL)    = 0",
+        "12:27:12.568933 kill(-4776, SIGKILL)    = 0",
+        "12:27:11.074506 kill(4779, SIGKILL)     = 0"
+      ]
+    },
+    {
+      "runtime": "codex",
+      "mode": "baseline",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376045.950926,
+          "pid": 5216,
+          "pgid": 5216,
+          "tool": "apply_patch"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 5217,
+          "child": 5218,
+          "pgid": 5216,
+          "parent": 5216
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 63.45,
+      "tool_ran": true,
+      "signal_syscalls": [
+        "12:28:25.711202 kill(5216, SIGKILL)     = 0",
+        "12:28:25.712703 kill(-5216, SIGKILL)    = 0",
+        "12:28:29.101864 kill(5201, SIGKILL)     = 0"
+      ]
+    },
+    {
+      "runtime": "claude_code",
+      "mode": "natural",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376118.199328,
+          "pid": 5590,
+          "pgid": 5588,
+          "tool": "Write"
+        },
+        {
+          "kind": "signal",
+          "time": 1791376178.037843,
+          "pid": 5590,
+          "pgid": 5588,
+          "signal": 15
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 5594,
+          "child": 5595,
+          "pgid": 5592,
+          "parent": 5592
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 69.53,
+      "tool_ran": true,
+      "signal_syscalls": [
+        "12:29:38.033889 kill(-5588, SIGTERM)    = 0",
+        "12:29:39.532940 kill(-5588, SIGKILL)    = 0",
+        "12:29:39.534873 kill(-5588, SIGKILL)    = 0",
+        "12:29:38.039646 kill(-5592, SIGTERM)    = 0",
+        "12:29:38.540583 kill(-5592, SIGKILL)    = 0"
+      ]
+    },
+    {
+      "runtime": "codex",
+      "mode": "natural",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376194.0961223,
+          "pid": 6023,
+          "pgid": 6023,
+          "tool": "apply_patch"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 6027,
+          "child": 6028,
+          "pgid": 6025,
+          "parent": 6025
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 45.94,
+      "tool_ran": false,
+      "signal_syscalls": [
+        "12:30:39.112081 kill(6023, SIGKILL)     = 0",
+        "12:30:39.113499 kill(-6023, SIGKILL)    = 0",
+        "12:30:39.128872 kill(6009, SIGKILL)     = 0",
+        "12:30:39.117713 kill(-6025, SIGTERM)    = 0",
+        "12:30:39.620660 kill(-6025, SIGKILL)    = 0"
+      ]
+    },
+    {
+      "runtime": "claude_code",
+      "mode": "hook",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376245.5288994,
+          "pid": 6342,
+          "pgid": 6341,
+          "tool": "Write"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 6347,
+          "child": 6348,
+          "pgid": 6345,
+          "parent": 6345
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 7.05,
+      "tool_ran": true
+    },
+    {
+      "runtime": "codex",
+      "mode": "hook",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376259.4025145,
+          "pid": 6728,
+          "pgid": 6728,
+          "tool": "apply_patch"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 6733,
+          "child": 6734,
+          "pgid": 6731,
+          "parent": 6731
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 9.38,
+      "tool_ran": true
+    },
+    {
+      "runtime": "claude_code",
+      "mode": "group",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376274.0413642,
+          "pid": 7044,
+          "pgid": 7043,
+          "tool": "Write"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 7049,
+          "child": 7050,
+          "pgid": 7047,
+          "parent": 7047
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 6.86,
+      "tool_ran": true
+    },
+    {
+      "runtime": "codex",
+      "mode": "group",
+      "exit_code": 0,
+      "events": [
+        {
+          "kind": "hook",
+          "time": 1791376289.1734939,
+          "pid": 7430,
+          "pgid": 7430,
+          "tool": "apply_patch"
+        }
+      ],
+      "reviewers": [
+        {
+          "pid": 7435,
+          "child": 7436,
+          "pgid": 7433,
+          "parent": 7433
+        }
+      ],
+      "survivors": [],
+      "survivors_at_executor_exit": [],
+      "cleanup_observation_seconds": 0.0,
+      "hook_elapsed_seconds": 9.33,
+      "tool_ran": true
+    }
+  ],
+  "additional_codex_natural_expiry": {
+    "runtime": "codex",
+    "mode": "natural",
+    "exit_code": 0,
+    "events": [
+      {
+        "kind": "hook",
+        "time": 1791375537.8366752,
+        "pid": 532,
+        "pgid": 532,
+        "tool": "apply_patch"
+      }
+    ],
+    "reviewers": [
+      {
+        "pid": 537,
+        "child": 538,
+        "pgid": 534,
+        "parent": 534
+      }
+    ],
+    "survivors": [],
+    "survivors_at_executor_exit": [],
+    "cleanup_observation_seconds": 0.0,
+    "hook_elapsed_seconds": 63.19,
+    "tool_ran": true,
+    "signal_syscalls": [
+      "12:19:57.610174 kill(532, SIGKILL)      = 0",
+      "12:19:57.612490 kill(-532, SIGKILL)     = 0",
+      "12:20:00.695172 kill(517, SIGKILL)      = 0",
+      "12:19:57.614583 kill(-534, SIGTERM)     = 0",
+      "12:19:58.120334 kill(-534, SIGKILL)     = 0"
+    ]
+  },
+  "auth": {
+    "platform": "linux",
+    "synthetic_only": true,
+    "control": {
+      "loggedIn": true,
+      "authMethod": "api_key_helper",
+      "apiProvider": "firstParty",
+      "apiKeySource": "ANTHROPIC_API_KEY"
+    },
+    "clean": {
+      "loggedIn": false,
+      "authMethod": "none",
+      "apiProvider": "firstParty",
+      "apiKeySource": null
+    },
+    "rows": [
+      {
+        "case": "missing-login-with-competing-selectors-and-trusted-settings",
+        "refused": true
+      },
+      {
+        "case": ".config/anthropic/active_config",
+        "refused": true
+      },
+      {
+        "case": ".config/anthropic/configs/default.json",
+        "refused": true
+      },
+      {
+        "case": ".claude/remote-settings.json",
+        "refused": true
+      },
+      {
+        "case": "managed-gateway",
+        "refused": true
+      }
+    ],
+    "helper_invocations": 0
+  }
+}

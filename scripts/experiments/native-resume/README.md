@@ -13,10 +13,10 @@ absolute CWD with `/`, `.`, and `_` replaced by `-` (the underscore mapping is v
 
 The 2026-04-02 negative result (Claude Code 2.1.90 — see
 [`src/forge/cli/session_fork.py`](../../../src/forge/cli/session_fork.py) and
-[`docs/design_sessions.md` §3.9](../../../docs/design_sessions.md#39-session-resume-context-management)) found that
-cross-CWD `--resume` fails with **"No conversation found."** But that test never *relocated* the JSONL — it resumed from
-a foreign CWD while the file stayed put. "No conversation found" is a **discovery** failure, not a signature/content
-failure.
+[`docs/design_session_context.md` §3.9](../../../docs/design_session_context.md#39-session-resume-context-management))
+found that cross-CWD `--resume` fails with **"No conversation found."** But that test never *relocated* the JSONL — it
+resumed from a foreign CWD while the file stayed put. "No conversation found" is a **discovery** failure, not a
+signature/content failure.
 
 **native-relocate** asks: if you first **copy** the parent JSONL into the child CWD's encoded dir, does Claude find it —
 and does the tool-use *continuation* survive signed-thinking revalidation?

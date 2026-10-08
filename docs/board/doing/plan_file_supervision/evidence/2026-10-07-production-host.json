@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-07",
+  "route": "CLI-managed subscription",
+  "credits_disabled_user_confirmed": true,
+  "parent_api_key_present": false,
+  "reviews": [
+    {
+      "mode": "fresh",
+      "run_ok": true,
+      "parsed": true,
+      "decision": "allow",
+      "failure_type": null,
+      "seconds": 5.17
+    },
+    {
+      "mode": "resume",
+      "run_ok": true,
+      "parsed": true,
+      "decision": "allow",
+      "failure_type": null,
+      "seconds": 6.12
+    }
+  ],
+  "billing_modes": [
+    "subscription_quota",
+    "subscription_quota"
+  ],
+  "requested_models": [
+    "sonnet",
+    "sonnet"
+  ],
+  "attempt_states": [
+    "completed",
+    "completed"
+  ],
+  "settings_unchanged": true,
+  "account_identity_unchanged": true,
+  "source_history_unchanged": true,
+  "login_usable_after": true,
+  "invoice_or_quota_measured": false
+}

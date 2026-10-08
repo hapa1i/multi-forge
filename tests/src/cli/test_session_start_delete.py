@@ -607,12 +607,14 @@ class TestSessionStart:
 
         with (
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.docker.require_sidecar_contract") as check_image,
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0) as run_sidecar,
         ):
             result = runner.invoke(main, ["session", "start", "sidecar-hooks", "--sidecar"])
 
         assert result.exit_code == 0, result.output
+        check_image.assert_called_once_with("forge-sidecar:latest", schema_version=2, reviewer=False)
         assert json.loads((sidecar_home / "settings.json").read_text()) == get_sidecar_hook_settings()
         assert (sidecar_home / "settings.json").stat().st_mode & 0o777 == 0o600
         assert project_settings.read_bytes() == before_project

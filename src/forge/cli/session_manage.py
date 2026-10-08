@@ -1191,6 +1191,8 @@ def _build_show_json(
             "fail_mode": ctx.policy.fail_mode,
             "bundles": list(ctx.policy.bundles),
             "supervisor_resume_id": ctx.policy.supervisor_resume_id,
+            "supervisor_plan_path": ctx.policy.supervisor_plan_path,
+            "supervisor_active": ctx.policy.supervisor_active,
         },
     }
 

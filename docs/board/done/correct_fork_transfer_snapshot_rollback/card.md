@@ -29,8 +29,9 @@ attempt, so a same-name retry cannot silently launch with stale parent context.
 
 Authority comes from the explicit pre-launch compensation criterion in
 [`extract_session_fork_execution`](../../done/extract_session_fork_execution/card.md), the frozen-snapshot contract in
-[`docs/design_sessions.md`](../../../design_sessions.md#39-session-resume-context-management), and the three-file
-ownership model in [`docs/design_sessions.md`](../../../design_sessions.md#h3-file-layout-and-overlay).
+[`docs/design_session_context.md`](../../../design_session_context.md#39-session-resume-context-management), and the
+three-file ownership model in
+[`docs/design_session_context.md`](../../../design_session_context.md#h3-file-layout-and-overlay).
 
 ## Acceptance criteria
 

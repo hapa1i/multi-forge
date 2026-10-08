@@ -7,6 +7,7 @@ to fork the planning session without polluting its conversation.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +15,7 @@ from typing import Any
 
 from forge.core.invoker.codex_stream import is_subscription_exhausted
 from forge.core.invoker.types import Attribution, HeadlessResult
-from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
+from forge.core.lanes import Lane, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import (
@@ -26,6 +27,13 @@ from forge.core.reactive.throttle import ThrottleCache
 from forge.policy.action_identity import action_fingerprint
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.queries import RESUME_ID_UUID_RE
+from forge.policy.semantic.deadline import (
+    review_deadline,
+    review_scope,
+    validate_timeout,
+)
+from forge.policy.semantic.identity import SUPERVISOR_CONSUMER, validate_reviewer
+from forge.policy.semantic.plan_source import PlanSnapshot, ReviewSource, read_plan
 from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     parse_supervisor_verdict_with_status,
@@ -141,28 +149,7 @@ def _supervisor_action_content(context: ActionContext) -> str:
     return _bounded_excerpt(context.new_content or "", _SUPERVISOR_CONTENT_CHARS)
 
 
-# The supervisor reads repository files, so it requires a `tool_agent` lane.
-# `runtime_id` selects the `claude_code` or `codex` arm in `_dispatch_supervisor`.
-# `backend_id` and `model` are placement metadata. The Claude arm derives transport
-# (`base_url`) and its `opus` pin dynamically, while Codex chooses its own model.
-# `backend_id` still determines billing (for example `claude-max`).
-# `anthropic-direct` is a real catalog source; no single backend is "correct" for a
-# proxied Claude supervisor, which routes through whichever proxy was resolved.
-SUPERVISOR_CONSUMER = Consumer(
-    id="supervisor",
-    capability_floor="tool_agent",
-    default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
-    # The codex-exec lane uses the ChatGPT subscription (chatgpt.reachable_via=("codex",)).
-    # resolve_lane rejects an override that is not a declared candidate.
-    # Only runtime_id drives dispatch. Codex picks its own model unless `-m` is passed.
-    # The keyless claude_code lane uses the Claude Max subscription
-    # (claude-max.reachable_via=("claude_code",)). backend_id determines billing only;
-    # resolve_billing_mode reads its subscription posture; the claude_code dispatch arm is unchanged.
-    allowed_lanes=(
-        Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
-        Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),
-    ),
-)
+# Concrete choices belong to the supervisor, not the shared lane resolver.
 
 
 def supervisor_lane_runtimes() -> tuple[str, ...]:
@@ -187,36 +174,19 @@ def supervisor_lane_backends() -> tuple[str, ...]:
 
 
 def plan_fingerprint(path: str, forge_root: str | None) -> str:
-    """Return a cheap fingerprint for cache key differentiation: path:mtime_ns:size."""
+    """Identify the exact plan bytes, including replacements preserving size and mtime."""
     resolved = Path(path)
     if not resolved.is_absolute() and forge_root:
         resolved = Path(forge_root) / resolved
     try:
-        st = resolved.stat()
-        return f"{resolved}:{st.st_mtime_ns}:{st.st_size}"
+        return f"{resolved}:{hashlib.sha256(resolved.read_bytes()).hexdigest()}"
     except OSError:
         return f"{path}:missing"
 
 
 def load_plan_override(config: SupervisorConfig) -> str | None:
-    """Read the plan override file from disk. Returns None if not set, missing, or empty."""
-    if not config.plan_override_path:
-        return None
-    try:
-        resolved = Path(config.plan_override_path)
-        if not resolved.is_absolute() and config.forge_root:
-            resolved = Path(config.forge_root) / resolved
-        if not resolved.is_file():
-            _log.warning("Supervisor plan_override_path file not found: %s", resolved)
-            return None
-        content = resolved.read_text(encoding="utf-8").strip()
-        if not content:
-            _log.warning("Supervisor plan_override_path file is empty: %s", resolved)
-            return None
-        return content
-    except Exception as e:
-        _log.warning("Failed to read supervisor plan_override_path: %s", e)
-        return None
+    """Read the approved plan without retaining mutable file state."""
+    return read_plan(config).text
 
 
 class SemanticSupervisorPolicy(DeterministicPolicy):
@@ -230,8 +200,15 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
     - cache: ThrottleCache entries {cache_key: {checked_at, verdict, confidence}}
     """
 
-    def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
+    def __init__(
+        self,
+        config: SupervisorConfig | None = None,
+        *,
+        lane_record: LaneRecord | None = None,
+        source: ReviewSource | None = None,
+    ) -> None:
         self._config = config
+        self._source = source or ReviewSource()
         # The policy-check hook passes the manifest's consumer-lane binding here,
         # so this module never reads the store.
         # None selects the default lane.
@@ -255,13 +232,13 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         """Apply to Write/Edit when supervisor is configured and not suspended."""
         if context.tool_name not in ("Write", "Edit"):
             return False
-        if self._config is None or self._config.resume_id is None:
+        if self._config is None or not self._config.configured:
             return False
         return not self._config.suspended
 
     def _evaluate(self, context: ActionContext) -> PolicyDecision:
         """Evaluate action via supervisor (with caching)."""
-        if not self._config or not self._config.resume_id:
+        if not self._config or not self._config.configured:
             return PolicyDecision(
                 decision="allow",
                 policy_id=self.policy_id,
@@ -270,11 +247,14 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         if self._config.suspended:
             return PolicyDecision(decision="allow", policy_id=self.policy_id)
 
-        cache_key = action_fingerprint(context)
+        snapshot = self._source.take(self._config, context)
+        from forge.policy.semantic.identity import reviewer_cache_identity
+
+        cache_key = (
+            action_fingerprint(context) + "|reviewer:" + reviewer_cache_identity(self._config, self._lane_record)
+        )
         if self._config.plan_override_path:
-            cache_key = (
-                cache_key + "|plan:" + plan_fingerprint(self._config.plan_override_path, self._config.forge_root)
-            )
+            cache_key = cache_key + "|plan:" + snapshot.fingerprint
 
         cached = self._cache.check(cache_key)
         if cached is not None:
@@ -292,11 +272,18 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
                     intent=self.intent,
                 )
                 decision.cached = True
-                return decision
+                from forge.policy.semantic.attempts import record_cached_review
+
+                try:
+                    return record_cached_review(self._config, context, snapshot, self._lane_record, decision)
+                except OSError as exc:
+                    return _supervisor_fail_open_decision(
+                        f"Review evidence unavailable: {exc}", failure_type="evidence_unavailable"
+                    )
             _log.warning("Ignoring invalid supervisor cache entry for %s", cache_key)
 
         # Invoke supervisor
-        decision = invoke_supervisor(self._config, context, lane_record=self._lane_record)
+        decision = invoke_supervisor(self._config, context, lane_record=self._lane_record, snapshot=snapshot)
 
         # Attach intent to deny decisions
         if decision.decision == "deny":
@@ -305,7 +292,12 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         # Only cache genuinely clean allows. Warns, allow-with-warnings
         # (timeout/failure), and denials are NOT cached so they re-evaluate
         # on the next check.
-        if decision.decision == "allow" and not decision.warnings:
+        if (
+            decision.decision == "allow"
+            and not decision.warnings
+            and not decision.fail_open
+            and not decision.failure_type
+        ):
             self._cache.update(cache_key, verdict="aligned", confidence=1.0)
 
         return decision
@@ -480,6 +472,7 @@ class SupervisorRun:
     verdict: SupervisorVerdict | None = None
     run_ok: bool = False
     parsed: bool = False
+    observed_models: tuple[str, ...] = ()
 
 
 def _supervisor_fail_open_decision(
@@ -572,7 +565,7 @@ def _dispatch_claude_supervisor(
     usage_command: str,
     backend_id: str,
 ) -> SessionResult:
-    """Run the supervisor as ``claude -p`` -- the byte-identical pre-T3 path.
+    """Run fresh or forked Claude with inspection-only tools.
 
     Owns transport resolution (proxy vs direct), the executor-pin scrub, the
     cost-tracked dispatch, and the SOLE usage emission. Raises
@@ -600,6 +593,10 @@ def _dispatch_claude_supervisor(
         model = "opus" if base_url else None
         unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
+    if config.supervisor_model is not None:
+        model = config.supervisor_model
+        unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS
+
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.usage import emit_usage_for_session_result
 
@@ -622,9 +619,13 @@ def _dispatch_claude_supervisor(
             base_url=base_url,
             direct=config.direct,
             timeout_seconds=config.timeout_seconds,
-            cwd=resolved.source_cwd,
+            cwd=resolved.source_cwd or context.repo_root or None,
             extra_env=spawn_env,
             unset_env_vars=unset_env_vars,
+            read_only=True,
+            subscription_only=config.auth_mode == "subscription-only",
+            deadline=review_deadline(config.timeout_seconds),
+            additional_dirs=(str(Path(context.repo_root).resolve()),) if context.repo_root else (),
         )
 
     # Attribute before the failure branch so failed runs are recorded too. This is the SOLE emitter for the run.
@@ -691,7 +692,10 @@ def _dispatch_codex_supervisor(
             # operation=None suppresses the invoker's upstream-outcome row (the usage event
             # still fires); the engine's policy.evaluate is this arm's only upstream row.
             attribution=Attribution(command=usage_command, session=context.session_name, operation=None),
-            model=None,  # codex picks its own model; backend_id/model on the lane are nominal
+            model=config.supervisor_model,
+            extra_args=(
+                ["-c", f'model_reasoning_effort="{config.supervisor_effort}"'] if config.supervisor_effort else ()
+            ),
             # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
             # worktree, needed only because `claude --resume` is CWD-scoped to find the
             # transcript -- a Claude-arm constraint codex (no --resume) doesn't share. Codex
@@ -704,6 +708,7 @@ def _dispatch_codex_supervisor(
             timeout_seconds=config.timeout_seconds,
             label="supervisor",
         )
+        request.watchdog_deadline = review_deadline(config.timeout_seconds)
         result = CodexHeadlessInvoker().run(request)
     except _SupervisorRoutingError:
         raise  # already a structured fail-open trigger (cache miss / unready)
@@ -773,6 +778,70 @@ def run_supervisor_check(
     intent: str | None = None,
     usage_command: str = "supervisor",
     lane_record: LaneRecord | None = None,
+    snapshot: PlanSnapshot | None = None,
+    resolved_target: _ResolvedTarget | None = None,
+) -> SupervisorRun:
+    """Persist a start before dispatch; preserve incomplete evidence if the hook dies."""
+    from time import monotonic
+
+    from forge.policy.semantic.attempts import ReviewAttempt
+
+    snapshot = snapshot if snapshot is not None else read_plan(config)
+    attempt = None
+    try:
+        expires = review_deadline(min(45, max(1, config.timeout_seconds)))
+        budget = expires - monotonic()
+        lane = SUPERVISOR_CONSUMER.default_lane
+        record = lane_record or LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
+        attempt = ReviewAttempt(
+            config,
+            context,
+            snapshot,
+            record,
+            budget=budget,
+            purpose="shadow" if usage_command == "supervisor-shadow" else "live",
+        )
+        with review_scope(expires):
+            result = _run_supervisor_check(
+                config,
+                context,
+                intent=intent,
+                usage_command=usage_command,
+                lane_record=lane_record,
+                snapshot=snapshot,
+                resolved_target=resolved_target,
+            )
+    except Exception as exc:
+        result = SupervisorRun(
+            _supervisor_fail_open_decision(
+                f"Supervisor evidence or setup unavailable: {exc}",
+                failure_type="review_unavailable",
+            )
+        )
+    # Evidence is downstream of the decision. Even a recorder/cleanup error must
+    # not turn a completed frontier deny into an operational fail-open.
+    if attempt is not None:
+        try:
+            try:
+                attempt.record.observed_models = list(result.observed_models)
+                attempt.finish(result.decision)
+            finally:
+                attempt.close()
+        except Exception as exc:
+            _log.warning("Supervisor evidence finalization failed: %s", exc)
+            result.decision.warnings.append("Supervisor evidence could not be saved; the review verdict is unchanged.")
+    return result
+
+
+def _run_supervisor_check(
+    config: SupervisorConfig,
+    context: ActionContext,
+    *,
+    intent: str | None = None,
+    usage_command: str = "supervisor",
+    lane_record: LaneRecord | None = None,
+    snapshot: PlanSnapshot | None = None,
+    resolved_target: _ResolvedTarget | None = None,
 ) -> SupervisorRun:
     """Run the frontier supervisor once; return decision + raw verdict + run/parse status.
 
@@ -796,16 +865,37 @@ def run_supervisor_check(
             )
         )
 
-    if not config.resume_id:
+    if not config.configured:
         return SupervisorRun(
             PolicyDecision(
                 decision="allow",
                 policy_id="semantic.supervisor",
-                warnings=["Supervisor not configured (no resume_id)"],
+                warnings=["Supervisor not configured (no planning target or plan file)"],
             )
         )
 
-    resolved = _resolve_resume_target(config.resume_id, forge_root=config.forge_root)
+    import os
+
+    if config.plan_override_path and (
+        os.environ.get("FORGE_SIDECAR") == "1" or os.environ.get("FORGE_LAUNCH_MODE") == "sidecar"
+    ):
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                "Plan-file supervision is unavailable in sidecars. Use a host executor.",
+                failure_type="unsupported_executor",
+            )
+        )
+
+    try:
+        validate_timeout(config.timeout_seconds)
+    except ValueError as exc:
+        return SupervisorRun(_supervisor_fail_open_decision(str(exc), failure_type="configuration_error"))
+
+    resolved = resolved_target or (
+        _resolve_resume_target(config.resume_id, forge_root=config.forge_root)
+        if config.resume_id
+        else _ResolvedTarget(source_cwd=context.repo_root or None)
+    )
     if resolved.warning:
         _log.warning(resolved.warning)
         return SupervisorRun(
@@ -815,17 +905,14 @@ def run_supervisor_check(
             )
         )
 
-    assert resolved.resume_id is not None
-
+    target_path = context.target_path
+    if target_path and context.repo_root:
+        target_path = str((Path(context.repo_root) / target_path).resolve())
     prompt = SUPERVISOR_PROMPT.format(
         tool_name=context.tool_name,
-        target_path=context.target_path or "N/A",
+        target_path=target_path or "N/A",
         content=_supervisor_action_content(context),
     )
-
-    plan_content = load_plan_override(config)
-    if plan_content:
-        prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
     # Resolve the supervisor lane under a fail-open guard, then dispatch on its runtime.
     # Converting the injected consumer-lane binding from LaneRecord to Lane
@@ -835,7 +922,8 @@ def run_supervisor_check(
     # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
     try:
         lane = resolve_supervisor_lane(lane_record)
-    except LaneError as e:
+        validate_reviewer(config, LaneRecord(lane.runtime_id, lane.backend_id, lane.model))
+    except ValueError as e:
         _log.warning("Supervisor lane resolution failed: %s", e)
         return SupervisorRun(
             _supervisor_fail_open_decision(
@@ -843,6 +931,17 @@ def run_supervisor_check(
                 failure_type="configuration_error",
             )
         )
+
+    plan_content = snapshot.text if snapshot is not None else load_plan_override(config)
+    if config.plan_override_path and not plan_content:
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                "Approved plan file is missing, empty, or unreadable; review unavailable.",
+                failure_type="plan_missing",
+            )
+        )
+    if plan_content:
+        prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
     # Codex has no `--resume`: the approved plan reaches it only via the plan-override
     # preamble (folded into `prompt` above when plan_content is present). With no plan text
@@ -889,7 +988,9 @@ def run_supervisor_check(
         # classified as `subscription_exhausted` -- ahead of the generic `subprocess_error`/
         # `exit_N` -- so callers can degrade the spent codex lane. This check is limited to codex
         # so a claude-lane/subprocess failure is never read as exhaustion.
-        if result.timed_out:
+        if not result.dispatched:
+            failure_type = "auth_unavailable"
+        elif result.timed_out:
             failure_type = "timeout"
         elif lane.runtime_id == "codex" and result.runtime_is_error and is_subscription_exhausted(reason):
             failure_type = "subscription_exhausted"
@@ -904,7 +1005,8 @@ def run_supervisor_check(
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
                 root_run_id=result.root_run_id,
-            )
+            ),
+            observed_models=result.observed_models,
         )
 
     verdict, parsed = parse_supervisor_verdict_with_status(result.stdout)
@@ -921,7 +1023,9 @@ def run_supervisor_check(
     decision.telemetry_run_id = result.run_id
     decision.telemetry_parent_run_id = result.parent_run_id
     decision.telemetry_root_run_id = result.root_run_id
-    return SupervisorRun(decision=decision, verdict=verdict, run_ok=True, parsed=parsed)
+    return SupervisorRun(
+        decision=decision, verdict=verdict, run_ok=True, parsed=parsed, observed_models=result.observed_models
+    )
 
 
 def invoke_supervisor(
@@ -930,6 +1034,7 @@ def invoke_supervisor(
     *,
     intent: str | None = None,
     lane_record: LaneRecord | None = None,
+    snapshot: PlanSnapshot | None = None,
 ) -> PolicyDecision:
     """Invoke the semantic supervisor via claude -p --resume (enforcement path).
 
@@ -937,7 +1042,7 @@ def invoke_supervisor(
     ``PolicyDecision`` (fail-open on errors). ``lane_record`` is the injected
     consumer-lane binding (None => default lane).
     """
-    return run_supervisor_check(config, context, intent=intent, lane_record=lane_record).decision
+    return run_supervisor_check(config, context, intent=intent, lane_record=lane_record, snapshot=snapshot).decision
 
 
 # --- Setup-time helpers (used by CLI, direct commands, and --supervise flags) ---
@@ -1189,6 +1294,7 @@ def apply_supervisor_routing(
     current_proxy_id: str | None = None,
     current_template: str | None = None,
     current_direct: bool = False,
+    runtime: str | None = None,
 ) -> str | None:
     """Apply explicit or auto-seeded supervisor routing to sup_config.
 
@@ -1200,6 +1306,10 @@ def apply_supervisor_routing(
     Returns a display string for the routing choice (for CLI output), or None
     when routing matched and no override was needed.
     """
+    if runtime == "codex":
+        if supervisor_proxy:
+            raise ValueError("Codex supervision cannot use a Claude supervisor proxy.")
+        return None
     if supervisor_proxy:
         sup_config.proxy = supervisor_proxy
         return supervisor_proxy
@@ -1224,6 +1334,8 @@ def apply_supervisor_routing(
 def apply_supervisor_to_intent(
     manifest: SessionState,
     sup_config: SupervisorConfig,
+    *,
+    replace_overrides: tuple[str, ...] = (),
 ) -> None:
     """Apply supervisor config to manifest intent (not overrides).
 
@@ -1247,6 +1359,23 @@ def apply_supervisor_to_intent(
     # Clear conflicting override so intent.policy.enabled takes effect.
     if manifest.overrides:
         delete_override(manifest.overrides, "policy.enabled")
+        # Source/routing identity belongs to this replacement. Unrelated tuning
+        # (including shadow sampling and checker defaults) remains user-owned.
+        for key in (
+            "resume_id",
+            "forge_root",
+            "plan_override_path",
+            "proxy",
+            "base_url",
+            "direct",
+            "auth_mode",
+            "supervisor_model",
+            "supervisor_effort",
+            "suspended",
+            "cascade",
+            *replace_overrides,
+        ):
+            delete_override(manifest.overrides, f"policy.supervisor.{key}")
 
 
 def apply_supervisor_and_lane(
@@ -1260,8 +1389,16 @@ def apply_supervisor_and_lane(
     ``--supervisor-runtime`` was given, the already-expanded ``lane_record`` into
     ``intent.consumer_lanes.supervisor``. ``None`` leaves the lane to the consumer default.
     """
+    from forge.policy.semantic.identity import (
+        select_supervisor_lane,
+        validate_reviewer,
+        validate_sidecar_supervisor,
+    )
     from forge.session.consumer_lanes import set_intent_lane
+    from forge.session.launch import is_sidecar_session
 
+    validate_reviewer(sup_config, lane_record or select_supervisor_lane())
+    validate_sidecar_supervisor(sup_config, sidecar=is_sidecar_session(manifest))
     apply_supervisor_to_intent(manifest, sup_config)
     if lane_record is not None:
         set_intent_lane(manifest, SUPERVISOR_CONSUMER, lane_record)

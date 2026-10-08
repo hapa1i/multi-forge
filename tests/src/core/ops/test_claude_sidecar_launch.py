@@ -169,6 +169,7 @@ def _launch_split_root_sidecar(
 
     with ExitStack() as stack:
         stack.enter_context(patch("forge.sidecar.docker.is_docker_available", return_value=True))
+        stack.enter_context(patch("forge.sidecar.docker.require_sidecar_contract"))
         stack.enter_context(patch("forge.sidecar.get_secrets_for_template", return_value={}))
         run_sidecar = stack.enter_context(patch("forge.sidecar.run_sidecar_session", return_value=0))
         build_routing_payload = stack.enter_context(

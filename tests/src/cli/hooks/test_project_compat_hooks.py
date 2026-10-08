@@ -275,6 +275,7 @@ def test_policy_hook_aggregates_store_and_shadow_roots_in_one_diagnostic(
         enabled=True,
         supervisor=SupervisorConfig(
             resume_id="planner",
+            supervisor_model="opus",
             direct=True,
             forge_root=str(shadow_root),
             cascade=True,

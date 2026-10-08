@@ -206,6 +206,7 @@ def build_claude_env(
     direct: bool = False,
     derive_run_identity: bool = True,
     interactive: bool = False,
+    hydrate_credentials: bool = True,
 ) -> dict[str, str]:
     """Build environment dict for a Claude subprocess.
 
@@ -244,7 +245,7 @@ def build_claude_env(
     # unset_vars) via apply_interactive_api_key, so skip the early hydrate to avoid
     # a redundant write the finalizer would only overwrite. Headless callers keep
     # the inline hydrate so can_use_bare(env) and the subprocess agree.
-    if not interactive:
+    if not interactive and hydrate_credentials:
         _hydrate_credentials(env)
 
     # Apply extra_vars AFTER hydration so explicit caller overrides

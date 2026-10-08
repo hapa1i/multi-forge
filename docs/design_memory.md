@@ -363,4 +363,4 @@ key outside `intent.memory` remains a strict schema error.
 
 ---
 
-[session design §3.9]: design_sessions.md#39-session-resume-context-management
+[session design §3.9]: design_session_context.md#39-session-resume-context-management

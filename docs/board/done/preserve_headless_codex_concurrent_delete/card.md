@@ -16,8 +16,8 @@ without losing the completed turn result to a post-run traceback or recreating p
 
 - [`docs/design.md` §3.2](../../../design.md#32-contract-files-authoritative-paths): deletion owns terminal manifest and
   index removal, and production updates may not recreate a published session.
-- [`docs/design_sessions.md` §3.9](../../../design_sessions.md#39-session-resume-context-management): headless and
-  interactive Codex frontends record the same CLI-owned turn facts after their runtime exits.
+- [`docs/design_session_context.md` §3.9](../../../design_session_context.md#39-session-resume-context-management):
+  headless and interactive Codex frontends record the same CLI-owned turn facts after their runtime exits.
 - `src/forge/core/ops/codex_session.py::_update_manifest_if_present`: the shared Codex frontend contract treats
   concurrent deletion as a visible post-turn warning and removes only an empty or lock-only directory shell.
 

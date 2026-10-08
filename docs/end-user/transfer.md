@@ -4,8 +4,9 @@
 `forge session start <name> --runtime codex --resume-from <parent> --task "…"` (see [session.md](session.md)); the
 manual `regenerate → show → codex exec` recipe below remains for sessionless handoffs.
 
-- Canonical architecture: [`design_sessions.md` §3.9](../design_sessions.md#39-session-resume-context-management) ·
-  schema: [`design_sessions.md` §H](../design_sessions.md#h-transfer-context-schema)
+- Canonical architecture:
+  [`design_session_context.md` §3.9](../design_session_context.md#39-session-resume-context-management) · schema:
+  [`design_session_context.md` §H](../design_session_context.md#h-transfer-context-schema)
 - Sessions (resume/fork): [`session.md`](session.md)
 - Authentication (Codex, OpenRouter): [`authentication.md`](authentication.md)
 

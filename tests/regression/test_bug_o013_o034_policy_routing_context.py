@@ -97,6 +97,10 @@ def _supervisor_set_with_matching_source(
         "validate_supervisor_target",
         lambda *_args, **_kwargs: source,
     )
+    monkeypatch.setattr(
+        "forge.core.reactive.reviewer_runtime.preflight_supervisor_runtime",
+        lambda *_args, **_kwargs: None,
+    )
 
     return policy_ops.supervisor_set(
         store=store,

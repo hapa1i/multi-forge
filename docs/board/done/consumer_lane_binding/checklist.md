@@ -192,7 +192,7 @@ full unit suite 7079 passed.
   `confirmed.consumer_lanes` added to hook writes (policy-check freeze, **write-once**, confirmed-first dispatch).
 - [x] design.md §3.6.2 gained the consumer-lane binding invariant (intent = requested `LaneRecord`, confirmed = frozen
   immutable, set only by resolving commands); the §3.6.12 `supervisor_runtime="codex"` mention repointed to the
-  `consumer_lanes` binding. design_runtime.md §G: supervisor lane is now the persisted/frozen binding the hook
+  `consumer_lanes` binding. design_subprocesses.md §G: supervisor lane is now the persisted/frozen binding the hook
   **injects** (not `run_supervisor_check`-resolved); the T5 observability paragraph reads the frozen binding,
   `not executable` on drift, never rewrites.
 - [x] cli_reference.md: `--supervisor-runtime` added to the start/fork launch-controls paragraph; a

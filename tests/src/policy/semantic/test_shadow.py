@@ -50,6 +50,7 @@ def _cfg(tmp_path: Path, **kw: object) -> SupervisorConfig:
         plan.write_text("# Plan\nDo the thing.")
     defaults: dict[str, object] = {
         "resume_id": "rid",
+        "supervisor_model": "opus",
         "forge_root": str(tmp_path),
         "plan_override_path": str(plan),
         "cascade": True,
@@ -134,7 +135,7 @@ class TestCaptureCandidate:
         from forge.session.models import LaneRecord
 
         out = capture_candidate(
-            _cfg(tmp_path),
+            _cfg(tmp_path, supervisor_model=None),
             _ctx(),
             cache_key="ck-lane",
             tier1_reason="aligned",
@@ -173,7 +174,7 @@ class TestCaptureCandidate:
         assert data["resume_id"] == "rid"
         assert data["direct"] is False
         assert data["fork_session"] is True
-        assert data["lane"] is None  # v3+ field always serialized; None == claude default lane
+        assert data["lane"] == {"runtime_id": "claude_code", "backend_id": "anthropic-direct", "model": "opus"}
         # dims + audit + lifecycle
         assert data["tier1_reason"] == "looks aligned"
         assert data["checker_model"] == "google/gemini-3.5-flash"
@@ -298,6 +299,7 @@ class TestCaptureCandidate:
         monkeypatch.chdir(elsewhere)
         cfg = SupervisorConfig(
             resume_id="rid",
+            supervisor_model="opus",
             forge_root=str(tmp_path),
             plan_override_path="plans/plan.md",  # relative
             cascade=True,
@@ -381,4 +383,4 @@ class TestConfigValidation:
     def test_schema_constant_present(self) -> None:
         # v4 (D005) freezes canonical action identity. Older records reconstruct with a
         # best-effort fingerprint from their stored, possibly truncated action fields.
-        assert shadow.SHADOW_SCHEMA_VERSION == 4
+        assert shadow.SHADOW_SCHEMA_VERSION == 6

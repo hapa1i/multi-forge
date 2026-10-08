@@ -358,6 +358,7 @@ class TestSessionFork:
 
         with (
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.docker.require_sidecar_contract"),
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
             successful_claude_launch() as mock_invoke,
@@ -402,6 +403,7 @@ class TestSessionFork:
 
         with (
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.docker.require_sidecar_contract"),
             patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
         ):
             result = runner.invoke(
@@ -1266,6 +1268,7 @@ class TestSessionFork:
                 return_value=(context_file, []),
             ),
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.docker.require_sidecar_contract"),
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0),
         ):

@@ -942,8 +942,8 @@ class TestConstants:
     """Test module constants."""
 
     def test_schema_version(self) -> None:
-        """SCHEMA_VERSION should be 2 for neutral model-route intent."""
-        assert SCHEMA_VERSION == 2
+        """SCHEMA_VERSION should be 3 for explicit supervisor identity."""
+        assert SCHEMA_VERSION == 3
 
     def test_index_version(self) -> None:
         """INDEX_VERSION should be 1."""

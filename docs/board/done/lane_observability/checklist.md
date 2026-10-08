@@ -162,8 +162,8 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 
 ### Phase 5 -- Docs + closeout
 
-- [x] design_runtime.md §G (codex `operation=None` upstream-parity fix + the two T5 read surfaces + the three closed M3
-  gaps) and the per-emitter coverage table (checker/reviewer/team-tagger rows + the activity lane note);
+- [x] design_subprocesses.md §G (codex `operation=None` upstream-parity fix + the two T5 read surfaces + the three
+  closed M3 gaps) and the per-emitter coverage table (checker/reviewer/team-tagger rows + the activity lane note);
   cli_reference.md `forge telemetry activity` lane columns and a new `forge policy supervisor status` row.
 - [x] `make pre-commit` clean; full unit suite 7019 passed. Merged via PR #56 (`4fc705b4`). Relevant integration
   (`test_supervisor_e2e.py`) is Docker/real-Claude release-tier and stays deferred -- the changes are additive telemetry

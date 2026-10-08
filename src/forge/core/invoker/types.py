@@ -68,6 +68,8 @@ class HeadlessRequest:
     # (proxied -> proxy cost wins; direct -> the runtime self-report wins; see emit.py).
     output_format: str | None = "json"
     base_url: str | None = None
+    # Supervisor-only lifetime guard; other callers retain the ordinary invoker lifecycle.
+    watchdog_deadline: float | None = None
 
 
 @dataclass

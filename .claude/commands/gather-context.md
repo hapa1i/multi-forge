@@ -16,9 +16,11 @@ Load Forge context in two passes so domain partitioning reduces aggregate contex
 
 **Then load only the domains implicated by the user request and active card**:
 
-- **Sessions**: @docs/design_sessions.md and @docs/board/impl_notes/sessions.md
+- **Sessions**: @docs/design_sessions.md and @docs/board/impl_notes/sessions.md; add @docs/design_session_context.md for
+  artifacts/resume/transfer and @docs/design_session_execution.md for hooks/queues/Codex/event journals
 - **Runtime or telemetry**: @docs/design_runtime.md and/or @docs/design_telemetry.md, plus
-  @docs/board/impl_notes/runtime_telemetry.md
+  @docs/board/impl_notes/runtime_telemetry.md; add @docs/design_subprocesses.md for subprocess routing and consumer
+  lanes
 - **Installation or core ownership**: @docs/design_installation.md and/or the relevant core sections in @docs/design.md,
   plus @docs/board/impl_notes/core_installation.md
 - **Workflows or memory**: @docs/design_workflows.md and/or @docs/design_memory.md; add the implementation-note ledger
