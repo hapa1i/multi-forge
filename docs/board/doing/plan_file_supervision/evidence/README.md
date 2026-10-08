@@ -3,6 +3,9 @@
 This evidence belongs to [B1](../card.md), on `feat/plan-file-supervision` after the documentation partitions at
 `6529ff38`. Final verification and PR coordinates are recorded below. B1 remains in `doing/` pending merge.
 
+The [2026-10-08 review correction record](2026-10-08-review-fixes.md) supersedes the version-admission, manifest-write,
+and shadow-format statements below. This page preserves the original test results and dated runtime observations.
+
 ## Runtime and billing evidence
 
 Versions: macOS host; Claude Code **2.1.291**, Codex **0.160.1**, Docker **29.8.2**. Docker native tests use explicit

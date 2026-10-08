@@ -261,16 +261,20 @@ forge policy supervisor status --json
 forge telemetry activity
 ```
 
-This explicit mode requires Claude 2.1.291, a personal Pro/Max CLI login, and **usage credits disabled on the Claude
-account**. Forge cannot inspect that account setting. It strips competing API/cloud/proxy credentials, skips Forge
-credential hydration and user/project/local settings, and verifies the same child auth configuration used for review.
-Missing/expired login, quota failure, managed policy, active/default profiles, alternate config directories, and
-unverified organization/gateway routes produce unavailable review with no API fallback. No login tokens are read or
-copied. This proves route selection, not a measured invoice or quota decrement.
+This explicit mode requires a compatible Claude 2.x (at least 2.1.248 with all review flags), a personal Pro/Max CLI
+login, and **usage credits disabled on the Claude account**. Forge cannot inspect that account setting. It strips
+competing API/cloud/proxy credentials, skips Forge credential hydration and user/project/local settings, and verifies
+the same child auth configuration used for review. Missing/expired login, quota failure, managed policy, active/default
+profiles, alternate config directories, and unverified organization/gateway routes produce unavailable review with no
+API fallback. No login tokens are read or copied. Runtime capability checks refresh after auto-updates; setup and status
+report incompatibility. This proves route selection, not a measured invoice or quota decrement.
 
 For an explicit paid direct route, use `--auth-mode inherit --no-supervisor-proxy`; an existing environment or Forge
-credential remains available. Select a proxy with `--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or
-`haiku` tier. For a Codex reviewer, run `forge runtime preflight codex`, then set
+credential remains available, as do user-settings `apiKeyHelper` and auth environment settings from user or explicitly
+trusted project settings. Move any project-only helper to user settings or export its credential; checkout-controlled
+helpers cannot run in the reviewer. Other customizations stay disabled. Select a proxy with
+`--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex reviewer, run
+`forge runtime preflight codex`, then set
 `--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Stale readiness
 produces an actionable unavailable result; hooks do not run readiness probes.
 
@@ -278,17 +282,20 @@ The plan must be readable, nonempty UTF-8. Target plus `--plan` resumes the targ
 Claude resumes from the planner directory and receives the action checkout as an additional directory; action paths are
 absolute. Fresh Claude and Codex review in the action checkout. Claude reviewers expose only inspection tools; Codex
 reviewers use a read-only sandbox. Plan-backed and subscription-only supervision refuse sidecars, including inherited
-configurations. Legacy conversation-only sidecar review keeps its route and gains read-only restrictions.
+configurations. Legacy conversation-only sidecar review keeps its route and gains read-only restrictions. A stale
+sidecar image refuses launch with rebuild guidance before mounting user state.
 
 `off` preserves configuration, `on` re-enables it, and `remove` clears the frozen binding. Bare `reload` on plan-only
 configuration revalidates the stored file; `reload --from <path>` changes it atomically. Content hashes invalidate
 cached verdicts even if timestamps and file sizes match. Status keeps suspended/unusable configuration visible and
-reports the latest completed, unavailable, or incomplete attempt. Allowed Codex actions remain silent in the executor.
+reports the latest live completed, unavailable, or incomplete attempt. Background shadow verdicts remain audits and
+never replace the live verdict. Allowed Codex actions remain silent in the executor.
 
 Upgrades leave existing frozen `claude-max` bindings on inherited auth. Opting in or changing a frozen model/effort
-requires `forge policy supervisor remove` followed by `set`. New session writes use schema v3; older Forge versions
-cannot read them, so retain a pre-upgrade manifest backup if downgrade is required. Old or incomplete shadow candidates
-finish unavailable without dispatch; newly captured complete v5 candidates freeze source, model, effort, auth, and lane.
+requires `forge policy supervisor remove` followed by `set`. Legacy timeouts over 45 seconds migrate to 45. Ordinary
+writes retain schema v2 compatibility; explicit model/auth fields require v3 and a matching sidecar image. Retain a
+pre-upgrade backup for downgrades. Old or incomplete shadow candidates finish unavailable without dispatch; complete v6
+candidates freeze source, effective model, effort, auth, and lane. Supervisor replacement preserves tuning overrides.
 `%policy` lifecycle commands work with these configurations, while new setup options belong to the terminal CLI;
 one-shot `evaluate -r` remains conversation-based.
 

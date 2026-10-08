@@ -128,6 +128,20 @@ retry follows auth/quota failure. Usage credits disabled is an account prerequis
 effort are supervisor-owned explicit choices; proxy tier mappings remain proxy-owned. Changing auth/model/effort after
 binding requires remove/reconfigure. Neither shared lane formats nor the three auxiliary consumers change.
 
+Claude reviewers require version 2.1.248 or later in major version 2 and a successful non-inference probe of every
+isolation flag. Capability results, including refusals, are cached by resolved executable identity; an auto-update
+invalidates that cache. Setup, host launch, and status expose incompatibility with recovery guidance. Subscription auth
+status remains a per-dispatch check; 2.1.291 is the measured version, not an exact-version admission pin. See the
+[Claude CLI contract](https://code.claude.com/docs/en/cli-reference).
+
+Inherited review projects `apiKeyHelper` from user settings and auth/provider environment settings from user settings
+and explicitly trusted project/local settings. A checkout-specific helper refuses with guidance to move it to user
+settings or export its credential, because checkout code must not become reviewer authentication code. Explicit child
+routing and environment/Forge credentials retain precedence. The helper configuration travels through an anonymous
+inherited file descriptor, not command-line JSON or a named credential file; hooks, permissions, plugins, and other
+customizations remain excluded. Subscription-only review never uses this projection. Both watchdog helpers use Python
+isolated mode and a neutral CWD; only the reviewer receives the action CWD.
+
 **Aux consumers on `claude-max` (T6a).** All three aux consumers use the same machinery. A `claude-max` binding keeps
 the default `claude_code` runtime, changing the **billing label, not dispatch**. Shadow-curation and memory-writer also
 have dispatch-changing Codex lanes (T6b/T6c); team-supervisor is billing-only.

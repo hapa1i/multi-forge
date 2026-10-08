@@ -75,15 +75,20 @@ as `forge +$Y`: Forge-added LLM spend for the session, **excluding** the main in
 (`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
 ([§A.8](design_telemetry.md#a8-status-line-guidance-3611)).
 
-**Supervisor attempts.** `FORGE_HOME/telemetry/supervisor_attempts/<attempt-id>.json` is global telemetry, retained
-across session deletion like usage/upstream events and removed by telemetry reset. Each schema-v1 start records
-session/Forge root, root run, canonical action, source path/digest/conversation, lane, requested model/effort/auth,
-stage, start, deadline, and owner. Runtime-reported model IDs are separate nullable observations. A held `.lock` flock
-proves a pending writer remains alive without trusting a reusable PID. Readers derive incomplete state after owner exit
-or deadline expiry without rewriting records; successful finalization records completed or unavailable separately from
-verdict. Concurrent attempts keep separate IDs. Cache hits are marked and emit no model usage. Checker attempts name the
-checker route, not the frontier lane. Status exposes the latest review; activity adds `supervisor_reviews` without
-incrementing operation/model-call/cost totals. Correlation uses `model_run_id`; incomplete work never implies zero cost.
+**Supervisor attempts.** `FORGE_HOME/telemetry/supervisor_attempts/<session-root-hash>-<attempt-id>.json` is global
+telemetry, preserved on session deletion and removed by telemetry reset. Writes retain the newest 200 records per
+session/root and prune records older than 30 days daily; a live writer's lock prevents pruning. Read paths select the
+session prefix instead of decoding unrelated sessions. Each schema-v2 start records session/Forge root, root run,
+canonical action, source path/digest/conversation, lane, requested model/effort/auth, stage, purpose (`live` or
+`shadow`), start, deadline, and owner. V1 purpose is unknown and is excluded from live summaries. Runtime-reported model
+IDs are separate nullable observations. A held `.lock` flock proves a pending writer remains alive without trusting a
+reusable PID. Readers derive incomplete state after owner exit or deadline expiry without rewriting records; successful
+finalization records completed or unavailable separately from verdict. Concurrent attempts keep separate IDs. Cache hits
+are marked and emit no model usage. Checker attempts name the checker route, not the frontier lane. Status exposes the
+latest live review; activity adds only live `supervisor_reviews` without incrementing operation/model-call/cost totals.
+Correlation uses `model_run_id`; incomplete work never implies zero cost. Shadow evidence remains queryable by purpose
+and through the existing shadow audit surfaces. Failed final evidence writes add a warning and leave an incomplete
+start; they cannot turn a computed deny into an allow.
 
 **Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
 to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens

@@ -7,10 +7,11 @@ at `6529ff38`. Merge order: [#258](https://github.com/hapa1i/multi-forge/pull/25
 
 ## Current focus
 
-Implementation and runtime validation are in progress on 2026-10-07. The host subscription and resumed-read-only gates
-passed; the user confirmed account usage credits are disabled. The [evidence record](evidence/README.md) separates real
-runtime results, test doubles, and refused unverified auth combinations. Final checks pass;
-[PR #260](https://github.com/hapa1i/multi-forge/pull/260) is open.
+Review corrections are in progress on 2026-10-08 for [PR #260](https://github.com/hapa1i/multi-forge/pull/260). The host
+subscription and resumed-read-only gates passed; the user confirmed account usage credits are disabled. The
+[evidence record](evidence/README.md) separates real runtime results, test doubles, and refused unverified auth
+combinations. The [review correction record](evidence/2026-10-08-review-fixes.md) supersedes the original exact-version,
+manifest-write, and shadow-evidence contracts.
 
 B1 ships `forge policy supervisor set --plan <file>` without a planning target, for fresh Claude and Codex reviewers. It
 also owns real model selection, isolation of existing Claude supervision, a whole-hook deadline, and durable review
@@ -419,6 +420,31 @@ identified before those runs; credentials or fixtures missing from a run are rec
   the relevant implementation-note ledger.
 - [ ] Move B1 to `done/`, repoint inbound links, and update the epic's next-member decision. Keep the epic active until
   its coordinated outcome is shipped and verified.
+
+## PR review corrections
+
+The fifteen findings were checked against source and reproduced with focused tests. These corrections keep the shared
+lane format and inherited billing rules unchanged. Their regression cases live in `tests/regression/test_bug_b1_*`; the
+[correction record](evidence/2026-10-08-review-fixes.md) maps behavior to evidence.
+
+- [x] Isolate both watchdog Python imports from the supervised checkout and `PYTHONPATH`; retain the reviewer's CWD.
+- [x] Preserve a computed deny if final evidence persistence fails; distinguish shadow audits from live decisions.
+- [x] Check required Claude capabilities before configuration/launch, cache by executable identity, and admit compatible
+  patch updates. Preserve inherited user-helper and auth-environment credentials without enabling customizations.
+- [x] Preserve tuning overrides; normalize legacy timeouts and ignored Codex proxies; validate lane/model/auth together
+  before writing or freezing state. Scope launch preference reads to launch state.
+- [x] Retain v2 writes when lossless, check sidecar images before mounting state, and make cascade/reload/launch
+  refusals actionable for inherited sidecar plans.
+- [x] Freeze resolved legacy models in shadow v6; exclude failed pre-dispatch reconstruction from the sampling cap.
+- [x] Bound attempt retention and eliminate the successful watchdog call's fixed termination grace. Test the production
+  plan-content cache path and catalog model selectors.
+- [ ] Finish the provider token-cache gate and its dependent unit assertion after explicit upload approval. All other
+  checks and the pending approval are recorded in the correction evidence.
+- [x] Commit and push corrections, then update PR #260 with current evidence and limitations. Keep it draft while the
+  document-size gate is pending.
+
+Correction commits are split into isolated runner/auth compatibility, supervisor state/evidence compatibility, and
+runtime verification/documentation. Each includes its regression coverage; the final aggregate checks cover all slices.
 
 ## Execution evidence
 

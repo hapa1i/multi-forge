@@ -1,0 +1,19 @@
+{
+  "wheel": "multi_forge-1.0.2-py3-none-any.whl",
+  "clean_install": true,
+  "no_dotenv": true,
+  "consumers_set_show_clear": [
+    "supervisor",
+    "memory_writer",
+    "shadow_curation",
+    "team_supervisor"
+  ],
+  "plan_lifecycle": true,
+  "policy_file_and_diff": true,
+  "activity_json": true,
+  "packaged_watchdog": true,
+  "billing_controls": true,
+  "root": "<disposable temporary project>",
+  "revision": "afe50816 (code tree)",
+  "planted_checkout_module": "json.py"
+}

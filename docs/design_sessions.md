@@ -69,14 +69,21 @@ The session file has three sections:
 Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
 new writes omit it.
 
-Session manifests write schema v3. `forge.session.models::SCHEMA_VERSION` owns the writer version;
+Session manifests write schema v2 when representable without the new supervisor fields, otherwise v3.
+`forge.session.store::manifest_for_write` owns that compatibility projection;
 `forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1, v2, and v3 on read. Strict legacy validation precedes
 in-memory projection: v1 gains `intent.launch.model_route=null` when launch exists; v1/v2 supervisors gain
-`auth_mode="inherit"` and `supervisor_model=null`. No read rewrites a manifest. The next ordinary write emits v3. These
+`auth_mode="inherit"` and `supervisor_model=null`. Legacy positive timeouts above 45 seconds clamp to 45 in both intent
+and overrides; Codex bindings discard formerly ignored Claude proxy/base-URL fields. No read rewrites a manifest. These
 defaults preserve existing frozen bindings and runtime-selected models; an old nominal lane model is not an explicit
-model request. V3 requires both supervisor fields when a supervisor object exists. Older Forge versions cannot read
-newly written v3 manifests; downgrade requires restoring the pre-upgrade manifest backup, not deleting unknown fields
-from a live session. Unknown versions and extra fields remain errors.
+model request. V3 requires both supervisor fields when a supervisor object exists. Older Forge versions cannot read v3
+manifests; downgrade requires restoring the pre-upgrade manifest backup, not deleting unknown fields from a live
+session. Unknown versions and extra fields remain errors.
+
+Ordinary host writes remain readable by existing v2 sidecars. Sidecar launch checks the image's schema support before
+mounting user state; conversation supervision also requires the current isolated reviewer implementation and CLI flags.
+An incompatible image refuses launch with rebuild guidance. Reading launch preferences does not decode unrelated
+overrides or reject a legacy sidecar plan; the selected launch path returns an actionable host-executor error.
 
 `intent` and `overrides` are required objects. Missing `confirmed` defaults empty; when present, it must be an object.
 Other values are corruption, surfaced without rewriting.

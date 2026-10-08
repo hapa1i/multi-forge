@@ -100,10 +100,10 @@ Both Claude Write/Edit and Codex `apply_patch` hooks resolve the supervisor's co
 when it has a planning target or an explicit plan file; active additionally means not suspended. Plan-only Claude runs
 fresh in the action checkout. Conversation-backed Claude resumes and forks from the planner CWD, adds the absolute
 action checkout with `--add-dir`, and receives absolute action paths. Both paths expose only Read/Glob/Grep, disable MCP
-and executable customizations, and isolate user/project/local settings. A pinned `codex` lane runs a fresh, read-only
-`codex exec` in the action checkout. Codex cannot resume the Claude planning session, so this arm requires an approved
-plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that snapshot in-band. A
-missing plan or cold, stale, or unready Codex preflight fails open with a warning.
+and executable customizations; inherited auth uses an auth-only settings projection. A pinned `codex` lane runs a fresh,
+read-only `codex exec` in the action checkout. Codex cannot resume the Claude planning session, so this arm requires an
+approved plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that snapshot
+in-band. A missing plan or cold, stale, or unready Codex preflight fails open with a warning.
 
 1. **Configure**:
    `forge policy supervisor set [<target>] --plan <file> [--runtime claude_code|codex] [--model <model>]`; target-only
@@ -122,13 +122,6 @@ fragments plus `replace_all`; Codex and on-demand diff identity includes the com
 checker share this base identity, then add their existing plan, route, budget, effort, and target-metadata dimensions.
 Only the digest enters cache keys and shadow sampling. Prompts remain bounded independently: Claude Edit presentation
 includes both matched and replacement fragments, while Codex updates retain their diff context.
-
-**Why this works:** On the Claude lane, native resume supplies the planning conversation; a plan override supersedes it
-when present. On the Codex lane, the in-band approved snapshot is the authority. Executor and supervisor routing are
-independent; specific model identities are lane/proxy choices, not architectural constants.
-
-**Promotion readiness:** Depends on ground truth quality: explicit acceptance criteria, invariant constraints, resolved
-ambiguities.
 
 **Supervisor lifecycle controls:**
 
@@ -157,19 +150,24 @@ sidecar review retains its explicit route and gains the inspection-only guard. `
 runtime; Claude supports tier selectors or declared direct model candidates, while a proxy owns its tier mapping. Codex
 effort is checked against the selected model. Auth/model/effort changes after binding require remove/reconfigure. The
 shared `LaneRecord` and auxiliary consumers' candidate semantics are unchanged. Status distinguishes absent, suspended,
-active, and unusable configuration, independently of the latest attempt outcome.
+active, and unusable configuration, independently of the latest attempt outcome. Lane changes validate the stored
+model/auth policy before writing or freezing. Replacing a supervisor preserves unrelated tuning overrides. Codex wiring
+never seeds a Claude planner proxy. Runtime admission is detailed in
+[subprocess routing](design_subprocesses.md#g-subprocess-routing-reference).
 
 **Deadline and evidence:** Both hook entries establish one 55-second review budget inside their unchanged 60-second
 registration. Each frontier call has a 1–45-second limit; the API checker has at most 15 seconds. Files, cascade stages,
 auth checks, and output-format retries consume remaining time. A detached watchdog owns a reviewer process group,
 watches a hook-owned pipe for EOF, and terminates on EOF or deadline: TERM, 0.5-second grace, then KILL and reaping. An
 anchor in that group also arms a deadline fallback if the watchdog itself dies. The five-second hook reserve covers
-cleanup and finalization. Manual and shadow calls establish their own bounded deadline. No available budget means
-unavailable review under the existing fail-open policy; deterministic denies retain precedence.
+cleanup and finalization. Completed reviewers skip the TERM grace; remaining group members are killed immediately. Both
+Python helpers use isolated imports from a neutral directory. Manual and shadow calls establish bounded deadlines. No
+available budget means unavailable review under the existing fail-open policy; deterministic denies retain precedence.
 
 Starts are durable before dispatch; evidence failure prevents a model call. Finalization failure leaves incomplete start
-evidence. [Telemetry](design_telemetry.md#314-cost-tracking-and-spend-caps) owns pending/completed/unavailable/
-incomplete records and status/activity projection. A timeout or missing terminal output is never an aligned verdict.
+evidence and a warning, preserving the computed verdict, including denies.
+[Telemetry](design_telemetry.md#314-cost-tracking-and-spend-caps) owns pending/completed/unavailable/ incomplete records
+and status/activity projection. A timeout or missing terminal output is never an aligned verdict.
 
 Persistent terminal setup owns the new plan/model/auth options. `%policy` retains target-based setup and shared
 lifecycle controls; one-shot `evaluate -r` retains its conversation argument and three-way exit contract. Source-only
@@ -205,14 +203,15 @@ hook. When `policy.supervisor.shadow_sample_rate > 0`, a *fresh* (uncached) tier
 stable hash of `(shadow_seed, session, cache_key)` — no RNG, so it is reproducible and never depends on global state —
 and, if selected, **frozen** to `.forge/artifacts/<session>/shadow/<hash>.json` (capped at `shadow_max_per_session`).
 The candidate freezes the canonical action fingerprint and replay inputs plus a copy of the plan (`<hash>.plan.md`) and
-a schema-v5 routing snapshot: source kind/path/CWD/conversation UUID, explicit lane, model, effort, and auth policy.
-Replay verifies the full plan digest and passes those exact bytes to the frontier. Missing, older, newer, malformed, or
-unverifiable routes finalize as unavailable/error without inference; replay never supplies a paid default. Captures
-without an explicit model cannot prove identity and are unavailable on replay. This is the **capture/check split**.
-Capture runs no LLM, never blocks, and is fully inert at rate 0 (the directory is not even created). The frontier replay
-is a post-hoc **Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI startup spawns a
-detached `forge policy shadow run` worker (the memory-writer pattern) that claims each candidate atomically (`rename` to
-`.processing`, bounding frontier billing to at-most-once), reconstructs the full `ActionContext`/`SupervisorConfig`,
+a schema-v6 routing snapshot: source kind/path/CWD/conversation UUID, explicit lane, model and its source, effort, and
+auth policy. Replay verifies the full plan digest and passes those exact bytes to the frontier. Missing, older, newer,
+malformed, or unverifiable routes finalize as unavailable/error without inference; replay never supplies a paid default.
+Captures without `--model` freeze the lane, proxy tier, environment selection, or restored conversation model; an
+unresolvable model prevents capture. Reconstruction failures consume no inference budget and do not exhaust the sampling
+cap. Capture runs no LLM, never blocks, and is fully inert at rate 0 (the directory is not even created). The frontier
+replay is a post-hoc **Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI startup spawns
+a detached `forge policy shadow run` worker (the memory-writer pattern) that claims each candidate atomically (`rename`
+to `.processing`, bounding frontier billing to at-most-once), reconstructs the full `ActionContext`/`SupervisorConfig`,
 runs the frontier, and classifies the verdict with the supervisor's **own** block bar: `agree` (frontier also aligned),
 `disagree` (frontier would have blocked — high-confidence, cited), `inconclusive` (divergent below the bar), or `error`
 (run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
