@@ -5,9 +5,10 @@ prerequisite; [B2](../../proposed/codex_0160_validation/card.md) can proceed alo
 [session](../../doing/partition_session_design/card.md) and [runtime](../../doing/partition_runtime_design/card.md)
 design partitions precede B1's normative documentation updates.
 
-Status: active execution planning, activated 2026-10-06 and revised 2026-10-07, on `feat/plan-file-supervision` from
-`main` at `6e0d1f4c`. Product implementation has not started. The [execution checklist](checklist.md) records the
-sequence, unresolved compatibility gates, and acceptance fixtures.
+Status: implemented and validated in [PR #260](https://github.com/hapa1i/multi-forge/pull/260), on
+`feat/plan-file-supervision`, stacked on the runtime partition [#259](https://github.com/hapa1i/multi-forge/pull/259).
+The [execution checklist](checklist.md) and [retained evidence](evidence/README.md) record passing checks and runtime
+limits. Optional source-only feedback is deferred to B3. Product closeout awaits merge.
 
 ## Problem and outcome
 

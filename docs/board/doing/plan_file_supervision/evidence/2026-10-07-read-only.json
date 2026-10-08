@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-07",
+  "claude_version": "2.1.291",
+  "codex_version": "0.160.1",
+  "platform": "macOS",
+  "preflight": {
+    "loggedIn": true,
+    "authMethod": "claude.ai",
+    "apiProvider": "firstParty",
+    "subscriptionType": "max"
+  },
+  "account_usage_credits": "disabled; user confirmed",
+  "billing_evidence": "CLI-managed subscription selection; no invoice or quota decrement measured",
+  "fixture": {
+    "origin": "real Claude turn in a disposable planner repository",
+    "executor": "Git worktree with a different sentinel",
+    "creation_is_compatibility_probe": false,
+    "planner_cwd": "<probe-root>/planner",
+    "executor_cwd": "<probe-root>/executor",
+    "history": "Real UUID emitted by fixture creation; resume uses that UUID from the same planner CWD",
+    "creation_route": "Same cleaned CLI-managed subscription path as the probes; separate turn"
+  },
+  "flags": [
+    "--restricted",
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "--tools",
+    "Read,Glob,Grep",
+    "--allowedTools",
+    "Read,Glob,Grep",
+    "--setting-sources",
+    ""
+  ],
+  "results": {
+    "create": {
+      "mode": "create",
+      "returncode": 0,
+      "seconds": 6.95,
+      "tools_available": [
+        "Bash",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "tools_used": [
+        "Read",
+        "Edit",
+        "Bash"
+      ],
+      "tool_errors": [
+        false,
+        false,
+        false
+      ],
+      "model": "claude-sonnet-5-5",
+      "result_type": "success",
+      "result_error": false,
+      "checkout_unchanged": false,
+      "fixture_edited": true
+    },
+    "resume": {
+      "mode": "resume",
+      "returncode": 0,
+      "seconds": 11.56,
+      "tools_available": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "tools_used": [
+        "Read",
+        "Read",
+        "Read",
+        "Edit",
+        "Edit",
+        "Bash"
+      ],
+      "tool_errors": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ],
+      "model": "claude-sonnet-5-5",
+      "result_type": "success",
+      "result_error": false,
+      "checkout_unchanged": true,
+      "fixture_edited": true,
+      "source_history_unchanged": true,
+      "executor_read_verified": true
+    },
+    "fresh": {
+      "mode": "fresh",
+      "returncode": 0,
+      "seconds": 9.54,
+      "tools_available": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "tools_used": [
+        "Read",
+        "Read",
+        "Read"
+      ],
+      "tool_errors": [
+        false,
+        false,
+        false
+      ],
+      "model": "claude-sonnet-5-5",
+      "result_type": "success",
+      "result_error": false,
+      "checkout_unchanged": true,
+      "fixture_edited": true,
+      "source_history_unchanged": true,
+      "executor_read_verified": true
+    }
+  },
+  "limitations": [
+    "Fresh review exposed only inspection tools; resumed review attempted disabled Edit and Bash and received runtime errors",
+    "Ordinary CLI caches and organization metadata refreshed; account identity and settings file digests preserved"
+  ]
+}

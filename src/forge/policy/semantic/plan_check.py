@@ -9,6 +9,7 @@ for the frontier supervisor (the engine's registered resolver) to decide.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -18,10 +19,9 @@ from forge.core.reactive.structured_output import extract_json_from_response
 from forge.core.reactive.throttle import ThrottleCache
 from forge.policy.action_identity import action_fingerprint
 from forge.policy.deterministic.base import StatefulDeterministicPolicy
+from forge.policy.semantic.plan_source import PlanSnapshot, ReviewSource
 from forge.policy.semantic.supervisor import (
-    load_plan_override,
     normalize_checker_provider_arg,
-    plan_fingerprint,
 )
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import LaneRecord, SupervisorConfig
@@ -396,6 +396,7 @@ def run_plan_check(
             resolve_direct_provider_user,
             with_openrouter_user,
         )
+        from forge.policy.semantic.deadline import remaining_review_seconds
 
         packed_plan, packed_action = _pack_prompt_sections(plan_text, context, budget_tokens=budget_tokens)
 
@@ -428,6 +429,7 @@ def run_plan_check(
             provider=provider,
             messages=[Message(role="user", content=prompt)],
             hyperparams=hp,
+            timeout_seconds=remaining_review_seconds(15),
         )
 
         verdict = parse_plan_check_verdict(response.text)
@@ -481,8 +483,10 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         config: SupervisorConfig | None = None,
         *,
         lane_record: LaneRecord | None = None,
+        source: ReviewSource | None = None,
     ) -> None:
         self._config = config
+        self._source = source or ReviewSource()
         # Thread the supervisor's consumer-lane binding into each shadow candidate.
         # None selects the default claude lane.
         self._lane_record = lane_record
@@ -505,28 +509,57 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         """Apply to Write/Edit when the cascade is enabled and not suspended."""
         if context.tool_name not in ("Write", "Edit"):
             return False
-        if self._config is None or self._config.resume_id is None:
+        if self._config is None or not self._config.configured:
             return False
         if not self._config.cascade:
             return False
         return not self._config.suspended
 
     def _evaluate(self, context: ActionContext) -> PolicyDecision:
-        try:
-            return self._check(context)
-        except Exception as e:
-            # A raise would hit the engine's fail-open and wrongly become allow;
-            # tier-1 failures must escalate to the supervisor instead.
-            _log.warning("Plan check failed unexpectedly: %s", e)
-            return self._needs_review("semantic.plan_check.error", f"Plan check failed: {e}")
+        from time import monotonic
 
-    def _check(self, context: ActionContext) -> PolicyDecision:
+        from forge.policy.semantic.attempts import ReviewAttempt
+        from forge.policy.semantic.deadline import review_deadline, review_scope
+
+        attempt = None
+        try:
+            if self._config is None:
+                return self._allow()
+            snapshot = self._source.begin(self._config, context)
+            expires = review_deadline(15)
+            attempt = ReviewAttempt(
+                self._config, context, snapshot, self._lane_record, budget=expires - monotonic(), stage="checker"
+            )
+            with review_scope(expires):
+                decision = self._check(context, snapshot=snapshot)
+            attempt.finish(decision)
+            return decision
+        except Exception as exc:
+            _log.warning("Plan check unavailable: %s", exc)
+            return self._needs_review("semantic.plan_check.error", f"Plan check unavailable: {exc}")
+        finally:
+            if attempt is not None:
+                attempt.close()
+
+    def _check(self, context: ActionContext, *, snapshot: PlanSnapshot | None = None) -> PolicyDecision:
         config = self._config
-        if config is None or not config.resume_id or config.suspended or not config.cascade:
+        if config is None or not config.configured or config.suspended or not config.cascade:
             # Unreachable when wiring is correct: applies_to gates the same fields.
             return self._allow()
 
-        plan_text = load_plan_override(config)
+        if os.environ.get("FORGE_SIDECAR") == "1" or os.environ.get("FORGE_LAUNCH_MODE") == "sidecar":
+            return self._needs_review(
+                "semantic.plan_check.unsupported_executor", "Plan-file review requires a host executor"
+            )
+
+        from forge.policy.semantic.identity import (
+            select_supervisor_lane,
+            validate_reviewer,
+        )
+
+        validate_reviewer(config, self._lane_record or select_supervisor_lane())
+        snapshot = snapshot if snapshot is not None else self._source.begin(config, context)
+        plan_text = snapshot.text
         if plan_text is None:
             _log.warning(
                 "Plan check: plan text unavailable (path=%s); escalating to supervisor",
@@ -542,7 +575,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
 
         cache_key = action_fingerprint(context)
         # plan_override_path is non-None here (load_plan_override returned content)
-        cache_key = cache_key + "|plan:" + plan_fingerprint(str(config.plan_override_path), config.forge_root)
+        cache_key = cache_key + "|plan:" + snapshot.fingerprint
         cache_key = (
             cache_key
             + f"|checker:{route.provider or 'auto'}:{route.model}"
@@ -594,6 +627,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
                             checker_budget_tokens=budget_tokens,
                             checker_prompt_version=CHECKER_PROMPT_VERSION,
                             lane_record=self._lane_record,
+                            snapshot=snapshot,
                         )
                 except Exception:  # best-effort audit: never block the hook
                     _log.debug("shadow capture failed", exc_info=True)
@@ -609,6 +643,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         return PolicyDecision(
             decision="needs_review",
             policy_id=self.policy_id,
+            failure_type=None if rule_id.endswith(".uncertain") else rule_id.rsplit(".", 1)[-1],
             violations=[
                 Violation(
                     rule_id=rule_id,

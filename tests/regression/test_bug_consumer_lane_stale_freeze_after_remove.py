@@ -27,7 +27,9 @@ from forge.session.models import (
     ConsumerLaneConfirmed,
     ConsumerLaneIntent,
     LaneRecord,
+    PolicyIntent,
     SessionState,
+    SupervisorConfig,
 )
 
 pytestmark = pytest.mark.regression
@@ -46,8 +48,7 @@ def _effective_supervisor() -> MagicMock:
     """A pre-call effective config with a configured supervisor -- the stale in-flight snapshot."""
     eff = MagicMock()
     eff.policy.bundles = []
-    eff.policy.supervisor.resume_id = "planner"
-    eff.policy.supervisor.suspended = False
+    eff.policy.supervisor = SupervisorConfig(resume_id="planner")
     return eff
 
 
@@ -93,6 +94,7 @@ def test_uncontested_freeze_still_writes() -> None:
     # Control: when nothing changed (fresh manifest still dispatches codex), the freeze lands -- the
     # guard drops only *stale* writes, not legitimate ones.
     state = _bare_state()
+    state.intent.policy = PolicyIntent(supervisor=SupervisorConfig(resume_id="planner"))
     state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=_CODEX)
     _run_freeze_mutate(state, supervisor_lane=_CODEX)
     assert state.confirmed.consumer_lanes is not None

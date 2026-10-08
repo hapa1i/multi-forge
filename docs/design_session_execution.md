@@ -414,3 +414,12 @@ Domain readers preserve distinct absence meanings. Routing history is `null` onl
 absent, `supported` when the projection and effective commit agree (or a complete aborted-only journal needs no
 projection), and `unproven` for empty or inconsistent evidence. Malformed/unreadable history is an error. Local
 append-only storage is not a tamper-proof audit log.
+
+### Semantic review within executor hooks
+
+Claude Write/Edit and Codex's supported `apply_patch` adapter share plan/conversation presence and lifecycle predicates.
+A single hook-entry deadline covers every normalized file and checker/frontier stage. Read-only reviewer containment,
+sidecar admission, frozen reviewer identity, and unavailable-review handling follow
+[workflow supervision](design_workflows.md#12-semantic-policy-the-supervisor). Durable attempt records live in global
+telemetry, independently of a hook's ability to write its terminal policy result. Codex shell writes and deletion-only
+patches outside the adapter remain outside semantic supervision.

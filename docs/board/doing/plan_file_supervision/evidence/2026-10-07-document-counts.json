@@ -1,0 +1,51 @@
+[
+  {
+    "path": "docs/design_installation.md",
+    "tokens": 23118,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "57c667fbf07a848804220aeef77109e2de6f82a44411486a09970764fef48efd"
+  },
+  {
+    "path": "docs/design_session_execution.md",
+    "tokens": 10769,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "ec30fde971e98680db0fd1c46c4566bd835dde38328ab5cf946f2dad76c6f3e0"
+  },
+  {
+    "path": "docs/design_sessions.md",
+    "tokens": 4859,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "a6eed49964ff203df88025add58706779e77eda2b149d719dfe200a41fb01292"
+  },
+  {
+    "path": "docs/design_subprocesses.md",
+    "tokens": 8713,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "231b6b16916a569c308e77110c77f3f1b59fb1515e3990c30507635867db689e"
+  },
+  {
+    "path": "docs/design_telemetry.md",
+    "tokens": 21429,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "e73fe230d1e5e6dc67cfba0d4270fa502c7ff5d577f6958f3867ab7914ad6b6c"
+  },
+  {
+    "path": "docs/design_workflows.md",
+    "tokens": 24466,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "90c0723c90be7f9d70b1707f0e579b4d72fcd46d1b17ef0dd430c0eef05b1b85"
+  },
+  {
+    "path": "docs/end-user/session.md",
+    "tokens": 24981,
+    "method": "anthropic API (claude-opus-5)",
+    "family": "anthropic",
+    "sha256": "53d2a602fb2d8aa1051399d1d39b9726f178bccefad48eaf79f402e46a7115d7"
+  }
+]

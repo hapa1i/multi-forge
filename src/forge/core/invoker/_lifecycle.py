@@ -274,6 +274,27 @@ class _HeadlessLifecycleBase:
         run_argv, hints = self._prepare_argv(request)
         proc: subprocess.Popen[str] | None = None
         try:
+            if request.watchdog_deadline is not None:
+                from forge.core.reactive.watchdog import run_guarded
+
+                guarded = run_guarded(
+                    run_argv,
+                    input=request.prompt,
+                    env=request.env,
+                    cwd=request.cwd,
+                    timeout=request.watchdog_deadline - time.monotonic(),
+                )
+                result = self._build_result(
+                    request,
+                    stdout=guarded.stdout,
+                    stderr=guarded.stderr,
+                    returncode=guarded.returncode,
+                    duration_seconds=time.monotonic() - start,
+                    ident=ident,
+                    hints=hints,
+                )
+                self._emit(request, result)
+                return result
             proc = subprocess.Popen(
                 run_argv,
                 stdin=subprocess.PIPE,

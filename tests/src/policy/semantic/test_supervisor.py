@@ -22,6 +22,7 @@ import pytest
 from forge.core.state import now_iso
 from forge.policy.action_identity import action_fingerprint
 from forge.policy.engine import build_engine
+from forge.policy.semantic.plan_source import PlanSnapshot
 from forge.policy.semantic.supervisor import (
     SemanticSupervisorPolicy,
     _supervisor_action_content,
@@ -641,7 +642,7 @@ class TestSupervisorResumeTargetResolution:
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_resolved_target_raw_uuid_no_cwd(self, mock_run: MagicMock) -> None:
-        """Raw UUID targets should not set source_cwd (no resolution possible)."""
+        """Raw UUID targets use the action checkout when no planner CWD is resolved."""
         from forge.core.reactive.session_runner import SessionResult
         from forge.policy.semantic.supervisor import invoke_supervisor
 
@@ -654,7 +655,7 @@ class TestSupervisorResumeTargetResolution:
         raw_uuid = "12345678-1234-1234-1234-123456789abc"
         invoke_supervisor(_make_config(resume_id=raw_uuid), _make_context())
 
-        assert mock_run.call_args.kwargs["cwd"] is None
+        assert mock_run.call_args.kwargs["cwd"] == "/workspace"
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_fork_session_passed_to_run_claude(self, mock_run: MagicMock) -> None:
@@ -1172,7 +1173,9 @@ class TestCodexSupervisorLane:
     All tests mock the invoker + preflight; no real codex binary is required.
     """
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="approved plan body")
+    @patch(
+        "forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "approved plan body", "digest")
+    )
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
@@ -1223,7 +1226,7 @@ class TestCodexSupervisorLane:
         mock_invoker_cls.return_value.run.assert_not_called()
         mock_claude.assert_not_called()
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_unready_cache_fails_open(
@@ -1277,7 +1280,7 @@ class TestCodexSupervisorLane:
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "configuration_error"
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
@@ -1314,7 +1317,7 @@ class TestCodexSupervisorLane:
         assert result.decision.telemetry_parent_run_id == "p1"
         assert result.decision.telemetry_root_run_id == "root1"
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
@@ -1349,7 +1352,7 @@ class TestCodexSupervisorLane:
         # The quota reason (on stderr) surfaces in the policy warning, not a bare "exit 1".
         assert any("usage limit" in w.lower() for w in result.decision.warnings)
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
@@ -1400,7 +1403,7 @@ class TestCodexSupervisorLane:
         assert result.decision.failure_type == "subprocess_error"
 
     @patch("forge.core.usage.emit_usage_for_session_result")
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
@@ -1427,7 +1430,7 @@ class TestCodexSupervisorLane:
         assert attribution.command == "supervisor"
         assert attribution.session == "test-session"
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_cache_read_exception_fails_open_not_uncaught(self, mock_read: MagicMock, mock_plan: MagicMock) -> None:
         """An unexpected exception in the cache read becomes codex_unavailable, never escapes (review claim 2)."""
@@ -1443,7 +1446,7 @@ class TestCodexSupervisorLane:
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "codex_unavailable"
 
-    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.policy.semantic.supervisor.read_plan", return_value=PlanSnapshot("/plan", "plan", "digest"))
     @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_request_shaping_exception_fails_open_not_uncaught(

@@ -171,6 +171,12 @@ def resolve_codex_session(
         require_session_worktree(name, worktree_path, action="resume")
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
+    from forge.core.reactive.reviewer_runtime import preflight_host_supervisor
+
+    try:
+        preflight_host_supervisor(state)
+    except ValueError as exc:
+        raise ForgeOpError(str(exc)) from exc
     return entry, state
 
 

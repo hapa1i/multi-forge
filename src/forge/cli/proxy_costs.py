@@ -392,6 +392,7 @@ _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("usage ledger", ("usage", "events"), "*.jsonl"),
     ("downstream telemetry", ("telemetry", "downstream"), "*.jsonl"),
     ("upstream telemetry", ("telemetry", "upstream"), "*.jsonl"),
+    ("supervisor attempts", ("telemetry", "supervisor_attempts"), "*"),
     ("spend-cap state", ("telemetry", "caps"), "*.json"),
     ("audit drift state", ("telemetry", "audit_state"), "*.json"),
     ("status-line cost cache", ("cache", "statusline"), "fcost-*.json"),

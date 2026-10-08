@@ -667,17 +667,20 @@ def _handle_policy_status() -> None:
                 cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
                 lines.append(f"    {bundle}: {cfg_str}")
 
-        if effective.policy.supervisor and effective.policy.supervisor.resume_id:
+        if effective.policy.supervisor and effective.policy.supervisor.configured:
             sup = effective.policy.supervisor
-            assert sup.resume_id is not None
-            sup_resume: str = sup.resume_id
+            sup_resume = sup.resume_id or sup.plan_override_path or ""
             lines.append(f"  Supervisor: {sup_resume}")
             if sup.suspended:
                 lines.append("    Status: suspended")
             try:
                 from forge.policy.queries import read_scoped_supervisor_target
 
-                ts = read_scoped_supervisor_target(sup_resume, sup.forge_root, manifest.forge_root)
+                ts = (
+                    read_scoped_supervisor_target(sup.resume_id, sup.forge_root, manifest.forge_root)
+                    if sup.resume_id
+                    else None
+                )
                 if ts is not None:
                     uuid = ts.confirmed.claude_session_id
                     if uuid:
@@ -1038,20 +1041,23 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     effective = compute_effective_intent(manifest)
 
-    if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.resume_id:
+    if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.configured:
         click.echo(json.dumps({"decision": "block", "reason": "No supervisor configured"}))
         return
 
     sup = effective.policy.supervisor
-    assert sup.resume_id is not None  # guarded above
-    lines = [f"Supervisor: {sup.resume_id}"]
+    lines = [f"Supervisor: {sup.resume_id or sup.plan_override_path}"]
     if sup.suspended:
         lines.append("  Status: suspended")
     try:
         from forge.session.manager import SessionManager
 
-        target_state = SessionManager().get_session(sup.resume_id, forge_root=sup.forge_root or manifest.forge_root)
-        uuid = target_state.confirmed.claude_session_id
+        target_state = (
+            SessionManager().get_session(sup.resume_id, forge_root=sup.forge_root or manifest.forge_root)
+            if sup.resume_id
+            else None
+        )
+        uuid = target_state.confirmed.claude_session_id if target_state else None
         if uuid:
             lines.append(f"  UUID: {uuid[:16]}...")
     except Exception:

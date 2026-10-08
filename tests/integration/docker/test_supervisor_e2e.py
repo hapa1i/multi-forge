@@ -41,7 +41,11 @@ def supervisor_workspace(forge_workspace: ContainerLike) -> ContainerLike:
 set -euo pipefail
 
 if [ "${1:-}" = "--version" ]; then
-    echo "99.99.99 (Claude Code)"
+    echo "2.1.291 (Claude Code)"
+    exit 0
+fi
+if [[ " $* " == *" --help "* ]]; then
+    echo '--restricted --safe-mode --strict-mcp-config --disable-slash-commands --tools --allowedTools --setting-sources'
     exit 0
 fi
 

@@ -243,13 +243,14 @@ def test_lane_record_for_backend_selects_subscription_lane() -> None:
     """lane_record_for(backend=...) disambiguates claude-max from the default claude_code lane;
     lane_record_for_runtime cannot (it returns the first match)."""
     from forge.session.consumer_lanes import lane_record_for
+    from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
 
     claude_max = LaneRecord("claude_code", "claude-max", "opus")
-    assert lane_record_for(SUPERVISOR_CONSUMER, backend="claude-max") == claude_max
+    assert lane_record_for(MEMORY_WRITER_CONSUMER, backend="claude-max") == claude_max
     # Runtime alone still returns the first claude_code lane (the default), not claude-max.
-    assert lane_record_for_runtime(SUPERVISOR_CONSUMER, "claude_code") == _DEFAULT_RECORD
+    assert lane_record_for_runtime(MEMORY_WRITER_CONSUMER, "claude_code") == _DEFAULT_RECORD
     # Both constraints together pin the same lane.
-    assert lane_record_for(SUPERVISOR_CONSUMER, runtime="claude_code", backend="claude-max") == claude_max
+    assert lane_record_for(MEMORY_WRITER_CONSUMER, runtime="claude_code", backend="claude-max") == claude_max
 
 
 def test_lane_record_for_rejects_unknown_empty_and_contradictory() -> None:

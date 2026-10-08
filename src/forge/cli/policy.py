@@ -24,7 +24,7 @@ from rich.table import Table
 from rich.text import Text
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
-from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.effort import CODEX_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.ops import policy as policy_ops
 from forge.core.paths import display_path
@@ -64,10 +64,10 @@ _log = logging.getLogger(__name__)
 
 # Click wrappers over the shared (Click-free) vocabularies. Checker effort uses the
 # core.llm ReasoningEffort set (the tier-1 checker is a core.llm call); supervisor effort
-# uses the claude --effort set (the frontier is a claude -p subprocess).
+# accepts the union here; policy ops validate effort against the chosen runtime/model.
 _CHECKER_PROVIDER_CHOICES = click.Choice(list(CHECKER_PROVIDER_CHOICES))
 _CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
-_SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
+_SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CODEX_EFFORT_LEVELS))
 _SUPERVISOR_RUNTIME_CHOICES = click.Choice(list(supervisor_lane_runtimes()))
 _SUPERVISOR_BACKEND_CHOICES = click.Choice(list(supervisor_lane_backends()))
 _POLICY_BUNDLE_CHOICES = click.Choice(list(policy_ops.POLICY_BUNDLE_NAMES))
@@ -431,6 +431,11 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
     if not sup:
         return None
     data: dict[str, object] = {
+        "auth_mode": sup.auth_mode,
+        "model": sup.supervisor_model,
+        "configured": sup.configured,
+        "active": sup.active,
+        "source": "plan" if not sup.resume_id and sup.plan_override_path else "conversation",
         "resume_id": sup.resume_id,
         "suspended": sup.suspended,
         "plan_override_path": sup.plan_override_path,
@@ -480,6 +485,44 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         if marker
         else None
     )
+    from forge.policy.semantic.attempts import read_attempts
+
+    attempts = read_attempts(manifest.name, manifest.forge_root)
+    data["latest_review"] = attempts[0] if attempts else None
+    data["state"] = "absent" if not sup.configured else "suspended" if sup.suspended else "active"
+    data["unavailable_reason"] = None
+    try:
+        from forge.policy.semantic.deadline import validate_timeout
+        from forge.policy.semantic.identity import (
+            validate_reviewer,
+            validate_sidecar_supervisor,
+        )
+        from forge.policy.semantic.plan_source import read_plan
+
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
+        validate_timeout(sup.timeout_seconds)
+        validate_reviewer(sup, LaneRecord(lane.runtime_id, lane.backend_id, lane.model))
+        from forge.session.launch import is_sidecar_session
+
+        sidecar = is_sidecar_session(manifest)
+        validate_sidecar_supervisor(sup, sidecar=sidecar)
+        if not sidecar:
+            from forge.core.reactive.reviewer_runtime import (
+                preflight_supervisor_runtime,
+            )
+
+            preflight_supervisor_runtime(
+                sup,
+                LaneRecord(lane.runtime_id, lane.backend_id, lane.model),
+                cwd=manifest.worktree.path if manifest.worktree else None,
+            )
+        if sup.plan_override_path and read_plan(sup).text is None:
+            raise ValueError("Approved plan is missing, empty, or unreadable; reload a readable plan file.")
+    except ValueError as exc:
+        if sup.configured:
+            data["state"] = "unusable"
+            data["active"] = False
+            data["unavailable_reason"] = str(exc)
     return data
 
 
@@ -1097,15 +1140,17 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         )
         return
 
-    if not (sup and sup.resume_id):
+    if not (sup and sup.configured):
         console.print("No supervisor configured.")
         return
 
-    console.print(f"Supervisor: [green]{sup.resume_id}[/green]")
+    console.print(f"Supervisor: [green]{sup.resume_id or sup.plan_override_path}[/green]")
     if sup.suspended:
         console.print("  Status: [yellow]suspended[/yellow]")
 
-    target_state = read_scoped_supervisor_target(sup.resume_id, sup.forge_root, manifest.forge_root)
+    target_state = (
+        read_scoped_supervisor_target(sup.resume_id, sup.forge_root, manifest.forge_root) if sup.resume_id else None
+    )
     if target_state is not None:
         uuid = target_state.confirmed.claude_session_id
         if uuid:
@@ -1140,6 +1185,8 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     console.print(f"  Fork session: {'yes' if sup.fork_session else 'no'}")
     console.print(f"  Timeout: {sup.timeout_seconds}s")
     console.print(f"  Throttle: {sup.throttle_seconds}s")
+    console.print(f"  Auth: {sup.auth_mode}")
+    console.print(f"  Model selector: {sup.supervisor_model or 'legacy runtime default'}")
     if sup.supervisor_effort:
         console.print(f"  Supervisor effort: {sup.supervisor_effort}")
     console.print(f"  Cascade: {'on' if sup.cascade else 'off'}")
@@ -1153,6 +1200,14 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
             console.print(f"  Checker effort: {sup.checker_effort}")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")
+    details = _supervisor_status_dict(sup, manifest) or {}
+    if details.get("unavailable_reason"):
+        console.print(f"Review unavailable: {details['unavailable_reason']}")
+    latest = details.get("latest_review")
+    if isinstance(latest, dict):
+        console.print(
+            f"  Latest review: {latest['state']} at {latest['started_at']} ({latest.get('reason') or latest.get('verdict') or 'running'})"
+        )
 
 
 def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
@@ -1160,12 +1215,15 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
     print_error_with_tip(
         "Cannot change the supervisor lane for an already-bound session.",
         f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
-        "Start or fork a fresh session to use a different lane.",
+        "Run forge policy supervisor remove, then set the supervisor again; or start a fresh session.",
     )
 
 
 @supervisor.command(name="set")
-@click.argument("target")
+@click.argument("target", required=False)
+@click.option("--model", help="Supervisor model selector; proxy routes accept opus, sonnet, or haiku")
+@click.option("--auth-mode", type=click.Choice(["inherit", "subscription-only"]), default="inherit", show_default=True)
+@click.option("--plan", type=click.Path(path_type=Path), help="Approved plan file; required when TARGET is omitted")
 @_session_option
 @click.option(
     "--supervisor-proxy",
@@ -1235,7 +1293,10 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
     help="Supervisor lane backend (e.g. claude-max for the Max subscription); rejected once frozen",
 )
 def supervisor_set(
-    target: str,
+    target: str | None,
+    plan: Path | None,
+    model: str | None,
+    auth_mode: str,
     session_name: str | None,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
@@ -1255,9 +1316,11 @@ def supervisor_set(
     \b
     Examples:
         forge policy supervisor set planner               # Set planner as supervisor
-        forge policy supervisor set planner --timeout 90  # Set with a longer check timeout
+        forge policy supervisor set --plan docs/plan.md   # Review a live plan file
         forge policy supervisor set planner --cascade     # Set with the tier-1 cascade enabled
     """
+    if not target and plan is None:
+        raise click.UsageError("Provide a planning TARGET or --plan <file>.")
     try:
         policy_ops.validate_supervisor_set_input(
             supervisor_proxy=supervisor_proxy,
@@ -1283,6 +1346,9 @@ def supervisor_set(
             store=store,
             manifest=manifest,
             target=target,
+            plan=plan,
+            model=model,
+            auth_mode=auth_mode,
             policy_forge_root=_policy_fr,
             supervisor_proxy=supervisor_proxy,
             supervisor_direct=supervisor_direct,
@@ -1308,7 +1374,11 @@ def supervisor_set(
     except policy_ops.SupervisorLaneFrozenError as exc:
         _reject_supervisor_lane_change(exc.frozen)
         sys.exit(1)
-    except (policy_ops.SupervisorTargetError, policy_ops.SupervisorProxyError) as exc:
+    except (
+        policy_ops.SupervisorTargetError,
+        policy_ops.SupervisorProxyError,
+        policy_ops.SupervisorPlanFileNotFoundError,
+    ) as exc:
         print_error(str(exc))
         sys.exit(1)
     except policy_ops.SupervisorPlanUnavailableError as exc:
@@ -1322,7 +1392,10 @@ def supervisor_set(
         console.print(
             f"[dim]Started proxy '{result.started_proxy_id}' from template '{result.started_proxy_template}'.[/dim]"
         )
-    console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
+    console.print(
+        f"Supervisor set to [green]{target or result.config.plan_override_path}[/green] "
+        f"for session [cyan]{name}[/cyan]"
+    )
     if result.lane_record is not None:
         console.print(
             f"  Lane: runtime={result.lane_record.runtime_id} backend={result.lane_record.backend_id} "
@@ -1428,6 +1501,9 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
         sys.exit(1)
     except policy_ops.SupervisorPlanUnavailableError:
         print_error("No approved plan found for supervisor target or related sessions.")
+        sys.exit(1)
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
         sys.exit(1)
 
     console.print(f"Supervisor plan updated from {result.source_desc}")

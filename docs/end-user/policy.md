@@ -226,8 +226,8 @@ blocking. The `tdd.no-skip-tests` policy is unaffected (always blocks skip patte
 
 ### Semantic supervisor (advanced)
 
-The semantic supervisor is an LLM session that validates Write/Edit actions against an approved plan. By default it uses
-`claude -p --resume <session_id>` to continue a planning session in a read-only advisory role; the runtime is selectable
+The semantic supervisor validates Write/Edit actions against an approved plan. Claude continues a planning conversation
+when a target is configured, or starts fresh for a plan file alone. Both paths are read-only. The runtime is selectable
 (see [Supervisor runtime (lane)](#supervisor-runtime-lane) below).
 
 Configured in the session manifest under `policy.supervisor`:
@@ -235,8 +235,8 @@ Configured in the session manifest under `policy.supervisor`:
 - `resume_id` — supervisor target (a Forge planning-session name or Claude session UUID). The Claude arm resumes it; the
   Codex arm uses the resolved approved-plan snapshot in-band.
 - `proxy` — proxy for supervisor LLM calls (optional, defaults to session proxy)
-- `timeout_seconds` — max wait for supervisor response (default: 45s). Set at configure time with
-  `forge policy supervisor set <target> --timeout N`, or adjust a live session with
+- `timeout_seconds` — reviewer limit from 1 to 45 seconds (default: 45s), including auth and retries. Set at configure
+  time with `forge policy supervisor set <target> --timeout N`, or adjust a live session with
   `forge session set policy.supervisor.timeout_seconds N`
 - `throttle_seconds` — cache window for repeated checks (default: 30s)
 
@@ -244,12 +244,60 @@ The supervisor only blocks when the verdict is "divergent" with **high confidenc
 plan. Low confidence or missing citations produce a warning instead. Timeouts, errors, and unparseable responses also
 result in a warning, not a block.
 
-**Picking a supervisor model.** On the default `claude_code` lane, the supervisor reads the planner's full conversation
-via `--resume` and must locate and cite specific plan items — that's multi-needle retrieval over a long context, not
-code writing. SWE-bench Verified is the wrong benchmark for this role. The Codex lane instead receives the approved plan
-snapshot in-band and chooses its own model. For per-family Claude-lane supervisor picks (including the Opus 4.6 vs 4.8
-split, when to cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a
-cost-efficient alternative), see [model_selection.md](model_selection.md).
+**Picking a supervisor model.** With a planning target, Claude reads the planner's conversation via `--resume` and must
+locate and cite specific plan items. Plan-only Claude and all Codex reviews receive the approved snapshot in-band.
+Select the reviewer with `--model`; the requested selector and any observed runtime model are recorded separately. For
+per-family Claude-lane supervisor picks (including the Opus 4.6 vs 4.8 split, when to cross-route to Gemini for mid-long
+or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient alternative), see
+[model_selection.md](model_selection.md).
+
+### Review an approved plan file
+
+For a host Claude or Codex executor, configure the current session without a planning conversation:
+
+```bash
+forge policy supervisor set --plan ./approved-plan.md --model sonnet --auth-mode subscription-only
+forge policy supervisor status --json
+forge telemetry activity
+```
+
+This explicit mode requires a compatible Claude 2.x (at least 2.1.248 with all review flags), a personal Pro/Max CLI
+login, and **usage credits disabled on the Claude account**. Forge cannot inspect that account setting. It strips
+competing API/cloud/proxy credentials, skips Forge credential hydration and user/project/local settings, and verifies
+the same child auth configuration used for review. Missing/expired login, quota failure, managed policy, active/default
+profiles, alternate config directories, and unverified organization/gateway routes produce unavailable review with no
+API fallback. No login tokens are read or copied. Runtime capability checks refresh after auto-updates; setup and status
+report incompatibility. This proves route selection, not a measured invoice or quota decrement.
+
+For an explicit paid direct route, use `--auth-mode inherit --no-supervisor-proxy`; an existing environment or Forge
+credential remains available, as do user-settings `apiKeyHelper` and auth environment settings from user or explicitly
+trusted project settings. Move any project-only helper to user settings or export its credential; checkout-controlled
+helpers cannot run in the reviewer. Other customizations stay disabled. Select a proxy with
+`--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex reviewer, run
+`forge runtime preflight codex`, then set
+`--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Stale readiness
+produces an actionable unavailable result; hooks do not run readiness probes.
+
+The plan must be readable, nonempty UTF-8. Target plus `--plan` resumes the target but makes the file authoritative.
+Claude resumes from the planner directory and receives the action checkout as an additional directory; action paths are
+absolute. Fresh Claude and Codex review in the action checkout. Claude reviewers expose only inspection tools; Codex
+reviewers use a read-only sandbox. Plan-backed and subscription-only supervision refuse sidecars, including inherited
+configurations. Legacy conversation-only sidecar review keeps its route and gains read-only restrictions. A stale
+sidecar image refuses launch with rebuild guidance before mounting user state.
+
+`off` preserves configuration, `on` re-enables it, and `remove` clears the frozen binding. Bare `reload` on plan-only
+configuration revalidates the stored file; `reload --from <path>` changes it atomically. Content hashes invalidate
+cached verdicts even if timestamps and file sizes match. Status keeps suspended/unusable configuration visible and
+reports the latest live completed, unavailable, or incomplete attempt. Background shadow verdicts remain audits and
+never replace the live verdict. Allowed Codex actions remain silent in the executor.
+
+Upgrades leave existing frozen `claude-max` bindings on inherited auth. Opting in or changing a frozen model/effort
+requires `forge policy supervisor remove` followed by `set`. Legacy timeouts over 45 seconds migrate to 45. Ordinary
+writes retain schema v2 compatibility; explicit model/auth fields require v3 and a matching sidecar image. Retain a
+pre-upgrade backup for downgrades. Old or incomplete shadow candidates finish unavailable without dispatch; complete v6
+candidates freeze source, effective model, effort, auth, and lane. Supervisor replacement preserves tuning overrides.
+`%policy` lifecycle commands work with these configurations, while new setup options belong to the terminal CLI;
+one-shot `evaluate -r` remains conversation-based.
 
 ### Supervisor runtime (lane)
 
@@ -477,15 +525,15 @@ doesn't know about it (state is session-scoped).
 
 ### Supervisor timeout
 
-The semantic supervisor has a 45s default timeout. If it exceeds this:
+The reviewer limit is 1–45 seconds. Both executors retain 60-second hook registration; Forge budgets all files and
+cascade stages together within 55 seconds, reserving five seconds for completion. Auth checks and format retries share
+the remaining time. A detached watchdog terminates the reviewer and its descendants on deadline or hook death, with a
+0.5-second termination grace before force-kill. Timeouts preserve fail-open behavior and record unavailable/incomplete
+review. Already dispatched upstream work can still incur cost.
 
-- The action is allowed with a warning (fail-open) — but the upstream provider may still bill the check, since the
-  request usually completes after Forge stops waiting
-- Check proxy connectivity: is the supervisor's proxy running?
-- Reduce supervisor response time: use a faster model via `proxy`
-- Raise the budget for slow models: `forge policy supervisor set <target> --timeout 90` at configure time, or
-  `forge session set policy.supervisor.timeout_seconds 90` on a live session. Note the hook that invokes the supervisor
-  has its own 60s budget; timeouts above ~55s won't take effect end-to-end
+Check `forge policy supervisor status --json` and `forge telemetry activity <session>`. Refresh Codex readiness when
+requested, repair a missing plan with `reload --from`, or choose a faster reviewer. Oversized timeout values, including
+generic session overrides and stale saved values, are refused. Forge does not extend trusted hook registration.
 
 ### Shadow audit marker failed compatibility
 

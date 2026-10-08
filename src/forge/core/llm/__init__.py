@@ -221,6 +221,7 @@ class SyncAdapter:
         *,
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
+        timeout_seconds: float | None = None,
     ) -> CompletionResponse:
         """Synchronous completion with full control.
 
@@ -233,4 +234,9 @@ class SyncAdapter:
             CompletionResponse with text, optional tool_calls, and usage.
         """
         self._check_no_running_loop()
-        return asyncio.run(self._client.complete(messages, tools=tools, hyperparams=hyperparams))
+
+        async def complete_bounded() -> CompletionResponse:
+            async with asyncio.timeout(timeout_seconds):
+                return await self._client.complete(messages, tools=tools, hyperparams=hyperparams)
+
+        return asyncio.run(complete_bounded())

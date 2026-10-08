@@ -812,3 +812,11 @@ and SHA-256 drift detection. Resume validation refuses a version mismatch, chang
 before clearing any suffix. The tests keep both self-contained copies identical except for two identity lines.
 
 ---
+
+### Supervisor deadline compatibility
+
+The installed Claude Write/Edit policy checks and Codex PreToolUse policy check retain their 60-second timeouts and
+existing command bytes. Plan-file supervision limits reviewer calls to 45 seconds within a shared 55-second hook budget.
+Changing registration is not a way to increase this limit: Codex enrollment is tied to the exact registration bytes. The
+supervisor validates the supported built-in limits and refuses a drifted budget. Reviewer cleanup also observes hook
+death through an independent watchdog; runtime hook teardown alone is not the ownership mechanism.

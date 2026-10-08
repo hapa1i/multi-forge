@@ -91,9 +91,9 @@ dispatches by runtime (`forge.core.lanes`; `resolve_lane` is pure). Persisted `c
 supervisor, shadow-curation, memory-writer, and team-supervisor. Policy-check resolves `SUPERVISOR_CONSUMER` and
 **injects** its `LaneRecord` into `run_supervisor_check` for the two `_dispatch_supervisor` arms:
 
-- **`claude_code`** (default lane) -- the byte-identical `claude -p` path; transport (direct vs proxy / `base_url`) is
-  still derived inside the arm by `resolve_subprocess_routing` (the chain below). The lane layer never touches the proxy
-  registry.
+- **`claude_code`** (default lane) -- inspection-only `claude -p`, fresh for plan-only sources or forked/resumed for
+  conversation sources; transport (direct vs proxy / `base_url`) is still derived inside the arm by
+  `resolve_subprocess_routing` (the chain below). The lane layer never touches the proxy registry.
 - **`codex`** -- the non-Claude supervisor lane, selected by the supervisor's `consumer_lanes` binding (a declared
   `SUPERVISOR_CONSUMER` candidate on the `chatgpt` subscription backend, `reachable_via=("codex",)`, T2). The
   policy-check hook reads the binding (`read_bound_lane`, confirmed-first then intent) and **injects** the resolved lane
@@ -116,6 +116,31 @@ for a registered supervisor freezes an explicit `intent.consumer_lanes` override
 commitment, not a dispatch. Default lanes never freeze and remain re-pinnable. `--supervisor-runtime` and
 `policy supervisor set <target> --runtime` set the override; raw `set` is rejected. Re-pinning is an idempotent no-op;
 `policy supervisor remove` clears intent and confirmed.
+
+**Supervisor auth opt-in (B1).** `auth_mode=inherit` is the legacy default, including frozen `claude-max` bindings.
+Resolvable keys still win as API for all four consumers; the backend name alone does not select authentication.
+`subscription-only` is a supervisor-local, direct Claude/`claude-max` route: construct the child once without Forge
+credential hydration, remove competing auth/cloud/profile/proxy selectors, isolate settings, then run version and auth
+status checks with the same executable, environment, CWD, and restrictions used for inference. Accept only a verified
+personal CLI-managed Pro/Max login. The tested version is 2.1.291. Managed policy/MCP, nonempty server policy, active or
+default profiles, alternate config directories, organization/gateway routes, and sidecars remain unavailable. No API
+retry follows auth/quota failure. Usage credits disabled is an account prerequisite Forge cannot inspect. Model and
+effort are supervisor-owned explicit choices; proxy tier mappings remain proxy-owned. Changing auth/model/effort after
+binding requires remove/reconfigure. Neither shared lane formats nor the three auxiliary consumers change.
+
+Claude reviewers require version 2.1.248 or later in major version 2 and a successful non-inference probe of every
+isolation flag. Capability results, including refusals, are cached by resolved executable identity; an auto-update
+invalidates that cache. Setup, host launch, and status expose incompatibility with recovery guidance. Subscription auth
+status remains a per-dispatch check; 2.1.291 is the measured version, not an exact-version admission pin. See the
+[Claude CLI contract](https://code.claude.com/docs/en/cli-reference).
+
+Inherited review projects `apiKeyHelper` from user settings and auth/provider environment settings from user settings
+and explicitly trusted project/local settings. A checkout-specific helper refuses with guidance to move it to user
+settings or export its credential, because checkout code must not become reviewer authentication code. Explicit child
+routing and environment/Forge credentials retain precedence. The helper configuration travels through an anonymous
+inherited file descriptor, not command-line JSON or a named credential file; hooks, permissions, plugins, and other
+customizations remain excluded. Subscription-only review never uses this projection. Both watchdog helpers use Python
+isolated mode and a neutral CWD; only the reviewer receives the action CWD.
 
 **Aux consumers on `claude-max` (T6a).** All three aux consumers use the same machinery. A `claude-max` binding keeps
 the default `claude_code` runtime, changing the **billing label, not dispatch**. Shadow-curation and memory-writer also
