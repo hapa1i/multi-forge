@@ -48,7 +48,12 @@ existing host subscription and protected-settings assertions remain in the [date
 - Formatting, type checks, secret scanning, Markdown links, local file line limits and diff whitespace pass.
   `SKIP=file-size-limits make pre-commit` passes; the full file-size gate remains pending.
 
-Automatic approval review rejected the token-counter upload because it sends the full revised design documents to
-Anthropic's `count_tokens` endpoint. Explicit approval was requested. The content-matched token cache and the related
-unit assertion remain unresolved; these results do not claim a green full pre-commit or unit run. The PR remains draft
-until that gate is completed. The previously recorded document counts describe the earlier bytes only.
+Automatic approval review initially rejected the token-counter upload because it sent unpublished design revisions to
+Anthropic's `count_tokens` endpoint. That gate was left pending in the original correction commits.
+
+After #260 and #259 merged into [PR #258](https://github.com/hapa1i/multi-forge/pull/258), the exact telemetry and
+workflow documents at public commit `d437efdde0ae4c3c36ac151e2f84bb0c8fa57e9c` were fetched without authentication and
+verified byte-for-byte against the checkout. Automatic review then approved counting these public payloads. The
+refreshed cache records **21,611** Opus tokens for telemetry and **24,543** for workflows, both below 25,000.
+`make pre-commit` passes with every hook enabled, and the file-limit tests pass, including the formerly failing
+exact-content assertion. The earlier counts and failed runs above describe the pre-refresh state.

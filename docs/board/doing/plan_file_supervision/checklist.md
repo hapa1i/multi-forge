@@ -438,10 +438,10 @@ lane format and inherited billing rules unchanged. Their regression cases live i
 - [x] Freeze resolved legacy models in shadow v6; exclude failed pre-dispatch reconstruction from the sampling cap.
 - [x] Bound attempt retention and eliminate the successful watchdog call's fixed termination grace. Test the production
   plan-content cache path and catalog model selectors.
-- [ ] Finish the provider token-cache gate and its dependent unit assertion after explicit upload approval. All other
-  checks and the pending approval are recorded in the correction evidence.
+- [x] Finish the provider token-cache gate and its dependent unit assertion. After the stack merged into PR #258, exact
+  public payload verification allowed the refresh; full pre-commit and the cache tests pass.
 - [x] Commit and push corrections, then update PR #260 with current evidence and limitations. Keep it draft while the
-  document-size gate is pending.
+  document-size gate is pending. This gate was subsequently resolved on PR #258.
 
 Correction commits are split into isolated runner/auth compatibility, supervisor state/evidence compatibility, and
 runtime verification/documentation. Each includes its regression coverage; the final aggregate checks cover all slices.
