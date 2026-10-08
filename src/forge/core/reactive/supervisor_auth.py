@@ -8,27 +8,17 @@ same executable, environment, CWD, and settings restrictions.
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 from pathlib import Path
 from time import monotonic
 
 from forge.core.reactive.env import build_claude_env
+from forge.core.reactive.reviewer_runtime import (
+    READ_ONLY_FLAGS,
+    require_reviewer_runtime,
+)
 from forge.core.reactive.watchdog import run_guarded
 
-READ_ONLY_FLAGS = (
-    "--restricted",
-    "--safe-mode",
-    "--strict-mcp-config",
-    "--disable-slash-commands",
-    "--tools",
-    "Read,Glob,Grep",
-    "--allowedTools",
-    "Read,Glob,Grep",
-    "--setting-sources",
-    "",
-)
-VERIFIED_CLAUDE_VERSIONS = {"2.1.291"}
 _BLOCKED_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_", "FORGE_SUBPROCESS_", "AWS_", "GOOGLE_", "AZURE_")
 _BLOCKED_NAMES = {
     "CLAUDECODE",
@@ -98,16 +88,11 @@ def validate_subscription_location(env: dict[str, str]) -> None:
 def preflight_subscription(*, env: dict[str, str], cwd: str | None, deadline: float) -> str:
     """Return the tested absolute CLI path, or refuse without model inference."""
     validate_subscription_location(env)
-    binary = shutil.which("claude", path=env.get("PATH"))
-    if not binary:
-        raise ValueError("Claude CLI is unavailable; install Claude and sign in before enabling subscription review.")
+    binary = require_reviewer_runtime(env=env, deadline=deadline)
 
     def run(argv: list[str]):
         return run_guarded(argv, input="", env=env, cwd=cwd, timeout=min(10.0, deadline - monotonic()))
 
-    version = run([binary, "--version"])
-    if version.returncode or version.stdout.split(maxsplit=1)[0] not in VERIFIED_CLAUDE_VERSIONS:
-        raise ValueError("Subscription-only review requires a verified Claude version (currently 2.1.291).")
     result = run([binary, *READ_ONLY_FLAGS, "auth", "status", "--json"])
     try:
         status = json.loads(result.stdout)

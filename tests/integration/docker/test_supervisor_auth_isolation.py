@@ -84,6 +84,22 @@ try:
 finally:
     managed.unlink()
 assert not (root / "helper-count").exists()
+# Inherit mode must retain user/sidecar authentication without loading hooks or
+# permissions. The helper settings travel on an anonymous inherited descriptor.
+from forge.core.reactive.reviewer_settings import inherited_auth_settings, auth_settings_descriptor
+from forge.core.reactive.watchdog import run_guarded
+for p in (project / ".claude/settings.json", project / ".claude/settings.local.json"):
+    p.unlink()
+(root / ".claude/settings.json").write_text(json.dumps({"apiKeyHelper":str(helper), "hooks":{"SessionStart":[]}}))
+inherited = dict(clean)
+selected = inherited_auth_settings(inherited, cwd=str(project), direct=False)
+assert selected == {"apiKeyHelper":str(helper)}
+with auth_settings_descriptor(selected) as (args, descriptors):
+    result = run_guarded(["claude", *READ_ONLY_FLAGS, *args, "auth", "status", "--json"], input="", env=inherited, cwd=str(project), timeout=20, pass_fds=descriptors)
+assert result.returncode == 0, result.stderr
+inherited_status = json.loads(result.stdout)
+assert inherited_status["authMethod"] == "api_key_helper", inherited_status
+rows.append({"case":"inherited-user-or-sidecar-helper", "authMethod":inherited_status["authMethod"]})
 print(json.dumps({"platform":"linux", "synthetic_only":True, "control":control, "clean":clean_status, "rows":rows, "helper_invocations":0}))
 """
 

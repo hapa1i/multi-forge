@@ -218,6 +218,20 @@ def run_claude_session(
         )
 
     binary = "claude"
+    auth_settings: dict[str, object] = {}
+    if read_only and not subscription_only:
+        try:
+            from forge.core.reactive.reviewer_runtime import require_reviewer_runtime
+            from forge.core.reactive.reviewer_settings import inherited_auth_settings
+
+            auth_settings = inherited_auth_settings(
+                env, cwd=cwd, direct=direct, excluded_env=tuple(unset_env_vars or ())
+            )
+            binary = require_reviewer_runtime(env=env, deadline=expires)
+        except Exception as exc:
+            refused = _session_result(error=f"Claude review unavailable: {exc}")
+            refused.dispatched = False
+            return refused
     if subscription_only:
         try:
             if not read_only or not direct or base_url or bare:
@@ -300,9 +314,20 @@ def run_claude_session(
 
         def execute(argv: list[str]) -> subprocess.CompletedProcess[str]:
             if read_only:
+                from forge.core.reactive.reviewer_settings import (
+                    auth_settings_descriptor,
+                )
                 from forge.core.reactive.watchdog import run_guarded
 
-                return run_guarded(argv, input=prompt, timeout=_remaining_time(expires), cwd=cwd, env=env)
+                with auth_settings_descriptor(auth_settings) as (settings_args, descriptors):
+                    return run_guarded(
+                        [*argv, *settings_args],
+                        input=prompt,
+                        timeout=_remaining_time(expires),
+                        cwd=cwd,
+                        env=env,
+                        pass_fds=descriptors,
+                    )
             return subprocess.run(
                 argv, input=prompt, capture_output=True, text=True, timeout=_remaining_time(expires), cwd=cwd, env=env
             )

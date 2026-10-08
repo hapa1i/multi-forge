@@ -31,6 +31,7 @@ def run_guarded(
     env: dict[str, str],
     cwd: str | None,
     timeout: float,
+    pass_fds: tuple[int, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
     """Run under a parent-death watchdog with subprocess.run-compatible results."""
     if timeout <= 0:
@@ -40,18 +41,29 @@ def run_guarded(
     watcher: subprocess.Popen[str] | None = None
     try:
         watcher = subprocess.Popen(
-            [sys.executable, "-m", _WATCHDOG_MODULE, "watch", str(control_read)],
+            [sys.executable, "-I", "-m", _WATCHDOG_MODULE, "watch", str(control_read)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             env=env,
+            cwd="/",
             start_new_session=True,
-            pass_fds=(control_read,),
+            pass_fds=(control_read, *pass_fds),
         )
         os.close(control_read)
         control_read = -1
-        payload = json.dumps({"argv": argv, "prompt": input, "cwd": cwd, "deadline": deadline})
+        # Helpers must never import checkout modules or PYTHONPATH entries. The
+        # actual reviewer still receives its original working directory and env.
+        payload = json.dumps(
+            {
+                "argv": argv,
+                "prompt": input,
+                "cwd": os.path.abspath(cwd) if cwd else os.getcwd(),
+                "deadline": deadline,
+                "pass_fds": pass_fds,
+            }
+        )
         stdout, stderr = watcher.communicate(payload, timeout=timeout + 2 * TERMINATION_GRACE_SECONDS + 2)
         if watcher.returncode == _TIMEOUT_EXIT:
             raise subprocess.TimeoutExpired(argv, timeout, output=stdout, stderr=stderr)
@@ -81,17 +93,19 @@ def _signal_group(pid: int, sig: signal.Signals) -> None:
 def _watch(control: int, payload: dict[str, Any]) -> int:
     status_read, status_write = os.pipe()
     anchor: subprocess.Popen[str] | None = None
+    completed = False
     try:
         deadline = float(payload["deadline"])
         # Check parent liveness before spawning, including death during payload delivery.
         if time.monotonic() >= deadline or select.select([control], [], [], 0)[0]:
             return _TIMEOUT_EXIT
         anchor = subprocess.Popen(
-            [sys.executable, "-m", _WATCHDOG_MODULE, "anchor", str(status_write)],
+            [sys.executable, "-I", "-m", _WATCHDOG_MODULE, "anchor", str(status_write)],
             stdin=subprocess.PIPE,
             text=True,
+            cwd="/",
             start_new_session=True,
-            pass_fds=(status_write,),
+            pass_fds=(status_write, *payload.get("pass_fds", ())),
         )
         os.close(status_write)
         status_write = -1
@@ -107,13 +121,15 @@ def _watch(control: int, payload: dict[str, Any]) -> int:
                 return _TIMEOUT_EXIT
             if status_read in readable:
                 status = os.read(status_read, 64)
+                completed = bool(status)
                 return int(status) if status else 125
     finally:
         if anchor is not None:
             # Do not poll/reap the anchor before the last signal. Even a crashed
             # anchor remains a zombie owned by us, retaining this group's identity.
-            _signal_group(anchor.pid, signal.SIGTERM)
-            time.sleep(TERMINATION_GRACE_SECONDS)
+            if not completed:
+                _signal_group(anchor.pid, signal.SIGTERM)
+                time.sleep(TERMINATION_GRACE_SECONDS)
             _signal_group(anchor.pid, signal.SIGKILL)
             anchor.wait()
         os.close(status_read)
@@ -140,6 +156,7 @@ def _anchor(status: int, payload: dict[str, Any]) -> None:
             input=payload["prompt"],
             text=True,
             cwd=payload["cwd"],
+            pass_fds=tuple(payload.get("pass_fds", ())),
             check=False,
         )
         os.write(status, str(result.returncode if result.returncode >= 0 else 128 - result.returncode).encode())

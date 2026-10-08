@@ -206,21 +206,25 @@ def test_plan_only_configuration_and_hook_review(forge_workspace: ContainerLike,
     created = workspace.exec("cd /workspace && forge session start plan-worker --no-launch")
     assert created.returncode == 0, created.stderr
     _write(workspace, "/workspace/approved.md", "Only add greet.py containing a greeting.\n")
-    configured = workspace.exec(
-        "cd /workspace && FORGE_SESSION=plan-worker forge policy supervisor set --plan approved.md "
-        "--model sonnet --no-supervisor-proxy"
-    )
-    assert configured.returncode == 0, configured.stderr
     _write(
         workspace,
         "/usr/local/bin/claude",
         """#!/bin/bash
 if [ "$1" = "--version" ]; then echo '2.1.291 (Claude Code)'; exit 0; fi
+if [[ " $* " == *" --help "* ]]; then
+  echo '--restricted --safe-mode --strict-mcp-config --disable-slash-commands --tools --allowedTools --setting-sources'
+  exit 0
+fi
 cat >/tmp/b1-review-prompt
 printf '%s\n' '{"verdict":"divergent","confidence":0.99,"violations":[{"severity":"high","evidence":"wrong file","citations":["Only add greet.py"]}]}'
 """,
         mode=0o700,
     )
+    configured = workspace.exec(
+        "cd /workspace && FORGE_SESSION=plan-worker forge policy supervisor set --plan approved.md "
+        "--model sonnet --no-supervisor-proxy"
+    )
+    assert configured.returncode == 0, configured.stderr
     if runtime == "claude_code":
         payload = {
             "tool_name": "Write",

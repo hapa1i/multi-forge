@@ -39,6 +39,10 @@ def test_new_hook_processes_each_negotiate_with_one_deadline(tmp_path):
     binary = tmp_path / "claude"
     binary.write_text("""#!/usr/bin/env python3
 import sys,time
+if '--version' in sys.argv:
+    print('2.1.291'); sys.exit(0)
+if '--help' in sys.argv:
+    print('--restricted --safe-mode --strict-mcp-config --disable-slash-commands --tools --allowedTools --setting-sources'); sys.exit(0)
 if '--output-format' in sys.argv:
     time.sleep(.6)
     print("error: unknown option '--output-format'", file=sys.stderr)

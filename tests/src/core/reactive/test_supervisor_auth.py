@@ -100,7 +100,7 @@ def test_preflight_and_dispatch_share_one_final_environment(personal_login, monk
         return subprocess.CompletedProcess(argv, 0, output, "")
 
     with (
-        patch("forge.core.reactive.supervisor_auth.shutil.which", return_value="/verified/claude"),
+        patch("forge.core.reactive.supervisor_auth.require_reviewer_runtime", return_value="/verified/claude"),
         patch("forge.core.reactive.watchdog.run_guarded", side_effect=guarded),
         patch("forge.core.reactive.supervisor_auth.run_guarded", side_effect=guarded),
         patch(
@@ -111,7 +111,7 @@ def test_preflight_and_dispatch_share_one_final_environment(personal_login, monk
             "review", direct=True, read_only=True, subscription_only=True, cwd=str(personal_login), timeout_seconds=10
         )
     assert result.dispatched is accepted
-    assert len(calls) == (3 if accepted else 2)
+    assert len(calls) == (2 if accepted else 1)
     assert all("ANTHROPIC_API_KEY" not in kwargs["env"] for _, kwargs in calls)
     assert len({id(kwargs["env"]) for _, kwargs in calls}) == 1
     if accepted:
