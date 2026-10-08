@@ -39,6 +39,7 @@ from forge.install.project_compat import (
     diagnose_project_compatibility_for_hook,
     enforce_project_compatibility,
 )
+from forge.policy.semantic.deadline import hook_review_budget
 from forge.session.artifacts import (
     get_artifact_paths,
     migrate_legacy_transcript_snapshots,
@@ -1208,6 +1209,7 @@ def subagent_stop() -> None:
 
 
 @hooks.command(name="policy-check")
+@hook_review_budget
 def policy_check() -> None:
     """Evaluate policies on PreToolUse:Write/Edit.
 
@@ -1273,7 +1275,7 @@ def policy_check() -> None:
     fail_mode: FailMode = effective.policy.fail_mode or "open"
     bundles = effective.policy.bundles or []
     sup = effective.policy.supervisor if effective.policy else None
-    has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
+    has_supervisor = bool(sup and sup.active)
 
     if not bundles and not has_supervisor:
         sys.exit(0)
@@ -1409,6 +1411,7 @@ def authority_check() -> None:
 
 
 @hooks.command(name="codex-policy-check")
+@hook_review_budget
 def codex_policy_check() -> None:
     """Evaluate authority, then policies, for a Codex PreToolUse action.
 
@@ -1485,7 +1488,7 @@ def codex_policy_check() -> None:
     fail_mode: FailMode = effective.policy.fail_mode or "open"
     bundles = effective.policy.bundles or []
     sup = effective.policy.supervisor if effective.policy else None
-    has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
+    has_supervisor = bool(sup and sup.active)
 
     if not bundles and not has_supervisor:
         sys.exit(0)

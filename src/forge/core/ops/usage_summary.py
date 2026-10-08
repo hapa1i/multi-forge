@@ -237,6 +237,7 @@ class SessionActivitySummary:
     upstream: OperationPane = field(default_factory=OperationPane)
     downstream: ModelCallPane = field(default_factory=ModelCallPane)
     notes: list[str] = field(default_factory=list)
+    supervisor_reviews: list[dict[str, object]] = field(default_factory=list)
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
@@ -256,6 +257,7 @@ class SessionActivitySummary:
     def is_empty(self) -> bool:
         return (
             not self.commands
+            and not self.supervisor_reviews
             and (self.policy is None or not self.policy.has_content)
             and (self.shadow is None or not self.shadow.has_content)
             and not self.upstream.has_content
@@ -288,6 +290,9 @@ def build_session_activity_summary(
         if subagents is not None:
             summary.subagents = int(subagents.total_count)
 
+    from forge.policy.semantic.attempts import read_attempts
+
+    summary.supervisor_reviews = read_attempts(session_name, forge_root, since=since)
     summary.shadow = _shadow_activity(forge_root, session_name, since)
     _build_activity_panes(summary, session_name, since, events)
 
@@ -401,6 +406,7 @@ def activity_summary_to_json(summary: SessionActivitySummary) -> dict[str, objec
         "upstream": asdict(summary.upstream),
         "downstream": asdict(summary.downstream),
         "shadow": asdict(summary.shadow) if summary.shadow is not None else None,
+        "supervisor_reviews": summary.supervisor_reviews,
         "subagents": summary.subagents,
         "notes": list(summary.notes),
     }

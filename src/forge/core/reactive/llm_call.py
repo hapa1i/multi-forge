@@ -14,6 +14,7 @@ def complete_llm_call(
     messages: list[Message],
     provider: ProviderType | None = None,
     hyperparams: ModelHyperparameters | None = None,
+    timeout_seconds: float | None = None,
 ) -> tuple[CompletionResponse, float, str | None]:
     """Complete one synchronous LLM call and return response, latency, and request id.
 
@@ -35,6 +36,9 @@ def complete_llm_call(
     call_hyperparams = with_forge_request_id(hyperparams, request_id) if request_id else hyperparams
 
     start = time.monotonic()
-    response = adapter.complete(messages, hyperparams=call_hyperparams)
+    if timeout_seconds is None:
+        response = adapter.complete(messages, hyperparams=call_hyperparams)
+    else:
+        response = adapter.complete(messages, hyperparams=call_hyperparams, timeout_seconds=timeout_seconds)
     latency_ms = (time.monotonic() - start) * 1000
     return response, latency_ms, request_id

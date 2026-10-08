@@ -450,3 +450,20 @@ def test_no_session_exits_with_error(runner: CliRunner, tmp_path: Path, monkeypa
     monkeypatch.delenv("FORGE_SESSION", raising=False)
     result = runner.invoke(main, ["session", "lane", "show"])
     assert result.exit_code != 0
+
+
+def test_all_four_consumers_keep_inherited_billing_contract(runner, project):
+    from forge.core.usage.billing import resolve_billing_mode
+
+    _seed(project)
+    for consumer in ("supervisor", "memory_writer", "shadow_curation", "team_supervisor"):
+        result = runner.invoke(main, ["session", "lane", "set", "--consumer", consumer, "--backend", "claude-max"])
+        assert result.exit_code == 0, result.output
+        shown = runner.invoke(main, ["session", "lane", "show", "--json"])
+        assert shown.exit_code == 0, shown.output
+        assert "claude-max" in shown.output
+        assert resolve_billing_mode(direct=True, has_api_key=True, backend_id="claude-max") == "api"
+        assert resolve_billing_mode(direct=True, has_api_key=False, backend_id="claude-max") == "subscription_quota"
+        assert resolve_billing_mode(direct=False, has_api_key=True, backend_id="claude-max") == "unknown"
+        cleared = runner.invoke(main, ["session", "lane", "clear", "--consumer", consumer])
+        assert cleared.exit_code == 0, cleared.output

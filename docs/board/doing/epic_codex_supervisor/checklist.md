@@ -5,14 +5,15 @@ belongs in each member's checklist.
 
 ## Current focus
 
-B1 [plan-file supervision](../plan_file_supervision/card.md) is active for execution planning on
-`feat/plan-file-supervision`, from `main` at `6e0d1f4c`. Its [checklist](../plan_file_supervision/checklist.md) starts
-with auth isolation and resumed-review compatibility. This activation prepares the requested checklists; product
-implementation and inference probes have not started.
+B1 [plan-file supervision](../plan_file_supervision/card.md) is implemented and validated in
+[PR #260](https://github.com/hapa1i/multi-forge/pull/260), on `feat/plan-file-supervision`. Its
+[evidence](../plan_file_supervision/evidence/README.md) covers the host subscription route, resumed inspection of the
+executor checkout, native Claude/Codex enforcement, and bounded reviewer cleanup.
 
-Revised 2026-10-07 after source verification. B1 records an explicit subscription-only opt-in, host Claude executor
-coverage, sidecar refusal, resumed checkout access, and proof gates for both runtimes' timeout/cleanup behavior. Its
-[commit slices](../plan_file_supervision/checklist.md#commit-slices) keep implementation concerns separately reviewable.
+The separate documentation prerequisites are open as [#258](https://github.com/hapa1i/multi-forge/pull/258) and
+[#259](https://github.com/hapa1i/multi-forge/pull/259), with B1 stacked after them. Shared `LaneRecord` and auxiliary
+consumer semantics remain unchanged; no extra model-format member is required. B3 receives the optional source-only
+feedback decision. B2-B5 remain proposed, and no later member has been activated.
 
 ## Activation
 
@@ -33,17 +34,17 @@ working-tree/staged diff checks pass. B1 retains the unresolved runtime gates in
 
 ## Sequence and ownership
 
-| Member                                             | State    | Dependency | Owned outcome                                                  |
-| -------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------- |
-| [B1](../plan_file_supervision/card.md)             | Planning | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
-| [B2](../../proposed/codex_0160_validation/card.md) | Proposed | None       | Current-runtime probe evidence                                 |
-| [B3](../../proposed/codex_policy_warnings/card.md) | Proposed | B2         | Allowed-action feedback delivery                               |
-| [B4](../../proposed/codex_stop_review/card.md)     | Proposed | B1, B2     | Bounded review at turn completion                              |
-| [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
+| Member                                             | State     | Dependency | Owned outcome                                                  |
+| -------------------------------------------------- | --------- | ---------- | -------------------------------------------------------------- |
+| [B1](../plan_file_supervision/card.md)             | In review | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
+| [B2](../../proposed/codex_0160_validation/card.md) | Proposed  | None       | Current-runtime probe evidence                                 |
+| [B3](../../proposed/codex_policy_warnings/card.md) | Proposed  | B2         | Allowed-action feedback delivery                               |
+| [B4](../../proposed/codex_stop_review/card.md)     | Proposed  | B1, B2     | Bounded review at turn completion                              |
+| [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed  | B1, B2     | Native Codex source context                                    |
 
 - [ ] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
 - [ ] Complete the [session](../../doing/partition_session_design/card.md) and
-  [runtime](../../todo/partition_runtime_design/card.md) design partitions on separate documentation branches before
+  [runtime](../../doing/partition_runtime_design/card.md) design partitions on separate documentation branches before
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [ ] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.
 - [ ] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.

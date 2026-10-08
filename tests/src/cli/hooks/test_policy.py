@@ -306,15 +306,18 @@ class TestSupervisorLaneBindingFreeze:
     def _effective(self, *, resume_id: str | None = "planner", suspended: bool = False) -> MagicMock:
         eff = MagicMock()
         eff.policy.bundles = []
-        eff.policy.supervisor.resume_id = resume_id
-        eff.policy.supervisor.suspended = suspended
+        from forge.session.models import SupervisorConfig
+
+        eff.policy.supervisor = SupervisorConfig(resume_id=resume_id, suspended=suspended)
         return eff
 
     def _state(self) -> Any:
         from forge.core.state import now_iso
-        from forge.session.models import SessionState
+        from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
 
-        return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+        state = SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+        state.intent.policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id="planner"))
+        return state
 
     def _run_mutate(self, state: Any, effective: MagicMock, supervisor_lane: Any = None, result: Any = None) -> None:
         engine = MagicMock()

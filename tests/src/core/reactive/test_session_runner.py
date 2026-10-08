@@ -183,7 +183,7 @@ class TestRunClaudeSession:
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         run_claude_session("prompt", timeout_seconds=120)
 
-        assert mock_run.call_args.kwargs["timeout"] == 120
+        assert 0 < mock_run.call_args.kwargs["timeout"] <= 120
 
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_bare_flag_when_api_key_present(self, mock_run):

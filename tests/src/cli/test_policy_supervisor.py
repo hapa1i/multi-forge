@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 from pytest import fixture
 
@@ -23,6 +24,14 @@ from forge.session.models import (
     SupervisorConfig,
 )
 from tests.fixtures.session_state import publish_session
+
+
+@pytest.fixture(autouse=True)
+def _reviewer_capabilities():
+    # CLI state tests do not depend on a host Claude installation. Admission and
+    # its non-inference probes have separate regression and Docker coverage.
+    with patch("forge.core.reactive.reviewer_runtime.preflight_supervisor_runtime"):
+        yield
 
 
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
@@ -111,7 +120,7 @@ def _set_supervisor_resume_id(forge_root: Path, name: str, resume_id: str) -> No
     store.update(timeout_s=5.0, mutate=_mutate)
 
 
-def _apply_supervisor_to_intent(manifest, supervisor) -> None:
+def _apply_supervisor_to_intent(manifest, supervisor, **kwargs) -> None:
     if manifest.intent.policy is None:
         manifest.intent.policy = PolicyIntent(enabled=True, supervisor=supervisor)
         return
@@ -134,6 +143,52 @@ def _auto_seed_supervisor_proxy(*args, **kwargs):
 
 def _hooks_installed(*args, **kwargs):
     return True
+
+
+@pytest.mark.parametrize("runtime", ["claude_code", "codex"])
+def test_plan_only_lifecycle(temp_guard_env, monkeypatch, runtime):
+    project = temp_guard_env
+    state = create_session_state("plan-worker", worktree_path=str(project))
+    state.forge_root = str(project)
+    state.intent.runtime = runtime
+    publish_session(
+        IndexStore(), state, project, forge_root=str(project), checkout_root=str(project), relative_path="."
+    )
+    monkeypatch.setenv("FORGE_SESSION", state.name)
+    plan = project / "approved.md"
+    plan.write_text("Only update the greeting.\n")
+    runner = CliRunner()
+    with patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=AssertionError("no target")):
+        result = runner.invoke(main, ["policy", "supervisor", "set", "--plan", "approved.md", "--no-supervisor-proxy"])
+        assert result.exit_code == 0, result.output
+        for verb in ("off", "reload", "on"):
+            result = runner.invoke(main, ["policy", "supervisor", verb])
+            assert result.exit_code == 0, result.output
+            status = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+            sup = json.loads(status.output)["supervisor"]
+            assert sup["resume_id"] is None
+            assert sup["plan_override_path"] == str(plan)
+            assert sup["active"] is (verb == "on")
+        result = runner.invoke(main, ["policy", "supervisor", "remove"])
+        assert result.exit_code == 0, result.output
+    assert SessionStore(str(project), state.name).read().intent.policy.supervisor is None
+
+
+@pytest.mark.parametrize("bad_plan", ["missing.md", ".", "empty.md", "binary.md"])
+def test_invalid_plan_preserves_configuration_and_does_not_start_proxy(temp_guard_env, monkeypatch, bad_plan):
+    project = temp_guard_env
+    _make_supervised_project(project, monkeypatch)
+    (project / "empty.md").write_text("  \n")
+    (project / "binary.md").write_bytes(b"\xff")
+    manifest = project / ".forge/sessions/worker/forge.session.json"
+    before = manifest.read_bytes()
+    with patch("forge.policy.semantic.supervisor.ensure_supervisor_proxy") as start:
+        result = CliRunner().invoke(
+            main, ["policy", "supervisor", "set", "--plan", bad_plan, "--supervisor-proxy", "x"]
+        )
+    assert result.exit_code != 0
+    start.assert_not_called()
+    assert manifest.read_bytes() == before
 
 
 def _project_env(tmp_path: Path, monkeypatch):
@@ -694,6 +749,14 @@ class TestSupervisorStatus:
         assert "Routing: direct (no proxy)" in result.output
 
     _SUPERVISOR_JSON_KEYS = {
+        "configured",
+        "active",
+        "source",
+        "auth_mode",
+        "model",
+        "latest_review",
+        "state",
+        "unavailable_reason",
         "resume_id",
         "suspended",
         "plan_override_path",
@@ -1165,8 +1228,8 @@ class TestSupervisorSetTimeoutFlag:
         return manifest.intent.policy.supervisor
 
     def test_timeout_persists_into_intent(self, temp_guard_env: Path) -> None:
-        sup = self._set_supervisor(temp_guard_env, ["--timeout", "90"])
-        assert sup.timeout_seconds == 90
+        sup = self._set_supervisor(temp_guard_env, ["--timeout", "30"])
+        assert sup.timeout_seconds == 30
 
     def test_default_unchanged_without_flag(self, temp_guard_env: Path) -> None:
         sup = self._set_supervisor(temp_guard_env, [])

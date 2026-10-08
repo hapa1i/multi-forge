@@ -487,6 +487,22 @@ def launch_claude_session(
     run_active: Callable[..., int] | None = None,
 ) -> ClaudeSessionLaunchResult:
     """Launch Claude for a session, handling sidecar/host split without rendering."""
+    from forge.policy.semantic.identity import (
+        snapshot_supervisor_options,
+        validate_sidecar_supervisor,
+    )
+
+    try:
+        supervisor = snapshot_supervisor_options(manifest)
+        validate_sidecar_supervisor(supervisor, sidecar=use_sidecar)
+        if supervisor and not use_sidecar:
+            from forge.core.reactive.reviewer_runtime import (
+                preflight_host_supervisor,
+            )
+
+            preflight_host_supervisor(manifest)
+    except ValueError as exc:
+        raise ForgeOpError(str(exc)) from exc
     _runtime = session_runtime(manifest)
     if _runtime != "claude_code":
         raise ForgeOpError(
@@ -1325,6 +1341,7 @@ def apply_supervisor_wiring(
         current_proxy_id=proxy_id,
         current_template=template,
         current_direct=direct,
+        runtime=wiring.supervisor_runtime,
     )
     # Launch-time --cascade only flips the flag; the runtime hook escalates to the
     # frontier when no plan exists (see plan_check._needs_review).
@@ -1424,6 +1441,23 @@ def _run_sidecar_claude_session(
     if not is_docker_available():
         raise ForgeOpError("Docker is not available or not running")
 
+    from forge.policy.semantic.identity import snapshot_supervisor_options
+    from forge.runtime_config import get_runtime_config
+    from forge.session.store import manifest_for_write
+    from forge.sidecar.docker import require_sidecar_contract
+
+    _runtime_config = get_runtime_config()
+    sidecar_image = image or _runtime_config.sidecar_image
+    supervisor = snapshot_supervisor_options(manifest)
+    try:
+        require_sidecar_contract(
+            sidecar_image,
+            schema_version=manifest_for_write(manifest)["schema_version"],
+            reviewer=bool(supervisor and supervisor.active),
+        )
+    except ValueError as exc:
+        raise ForgeOpError(str(exc)) from exc
+
     try:
         extra_mounts = parse_mounts(mounts) if mounts else []
     except ValueError as e:
@@ -1498,9 +1532,6 @@ def _run_sidecar_claude_session(
         except Exception:
             pass
 
-    from forge.runtime_config import get_runtime_config
-
-    _runtime_config = get_runtime_config()
     _omit_interactive_key = _runtime_config.interactive_anthropic_api_key == "omit"
     if _omit_interactive_key:
         container_env["FORGE_OMIT_INTERACTIVE_KEY"] = "1"
@@ -1524,7 +1555,6 @@ def _run_sidecar_claude_session(
         proxy_cost_baseline_started_at=(_sidecar_cost_baseline.started_at if _sidecar_cost_baseline else None),
     )
 
-    sidecar_image = image or _runtime_config.sidecar_image
     if on_sidecar_launch is not None:
         on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id))
 

@@ -185,7 +185,7 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
     registered check -- not a fresh manifest read that could race an intent change.
     """
     sup = effective.policy.supervisor if effective.policy else None
-    has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
+    has_supervisor = bool(sup and sup.active)
     lane_record: LaneRecord | None = None
     if has_supervisor:
         from forge.policy.semantic.supervisor import (
@@ -203,14 +203,23 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
         # route around it to the default claude lane. The frozen codex binding is left intact
         # (still observable in `lane show`); only this run's dispatch lane is overridden to None.
         if lane_record is not None and is_supervisor_degraded(manifest):
+            from dataclasses import replace
+
             lane_record = None
+            if sup_cfg and sup_cfg.auth_mode == "inherit":
+                # A sanctioned Codex degrade selects the legacy Claude default;
+                # never pass a Codex model/effort to that runtime.
+                sup_cfg = replace(sup_cfg, supervisor_model=None, supervisor_effort=None)
         if sup_cfg and sup_cfg.cascade:
             # Cascade: the cheap tier-1 plan check runs on every event; the frontier
             # supervisor becomes the needs_review resolver (invoked only on escalation).
             from forge.policy.semantic.plan_check import PlanCheckPolicy
+            from forge.policy.semantic.plan_source import ReviewSource
 
-            engine.register(PlanCheckPolicy(config=sup_cfg, lane_record=lane_record))
-            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
+            source = ReviewSource()
+
+            engine.register(PlanCheckPolicy(config=sup_cfg, lane_record=lane_record, source=source))
+            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record, source=source))
         else:
             engine.register(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
 
@@ -353,14 +362,26 @@ def _persist_policy_decisions(
         # (cli/consumer_lane_freeze.py). They have no registration commitment point, so a
         # skip must not freeze. Same equality-guard mechanism, different trigger.
         sup = effective.policy.supervisor if effective.policy else None
-        if sup and sup.resume_id and not sup.suspended:
+        if sup and sup.active:
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
             from forge.session.consumer_lanes import (
                 ensure_consumer_lane_binding,
                 read_bound_lane,
             )
+            from forge.session.effective import compute_effective_intent
 
-            if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane:
+            fresh = compute_effective_intent(m)
+            fresh_sup = fresh.policy.supervisor if fresh.policy else None
+            if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane and fresh_sup == sup:
+                from forge.policy.semantic.identity import (
+                    select_supervisor_lane,
+                    validate_reviewer,
+                )
+
+                try:
+                    validate_reviewer(sup, supervisor_lane or select_supervisor_lane())
+                except ValueError:
+                    return  # persist decisions, but never commit an invalid reviewer identity
                 ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
                 # If a check exhausted the codex subscription during this evaluation,
                 # persist the degrade overlay so subsequent checks route to the default claude

@@ -117,6 +117,13 @@ def _find_result_object(stdout: str) -> dict[str, Any] | None:
     return None
 
 
+def observed_headless_models(stdout: str) -> tuple[str, ...]:
+    """Report runtime model IDs only when the terminal envelope supplies them."""
+    result = _find_result_object(stdout)
+    usage = result.get("modelUsage") if result else None
+    return tuple(sorted(key for key in usage if isinstance(key, str))) if isinstance(usage, dict) else ()
+
+
 def parse_headless_envelope(stdout: str) -> HeadlessEnvelope:
     """Parse a `claude -p --output-format json` envelope. NEVER raises.
 

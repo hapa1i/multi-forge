@@ -31,7 +31,7 @@ from forge.session.store import (
     MANIFEST_DIR,
     MANIFEST_FILENAME,
     SessionStore,
-    upgrade_v1_manifest_for_read,
+    upgrade_manifest_for_read,
 )
 
 
@@ -102,7 +102,7 @@ class TestSessionStoreWrite:
         with open(store.manifest_path) as f:
             data = json.load(f)
         assert data["name"] == "test-session"
-        assert data["schema_version"] == 2  # Always writes current version
+        assert data["schema_version"] == 2  # No v3-only supervision; old sidecars can read it.
         assert data["intent"]["launch"]["model_route"] is None
 
     def test_write_validates_name(self, store: SessionStore) -> None:
@@ -615,7 +615,7 @@ class TestSessionStoreRead:
         assert loaded.intent.launch.mode == "host"
         assert loaded.intent.launch.model_route is None
 
-    def test_read_v1_projects_to_v2_without_rewriting(self, store: SessionStore, sample_manifest: SessionState) -> None:
+    def test_read_v1_projects_to_v3_without_rewriting(self, store: SessionStore, sample_manifest: SessionState) -> None:
         store.write(sample_manifest)
         data = json.loads(store.manifest_path.read_text())
         data["schema_version"] = 1
@@ -625,25 +625,25 @@ class TestSessionStoreRead:
 
         loaded = store.read()
 
-        assert loaded.schema_version == 2
+        assert loaded.schema_version == 3
         assert loaded.intent.launch is not None
         assert loaded.intent.launch.model_route is None
         assert store.manifest_path.read_bytes() == before
 
-    def test_v1_projection_is_pinned_to_v2_shape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_v1_projection_is_pinned_to_v3_shape(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import forge.session.store as store_module
 
         data: dict[str, Any] = {"schema_version": 1, "intent": {"launch": {}}}
-        monkeypatch.setattr(store_module, "SCHEMA_VERSION", 3)
+        monkeypatch.setattr(store_module, "SCHEMA_VERSION", 4)
 
-        upgrade_v1_manifest_for_read(data)
+        upgrade_manifest_for_read(data)
 
         assert data == {
-            "schema_version": 2,
+            "schema_version": 3,
             "intent": {"launch": {"model_route": None}},
         }
 
-    def test_first_ordinary_v1_write_emits_complete_v2(
+    def test_first_ordinary_v1_write_emits_compatible_v2(
         self,
         store: SessionStore,
         sample_manifest: SessionState,
@@ -657,7 +657,7 @@ class TestSessionStoreRead:
         updated = store.update_last_accessed()
         persisted = json.loads(store.manifest_path.read_text())
 
-        assert updated.schema_version == 2
+        assert updated.schema_version == 3
         assert persisted["schema_version"] == 2
         assert persisted["intent"]["launch"]["model_route"] is None
 

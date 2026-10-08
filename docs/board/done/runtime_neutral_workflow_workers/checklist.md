@@ -83,9 +83,9 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
   remains failure, and every other plan entry requires a non-null route (today's `_raise_no_route_error` behavior).
   Scope honesty: this matrix is a plan-level invariant, NOT a global `RoutingResult` contract -- the shared resolver
   already returns successful route-null results for opaque routing (`source="explicit"` base-URL passthrough,
-  `core/reactive/routing.py:315-323`; `require_route=False` opaque session-proxy acceptance, design_runtime.md §G.1).
-  The core type docstring documents only the additive `runtime_native => route=None by design`; the plan-level matrix is
-  pinned in `resolve_invocation_routing` tests.
+  `core/reactive/routing.py:315-323`; `require_route=False` opaque session-proxy acceptance, design_subprocesses.md
+  §G.1). The core type docstring documents only the additive `runtime_native => route=None by design`; the plan-level
+  matrix is pinned in `resolve_invocation_routing` tests.
 
 - [x] **D2b -- Card wording vs backend identity.** The normative card now says selection uses the runtime registry and
   runtime-native auth/billing posture is preflight-resolved without asserting a static backend identity. Applied during

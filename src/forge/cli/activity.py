@@ -109,6 +109,12 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
         "not your full interactive session.[/dim]"
     )
 
+    if summary.supervisor_reviews:
+        latest = summary.supervisor_reviews[0]
+        console.print(
+            f"Supervisor review: {latest['state']} at {latest['started_at']} ({latest.get('reason') or latest.get('verdict') or 'running'})"
+        )
+
     pol = summary.policy
     # Fail-open breakdown is ledger-derived (the supervisor CommandUsage), so the
     # Supervisor line must render even when there is no decision log (pol is None) --

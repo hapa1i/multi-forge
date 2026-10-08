@@ -56,8 +56,8 @@ The current implementation already separates model gateways and subprocess routi
   cost decisions.
 - `derive_model_routes()`, `resolve_subprocess_routing()`, and `WorkerRoutingPlan` move workflow routing toward a
   capability-based contract that can later feed non-Claude invokers (see
-  [design.md §3.6.12](../../../design_runtime.md#3612-subprocess-routing-resolution-normative) and
-  [design_runtime.md §L](../../../design_runtime.md#g-subprocess-routing-reference) for the current contract).
+  [design.md §3.6.12](../../../design_subprocesses.md#3612-subprocess-routing-resolution-normative) and
+  [design_runtime.md §L](../../../design_subprocesses.md#g-subprocess-routing-reference) for the current contract).
 - `--subprocess-proxy` lets a direct Claude Code frontend route headless child work through an API-backed proxy, which
   is an important transitional bridge.
 - Proxy request logs, verb-level cost attribution, `forge proxy costs`, and per-proxy spend caps provide an initial

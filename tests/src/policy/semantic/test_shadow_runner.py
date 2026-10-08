@@ -15,6 +15,9 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import dacite
+import pytest
+
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.policy.semantic.shadow import capture_candidate
@@ -67,7 +70,8 @@ def _cfg(tmp_path: Path, **kw: object) -> SupervisorConfig:
     if not plan.exists():
         plan.write_text("# Plan\nStep 1: do the thing.\nStep 2: do the other thing.")
     defaults: dict[str, object] = {
-        "resume_id": "rid",
+        "resume_id": "12345678-1234-1234-1234-123456789abc",
+        "supervisor_model": "opus",
         "forge_root": str(tmp_path),
         "plan_override_path": str(plan),
         "cascade": True,
@@ -97,7 +101,7 @@ def _frontier_prompt(config: SupervisorConfig, context: ActionContext) -> str:
     """Replicate run_supervisor_check's prompt assembly (the fidelity reference)."""
     prompt = SUPERVISOR_PROMPT.format(
         tool_name=context.tool_name,
-        target_path=context.target_path or "N/A",
+        target_path=str(Path(context.repo_root) / context.target_path) if context.target_path else "N/A",
         content=_supervisor_action_content(context),
     )
     plan_content = load_plan_override(config)
@@ -198,14 +202,12 @@ class TestReconstruction:
         candidate = {"lane": {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}}
         assert reconstruct_lane(candidate) == LaneRecord("codex", "chatgpt", "gpt-5-codex")
 
-    def test_reconstruct_lane_absent_defaults_to_none(self) -> None:
-        """An older/malformed record reconstructs to None -> claude default replay (discard-and-default)."""
+    def test_reconstruct_lane_missing_or_malformed_refuses(self) -> None:
         from forge.policy.semantic.shadow_runner import reconstruct_lane
 
-        assert reconstruct_lane({}) is None  # no lane key (pre-v3 record)
-        assert reconstruct_lane({"lane": None}) is None  # explicit default
-        assert reconstruct_lane({"lane": "codex"}) is None  # malformed (old v2 string) -> default
-        assert reconstruct_lane({"lane": {"runtime_id": "codex"}}) is None  # incomplete dict -> default
+        for candidate in ({}, {"lane": None}, {"lane": "codex"}, {"lane": {"runtime_id": "codex"}}):
+            with pytest.raises((ValueError, dacite.DaciteError)):
+                reconstruct_lane(candidate)
 
     def test_rebuilds_identical_supervisor_prompt(self, tmp_path: Path) -> None:
         ctx = _ctx(raw_diff="@@ -1 +2 @@\n+changed", new_content="ignored when raw_diff present")
@@ -380,3 +382,27 @@ class TestPostClaimFailure:
         run_shadow_candidate(cand)
         # run_shadow_for_session only sweeps *.json; the errored one is .done, so nothing reruns.
         assert run_shadow_for_session("sess", str(tmp_path)) == {}
+
+
+@pytest.mark.parametrize("change", ["older", "newer", "lane", "model", "auth", "digest"])
+def test_unverified_replay_never_uses_a_paid_default(tmp_path, monkeypatch, change):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "synthetic-must-not-dispatch")
+    path = _capture(_ctx(), _cfg(tmp_path))
+    candidate = json.loads(path.read_text())
+    if change == "older":
+        candidate["schema_version"] = 4
+    elif change == "newer":
+        candidate["schema_version"] = 999
+    elif change == "lane":
+        candidate.pop("lane")
+    elif change == "model":
+        candidate["supervisor_model"] = None
+    elif change == "auth":
+        candidate["auth_mode"] = "unknown"
+    else:
+        (path.parent / candidate["plan_snapshot_file"]).write_text("modified after capture")
+    path.write_text(json.dumps(candidate))
+    with patch("forge.policy.semantic.shadow_runner.run_supervisor_check") as dispatch:
+        assert run_shadow_candidate(path) == STATUS_ERROR
+    dispatch.assert_not_called()
+    assert json.loads(path.with_suffix(".done").read_text())["review_state"] == "unavailable"

@@ -2,7 +2,7 @@
 
 Path: <forge_root>/.forge/sessions/<session_name>/forge.session.json
 
-Schema: v1/v2 reads; writes emit v2.
+Schema: v1/v2/v3 reads; writes emit v2 unless v3 supervision fields are required.
 
 Session manifests are treated as a strict contract:
 - Only explicitly retired fields are stripped from the in-memory read payload
@@ -10,7 +10,8 @@ Session manifests are treated as a strict contract:
 - Invalid manifests fail fast on read
 
 V1 is upgraded in memory with ``intent.launch.model_route=null``. Reads never
-rewrite a manifest; the next ordinary write emits the complete v2 shape.
+rewrite a manifest. V1/v2 supervisors gain
+explicit inherited auth and a null model selector, preserving legacy dispatch.
 
 Invariant: session names are unique within one forge root (enforced by
 IndexStore.create_session_txn). The directory name IS the session name.
@@ -43,7 +44,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -129,16 +130,56 @@ def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "
         )
 
 
-def upgrade_v1_manifest_for_read(data: dict[str, Any]) -> None:
-    """Project a validated v1 manifest into the current in-memory v2 shape."""
+def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
+    """Project validated v1/v2 manifests into v3 without modifying persisted state."""
 
-    if data.get("schema_version") != 1:
+    version = data.get("schema_version")
+    if version not in {1, 2}:
         return
     intent = data.get("intent")
     launch = intent.get("launch") if isinstance(intent, dict) else None
-    if isinstance(launch, dict):
+    if version == 1 and isinstance(launch, dict):
         launch["model_route"] = None
-    data["schema_version"] = 2
+    policy = intent.get("policy") if isinstance(intent, dict) else None
+    supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+    if isinstance(supervisor, dict):
+        supervisor["auth_mode"] = "inherit"
+        supervisor["supervisor_model"] = None
+    # Older supervisors accepted any positive timeout, and Codex ignored Claude
+    # routing fields. Preserve their working behavior under the bounded reviewer.
+    from forge.session.effective import apply_overrides
+
+    overrides = data.get("overrides") or {}
+    effective = apply_overrides(intent or {}, overrides)
+    binding = ((data.get("confirmed") or {}).get("consumer_lanes") or {}).get("supervisor")
+    lane = binding.get("lane") if binding else (effective.get("consumer_lanes") or {}).get("supervisor")
+    override_sup = (overrides.get("policy") or {}).get("supervisor")
+    for config in (supervisor, override_sup):
+        if not isinstance(config, dict):
+            continue
+        timeout = config.get("timeout_seconds")
+        if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 45:
+            config["timeout_seconds"] = 45
+            _store_logger.info("Migrated legacy supervisor timeout %ss to the 45s hook budget", timeout)
+        if lane and lane.get("runtime_id") == "codex":
+            for key in ("proxy", "base_url"):
+                if key in config:
+                    config[key] = None
+    data["schema_version"] = 3
+
+
+def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
+    """Use v2 when the state is losslessly readable by existing sidecar images."""
+    data = session_state_to_dict(manifest)
+    supervisor = (data["intent"].get("policy") or {}).get("supervisor")
+    override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
+    new_override = isinstance(override_sup, dict) and bool({"auth_mode", "supervisor_model"} & override_sup.keys())
+    legacy = not supervisor or (supervisor["auth_mode"] == "inherit" and supervisor["supervisor_model"] is None)
+    data["schema_version"] = 2 if legacy and not new_override else SCHEMA_VERSION
+    if data["schema_version"] == 2 and supervisor:
+        del supervisor["auth_mode"]
+        del supervisor["supervisor_model"]
+    return data
 
 
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
@@ -254,7 +295,7 @@ class SessionStore:
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
-        upgrade_v1_manifest_for_read(data)
+        upgrade_manifest_for_read(data)
 
         try:
             manifest = dacite.from_dict(
@@ -356,8 +397,7 @@ class SessionStore:
                 f"name '{self._session_name}'. This would create a directory/name mismatch."
             )
 
-        data = session_state_to_dict(manifest)
-        data["schema_version"] = SCHEMA_VERSION
+        data = manifest_for_write(manifest)
         atomic_write_json(self._manifest_path, data)
 
     def delete(self) -> bool:
@@ -533,8 +573,21 @@ class SessionStore:
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version == 2 and "model_route" not in launch:
+            if schema_version in {2, 3} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
+
+        policy = intent.get("policy") if isinstance(intent, dict) else None
+        supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+        if isinstance(supervisor, dict):
+            for field_name in ("auth_mode", "supervisor_model"):
+                if schema_version in {1, 2} and field_name in supervisor:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path), f"schema v{schema_version} cannot contain supervisor.{field_name}"
+                    )
+                if schema_version == 3 and field_name not in supervisor:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path), f"schema v3 requires supervisor.{field_name}"
+                    )
 
         # Strict overrides schema: keys must be valid SessionIntent paths
         overrides = data.get("overrides")

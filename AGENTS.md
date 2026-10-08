@@ -207,7 +207,14 @@ dispatcher, while project/local extension installs own status line and project a
 subscription-billing changes, verify
 `forge session lane set|show|clear --consumer <supervisor|memory_writer|shadow_curation|team_supervisor>`,
 `forge policy supervisor status`, and `forge telemetry activity [session]`; `--backend claude-max` should label only
-keyless direct runs as `subscription_quota`, while resolvable keys remain `api` and proxied runs remain `unknown`.
+keyless direct runs as `subscription_quota`, while resolvable keys remain `api` and proxied runs remain `unknown`. This
+inherited rule applies to all four consumers, including existing frozen supervisors. The supervisor-only
+`--auth-mode subscription-only` opt-in instead verifies and uses a stripped, direct Claude login child; test both
+policies, all four lane commands, and refusal without inference when the opt-in cannot verify auth. Usage credits must
+be disabled on the account. Plan-file supervision supports host Claude/Codex executors; sidecars refuse it. Keep
+reviewer timeouts within 1–45 seconds and preserve the registered 60-second hooks. Verify reviewer capability admission
+on the old supported CLI and after an executable update; auth-only user/sidecar helpers must still work. Check stale
+sidecar-image refusal, v2-compatible ordinary writes, and separation of live review evidence from shadow audits.
 
 ## Coding Style & Naming Conventions
 

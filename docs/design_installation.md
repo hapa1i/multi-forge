@@ -44,7 +44,7 @@ Canonical configuration ownership, credentials, extension, scope, merge, registr
   later re-add starts from the default. The post-eval freeze runs lock-free during the (multi-second) check, so it lands
   only when the fresh under-lock manifest still dispatches the lane it ran on — a concurrent remove/reconfigure drops
   the stale write rather than resurrecting a cleared binding. See
-  [design_runtime.md §G](design_runtime.md#g-subprocess-routing-reference).
+  [design_subprocesses.md §G](design_subprocesses.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
@@ -812,3 +812,11 @@ and SHA-256 drift detection. Resume validation refuses a version mismatch, chang
 before clearing any suffix. The tests keep both self-contained copies identical except for two identity lines.
 
 ---
+
+### Supervisor deadline compatibility
+
+The installed Claude Write/Edit policy checks and Codex PreToolUse policy check retain their 60-second timeouts and
+existing command bytes. Plan-file supervision limits reviewer calls to 45 seconds within a shared 55-second hook budget.
+Changing registration is not a way to increase this limit: Codex enrollment is tied to the exact registration bytes. The
+supervisor validates the supported built-in limits and refuses a drifted budget. Reviewer cleanup also observes hook
+death through an independent watchdog; runtime hook teardown alone is not the ownership mechanism.
