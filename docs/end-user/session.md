@@ -929,39 +929,22 @@ Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eager
 frontier supervisor when no plan exists yet. This differs from `forge policy supervisor set <target> --cascade` (or
 `forge policy supervisor cascade on`), which resolves the plan at the time you run it.
 
-**Reasoning effort:** `--supervisor-effort` sets the Claude arm's `claude --effort` (`low/medium/high/xhigh/max`); the
-Codex arm does not consume this field. `--checker-effort` sets the tier-1 checker's reasoning effort
-(`none/low/medium/high/xhigh`; the checker is an API call, not a `claude -p` subprocess). The two vocabularies are
-distinct: `max` is invalid for the checker and `none` is invalid for the Claude supervisor arm.
+**Reasoning effort:** `--supervisor-effort` sets the chosen reviewer's effort. Claude accepts
+`low/medium/high/xhigh/max`; Codex validates the level against the selected model. `--checker-effort` sets the tier-1
+checker's reasoning effort (`none/low/medium/high/xhigh`; the checker is an API call, not a `claude -p` subprocess). The
+two vocabularies are distinct: `max` is invalid for the checker and `none` is invalid for the Claude supervisor arm.
 
 ```bash
 forge session fork planner --worktree --supervise --cascade \
   --checker-effort low --supervisor-effort medium
 ```
 
-**Supervisor lifecycle controls:**
-
-```bash
-# Suspend supervision (preserves config — resume_id, proxy, timeouts)
-forge policy supervisor off
-%policy supervisor off
-
-# Resume suspended supervisor
-forge policy supervisor on
-%policy supervisor on
-
-# Remove supervisor entirely
-forge policy supervisor remove
-%policy supervisor remove
-
-# Reload plan when it evolves (searches current session, forks, target)
-forge policy supervisor reload
-%policy supervisor reload
-
-# Reload from explicit file
-forge policy supervisor reload --from ~/.claude/plans/updated-plan.md
-%policy supervisor reload /path/to/plan.md
-```
+**Supervisor lifecycle:** `forge policy supervisor off|on|remove` suspends, resumes, or clears configuration and its
+frozen lane. `reload --from <path>` selects an explicit approved plan; bare reload searches conversation sources or
+revalidates a plan-only file. `%policy supervisor` offers the same lifecycle verbs, with a bare path for explicit
+reload. Plan-file and subscription-only review require host executors; sidecars refuse these configurations, including
+inherited ones. Existing frozen `claude-max` bindings retain inherited auth on upgrade. See
+[the policy guide](policy.md#review-an-approved-plan-file) for setup, the account credits prerequisite, and recovery.
 
 The planner session stays intact throughout — it can be forked multiple times for different executors or reviewers.
 

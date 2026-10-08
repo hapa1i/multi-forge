@@ -69,10 +69,14 @@ The session file has three sections:
 Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
 new writes omit it.
 
-Session manifests currently write schema v2. `forge.session.models::SCHEMA_VERSION` owns the writer version and
-`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1 and v2 on read; unknown versions remain errors. After a
-strict v1 validation, the reader projects the manifest to v2 in memory by adding only `intent.launch.model_route=null`
-when `intent.launch` exists. A read never rewrites the file. The next ordinary write emits a complete v2 manifest.
+Session manifests write schema v3. `forge.session.models::SCHEMA_VERSION` owns the writer version;
+`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1, v2, and v3 on read. Strict legacy validation precedes
+in-memory projection: v1 gains `intent.launch.model_route=null` when launch exists; v1/v2 supervisors gain
+`auth_mode="inherit"` and `supervisor_model=null`. No read rewrites a manifest. The next ordinary write emits v3. These
+defaults preserve existing frozen bindings and runtime-selected models; an old nominal lane model is not an explicit
+model request. V3 requires both supervisor fields when a supervisor object exists. Older Forge versions cannot read
+newly written v3 manifests; downgrade requires restoring the pre-upgrade manifest backup, not deleting unknown fields
+from a live session. Unknown versions and extra fields remain errors.
 
 `intent` and `overrides` are required objects. Missing `confirmed` defaults empty; when present, it must be an object.
 Other values are corruption, surfaced without rewriting.
@@ -103,8 +107,8 @@ launch:
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
 
-In schema v2, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral route
-selection:
+In schema v2/v3, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral
+route selection:
 
 ```yaml
 model_route:

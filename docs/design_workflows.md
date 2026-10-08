@@ -96,13 +96,19 @@ session forking) can compose before Forge hardcodes a default. Configure persist
 
 **Mechanism: runtime-selectable side-channel supervision**
 
-The `policy-check` hook resolves the supervisor's consumer lane. The default `claude_code` lane runs
-`claude -p --resume <supervisor_uuid>` (plus `--model opus` when proxied). A pinned `codex` lane runs a fresh, read-only
+Both Claude Write/Edit and Codex `apply_patch` hooks resolve the supervisor's consumer lane. A supervisor is configured
+when it has a planning target or an explicit plan file; active additionally means not suspended. Plan-only Claude runs
+fresh in the action checkout. Conversation-backed Claude resumes and forks from the planner CWD, adds the absolute
+action checkout with `--add-dir`, and receives absolute action paths. Both paths expose only Read/Glob/Grep, disable MCP
+and executable customizations, and isolate user/project/local settings. A pinned `codex` lane runs a fresh, read-only
 `codex exec` in the action checkout. Codex cannot resume the Claude planning session, so this arm requires an approved
 plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that snapshot in-band. A
 missing plan or cold, stale, or unready Codex preflight fails open with a warning.
 
-1. **Configure**: `forge policy supervisor set <target> [--runtime claude_code|codex]` (or use launch/fork supervision).
+1. **Configure**:
+   `forge policy supervisor set [<target>] --plan <file> [--runtime claude_code|codex] [--model <model>]`; target-only
+   setup and existing launch/fork supervision remain supported. `--auth-mode subscription-only` selects guarded direct
+   Claude/`claude-max`; omitted/`inherit` retains existing routing and credential selection.
 2. **Check**: Runs at PreToolUse for Write/Edit, throttled via cache (default 30s).
 3. **Enforce**:
    - **Aligned**: Silent success (cached for throttle window).
@@ -134,14 +140,40 @@ ambiguities.
   same `forge_root` whose parent is the supervisor target), supervisor target session. Only approved snapshots are
   considered (no drafts). The plan content is prepended to each evaluation prompt with explicit supersession framing.
   `--from` takes an explicit file path (resolved relative to CWD, stored absolute). The direct equivalent is
-  `%policy supervisor reload [path]`. Cache keys include a `path:mtime_ns:size` fingerprint so in-place edits invalidate
-  cached verdicts.
+  `%policy supervisor reload [path]`. Plan-only bare reload revalidates its stored file. An explicit file must be
+  readable, nonempty UTF-8; failure leaves configuration unchanged. The checker, frontier, shadow capture, and attempt
+  evidence share one immutable byte snapshot per action. SHA-256 content identity invalidates same-size/same-mtime
+  edits. Frontier keys also include source, lane, model, effort, auth policy, and proxy/direct route.
 - `plan_override_path` on `SupervisorConfig` stores the override. It can be set while the supervisor is suspended
   (configure the plan, then run `forge policy supervisor on`). Proxy routing is not re-seeded on `on` — the preserved
   config is used as-is.
 - Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
   may still hold the plan). Status always shows the configured supervisor target; when that target resolves, it adds the
   Claude UUID and source model facts that are available.
+
+**Admission and reviewer identity:** Plan-file and subscription-only supervision require host executors. Setup,
+relaunch, generic overrides, and dispatch refuse sidecars, including inherited configurations. Legacy conversation-only
+sidecar review retains its explicit route and gains the inspection-only guard. `--model` is passed to the selected
+runtime; Claude supports tier selectors or declared direct model candidates, while a proxy owns its tier mapping. Codex
+effort is checked against the selected model. Auth/model/effort changes after binding require remove/reconfigure. The
+shared `LaneRecord` and auxiliary consumers' candidate semantics are unchanged. Status distinguishes absent, suspended,
+active, and unusable configuration, independently of the latest attempt outcome.
+
+**Deadline and evidence:** Both hook entries establish one 55-second review budget inside their unchanged 60-second
+registration. Each frontier call has a 1–45-second limit; the API checker has at most 15 seconds. Files, cascade stages,
+auth checks, and output-format retries consume remaining time. A detached watchdog owns a reviewer process group,
+watches a hook-owned pipe for EOF, and terminates on EOF or deadline: TERM, 0.5-second grace, then KILL and reaping. An
+anchor in that group also arms a deadline fallback if the watchdog itself dies. The five-second hook reserve covers
+cleanup and finalization. Manual and shadow calls establish their own bounded deadline. No available budget means
+unavailable review under the existing fail-open policy; deterministic denies retain precedence.
+
+Starts are durable before dispatch; evidence failure prevents a model call. Finalization failure leaves incomplete start
+evidence. [Telemetry](design_telemetry.md#314-cost-tracking-and-spend-caps) owns pending/completed/unavailable/
+incomplete records and status/activity projection. A timeout or missing terminal output is never an aligned verdict.
+
+Persistent terminal setup owns the new plan/model/auth options. `%policy` retains target-based setup and shared
+lifecycle controls; one-shot `evaluate -r` retains its conversation argument and three-way exit contract. Source-only
+feedback is deferred to B3; B1 does not claim allowed-action feedback in Codex context.
 
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set <target> --cascade` or
 `forge policy supervisor cascade on` routes checks through a cheap tier before the frontier. The direct toggle is
@@ -173,19 +205,21 @@ hook. When `policy.supervisor.shadow_sample_rate > 0`, a *fresh* (uncached) tier
 stable hash of `(shadow_seed, session, cache_key)` — no RNG, so it is reproducible and never depends on global state —
 and, if selected, **frozen** to `.forge/artifacts/<session>/shadow/<hash>.json` (capped at `shadow_max_per_session`).
 The candidate freezes the canonical action fingerprint and replay inputs plus a copy of the plan (`<hash>.plan.md`) and
-a routing snapshot, because the frontier builds its own prompt and reloads the plan at run time — the **capture/check
-split**. Capture runs no LLM, never blocks, and is fully inert at rate 0 (the directory is not even created). The
-frontier replay is a post-hoc **Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI
-startup spawns a detached `forge policy shadow run` worker (the memory-writer pattern) that claims each candidate
-atomically (`rename` to `.processing`, bounding frontier billing to at-most-once), reconstructs the full
-`ActionContext`/`SupervisorConfig`, runs the frontier, and classifies the verdict with the supervisor's **own** block
-bar: `agree` (frontier also aligned), `disagree` (frontier would have blocked — high-confidence, cited), `inconclusive`
-(divergent below the bar), or `error` (run failed or output unparseable, kept distinct from a real low-confidence
-`inconclusive`). It records the verdict and renames `.processing` → `.done`; it **never enforces**. Spend is a separate
-`supervisor-shadow` usage row (the worker is the sole emitter, re-rooted under the originating session). The read
-surface is `forge telemetry activity` (a Shadow line with checked/disagree/pending counts), `forge policy shadow show`
-(the disagreement artifacts with citations), and `forge policy shadow status` (the sample rate plus pending/done counts
-for one session).
+a schema-v5 routing snapshot: source kind/path/CWD/conversation UUID, explicit lane, model, effort, and auth policy.
+Replay verifies the full plan digest and passes those exact bytes to the frontier. Missing, older, newer, malformed, or
+unverifiable routes finalize as unavailable/error without inference; replay never supplies a paid default. Captures
+without an explicit model cannot prove identity and are unavailable on replay. This is the **capture/check split**.
+Capture runs no LLM, never blocks, and is fully inert at rate 0 (the directory is not even created). The frontier replay
+is a post-hoc **Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI startup spawns a
+detached `forge policy shadow run` worker (the memory-writer pattern) that claims each candidate atomically (`rename` to
+`.processing`, bounding frontier billing to at-most-once), reconstructs the full `ActionContext`/`SupervisorConfig`,
+runs the frontier, and classifies the verdict with the supervisor's **own** block bar: `agree` (frontier also aligned),
+`disagree` (frontier would have blocked — high-confidence, cited), `inconclusive` (divergent below the bar), or `error`
+(run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
+renames `.processing` → `.done`; it **never enforces**. Spend is a separate `supervisor-shadow` usage row (the worker is
+the sole emitter, re-rooted under the originating session). The read surface is `forge telemetry activity` (a Shadow
+line with checked/disagree/pending counts), `forge policy shadow show` (the disagreement artifacts with citations), and
+`forge policy shadow status` (the sample rate plus pending/done counts for one session).
 
 In sidecar mode, Stop discovers candidates through the mounted, container-visible Forge root. The queued marker keeps
 the host-resolvable worktree and manifest Forge-root paths because only the later host CLI drains it.
