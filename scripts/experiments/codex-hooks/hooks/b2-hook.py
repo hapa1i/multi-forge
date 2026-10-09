@@ -8,17 +8,31 @@ import os
 import signal
 import sys
 import time
+import traceback
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import TextIO
 
 
-def main() -> None:
-    control = json.loads(Path(os.environ["PROBE_CONTROL"]).read_text())
-    capture = Path(control["capture"])
-    capture.mkdir(parents=True, exist_ok=True)
-    event = sys.argv[1]
-    payload = json.load(sys.stdin)
-    name = f"{event}-{time.time_ns()}-{os.getpid()}"
-    (capture / f"{name}.stdin.json").write_text(json.dumps(payload, indent=2) + "\n")
+class CapturedOutput:
+    """Keep the exact response bytes while forwarding them to Codex."""
+
+    def __init__(self, output: TextIO, capture: TextIO) -> None:
+        self.output = output
+        self.capture = capture
+
+    def write(self, value: str) -> int:
+        self.capture.write(value)
+        self.capture.flush()
+        return self.output.write(value)
+
+    def flush(self) -> None:
+        self.output.flush()
+        self.capture.flush()
+
+
+def respond(event: str, payload: dict, control: dict, capture: Path, name: str) -> None:
+    """Emit one controlled hook response, including the real explicit-allow helper."""
     mode = control.get("mode", "observe")
     nonce = control.get("nonce", "")
     response: dict = {}
@@ -77,5 +91,33 @@ def main() -> None:
         print(json.dumps(response))
 
 
+def main() -> int:
+    control = json.loads(Path(os.environ["PROBE_CONTROL"]).read_text())
+    capture = Path(control["capture"])
+    capture.mkdir(parents=True, exist_ok=True)
+    event = sys.argv[1]
+    payload = json.load(sys.stdin)
+    name = f"{event}-{time.time_ns()}-{os.getpid()}"
+    (capture / f"{name}.stdin.json").write_text(json.dumps(payload, indent=2) + "\n")
+    returncode = None
+    with (capture / f"{name}.stdout").open("w") as stdout, (capture / f"{name}.stderr").open("w") as stderr:
+        with redirect_stdout(CapturedOutput(sys.stdout, stdout)), redirect_stderr(CapturedOutput(sys.stderr, stderr)):
+            try:
+                respond(event, payload, control, capture, name)
+                returncode = 0
+            except SystemExit as exc:
+                returncode = exc.code if isinstance(exc.code, int) else int(exc.code is not None)
+                if isinstance(exc.code, str):
+                    print(exc.code, file=sys.stderr)
+            except Exception:
+                traceback.print_exc()
+                returncode = 1
+            finally:
+                (capture / f"{name}.result.json").write_text(
+                    json.dumps({"returncode": returncode, "completed_at": time.time()}) + "\n"
+                )
+    return returncode
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

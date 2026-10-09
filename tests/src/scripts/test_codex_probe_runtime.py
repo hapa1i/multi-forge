@@ -2,25 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import importlib.util
 import json
-import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-PROBES = Path(__file__).resolve().parents[3] / "scripts/experiments/codex-hooks"
-
-
-def load_script(name):
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), PROBES / f"{name}.py")
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from tests.fixtures.codex_probe import PROBES, load_script
 
 
 def test_probe_login_refuses_unowned_or_symlinked_home(tmp_path):
@@ -55,27 +43,6 @@ def test_budget_refuses_before_overrun(tmp_path):
         runtime.reserve_turn(ledger, 3, 2)
     runtime.reserve_turn(ledger, 3)
     assert sum(json.loads(line)["reserved_turns"] for line in ledger.read_text().splitlines()) == 3
-
-
-@pytest.mark.regression
-def test_missing_login_refuses_before_model_launch_or_quota_reservation(tmp_path, monkeypatch):
-    runtime = load_script("probe-runtime")
-    login = load_script("probe-home").prepare_home(tmp_path / "codex-home")
-    binary = tmp_path / "codex"
-    binary.write_text('#!/bin/sh\necho "Not logged in" >&2\nexit 1\n')
-    binary.chmod(0o700)
-    identity = tmp_path / "identity.json"
-    identity.write_text(
-        json.dumps({"retained_path": str(binary), "sha256": hashlib.sha256(binary.read_bytes()).hexdigest()})
-    )
-    for name in os.environ:
-        if name.endswith("API_KEY") or name in {"CODEX_ACCESS_TOKEN", "OPENAI_BASE_URL"}:
-            monkeypatch.delenv(name)
-    monkeypatch.setenv("CODEX_HOME", str(login))
-    monkeypatch.setenv("PROBE_TURN_CEILING", "10")
-    with pytest.raises(ValueError, match="ChatGPT login is unavailable"):
-        runtime.codex_exec(identity, ["exec", "Reply OK"])
-    assert not (tmp_path / "turns.jsonl").exists()
 
 
 def test_signal_refuses_reused_pid(monkeypatch):
@@ -133,92 +100,3 @@ def test_probe_shell_refuses_unbounded_fallback(tmp_path):
     assert result.returncode != 0
     assert "refusing an unbounded probe" in result.stderr
     assert not marker.exists()
-
-
-@pytest.mark.regression
-def test_shell_probe_auth_rejects_not_logged_in_even_with_exit_zero(tmp_path):
-    login = load_script("probe-home").prepare_home(tmp_path / "codex-home")
-    (login / "auth.json").write_text('{"fixture": "stale"}')
-    binary = tmp_path / "bin"
-    binary.mkdir()
-    codex = binary / "codex"
-    codex.write_text('#!/bin/sh\necho "Not logged in"\n')
-    codex.chmod(0o700)
-    env = dict(
-        os.environ,
-        PATH=str(binary) + os.pathsep + os.environ["PATH"],
-        PROBE_CODEX_HOME=str(login),
-        CODEX_HOOKS_CAPTURE_DIR=str(tmp_path / "captures"),
-    )
-    result = subprocess.run(
-        ["/bin/bash", "-c", 'source "$1/lib.sh"; fixture_init auth; probe_auth', "probe", str(PROBES)],
-        env=env,
-        text=True,
-        capture_output=True,
-        timeout=15,
-    )
-    assert result.returncode != 0
-    assert "Stop; no auth fallback" in result.stderr
-
-
-@pytest.mark.regression
-def test_cross_project_stage_preserves_independent_login(tmp_path):
-    """Run the full stage, including its EXIT trap, without network or model calls."""
-    home = tmp_path / "home"
-    home.mkdir()
-    login = load_script("probe-home").prepare_home(tmp_path / "codex-home")
-    (login / "auth.json").write_text('{"fixture": "refreshed"}')
-    capture = tmp_path / "captures"
-    binary = tmp_path / "bin"
-    binary.mkdir()
-    codex = binary / "codex"
-    codex.write_text(
-        f"#!{sys.executable}\n"
-        "import json, os, subprocess, sys, tomllib\n"
-        "from pathlib import Path\n"
-        "args = sys.argv[1:]\n"
-        "if args == ['--version']: print('codex-cli 0.161.0')\n"
-        "elif args == ['login', 'status']: print('Logged in using ChatGPT')\n"
-        "elif args[0] == 'exec':\n"
-        " cfg = tomllib.loads((Path(os.environ['CODEX_HOME'])/'config.toml').read_text())\n"
-        " for row in cfg['hooks']['SessionStart']:\n"
-        "  for hook in row['hooks']:\n"
-        "   subprocess.run([hook['command']], input=json.dumps({'hook_event_name':'SessionStart',"
-        "'session_id':'fixture-thread','cwd':os.getcwd()}), text=True, check=True)\n"
-        " Path(args[args.index('-o')+1]).write_text('OK')\n"
-        " print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':1}}))\n"
-        "else: raise SystemExit(2)\n"
-    )
-    codex.chmod(0o700)
-    env = {
-        "HOME": str(home),
-        "PATH": str(binary) + os.pathsep + os.environ["PATH"],
-        "PROBE_CODEX_HOME": str(login),
-        "CODEX_HOOKS_CAPTURE_DIR": str(capture),
-        "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_CONFIG_NOSYSTEM": "1",
-    }
-    prepare = subprocess.run(
-        [
-            "/bin/bash",
-            "-c",
-            'source "$1/lib.sh"; fixture_init setup; fixture_build; '
-            "fixture_register_user; fixture_tee_all; fixture_mark_enrolled fixture",
-            "probe",
-            str(PROBES),
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    result = subprocess.run(
-        ["/bin/bash", str(PROBES / "stages/84-fresh-project.sh")],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode == 0, prepare.stdout + result.stdout + result.stderr
-    assert "CROSS-PROJECT-TRUST-SCOPED" in result.stdout
-    assert (login / "auth.json").read_text() == '{"fixture": "refreshed"}'

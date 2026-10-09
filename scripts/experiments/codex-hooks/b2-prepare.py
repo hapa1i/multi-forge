@@ -39,9 +39,6 @@ def prepare(root: Path) -> None:
         check=True,
     )
     login_home = Path(os.environ["CODEX_HOME"])
-    stale_json = login_home / "hooks.json"
-    if stale_json.exists():
-        stale_json.rename(root / "captures/80-enroll-fixture/meta/baseline-hooks.json")
     forge = checkout / ".venv/bin/forge"
     subprocess.run(
         [
@@ -100,6 +97,8 @@ def prepare(root: Path) -> None:
     launcher = root / "run"
     text = launcher.read_text().replace(
         '  "$@"',
+        "  PROBE_LAUNCHER=" + shlex.quote(str(launcher)) + " \\\n"
+        "  PROBE_ROUND_ROOT=" + shlex.quote(str(root)) + " \\\n"
         "  PROBE_CONTROL=" + shlex.quote(str(control)) + " \\\n"
         "  PYTHONPATH=" + shlex.quote(str(scripts / "instrumentation")) + " \\\n"
         "  GIT_CONFIG_GLOBAL=/dev/null \\\n"

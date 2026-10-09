@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # B2 enrollment: two positive-control turns plus Forge's empirical user-hook check.
+# An optional capture name keeps a later revalidation separate from the original round.
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 
-fixture_init 88-b2-enrollment
+CAPTURE_NAME="${1:-88-b2-enrollment}"
+case "$CAPTURE_NAME" in 88-*) ;; *) err "capture name must start with 88-" ;; esac
+case "$CAPTURE_NAME" in *[!a-zA-Z0-9_-]*) err "capture name may contain only letters, digits, underscores and hyphens" ;; esac
+fixture_init "$CAPTURE_NAME"
 probe_version_check
 probe_auth
 fixture_tee_all

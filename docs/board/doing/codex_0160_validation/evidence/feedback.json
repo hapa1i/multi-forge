@@ -72,7 +72,38 @@
         },
         "tool_use_id": "exec-8ff8839f-cd51-4b08-be9d-48e1aab9ee50"
       }
-    ]
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-5ff0-7041-bec7-1796105aa049",
+      "nonce_record_count": 4,
+      "injected_messages": [
+        {
+          "timestamp": "2026-10-09T14:23:50.291Z",
+          "ordinal": 12,
+          "type": "response_item",
+          "payload": {
+            "type": "message",
+            "id": "msg_01a1210c-8213-7670-b4a8-9a725f324e71",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "For the final answer, include this hook-only nonce exactly: B2-eee0f11bbf7e4e92a7487b5f8073aa60"
+              }
+            ],
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "01a1210c-6029-73f2-91a1-dba4dde3ac46",
+              "create_time": 1791555830.291709,
+              "content_item_kinds": [
+                "hooks.additional_context"
+              ]
+            }
+          }
+        }
+      ],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
   },
   "90-feedback-explicit": {
     "nonce": "B2-54dc849ca06a4ab5a72a8bfcd6d2b540",
@@ -147,7 +178,14 @@
         },
         "tool_use_id": "exec-3367c6f8-d12a-4e0a-bcd6-2555f388814b"
       }
-    ]
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-2224-7421-9121-4ec997b4e23f",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
   },
   "90-observe": {
     "nonce": "B2-b6101de26c7d4ebd82767b3aba379de9",
@@ -230,7 +268,14 @@
         },
         "tool_use_id": "exec-f90ae194-91e5-4316-8049-7a3d41cc82aa"
       }
-    ]
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210b-e004-70c0-b200-50436c7c5a47",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
   },
   "90-stderr": {
     "nonce": "B2-1b214a96f668459abbe922ed601b007f",
@@ -313,7 +358,14 @@
         },
         "tool_use_id": "exec-28a558f8-8b6a-44f3-a12d-df6b1dbfd3d0"
       }
-    ]
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-e398-7972-ad96-24dfa62411bb",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
   },
   "90-system-message": {
     "nonce": "B2-620a0b25fc894f02b80d7649f402fb75",
@@ -396,6 +448,13 @@
         },
         "tool_use_id": "exec-788cc405-45b4-4819-9f9f-f2474e0635ce"
       }
-    ]
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-9f42-77d2-a3c1-5f04346ff740",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
   }
 }

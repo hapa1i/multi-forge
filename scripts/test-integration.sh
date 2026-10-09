@@ -6,6 +6,8 @@
 #   ./scripts/test-integration.sh -k test_proxy       # Filter by keyword
 #   ./scripts/test-integration.sh tests/integration/  # Specific directory
 #   ./scripts/test-integration.sh -v --tb=short       # With pytest flags
+#   PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh <path>  # Do not source .env
+# This switch preserves inherited environment variables; it does not isolate credentials.
 
 set -euo pipefail
 
@@ -42,7 +44,7 @@ find_repo_root() {
 REPO_ROOT="$(find_repo_root)"
 cd "$REPO_ROOT"
 
-# Load environment variables (secrets only: API keys, workspace ID)
+# Match python-dotenv's opt-out for the shell's own .env loading too.
 if [[ "${PYTHON_DOTENV_DISABLED:-0}" != "1" && -f ".env" ]]; then
     # shellcheck disable=SC1091
     source .env

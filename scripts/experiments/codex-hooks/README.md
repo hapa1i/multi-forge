@@ -11,20 +11,28 @@ itself a doc-claim).
 ## B2 round (2026-10-09, Codex 0.161.0)
 
 The [B2 results](../../../docs/board/doing/codex_0160_validation/evidence/README.md) record the retained binary,
-subscription posture, commands, limitations, and B3/B4/B5 handoffs. This round supplements stages 85–87 with the current
-absolute `forge-hook` dispatcher; those historical stages register older direct commands.
+subscription posture, commands, limitations, and B3/B4/B5 handoffs. Cases 88/89/91/92/97 exercise the current absolute
+`forge-hook` dispatcher; historical stages 85–87 register older direct commands.
 
 Use a private round root with a retained **complete** Codex package, `identity.json`, `stub-bin/codex`, and a clean
 `run` launcher. The identity file supplies `retained_path`, `sha256`, `version`, and `model`. The Codex shim invokes
 `probe-runtime.py codex --identity <identity.json> -- "$@"`. The launcher must use `env -i`, the fixture homes,
 `FORGE_DEV=<checkout>`, `PYTHON_DOTENV_DISABLED=1`, `PROBE_RUNTIME_IDENTITY`, and `PROBE_TURN_CEILING`; put the shim and
-checkout `.venv/bin` first on PATH. Do not pass API credentials. The round's sanitized environment and exact command
-records are linked from its evidence.
+checkout `.venv/bin` first on PATH. Export `PROBE_LAUNCHER=<absolute path to run>` and `PROBE_ROUND_ROOT=<round-root>`
+inside that launcher. Operator commands use the same launcher to retain its budget and auth environment in a second
+terminal. The sanitizer replaces `PROBE_ROUND_ROOT` literally, including punctuation in its path. Do not pass API
+credentials. The round's sanitized environment and exact command records are linked from its evidence.
 
 Create the independent login with `probe-home.py`; log in once using this launcher. Run baseline selectors
 `00 05 10 60 61`, then `b2-prepare.py <round-root>`. It creates the admitted local Claude stub and stable response
 hooks. Complete the interactive project/hook trust ceremony in that fixture; run `88`, then `81 84`. Preparation is
 one-shot and refuses to erase existing enrollment. The retained package and credential store survive every stage.
+
+Baseline stages reset `config.toml` to the file-login/hooks base and remove `hooks.json` before registering their own
+hooks. They refuse while `captures/fixture/ENROLLED` exists, before changing captures, control state or configuration.
+An explicit `PROBE_RESET_ENROLLED=1` permits the reset and removes the enrollment marker. Fixture stages require
+enrollment again afterward. B2's one-shot preparer still refuses an already prepared round; use a new round root and
+independent login for another B2 baseline. Neither reset path removes or copies `auth.json`.
 
 Run the Python drivers through the same clean launcher, sequentially:
 
@@ -54,6 +62,19 @@ Never load that arm into ordinary product-deadline checks.
 Budget reservations include failed launches, subagents, Stop continuation, and every advisory enrollment check. A real
 Claude reviewer is not part of this round: the stub passes admission and records entry before responding or sleeping.
 The 100-turn ceiling is conservative reservation accounting, not a claim about a provider's billed turn count.
+
+For a revalidation, pass a separate `88-...` capture name to `stages/88-b2-enrollment.sh <name>` and use
+`b2-interactive.py <root> start --session <new-session> --capture-name <name>`. Keep the original fixture paths and
+trusted command strings. The custom response helper now retains each invocation's stdout, stderr and result beside its
+stdin; a missing result is not a successful response.
+
+`export-evidence.py <frozen-inputs> <new-output-directory>` reproduces the October 9 publication with explicit
+supplements. Use Python 3.13 for its retained bytecode comparison. The private inputs preserve the relative paths and
+bytes identified by `source-hashes.json`, plus the feedback rollouts, product/lifetime output files, original helper
+sources, cached `sitecustomize` bytecode, and `publication.json`. The sanitized input manifest and filtering rules are
+in the round's `export-selection.json`. The exporter refuses an existing output directory. It retains the original run
+identities and records drift against the initial published commit; later runtime rechecks are separate evidence. Keep
+commit `85359aed` available locally for the exporter's Git comparison.
 
 ## Facts under test
 

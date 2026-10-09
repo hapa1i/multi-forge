@@ -70,6 +70,12 @@ the patch run but did not deliver their nonce. This response delivered the hook-
 model answer, headless event output, or inspected TUI/warnings. These observations are channel-specific; B2 does not
 change product feedback. Keep the authority guard when considering a narrower matcher.
 
+The retained native rollouts independently support this distinction: bare context injected a developer-role message
+tagged `hooks.additional_context`; the explicit-allow, observe, `systemMessage` and stderr nonces occur zero times.
+[Feedback evidence](feedback.json) records the checks and injected message. The original custom-hook stdout, stderr and
+exit status were not captured. Offline replay passes all five response arms and their helper hashes match the runs, but
+it cannot establish the historical exit status. The corrected harness captures those outputs for future probes.
+
 **E5.** The model used code-mode tool calls. Actual hook names were `Bash`, `apply_patch`, `mcp__b2__echo`,
 `collaborationspawn_agent`, and `collaborationwait_agent`. Shell polling called `write_stdin` but produced no separate
 PreToolUse payload. MCP initially reached the hook but failed tool approval; marking the local echo read-only gave a
@@ -80,7 +86,7 @@ rule can be inferred. The spawn message field was opaque encrypted content; only
 Dispatcher replay wall time includes instrumentation and process startup, excludes executor/model latency, and uses five
 samples per tool in each condition. Supervision-off medians were 538–548 ms. Supervision-on non-patch medians were
 531–550 ms with **zero** reviewer entries. The five patch samples had four stub calls and one verdict-cache hit:
-uncached samples were about 686–693 ms; the cache hit was 539 ms. A separate cold-admission sample was 1,285 ms and its
+uncached samples were about 684–693 ms; the cache hit was 539 ms. A separate cold-admission sample was 1,285 ms and its
 warm verdict-cache control was 697 ms; [dispatcher samples](dispatcher-timings.json) retain both. These small samples
 are not production latency percentiles.
 
@@ -99,9 +105,12 @@ delayed completion left neither a completion marker nor a surviving child; the e
 established. Background results cannot enforce an already executed action.
 
 The Stop control emitted `FIRST`, then `SECOND` after exactly one block. Both Stop payloads had the same thread and turn
-IDs; `stop_hook_active` changed false to true. The stream contained one user prompt, one turn start, and one turn
-completion. B4 can use those observed markers for idempotence, but must still handle edits after its reviewed snapshot.
-A no-block control emitted only one Stop.
+IDs; `stop_hook_active` changed false to true. There was one `UserPromptSubmit`, one turn start, and one turn
+completion. The block reason also entered the native context as a **user-role** message wrapped in
+`<hook_prompt hook_run_id="stop:22:<fixture-config-path>">`. That is a hook-generated continuation with user authority,
+not a second operator submission. B4 should retain this marker and control the reason text it supplies. This one case
+does not establish `hook_run_id` uniqueness or stability across retries or launches; an idempotency rule needs those
+checks and must handle edits after its reviewed snapshot. A no-block control emitted only one Stop.
 
 **B5 / E7–E9.**
 `codex exec --json --sandbox read-only -C <action> fork --ephemeral --output-schema <schema> <source> <prompt>` returned

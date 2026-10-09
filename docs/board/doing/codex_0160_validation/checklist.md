@@ -221,19 +221,19 @@ positive control, result, and sanitized capture reference. Use `pass`, `fail`, `
 exit status separately. The [results matrix](evidence/README.md#results-and-downstream-decisions) links the retained
 artifacts for every row. E1 combines explicit Forge preflight/enrollment/usage assertions with the listed stages.
 
-| ID  | Area                | Fixture / control                            | Observable assertion                        | Evidence owner                               |
-| --- | ------------------- | -------------------------------------------- | ------------------------------------------- | -------------------------------------------- |
-| E1  | Existing paths      | Enrolled/untrusted homes; allow/deny         | Readiness, receipt, usage, hook/resume      | Forge checks; stages 00/05/10/60/61/81/84-87 |
-| E2  | Allowed warnings    | Three response arms; unique nonces           | Action executes; model consumes context     | 90 feedback captures                         |
-| E3  | Operator warnings   | UI/events; no-message control                | `systemMessage` and stderr visibility       | 90 + 97 TUI captures                         |
-| E4  | Hook timeout        | 60-second expiry; earlier deadline           | Tool outcome, child cleanup, attempt state  | 95 lifetime captures                         |
-| E5  | Catch-all cost      | Tool matrix; supervision off/on              | Counts, latency, zero skipped-review calls  | 93 coverage captures                         |
-| E6  | Background          | Live/finished/cancelled turns                | Delivery ordering and next-turn behavior    | 96 + 97 background captures                  |
-| E7  | Planning fork       | Source-only nonce; quiescent parent          | Context, schema, identity, unchanged source | 94 fork captures                             |
-| E8  | Shared source       | Plan/implementation sentinels; active source | Inherited boundary and concurrency limits   | 94 fork captures                             |
-| E9  | Read-only/recursion | Different checkouts; write control           | Correct read, blocked write, bounded calls  | 94 fork captures                             |
-| E10 | Plan events         | Multiple updates; independent approval       | Complete payloads and observed IDs          | 93 coverage captures                         |
-| E11 | Stop continuation   | Block once; no-block control                 | Continuation markers and repeat counts      | 81 Stop capture                              |
+| ID  | Area                | Fixture / control                            | Observable assertion                        | Evidence owner                                           |
+| --- | ------------------- | -------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| E1  | Existing paths      | Enrolled/untrusted homes; allow/deny         | Readiness, receipt, usage, hook/resume      | Forge checks; stages 00/05/10/60/61/81/84/88/89/91/92/97 |
+| E2  | Allowed warnings    | Three response arms; unique nonces           | Action executes; model consumes context     | 90 feedback captures                                     |
+| E3  | Operator warnings   | UI/events; no-message control                | `systemMessage` and stderr visibility       | 90 + 97 TUI captures                                     |
+| E4  | Hook timeout        | 60-second expiry; earlier deadline           | Tool outcome, child cleanup, attempt state  | 95 lifetime captures                                     |
+| E5  | Catch-all cost      | Tool matrix; supervision off/on              | Counts, latency, zero skipped-review calls  | 93 coverage captures                                     |
+| E6  | Background          | Live/finished/cancelled turns                | Delivery ordering and next-turn behavior    | 96 + 97 background captures                              |
+| E7  | Planning fork       | Source-only nonce; quiescent parent          | Context, schema, identity, unchanged source | 94 fork captures                                         |
+| E8  | Shared source       | Plan/implementation sentinels; active source | Inherited boundary and concurrency limits   | 94 fork captures                                         |
+| E9  | Read-only/recursion | Different checkouts; write control           | Correct read, blocked write, bounded calls  | 94 fork captures                                         |
+| E10 | Plan events         | Multiple updates; independent approval       | Complete payloads and observed IDs          | 93 coverage captures                                     |
+| E11 | Stop continuation   | Block once; no-block control                 | Continuation markers and repeat counts      | 81 Stop capture                                          |
 
 ## 6. Record results and apply the compatibility decision
 
@@ -278,7 +278,8 @@ artifacts for every row. E1 combines explicit Forge preflight/enrollment/usage a
   and all non-passing outcomes. Verify Markdown, size, repository links, and working/staged diff checks.
 - [ ] After PR review/merge, record merge coordinates and completed work in the changelog. Promote implementation notes
   only after human review. Move B2 to `done/` after verification and closeout, repoint inbound links, and leave the epic
-  active.
+  active. Explicitly update the evidence path in the `src/forge/core/runtime/codex_preflight.py` comment and the B2
+  evidence link in `docs/design_session_execution.md` §I.3; the Markdown link check does not inspect Python comments.
 - [x] Verify the fixture process sweep is empty. Record the host-check limitation: no whole-round host-file hash
   baseline was captured, so byte-for-byte equality is unverified. Commands used isolated homes and did not copy host
   auth. Remove only the fixture-owned login store at final teardown; do not restore a stale auth copy or run host
@@ -311,3 +312,10 @@ auth mutation was performed during this correction.
 integration's empty-home fixture were corrected; failed attempts are retained separately. TUI driver and concurrency
 detector failures were rerun with completed controls. B3–B5 have explicit measured handoffs and remain proposed. Final
 test, wheel, cleanup, and PR details are in [validation.md](evidence/validation.md). B2 stays active until merge.
+
+2026-10-10 review follow-up: protected enrolled fixtures from baseline resets, retained custom-hook response outcomes,
+fixed second-terminal environment and path redaction, moved auth regressions into the regression suite, and published
+the missing helper sources, export selection and source-drift audit. Native feedback and Stop handoffs now describe the
+observed message roles and evidence limits. Validation: 10,600 unit tests, 1,400 regression tests, 98 focused checks and
+32 policy integration tests pass. Fresh committed-harness 88/97 captures await an independent fixture login; no new
+model turn has been launched. See [the review validation record](evidence/validation.md#review-follow-up-2026-10-10).

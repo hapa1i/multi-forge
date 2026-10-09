@@ -33,7 +33,59 @@ validation metadata, with general ceiling 0.161.0. The first artifact inspection
 the corrected check reads the wheel's actual `_extensions/skills/qa` package path.
 
 The [private follow-up helper sources](helper-sources.json) retain the exact concurrent/tool retries, cold replay, real
-integration wrapper, and wheel inspection commands with path placeholders.
+integration wrapper, wheel inspection, original exporter, teardown and stub-admission commands with path placeholders.
+
+## Harness and publication provenance
+
+The harness committed in `85359aed` post-dates the live round. None of the 19 recorded whole-harness snapshots matches
+that committed tree. Every recorded 97 case used an earlier `b2-terminal.py`; the relevant 89–96 cases used earlier
+`b2-run.py`/`b2-forks.py`. The committed `sitecustomize.py` hash appears in no run. Comparing the retained Python 3.13
+cache with that committed source finds identical normalized executable code after excluding filename/line positions.
+This establishes equivalence for that cached module only. Older terminal/run/fork source bodies were not retained, so
+their behavioral equivalence is unverified. [The drift audit](harness-drift.json) gives the hashes and case mapping.
+
+The original `export.py` omitted product directories containing `failure`, `missing-login` or `env-`, and TUI
+directories containing `failure`. [The selection record](export-selection.json) lists them explicitly. Available
+command/process records remain in `provenance.json`, and the results page describes their disposition. These filtered
+attempts are not successful observations or negative hook-delivery evidence.
+
+The original ad hoc commands that added `product.json.file_contents` and the first four helper sources were not
+retained. The committed [exporter](../../../../../scripts/experiments/codex-hooks/export-evidence.py) reconstructs those
+steps and includes all seven historical helpers, the native feedback checks, selection rules and drift audit. Its
+private frozen inputs were copied only after all 480 original source hashes matched; no credentials were copied. It
+reproduced all 13 unaffected original artifacts byte-for-byte, including `product.json`, the original provenance and all
+19 snapshots. New source hashes cover the supplementary inputs. Historical run identities remain unchanged.
+
+Reproduce with Python 3.13:
+
+```bash
+python scripts/experiments/codex-hooks/export-evidence.py \
+  <round-root>/review-20261010/historical/export-inputs <new-output-directory>
+```
+
+The corrected harness preserves auth while refusing destructive baseline reruns after enrollment, captures custom-hook
+stdout/stderr/result, and uses the clean launcher for second-terminal trust commands. The three existing auth
+regressions now live in `tests/regression/`, alongside the new reset, environment and redaction regressions.
+
+## Review follow-up, 2026-10-10
+
+| Check                                                         | Result                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `make test-unit`                                              | 10,600 passed; 117 deselected                                                            |
+| `make test-regression`                                        | 1,400 passed, including the relocated auth regressions                                   |
+| Focused harness regressions, preflight and QA contract checks | 98 passed                                                                                |
+| Selected policy Docker/CLI integrations listed above          | 32 passed; no model calls                                                                |
+| `make pre-commit`                                             | Passed after Markdown formatting                                                         |
+| Frozen-input export                                           | 13 unaffected original artifacts reproduced byte-for-byte; helper/source hashes verified |
+
+The first focused run caught incorrect literal `|` handling in the new round-root substitution. The corrected sanitizer
+passes cases containing regex metacharacters and its substitution delimiter. The lower unit count reflects the three
+auth tests moving to the regression suite.
+
+A fresh stage 88 and one 97 TUI case on the corrected committed harness remain **pending** the operator's independent
+fixture login. Teardown removed that login, and the operator was asked to restore it. No live turn was launched for this
+follow-up; the original reservation ledger remains **95/100**. These reruns must use separate capture names and record
+their own committed revision. The historical source-drift qualification above remains in force.
 
 The [results](README.md#non-passing-attempts-and-repairs) retain setup, auth, terminal-driver and concurrency failures.
 No failed turn counts as negative delivery evidence. Raw artifacts stay in the private round directory; sanitized

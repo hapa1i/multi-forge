@@ -13,9 +13,7 @@
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 
-probe_init 40-trust --persistent-home
-printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n' >"$CODEX_HOME/config.toml"
-rm -f "$CODEX_HOME/hooks.json"
+probe_init 40-trust
 probe_version_check
 probe_auth
 

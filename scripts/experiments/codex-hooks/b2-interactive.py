@@ -17,11 +17,17 @@ def main() -> int:
     parser.add_argument("root", type=Path)
     parser.add_argument("case", choices=("start", "resume", "background", "context"))
     parser.add_argument("--session", default="b2-tui")
+    parser.add_argument("--capture-name", help="Separate capture directory name for a revalidation.")
     args = parser.parse_args()
     scripts = Path(__file__).resolve().parent
     harness = runpy.run_path(str(scripts / "b2-run.py"))
     round_ = harness["Round"](args.root.resolve())
-    capture = round_.root / "captures" / ("97-tui-" + args.case)
+    capture_name = args.capture_name or "97-tui-" + args.case
+    if Path(capture_name).name != capture_name or capture_name in {".", ".."}:
+        parser.error("--capture-name must be a directory name, without parent paths")
+    capture = round_.root / "captures" / capture_name
+    if capture.exists():
+        parser.error(f"Capture already exists: {capture}; choose a new name to retain prior evidence.")
     mode = {"start": "system-message", "resume": "stderr", "background": "background", "context": "observe"}[args.case]
     Path(os.environ["PROBE_CONTROL"]).write_text(
         json.dumps(

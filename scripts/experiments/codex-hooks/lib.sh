@@ -46,6 +46,13 @@ probe_home() {
     python3 "$LIB_DIR/probe-home.py" "$CODEX_HOME" || err "unsafe Codex probe home"
 }
 
+probe_reset_config() {
+    # Unlink first so an owned home's symlink cannot redirect the reset elsewhere.
+    rm -f "$CODEX_HOME/config.toml" "$CODEX_HOME/hooks.json" || err "cannot reset probe hook configuration"
+    printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n' >"$CODEX_HOME/config.toml" ||
+        err "cannot write base probe configuration"
+}
+
 prepare_capture() {
     if [ -d "$PROBE_CAPTURE_DIR" ]; then
         mkdir -p "$CAPTURE_ROOT/archive"
@@ -63,7 +70,7 @@ PY
     fi
 }
 
-probe_init() { # probe_init <stage-name> [--persistent-home]
+probe_init() { # probe_init <stage-name>
     local stage="${1:?stage name}"
 
     command -v codex >/dev/null 2>&1 || err "codex is not on PATH."
@@ -78,6 +85,14 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
     export CAPTURE_ROOT
     PROBE_CAPTURE_DIR="$CAPTURE_ROOT/$stage"
     export PROBE_CAPTURE_DIR
+    local enrollment="$CAPTURE_ROOT/fixture/ENROLLED"
+    if [ -f "$enrollment" ] && [ "${PROBE_RESET_ENROLLED:-0}" != "1" ]; then
+        err "fixture is enrolled; use another capture/login home, or set PROBE_RESET_ENROLLED=1 and enroll again afterward."
+    fi
+    probe_home
+    # Baseline stages share credentials, but must not inherit each other's hooks.
+    rm -f "$enrollment" || err "cannot invalidate fixture enrollment"
+    probe_reset_config
     # Archive prior attempts so neither stale payloads nor lost failures affect results.
     prepare_capture
 
@@ -85,10 +100,6 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
     export PROBE_ROOT
     # shellcheck disable=SC2064  # expand PROBE_ROOT now: the trap must remove THIS tree
     trap "rm -rf '$PROBE_ROOT'" EXIT
-
-    # Credentials survive project teardown and refresh in one place. Callers run
-    # baseline/config probes before enrollment, or use another independent login.
-    probe_home
 
     PROJ="$PROBE_ROOT/proj"
     export PROJ
@@ -308,13 +319,25 @@ prepare_product_project() { # prepare_product_project <path> <title>
     ) || err "product project git init failed: $dir"
 }
 
+product_trust_command() { # product_trust_command <project-path>
+    case "${PROBE_LAUNCHER:-}" in
+        /*) [ -x "$PROBE_LAUNCHER" ] || err "PROBE_LAUNCHER must name an executable clean round launcher." ;;
+        *) err "Set PROBE_LAUNCHER to the absolute clean round launcher; the operator terminal needs its auth and budget guards." ;;
+    esac
+    # The launcher may change cwd and owns the complete stripped environment.
+    printf '%q env %q %q %q /bin/bash -c %q probe %q' \
+        "$PROBE_LAUNCHER" "FORGE_DEV=$REPO_ROOT" "CODEX_HOME=$CODEX_HOME" "FORGE_HOME=$FORGE_HOME" \
+        'cd "$1" && exec codex' "${1:?project path}"
+}
+
 guided_product_trust() { # guided_product_trust <stage> <project-path> <hook-summary>
     local stage="${1:?stage}" project="${2:?project}" hook_summary="${3:?hook summary}"
     if [ ! -t 0 ]; then
         err "stage $stage needs a TTY for the product-hook trust ceremony."
     fi
-    local project_real
+    local project_real launch_command
     project_real="$(cd "$project" && pwd -P)"
+    launch_command="$(product_trust_command "$project_real")" || err "cannot construct the operator command"
     cat <<EOI
 
   ================= OPERATOR STEP ($stage -- product hook trust) =================
@@ -324,7 +347,7 @@ guided_product_trust() { # guided_product_trust <stage> <project-path> <hook-sum
 
   In ANOTHER terminal, run EXACTLY:
 
-    cd "$project_real" && FORGE_DEV="$REPO_ROOT" CODEX_HOME="$CODEX_HOME" FORGE_HOME="$FORGE_HOME" "$(command -v codex)"
+    $launch_command
 
   In the TUI:
     1. Accept project/folder trust if shown.
@@ -349,7 +372,7 @@ fixture_build() {
     rm -rf "$FIXTURE_ROOT"
     mkdir -p "$CODEX_HOME" "$HOOKBIN"
     chmod 700 "$CODEX_HOME"
-    printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n' >"$CODEX_HOME/config.toml"
+    probe_reset_config
     mkdir -p "$PROJ"
     (cd "$PROJ" &&
         git init -q &&

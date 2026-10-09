@@ -1,0 +1,42 @@
+{
+  "excluded_product_or_tui_directories": [
+    "97-tui-background-driver-failure",
+    "97-tui-context-driver-failure",
+    "97-tui-resume-driver-failure",
+    "97-tui-resume-unreconciled-failure",
+    "97-tui-start-corrected-failure",
+    "97-tui-start-driver-failure",
+    "97-tui-start-foreground-failure",
+    "97-tui-start-input-failure",
+    "97-tui-start-terminal-failure"
+  ],
+  "selection": "Original export.py omitted product directories containing failure, missing-login or env-, and TUI directories containing failure. Their command/process records remain in provenance.json when captured; README.md records the non-passing attempts.",
+  "publication_supplements": "The original ad hoc commands adding product.file_contents and the four helper sources were not retained. This exporter reconstructs those steps from the retained bytes and publishes all seven helpers.",
+  "inputs": "Frozen original source-hashes.json inputs, the five feedback rollouts, product file contents, historical helper sources and publication.json; no auth store is copied.",
+  "published_revision": "85359aedf0350717179a0dd7f4cd281483e77cf8",
+  "input_manifest": {
+    "source_root": "<ROUND_ROOT>",
+    "checkout": "<CHECKOUT>",
+    "home": "<HOME>",
+    "published_revision": "85359aedf0350717179a0dd7f4cd281483e77cf8",
+    "file_contents": [
+      "src/paired_b2.py",
+      "tests/test_paired_b2.py",
+      "src/absent_b2.py",
+      "updated_b2.txt",
+      "malformed_b2.txt",
+      "supervised_b2.txt",
+      "producer_b2.txt",
+      "unmarked_b2.txt"
+    ],
+    "helpers": [
+      "followup.py",
+      "cold.py",
+      "integration.py",
+      "wheel-check.py",
+      "export.py",
+      "close-fixture.py",
+      "validate-stub.py"
+    ]
+  }
+}

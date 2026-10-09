@@ -36,6 +36,11 @@ USER_NAME="$(whoami)"
 # sed, leaving the real username in "sanitized" output.
 SED="$(command -v gsed || command -v sed)"
 GREP="$(command -v ggrep || command -v grep)"
+ROUND_RULE=""
+if [ -n "${PROBE_ROUND_ROOT:-}" ]; then
+    ROUND_PATTERN="$(python3 -c 'import re, sys; print(re.escape(sys.argv[1]).replace("@", r"\@"))' "$PROBE_ROUND_ROOT")"
+    ROUND_RULE="s@$ROUND_PATTERN@<ROUND_ROOT>@g"
+fi
 
 find "$CAPTURE_ROOT" -type f \
     -not -path "$OUT/*" \
@@ -46,10 +51,10 @@ find "$CAPTURE_ROOT" -type f \
     dest="$OUT/$rel"
     mkdir -p "$(dirname "$dest")"
     "$SED" -E \
+        -e "$ROUND_RULE" \
         -e "s|/private/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/tmp/tmp[A-Za-z0-9._-]*|<PROBE_ROOT>|g" \
-        -e 's|/private/tmp/forge-b2-[0-9]+|<ROUND_ROOT>|g' \
         -e "s|$HOME|<HOME>|g" \
         -e "s|\b$USER_NAME\b|<USER>|g" \
         "$f" >"$dest"

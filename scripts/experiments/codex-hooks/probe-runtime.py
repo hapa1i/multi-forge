@@ -203,6 +203,14 @@ def reserve_turn(ledger: Path, ceiling: int, count: int = 1) -> None:
         stream.flush()
 
 
+def required_environment(name: str) -> str:
+    """Refuse an incomplete second-terminal environment before launching Codex."""
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"Set {name} in the clean round launcher and run this command through that launcher.")
+    return value
+
+
 def codex_exec(identity_path: Path, argv: list[str]) -> None:
     """Use only the retained binary and file login; count execution entry points."""
     if any(
@@ -210,7 +218,7 @@ def codex_exec(identity_path: Path, argv: list[str]) -> None:
         for name, value in os.environ.items()
     ):
         raise ValueError("Remove API credentials and provider overrides before running subscription probes.")
-    login_home = Path(os.environ["CODEX_HOME"])
+    login_home = Path(required_environment("CODEX_HOME"))
     if (
         login_home.resolve() == (Path.home() / ".codex").resolve()
         or not (login_home / ".forge-codex-probe-home").is_file()
@@ -223,6 +231,13 @@ def codex_exec(identity_path: Path, argv: list[str]) -> None:
         raise ValueError("Retained Codex binary changed; start a new recorded round.")
     read_only = bool(argv) and argv[0] in {"login", "features", "doctor", "completion", "debug", "mcp"}
     if not read_only and not any(flag in argv for flag in ("--help", "-h", "--version", "-V")):
+        budget = required_environment("PROBE_TURN_CEILING")
+        try:
+            ceiling = int(budget)
+        except ValueError as exc:
+            raise ValueError("PROBE_TURN_CEILING must be a positive integer in the clean round launcher.") from exc
+        if ceiling < 1:
+            raise ValueError("PROBE_TURN_CEILING must be a positive integer in the clean round launcher.")
         status = subprocess.run(
             [str(binary), "-c", 'cli_auth_credentials_store="file"', "login", "status"],
             capture_output=True,
@@ -233,7 +248,7 @@ def codex_exec(identity_path: Path, argv: list[str]) -> None:
             raise ValueError("Independent ChatGPT login is unavailable; stop probes and restore that login.")
         reserve_turn(
             identity_path.parent / "turns.jsonl",
-            int(os.environ["PROBE_TURN_CEILING"]),
+            ceiling,
             int(os.environ.get("PROBE_TURN_RESERVATION", "1")),
         )
     register_process()
