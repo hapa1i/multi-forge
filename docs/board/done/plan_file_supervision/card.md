@@ -1,7 +1,7 @@
 # Plan-file supervision with a fresh `claude -p`
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
-prerequisite; [B2](../../doing/codex_0160_validation/card.md) can proceed alongside it. The
+prerequisite; [B2](../../done/codex_0160_validation/card.md) can proceed alongside it. The
 [session](../../done/partition_session_design/card.md) and [runtime](../../done/partition_runtime_design/card.md) design
 partitions precede B1's normative documentation updates.
 

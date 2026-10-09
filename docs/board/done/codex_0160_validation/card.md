@@ -1,20 +1,23 @@
 # Codex runtime test round
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
 [B1](../../done/plan_file_supervision/card.md) has shipped; this card supplies broader runtime evidence for B3, B4 and
-B5. Selected 2026-10-08 on `test/codex-0160-validation`; see the [execution checklist](checklist.md). The
-[2026-10-09 results](evidence/README.md) cover retained Codex 0.161.0; the PR is pending review.
+B5. Completed 2026-10-10 after [PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged to `main` as `2a15c087`.
+The [merged closeout](checklist.md#merged-closeout) records verification and remaining evidence limits; the
+[2026-10-09 results](evidence/README.md) cover retained Codex 0.161.0. B3-B5 remain proposed.
 
 ## Problem and outcome
 
-Forge's general validated ceiling is 0.149.1. Test the Codex version installed when the round starts, recording and
-retaining that executable for the whole round. Documentation and CLI help are leads, not end-to-end evidence. Extend the
-existing [Codex probe harness](../../../../scripts/experiments/codex-hooks/README.md) and record which contracts hold on
-the selected binary. The checklist records the dated installation observation; the slug and branch stay unchanged.
+At activation, Forge's general validated ceiling was 0.149.1. The round tested and retained the installed Codex 0.161.0
+executable, then raised only the general ceiling; the blocking QA pin remains 0.149.1. Documentation and CLI help are
+leads, not end-to-end evidence. The extended
+[Codex probe harness](../../../../scripts/experiments/codex-hooks/README.md) records which contracts hold on the
+selected binary. The checklist retains the dated installation observation; the slug and execution branch name stay
+unchanged.
 
-The [research](../epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates current
-source claims from local observations. This card is an experiment and compatibility update, not implementation of the
-downstream features.
+The [research](../../doing/epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates
+current source claims from local observations. This card is an experiment and compatibility update, not implementation
+of the downstream features.
 
 ## Probe matrix
 

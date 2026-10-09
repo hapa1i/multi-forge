@@ -8,6 +8,29 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Codex probes must preserve identity, enrollment, and hook-state boundaries (B2, reviewed 2026-10-10)
+
+- Retain the selected complete runtime package and record its executable path/hash, not just `--version`. Host hook
+  dispatch can bypass PATH and select another Forge build with the same version. Set `FORGE_DEV` for checkout probes,
+  verify the effective dispatcher override, and retain hook-side launcher/module provenance.
+- Give a persistent probe home its own login. Baseline configuration resets must refuse an enrolled fixture before
+  mutation; an explicit reset invalidates its enrollment marker. Stage cleanup must preserve the login store. Sharing
+  the home does not make temporary hook registrations safe to reuse after their scripts disappear.
+- Keep the general probe ceiling separate from the blocking QA runtime pin and shared validation provenance. A ceiling
+  bump does not revalidate the release track or unmeasured quota/proxy behavior.
+- Check native rollout roles as well as model replies. On 0.161.0, bare PreToolUse context became a developer message,
+  while a Stop block reason became a user-role `hook_prompt` continuation. A single `UserPromptSubmit` therefore does
+  not mean all later user-role content came from the operator. Capture hook stdout/exit status for negative delivery
+  claims; offline replay cannot establish a historical process outcome.
+- Read-only native forks and recursion suppression do not isolate Forge hook state. B2's fork prevented writes and
+  nested reviews but still mutated the parent manifest. Isolate reviewer session markers before reuse; source-rollout
+  immutability alone does not establish parent-state isolation.
+
+Sources: [reviewed closeout](../done/codex_0160_validation/checklist.md#merged-closeout),
+[evidence and limits](../done/codex_0160_validation/evidence/README.md),
+[probe harness](../../../scripts/experiments/codex-hooks/README.md), and
+[enrollment reset regression](../../../tests/regression/test_bug_b2_probe_enrollment_reset.py).
+
 ### Revalidate launch arguments under the authority lock (session_launch_effort, shipped 2026-10-06)
 
 - CLI and ops validation must refuse invalid runtime arguments before session, worktree, or proxy mutation. Repeat

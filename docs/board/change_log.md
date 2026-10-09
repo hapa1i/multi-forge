@@ -6,6 +6,28 @@ Older entries are retained verbatim in [2026-08-15 through 2026-08-17](archive/c
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-10
+
+### Validate Codex 0.161.0 runtime contracts
+
+**Goal**: Establish which existing hook, session, and native-fork contracts hold on a retained Codex binary.
+
+**Key changes**:
+
+- Raised the general validated ceiling to 0.161.0 after preflight, enrollment, product hook, resume, TUI, and native
+  usage probes; preserved the blocking QA pin, shared QA provenance, and independent proxy floor.
+- Published measured feedback, Stop, lifetime, and fork handoffs for B3-B5, including the parent-manifest isolation
+  blocker, unverified quota/snapshot claims, and historical harness-source drift.
+- Protected probe auth and enrollment, corrected operator environments and redaction, and added regression coverage and
+  reproducible evidence export. Closed B2; the epic stays active and B3-B5 remain proposed.
+
+**Verification**: Review fixes passed 10,600 unit tests (117 deselected), 1,400 regressions, 98 focused checks, 32
+policy integrations, and full pre-commit. The original round also passed two subscription-backed Codex integrations,
+build, and clean-wheel checks. [PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged as `2a15c087`, matching
+tested head `29ee539d`, with all five GitHub checks passing. The
+[merged closeout](done/codex_0160_validation/checklist.md#merged-closeout) retains artifact identities and evidence
+limits; optional fresh stage 88/97 reruns were not performed before merge.
+
 ## 2026-10-08
 
 ### Supervise approved plans with isolated reviewers

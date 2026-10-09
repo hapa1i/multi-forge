@@ -319,7 +319,7 @@ operator-facing guards backstop version churn and the unverifiable trust ceremon
   installed binary sorts strictly above it; `forge runtime preflight codex` then prints a non-blocking re-probe notice
   (a bump never fails readiness — the facts are just unverified for that version). Mirrors the 4g
   `CLAUDE_VERSION_VALIDATED` guard; bump after a green probe round. The
-  [2026-10-09 B2 round](board/doing/codex_0160_validation/evidence/README.md) covers 0.161.0: current dispatcher
+  [2026-10-09 B2 round](board/done/codex_0160_validation/evidence/README.md) covers 0.161.0: current dispatcher
   enrollment, product hooks, managed/native resume, interactive paths, and native usage. It does not validate live quota
   exhaustion or proxy transport. The QA release pin and its shared provenance are independent of this ceiling.
 - **Empirical enrollment check.** `forge runtime preflight codex --verify-enrollment` (`core/ops/codex_enrollment.py`)

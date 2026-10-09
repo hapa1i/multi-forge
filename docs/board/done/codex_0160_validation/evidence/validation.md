@@ -82,10 +82,10 @@ The first focused run caught incorrect literal `|` handling in the new round-roo
 passes cases containing regex metacharacters and its substitution delimiter. The lower unit count reflects the three
 auth tests moving to the regression suite.
 
-A fresh stage 88 and one 97 TUI case on the corrected committed harness remain **pending** the operator's independent
-fixture login. Teardown removed that login, and the operator was asked to restore it. No live turn was launched for this
-follow-up; the original reservation ledger remains **95/100**. These reruns must use separate capture names and record
-their own committed revision. The historical source-drift qualification above remains in force.
+The optional fresh stage 88 and one 97 TUI case on the corrected committed harness were **not performed before merge**.
+Teardown removed the independent fixture login, and no follow-up login was confirmed. No live turn was launched for this
+follow-up; the original reservation ledger remains **95/100**. Any later reruns must use separate capture names and
+record their own committed revision. The historical source-drift qualification above remains in force.
 
 The [results](README.md#non-passing-attempts-and-repairs) retain setup, auth, terminal-driver and concurrency failures.
 No failed turn counts as negative delivery evidence. Raw artifacts stay in the private round directory; sanitized
@@ -97,5 +97,8 @@ Final teardown removes only the independently owned fixture auth file, retains t
 checks registered process identities. Whole-round host-file equality is **unverified** because no initial hash baseline
 was captured. Isolated path provenance is available; unchanged file bytes would not prove refresh-token validity anyway.
 
-B1 closeout `79563944` was fast-forward pushed to `origin/main`. B2 stays in `doing/` until PR review and merge; the
-changelog and lane move remain merge closeout work. B3–B5 remain proposed with linked measured handoffs.
+B1 closeout `79563944` was fast-forward pushed to `origin/main` before the B2 PR.
+[PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged as `2a15c087`, with the same tree as tested head
+`29ee539d` and all five GitHub checks passing. The [2026-10-10 merged closeout](../checklist.md#merged-closeout) records
+the move to `done/`, changelog, reviewed implementation notes, and link checks. B3–B5 remain proposed with linked
+measured handoffs under the active epic.

@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5**. Depends on
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
-[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -72,5 +72,5 @@ context included later implementation reasoning, so it is not independent planni
 
 **Isolation blocker:** depth suppression made zero nested reviewer calls but still appended policy decisions and changed
 `confirmed_at` in the parent Forge manifest. B5 must isolate reviewer hook state rather than inherit the parent session
-markers unchanged. See [fork evidence](../../doing/codex_0160_validation/evidence/forks.json) and
-[results](../../doing/codex_0160_validation/evidence/README.md). This card remains proposed.
+markers unchanged. See [fork evidence](../../done/codex_0160_validation/evidence/forks.json) and
+[results](../../done/codex_0160_validation/evidence/README.md). This card remains proposed.

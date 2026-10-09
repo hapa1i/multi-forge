@@ -145,6 +145,8 @@ guarantee; an earlier-turn selector and safe arbitrary concurrent review remain 
 
 ## Validation and closeout
 
-The validation log records final checks and artifact identity. B2 remains in `doing/` while its PR is under review;
-B3–B5 remain proposed. No new warning, Stop-supervisor, native-fork supervisor, release-pin, or proxy behavior ships
-here.
+The [validation log](validation.md) records checks, artifact identity, and source-drift qualifications.
+[PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged as `2a15c087`; the
+[2026-10-10 closeout](../checklist.md#merged-closeout) moves B2 to `done/`. The optional fresh stage 88/97 reruns were
+not performed before merge. B3–B5 remain proposed under the active epic. No new warning, Stop-supervisor, native-fork
+supervisor, release-pin, or proxy behavior ships here.

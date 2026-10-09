@@ -74,7 +74,7 @@ _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 # The newest codex-cli covered by the general probe contract, independent of the
 # blocking QA release pin. B2 tested 0.161.0 on 2026-10-09: preflight, enrollment,
 # product hooks, managed/native resume, TUI, and usage; evidence lives in
-# docs/board/doing/codex_0160_validation/evidence/. Live quota exhaustion and proxy
+# docs/board/done/codex_0160_validation/evidence/. Live quota exhaustion and proxy
 # transport were not tested. Codex's trust/enrollment and hook-firing behavior is pinned
 # empirically, not contractually -- exactly the surface a minor
 # release can change silently. This is a *ceiling*, surfaced as a re-probe notice when

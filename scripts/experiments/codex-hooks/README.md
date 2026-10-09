@@ -10,7 +10,7 @@ itself a doc-claim).
 
 ## B2 round (2026-10-09, Codex 0.161.0)
 
-The [B2 results](../../../docs/board/doing/codex_0160_validation/evidence/README.md) record the retained binary,
+The [B2 results](../../../docs/board/done/codex_0160_validation/evidence/README.md) record the retained binary,
 subscription posture, commands, limitations, and B3/B4/B5 handoffs. Cases 88/89/91/92/97 exercise the current absolute
 `forge-hook` dispatcher; historical stages 85–87 register older direct commands.
 

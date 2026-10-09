@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
 [B1: plan-file supervision](../../done/plan_file_supervision/card.md) and
-[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -66,7 +66,7 @@ block does not establish the ID's uniqueness or stability across retries or laun
 deduplication. Ordinary B1 timeout and native hook expiry both cleaned the admitted stub descendants; interrupted
 attempts remained incomplete. Background context could reach the next explicit user turn without an observed autonomous
 idle turn. These are measured limits, not a Stop-supervisor implementation. See
-[Stop evidence](../../doing/codex_0160_validation/evidence/stop.json),
-[lifetime evidence](../../doing/codex_0160_validation/evidence/lifetime.json), and
-[results](../../doing/codex_0160_validation/evidence/README.md). `update_plan` was absent from the tested inventory; do
+[Stop evidence](../../done/codex_0160_validation/evidence/stop.json),
+[lifetime evidence](../../done/codex_0160_validation/evidence/lifetime.json), and
+[results](../../done/codex_0160_validation/evidence/README.md). `update_plan` was absent from the tested inventory; do
 not make plan-event availability or agent plan text an approval prerequisite.

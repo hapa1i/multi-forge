@@ -1,12 +1,13 @@
 # Codex runtime validation checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card.md), member **B2**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B2**.
 
 ## Current focus
 
-Selected 2026-10-08 on `test/codex-0160-validation`, based on clean local `main` at `79563944`. The 2026-10-09 runtime
-round is executed; see the [results and limitations](evidence/README.md). B3-B5 remain proposed on separate future
-branches.
+Closed 2026-10-10 after [PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged as `2a15c087`. The
+[merged closeout](#merged-closeout) records verification and the [results](evidence/README.md) retain the 2026-10-09
+round's limitations. Execution used `test/codex-0160-validation`, selected 2026-10-08 from `79563944`. B3-B5 remain
+proposed on separate future branches; the epic remains active.
 
 Establish which existing Forge contracts and proposed hook/fork behaviors hold on the installed Codex version selected
 at round start. Keep that executable fixed throughout the round. The result is a dated evidence matrix and a justified
@@ -276,7 +277,7 @@ artifacts for every row. E1 combines explicit Forge preflight/enrollment/usage a
   selected separately. Record any required dependency or scope change on both sides.
 - [x] Record focused/aggregate tests, integration auth posture, runtime versions, installed-wheel results when required,
   and all non-passing outcomes. Verify Markdown, size, repository links, and working/staged diff checks.
-- [ ] After PR review/merge, record merge coordinates and completed work in the changelog. Promote implementation notes
+- [x] After PR review/merge, record merge coordinates and completed work in the changelog. Promote implementation notes
   only after human review. Move B2 to `done/` after verification and closeout, repoint inbound links, and leave the epic
   active. Explicitly update the evidence path in the `src/forge/core/runtime/codex_preflight.py` comment and the B2
   evidence link in `docs/design_session_execution.md` §I.3; the Markdown link check does not inspect Python comments.
@@ -319,3 +320,32 @@ the missing helper sources, export selection and source-drift audit. Native feed
 observed message roles and evidence limits. Validation: 10,600 unit tests, 1,400 regression tests, 98 focused checks and
 32 policy integration tests pass. Fresh committed-harness 88/97 captures await an independent fixture login; no new
 model turn has been launched. See [the review validation record](evidence/validation.md#review-follow-up-2026-10-10).
+
+## Merged closeout
+
+[PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged to `main` as `2a15c087ce988d4ae05a3617790c53940278bdbf`
+at 2026-10-09 23:51:44 UTC (2026-10-10 Europe/Berlin). Its tree matches tested head
+`29ee539ddf36640eaa3d4acceee26d13a772c13c`; all five GitHub checks passed. Local `main` fast-forwarded to that merge
+before closeout.
+
+The general Codex ceiling is 0.161.0. The blocking QA pin stays 0.149.1, its shared Claude/Codex provenance is
+unchanged, and the independent proxy floor stays 0.141.0. The original live captures pre-date the committed harness; the
+[source-drift audit](evidence/validation.md#harness-and-publication-provenance) remains part of every downstream claim.
+The optional fresh stage 88 and 97 reruns were not performed before merge: fixture credentials had been removed at
+teardown and no follow-up login was confirmed. They are recorded as unperformed checks, not passing evidence; the
+reservation ledger remains 95/100. Live quota exhaustion, general concurrent-fork guarantees, and the earlier-turn
+selector remain unverified. B5's parent-manifest isolation blocker remains explicit.
+
+Moved B2 to `done/`, repaired inbound links and the Python evidence-path comment, and recorded completed work in the
+[changelog](../../change_log.md#2026-10-10). Promoted reviewed probe-identity and hook-state lessons to the
+[session implementation notes](../../impl_notes/sessions.md). The epic's B2 handoff and the B3-B5 cards point to the
+completed evidence; the epic remains in `doing/` and those members remain proposed. Normative session design reflects
+the ceiling-only change; no end-user setup or downstream feature contract changed. Historical JSON captures, B1's dated
+handoff, and the epic research record are preserved.
+
+Closeout validation: full `make pre-commit` passes after Markdown formatting, including size and secret checks.
+`./scripts/check-markdown-links.py` passes for 647 Markdown sources; working-tree and staged `git diff --check` pass.
+All 18 historical JSON/text artifacts remain byte-for-byte identical to the merged tree. The preflight Python AST is
+unchanged. A repository search confirms the only remaining old B2 lane path is inside the preserved historical exporter
+source in `helper-sources.json`. Existing changelog entries, implementation notes, B1's dated handoff, and epic research
+remain unchanged. No new model turn or runtime test was needed for this documentation/comment closeout.
