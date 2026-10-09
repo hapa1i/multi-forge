@@ -2,8 +2,8 @@
 
 Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
 [B1](../../done/plan_file_supervision/card.md) has shipped; this card supplies broader runtime evidence for B3, B4 and
-B5. Selected 2026-10-08 on `test/codex-0160-validation`; see the [execution checklist](checklist.md). Runtime probes
-remain pending.
+B5. Selected 2026-10-08 on `test/codex-0160-validation`; see the [execution checklist](checklist.md). The
+[2026-10-09 results](evidence/README.md) cover retained Codex 0.161.0; the PR is pending review.
 
 ## Problem and outcome
 

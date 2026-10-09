@@ -1,0 +1,499 @@
+{
+  "95-executor-cancel": {
+    "reviewer": [
+      {
+        "kind": "dispatch_started",
+        "at": 1791558143.084898,
+        "pid": 36420,
+        "pgid": 36417,
+        "run_id": "run_b6af764efa49",
+        "parent_run_id": null,
+        "synthetic": true
+      },
+      {
+        "kind": "descendant",
+        "at": 1791558143.0861282,
+        "pid": 36420,
+        "pgid": 36417,
+        "run_id": "run_b6af764efa49",
+        "parent_run_id": null,
+        "synthetic": true,
+        "child_pid": 36423
+      },
+      {
+        "kind": "signal",
+        "at": 1791558144.1611369,
+        "pid": 36420,
+        "pgid": 36417,
+        "run_id": "run_b6af764efa49",
+        "parent_run_id": null,
+        "synthetic": true,
+        "signal": 15
+      }
+    ],
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212f-acfa-7722-8ed4-cbbfeb6a731d"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll make the single patch attempt, then reply DONE.\n"
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791558138.059068,
+        "elapsed_seconds": 0.4724244169774465,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 36225,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "process-result.json": {
+      "returncode": 1,
+      "elapsed_seconds": 10.860675458039623,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "f1285e98b78640cdac01febf37909773",
+      "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "codex_identity_unchanged": true
+    },
+    "injected-signal.json": {
+      "at": 1791558144.1514251,
+      "target": {
+        "owner": "f1285e98b78640cdac01febf37909773",
+        "pgid": 36037,
+        "pid": 36039,
+        "ppid": 36037,
+        "recorded_at": 1791558134.846344,
+        "started": "Fri Oct  9 17:02:14 2026    ",
+        "status": "S"
+      },
+      "signal": 2,
+      "after_reviewer_entry": [
+        {
+          "kind": "dispatch_started",
+          "at": 1791558143.084898,
+          "pid": 36420,
+          "pgid": 36417,
+          "run_id": "run_b6af764efa49",
+          "parent_run_id": null,
+          "synthetic": true
+        }
+      ]
+    },
+    "file_exists": false
+  },
+  "95-hook-death": {
+    "reviewer": [
+      {
+        "kind": "dispatch_started",
+        "at": 1791558125.779572,
+        "pid": 35745,
+        "pgid": 35743,
+        "run_id": "run_6051acc23865",
+        "parent_run_id": null,
+        "synthetic": true
+      },
+      {
+        "kind": "descendant",
+        "at": 1791558125.780802,
+        "pid": 35745,
+        "pgid": 35743,
+        "run_id": "run_6051acc23865",
+        "parent_run_id": null,
+        "synthetic": true,
+        "child_pid": 35749
+      },
+      {
+        "kind": "signal",
+        "at": 1791558126.819545,
+        "pid": 35745,
+        "pgid": 35743,
+        "run_id": "run_6051acc23865",
+        "parent_run_id": null,
+        "synthetic": true,
+        "signal": 15
+      }
+    ],
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212f-6c2c-71c3-a2d5-a75cea98f106"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll use apply_patch once to add the file.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-hook-death.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-hook-death.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29070,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 79,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791558121.274543,
+        "elapsed_seconds": 0.441108750004787,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 35561,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "process-result.json": {
+      "returncode": 0,
+      "elapsed_seconds": 15.24825183302164,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "134fd219bb1d40eaad55f32bfe4278ce",
+      "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "codex_identity_unchanged": true
+    },
+    "injected-signal.json": {
+      "at": 1791558126.8175411,
+      "target": {
+        "pgid": 35714,
+        "pid": 35714,
+        "ppid": 35378,
+        "started": "Fri Oct  9 17:02:05 2026    ",
+        "status": "Ss"
+      },
+      "signal": 9,
+      "after_reviewer_entry": [
+        {
+          "kind": "dispatch_started",
+          "at": 1791558125.779572,
+          "pid": 35745,
+          "pgid": 35743,
+          "run_id": "run_6051acc23865",
+          "parent_run_id": null,
+          "synthetic": true
+        }
+      ]
+    },
+    "file_exists": true
+  },
+  "95-natural-review-expiry": {
+    "reviewer": [
+      {
+        "kind": "dispatch_started",
+        "at": 1791558052.0858681,
+        "pid": 33510,
+        "pgid": 33508,
+        "run_id": "run_e0414794057c",
+        "parent_run_id": null,
+        "synthetic": true
+      },
+      {
+        "kind": "descendant",
+        "at": 1791558052.0868979,
+        "pid": 33510,
+        "pgid": 33508,
+        "run_id": "run_e0414794057c",
+        "parent_run_id": null,
+        "synthetic": true,
+        "child_pid": 33514
+      },
+      {
+        "kind": "signal",
+        "at": 1791558111.363209,
+        "pid": 33510,
+        "pgid": 33508,
+        "run_id": "run_e0414794057c",
+        "parent_run_id": null,
+        "synthetic": true,
+        "signal": 15
+      }
+    ],
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212e-473a-75c3-838c-67695470e51d"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add the file with one `apply_patch` call."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-natural-review-expiry.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-natural-review-expiry.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 88093,
+          "cached_input_tokens": 80128,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 230,
+          "reasoning_output_tokens": 20
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791558046.268974,
+        "elapsed_seconds": 0.43026216595899314,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 33293,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "process-result.json": {
+      "returncode": 0,
+      "elapsed_seconds": 73.64854808303062,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "410af987c920446786926b70674c4425",
+      "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "codex_identity_unchanged": true
+    },
+    "file_exists": true
+  },
+  "95-ordinary-deadline": {
+    "reviewer": [
+      {
+        "kind": "dispatch_started",
+        "at": 1791557990.015197,
+        "pid": 31653,
+        "pgid": 31651,
+        "run_id": "run_e90f7c716fcb",
+        "parent_run_id": null,
+        "synthetic": true
+      },
+      {
+        "kind": "descendant",
+        "at": 1791557990.016278,
+        "pid": 31653,
+        "pgid": 31651,
+        "run_id": "run_e90f7c716fcb",
+        "parent_run_id": null,
+        "synthetic": true,
+        "child_pid": 31657
+      },
+      {
+        "kind": "signal",
+        "at": 1791558034.861784,
+        "pid": 31653,
+        "pgid": 31651,
+        "run_id": "run_e90f7c716fcb",
+        "parent_run_id": null,
+        "synthetic": true,
+        "signal": 15
+      }
+    ],
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212d-59dd-7952-87e3-3151a8068cec"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add the file with one apply_patch call."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-ordinary-deadline.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/95-ordinary-deadline.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 73237,
+          "cached_input_tokens": 70144,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 194,
+          "reasoning_output_tokens": 16
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791557985.37417,
+        "elapsed_seconds": 0.43402666598558426,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 31467,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791558035.378735,
+        "elapsed_seconds": 45.949853375030216,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 31621,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "process-result.json": {
+      "returncode": 0,
+      "elapsed_seconds": 59.423065582988784,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "43f1c490641146e1b17c4d2e5f5e0628",
+      "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "codex_identity_unchanged": true
+    },
+    "file_exists": true
+  },
+  "status_file": "lifetime-status.json"
+}

@@ -24,7 +24,7 @@
       "codex": {
         "package": "@openai/codex",
         "version": "0.149.1",
-        "general_probe_ceiling": "0.149.1",
+        "general_probe_ceiling": "0.161.0",
         "proxy_contract_floor": "0.141.0",
         "probe": {
           "kind": "preflight_and_codex_hooks_stages_00_10",

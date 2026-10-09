@@ -43,7 +43,7 @@ REPO_ROOT="$(find_repo_root)"
 cd "$REPO_ROOT"
 
 # Load environment variables (secrets only: API keys, workspace ID)
-if [[ -f ".env" ]]; then
+if [[ "${PYTHON_DOTENV_DISABLED:-0}" != "1" && -f ".env" ]]; then
     # shellcheck disable=SC1091
     source .env
 fi

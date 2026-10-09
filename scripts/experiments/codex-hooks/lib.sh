@@ -2,9 +2,9 @@
 # Shared library for the codex-hooks probe stages. Source from stages/*.sh.
 #
 # Environment contract:
-#   PROBE_ROOT    disposable mktemp tree (CODEX_HOME, project, hookbin) -- removed on EXIT
+#   PROBE_ROOT    disposable mktemp project and hookbin -- removed on EXIT
 #   CAPTURE_ROOT  persistent capture dir OUTSIDE the repo (survives stages; rm -rf when done)
-#   CODEX_HOME    isolated codex home inside PROBE_ROOT (never the real ~/.codex)
+#   CODEX_HOME    independently logged-in persistent probe home (never ~/.codex)
 #   PROJ          hermetic git-inited temp project inside PROBE_ROOT
 #   PROBE_CAPTURE_DIR  stage-scoped capture dir (exported; hook scripts write here)
 #
@@ -29,21 +29,42 @@ version_ge() { # version_ge ACTUAL FLOOR -> exit 0 when ACTUAL >= FLOOR
         exit 0 }'
 }
 
-# Prefer coreutils timeout; macOS homebrew ships gtimeout (5a reproduce.sh precedent).
+# A separate round owner must also sweep detached descendants (see probe-runtime.py).
 with_timeout() {
     if command -v timeout >/dev/null 2>&1; then
-        timeout "$PROBE_TURN_TIMEOUT" "$@"
+        timeout --kill-after="${PROBE_KILL_GRACE:-5}s" "$PROBE_TURN_TIMEOUT" "$@"
     elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "$PROBE_TURN_TIMEOUT" "$@"
+        gtimeout --kill-after="${PROBE_KILL_GRACE:-5}s" "$PROBE_TURN_TIMEOUT" "$@"
     else
-        note "WARNING: no timeout/gtimeout on PATH -- running unbounded"
-        "$@"
+        err "GNU timeout/gtimeout is required; refusing an unbounded probe."
+    fi
+}
+
+probe_home() {
+    CODEX_HOME="${PROBE_CODEX_HOME:-$CAPTURE_ROOT/login/codex-home}"
+    export CODEX_HOME
+    python3 "$LIB_DIR/probe-home.py" "$CODEX_HOME" || err "unsafe Codex probe home"
+}
+
+prepare_capture() {
+    if [ -d "$PROBE_CAPTURE_DIR" ]; then
+        mkdir -p "$CAPTURE_ROOT/archive"
+        local stamp
+        stamp="$(python3 -c 'import time; print(time.time_ns())')"
+        mv "$PROBE_CAPTURE_DIR" "$CAPTURE_ROOT/archive/$(basename "$PROBE_CAPTURE_DIR")-$stamp"
+    fi
+    mkdir -p "$PROBE_CAPTURE_DIR"/{payloads,results,streams,trees,meta,env,guards}
+    if [ -n "${PROBE_CONTROL:-}" ]; then
+        python3 - "$PROBE_CONTROL" "$PROBE_CAPTURE_DIR" <<'PY'
+import json, sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps({"capture": sys.argv[2], "mode": "observe", "reviewer": "fast"}))
+PY
     fi
 }
 
 probe_init() { # probe_init <stage-name> [--persistent-home]
     local stage="${1:?stage name}"
-    local home_mode="${2:-}"
 
     command -v codex >/dev/null 2>&1 || err "codex is not on PATH."
     command -v python3 >/dev/null 2>&1 || err "python3 is not on PATH."
@@ -57,27 +78,17 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
     export CAPTURE_ROOT
     PROBE_CAPTURE_DIR="$CAPTURE_ROOT/$stage"
     export PROBE_CAPTURE_DIR
-    # Clear prior captures: the per-stage capture dir is persistent across runs,
-    # and stale payloads (from an earlier PROBE_ROOT) otherwise read as this
-    # run's firings -- the false-positive that masked the headless no-fire result.
-    rm -rf "$PROBE_CAPTURE_DIR"
-    mkdir -p "$PROBE_CAPTURE_DIR"/{payloads,results,streams,trees,meta,env,guards}
+    # Archive prior attempts so neither stale payloads nor lost failures affect results.
+    prepare_capture
 
     PROBE_ROOT="$(mktemp -d)" || err "mktemp -d failed."
     export PROBE_ROOT
     # shellcheck disable=SC2064  # expand PROBE_ROOT now: the trap must remove THIS tree
     trap "rm -rf '$PROBE_ROOT'" EXIT
 
-    # Isolated CODEX_HOME. Stage 40 needs trust state to persist across sub-steps,
-    # so --persistent-home keeps it under the capture root (still never ~/.codex).
-    if [ "$home_mode" = "--persistent-home" ]; then
-        CODEX_HOME="$CAPTURE_ROOT/$stage/codex-home"
-    else
-        CODEX_HOME="$PROBE_ROOT/codex-home"
-    fi
-    export CODEX_HOME
-    mkdir -p "$CODEX_HOME"
-    chmod 700 "$CODEX_HOME"
+    # Credentials survive project teardown and refresh in one place. Callers run
+    # baseline/config probes before enrollment, or use another independent login.
+    probe_home
 
     PROJ="$PROBE_ROOT/proj"
     export PROJ
@@ -86,6 +97,7 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
         git init -q &&
         git config user.email probe@example.invalid &&
         git config user.name probe &&
+        git config commit.gpgsign false &&
         echo "# probe project" >README.md &&
         git add README.md &&
         git commit -qm init) || err "temp project git init failed."
@@ -114,28 +126,21 @@ probe_version_check() {
     note "codex-cli $version OK (floor $MIN_CODEX_VERSION)"
 }
 
-# Copy real auth into the isolated home (0600, dies with PROBE_ROOT unless
-# --persistent-home, where it dies with the capture-root cleanup). Escape hatch:
-# PROBE_USE_REAL_CODEX_HOME=1 keeps the real ~/.codex (WARNING: trust probes then
-# mutate real trust state).
+# Never duplicate a refreshing login. The operator logs this persistent home in.
 probe_auth() {
     if [ "${PROBE_USE_REAL_CODEX_HOME:-0}" = "1" ]; then
-        CODEX_HOME="$HOME/.codex"
-        export CODEX_HOME
-        note "WARNING: using REAL ~/.codex (PROBE_USE_REAL_CODEX_HOME=1) -- trust probes will mutate real state"
-        return 0
+        err "PROBE_USE_REAL_CODEX_HOME is no longer supported; use an independent fixture login."
     fi
-    [ -f "$HOME/.codex/auth.json" ] || err "no ~/.codex/auth.json to copy -- run 'codex login' first (or set PROBE_USE_REAL_CODEX_HOME=1)."
-    if [ ! -f "$CODEX_HOME/auth.json" ]; then
-        install -m 600 "$HOME/.codex/auth.json" "$CODEX_HOME/auth.json" || err "auth copy failed."
-    fi
+    python3 "$LIB_DIR/probe-home.py" "$CODEX_HOME" || err "unsafe Codex probe home"
+    [ -f "$CODEX_HOME/auth.json" ] || err "Log in separately: CODEX_HOME='$CODEX_HOME' codex -c 'cli_auth_credentials_store=\"file\"' login"
     local status
-    status="$(codex login status 2>&1)"
+    local status_rc=0
+    status="$(codex login status 2>&1)" || status_rc=$?
     printf '%s\n' "$status" >"$PROBE_CAPTURE_DIR/meta/login-status.txt"
-    if printf '%s' "$status" | grep -qi 'logged in'; then
+    if [ "$status_rc" -eq 0 ] && printf '%s' "$status" | grep -q '^Logged in using ChatGPT'; then
         note "isolated CODEX_HOME auth OK: $status"
     else
-        err "codex does not report logged-in under isolated CODEX_HOME ('$status'). The CODEX_HOME-isolation assumption failed -- record this finding; rerun with PROBE_USE_REAL_CODEX_HOME=1 only with explicit consent."
+        err "codex does not report logged-in under the independent fixture home ('$status'). Stop; no auth fallback."
     fi
 }
 
@@ -217,9 +222,9 @@ need_trust_bypass() {
 #
 # Contract vs probe_init:
 #   - No mktemp tree, no EXIT-trap tree removal: the fixture survives across runs.
-#   - Per-run captures still go to a cleared per-stage $PROBE_CAPTURE_DIR.
-#   - auth.json is copied per run (probe_auth) and removed on EXIT; trust lives in
-#     config.toml and is unaffected.
+#   - Prior attempts are archived before creating a per-stage $PROBE_CAPTURE_DIR.
+#   - The independent login lives outside fixture/project teardown and retains
+#     refreshed auth across stages. It is never copied or restored from a seed.
 #   - Registered hook COMMAND STRINGS (wrapper paths) are STABLE so the trust key
 #     never changes; wrapper BODIES are rewritten per stage (make_hook_cmd bakes
 #     the stage's PROBE_CAPTURE_DIR -- a stale body silently misattributes
@@ -248,20 +253,14 @@ fixture_init() { # fixture_init <stage-name>  -- shared setup for stages 80-83
     export CAPTURE_ROOT
     PROBE_CAPTURE_DIR="$CAPTURE_ROOT/$stage"
     export PROBE_CAPTURE_DIR
-    rm -rf "$PROBE_CAPTURE_DIR"
-    mkdir -p "$PROBE_CAPTURE_DIR"/{payloads,results,streams,trees,meta,env,guards}
+    prepare_capture
 
     FIXTURE_ROOT="$CAPTURE_ROOT/fixture"
     export FIXTURE_ROOT
-    CODEX_HOME="$FIXTURE_ROOT/codex-home"
     PROJ="$FIXTURE_ROOT/proj"
     HOOKBIN="$FIXTURE_ROOT/hookbin"
-    export CODEX_HOME PROJ HOOKBIN
-
-    # Auth (copied per run by probe_auth) is removed on exit; the fixture tree is
-    # NOT removed (that is the whole point). shellcheck disable=SC2064: expand now.
-    # shellcheck disable=SC2064
-    trap "rm -f '$CODEX_HOME/auth.json'" EXIT
+    export PROJ HOOKBIN
+    probe_home
 
     note "stage=$stage (fixture mode)"
     note "FIXTURE_ROOT=$FIXTURE_ROOT"
@@ -269,7 +268,7 @@ fixture_init() { # fixture_init <stage-name>  -- shared setup for stages 80-83
 }
 
 probe_forge_home() {
-    FORGE_HOME="$PROBE_CAPTURE_DIR/forge-home"
+    FORGE_HOME="${PROBE_FORGE_HOME:-$PROBE_CAPTURE_DIR/forge-home}"
     export FORGE_HOME
     mkdir -p "$FORGE_HOME"
     chmod 700 "$FORGE_HOME"
@@ -302,6 +301,7 @@ prepare_product_project() { # prepare_product_project <path> <title>
             git init -q &&
             git config user.email probe@example.invalid &&
             git config user.name probe &&
+            git config commit.gpgsign false &&
             printf '# %s\n' "$title" >README.md &&
             git add README.md &&
             git commit -qm init
@@ -324,7 +324,7 @@ guided_product_trust() { # guided_product_trust <stage> <project-path> <hook-sum
 
   In ANOTHER terminal, run EXACTLY:
 
-    cd "$project_real" && CODEX_HOME="$CODEX_HOME" FORGE_HOME="$FORGE_HOME" codex
+    cd "$project_real" && FORGE_DEV="$REPO_ROOT" CODEX_HOME="$CODEX_HOME" FORGE_HOME="$FORGE_HOME" "$(command -v codex)"
 
   In the TUI:
     1. Accept project/folder trust if shown.
@@ -342,19 +342,20 @@ EOI
     fi
 }
 
-# fixture_build -- (stage 80 only) (re)create the fixture from scratch: fresh
-# codex-home (forces re-enrollment), stable git-inited proj, empty hookbin.
-# Deliberately NOT idempotent: re-running stage 80 means a fresh trust ceremony.
+# Stage 80 rebuilds projects and hook registrations, preserving its independent login.
 fixture_build() {
     [ -n "${FIXTURE_ROOT:-}" ] || err "fixture_build: call fixture_init first."
+    case "$CODEX_HOME/" in "$FIXTURE_ROOT/"*) err "login home must be outside fixture teardown" ;; esac
     rm -rf "$FIXTURE_ROOT"
     mkdir -p "$CODEX_HOME" "$HOOKBIN"
     chmod 700 "$CODEX_HOME"
+    printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n' >"$CODEX_HOME/config.toml"
     mkdir -p "$PROJ"
     (cd "$PROJ" &&
         git init -q &&
         git config user.email probe@example.invalid &&
         git config user.name probe &&
+        git config commit.gpgsign false &&
         echo "# probe fixture project" >README.md &&
         git add README.md &&
         git commit -qm init) || err "fixture project git init failed."

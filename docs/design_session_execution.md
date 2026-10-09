@@ -318,7 +318,10 @@ operator-facing guards backstop version churn and the unverifiable trust ceremon
   codex-cli the probe harness was run against end-to-end. `CodexPreflight.version_beyond_validated` is `True` when the
   installed binary sorts strictly above it; `forge runtime preflight codex` then prints a non-blocking re-probe notice
   (a bump never fails readiness — the facts are just unverified for that version). Mirrors the 4g
-  `CLAUDE_VERSION_VALIDATED` guard; bump after a green probe round.
+  `CLAUDE_VERSION_VALIDATED` guard; bump after a green probe round. The
+  [2026-10-09 B2 round](board/doing/codex_0160_validation/evidence/README.md) covers 0.161.0: current dispatcher
+  enrollment, product hooks, managed/native resume, interactive paths, and native usage. It does not validate live quota
+  exhaustion or proxy transport. The QA release pin and its shared provenance are independent of this ceiling.
 - **Empirical enrollment check.** `forge runtime preflight codex --verify-enrollment` (`core/ops/codex_enrollment.py`)
   confirms user-scope hooks are trust-enrolled by *effect*: it runs one trivial managed `codex exec` turn in a throwaway
   git repo and reports enrolled iff `codex-session-start` fired (the observation receipt appeared). Short-circuits with

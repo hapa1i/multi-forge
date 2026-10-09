@@ -11,9 +11,10 @@ The merged tree matches tested head `2a3e7279`, with all five GitHub checks pass
 [closeout](../../done/plan_file_supervision/checklist.md#merged-closeout) records the runtime evidence and limitations.
 
 B2's broader runtime experiment is selected on `test/codex-0160-validation`, based on local `main` at `79563944`. Its
-[execution checklist](../codex_0160_validation/checklist.md) owns the probes and compatibility decision; no runtime
-probe has run for B2. B3-B5 remain proposed. B3 receives the optional source-only feedback decision. The epic remains
-active until the coordinated feedback, Stop, and native-fork outcomes also ship.
+[execution checklist](../codex_0160_validation/checklist.md) and
+[2026-10-09 evidence](../codex_0160_validation/evidence/README.md) record the 0.161.0 round and general-ceiling update.
+B2 is awaiting PR review. B3-B5 remain proposed. B3 receives the optional source-only feedback decision. The epic
+remains active until the coordinated feedback, Stop, and native-fork outcomes also ship.
 
 ## Activation
 
@@ -51,7 +52,7 @@ commit above merged stack `56d4b8f5`. B2's checklist records planning validation
   [runtime](../../done/partition_runtime_design/card.md) design partitions on separate documentation branches before
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [x] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.
-- [ ] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.
+- [x] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.
 - [ ] Activate each later member on its own branch and add its own checklist. Record any changed dependency here and in
   both affected cards before implementation relies on it.
 - [x] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.

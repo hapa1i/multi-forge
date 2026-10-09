@@ -1,0 +1,150 @@
+{
+  "00-preflight": {
+    "meta/version.txt": "0.161.0\n"
+  },
+  "05-config-schema": {
+    "results/schema-findings.txt": "valid-shape: LOADED (schema-accepted; reached provider model rejection)\nmissing-command: CONFIG-ERROR (<ROUND_ROOT>/codex-home/config.toml:1:3: missing field `command`)\ntoplevel-bogus-key: CONFIG-ERROR (<ROUND_ROOT>/codex-home/config.toml:1:1: unknown configuration field `definitely_not_a_real_key`)\ninner-bogus-field: LOADED (schema-accepted; reached provider model rejection)\nouter-bogus-field: LOADED (schema-accepted; reached provider model rejection)\nbogus-event-name: LOADED (schema-accepted; reached provider model rejection)\n",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "10-headless-fire": {
+    "results/verdict.txt": "[FIRES-HEADLESS-TRUST-GATED]\n",
+    "results/fired-summary.txt": "turn1_fired: none (exit 0)\nturn2_bypass_fired: SessionStart-userJson\nSessionStart-userToml (exit 0)\n",
+    "results/t1-plain.exit": "0\n",
+    "results/t2-bypass-trust.exit": "0\n",
+    "results/t1-plain.last-message.txt": "OK",
+    "results/t2-bypass-trust.last-message.txt": "OK",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "60-exec-resume": {
+    "results/verdict.txt": "RESUME-CONFIRMED (same-cwd recall=yes cross-cwd=yes)\n",
+    "results/60a-seed.exit": "0\n",
+    "results/60b-same-cwd.exit": "A 0\n",
+    "results/60c-cross-cwd.exit": "A 0\n",
+    "results/60d-last.exit": "A 0\n",
+    "results/60a-seed.last-message.txt": "OK",
+    "results/60b-same-cwd.last-message.txt": "AUBERGINE",
+    "results/60c-cross-cwd.last-message.txt": "AUBERGINE",
+    "results/60d-last.last-message.txt": "Unknown",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "61-rollout-identity": {
+    "results/verdict.txt": "ROLLOUT-IDENTITY=confirmed STDIN-RESUME=confirmed\n",
+    "results/61a-seed.exit": "0\n",
+    "results/61b-stdin-resume.exit": "0\n",
+    "results/61a-seed.last-message.txt": "OK",
+    "results/61b-stdin-resume.last-message.txt": "PERSIMMON",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "81-enrolled-coverage": {
+    "results/30a-deny-json.oracle.txt": "stream references PROBE-30A -- inspect whether it EXECUTED or was denied\nPreToolUse fired 1x (gates Phase 3 + registry pretool_policy)\n",
+    "results/30b-deny-exit2.oracle.txt": "exit-2 stderr reason surfaced in the stream\n",
+    "results/30c-updatedinput.oracle.txt": "REWRITTEN marker present -- updatedInput mutation took effect (gates Phase 3 mutation support)\n",
+    "results/30d-ups-block.oracle.txt": "exit=0 ups-fired=1 -- inspect stream for whether a model turn happened\n",
+    "results/30e-additionalcontext.oracle.txt": "PASS: model echoed the injected token -- additionalContext lands in context headless (Phase 4 SessionStart transfer delivery is VIABLE)\n",
+    "results/30f-permreq.oracle.txt": "PermissionRequest did NOT fire headless even enrolled (write under read-only sandbox)\n",
+    "results/30g-stop-block.oracle.txt": "Stop fired 2x; last message: SECOND\n",
+    "results/30h-malformed.oracle.txt": "PROBE-30H referenced in stream -- inspect whether the malformed response failed OPEN\n",
+    "results/81-revalidate.oracle.txt": "PASS: SessionStart fired after a body swap -- 40d holds on this fixture/version; the arm/tee design is valid.\n",
+    "results/event-matrix.txt": "# post-enrollment fired/not-fired matrix (codex 0.161.0, enrolled, no bypass)\n# fired_count is CUMULATIVE for this stage so far: the 81.0 body-swap revalidate\n# turn PLUS the two 81.1 matrix turns (read-only shell + workspace-write). The\n# signal is fired>=1 vs 0 per event, not the exact count (payloads are not reset).\n# wrapper-key          fired_count\nSessionStart         3\nSubagentStart        0\nPreToolUse           2\nPreToolUseMatched    0\nPermissionRequest    0\nPostToolUse          2\nPreCompact           0\nPostCompact          0\nUserPromptSubmit     3\nSubagentStop         0\nStop                 3\nSacrificial          3\nUserSessionStart     3\n",
+    "results/30a-deny-json.exit": "0\n",
+    "results/30b-deny-exit2.exit": "0\n",
+    "results/30c-updatedinput.exit": "0\n",
+    "results/30d-ups-block.exit": "0\n",
+    "results/30e-additionalcontext.exit": "0\n",
+    "results/30f-permreq.exit": "0\n",
+    "results/30g-stop-block.exit": "0\n",
+    "results/30h-malformed.exit": "0\n",
+    "results/81-matrix-readonly.exit": "0\n",
+    "results/81-matrix-write.exit": "0\n",
+    "results/81-revalidate.exit": "0\n",
+    "results/30a-deny-json.last-message.txt": "DONE\n\nAutomatic approval review rejected `echo PROBE-30A`: the probe hook blocked it, so it did not run.",
+    "results/30b-deny-exit2.last-message.txt": "DONE\n\nThe command was blocked by an automatic approval hook: `PROBE-DENY-30B` (exit 2).",
+    "results/30c-updatedinput.last-message.txt": "DONE",
+    "results/30d-ups-block.last-message.txt": "",
+    "results/30e-additionalcontext.last-message.txt": "MAGIC-CTX-7F3A9",
+    "results/30f-permreq.last-message.txt": "Couldn’t create `blocked.txt`: the filesystem is read-only.",
+    "results/30g-stop-block.last-message.txt": "SECOND",
+    "results/30h-malformed.last-message.txt": "DONE",
+    "results/81-matrix-readonly.last-message.txt": "DONE",
+    "results/81-matrix-write.last-message.txt": "DONE",
+    "results/81-revalidate.last-message.txt": "OK",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "84-fresh-project": {
+    "results/84-cross-project.oracle.txt": "84a (natural state, no folder trust): proj=0 user=1 exit=0 self_enroll=no\n84b (decisive, folder trust added): proj=0 user=1 exit=0 self_enroll=no\n[CROSS-PROJECT-TRUST-SCOPED]: the turn RAN (user-level positive control fired b_user=1) but the fresh repo's project hook did NOT fire (b_proj=0) despite a byte-identical command string + folder trust. Cross-project trust does NOT hold (key-path-scoping H2 OR preimage-path-binding H3 -- same installer conclusion). 82w worktree survival was git->checkout canonicalization, not a portable command-string trust. -> Phase 6: per-project enrollment OR register at USER scope (the path-stable user config -- the positive control proves user-scope hooks fire from any project).\n",
+    "results/verdict.txt": "[CROSS-PROJECT-TRUST-SCOPED]: the turn RAN (user-level positive control fired b_user=1) but the fresh repo's project hook did NOT fire (b_proj=0) despite a byte-identical command string + folder trust. Cross-project trust does NOT hold (key-path-scoping H2 OR preimage-path-binding H3 -- same installer conclusion). 82w worktree survival was git->checkout canonicalization, not a portable command-string trust. -> Phase 6: per-project enrollment OR register at USER scope (the path-stable user config -- the positive control proves user-scope hooks fire from any project).\n",
+    "results/84a-fresh-clean.exit": "0\n",
+    "results/84b-fresh-trustlevel.exit": "0\n",
+    "results/84a-fresh-clean.last-message.txt": "OK",
+    "results/84b-fresh-trustlevel.last-message.txt": "OK",
+    "meta/version.txt": "0.161.0\n"
+  },
+  "88-b2-enrollment": {
+    "preflight": {
+      "installed": true,
+      "version": "0.161.0",
+      "version_ok": true,
+      "auth_method": "chatgpt_tokens",
+      "auth_source": "codex_store",
+      "billing_mode": "subscription_quota",
+      "ready": true,
+      "blocking_reason": null,
+      "hook_seam": "enrollment_gated",
+      "proxy_responses": "native_direct",
+      "doctor_status": "warning",
+      "version_validated": "0.149.1",
+      "version_beyond_validated": true
+    },
+    "enrollment": {
+      "ready": true,
+      "registered": true,
+      "config_path": "<ROUND_ROOT>/codex-home/config.toml",
+      "attempted": true,
+      "codex_succeeded": true,
+      "enrolled": true,
+      "reason": "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.",
+      "version": "0.161.0",
+      "version_validated": "0.149.1"
+    },
+    "dispatcher": {
+      "path": "<ROUND_ROOT>/forge-home/bin/forge-hook",
+      "status": "current",
+      "installed_version": "1.0.2",
+      "expected_version": "1.0.2",
+      "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "metadata_path": "<ROUND_ROOT>/forge-home/runtime.json",
+      "metadata_status": "current",
+      "forge_binary_path": "<HOME>/.local/bin/forge",
+      "dev_override": {
+        "present": true,
+        "value": "<CHECKOUT>",
+        "target": "<CHECKOUT>/.venv/bin/forge",
+        "valid": true,
+        "effective": true,
+        "advice": null
+      },
+      "advice": null
+    },
+    "receipt": {
+      "session_id": "01a11e4b-6693-7b40-9d1c-915c04c9cb33",
+      "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T03-33-40-01a11e4b-6693-7b40-9d1c-915c04c9cb33.jsonl",
+      "source": "startup",
+      "observed_at": "2026-10-09T01:33:43+00:00"
+    },
+    "launchers": [
+      {
+        "at": 1791509623.117043,
+        "elapsed_seconds": 0.6418270420108456,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 96427,
+        "python": "<CHECKOUT>/.venv/bin/python3"
+      }
+    ]
+  },
+  "operator_enrollment_notes": "2026-10-09: isolated TUI showed Folder access, then Hooks need review: 23 hooks are new or changed. Selected Trust all and continue. No trust bypass. Exited via Ctrl-D, no model prompt. TUI session 01a11e1a-07b6-7451-acb1-409f199a579d. Empirical confirmation follows in stage 88.\n"
+}

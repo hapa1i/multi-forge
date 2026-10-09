@@ -62,3 +62,15 @@ boundary is proven selectable, this card must not imply a planning-only snapshot
 This extends semantic supervision, not native team orchestration or general session fork/resume. Broader Codex source
 capture remains with [codex_source_adapter](../codex_source_adapter/card.md); reuse shipped identity contracts without
 making this card depend on an unshipped transcript-import framework.
+
+## B2 handoff (2026-10-09)
+
+Codex 0.161.0 combined `exec fork`, `--ephemeral`, `--output-schema`, action-checkout selection, and enforced read-only
+writes on short synthetic sources. Quiescent source bytes stayed unchanged. One active-source boundary preserved source
+prefixes and inherited the current marker; an atomic snapshot or earlier-turn selector remains unverified. Shared-source
+context included later implementation reasoning, so it is not independent planning context.
+
+**Isolation blocker:** depth suppression made zero nested reviewer calls but still appended policy decisions and changed
+`confirmed_at` in the parent Forge manifest. B5 must isolate reviewer hook state rather than inherit the parent session
+markers unchanged. See [fork evidence](../../doing/codex_0160_validation/evidence/forks.json) and
+[results](../../doing/codex_0160_validation/evidence/README.md). This card remains proposed.

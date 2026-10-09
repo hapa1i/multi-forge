@@ -4,8 +4,9 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 ## Current focus
 
-Selected 2026-10-08 on `test/codex-0160-validation`, based on clean local `main` at `79563944`. This selection creates
-the execution plan; runtime probes have not started. B3-B5 remain proposed on separate future branches.
+Selected 2026-10-08 on `test/codex-0160-validation`, based on clean local `main` at `79563944`. The 2026-10-09 runtime
+round is executed; see the [results and limitations](evidence/README.md). B3-B5 remain proposed on separate future
+branches.
 
 Establish which existing Forge contracts and proposed hook/fork behaviors hold on the installed Codex version selected
 at round start. Keep that executable fixed throughout the round. The result is a dated evidence matrix and a justified
@@ -27,41 +28,41 @@ replace this probe matrix.
 
 ### Runtime and Forge identity
 
-- [ ] Select the Codex version installed when the round starts. Record its resolved executable path, SHA-256, version,
+- [x] Select the Codex version installed when the round starts. Record its resolved executable path, SHA-256, version,
   OS, selected model/effort, and relevant CLI help. Preserve a private copy outside the repository, including required
   companion resources and their layout; verify the copy's hash/version and use its absolute path or fixture-local PATH
   in every probe terminal. Require the version recorded in this item for the whole round, including preflight,
   enrollment, and fork children. Recheck identity before/after each stage; changing the selected executable starts a
   separately recorded round.
-- [ ] Export `FORGE_DEV=<absolute checkout root>` in every probe environment, including the operator's second terminal;
+- [x] Export `FORGE_DEV=<absolute checkout root>` in every probe environment, including the operator's second terminal;
   invoke that checkout's `.venv/bin/forge` for direct commands. In the same isolated environment, require
   `forge extension doctor --json` to report `hook_dispatcher.dev_override.effective: true` and the expected target.
   Capture hook-side launcher and imported-module paths outside stdout to prove dispatch actually reached the checkout.
   Keep registered command bytes unchanged when adding fixture instrumentation. Version `1.0.2` alone cannot identify the
   build: the global tool and post-B1 checkout share it.
-- [ ] Record `git rev-parse HEAD` and any dirty source diff/hash with each stage. Require direct commands and dispatched
+- [x] Record `git rev-parse HEAD` and any dirty source diff/hash with each stage. Require direct commands and dispatched
   hooks to resolve the same build. A final installed-wheel check records a separate artifact identity and proves its own
   dispatcher target; it must not inherit `FORGE_DEV` and accidentally test the editable checkout.
 
 ### Auth and reviewer fixtures
 
-- [ ] Give the persistent Codex fixture its own operator-completed `codex login`, with
+- [x] Give the persistent Codex fixture its own operator-completed `codex login`, with
   `cli_auth_credentials_store="file"` in its isolated home. Do not copy the host's `auth.json`, use the real-home escape
   hatch, or clone a refreshing credential into per-stage homes. Adapt `probe_auth`, fixture construction, and EXIT
   cleanup before running stages: retain the fixture's refreshed auth in place across the round. A stage requiring
   another home needs its own login. Serialize ordinary stages against that store; isolate the deliberate
   concurrent-source case and classify any auth interference as inconclusive. Keep credential files private and outside
   captures; never read or log their contents.
-- [ ] Verify the selected Codex subscription auth in the exact isolated child environment. Remove competing API/auth and
+- [x] Verify the selected Codex subscription auth in the exact isolated child environment. Remove competing API/auth and
   provider selectors; prevent Forge dotenv/credential hydration from restoring paid auth. Record only non-secret posture
   and token/turn evidence. Ambiguous auth or exhausted quota stops the probe without an API fallback.
-- [ ] Default nested semantic supervision to a deterministic Claude stub for E5 timings, E9 recursion, and E4 lifetime
+- [x] Default nested semantic supervision to a deterministic Claude stub for E5 timings, E9 recursion, and E4 lifetime
   checks. Use a direct Claude lane with cascade and shadow sampling disabled. The stub must answer `--version` with an
   admitted major-2 version at least 2.1.248, pass the exact `READ_ONLY_FLAGS` help probe, and expose separate
   fast-verdict and sleeping-descendant modes. Reuse the admission pattern in
   `tests/integration/docker/test_plan_file_supervision.py`. Resolve only the fixture stub, strip real reviewer
   credentials, and allow no fallback to real Claude, a proxy, or an API checker. Do not replace the executor's `codex`.
-- [ ] Record stub admission separately from actual review entry: the review arm writes a marker with run identity,
+- [x] Record stub admission separately from actual review entry: the review arm writes a marker with run identity,
   timestamp, PID, and process group before responding or sleeping. Label stub usage synthetic. A real Claude reviewer is
   allowed only for a named row that needs it, using `--auth-mode subscription-only`, B1's verified direct route and
   account prerequisites, and a separately budgeted Claude quota allocation. Native Codex fork subjects remain real Codex
@@ -74,23 +75,23 @@ logout was reproduced here.
 
 ### Budget, enrollment, and cleanup
 
-- [ ] Audit the [existing harness](../../../../scripts/experiments/codex-hooks/README.md) before selecting stages.
+- [x] Audit the [existing harness](../../../../scripts/experiments/codex-hooks/README.md) before selecting stages.
   Record a per-stage model-turn estimate, a total turn ceiling, timeout bounds, and interactive operator steps. Include
   setup/control turns, subagents, retries, explicit enrollment verification, and the extra enrollment turn on every
   advisory Codex launch, including each `resume --task`. Count any real Claude reviewer calls against a separate Claude
   quota allocation; stop at the declared ceilings.
-- [ ] Prepare the selected stages from sections 2–5 with explicit selectors, positive controls, bounded cleanup, and the
+- [x] Prepare the selected stages from sections 2–5 with explicit selectors, positive controls, bounded cleanup, and the
   revised turn budget. Check shell syntax and offline result classifiers before model turns. Record new stage names in
   the acceptance table and harness README; preserve historical captures and version-qualified findings.
-- [ ] Use disposable projects and isolated `CODEX_HOME`/`FORGE_HOME`, with raw captures outside the repository. Preserve
+- [x] Use disposable projects and isolated `CODEX_HOME`/`FORGE_HOME`, with raw captures outside the repository. Preserve
   host hook/trust configuration and account settings. Keep the independent fixture login separate from disposable
   project and capture cleanup.
-- [ ] Reuse an operator-enrolled fixture only when its exact config paths and hook definitions still match. Otherwise
+- [x] Reuse an operator-enrolled fixture only when its exact config paths and hook definitions still match. Otherwise
   prepare the isolated fixture and complete its interactive trust ceremony. No trust bypass counts as enrollment
   evidence. Re-enroll changed command, matcher, timeout, or config-location definitions before testing their delivery.
-- [ ] Revalidate wrapper-body replacement at stable paths and stamp each run's capture destination. Archive each attempt
+- [x] Revalidate wrapper-body replacement at stable paths and stamp each run's capture destination. Archive each attempt
   before rerunning a stage: `lib.sh` currently clears that stage's capture directory on initialization.
-- [ ] Require GNU `timeout` with a recorded TERM-to-KILL grace (`--kill-after`) and an independent fixture cleanup
+- [x] Require GNU `timeout` with a recorded TERM-to-KILL grace (`--kill-after`) and an independent fixture cleanup
   owner. Register child PID/start-time/process-group identities as they spawn, including the invoker's detached group
   and B1's watchdog/anchor/reviewer groups. After the observed deadline, sweep fixture-owned survivors, TERM then KILL
   after a bounded grace, and verify none remain. Do not signal unrelated processes or recycled PIDs. Capture survivors
@@ -98,38 +99,38 @@ logout was reproduced here.
 
 **Execution prerequisites:** confirmed isolated subscription auth, a usable enrolled fixture, a declared turn budget,
 and operator access for UI/trust cases. Missing prerequisites leave dependent rows pending or inconclusive; an
-unsuccessful model turn cannot prove non-delivery. This checklist does not initiate those turns.
+unsuccessful model turn cannot prove non-delivery. These prerequisites were established for the executed round.
 
 ## 2. Recheck the contracts Forge already relies on
 
-- [ ] Map existing stages `00`, `05`, `10`, `60`, `61`, `81`, and `84`-`87` to the retained assertions before running
+- [x] Map existing stages `00`, `05`, `10`, `60`, `61`, `81`, and `84`-`87` to the retained assertions before running
   them. Retain the current ceiling's Forge-preflight plus `00`/`10` baseline, with stage 10's bypass arm explicitly
   labelled diagnostic; it never proves enrollment. Use individual stages and positive controls rather than default/all
   bundles whose legacy auth/trust behavior has not been adapted.
-- [ ] Run `forge runtime preflight codex --json` against the retained binary and independently logged-in fixture. Assert
+- [x] Run `forge runtime preflight codex --json` against the retained binary and independently logged-in fixture. Assert
   `ready=true`, doctor-backed `auth_method=chatgpt_tokens` / `auth_source=codex_store`,
   `billing_mode=subscription_quota`, and `hook_seam=enrollment_gated`. This proves auth presence and hook capability;
   successful turns and receipts must establish validity and enrollment. Record the expected re-probe notice before the
   ceiling changes; stage 00 does not run Forge's preflight.
-- [ ] Run `forge runtime preflight codex --verify-enrollment --json` and prove the current user-scope SessionStart
+- [x] Run `forge runtime preflight codex --verify-enrollment --json` and prove the current user-scope SessionStart
   registration fires. Retain the correlated observation receipt before the temporary probe directory is removed, through
   fixture instrumentation, plus `attempted=true`, `codex_succeeded=true`, and `enrolled=true`. A registration-only check
   or failed turn is insufficient; account for the model turn in the budget.
-- [ ] Exercise current user-scope registrations through the installed absolute `forge-hook` dispatcher, including its
+- [x] Exercise current user-scope registrations through the installed absolute `forge-hook` dispatcher, including its
   catch-all policy row and 60-second timeout. Existing stages 85-87 use older direct `forge hook ...` registrations;
   adapt or supplement them so old fixture success is not reported as current installation evidence.
-- [ ] Prove SessionStart delivery with a nonce that appears only in hook context and is consumed by the model. Check
+- [x] Prove SessionStart delivery with a nonce that appears only in hook context and is consumed by the model. Check
   delivery receipts and reconciled `confirmed.codex` facts, including an undelivered control.
-- [ ] Prove a product `apply_patch` deny prevents the requested filesystem change and an allow control performs it.
+- [x] Prove a product `apply_patch` deny prevents the requested filesystem change and an allow control performs it.
   Cover multi-file patches, tests-first evaluation, `updatedInput`, malformed output, and absent/untrusted hooks; record
   actual allow/deny/error behavior without assuming malformed output fails closed.
-- [ ] Recheck native start/resume, cross-CWD resume, JSONL thread/rollout identity, and the relevant managed TUI paths.
+- [x] Recheck native start/resume, cross-CWD resume, JSONL thread/rollout identity, and the relevant managed TUI paths.
   Record interactive start, reattach, active-session refusal, and context-delivery observations separately.
-- [ ] For a real headless Forge turn, compare `turn.completed.usage` with exactly one correlated usage event:
+- [x] For a real headless Forge turn, compare `turn.completed.usage` with exactly one correlated usage event:
   `route=codex_exec`, `reporter=codex_jsonl`, matching tokens, subscription billing, and unavailable dollar cost.
   Preserve runtime-error handling even at exit zero; use `tests/integration/core/test_codex_exec_smoke.py` as the
   existing owner.
-- [ ] Preserve authority-before-policy coverage for non-patch tools. Use enrolled advisory deny and unmarked/producer
+- [x] Preserve authority-before-policy coverage for non-patch tools. Use enrolled advisory deny and unmarked/producer
   controls; a semantic-policy skip must not disable artifact authority.
 
 **Compatibility gate:** a regression in a relied-on contract blocks the general validated-ceiling increase. Investigate
@@ -142,19 +143,19 @@ that live exhaustion or every runtime capability was tested.
 
 ## 3. Measure allowed feedback and catch-all coverage
 
-- [ ] Compare three allow responses: today's empty product stdout, `CodexHookResponder.allow_feedback()` with explicit
+- [x] Compare three allow responses: today's empty product stdout, `CodexHookResponder.allow_feedback()` with explicit
   `permissionDecision: allow`, and the candidate documented `additionalContext` response. The helper exists but is not
   emitted by the current command. Give each arm a fresh hook-only nonce; verify both the action and later model use.
-- [ ] Probe `systemMessage` and stderr separately in headless events and the interactive UI. Retain event captures and
+- [x] Probe `systemMessage` and stderr separately in headless events and the interactive UI. Retain event captures and
   operator observations; neither alone establishes model-context delivery. Include a no-message control.
-- [ ] Capture actual payload names and counts for `apply_patch`, `update_plan`, a disposable MCP tool, `spawn_agent`,
+- [x] Capture actual payload names and counts for `apply_patch`, `update_plan`, a disposable MCP tool, `spawn_agent`,
   shell commands, and long-running `exec_command`/`write_stdin` sequences. Record unsupported tool surfaces explicitly.
-- [ ] Measure repeated per-tool dispatcher duration with semantic supervision disabled and configured, keeping fixture
+- [x] Measure repeated per-tool dispatcher duration with semantic supervision disabled and configured, keeping fixture
   conditions comparable and using the fast Claude stub. Separate cold admission, uncached patches, and cache hits; patch
   samples need not all dispatch because the supervisor caches results. Report sample count and latency distribution
   separately from stub time, model latency, and quota use. Non-patch semantic skips must make zero reviewer calls;
   instrument dispatch to prove it.
-- [ ] Capture complete `update_plan` payloads, ordering, thread/turn/tool IDs, and repeated updates. Identify missing or
+- [x] Capture complete `update_plan` payloads, ordering, thread/turn/tool IDs, and repeated updates. Identify missing or
   truncated evidence. An agent plan event is not user approval and must not become a plan-source admission rule.
 
 **B3 handoff:** identify the exact tested response shape, versions, model-visible channel, and operator-visible channel.
@@ -163,24 +164,24 @@ account for the authority guard and the enrollment cost of a changed registratio
 
 ## 4. Probe timeout, background delivery, and Stop continuation
 
-- [ ] Compare a hook that exceeds the registered 60 seconds with a controlled earlier Forge deadline. Use a bounded
+- [x] Compare a hook that exceeds the registered 60 seconds with a controlled earlier Forge deadline. Use a bounded
   sleeping Claude stub/descendant fixture that has passed admission. Count reviewer-lifetime evidence only after its
   review-entry marker proves dispatch and correlates to a durable attempt. `ReviewAttempt` is written before admission;
   a pending attempt alone proves neither process start nor inference. Capture timestamps, signals, tool effects,
   warnings, and reviewer/descendant survival through the cleanup grace.
-- [ ] Keep natural runtime expiry separate from production-budget evidence. B1 normally stops review within 55 seconds;
+- [x] Keep natural runtime expiry separate from production-budget evidence. B1 normally stops review within 55 seconds;
   use an explicitly instrumented fixture to exceed 60 seconds, preserving registration bytes. Label that arm as runtime
   timeout evidence, and exercise the ordinary earlier deadline through unmodified B1 code. Do not attribute a bare
   sleeping hook's behavior to a reviewer that never dispatched.
-- [ ] Separate natural expiry from executor cancellation and hook-only death. Confirm a completed positive-control turn;
+- [x] Separate natural expiry from executor cancellation and hook-only death. Confirm a completed positive-control turn;
   label early cancellation inconclusive for the natural-timeout claim. Inspect durable attempt/usage evidence and
   `forge policy supervisor status --json` / `forge telemetry activity <session> --json` after interruption.
-- [ ] Record pending, unavailable, and incomplete attempts without treating missing terminal records as aligned or
+- [x] Record pending, unavailable, and incomplete attempts without treating missing terminal records as aligned or
   zero-cost. Keep the operational failure result distinct from any computed alignment verdict.
-- [ ] Test background hook completion during a live turn and after turn completion, plus cancellation and ordering. Use
+- [x] Test background hook completion during a live turn and after turn completion, plus cancellation and ordering. Use
   a nonce and timestamps to distinguish model delivery, operator notification, and whether a new turn starts. Background
   delivery never counts as enforcement of the triggering action.
-- [ ] Trigger exactly one controlled Stop block in the isolated fixture, followed by an allow. Capture continuation
+- [x] Trigger exactly one controlled Stop block in the isolated fixture, followed by an allow. Capture continuation
   prompt/context, `stop_hook_active`, thread/turn IDs, repeated Stop events, and a no-block control. Bound the harness
   against loops independently of the runtime's Stop guard.
 
@@ -190,22 +191,22 @@ made after the reviewed snapshot. A Stop block cannot undo an edit.
 
 ## 5. Probe native forks and shared source threads
 
-- [ ] Create a planning source with a unique sentinel, then fork with `codex exec fork`, `--ephemeral`, and
+- [x] Create a planning source with a unique sentinel, then fork with `codex exec fork`, `--ephemeral`, and
   `--output-schema` together. Record exact option placement, source/fork identities, schema validation, terminal status,
   and persisted artifacts; exit zero alone is insufficient evidence of a successful review.
-- [ ] Prove inherited context using a source-only sentinel absent from the fork prompt and accessible files. Compare
+- [x] Prove inherited context using a source-only sentinel absent from the fork prompt and accessible files. Compare
   source rollout hashes and identity before/after a quiescent fork; the review must not append to or rebind the source.
   State what was actually retained, including any observed compaction limit.
-- [ ] Put different file sentinels in planner and action checkouts. Launch the fork to inspect the action checkout,
+- [x] Put different file sentinels in planner and action checkouts. Launch the fork to inspect the action checkout,
   require the corresponding read result, and attempt a controlled write. Compare filesystem snapshots and an isolated
   workspace-write positive control; accepted read-only flags or model promises are not enforcement evidence.
-- [ ] Observe hooks inside the fork under Forge depth/consumer markers. Record actual deliveries, recursion suppression,
+- [x] Observe hooks inside the fork under Forge depth/consumer markers. Record actual deliveries, recursion suppression,
   reviewer dispatch count, and whether any unintended session adoption or parent-state mutation occurs. Keep any nested
   semantic review on the admitted Claude stub, and identify its events separately from the real Codex fork.
-- [ ] Add a later implementation sentinel and reasoning that contradicts an explicit approved plan to a shared source.
+- [x] Add a later implementation sentinel and reasoning that contradicts an explicit approved plan to a shared source.
   Record which context the fork inherits and whether the supplied plan takes precedence. This behavioral observation
   does not establish reviewer independence or create an earlier-turn fork selector.
-- [ ] Fork while the controlled source is active. Separate expected source writes from fork-induced changes using tagged
+- [x] Fork while the controlled source is active. Separate expected source writes from fork-induced changes using tagged
   events and prefix snapshots; a whole-file hash change during source execution is not by itself a failure. Record a
   reproducible fork boundary or mark concurrent-source behavior unsupported/inconclusive.
 
@@ -217,70 +218,72 @@ cases rather than infer support from CLI help or silently use another source.
 
 Every row needs an exact command, Forge revision/build provenance, Codex path/hash/version, fixture and auth identity,
 positive control, result, and sanitized capture reference. Use `pass`, `fail`, `unsupported`, or `inconclusive`; retain
-exit status separately. The evidence column below names existing owners or planned additions, not files already produced
-by B2. E1 combines explicit Forge preflight/enrollment/usage assertions with the listed stages.
+exit status separately. The [results matrix](evidence/README.md#results-and-downstream-decisions) links the retained
+artifacts for every row. E1 combines explicit Forge preflight/enrollment/usage assertions with the listed stages.
 
 | ID  | Area                | Fixture / control                            | Observable assertion                        | Evidence owner                               |
 | --- | ------------------- | -------------------------------------------- | ------------------------------------------- | -------------------------------------------- |
 | E1  | Existing paths      | Enrolled/untrusted homes; allow/deny         | Readiness, receipt, usage, hook/resume      | Forge checks; stages 00/05/10/60/61/81/84-87 |
-| E2  | Allowed warnings    | Three response arms; unique nonces           | Action executes; model consumes context     | New delivery stage                           |
-| E3  | Operator warnings   | UI/events; no-message control                | `systemMessage` and stderr visibility       | New delivery stage + TUI record              |
-| E4  | Hook timeout        | 60-second expiry; earlier deadline           | Tool outcome, child cleanup, attempt state  | New lifetime stage + B1 comparison           |
-| E5  | Catch-all cost      | Tool matrix; supervision off/on              | Counts, latency, zero skipped-review calls  | New coverage stage                           |
-| E6  | Background          | Live/finished/cancelled turns                | Delivery ordering and next-turn behavior    | New background stage                         |
-| E7  | Planning fork       | Source-only nonce; quiescent parent          | Context, schema, identity, unchanged source | New fork stage                               |
-| E8  | Shared source       | Plan/implementation sentinels; active source | Inherited boundary and concurrency limits   | New fork stage                               |
-| E9  | Read-only/recursion | Different checkouts; write control           | Correct read, blocked write, bounded calls  | New fork stage                               |
-| E10 | Plan events         | Multiple updates; independent approval       | Complete payloads and observed IDs          | New coverage stage                           |
-| E11 | Stop continuation   | Block once; no-block control                 | Continuation markers and repeat counts      | New Stop stage                               |
+| E2  | Allowed warnings    | Three response arms; unique nonces           | Action executes; model consumes context     | 90 feedback captures                         |
+| E3  | Operator warnings   | UI/events; no-message control                | `systemMessage` and stderr visibility       | 90 + 97 TUI captures                         |
+| E4  | Hook timeout        | 60-second expiry; earlier deadline           | Tool outcome, child cleanup, attempt state  | 95 lifetime captures                         |
+| E5  | Catch-all cost      | Tool matrix; supervision off/on              | Counts, latency, zero skipped-review calls  | 93 coverage captures                         |
+| E6  | Background          | Live/finished/cancelled turns                | Delivery ordering and next-turn behavior    | 96 + 97 background captures                  |
+| E7  | Planning fork       | Source-only nonce; quiescent parent          | Context, schema, identity, unchanged source | 94 fork captures                             |
+| E8  | Shared source       | Plan/implementation sentinels; active source | Inherited boundary and concurrency limits   | 94 fork captures                             |
+| E9  | Read-only/recursion | Different checkouts; write control           | Correct read, blocked write, bounded calls  | 94 fork captures                             |
+| E10 | Plan events         | Multiple updates; independent approval       | Complete payloads and observed IDs          | 93 coverage captures                         |
+| E11 | Stop continuation   | Block once; no-block control                 | Continuation markers and repeat counts      | 81 Stop capture                              |
 
 ## 6. Record results and apply the compatibility decision
 
-- [ ] Run `sanitize.sh`, inspect its secret scan, and review fixture candidates before adding them. Publish a dated
+- [x] Run `sanitize.sh`, inspect its secret scan, and review fixture candidates before adding them. Publish a dated
   results matrix under this card's `evidence/` and promote only reusable sanitized fixtures to `tests/fixtures/codex/`
   with provenance. Do not retain auth files, real account identifiers, or raw private rollouts.
-- [ ] After the selected relied-on contracts pass, advance `CODEX_VERSION_VALIDATED` to the version recorded in section
+- [x] After the selected relied-on contracts pass, advance `CODEX_VERSION_VALIDATED` to the version recorded in section
   1 and change only `tracks.pinned.codex.general_probe_ceiling` in the QA runtime matrix to match. Keep the release pin,
   both runtime probe records, shared `validated_forge_revision`/`validated_on`, and blocking track unchanged. Record
   B2's revision, date, scope, and exhaustion limitation in B2's evidence. A release-pin change needs its own probe and
   provenance decision. Keep `CODEX_PROXY_CONTRACT_VALIDATED` and `proxy_contract_floor` at 0.141.0; this round does not
   validate proxy transport. Re-run preflight to prove the retained binary is no longer above the updated ceiling.
-- [ ] If a relied-on contract does not pass, retain the current ceiling and record the exact blocker and downstream
-  dispositions. Negative results limited to new behavior do not require inventing feature support to close the round.
-- [ ] Update focused tests for any changed preflight, hook, fixture-parser, or QA-matrix contract. Reuse
+- [x] The selected relied-on contracts passed. Record unsupported plan tools, parent-manifest mutation, concurrency
+  limits, and unverified live quota exhaustion without claiming support for those cases.
+- [x] Update focused tests for any changed preflight, hook, fixture-parser, or QA-matrix contract. Reuse
   `tests/src/core/runtime/test_codex_preflight.py`, `tests/src/cli/hooks/test_codex_policy*.py`,
   `tests/src/install/test_codex_hooks.py`, and `tests/src/skills/test_qa_checklist_contract.py` where applicable. Every
   product bug fix gets a failing-before/passing-after regression; do not weaken existing assertions to obtain a pass.
-- [ ] Run affected integration paths through `./scripts/test-integration.sh <selected-paths>`. Candidate owners are
+- [x] Run affected integration paths through `./scripts/test-integration.sh <selected-paths>`. Candidate owners are
   `tests/integration/core/test_codex_exec_smoke.py`, `test_codex_session_start.py` in that directory, and the relevant
   Docker policy/authority/plan-supervision cases. Inspect auth requirements before selecting them: API-backed tests are
   separate evidence and must not silently spend against the subscription-only probe plan. Add or adapt the required
   isolated subscription coverage when existing fixtures select paid credentials.
-- [ ] Update the narrow normative owners with measured behavior: `design_session_execution.md` for runtime/hooks,
+- [x] Update the narrow normative owners with measured behavior: `design_session_execution.md` for runtime/hooks,
   `design_session_context.md` for context facts, and workflow/subprocess/telemetry/installation docs only where their
   shipped contracts change. Update end-user policy/session/setup guidance when a user's required action changes. Correct
   obsolete runtime-limit wording in touched living docs; preserve dated historical findings.
-- [ ] If packaged QA assets or runtime behavior change, run `make build` and verify the relevant behavior from that
+- [x] If packaged QA assets or runtime behavior change, run `make build` and verify the relevant behavior from that
   wheel in a clean install. Run applicable aggregate unit/regression and full pre-commit gates before the execution
   commit/PR; rerun affected probes only when fixes or unresolved observations justify it.
 
 ## Closeout
 
-- [ ] Before opening B2's PR, fetch `origin/main`, publish the separate B1 closeout `79563944` from local `main` with a
+- [x] Before opening B2's PR, fetch `origin/main`, publish the separate B1 closeout `79563944` from local `main` with a
   normal fast-forward push, and verify it is an ancestor of `origin/main`. On remote divergence reconcile first; never
-  force-push. Inspect the PR's `origin/main...HEAD` diff so it contains only B2 work. As checked on 2026-10-09, the
-  fetched remote remains at `56d4b8f5` and the closeout is still local.
-- [ ] Every E1-E11 row has retained evidence and an explicit disposition; no pending observation is called supported.
-- [ ] Link the B3/B4/B5 decisions and captures from their cards and the epic checklist; keep each member proposed until
+  force-push. Inspect the PR's `origin/main...HEAD` diff so it contains only B2 work. `79563944` was pushed normally to
+  `origin/main` before execution closeout; no force-push was used.
+- [x] Every E1-E11 row has retained evidence and an explicit disposition; no pending observation is called supported.
+- [x] Link the B3/B4/B5 decisions and captures from their cards and the epic checklist; keep each member proposed until
   selected separately. Record any required dependency or scope change on both sides.
-- [ ] Record focused/aggregate tests, integration auth posture, runtime versions, installed-wheel results when required,
+- [x] Record focused/aggregate tests, integration auth posture, runtime versions, installed-wheel results when required,
   and all non-passing outcomes. Verify Markdown, size, repository links, and working/staged diff checks.
-- [ ] Record review/merge coordinates and completed work in the changelog. Promote implementation notes only after human
-  review. Move B2 to `done/` after verification and closeout, repoint inbound links, and leave the epic active.
-- [ ] Verify the fixture process sweep is empty and protected host configuration is unchanged. Remove only the
-  fixture-owned login store at final teardown; do not restore a stale auth copy or run host logout. Retain sanitized
-  evidence and the runtime identity record before cleaning raw captures and fixture state. Host-file equality is not
-  evidence of account-session validity.
+- [ ] After PR review/merge, record merge coordinates and completed work in the changelog. Promote implementation notes
+  only after human review. Move B2 to `done/` after verification and closeout, repoint inbound links, and leave the epic
+  active.
+- [x] Verify the fixture process sweep is empty. Record the host-check limitation: no whole-round host-file hash
+  baseline was captured, so byte-for-byte equality is unverified. Commands used isolated homes and did not copy host
+  auth. Remove only the fixture-owned login store at final teardown; do not restore a stale auth copy or run host
+  logout. Retain sanitized evidence and the runtime identity record before cleaning raw captures and fixture state.
+  Host-file equality is not evidence of account-session validity.
 
 ## Execution record
 
@@ -302,3 +305,9 @@ enrollment-aware budgets, a ceiling-only QA update, and cleanup across detached 
 installed, but `with_timeout` supplies no KILL escalation. Revision validation: `make pre-commit-md` passes after
 formatting, including repository size and link checks; working-tree/staged `git diff --check` pass. No model turn or
 auth mutation was performed during this correction.
+
+2026-10-09 execution: retained Codex 0.161.0, completed the E1–E11 matrix, and recorded the ceiling-only decision in
+[evidence/README.md](evidence/README.md). Stage 84's credential-deleting trap, weak login admission, and the smoke
+integration's empty-home fixture were corrected; failed attempts are retained separately. TUI driver and concurrency
+detector failures were rerun with completed controls. B3–B5 have explicit measured handoffs and remain proposed. Final
+test, wheel, cleanup, and PR details are in [validation.md](evidence/validation.md). B2 stays active until merge.

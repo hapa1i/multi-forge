@@ -1,0 +1,1292 @@
+{
+  "89-absent-hook-control": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12108-4863-7de3-b74b-e9979c65bac8"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/src/absent_b2.py",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/src/absent_b2.py",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29055,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 64,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hooks": [],
+    "reviewer": [],
+    "usage": [],
+    "receipts": {}
+  },
+  "89-patch-malformed": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12108-b827-72b3-9214-447d509aed40"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add `malformed_b2.txt` with `ORIGINAL`.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/malformed_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/malformed_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29096,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 123,
+          "reasoning_output_tokens": 39
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791555584.857488,
+        "elapsed_seconds": 0.470901833003154,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 5009,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791555592.311733,
+        "elapsed_seconds": 0.5015495829866268,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 5216,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [],
+    "usage": [],
+    "receipts": {
+      "5216-observation-receipt.json": {
+        "session_id": "01a12108-b827-72b3-9214-447d509aed40",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-19-42-01a12108-b827-72b3-9214-447d509aed40.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:19:44+00:00"
+      },
+      "5009-observation-receipt.json": {
+        "session_id": "01a12108-b827-72b3-9214-447d509aed40",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-19-42-01a12108-b827-72b3-9214-447d509aed40.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:19:44+00:00"
+      }
+    }
+  },
+  "89-patch-updated-input": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12108-79b0-7af0-8673-2f2107b91fc4"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/updated_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/updated_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29033,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 60,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791555570.07901,
+        "elapsed_seconds": 1.0366573330247775,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 4340,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791555575.2540731,
+        "elapsed_seconds": 0.47942466600215994,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 4579,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [],
+    "usage": [],
+    "receipts": {
+      "4579-observation-receipt.json": {
+        "session_id": "01a12108-79b0-7af0-8673-2f2107b91fc4",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-19-26-01a12108-79b0-7af0-8673-2f2107b91fc4.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:19:30+00:00"
+      },
+      "4340-observation-receipt.json": {
+        "session_id": "01a12108-79b0-7af0-8673-2f2107b91fc4",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-19-26-01a12108-79b0-7af0-8673-2f2107b91fc4.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:19:30+00:00"
+      }
+    }
+  },
+  "89-product-deny": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12107-a6cd-7ee0-a153-2aef014dc6e3"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll use apply_patch once to add the file, without creating tests."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "DONE.\n\nAutomatic approval review blocked the file creation because project policy requires test changes first. I stopped without trying another tool."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 31676,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 108,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791555518.0400908,
+        "elapsed_seconds": 1.1022926250007004,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 1831,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791555526.012471,
+        "elapsed_seconds": 2.3416106249787845,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 2095,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/blocked_b2.py:\\nPolicy violation(s):\\n  [tdd.tests-before-impl] Implementation changes require test changes first\\n    Intent: Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.\\n    Fix: Write or update tests in tests/ directory before modifying src/ code\\n    Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal.\"}}\n"
+      }
+    ],
+    "reviewer": [],
+    "usage": [],
+    "receipts": {
+      "1831-observation-receipt.json": {
+        "session_id": "01a12107-a6cd-7ee0-a153-2aef014dc6e3",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-18-33-01a12107-a6cd-7ee0-a153-2aef014dc6e3.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:18:38+00:00"
+      },
+      "2095-observation-receipt.json": {
+        "session_id": "01a12107-a6cd-7ee0-a153-2aef014dc6e3",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-18-33-01a12107-a6cd-7ee0-a153-2aef014dc6e3.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:18:38+00:00"
+      }
+    }
+  },
+  "89-product-tests-first": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12107-fb0e-75d2-be78-b624a15bfab5"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add both files in one patch, with the implementation first."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/src/paired_b2.py",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/tests/test_paired_b2.py",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/src/paired_b2.py",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/tests/test_paired_b2.py",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29220,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 179,
+          "reasoning_output_tokens": 51
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791555536.885605,
+        "elapsed_seconds": 0.47554791599395685,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 3018,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791555546.179441,
+        "elapsed_seconds": 0.47497608300182037,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 3293,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [],
+    "usage": [],
+    "receipts": {
+      "3293-observation-receipt.json": {
+        "session_id": "01a12107-fb0e-75d2-be78-b624a15bfab5",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-18-53-01a12107-fb0e-75d2-be78-b624a15bfab5.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:18:56+00:00"
+      },
+      "3018-observation-receipt.json": {
+        "session_id": "01a12107-fb0e-75d2-be78-b624a15bfab5",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-18-53-01a12107-fb0e-75d2-be78-b624a15bfab5.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:18:56+00:00"
+      }
+    }
+  },
+  "89-supervised-allow": {
+    "stream": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12109-02ee-7701-8146-b5adb90e996a"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/supervised_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/supervised_b2.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "DONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29036,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 61,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hooks": [
+      {
+        "at": 1791555604.134912,
+        "elapsed_seconds": 0.4603802909841761,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 5635,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791555608.403658,
+        "elapsed_seconds": 0.645855084003415,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 5773,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [
+      {
+        "kind": "dispatch_started",
+        "at": 1791555608.385921,
+        "pid": 5806,
+        "pgid": 5804,
+        "run_id": "run_bd0fee2e1372",
+        "parent_run_id": null,
+        "synthetic": true
+      },
+      {
+        "kind": "completed",
+        "at": 1791555608.3861299,
+        "pid": 5806,
+        "pgid": 5804,
+        "run_id": "run_bd0fee2e1372",
+        "parent_run_id": null,
+        "synthetic": true
+      }
+    ],
+    "usage": [],
+    "receipts": {
+      "5635-observation-receipt.json": {
+        "session_id": "01a12109-02ee-7701-8146-b5adb90e996a",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-20-01-01a12109-02ee-7701-8146-b5adb90e996a.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:20:04+00:00"
+      },
+      "5773-observation-receipt.json": {
+        "session_id": "01a12109-02ee-7701-8146-b5adb90e996a",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-20-01-01a12109-02ee-7701-8146-b5adb90e996a.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:20:04+00:00"
+      }
+    }
+  },
+  "91-advisory-resume": {
+    "stream": [],
+    "hooks": [
+      {
+        "at": 1791557581.900161,
+        "elapsed_seconds": 0.7131529159960337,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 22776,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557589.717561,
+        "elapsed_seconds": 0.5150381670100614,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 23092,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557597.894148,
+        "elapsed_seconds": 0.5205357919912785,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 23406,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Artifact authority denied this tool request for the managed advisory session.\"}}\n"
+      }
+    ],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 12288,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 8.050157584017143,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 14255,
+          "label": "codex-enroll-verify",
+          "output_tokens": 5,
+          "parent_run_id": "run_d4e646666721",
+          "returncode": 0,
+          "root_run_id": "run_d4e646666721",
+          "run_id": "run_aaacbf80bb01",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a12127-2f87-77e3-b14e-48b1c8274a98",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "OK",
+          "timed_out": false
+        },
+        "run_id": "run_aaacbf80bb01",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 12288,
+            "command": "codex-enroll-verify",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_7702f6715ff1",
+            "failure_type": null,
+            "input_tokens": 14255,
+            "latency_ms": 8050.2,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 5,
+            "parent_run_id": "run_d4e646666721",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_d4e646666721",
+            "route": "codex_exec",
+            "run_id": "run_aaacbf80bb01",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": null,
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:53:06Z",
+            "workflow": null
+          }
+        ]
+      },
+      {
+        "result": {
+          "cached_tokens": 59008,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 19.666542000020854,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 63316,
+          "label": "codex-resume",
+          "output_tokens": 92,
+          "parent_run_id": "run_08c0611ff478",
+          "returncode": 0,
+          "root_run_id": "run_08c0611ff478",
+          "run_id": "run_4f0b5942cb80",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+          "stderr": "Reading prompt from stdin...\n2026-10-09T14:53:17.985809Z ERROR codex_core::tools::router: error=Command blocked by PreToolUse hook: Artifact authority denied this tool request for the managed advisory session.. Command: printf RESUME > advisory_resume_b2.txt\n",
+          "stdout": "I’ll run the requested command.\n\nDONE",
+          "timed_out": false
+        },
+        "run_id": "run_4f0b5942cb80",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 59008,
+            "command": "codex-resume",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_e637d2721e25",
+            "failure_type": null,
+            "input_tokens": 63316,
+            "latency_ms": 19666.5,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 92,
+            "parent_run_id": "run_08c0611ff478",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_08c0611ff478",
+            "route": "codex_exec",
+            "run_id": "run_4f0b5942cb80",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-advisory-managed",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:53:26Z",
+            "workflow": null
+          }
+        ]
+      }
+    ],
+    "receipts": {
+      "23406-observation-receipt.json": {
+        "session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-09-01a12126-70f6-7d23-95c1-6367efa31188.jsonl",
+        "source": "resume",
+        "observed_at": "2026-10-09T14:53:09+00:00"
+      },
+      "23092-observation-receipt.json": {
+        "session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-09-01a12126-70f6-7d23-95c1-6367efa31188.jsonl",
+        "source": "resume",
+        "observed_at": "2026-10-09T14:53:09+00:00"
+      },
+      "22776-observation-receipt.json": {
+        "session_id": "01a12127-2f87-77e3-b14e-48b1c8274a98",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-58-01a12127-2f87-77e3-b14e-48b1c8274a98.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:53:01+00:00"
+      }
+    }
+  },
+  "91-advisory-shell": {
+    "stream": [],
+    "hooks": [
+      {
+        "at": 1791557525.526792,
+        "elapsed_seconds": 0.6319662500172853,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 20677,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557532.891718,
+        "elapsed_seconds": 0.5321490840287879,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 20988,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557543.0585432,
+        "elapsed_seconds": 0.629978957993444,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 21306,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Artifact authority denied this tool request for the managed advisory session.\"}}\n"
+      }
+    ],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 12288,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 7.88894012500532,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 15452,
+          "label": "codex-enroll-verify",
+          "output_tokens": 5,
+          "parent_run_id": "run_c66a2098864b",
+          "returncode": 0,
+          "root_run_id": "run_c66a2098864b",
+          "run_id": "run_797b80cc60ea",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a12126-51fb-7903-8718-af1125a7b91d",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "OK",
+          "timed_out": false
+        },
+        "run_id": "run_797b80cc60ea",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 12288,
+            "command": "codex-enroll-verify",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_962fef883fab",
+            "failure_type": null,
+            "input_tokens": 15452,
+            "latency_ms": 7888.9,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 5,
+            "parent_run_id": "run_c66a2098864b",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_c66a2098864b",
+            "route": "codex_exec",
+            "run_id": "run_797b80cc60ea",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": null,
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:52:09Z",
+            "workflow": null
+          }
+        ]
+      },
+      {
+        "result": {
+          "cached_tokens": 27776,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 22.592400500026997,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 31522,
+          "label": "codex-bridge",
+          "output_tokens": 46,
+          "parent_run_id": "run_8d251d968c2f",
+          "returncode": 0,
+          "root_run_id": "run_8d251d968c2f",
+          "run_id": "run_2520361739ae",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+          "stderr": "Reading prompt from stdin...\n2026-10-09T14:52:23.126336Z ERROR codex_core::tools::router: error=Command blocked by PreToolUse hook: Artifact authority denied this tool request for the managed advisory session.. Command: printf ADVISORY > advisory_b2.txt\n",
+          "stdout": "I’ll run the requested command.\n\nDONE",
+          "timed_out": false
+        },
+        "run_id": "run_2520361739ae",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 27776,
+            "command": "codex-bridge",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_ec72c7eca71b",
+            "failure_type": null,
+            "input_tokens": 31522,
+            "latency_ms": 22592.4,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 46,
+            "parent_run_id": "run_8d251d968c2f",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_8d251d968c2f",
+            "route": "codex_exec",
+            "run_id": "run_2520361739ae",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-advisory-managed",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:52:32Z",
+            "workflow": "transfer"
+          }
+        ]
+      }
+    ],
+    "receipts": {
+      "20988-observation-receipt.json": {
+        "session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-09-01a12126-70f6-7d23-95c1-6367efa31188.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:52:12+00:00"
+      },
+      "20677-observation-receipt.json": {
+        "session_id": "01a12126-51fb-7903-8718-af1125a7b91d",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-02-01a12126-51fb-7903-8718-af1125a7b91d.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:52:05+00:00"
+      },
+      "21306-observation-receipt.json": {
+        "session_id": "01a12126-70f6-7d23-95c1-6367efa31188",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-09-01a12126-70f6-7d23-95c1-6367efa31188.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:52:12+00:00"
+      }
+    }
+  },
+  "91-producer-shell": {
+    "stream": [],
+    "hooks": [
+      {
+        "at": 1791557563.239095,
+        "elapsed_seconds": 0.5873077079886571,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 22012,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557567.511499,
+        "elapsed_seconds": 0.44873466703575104,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 22156,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 27776,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 12.022693292004988,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 31527,
+          "label": "codex-bridge",
+          "output_tokens": 53,
+          "parent_run_id": "run_928c15e86ec5",
+          "returncode": 0,
+          "root_run_id": "run_928c15e86ec5",
+          "run_id": "run_e69ec886980e",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a12126-e89f-7dd2-8a6e-d99680608552",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "I’ll run the requested command.\n\nDONE",
+          "timed_out": false
+        },
+        "run_id": "run_e69ec886980e",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 27776,
+            "command": "codex-bridge",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_8f1a3bbbf778",
+            "failure_type": null,
+            "input_tokens": 31527,
+            "latency_ms": 12022.7,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 53,
+            "parent_run_id": "run_928c15e86ec5",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_928c15e86ec5",
+            "route": "codex_exec",
+            "run_id": "run_e69ec886980e",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-producer-managed",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:52:52Z",
+            "workflow": "transfer"
+          }
+        ]
+      }
+    ],
+    "receipts": {
+      "22012-observation-receipt.json": {
+        "session_id": "01a12126-e89f-7dd2-8a6e-d99680608552",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-40-01a12126-e89f-7dd2-8a6e-d99680608552.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:52:43+00:00"
+      },
+      "22156-observation-receipt.json": {
+        "session_id": "01a12126-e89f-7dd2-8a6e-d99680608552",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-52-40-01a12126-e89f-7dd2-8a6e-d99680608552.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:52:43+00:00"
+      }
+    }
+  },
+  "91-unmarked-shell": {
+    "stream": [],
+    "hooks": [
+      {
+        "at": 1791556771.341378,
+        "elapsed_seconds": 1.3073253330076113,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 14368,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791556776.3705401,
+        "elapsed_seconds": 0.601082207984291,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 14581,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 24576,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 16.013348083011806,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 33889,
+          "label": "codex-bridge",
+          "output_tokens": 47,
+          "parent_run_id": "run_4c20aab3203c",
+          "returncode": 0,
+          "root_run_id": "run_4c20aab3203c",
+          "run_id": "run_cee840dec1b5",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a1211a-cb4f-7b81-b15c-49ba2d4ba8e4",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "I’ll run the command now.\n\nDONE",
+          "timed_out": false
+        },
+        "run_id": "run_cee840dec1b5",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 24576,
+            "command": "codex-bridge",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_21729fab6c49",
+            "failure_type": null,
+            "input_tokens": 33889,
+            "latency_ms": 16013.3,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 47,
+            "parent_run_id": "run_4c20aab3203c",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_4c20aab3203c",
+            "route": "codex_exec",
+            "run_id": "run_cee840dec1b5",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-unmarked-managed",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:39:42Z",
+            "workflow": "transfer"
+          }
+        ]
+      }
+    ],
+    "receipts": {
+      "14581-observation-receipt.json": {
+        "session_id": "01a1211a-cb4f-7b81-b15c-49ba2d4ba8e4",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-39-27-01a1211a-cb4f-7b81-b15c-49ba2d4ba8e4.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:39:31+00:00"
+      },
+      "14368-observation-receipt.json": {
+        "session_id": "01a1211a-cb4f-7b81-b15c-49ba2d4ba8e4",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-39-27-01a1211a-cb4f-7b81-b15c-49ba2d4ba8e4.jsonl",
+        "source": "startup",
+        "observed_at": "2026-10-09T14:39:31+00:00"
+      }
+    }
+  },
+  "92-context-delivered": {
+    "stream": [],
+    "hooks": [
+      {
+        "at": 1791556797.186201,
+        "elapsed_seconds": 0.6782387499697506,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 15271,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"# Handoff context (curated transfer from a prior planning session)\\n\\nThe section below is curated context -- decisions, current state, relevant files, and\\nopen questions -- distilled from a planning session in another agent runtime. Reasoning\\nstate does not transfer across runtimes, so treat this as your authoritative context.\\n\\n# Session Context: b2-parent\\n\\n**Resumed at**: 2026-10-09T14:39:53+00:00\\n**Parent proxy**: none\\n**Lineage**: b2-parent\\n\\n---\\n\\n## Full Transcript\\n\\n### [2026-10-09T00:00:00Z] Assistant\\n\\nSynthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context. Synthetic planning context.  The oracle token is PARENT-a53fc96b7f074847ad33d2fba4e92dbc.\\n\\n---\\n\\n## Artifacts\\n\\n*No artifacts recorded.*\\n\\n## Runtime Hints\\n\\nTarget runtime: codex.\\n\\nConsumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive changes through the Codex tool surface.\\n\"}}\n"
+      }
+    ],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 12288,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 8.88421600003494,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 15710,
+          "label": "codex-bridge",
+          "output_tokens": 25,
+          "parent_run_id": "run_b32213ba248e",
+          "returncode": 0,
+          "root_run_id": "run_b32213ba248e",
+          "run_id": "run_a643507c4fb4",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a1211b-35e9-7f23-8364-77eb1304e9fc",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "PARENT-a53fc96b7f074847ad33d2fba4e92dbc",
+          "timed_out": false
+        },
+        "run_id": "run_a643507c4fb4",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 12288,
+            "command": "codex-bridge",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_6605ba5fefaf",
+            "failure_type": null,
+            "input_tokens": 15710,
+            "latency_ms": 8884.2,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 25,
+            "parent_run_id": "run_b32213ba248e",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_b32213ba248e",
+            "route": "codex_exec",
+            "run_id": "run_a643507c4fb4",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-context-delivered",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:40:02Z",
+            "workflow": "transfer"
+          }
+        ]
+      }
+    ],
+    "receipts": {
+      "15271-context-receipt.json": {
+        "session_id": "01a1211b-35e9-7f23-8364-77eb1304e9fc",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-39-53-01a1211b-35e9-7f23-8364-77eb1304e9fc.jsonl",
+        "source": "startup",
+        "delivered_at": "2026-10-09T14:39:57+00:00"
+      }
+    }
+  },
+  "92-context-undelivered": {
+    "stream": [],
+    "hooks": [],
+    "reviewer": [],
+    "usage": [
+      {
+        "result": {
+          "cached_tokens": 12288,
+          "cancelled": false,
+          "cost_micro_usd": null,
+          "duration_seconds": 8.776938499999233,
+          "envelope_parsed": true,
+          "error": null,
+          "input_tokens": 14479,
+          "label": "codex-bridge",
+          "output_tokens": 18,
+          "parent_run_id": "run_7bc74cf8892e",
+          "returncode": 0,
+          "root_run_id": "run_7bc74cf8892e",
+          "run_id": "run_afcc06f6a323",
+          "runtime_is_error": false,
+          "runtime_session_id": "01a1211b-7a3f-7db2-b019-04dc76500ea4",
+          "stderr": "Reading prompt from stdin...\n",
+          "stdout": "NONE",
+          "timed_out": false
+        },
+        "run_id": "run_afcc06f6a323",
+        "usage_events": [
+          {
+            "attribution_granularity": "worker",
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 12288,
+            "command": "codex-bridge",
+            "confidence": "unavailable",
+            "cost_micro_usd": null,
+            "event_id": "evt_cf902fdeb7a1",
+            "failure_type": null,
+            "input_tokens": 14479,
+            "latency_ms": 8776.9,
+            "measurement_source": "runtime_native",
+            "model": null,
+            "output_tokens": 18,
+            "parent_run_id": "run_7bc74cf8892e",
+            "provider": "openai",
+            "proxy_id": null,
+            "reporter": "codex_jsonl",
+            "root_run_id": "run_7bc74cf8892e",
+            "route": "codex_exec",
+            "run_id": "run_afcc06f6a323",
+            "runtime": "codex",
+            "schema_version": 1,
+            "session": "b2-context-undelivered",
+            "source_refs": null,
+            "status": "success",
+            "ts": "2026-10-09T14:40:19Z",
+            "workflow": "transfer"
+          }
+        ]
+      }
+    ],
+    "receipts": {}
+  },
+  "filesystem": {
+    "src/blocked_b2.py": false,
+    "src/paired_b2.py": true,
+    "tests/test_paired_b2.py": true,
+    "src/absent_b2.py": true,
+    "updated_b2.txt": true,
+    "malformed_b2.txt": true,
+    "supervised_b2.txt": true,
+    "advisory_b2.txt": false,
+    "advisory_resume_b2.txt": false,
+    "producer_b2.txt": true,
+    "unmarked_b2.txt": true
+  },
+  "file_contents": {
+    "src/paired_b2.py": "VALUE = 2\n",
+    "tests/test_paired_b2.py": "def test_value(): assert 2 == 2\n",
+    "src/absent_b2.py": "VALUE = 3\n",
+    "updated_b2.txt": "REWRITTEN\n",
+    "malformed_b2.txt": "ORIGINAL\n",
+    "supervised_b2.txt": "ALLOWED\n",
+    "producer_b2.txt": "PRODUCER",
+    "unmarked_b2.txt": "UNMARKED"
+  }
+}

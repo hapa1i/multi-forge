@@ -1,0 +1,1552 @@
+{
+  "timings": [
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5489018749794923,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5464033749885857,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5414177909842692,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5348651670501567,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5373507919721305,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5321179170277901,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5441110410029069,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.546742209000513,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.547043583006598,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5985764580545947,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+CACHED\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5504850830184296,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+CACHED\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5475922920159064,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-2\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.542219249997288,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-3\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5374789159977809,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-4\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5548566660145298,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5461568330065347,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.537950792000629,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5390196249936707,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.529808834020514,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5383996670134366,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5473839169717394,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5401086250203662,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5353382500470616,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5396602080436423,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5752122499980032,
+      "session": "b2-plain",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.6292450419859961,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5337537919986062,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5367994169937447,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5397014999762177,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "text": "B2-MCP"
+        },
+        "tool_name": "mcp__b2__echo",
+        "tool_use_id": "exec-9c0ed85c-166a-4437-bc3c-759cde24f967",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5449261249741539,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "mcp__b2__echo"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5463932079728693,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.6518147499882616,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5497905830270611,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5521445840131491,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "message": "<OPAQUE_ENCRYPTED_AGENT_MESSAGE>",
+          "task_name": "b2_child"
+        },
+        "tool_name": "collaborationspawn_agent",
+        "tool_use_id": "call_afadd5937ae543d9b72e9a41cbf28ac6",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5468529589707032,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationspawn_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+CACHED\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.6928718329872936,
+      "session": "b2-supervised",
+      "stderr": "[forge] Policy: checked apply_patch:latency_b2.txt against semantic.supervisor (aligned, 0.2s)\n",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+CACHED\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5393574999761768,
+      "session": "b2-supervised",
+      "stderr": "[forge] Policy: checked apply_patch:latency_b2.txt against semantic.supervisor (aligned, cached, 0.0s)\n",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-2\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.6837457089568488,
+      "session": "b2-supervised",
+      "stderr": "[forge] Policy: checked apply_patch:latency_b2.txt against semantic.supervisor (aligned, 0.1s)\n",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-3\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.6856949159991927,
+      "session": "b2-supervised",
+      "stderr": "[forge] Policy: checked apply_patch:latency_b2.txt against semantic.supervisor (aligned, 0.1s)\n",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: latency_b2.txt\n+SAMPLE-4\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-cefac9c0-ff82-47fe-a32b-19f10a717feb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.6924445409676991,
+      "session": "b2-supervised",
+      "stderr": "[forge] Policy: checked apply_patch:latency_b2.txt against semantic.supervisor (aligned, 0.2s)\n",
+      "stdout": "",
+      "tool": "apply_patch"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.5408155000186525,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.5349293340113945,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5306065829936415,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5295975839835592,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "timeout_ms": 10000
+        },
+        "tool_name": "collaborationwait_agent",
+        "tool_use_id": "call_ebdb4f634bb041fcbc4393b65e5525cb",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5296598330023699,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "collaborationwait_agent"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 0,
+      "seconds": 0.530804582987912,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 1,
+      "seconds": 0.539822583028581,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 2,
+      "seconds": 0.5260643750079907,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 3,
+      "seconds": 0.5303588749957271,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    },
+    {
+      "command": [
+        "<ROUND_ROOT>/forge-home/bin/forge-hook",
+        "codex-policy-check"
+      ],
+      "measurement": "dispatcher replay wall time; instrumentation included; no executor/model turn",
+      "payload": {
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a1212a-6e15-7a80-8906-e3abd5979659",
+        "tool_input": {
+          "command": "sleep 3; printf B2-SHELL"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-25fff92c-1b7a-4aaa-8e75-041e2235c1b0",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-56-31-01a1212a-6e15-7a80-8906-e3abd5979659.jsonl",
+        "turn_id": "01a1212a-6e5d-70d1-8df5-72c3ecd84bb0"
+      },
+      "returncode": 0,
+      "sample": 4,
+      "seconds": 0.5318118329741992,
+      "session": "b2-supervised",
+      "stderr": "",
+      "stdout": "",
+      "tool": "Bash"
+    }
+  ],
+  "reviewers": [
+    {
+      "kind": "dispatch_started",
+      "at": 1791557868.294076,
+      "pid": 27548,
+      "pgid": 27547,
+      "run_id": "run_412fb5961e1d",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "completed",
+      "at": 1791557868.2942772,
+      "pid": 27548,
+      "pgid": 27547,
+      "run_id": "run_412fb5961e1d",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "dispatch_started",
+      "at": 1791557869.516984,
+      "pid": 27557,
+      "pgid": 27556,
+      "run_id": "run_1806a0559da2",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "completed",
+      "at": 1791557869.517191,
+      "pid": 27557,
+      "pgid": 27556,
+      "run_id": "run_1806a0559da2",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "dispatch_started",
+      "at": 1791557870.2048378,
+      "pid": 27565,
+      "pgid": 27563,
+      "run_id": "run_951f29691dee",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "completed",
+      "at": 1791557870.205044,
+      "pid": 27565,
+      "pgid": 27563,
+      "run_id": "run_951f29691dee",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "dispatch_started",
+      "at": 1791557870.8917918,
+      "pid": 27572,
+      "pgid": 27571,
+      "run_id": "run_857c5ce9c363",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "completed",
+      "at": 1791557870.891989,
+      "pid": 27572,
+      "pgid": 27571,
+      "run_id": "run_857c5ce9c363",
+      "parent_run_id": null,
+      "synthetic": true
+    }
+  ],
+  "cold_admission": [
+    {
+      "mode": "cold_admission_uncached",
+      "seconds": 1.2849982919869944,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "[forge] Policy: checked apply_patch:cold_latency_b2.txt against semantic.supervisor (aligned, 0.5s)\n",
+      "payload": {
+        "session_id": "01a12109-02ee-7701-8146-b5adb90e996a",
+        "turn_id": "01a12109-0332-7622-aac6-af605bebc49f",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-20-01-01a12109-02ee-7701-8146-b5adb90e996a.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: cold_latency_b2.txt\n+COLD\n*** End Patch"
+        },
+        "tool_use_id": "exec-48ac63e3-8b9c-492c-99c6-dec8f4bf8982"
+      }
+    },
+    {
+      "mode": "warm_admission_verdict_cache",
+      "seconds": 0.6965739589650184,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "[forge] Policy: checked apply_patch:cold_latency_b2.txt against semantic.supervisor (aligned, cached, 0.0s)\n",
+      "payload": {
+        "session_id": "01a12109-02ee-7701-8146-b5adb90e996a",
+        "turn_id": "01a12109-0332-7622-aac6-af605bebc49f",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-20-01-01a12109-02ee-7701-8146-b5adb90e996a.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: cold_latency_b2.txt\n+COLD\n*** End Patch"
+        },
+        "tool_use_id": "exec-48ac63e3-8b9c-492c-99c6-dec8f4bf8982"
+      }
+    }
+  ],
+  "cold_reviewers": [
+    {
+      "kind": "dispatch_started",
+      "at": 1791565338.753858,
+      "pid": 97138,
+      "pgid": 97137,
+      "run_id": "run_9274fd43d391",
+      "parent_run_id": null,
+      "synthetic": true
+    },
+    {
+      "kind": "completed",
+      "at": 1791565338.7540889,
+      "pid": 97138,
+      "pgid": 97137,
+      "run_id": "run_9274fd43d391",
+      "parent_run_id": null,
+      "synthetic": true
+    }
+  ]
+}

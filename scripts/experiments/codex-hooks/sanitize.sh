@@ -7,7 +7,7 @@
 # Policy (mirrors tests/fixtures/codex/README.md): replace $HOME/$USER/probe
 # paths with placeholders, then SCAN for residual secrets and FAIL LOUDLY listing
 # files (scan-and-fail, never silent scrub). codex-home dirs (which may hold an
-# auth.json copy) are never copied; a lingering auth.json anywhere fails the run.
+# independent login) are never copied; a lingering auth.json anywhere else fails the run.
 set -euo pipefail
 
 CAPTURE_ROOT="${CODEX_HOOKS_CAPTURE_DIR:-$HOME/.cache/forge-codex-hooks-probe}"
@@ -40,6 +40,7 @@ GREP="$(command -v ggrep || command -v grep)"
 find "$CAPTURE_ROOT" -type f \
     -not -path "$OUT/*" \
     -not -path '*/codex-home/*' \
+    -not -path '*/.git/*' \
     -not -name '*.guard' -not -path '*/guards/*' | while IFS= read -r f; do
     rel="${f#"$CAPTURE_ROOT"/}"
     dest="$OUT/$rel"
@@ -48,6 +49,7 @@ find "$CAPTURE_ROOT" -type f \
         -e "s|/private/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/tmp/tmp[A-Za-z0-9._-]*|<PROBE_ROOT>|g" \
+        -e 's|/private/tmp/forge-b2-[0-9]+|<ROUND_ROOT>|g' \
         -e "s|$HOME|<HOME>|g" \
         -e "s|\b$USER_NAME\b|<USER>|g" \
         "$f" >"$dest"

@@ -9,16 +9,15 @@
 #   40c (operator, TTY) interactive trust flow; tree-diff finds WHERE trust lives
 #   40d after trust: change the hook script content -> skipped again? (hash-keyed?)
 #
-# The auth.json copy inside the persistent home is removed on exit.
+# The independent login survives; this baseline stage resets only hook config.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 
 probe_init 40-trust --persistent-home
-rm -rf "$CODEX_HOME" && mkdir -p "$CODEX_HOME" && chmod 700 "$CODEX_HOME" # deterministic restart
+printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n' >"$CODEX_HOME/config.toml"
+rm -f "$CODEX_HOME/hooks.json"
 probe_version_check
 probe_auth
-# shellcheck disable=SC2064  # expand now; PROBE_ROOT trap is replaced on purpose
-trap "rm -f '$CODEX_HOME/auth.json'; rm -rf '$PROBE_ROOT'" EXIT
 
 count_fired() { find "$PROBE_CAPTURE_DIR/payloads" -name "$1-*.stdin.json" 2>/dev/null | wc -l | tr -d ' '; }
 

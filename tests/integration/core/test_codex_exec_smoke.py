@@ -42,6 +42,7 @@ def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "config", "user.name", "smoke"], cwd=path, check=True)
 
 
+@pytest.mark.usefixtures("real_codex_home")
 def test_codex_exec_smoke_parses_text_tokens_and_emits_event(tmp_path: Path) -> None:
     pf = _require_codex_ready()
     _init_git_repo(tmp_path)
