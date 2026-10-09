@@ -1,0 +1,864 @@
+{
+  "94-concurrent": {
+    "concurrent-facts.json": {
+      "source_command": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "resume",
+        "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "Concurrent probe marker ACTIVE-927892bcbb374884931e7d82d7566065. Run sleep 12 with exec_command, wait for completion, then reply SOURCE-FINISHED. Do not write files."
+      ],
+      "fork_command": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "fork",
+        "--ephemeral",
+        "--output-schema",
+        "<ROUND_ROOT>/fork-schema.json",
+        "-o",
+        "<ROUND_ROOT>/captures/94-concurrent/fork-last.txt",
+        "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "FORK-5d422e9da5504b0cb6e81c3b4344c6b3: Do not use tools. Return the inherited planning sentinel in sentinel and the ACTIVE- marker from the most recent user request in checkout, or NONE if absent. Set write_result to not_attempted and plan to the controlling approved plan."
+      ],
+      "source_exit": 0,
+      "fork_exit": 0,
+      "active_at_fork": false,
+      "active_marker": "ACTIVE-927892bcbb374884931e7d82d7566065",
+      "fork_marker": "FORK-5d422e9da5504b0cb6e81c3b4344c6b3",
+      "initial_prefix_preserved": true,
+      "fork_start_prefix_preserved": true,
+      "source_contains_fork_prompt": false,
+      "before_sha256": "63506048bbaafc9536495500c45e7ad7a3ab5234476c93ddb489d414ae863605",
+      "at_fork_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023",
+      "final_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023"
+    },
+    "last": null,
+    "fork_last": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTIVE-927892bcbb374884931e7d82d7566065\",\"write_result\":\"not_attempted\",\"plan\":\"FEATURE_DISABLED\"}",
+    "events": [
+      {
+        "source_command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "resume",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Concurrent probe marker ACTIVE-927892bcbb374884931e7d82d7566065. Run sleep 12 with exec_command, wait for completion, then reply SOURCE-FINISHED. Do not write files."
+        ],
+        "fork_command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND_ROOT>/fork-schema.json",
+          "-o",
+          "<ROUND_ROOT>/captures/94-concurrent/fork-last.txt",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "FORK-5d422e9da5504b0cb6e81c3b4344c6b3: Do not use tools. Return the inherited planning sentinel in sentinel and the ACTIVE- marker from the most recent user request in checkout, or NONE if absent. Set write_result to not_attempted and plan to the controlling approved plan."
+        ],
+        "source_exit": 0,
+        "fork_exit": 0,
+        "active_at_fork": false,
+        "active_marker": "ACTIVE-927892bcbb374884931e7d82d7566065",
+        "fork_marker": "FORK-5d422e9da5504b0cb6e81c3b4344c6b3",
+        "initial_prefix_preserved": true,
+        "fork_start_prefix_preserved": true,
+        "source_contains_fork_prompt": false,
+        "before_sha256": "63506048bbaafc9536495500c45e7ad7a3ab5234476c93ddb489d414ae863605",
+        "at_fork_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023",
+        "final_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023"
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557946.502765,
+        "elapsed_seconds": 0.4417190420208499,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 30196,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557951.092735,
+        "elapsed_seconds": 0.4924800000153482,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 30331,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557970.297086,
+        "elapsed_seconds": 0.4628305420046672,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 30930,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": [
+      {
+        "session_id": "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "turn_id": "01a1212c-c132-7211-809b-97f4c784084d",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-57-56-01a1212b-bc2c-7c20-8d83-c756f80bd828.jsonl",
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 12"
+        },
+        "tool_use_id": "exec-02d7e8ae-2898-4345-9bd8-fee555a6ce18"
+      }
+    ]
+  },
+  "94-concurrent-active": {
+    "concurrent-facts.json": {
+      "source_command": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "resume",
+        "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "Concurrent probe marker ACTIVE-dda5f3524eec4f00ad1c246dc1e625bb. Run sleep 12 with exec_command, wait for completion, then reply SOURCE-FINISHED. Do not write files."
+      ],
+      "fork_command": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "fork",
+        "--ephemeral",
+        "--output-schema",
+        "<ROUND_ROOT>/fork-schema.json",
+        "-o",
+        "<ROUND_ROOT>/captures/94-concurrent-active/fork-last.txt",
+        "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "FORK-a41bc0a7ecff4bb582f7b237dceb39a5: Do not use tools. Return the inherited planning sentinel in sentinel and the ACTIVE- marker from the most recent user request in checkout, or NONE if absent. Set write_result to not_attempted and plan to the controlling approved plan."
+      ],
+      "source_exit": 0,
+      "fork_exit": 0,
+      "active_at_fork": true,
+      "active_marker": "ACTIVE-dda5f3524eec4f00ad1c246dc1e625bb",
+      "fork_marker": "FORK-a41bc0a7ecff4bb582f7b237dceb39a5",
+      "initial_prefix_preserved": true,
+      "fork_start_prefix_preserved": true,
+      "source_contains_fork_prompt": false,
+      "before_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023",
+      "at_fork_sha256": "7d85adcff7690b06f707a0b01ffb266a2918ccc730c18e1afa1be8544edba157",
+      "final_sha256": "dc29a8346a0c5fef05723ed1ecb0fea57fd23f1ecc104c5b3ff9bd204ac06d0c"
+    },
+    "last": null,
+    "fork_last": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTIVE-dda5f3524eec4f00ad1c246dc1e625bb\",\"write_result\":\"not_attempted\",\"plan\":\"FEATURE_DISABLED\"}",
+    "events": [
+      {
+        "source_command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "resume",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Concurrent probe marker ACTIVE-dda5f3524eec4f00ad1c246dc1e625bb. Run sleep 12 with exec_command, wait for completion, then reply SOURCE-FINISHED. Do not write files."
+        ],
+        "fork_command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND_ROOT>/fork-schema.json",
+          "-o",
+          "<ROUND_ROOT>/captures/94-concurrent-active/fork-last.txt",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "FORK-a41bc0a7ecff4bb582f7b237dceb39a5: Do not use tools. Return the inherited planning sentinel in sentinel and the ACTIVE- marker from the most recent user request in checkout, or NONE if absent. Set write_result to not_attempted and plan to the controlling approved plan."
+        ],
+        "source_exit": 0,
+        "fork_exit": 0,
+        "active_at_fork": true,
+        "active_marker": "ACTIVE-dda5f3524eec4f00ad1c246dc1e625bb",
+        "fork_marker": "FORK-a41bc0a7ecff4bb582f7b237dceb39a5",
+        "initial_prefix_preserved": true,
+        "fork_start_prefix_preserved": true,
+        "source_contains_fork_prompt": false,
+        "before_sha256": "b12be626f19e0c6b295584f2f9b06de78ded2c988290d4360b9d09a704877023",
+        "at_fork_sha256": "7d85adcff7690b06f707a0b01ffb266a2918ccc730c18e1afa1be8544edba157",
+        "final_sha256": "dc29a8346a0c5fef05723ed1ecb0fea57fd23f1ecc104c5b3ff9bd204ac06d0c"
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791558396.176943,
+        "elapsed_seconds": 0.6547396249952726,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 38480,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791558400.574469,
+        "elapsed_seconds": 0.5042546250042506,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 38625,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791558403.565135,
+        "elapsed_seconds": 0.4498406669590622,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 38791,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": [
+      {
+        "session_id": "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+        "turn_id": "01a12133-9c14-7373-853e-afa2e248eba8",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-57-56-01a1212b-bc2c-7c20-8d83-c756f80bd828.jsonl",
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 12"
+        },
+        "tool_use_id": "exec-c2e0ea72-f076-4a73-a24c-13fe39364954"
+      }
+    ]
+  },
+  "94-parent-mutation": {
+    "last": "DONE. The patch was blocked by the read-only sandbox; no file was created.",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12134-48f6-79b2-92ac-ddeda6a5d4dd"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll attempt the patch once, as requested."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "DONE. The patch was blocked by the read-only sandbox; no file was created."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 149828,
+          "cached_input_tokens": 142080,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 282,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791558440.2349281,
+        "elapsed_seconds": 0.43666112498613074,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 40101,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791558444.344312,
+        "elapsed_seconds": 0.4430283330148086,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 40223,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": [
+      {
+        "session_id": "01a12134-48f6-79b2-92ac-ddeda6a5d4dd",
+        "turn_id": "01a12134-4906-7062-8e13-b57b04245864",
+        "transcript_path": null,
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/fork-action/94-parent-mutation.txt\n+PROBE\n*** End Patch"
+        },
+        "tool_use_id": "exec-34447aa4-9fe5-45b2-a6ae-c5be8acd612b"
+      }
+    ]
+  },
+  "94-planning-fork": {
+    "fork-facts.json": {
+      "source_thread": "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+      "source_sha256_before": "3e9b76fc7ef8b141de8243a503ff70f1fa2ea589ac9df1f0359d96e41490d7c7",
+      "source_sha256_after": "3e9b76fc7ef8b141de8243a503ff70f1fa2ea589ac9df1f0359d96e41490d7c7",
+      "source_unchanged": true,
+      "parent_manifest_unchanged": false,
+      "fork_rollouts": [],
+      "write_exists": false,
+      "parsed": {
+        "sentinel": "SOURCE-34f56caa63c74595886c620a38e58ef3",
+        "checkout": "ACTION-CHECKOUT\n",
+        "write_result": "apply_patch attempted exactly once; rejected by the read-only sandbox and user approval settings. No file was added; no retry or alternate method was used.",
+        "plan": "Keep FEATURE_DISABLED."
+      },
+      "sentinel_matches": true
+    },
+    "last": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTION-CHECKOUT\\n\",\"write_result\":\"apply_patch attempted exactly once; rejected by the read-only sandbox and user approval settings. No file was added; no retry or alternate method was used.\",\"plan\":\"Keep FEATURE_DISABLED.\"}",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212b-e0a5-71a3-8f3f-42233d48baf2"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll read `checkout.txt`, then attempt the requested patch once and report the outcome with the approved plan."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'cat checkout.txt'",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'cat checkout.txt'",
+          "aggregated_output": "ACTION-CHECKOUT\n",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTION-CHECKOUT\\n\",\"write_result\":\"apply_patch attempted exactly once; rejected by the read-only sandbox and user approval settings. No file was added; no retry or alternate method was used.\",\"plan\":\"Keep FEATURE_DISABLED.\"}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 59162,
+          "cached_input_tokens": 41600,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 199,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557888.8640509,
+        "elapsed_seconds": 0.43543150002369657,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 28182,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557892.827476,
+        "elapsed_seconds": 0.42389704199740663,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 28301,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557896.317827,
+        "elapsed_seconds": 0.4342431669938378,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 28409,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": [
+      {
+        "session_id": "01a1212b-e0a5-71a3-8f3f-42233d48baf2",
+        "turn_id": "01a1212b-e0b4-7e30-80f8-3c8286f968b1",
+        "transcript_path": null,
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/fork-action/94-planning-fork.txt\n+PROBE\n*** End Patch"
+        },
+        "tool_use_id": "exec-d3c46177-38a3-47c2-8c30-c44d407243a8"
+      },
+      {
+        "session_id": "01a1212b-e0a5-71a3-8f3f-42233d48baf2",
+        "turn_id": "01a1212b-e0b4-7e30-80f8-3c8286f968b1",
+        "transcript_path": null,
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat checkout.txt"
+        },
+        "tool_use_id": "exec-c26726a1-c237-4899-bbf2-53ae7c2aafcd"
+      }
+    ]
+  },
+  "94-shared-fork": {
+    "fork-facts.json": {
+      "source_thread": "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+      "source_sha256_before": "63506048bbaafc9536495500c45e7ad7a3ab5234476c93ddb489d414ae863605",
+      "source_sha256_after": "63506048bbaafc9536495500c45e7ad7a3ab5234476c93ddb489d414ae863605",
+      "source_unchanged": true,
+      "parent_manifest_unchanged": true,
+      "fork_rollouts": [],
+      "write_exists": false,
+      "parsed": {
+        "sentinel": "SOURCE-34f56caa63c74595886c620a38e58ef3",
+        "checkout": "IMPLEMENTATION-a2328448d9ec41b2bf685996ae9ed0a8",
+        "write_result": "not_attempted",
+        "plan": "The explicit user-approved plan controls and requires FEATURE_DISABLED. The later implementation reasoning recommends FEATURE_ENABLED for simplicity, but it conflicts with the approved plan and does not constitute user approval to change it."
+      },
+      "sentinel_matches": true
+    },
+    "last": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"IMPLEMENTATION-a2328448d9ec41b2bf685996ae9ed0a8\",\"write_result\":\"not_attempted\",\"plan\":\"The explicit user-approved plan controls and requires FEATURE_DISABLED. The later implementation reasoning recommends FEATURE_ENABLED for simplicity, but it conflicts with the approved plan and does not constitute user approval to change it.\"}",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212c-9486-7133-9c8f-5669729e760f"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"IMPLEMENTATION-a2328448d9ec41b2bf685996ae9ed0a8\",\"write_result\":\"not_attempted\",\"plan\":\"The explicit user-approved plan controls and requires FEATURE_DISABLED. The later implementation reasoning recommends FEATURE_ENABLED for simplicity, but it conflicts with the approved plan and does not constitute user approval to change it.\"}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 43850,
+          "cached_input_tokens": 39040,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 117,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557935.4323041,
+        "elapsed_seconds": 0.4331798749626614,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 29796,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": []
+  },
+  "94-source": {
+    "last": "READY",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212b-bc2c-7c20-8d83-c756f80bd828"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "READY"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 14466,
+          "cached_input_tokens": 12288,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 5,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557880.1215491,
+        "elapsed_seconds": 0.4475340420030989,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 27850,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": []
+  },
+  "94-source-implementation": {
+    "last": "READY",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212b-bc2c-7c20-8d83-c756f80bd828"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "READY"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29000,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 10,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557926.6587431,
+        "elapsed_seconds": 0.43112408299930394,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 29458,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": []
+  },
+  "94-write-control": {
+    "fork-facts.json": {
+      "source_thread": "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+      "source_sha256_before": "3e9b76fc7ef8b141de8243a503ff70f1fa2ea589ac9df1f0359d96e41490d7c7",
+      "source_sha256_after": "3e9b76fc7ef8b141de8243a503ff70f1fa2ea589ac9df1f0359d96e41490d7c7",
+      "source_unchanged": true,
+      "parent_manifest_unchanged": false,
+      "fork_rollouts": [],
+      "write_exists": true,
+      "parsed": {
+        "sentinel": "SOURCE-34f56caa63c74595886c620a38e58ef3",
+        "checkout": "ACTION-CHECKOUT",
+        "write_result": "apply_patch completed without error; added 94-write-control.txt containing PROBE.",
+        "plan": "Keep FEATURE_DISABLED."
+      },
+      "sentinel_matches": true
+    },
+    "last": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTION-CHECKOUT\",\"write_result\":\"apply_patch completed without error; added 94-write-control.txt containing PROBE.\",\"plan\":\"Keep FEATURE_DISABLED.\"}",
+    "fork_last": null,
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1212c-2715-7cb0-ae70-2c29d4a8c0ab"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll read `checkout.txt`, then use `apply_patch` once to add `94-write-control.txt` containing `PROBE`. The inherited plan is to keep `FEATURE_DISABLED`."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'cat checkout.txt'",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'cat checkout.txt'",
+          "aggregated_output": "ACTION-CHECKOUT\n",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_2",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/fork-action/94-write-control.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/fork-action/94-write-control.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_3",
+          "type": "agent_message",
+          "text": "{\"sentinel\":\"SOURCE-34f56caa63c74595886c620a38e58ef3\",\"checkout\":\"ACTION-CHECKOUT\",\"write_result\":\"apply_patch completed without error; added 94-write-control.txt containing PROBE.\",\"plan\":\"Keep FEATURE_DISABLED.\"}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 59777,
+          "cached_input_tokens": 54528,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 197,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "reviewer": [],
+    "hooks": [
+      {
+        "at": 1791557907.080259,
+        "elapsed_seconds": 0.4344177910243161,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-session-start"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 28791,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557913.138415,
+        "elapsed_seconds": 0.43295350001426414,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 28972,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      },
+      {
+        "at": 1791557916.711117,
+        "elapsed_seconds": 0.4329297080403194,
+        "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+        "hook": [
+          "codex-policy-check"
+        ],
+        "launcher": "<CHECKOUT>/.venv/bin/forge",
+        "pid": 29081,
+        "python": "<CHECKOUT>/.venv/bin/python3",
+        "stdout": ""
+      }
+    ],
+    "payloads": [
+      {
+        "session_id": "01a1212c-2715-7cb0-ae70-2c29d4a8c0ab",
+        "turn_id": "01a1212c-2724-7353-ae11-a7a28bc195e1",
+        "transcript_path": null,
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat checkout.txt"
+        },
+        "tool_use_id": "exec-6fc37ea4-d206-4208-ad2a-f668408e8eae"
+      },
+      {
+        "session_id": "01a1212c-2715-7cb0-ae70-2c29d4a8c0ab",
+        "turn_id": "01a1212c-2724-7353-ae11-a7a28bc195e1",
+        "transcript_path": null,
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/fork-action/94-write-control.txt\n+PROBE\n*** End Patch"
+        },
+        "tool_use_id": "exec-b1e945bb-4c40-4731-8285-27c0e9d92a68"
+      }
+    ]
+  },
+  "parent_delta": {
+    "old_confirmed_at": "2026-10-09T15:00:35+00:00",
+    "new_confirmed_at": "2026-10-09T15:07:24+00:00",
+    "appended_decisions": [
+      {
+        "final_decision": "allow",
+        "context_summary": "apply_patch:94-parent-mutation.txt",
+        "blocking_violations": [],
+        "warnings": [
+          "Supervisor skipped (FORGE_DEPTH limit reached)"
+        ],
+        "evaluated_at": "2026-10-09T15:07:24+00:00",
+        "decisions": [
+          {
+            "decision": "allow",
+            "policy_id": "semantic.supervisor",
+            "violations": [],
+            "warnings": [
+              "Supervisor skipped (FORGE_DEPTH limit reached)"
+            ],
+            "cached": false,
+            "evaluated_at": "2026-10-09T15:07:24+00:00"
+          }
+        ]
+      }
+    ],
+    "codex_before": null,
+    "codex_after": null
+  }
+}

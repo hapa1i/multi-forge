@@ -1,0 +1,460 @@
+{
+  "90-feedback-context": {
+    "nonce": "B2-eee0f11bbf7e4e92a7487b5f8073aa60",
+    "last": "B2-eee0f11bbf7e4e92a7487b5f8073aa60",
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1210c-5ff0-7041-bec7-1796105aa049"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_feedback-context.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_feedback-context.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "B2-eee0f11bbf7e4e92a7487b5f8073aa60"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29107,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 87,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hook_payloads": [
+      {
+        "session_id": "01a1210c-5ff0-7041-bec7-1796105aa049",
+        "turn_id": "01a1210c-6029-73f2-91a1-dba4dde3ac46",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-23-41-01a1210c-5ff0-7041-bec7-1796105aa049.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/captures/fixture/proj/warning_feedback-context.txt\n+OK\n*** End Patch"
+        },
+        "tool_use_id": "exec-8ff8839f-cd51-4b08-be9d-48e1aab9ee50"
+      }
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-5ff0-7041-bec7-1796105aa049",
+      "nonce_record_count": 4,
+      "injected_messages": [
+        {
+          "timestamp": "2026-10-09T14:23:50.291Z",
+          "ordinal": 12,
+          "type": "response_item",
+          "payload": {
+            "type": "message",
+            "id": "msg_01a1210c-8213-7670-b4a8-9a725f324e71",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "For the final answer, include this hook-only nonce exactly: B2-eee0f11bbf7e4e92a7487b5f8073aa60"
+              }
+            ],
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "01a1210c-6029-73f2-91a1-dba4dde3ac46",
+              "create_time": 1791555830.291709,
+              "content_item_kinds": [
+                "hooks.additional_context"
+              ]
+            }
+          }
+        }
+      ],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
+  },
+  "90-feedback-explicit": {
+    "nonce": "B2-54dc849ca06a4ab5a72a8bfcd6d2b540",
+    "last": "NONE",
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1210c-2224-7421-9121-4ec997b4e23f"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_feedback-explicit.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_feedback-explicit.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "NONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29070,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 65,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hook_payloads": [
+      {
+        "session_id": "01a1210c-2224-7421-9121-4ec997b4e23f",
+        "turn_id": "01a1210c-225d-7162-ae5a-4ba4036016b2",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-23-25-01a1210c-2224-7421-9121-4ec997b4e23f.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/captures/fixture/proj/warning_feedback-explicit.txt\n+OK\n*** End Patch"
+        },
+        "tool_use_id": "exec-3367c6f8-d12a-4e0a-bcd6-2555f388814b"
+      }
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-2224-7421-9121-4ec997b4e23f",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
+  },
+  "90-observe": {
+    "nonce": "B2-b6101de26c7d4ebd82767b3aba379de9",
+    "last": "NONE",
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1210b-e004-70c0-b200-50436c7c5a47"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add the file with one apply_patch call and check its feedback for a B2- nonce.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_observe.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_observe.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "NONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29076,
+          "cached_input_tokens": 26624,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 73,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ],
+    "hook_payloads": [
+      {
+        "session_id": "01a1210b-e004-70c0-b200-50436c7c5a47",
+        "turn_id": "01a1210b-e052-7ad1-b43e-1686174bff80",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-23-08-01a1210b-e004-70c0-b200-50436c7c5a47.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: warning_observe.txt\n+OK\n*** End Patch"
+        },
+        "tool_use_id": "exec-f90ae194-91e5-4316-8049-7a3d41cc82aa"
+      }
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210b-e004-70c0-b200-50436c7c5a47",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
+  },
+  "90-stderr": {
+    "nonce": "B2-1b214a96f668459abbe922ed601b007f",
+    "last": "NONE",
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1210c-e398-7972-ad96-24dfa62411bb"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add `warning_stderr.txt` with `OK` and check the patch feedback for a B2- nonce."
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_stderr.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_stderr.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "NONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29116,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 113,
+          "reasoning_output_tokens": 15
+        }
+      }
+    ],
+    "hook_payloads": [
+      {
+        "session_id": "01a1210c-e398-7972-ad96-24dfa62411bb",
+        "turn_id": "01a1210c-e3d4-7132-89be-6f91768afd57",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-24-15-01a1210c-e398-7972-ad96-24dfa62411bb.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND_ROOT>/captures/fixture/proj/warning_stderr.txt\n+OK\n*** End Patch"
+        },
+        "tool_use_id": "exec-28a558f8-8b6a-44f3-a12d-df6b1dbfd3d0"
+      }
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-e398-7972-ad96-24dfa62411bb",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
+  },
+  "90-system-message": {
+    "nonce": "B2-620a0b25fc894f02b80d7649f402fb75",
+    "last": "NONE",
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a1210c-9f42-77d2-a3c1-5f04346ff740"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add the file with one patch, then check its feedback for a B2- nonce.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_system-message.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND_ROOT>/captures/fixture/proj/warning_system-message.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "NONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 29103,
+          "cached_input_tokens": 24576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 100,
+          "reasoning_output_tokens": 26
+        }
+      }
+    ],
+    "hook_payloads": [
+      {
+        "session_id": "01a1210c-9f42-77d2-a3c1-5f04346ff740",
+        "turn_id": "01a1210c-9f7b-7a21-bf71-fc8bdf6a3ae9",
+        "transcript_path": "<ROUND_ROOT>/codex-home/sessions/2026/10/09/rollout-2026-10-09T16-23-57-01a1210c-9f42-77d2-a3c1-5f04346ff740.jsonl",
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: warning_system-message.txt\n+OK\n*** End Patch"
+        },
+        "tool_use_id": "exec-788cc405-45b4-4819-9f9f-f2474e0635ce"
+      }
+    ],
+    "rollout_check": {
+      "thread_id": "01a1210c-9f42-77d2-a3c1-5f04346ff740",
+      "nonce_record_count": 0,
+      "injected_messages": [],
+      "historical_hook_output_captured": false,
+      "limitation": "Native context was inspected. Hook stdout/stderr/exit were not captured; offline replay does not establish the historical exit status."
+    }
+  }
+}

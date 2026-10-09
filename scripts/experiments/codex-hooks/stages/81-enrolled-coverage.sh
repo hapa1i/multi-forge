@@ -143,7 +143,7 @@ fixture_tee PostToolUse
 
 # 30g: Stop block-once (bounded continuation)
 fixture_arm Stop respond-hook.sh "$RESPONSES/stop-block-once.json" 30g-Stop
-run_exec 30g-stop-block read-only 'reply with the single word FIRST.'
+PROBE_TURN_RESERVATION=2 run_exec 30g-stop-block read-only 'reply with the single word FIRST.'
 LM="$(cat "$PROBE_CAPTURE_DIR/results/30g-stop-block.last-message.txt" 2>/dev/null || true)"
 oracle 30g-stop-block "Stop fired $(fired_count 30g-Stop)x; last message: $(printf '%s' "$LM" | head -c 40)"
 fixture_tee Stop

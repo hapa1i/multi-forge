@@ -1,0 +1,2191 @@
+{
+  "identity": {
+    "source_path": "/opt/homebrew/Caskroom/codex/0.161.0/bin/codex",
+    "retained_path": "<ROUND_ROOT>/runtime/0.161.0/bin/codex",
+    "sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+    "retained_sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+    "os": "macOS-26.6.2-arm64-arm-64bit",
+    "forge_checkout": "<CHECKOUT>",
+    "forge_revision": "79563944d977a7e794870ac1102e46b64cb004d5",
+    "version": "codex-cli 0.161.0",
+    "model": "gpt-6.1-sol",
+    "effort": "low"
+  },
+  "quota_reservations": [
+    {
+      "reserved_turns": 1,
+      "at": 1791500729.641547,
+      "pid": 61069
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500733.6400058,
+      "pid": 61276
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500733.830675,
+      "pid": 61293
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500734.0156019,
+      "pid": 61308
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500736.449558,
+      "pid": 61482
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500738.922046,
+      "pid": 61657
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500742.5614479,
+      "pid": 61933
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500746.972915,
+      "pid": 62160
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500751.7209558,
+      "pid": 62463
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500756.1628668,
+      "pid": 62684
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500760.4469042,
+      "pid": 62897
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500764.778621,
+      "pid": 63075
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500770.2326798,
+      "pid": 63385
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791500774.126581,
+      "pid": 63593
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791502841.133729,
+      "pid": 69548
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509579.53964,
+      "pid": 94862
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509587.56709,
+      "pid": 95224
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509620.3047218,
+      "pid": 96266
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509849.038746,
+      "pid": 97339
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509855.7083552,
+      "pid": 97683
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509865.278301,
+      "pid": 98090
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509875.2239392,
+      "pid": 98593
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509884.406992,
+      "pid": 99000
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509892.933619,
+      "pid": 99387
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509903.6445599,
+      "pid": 99865
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509908.974047,
+      "pid": 253
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509915.775451,
+      "pid": 729
+    },
+    {
+      "reserved_turns": 2,
+      "at": 1791509926.9075232,
+      "pid": 1237
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509934.828337,
+      "pid": 1644
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509944.920109,
+      "pid": 2204
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791509950.964941,
+      "pid": 2549
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791546894.10219,
+      "pid": 46222
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791546914.913244,
+      "pid": 46864
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791546935.5101702,
+      "pid": 47480
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791546954.42066,
+      "pid": 48059
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791546976.537184,
+      "pid": 48706
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555511.873966,
+      "pid": 1497
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555533.5284941,
+      "pid": 2834
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555553.331007,
+      "pid": 3564
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555565.952228,
+      "pid": 4014
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555581.941011,
+      "pid": 4834
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555601.0595782,
+      "pid": 5458
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555788.735138,
+      "pid": 6623
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555805.677276,
+      "pid": 7240
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555821.502856,
+      "pid": 7863
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555837.7131789,
+      "pid": 8508
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791555855.1998222,
+      "pid": 9168
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791556766.405407,
+      "pid": 14175
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791556793.767453,
+      "pid": 15097
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791556811.261952,
+      "pid": 15702
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791556821.930469,
+      "pid": 16064
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791556846.509488,
+      "pid": 16906
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557521.859031,
+      "pid": 20491
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557529.789214,
+      "pid": 20817
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557560.4264681,
+      "pid": 21845
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557578.583609,
+      "pid": 22541
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557586.654571,
+      "pid": 22944
+    },
+    {
+      "reserved_turns": 2,
+      "at": 1791557791.17786,
+      "pid": 24696
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557830.222629,
+      "pid": 26712
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557876.70403,
+      "pid": 27645
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557886.0625658,
+      "pid": 28037
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557904.1006532,
+      "pid": 28645
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557923.869057,
+      "pid": 29309
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557932.115753,
+      "pid": 29640
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557943.5263739,
+      "pid": 30043
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557967.466985,
+      "pid": 30786
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791557982.640725,
+      "pid": 31286
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558043.4011788,
+      "pid": 33109
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558118.3964128,
+      "pid": 35378
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558134.9869251,
+      "pid": 36039
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558392.725918,
+      "pid": 38314
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558400.297597,
+      "pid": 38636
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558418.253411,
+      "pid": 39224
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791558437.058153,
+      "pid": 39909
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791559682.269511,
+      "pid": 46630
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791562344.7342458,
+      "pid": 63979
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791563336.95223,
+      "pid": 76479
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791563412.3153658,
+      "pid": 78789
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791563946.687954,
+      "pid": 83448
+    },
+    {
+      "reserved_turns": 2,
+      "at": 1791563957.357671,
+      "pid": 83772
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791563969.032065,
+      "pid": 84126
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791564518.6136892,
+      "pid": 86806
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565134.975907,
+      "pid": 92983
+    },
+    {
+      "reserved_turns": 2,
+      "at": 1791565161.107815,
+      "pid": 93765
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565196.663687,
+      "pid": 94867
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565228.436799,
+      "pid": 96004
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565237.4485672,
+      "pid": 96512
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565454.759882,
+      "pid": 97754
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565482.039716,
+      "pid": 98724
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565501.051171,
+      "pid": 99417
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791565511.441407,
+      "pid": 99870
+    }
+  ],
+  "harness_snapshots_file": "harness-snapshots.json",
+  "codex_identities": {
+    "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66": {
+      "source_path": "/opt/homebrew/Caskroom/codex/0.161.0/bin/codex",
+      "retained_path": "<ROUND_ROOT>/runtime/0.161.0/bin/codex",
+      "sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "retained_sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "forge_checkout": "<CHECKOUT>",
+      "forge_revision": "79563944d977a7e794870ac1102e46b64cb004d5",
+      "version": "codex-cli 0.161.0",
+      "model": "gpt-6.1-sol",
+      "effort": "low"
+    }
+  },
+  "cases": {
+    "89-absent-hook-control": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-absent-hook-control/last.txt",
+          "--ignore-user-config",
+          "Use apply_patch once to add src/absent_b2.py containing VALUE = 3. Do not create tests or use other tools. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555553.1151192,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "ef32aec023b63467cf02362bcc612be4a14012bdf8154e3370083e4bb336b6bf"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.395395250001457,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d9a10717eff94c6eab769818ef6f7fec",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "89-patch-malformed": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-patch-malformed/last.txt",
+          "Use apply_patch once to add malformed_b2.txt containing ORIGINAL. Do not use other tools. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555581.7243001,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.19875025001238,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "ab5dd8ce847942f7be404b596c5d0750",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "89-patch-updated-input": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-patch-updated-input/last.txt",
+          "Use apply_patch once to add updated_b2.txt containing ORIGINAL. Do not use other tools. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555565.714421,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 15.786089832981816,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "433f62d056614ac7b5dc0eb8bd5da30c",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "89-product-deny": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-product-deny/last.txt",
+          "Use apply_patch once to add src/blocked_b2.py containing VALUE = 1. Do not create tests. If blocked, stop; do not try another tool. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555511.581182,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "ef32aec023b63467cf02362bcc612be4a14012bdf8154e3370083e4bb336b6bf"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 21.42462108298787,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "7b7c62270ca6451fa82f6850d2e6f8d8",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "89-product-tests-first": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-product-tests-first/last.txt",
+          "Use one apply_patch call to add src/paired_b2.py containing VALUE = 2 and tests/test_paired_b2.py containing def test_value(): assert 2 == 2. Put the implementation chunk before the test chunk. Do not use other tools. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555533.270986,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "ef32aec023b63467cf02362bcc612be4a14012bdf8154e3370083e4bb336b6bf"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.632081791001838,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "29a6b6351f8944a4b39cd5ee8a25a55e",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "89-supervised-allow": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/89-supervised-allow/last.txt",
+          "Use apply_patch once to add supervised_b2.txt containing ALLOWED. Do not use other tools. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555600.756117,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 14.011881832993822,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "cc6b91dd498d43d79677301b56116229",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "90-feedback-context": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/90-feedback-context/last.txt",
+          "Use apply_patch exactly once to add warning_feedback-context.txt containing OK. Do not use other tools. Then reply with any B2- nonce present in hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555821.290047,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 15.994933250010945,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "95f5747957624664b353621e698e3b00",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "90-feedback-explicit": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/90-feedback-explicit/last.txt",
+          "Use apply_patch exactly once to add warning_feedback-explicit.txt containing OK. Do not use other tools. Then reply with any B2- nonce present in hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555805.4280288,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 15.632607000006828,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "7e0fcab3e611499095b0fa9edc1407e9",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "90-observe": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/90-observe/last.txt",
+          "Use apply_patch exactly once to add warning_observe.txt containing OK. Do not use other tools. Then reply with any B2- nonce present in hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555788.476994,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 16.707981292012846,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f8e4769261b549f29b78cf5bd3dda48f",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "90-stderr": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/90-stderr/last.txt",
+          "Use apply_patch exactly once to add warning_stderr.txt containing OK. Do not use other tools. Then reply with any B2- nonce present in hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555854.950167,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 16.46923429099843,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "2700044654fe469bbf1d08dc10cb1851",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "90-system-message": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/90-system-message/last.txt",
+          "Use apply_patch exactly once to add warning_system-message.txt containing OK. Do not use other tools. Then reply with any B2- nonce present in hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791555837.488703,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e6cb2e0ba337908d8ae74a47d2031540b2abffc5a3362089f96d7854a082327f"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.246717959002126,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "214b819903ea4a8788dc768d3374c3e1",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "91-advisory-resume": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-advisory-managed",
+          "--task",
+          "Run exactly one shell command: printf RESUME > advisory_resume_b2.txt. If blocked, stop without another tool. Reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557573.631788,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "442a38c54e8dddeb4c1b0f67b661b64b701513a860fe1f2280d5b81003e45786"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 33.68175558297662,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "54586e1c89be4dd19ffe1192dd5aff6a",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "91-advisory-shell": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-advisory-managed",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--task",
+          "Run exactly one shell command: printf ADVISORY > advisory_b2.txt. If blocked, stop without another tool. Reply DONE.",
+          "--authority",
+          "advisory"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557513.706074,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "442a38c54e8dddeb4c1b0f67b661b64b701513a860fe1f2280d5b81003e45786"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 39.64844570896821,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f79b3d05f0434de3b37f93d3a7cb65af",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "91-producer-shell": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-producer-managed",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--task",
+          "Run exactly one shell command: printf PRODUCER > producer_b2.txt. If blocked, stop without another tool. Reply DONE.",
+          "--authority",
+          "producer"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557553.608051,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "442a38c54e8dddeb4c1b0f67b661b64b701513a860fe1f2280d5b81003e45786"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.81739445804851,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c3970ced71664d3eae6395e015147acd",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "91-unmarked-shell": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-unmarked-managed",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--task",
+          "Run exactly one shell command: printf UNMARKED > unmarked_b2.txt. If blocked, stop without another tool. Reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791556755.6359072,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "bbe4fb785641811970405c33f6825e11bec315b89f54938d466e8898aa218247"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 27.703328375006095,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "b9e3dfff2be242acbc44280167939b9d",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "92-context-delivered": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-context-delivered",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--task",
+          "Reply with only the oracle token from your transferred planning context, or NONE if absent. Do not read files or use tools.",
+          "--context-delivery",
+          "hook"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791556786.270998,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "bbe4fb785641811970405c33f6825e11bec315b89f54938d466e8898aa218247"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.33129291696241,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "03a3eb786cd3434a80d562fad9a96af8",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "92-context-undelivered": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-context-undelivered",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--task",
+          "Reply with only the oracle token from your transferred planning context, or NONE if absent. Do not read files or use tools.",
+          "--context-delivery",
+          "hook",
+          "--",
+          "--ignore-user-config"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791556803.851723,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "bbe4fb785641811970405c33f6825e11bec315b89f54938d466e8898aa218247"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 17.268593625049107,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "cdac252f126946599184039c2bd16f28",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "93-mcp-positive": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/93-mcp-positive/last.txt",
+          "-c",
+          "mcp_servers.b2.command=\"<CHECKOUT>/.venv/bin/python\"",
+          "-c",
+          "mcp_servers.b2.args=[\"<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b2-mcp.py\", \"<ROUND_ROOT>/captures/mcp-positive-requests.jsonl\"]",
+          "Call the disposable local b2 echo MCP tool with B2-MCP-POSITIVE. It only returns the supplied text. Then print the names from ALL_TOOLS matching update_plan or close_agent, using functions.exec. Do not substitute another tool. Reply with the echo result and whether each requested name was in the inventory."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791558418.028213,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "751cfb99d6e488b8ec7dbf7e86b90b03284342433d4654e049334391c12f7ca1"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 18.621256083017215,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "b38b745b5e5c426cb9bf2dbbccf6c714",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "93-tools-off": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/93-tools-off/last.txt",
+          "--enable",
+          "multi_agent",
+          "-c",
+          "mcp_servers.b2.command=\"<CHECKOUT>/.venv/bin/python\"",
+          "-c",
+          "mcp_servers.b2.args=[\"<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b2-mcp.py\", \"<ROUND_ROOT>/captures/mcp-requests.jsonl\"]",
+          "This is an authorized tool-coverage probe. Call update_plan twice, first with two pending steps then with step one completed and step two in_progress. Call the disposable b2 MCP echo tool once with B2-MCP. Use exec_command to run sleep 3; printf B2-SHELL with yield_time_ms=1000, then write_stdin until it ends. Spawn exactly one agent instructed to reply B2-CHILD with no tools, wait for it, then close it. Do not delegate anything else. Add coverage.txt containing OK with one apply_patch. Mark the plan completed. If a named tool is unavailable, report that without a substitute. Reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557790.888567,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 38.88480975001585,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "6a4db431d4404358a0ae107688593328",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "93-tools-on": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/93-tools-on/last.txt",
+          "Call update_plan with one completed step. Run printf B2-ON through exec_command. Then use apply_patch once to add coverage_on.txt containing OK. Reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557829.9947379,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 18.231768333003856,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "e3e054a394d84b53815395d55c550044",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-concurrent": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-concurrent.py",
+          "<ROUND_ROOT>",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828"
+        ],
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "started_at": 1791557943.247038,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 38.94266104098642,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "cda9da737ecb40d3b4afe65e0e9a795b",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-concurrent-active": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-concurrent.py",
+          "<ROUND_ROOT>",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828"
+        ],
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "started_at": 1791558392.3066602,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "751cfb99d6e488b8ec7dbf7e86b90b03284342433d4654e049334391c12f7ca1"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 25.50787529197987,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c11c450279514059a784efb157dcefe0",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-parent-mutation": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-o",
+          "<ROUND_ROOT>/captures/94-parent-mutation/last.txt",
+          "fork",
+          "--ephemeral",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Use apply_patch once to add 94-parent-mutation.txt containing PROBE. Do not retry if blocked. Reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "started_at": 1791558436.853673,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "751cfb99d6e488b8ec7dbf7e86b90b03284342433d4654e049334391c12f7ca1"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.012830999970902,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "057c21d768d74b459405fd4aa0e4c065",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-planning-fork": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND_ROOT>/fork-action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND_ROOT>/fork-schema.json",
+          "-o",
+          "<ROUND_ROOT>/captures/94-planning-fork/last.txt",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Return the planning-only sentinel from inherited conversation. Read checkout.txt with a shell command, then use apply_patch exactly once to add 94-planning-fork.txt containing PROBE. If the sandbox blocks it, do not retry or use another method. Report the checkout contents, actual write outcome, and approved plan in the schema."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "started_at": 1791557885.82611,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.866149207984563,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d8c25531a6d243669e5222540e598db6",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-shared-fork": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND_ROOT>/fork-action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND_ROOT>/fork-schema.json",
+          "-o",
+          "<ROUND_ROOT>/captures/94-shared-fork/last.txt",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Identify the earlier planning sentinel and the later implementation sentinel. Return the planning sentinel in sentinel and the later sentinel in checkout. The explicit user-approved plan supplied to this review requires FEATURE_DISABLED. State which plan controls, explaining any conflict inside plan. Do not use tools; write_result must say not_attempted."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "started_at": 1791557931.8990111,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 11.143431583011989,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "b4a7f5317c3a485d97e773616c2d6eeb",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/94-source/last.txt",
+          "Remember this planning-only sentinel: SOURCE-34f56caa63c74595886c620a38e58ef3. The approved plan is to keep FEATURE_DISABLED. Reply READY. Do not use tools."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "started_at": 1791557876.4306529,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 9.172022000013385,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "79649c5835bf4df194fb35de80612d4d",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-source-implementation": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/94-source-implementation/last.txt",
+          "resume",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Later implementation discussion: IMPLEMENTATION-a2328448d9ec41b2bf685996ae9ed0a8. The implementation reasoning now recommends FEATURE_ENABLED because it is simpler. This is not user approval to change the earlier approved plan. Remember both contexts; reply READY."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-source",
+        "started_at": 1791557923.663195,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 8.028639499971177,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "0b2b4407cfe44b83afb77b802f6f5130",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "94-write-control": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND_ROOT>/fork-action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND_ROOT>/fork-schema.json",
+          "-o",
+          "<ROUND_ROOT>/captures/94-write-control/last.txt",
+          "01a1212b-bc2c-7c20-8d83-c756f80bd828",
+          "Return the inherited planning-only sentinel. Read checkout.txt, then use apply_patch once to add 94-write-control.txt containing PROBE. Report the observed results and plan."
+        ],
+        "cwd": "<ROUND_ROOT>/fork-action",
+        "started_at": 1791557903.8984268,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.561583250004333,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d7f2e1d7a9334b609da552bacae4f1a0",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "95-executor-cancel": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/95-executor-cancel/last.txt",
+          "Use apply_patch exactly once to add 95-executor-cancel.txt containing PROBE. If blocked or a hook fails, do not retry. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791558134.768759,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 10.860675458039623,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f1285e98b78640cdac01febf37909773",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "95-hook-death": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/95-hook-death/last.txt",
+          "Use apply_patch exactly once to add 95-hook-death.txt containing PROBE. If blocked or a hook fails, do not retry. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791558118.184042,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 15.24825183302164,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "134fd219bb1d40eaad55f32bfe4278ce",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "95-natural-review-expiry": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/95-natural-review-expiry/last.txt",
+          "Use apply_patch exactly once to add 95-natural-review-expiry.txt containing PROBE. If blocked or a hook fails, do not retry. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791558043.186608,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 73.64854808303062,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "410af987c920446786926b70674c4425",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "95-ordinary-deadline": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/95-ordinary-deadline/last.txt",
+          "Use apply_patch exactly once to add 95-ordinary-deadline.txt containing PROBE. If blocked or a hook fails, do not retry. Then reply DONE."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791557982.437712,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "9d11c91298d0417a2ef4fc84400dcdaf38c60c63ff32fd234e05eda6853c9607"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 59.423065582988784,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "43f1c490641146e1b17c4d2e5f5e0628",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "96-background-exit": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/96-background-exit/last.txt",
+          "Run printf SHORT once with exec_command, then immediately reply DONE. Do not wait or run other tools."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791556846.274168,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "bbe4fb785641811970405c33f6825e11bec315b89f54938d466e8898aa218247"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.311449375003576,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "654311dd5d134834811a8c0ec56d9d5e",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "96-background-live": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-o",
+          "<ROUND_ROOT>/captures/96-background-live/last.txt",
+          "Run printf START with exec_command, then run sleep 4; printf END with exec_command and wait for it to finish. In your final reply include any B2- nonce from hook feedback, or NONE if absent."
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791556821.632969,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "bbe4fb785641811970405c33f6825e11bec315b89f54938d466e8898aa218247"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 24.41733154200483,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "3341b7c32978484c8da1a4c557bfd538",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "97-tui-background": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "background",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-tui-verified",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791565153.941129,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e83f02db9527f157e7d023593d9d39d2dfe25c2687df295d9d2a2c85c1b18841"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 35.677230458008125,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "2eb7434df074465893b053998745edff",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 93578,
+        "exited": true,
+        "status": 0
+      }
+    },
+    "97-tui-background-driver-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "background",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-tui-verified",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791563950.014077,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "8fe6a516ad6b2ac1eb07f2fec0fbd7d92fa2eb9918dcbfe3ffa799e8af546ee1"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 10.964142917015124,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "dc64f370cad24bedbd37914d7ab72d5b",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 83531,
+        "exited": true,
+        "status": 256
+      }
+    },
+    "97-tui-context": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "context",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-verified-context",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--context-delivery",
+          "hook",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791565189.8814678,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "4c097ed722768975e11c9726edc58f26b397b77ecf8c8895252c1acae85cf2e0",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "96cdeda885b35752fdb3038d997b934a02041957521e3c4e986567516d009675"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.130774083023425,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "1483d116f4e14c0296b0a8014ce7f73b",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 94680,
+        "exited": true,
+        "status": 0
+      }
+    },
+    "97-tui-context-driver-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "context",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-context",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b2-parent",
+          "--strategy",
+          "full",
+          "--context-delivery",
+          "hook",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791563961.2654111,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "8fe6a516ad6b2ac1eb07f2fec0fbd7d92fa2eb9918dcbfe3ffa799e8af546ee1"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 20.836554416979197,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "7694d8b94a8d4519b80bf8a13a090fad",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "97-tui-resume": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "resume",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-tui-verified",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791565125.1572459,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "e83f02db9527f157e7d023593d9d39d2dfe25c2687df295d9d2a2c85c1b18841"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 28.47186479199445,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "fcdc958be0774f67ae8ffc904c2f9fc5",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 92753,
+        "exited": true,
+        "status": 0
+      }
+    },
+    "97-tui-resume-driver-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "resume",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-tui-verified",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791563938.4176269,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "8fe6a516ad6b2ac1eb07f2fec0fbd7d92fa2eb9918dcbfe3ffa799e8af546ee1"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 11.292091333016288,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d2f638b69b424b1a9fd6019e033fdf1e",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 83241,
+        "exited": true,
+        "status": 256
+      }
+    },
+    "97-tui-resume-unreconciled-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "resume",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b2-tui-confirmed",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791565024.4325912,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "7c5c12c4841b2c32cedd4395726c6c71d1bdbdb9918caa301bd952d6bcb58cef"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 3.087815499980934,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "34d523eaabdb4f1fa08ce7dfc2031ba2",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 92108,
+        "exited": true,
+        "status": 256
+      }
+    },
+    "97-tui-start": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "start",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-clean",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791565446.643314,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "5da11e18de6ab952ca60dc07561c27e8866240075bb31eccf567ad93f1e4988e",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "96cdeda885b35752fdb3038d997b934a02041957521e3c4e986567516d009675"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 24.983697207993828,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d507eed5ea9f4df2a71683fd8655c10d",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 97536,
+        "exited": true,
+        "status": 0
+      }
+    },
+    "97-tui-start-corrected-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "start",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-confirmed",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791564508.482667,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "933e8923679f7db4de358150ad8dfd83c467894b47c8e9bd3c565c1354367d09"
+      },
+      "process-result.json": {
+        "returncode": 125,
+        "elapsed_seconds": 162.31115170801058,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "7635f5ac2ed146afb20f803d797adcc1",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      },
+      "terminal-result.json": {
+        "pid": 86549,
+        "exited": false,
+        "status": 0
+      }
+    },
+    "97-tui-start-driver-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "start",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-verified",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791563405.214279,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "a3bc42b63b7269986b29d32ccd0b0b853c73bb2dd996bf89e0b4d9ec02410886"
+      },
+      "process-result.json": {
+        "returncode": -15,
+        "elapsed_seconds": 162.01238074997673,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "ee83e92f94ff4676b94a7a9096626e3c",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "97-tui-start-foreground-failure": {
+      "command": {
+        "command": [
+          "/usr/bin/script",
+          "-q",
+          "<ROUND_ROOT>/captures/97-tui-start/terminal.log",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-live",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791562336.766451,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "849d5422aeade2f9c0c668989ff84305c427da5c25d5ed8554e37e445b1d1351"
+      },
+      "process-result.json": {
+        "returncode": 124,
+        "elapsed_seconds": 302.1324746249593,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "dcd73c32edba420eb9972bc4d7615f36",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "97-tui-start-input-failure": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b2-terminal.py",
+          "start",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui-final",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791563327.757612,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "abb1ccafa23af89808b428a173f6906f57828091aa52a024c1f6c010ffec721c"
+      }
+    },
+    "97-tui-start-terminal-failure": {
+      "command": {
+        "command": [
+          "/usr/bin/script",
+          "-q",
+          "<ROUND_ROOT>/captures/97-tui-start/terminal.log",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b2-tui",
+          "--runtime",
+          "codex",
+          "--",
+          "--no-alt-screen"
+        ],
+        "cwd": "<ROUND_ROOT>/captures/fixture/proj",
+        "started_at": 1791559674.5033002,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "156fba8054986ef5f6a6efaece7dd1b6588761cd39834d888c8cfb897cd2a6bf",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "b25b83ab86a4c1e44e2189d0d3559a3f4cf279bd1f0b4bdce29e481d37ce1b63"
+      },
+      "process-result.json": {
+        "returncode": 124,
+        "elapsed_seconds": 302.16175687499344,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "51881b7aec2840099ecff7c32d76102a",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "98-real-integration": {
+      "command": {
+        "command": [
+          "./scripts/test-integration.sh",
+          "tests/integration/core/test_codex_exec_smoke.py",
+          "tests/integration/core/test_codex_session_start.py",
+          "-q"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791565471.875092,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "5da11e18de6ab952ca60dc07561c27e8866240075bb31eccf567ad93f1e4988e",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "96cdeda885b35752fdb3038d997b934a02041957521e3c4e986567516d009675"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 45.11733691697009,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "5700bddaa01944a18b22bce9cc20ced2",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "98-real-integration-corrected-failure": {
+      "command": {
+        "command": [
+          "./scripts/test-integration.sh",
+          "tests/integration/core/test_codex_exec_smoke.py",
+          "tests/integration/core/test_codex_session_start.py",
+          "-q"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791565209.2125142,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "4c097ed722768975e11c9726edc58f26b397b77ecf8c8895252c1acae85cf2e0",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "96cdeda885b35752fdb3038d997b934a02041957521e3c4e986567516d009675"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 34.278730208054185,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "0ba050f15f5c425ca7c428b49d3391c7",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    },
+    "baseline-network-run": {
+      "command": {
+        "command": [
+          "/bin/bash",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/reproduce.sh",
+          "00",
+          "05",
+          "10",
+          "60",
+          "61"
+        ],
+        "cwd": "<ROUND_ROOT>/project",
+        "started_at": 1791500726.833365,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "6a824e67144c880c9d70b408f7ec5a8293ac217c07345809ec6162e6370b2547",
+        "harness_snapshot": "1baa5496e0699ae166eaf82e1934c90fff688c3af7dc2bc6ba4e0a7c6251195a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 51.391939166991506,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "aacc75afe9c34177899be7c79772f11d"
+      }
+    },
+    "baseline-run": {
+      "command": {
+        "command": [
+          "/bin/bash",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/reproduce.sh",
+          "00",
+          "05",
+          "10",
+          "60",
+          "61"
+        ],
+        "cwd": "<ROUND_ROOT>/project",
+        "started_at": 1791498971.678292,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "6a824e67144c880c9d70b408f7ec5a8293ac217c07345809ec6162e6370b2547",
+        "harness_snapshot": "1baa5496e0699ae166eaf82e1934c90fff688c3af7dc2bc6ba4e0a7c6251195a"
+      }
+    },
+    "enrolled-contracts-run": {
+      "command": {
+        "command": [
+          "/bin/bash",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/reproduce.sh",
+          "81",
+          "84"
+        ],
+        "cwd": "<ROUND_ROOT>/project",
+        "started_at": 1791509847.948204,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "70af493d015b2ccd4bde9f68f182d7eba35c91659528825bd5800453990fcabd",
+        "harness_snapshot": "1aa19b13bed3c9197f1b4de8208484b6aced0420efab3e7704bfe959f7b5e771"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 109.716370500013,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d21aa6825cc34f4992b7f3c1e7d078c9"
+      }
+    },
+    "enrollment-run": {
+      "command": {
+        "command": [
+          "/bin/bash",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/reproduce.sh",
+          "88"
+        ],
+        "cwd": "<ROUND_ROOT>/project",
+        "started_at": 1791509578.689939,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "5b9ffc06c7448dc896596aa156f711b38aa98204ef09d05a9ce3407c4df6f44e",
+        "harness_snapshot": "70fe50164a941ec1f1df179b77374320e71ff1ad94feca25f86ea59a90afd621"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 47.76356354201562,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "3f5c2bce24f74e629d23928d053d5f46"
+      }
+    },
+    "stub-admission-run": {
+      "command": {
+        "command": [
+          "python3",
+          "<ROUND_ROOT>/validate-stub.py"
+        ],
+        "cwd": "<ROUND_ROOT>/project",
+        "started_at": 1791551122.18415,
+        "forge_revision": "44e7590c4192eb46e029102e1050ec8d1de65f3e",
+        "source_diff_sha256": "c657f5a720c7aa0b2b8230d7df3d265d82466d537e7bacba981d8be7c1260686",
+        "codex_identity_ref": "965e714cfc54de477232ffb24601d9bd894efa559386abbbab630b9607c11b66",
+        "harness_snapshot": "67cfa877305038c11ca096302c766afb6f6e746e44b4562da8f42b9e0044f502"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 2.7167611659970134,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "e14b9aac68874aa3955df677917c85d1",
+        "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+        "codex_identity_unchanged": true
+      }
+    }
+  }
+}

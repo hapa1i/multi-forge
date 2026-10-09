@@ -8,6 +8,74 @@ Research pin: codex-cli **0.137.0** (Phase 5, 2026-06-08). Stage 00 stamps the a
 `meta/version.txt` and warns on drift (0.138.0 observed 2026-06-09; changelog claims 0.138/0.139 are hook-neutral —
 itself a doc-claim).
 
+## B2 round (2026-10-09, Codex 0.161.0)
+
+The [B2 results](../../../docs/board/doing/codex_0160_validation/evidence/README.md) record the retained binary,
+subscription posture, commands, limitations, and B3/B4/B5 handoffs. Cases 88/89/91/92/97 exercise the current absolute
+`forge-hook` dispatcher; historical stages 85–87 register older direct commands.
+
+Use a private round root with a retained **complete** Codex package, `identity.json`, `stub-bin/codex`, and a clean
+`run` launcher. The identity file supplies `retained_path`, `sha256`, `version`, and `model`. The Codex shim invokes
+`probe-runtime.py codex --identity <identity.json> -- "$@"`. The launcher must use `env -i`, the fixture homes,
+`FORGE_DEV=<checkout>`, `PYTHON_DOTENV_DISABLED=1`, `PROBE_RUNTIME_IDENTITY`, and `PROBE_TURN_CEILING`; put the shim and
+checkout `.venv/bin` first on PATH. Export `PROBE_LAUNCHER=<absolute path to run>` and `PROBE_ROUND_ROOT=<round-root>`
+inside that launcher. Operator commands use the same launcher to retain its budget and auth environment in a second
+terminal. The sanitizer replaces `PROBE_ROUND_ROOT` literally, including punctuation in its path. Do not pass API
+credentials. The round's sanitized environment and exact command records are linked from its evidence.
+
+Create the independent login with `probe-home.py`; log in once using this launcher. Run baseline selectors
+`00 05 10 60 61`, then `b2-prepare.py <round-root>`. It creates the admitted local Claude stub and stable response
+hooks. Complete the interactive project/hook trust ceremony in that fixture; run `88`, then `81 84`. Preparation is
+one-shot and refuses to erase existing enrollment. The retained package and credential store survive every stage.
+
+Baseline stages reset `config.toml` to the file-login/hooks base and remove `hooks.json` before registering their own
+hooks. They refuse while `captures/fixture/ENROLLED` exists, before changing captures, control state or configuration.
+An explicit `PROBE_RESET_ENROLLED=1` permits the reset and removes the enrollment marker. Fixture stages require
+enrollment again afterward. B2's one-shot preparer still refuses an already prepared round; use a new round root and
+independent login for another B2 baseline. Neither reset path removes or copies `auth.json`.
+
+Run the Python drivers through the same clean launcher, sequentially:
+
+| Driver / selector                                  | Assertions                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| `b2-run.py <root> product`                         | Product patch deny, tests-first, malformed, rewrite, absent-hook control |
+| `b2-run.py <root> warnings`                        | Empty allow, explicit allow, bare context, UI message, stderr            |
+| `b2-run.py <root> authority`                       | Advisory shell deny, producer/unmarked controls, resume enrollment       |
+| `b2-run.py <root> context`                         | Managed hook delivery, missing-hook control, correlated native usage     |
+| `b2-coverage.py <root>`                            | Actual tool names, local MCP, subagent, dispatcher timings               |
+| `b2-forks.py <root>`                               | Ephemeral schema forks, read-only control, shared and concurrent sources |
+| `b2-lifetime.py <root>`                            | Ordinary deadline, instrumented native expiry, hook/executor death       |
+| `b2-run.py <root> background`                      | Live and exit-time asynchronous delivery                                 |
+| `b2-interactive.py <root> <case> --session <name>` | `start`, `resume`, `background`, `context` terminal cases                |
+
+The terminal driver sends only synthetic prompts, opens warnings with F2, and exits with Escape/EOF. It never accepts
+trust or approval dialogs. Inspect actual Stop/turn records and terminal output; a zero driver exit alone is not proof
+of an assertion. Existing capture paths must be archived after their processes stop before any retry.
+
+`probe-runtime.py run --evidence <new-directory> --seconds 240 --grace 5 -- <command>` provides the independent cleanup
+owner. It snapshots revision, harness hashes, and retained binary identity; registers detached fixture processes;
+records survivors **before** TERM/KILL cleanup; and refuses missing GNU timeout. Keep its registry active for every
+model case. `instrumentation/sitecustomize.py` is fixture-only observation code, except the explicitly labelled
+`natural-review-expiry` arm, which extends reviewer transport to 90 seconds to expose Codex's 60-second hook expiry.
+Never load that arm into ordinary product-deadline checks.
+
+Budget reservations include failed launches, subagents, Stop continuation, and every advisory enrollment check. A real
+Claude reviewer is not part of this round: the stub passes admission and records entry before responding or sleeping.
+The 100-turn ceiling is conservative reservation accounting, not a claim about a provider's billed turn count.
+
+For a revalidation, pass a separate `88-...` capture name to `stages/88-b2-enrollment.sh <name>` and use
+`b2-interactive.py <root> start --session <new-session> --capture-name <name>`. Keep the original fixture paths and
+trusted command strings. The custom response helper now retains each invocation's stdout, stderr and result beside its
+stdin; a missing result is not a successful response.
+
+`export-evidence.py <frozen-inputs> <new-output-directory>` reproduces the October 9 publication with explicit
+supplements. Use Python 3.13 for its retained bytecode comparison. The private inputs preserve the relative paths and
+bytes identified by `source-hashes.json`, plus the feedback rollouts, product/lifetime output files, original helper
+sources, cached `sitecustomize` bytecode, and `publication.json`. The sanitized input manifest and filtering rules are
+in the round's `export-selection.json`. The exporter refuses an existing output directory. It retains the original run
+identities and records drift against the initial published commit; later runtime rechecks are separate evidence. Keep
+commit `85359aed` available locally for the exporter's Git comparison.
+
 ## Facts under test
 
 | #   | Fact                                                                                                                                                                         | Stage      |
@@ -82,12 +150,15 @@ misregistration is a cross-stage call (it needs stage 50's interactive evidence)
 
 ## Safety
 
-1. **Never touches the real `~/.codex`**: every stage runs under an isolated `CODEX_HOME` inside a mktemp tree (stage 40
-   keeps a persistent home under the capture root because trust state must survive its sub-steps; its `auth.json` copy
-   is removed on exit). Escape hatch `PROBE_USE_REAL_CODEX_HOME=1` is operator-consent-only and mutates real trust
-   state.
-2. **Auth**: `~/.codex/auth.json` is copied 0600 into the disposable home and dies with it. Hook env captures elide the
-   values of anything matching `KEY|TOKEN|SECRET|AUTH|PASSWORD` at capture time — before sanitization ever runs.
+1. **Independent login**: set `PROBE_CODEX_HOME` to a private, persistent directory outside disposable projects. Run
+   `python3 probe-home.py "$PROBE_CODEX_HOME"`, then
+   `CODEX_HOME="$PROBE_CODEX_HOME" codex -c 'cli_auth_credentials_store="file"' login --device-auth`. The default
+   location is `$CODEX_HOOKS_CAPTURE_DIR/login/codex-home`. Existing unowned homes and the real `~/.codex` are refused;
+   `PROBE_USE_REAL_CODEX_HOME` is no longer supported.
+2. **Auth survives stages**: never copy a refreshing login. Stages preserve the fixture's credential store in place.
+   Stage 83's optional empirical arm requires a second independent login in `PROBE_EMPIRICAL_CODEX_HOME`. Hook env
+   captures elide values matching `KEY|TOKEN|SECRET|AUTH|PASSWORD` before sanitization. Remove the fixture login only at
+   final teardown, after evidence is saved; never run logout against the host home.
 3. **No writes outside the probe trees**: hooks write only via `PROBE_CAPTURE_DIR`; workspace-write turns are confined
    to the mktemp project.
 4. **Sanitize-then-scan**: `sanitize.sh` replaces `$HOME`/`$USER`/probe paths and then FAILS LOUDLY on residual
@@ -115,11 +186,12 @@ lives OUTSIDE the per-stage capture dirs and survives across runs:
 
 ```
 ${CODEX_HOOKS_CAPTURE_DIR}/fixture/
-├── codex-home/     # persistent CODEX_HOME (trust state in config.toml; auth.json copied per run, removed on exit)
 ├── proj/           # stable git-inited project; proj/.codex/config.toml registers all hooks
 ├── hookbin/        # STABLE wrapper paths (the registered command strings -> the trust key never changes)
 └── ENROLLED        # sentinel written after stage 80 verifies SessionStart fires headless
 ```
+
+The separately owned `PROBE_CODEX_HOME` holds trust and the independent login; rebuilding `fixture/` preserves it.
 
 **Why stable paths + rewritten bodies.** Trust keys embed the registering config's *absolute path* and a hash of the
 hook *definition* (which includes the command string = the wrapper path). 40d proved trust survives a wrapper-*content*
@@ -130,9 +202,9 @@ bakes the stage's `PROBE_CAPTURE_DIR`; a stale body would silently misattribute 
 ### Ceremony (one required, ~3 min)
 
 `./reproduce.sh 80` registers everything, then prints an OPERATOR block: in a second terminal,
-`cd <fixture>/proj && CODEX_HOME=<fixture>/codex-home codex`, accept the project + hook trust prompts (noting the exact
+`cd <fixture>/proj && CODEX_HOME="$PROBE_CODEX_HOME" codex`, accept the project + hook trust prompts (noting the exact
 wording), `/quit`, then press ENTER. Stage 80 snapshots the trust delta, harvests the `[hooks.state]` keys + hashes, and
-runs two headless verification turns. Re-running 80 rebuilds the home and needs a fresh ceremony (never idempotent);
+runs two headless verification turns. Re-running 80 rebuilds config and needs a fresh ceremony, but preserves login;
 81-83 are the repeatable headless consumers.
 
 ### Stage map
@@ -179,13 +251,13 @@ runs two headless verification turns. Re-running 80 rebuilds the home and needs 
 
 ### Safety (round 3 additions)
 
-The fixture's `codex-home/` is never copied by `sanitize.sh` (the existing `*/codex-home/*` exclusion covers it), and
-its `auth.json` is removed on every stage exit. Stage 83's empirical test runs in a fresh `mktemp` home, removed on
-exit. Trust state (`config.toml`) persists by design; delete the fixture dir when the round-3 record is written. Stages
-85-87 additionally create isolated Forge state under each stage capture dir (`FORGE_HOME=$CAPTURE/stage/forge-home`) and
-stable product projects under the stage capture dir. They register the **real product command strings**
-(`forge hook codex-policy-check` / `forge hook codex-session-start`), so `forge` must be on PATH for the Codex hook
-subprocess. Use `./scripts/setup.sh --local` or another local install before running those stages.
+Login stores are never copied by `sanitize.sh`; a stray `auth.json` outside a `codex-home/` exclusion fails the scan.
+Auth and trust persist across stages. Preserve the login until final teardown and retain the sanitized evidence first.
+Stages 85-87 additionally create isolated Forge state under each stage capture dir
+(`FORGE_HOME=$CAPTURE/stage/forge-home`) and stable product projects under the stage capture dir. They register the
+**real product command strings** (`forge hook codex-policy-check` / `forge hook codex-session-start`), so `forge` must
+be on PATH for the Codex hook subprocess. Use `./scripts/setup.sh --local` or another local install before running those
+stages.
 
 ## Relationship to the decision record
 

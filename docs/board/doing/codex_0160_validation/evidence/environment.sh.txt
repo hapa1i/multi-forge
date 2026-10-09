@@ -1,0 +1,21 @@
+# Sanitized evidence template; placeholders require editing before use.
+#!/bin/bash
+set -eu
+cd <ROUND_ROOT>/project
+exec env -i HOME="$HOME" USER="$USER" TERM="${TERM:-xterm-256color}" TMPDIR="${TMPDIR:-/tmp}" \
+  PATH=<ROUND_ROOT>/stub-bin:<ROUND_ROOT>/runtime/0.161.0/bin:<CHECKOUT>/.venv/bin:<HOME>/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+  CODEX_HOME=<ROUND_ROOT>/codex-home \
+  FORGE_HOME=<ROUND_ROOT>/forge-home \
+  FORGE_DEV=<CHECKOUT> \
+  PYTHON_DOTENV_DISABLED=1 \
+  CLAUDE_CONFIG_DIR=<ROUND_ROOT>/claude-home \
+  PROBE_TURN_CEILING=100 \
+  PROBE_RUNTIME_IDENTITY=<ROUND_ROOT>/identity.json \
+  PROBE_CODEX_HOME=<ROUND_ROOT>/codex-home \
+  PROBE_FORGE_HOME=<ROUND_ROOT>/forge-home \
+  CODEX_HOOKS_CAPTURE_DIR=<ROUND_ROOT>/captures \
+  PROBE_CONTROL=<ROUND_ROOT>/control.json \
+  PYTHONPATH=<CHECKOUT>/scripts/experiments/codex-hooks/instrumentation \
+  GIT_CONFIG_GLOBAL=/dev/null \
+  GIT_CONFIG_NOSYSTEM=1 \
+  "$@"

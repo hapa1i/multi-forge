@@ -144,6 +144,10 @@ Stay cost-conscious: run the **relevant** integration files, not the whole suite
 
 Reserve the full `make test-integration` (~2-3 min) for pre-release or broad, cross-cutting changes.
 
+Set `PYTHON_DOTENV_DISABLED=1` when an integration run must not load the repository's `.env`. The runner honors it for
+shell sourcing, and python-dotenv honors it in Python. The switch preserves inherited environment variables; it does not
+strip API credentials. Subscription-only experiments must also use their documented clean launcher.
+
 ### Advanced: Direct pytest (after `make` ran once)
 
 **WARNING:** Direct `pytest` assumes `make` ran; integration fails if LiteLLM isn't on 4001.

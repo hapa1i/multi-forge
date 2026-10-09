@@ -71,18 +71,18 @@ _FEATURES_TIMEOUT_S = 10
 
 _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 
-# The newest codex-cli version covered by the release probe contract. The v1.0.0
-# refresh ran the static preflight plus stages 00/10 of
-# ``scripts/experiments/codex-hooks/`` on 0.149.1 through 2026-08-26; deeper
-# product-hook behavior remains owned by the real-runtime
-# integration suites. Codex's trust/enrollment and hook-firing behavior is pinned
+# The newest codex-cli covered by the general probe contract, independent of the
+# blocking QA release pin. B2 tested 0.161.0 on 2026-10-09: preflight, enrollment,
+# product hooks, managed/native resume, TUI, and usage; evidence lives in
+# docs/board/doing/codex_0160_validation/evidence/. Live quota exhaustion and proxy
+# transport were not tested. Codex's trust/enrollment and hook-firing behavior is pinned
 # empirically, not contractually -- exactly the surface a minor
 # release can change silently. This is a *ceiling*, surfaced as a re-probe notice when
 # the installed binary runs ahead of it (``version_beyond_validated``): a bump does not
 # block readiness (the binary may be fine), it tells the operator the pinned facts are
 # now unverified for their version. Mirrors the 4g ``CLAUDE_VERSION_VALIDATED`` guard;
 # bump it after a green probe round on a newer codex.
-CODEX_VERSION_VALIDATED = "0.149.1"
+CODEX_VERSION_VALIDATED = "0.161.0"
 
 # Hard floor for the ``forge codex start --proxy`` launcher: the codex version on which the
 # ``-c model_providers.<id>.{base_url,wire_api,env_key}`` custom-provider contract was proved

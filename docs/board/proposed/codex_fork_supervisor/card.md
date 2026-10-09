@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5**. Depends on
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
-[B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -16,8 +16,8 @@ is not a guarantee of complete original conversation history.
 
 A separate planning conversation is the clearest independent source, but planning and implementation can share a thread.
 Support that case only with an explicit approved plan file taking precedence and reduced independence recorded: the fork
-inherits later executor reasoning too. Installed 0.160.1 help exposes no option to fork from an earlier turn; this card
-must not imply a planning-only snapshot.
+inherits later executor reasoning too. B2 must establish the tested binary's fork-boundary controls; until an earlier
+boundary is proven selectable, this card must not imply a planning-only snapshot.
 
 ## Scope
 
@@ -62,3 +62,15 @@ must not imply a planning-only snapshot.
 This extends semantic supervision, not native team orchestration or general session fork/resume. Broader Codex source
 capture remains with [codex_source_adapter](../codex_source_adapter/card.md); reuse shipped identity contracts without
 making this card depend on an unshipped transcript-import framework.
+
+## B2 handoff (2026-10-09)
+
+Codex 0.161.0 combined `exec fork`, `--ephemeral`, `--output-schema`, action-checkout selection, and enforced read-only
+writes on short synthetic sources. Quiescent source bytes stayed unchanged. One active-source boundary preserved source
+prefixes and inherited the current marker; an atomic snapshot or earlier-turn selector remains unverified. Shared-source
+context included later implementation reasoning, so it is not independent planning context.
+
+**Isolation blocker:** depth suppression made zero nested reviewer calls but still appended policy decisions and changed
+`confirmed_at` in the parent Forge manifest. B5 must isolate reviewer hook state rather than inherit the parent session
+markers unchanged. See [fork evidence](../../doing/codex_0160_validation/evidence/forks.json) and
+[results](../../doing/codex_0160_validation/evidence/README.md). This card remains proposed.

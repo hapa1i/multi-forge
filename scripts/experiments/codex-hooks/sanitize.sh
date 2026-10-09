@@ -7,7 +7,7 @@
 # Policy (mirrors tests/fixtures/codex/README.md): replace $HOME/$USER/probe
 # paths with placeholders, then SCAN for residual secrets and FAIL LOUDLY listing
 # files (scan-and-fail, never silent scrub). codex-home dirs (which may hold an
-# auth.json copy) are never copied; a lingering auth.json anywhere fails the run.
+# independent login) are never copied; a lingering auth.json anywhere else fails the run.
 set -euo pipefail
 
 CAPTURE_ROOT="${CODEX_HOOKS_CAPTURE_DIR:-$HOME/.cache/forge-codex-hooks-probe}"
@@ -36,15 +36,22 @@ USER_NAME="$(whoami)"
 # sed, leaving the real username in "sanitized" output.
 SED="$(command -v gsed || command -v sed)"
 GREP="$(command -v ggrep || command -v grep)"
+ROUND_RULE=""
+if [ -n "${PROBE_ROUND_ROOT:-}" ]; then
+    ROUND_PATTERN="$(python3 -c 'import re, sys; print(re.escape(sys.argv[1]).replace("@", r"\@"))' "$PROBE_ROUND_ROOT")"
+    ROUND_RULE="s@$ROUND_PATTERN@<ROUND_ROOT>@g"
+fi
 
 find "$CAPTURE_ROOT" -type f \
     -not -path "$OUT/*" \
     -not -path '*/codex-home/*' \
+    -not -path '*/.git/*' \
     -not -name '*.guard' -not -path '*/guards/*' | while IFS= read -r f; do
     rel="${f#"$CAPTURE_ROOT"/}"
     dest="$OUT/$rel"
     mkdir -p "$(dirname "$dest")"
     "$SED" -E \
+        -e "$ROUND_RULE" \
         -e "s|/private/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/tmp/tmp[A-Za-z0-9._-]*|<PROBE_ROOT>|g" \

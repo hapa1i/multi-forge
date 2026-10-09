@@ -1,0 +1,148 @@
+{
+  "published_revision": "85359aedf0350717179a0dd7f4cd281483e77cf8",
+  "recorded_snapshot_count": 19,
+  "exact_snapshot_matches": 0,
+  "files": {
+    "instrumentation/sitecustomize.py": {
+      "published_sha256": "dc75ec31489d930f589a74c12e5bc75f504d4b786c1c2c7df4843584f5c4c389",
+      "recorded_case_hashes": {
+        "89-absent-hook-control": "c6a59f7082dbb3b851ffa82c337ca1eedb4059800e482710bb70a77ea7004627",
+        "89-patch-malformed": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "89-patch-updated-input": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "89-product-deny": "c6a59f7082dbb3b851ffa82c337ca1eedb4059800e482710bb70a77ea7004627",
+        "89-product-tests-first": "c6a59f7082dbb3b851ffa82c337ca1eedb4059800e482710bb70a77ea7004627",
+        "89-supervised-allow": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "90-feedback-context": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "90-feedback-explicit": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "90-observe": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "90-stderr": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "90-system-message": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "91-advisory-resume": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "91-advisory-shell": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "91-producer-shell": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "91-unmarked-shell": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "92-context-delivered": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "92-context-undelivered": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "93-mcp-positive": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "93-tools-off": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "93-tools-on": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-concurrent": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-concurrent-active": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-parent-mutation": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-planning-fork": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-shared-fork": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-source": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-source-implementation": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "94-write-control": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "95-executor-cancel": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "95-hook-death": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "95-natural-review-expiry": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "95-ordinary-deadline": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "96-background-exit": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "96-background-live": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "97-tui-background": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-background-driver-failure": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-context": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-context-driver-failure": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-resume": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-resume-driver-failure": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-resume-unreconciled-failure": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-start": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-start-corrected-failure": "5ebeaf1a94debaea52d90c5943f05194616d36c0800cd95abc6142c746e0cd79",
+        "97-tui-start-driver-failure": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "97-tui-start-foreground-failure": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "97-tui-start-input-failure": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52",
+        "97-tui-start-terminal-failure": "df678eaf1f78a566b3af3900e6f1f0517d392b276025491e362d4ffea7f0ac52"
+      },
+      "matching_cases": []
+    },
+    "b2-terminal.py": {
+      "published_sha256": "d6b086e62082fdc43bb552fb609bbcb735d9fef9ce157a7a0af39c2896bf8ae8",
+      "recorded_case_hashes": {
+        "97-tui-background": "8b0be28179137e07b2359ad01f989d3d4d4617e030155f3a5d2f905fee025b0b",
+        "97-tui-background-driver-failure": "17e302428a100ee0861809ec86eb3bc0e24ed8ff8ce0d51c9d1d9177a65b1a4a",
+        "97-tui-context": "8b0be28179137e07b2359ad01f989d3d4d4617e030155f3a5d2f905fee025b0b",
+        "97-tui-context-driver-failure": "17e302428a100ee0861809ec86eb3bc0e24ed8ff8ce0d51c9d1d9177a65b1a4a",
+        "97-tui-resume": "8b0be28179137e07b2359ad01f989d3d4d4617e030155f3a5d2f905fee025b0b",
+        "97-tui-resume-driver-failure": "17e302428a100ee0861809ec86eb3bc0e24ed8ff8ce0d51c9d1d9177a65b1a4a",
+        "97-tui-resume-unreconciled-failure": "3b5034600d40ef7ab87b1cc349fe5a62cea5526d71905b6c4c778d7c868922b2",
+        "97-tui-start": "8b0be28179137e07b2359ad01f989d3d4d4617e030155f3a5d2f905fee025b0b",
+        "97-tui-start-corrected-failure": "fe8786602f60d68f5511efada5d85b7e015beee6b31b4c2380929cc17beaa4ca",
+        "97-tui-start-driver-failure": "f5e0df4d48dc19c1db4e9e2f6093d3cf38dda608cc764e1e0ec2e969ad8307ca",
+        "97-tui-start-foreground-failure": null,
+        "97-tui-start-input-failure": "255aece524b853aa722c108312b5b2b5811da79fa3f3b81a10cf5dc6d548d332",
+        "97-tui-start-terminal-failure": null
+      },
+      "matching_cases": []
+    },
+    "b2-run.py": {
+      "published_sha256": "e14fd7fc08da43e5ff4be5380e5a73487afe41702d34591561e8ee1c40b9b1fa",
+      "recorded_case_hashes": {
+        "89-absent-hook-control": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "89-patch-malformed": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "89-patch-updated-input": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "89-product-deny": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "89-product-tests-first": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "89-supervised-allow": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "90-feedback-context": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "90-feedback-explicit": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "90-observe": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "90-stderr": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "90-system-message": "9a4f8b7ff7dade17e0afa63af5c1e509dc9181910f967ef1a605c56242c77d21",
+        "91-advisory-resume": "f13dae1787f2912d6a2764cdec2efbba2d636887da0fc8b45d10967eb2563ec0",
+        "91-advisory-shell": "f13dae1787f2912d6a2764cdec2efbba2d636887da0fc8b45d10967eb2563ec0",
+        "91-producer-shell": "f13dae1787f2912d6a2764cdec2efbba2d636887da0fc8b45d10967eb2563ec0",
+        "91-unmarked-shell": "0e76290d593b294dd430038a2a8a5f911aa7910eb26a2adb79b04507e87935c4",
+        "92-context-delivered": "0e76290d593b294dd430038a2a8a5f911aa7910eb26a2adb79b04507e87935c4",
+        "92-context-undelivered": "0e76290d593b294dd430038a2a8a5f911aa7910eb26a2adb79b04507e87935c4",
+        "93-mcp-positive": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "93-tools-off": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "93-tools-on": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "95-executor-cancel": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "95-hook-death": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "95-natural-review-expiry": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "95-ordinary-deadline": "c25bf33685ad23bb275ef50b11616992bf78cb30b97a83b52a7eca051d9bf7bf",
+        "96-background-exit": "0e76290d593b294dd430038a2a8a5f911aa7910eb26a2adb79b04507e87935c4",
+        "96-background-live": "0e76290d593b294dd430038a2a8a5f911aa7910eb26a2adb79b04507e87935c4"
+      },
+      "matching_cases": []
+    },
+    "b2-forks.py": {
+      "published_sha256": "f4757695b591700be2dd612f8cf9fafd267c636faa1e383af9c5cee2367a4ed6",
+      "recorded_case_hashes": {
+        "94-concurrent": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-concurrent-active": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-parent-mutation": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-planning-fork": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-shared-fork": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-source": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-source-implementation": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b",
+        "94-write-control": "8f1d834fe16a0e3fcfa528ecd26010dc7575c05d81b8fcef23e5d0229472d28b"
+      },
+      "matching_cases": []
+    },
+    "hooks/b2-hook.py": {
+      "published_sha256": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b",
+      "recorded_case_hashes": {
+        "90-feedback-context": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b",
+        "90-feedback-explicit": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b",
+        "90-observe": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b",
+        "90-stderr": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b",
+        "90-system-message": "54008918711c55841ce1af31b8ad18afa46f34ef72c0fb7374b7ac05543f154b"
+      },
+      "matching_cases": [
+        "90-feedback-context",
+        "90-feedback-explicit",
+        "90-observe",
+        "90-stderr",
+        "90-system-message"
+      ]
+    }
+  },
+  "sitecustomize_bytecode": {
+    "cache_sha256": "a788bafb54d073563f1564d9ba2c30bfc7d5a25bfbb07ac3eb84e84d75d4120e",
+    "normalized_code_equal": true,
+    "method": "Compare Python 3.13 code objects recursively, excluding filenames and source-line positions; no cached code is executed.",
+    "limitation": "This compares the retained cache only. Older terminal/run/fork sources were not retained, so their behavioral equivalence is unverified."
+  }
+}

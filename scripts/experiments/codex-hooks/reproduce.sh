@@ -26,6 +26,7 @@ GUIDED_STAGES=(40-trust 50-interactive 80-enroll-fixture 85-policy-check-e2e 86-
 # would burn quota against a fixture that may not exist), but resolve_stage must
 # still recognize them by name so `./reproduce.sh 81` works.
 FIXTURE_STAGES=(81-enrolled-coverage 82-trust-dimensions 83-preimage 84-fresh-project)
+B2_STAGES=(88-b2-enrollment)
 
 declare_budget() {
     cat <<'EOB'
@@ -55,7 +56,7 @@ EOB
 
 resolve_stage() { # accept "30" or "30-responses"
     local want="$1" s
-    for s in "${HEADLESS_STAGES[@]}" "${GUIDED_STAGES[@]}" "${FIXTURE_STAGES[@]}"; do
+    for s in "${HEADLESS_STAGES[@]}" "${GUIDED_STAGES[@]}" "${FIXTURE_STAGES[@]}" "${B2_STAGES[@]}"; do
         case "$s" in "$want" | "$want"-*)
             printf '%s\n' "$s"
             return 0

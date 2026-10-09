@@ -2,7 +2,7 @@
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
 [B1: plan-file supervision](../../done/plan_file_supervision/card.md) and
-[B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -55,3 +55,18 @@ edit from landing or roll it back. Deterministic PreToolUse enforcement remains 
 The exact identity and evidence collection mechanics depend on B2; implementation must not guess them. This card does
 not introduce arbitrary background monitoring, native fork supervision, or automatic approval of every post-review
 correction. Those are separate behavioral contracts.
+
+## B2 handoff (2026-10-09)
+
+Codex 0.161.0 emitted two Stop events for one controlled block, with the same thread/turn IDs and `stop_hook_active`
+changing false to true; only one `UserPromptSubmit` and one turn completion were observed. The block reason entered
+native context as a user-role message inside `<hook_prompt hook_run_id="stop:22:<fixture-config-path>">`. Retain this
+continuation marker and control the reason text: it carries user authority in the executor context. The one observed
+block does not establish the ID's uniqueness or stability across retries or launches; validate those before using it for
+deduplication. Ordinary B1 timeout and native hook expiry both cleaned the admitted stub descendants; interrupted
+attempts remained incomplete. Background context could reach the next explicit user turn without an observed autonomous
+idle turn. These are measured limits, not a Stop-supervisor implementation. See
+[Stop evidence](../../doing/codex_0160_validation/evidence/stop.json),
+[lifetime evidence](../../doing/codex_0160_validation/evidence/lifetime.json), and
+[results](../../doing/codex_0160_validation/evidence/README.md). `update_plan` was absent from the tested inventory; do
+not make plan-event availability or agent plan text an approval prerequisite.

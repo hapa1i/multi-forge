@@ -1,24 +1,26 @@
-# Codex 0.160.1 test round
+# Codex runtime test round
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
-[B1](../../done/plan_file_supervision/card.md) has shipped; this proposed card supplies broader runtime evidence for B3,
-B4 and B5.
+Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
+[B1](../../done/plan_file_supervision/card.md) has shipped; this card supplies broader runtime evidence for B3, B4 and
+B5. Selected 2026-10-08 on `test/codex-0160-validation`; see the [execution checklist](checklist.md). The
+[2026-10-09 results](evidence/README.md) cover retained Codex 0.161.0; the PR is pending review.
 
 ## Problem and outcome
 
-The installed CLI is 0.160.1, while Forge's general validated ceiling is 0.149.1. Current documentation and local help
-expose useful hook and native fork behavior, but availability is not an end-to-end result. Extend the existing
-[Codex probe harness](../../../../scripts/experiments/codex-hooks/README.md) and record which contracts hold on 0.160.1.
+Forge's general validated ceiling is 0.149.1. Test the Codex version installed when the round starts, recording and
+retaining that executable for the whole round. Documentation and CLI help are leads, not end-to-end evidence. Extend the
+existing [Codex probe harness](../../../../scripts/experiments/codex-hooks/README.md) and record which contracts hold on
+the selected binary. The checklist records the dated installation observation; the slug and branch stay unchanged.
 
-The [research](../../doing/epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates
-current source claims from local observations. This card is an experiment and compatibility update, not implementation
-of the downstream features.
+The [research](../epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates current
+source claims from local observations. This card is an experiment and compatibility update, not implementation of the
+downstream features.
 
 ## Probe matrix
 
 | Area                     | Required evidence                                                                                                                                                                                                           |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Allowed-action warnings  | Model demonstrably consumes a nonce carried by the documented `additionalContext` shape; compare Forge's current shape containing `permissionDecision: allow`; the action still executes                                    |
+| Allowed-action warnings  | Model consumes a nonce from `additionalContext`; compare current product stdout and Forge's explicit-allow feedback helper; the action still executes                                                                       |
 | Operator warnings        | Test PreToolUse `systemMessage` and stderr separately in the interactive UI and event stream; identify operator visibility independently of model-context delivery                                                          |
 | Hook timeout             | Deliberately exceed the registered PreToolUse timeout; observe action allow/deny behavior, warning delivery, child-process cleanup and surviving attempt/usage records; compare a controlled earlier Forge timeout          |
 | Catch-all coverage/cost  | Count hook deliveries and measure dispatch wall time for `apply_patch`, `update_plan`, MCP, `spawn_agent`, shell commands and long-running `exec_command`/`write_stdin` sessions; distinguish hook overhead from paid calls |
@@ -32,13 +34,16 @@ of the downstream features.
 
 ## Method and deliverables
 
-Pin the binary version in each capture. Reuse isolated projects and the harness's operator-approved trust fixture;
-synthetic prompts and sentinel outputs must distinguish actual delivery from a hook merely exiting successfully. Keep
-raw captures outside the repository and publish sanitized fixtures and a concise results matrix with pass, fail,
-unsupported and inconclusive outcomes. Never count an unsuccessful model turn as evidence that a hook does not fire.
+Record the binary path, SHA-256, and version in each capture, using the retained round copy. Reuse isolated projects and
+an operator-approved trust fixture with its own login. Synthetic prompts and sentinel outputs must distinguish actual
+delivery from a hook merely exiting successfully. Keep raw captures outside the repository and publish sanitized
+fixtures and a concise results matrix with pass, fail, unsupported and inconclusive outcomes. Never count an
+unsuccessful model turn as evidence that a hook does not fire.
 
-Use the selected subscription authentication for the probe set, identify its quota use in advance, and avoid implicit
-API fallback. Do not change the user's real hook/trust configuration as a side effect of a headless test.
+Use the selected subscription authentication for the Codex probe set, identify its quota use in advance, and avoid
+implicit API fallback. Do not clone the host's refreshing auth cache or change real hook/trust configuration. Nested
+semantic reviewers default to an admitted Claude stub; any required real Claude review uses B1's subscription-only
+policy and separately budgeted quota. The checklist defines build provenance and cleanup gates.
 
 The catch-all registration also runs Forge's artifact-authority guard **before** the `apply_patch` filter. Any proposal
 to narrow it must preserve authority enforcement for other tools, with explicit ownership of any replacement hook. The
@@ -51,9 +56,10 @@ no reviewer calls. Record timeout behavior as observed, without assuming the run
 - Every matrix row has a reproducible command, exact version, positive control and retained result. Confirm native-fork
   read-only behavior empirically rather than inferring it from an accepted flag. Report per-tool hook counts and
   latency, and separate operator-only warnings from model-visible content in the results.
-- Raise `CODEX_VERSION_VALIDATED` to 0.160.1 only after the existing contracts on which Forge relies pass. Update the QA
-  runtime matrix, affected assertions and documentation consistently. Keep the independently validated proxy contract
-  ceiling unchanged unless separately tested.
+- Advance `CODEX_VERSION_VALIDATED` to the recorded round version only after the selected relied-on contracts pass,
+  including Forge preflight, enrollment receipts, and usage attribution. Update the QA matrix's `general_probe_ceiling`
+  only; preserve its release pin, probe records, and shared provenance. Keep the independent proxy-contract floor
+  unchanged. Record B2's evidence and live quota-exhaustion limitation separately.
 - Negative results for new behavior gate the corresponding B3/B4/B5 design; they are valid experiment results, not
   reasons to claim feature support. Record any fixes or follow-up blockers explicitly before closing this card.
 - Re-run only affected probe stages and targeted integration tests after fixes. CLI help inspection alone is not a

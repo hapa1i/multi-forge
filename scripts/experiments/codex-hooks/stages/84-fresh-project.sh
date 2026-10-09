@@ -33,14 +33,12 @@
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 
-# Stage 84 writes fresh-project trust into the persistent fixture and the cleanup
-# trap removes the fixture auth -- it must never target the real ~/.codex.
+# Stage 84 writes fresh-project trust into the independent fixture only.
 [ "${PROBE_USE_REAL_CODEX_HOME:-0}" = "1" ] &&
-    err "stage 84 refuses PROBE_USE_REAL_CODEX_HOME=1: it mutates trust state and the cleanup trap would touch the real ~/.codex."
+    err "stage 84 refuses PROBE_USE_REAL_CODEX_HOME=1: it mutates trust state."
 
 fixture_init 84-fresh-project
-# Capture the FIXTURE codex-home BEFORE probe_auth (which could otherwise repoint
-# CODEX_HOME); the cleanup trap cleans this path, never whatever CODEX_HOME becomes.
+# Capture the fixture path for config restoration, never credential cleanup.
 FIXTURE_CODEX_HOME="$CODEX_HOME"
 fixture_require
 probe_version_check
@@ -80,13 +78,10 @@ cp "$CODEX_HOME/config.toml" "$BASE"
 # own git history, registering a byte-identical primary-SessionStart definition.
 # =============================================================================
 TMPPARENT="$(mktemp -d)" || err "mktemp -d failed."
-# Combined cleanup: restore the pristine fixture config (so a Ctrl+C / timeout after
-# 84b's trust append leaves no fresh-project residue), drop the fixture auth, remove
-# the mktemp tree. Overrides fixture_init's auth-only trap; FIXTURE_CODEX_HOME (not
-# the live $CODEX_HOME) guarantees we never touch the real ~/.codex. Set now (BASE +
-# FIXTURE_CODEX_HOME + TMPPARENT all known) so a git-init failure can't leak the tree.
+# Restore config and remove the disposable project. The independently logged-in
+# home must retain refreshed credentials for subsequent stages.
 # shellcheck disable=SC2064  # expand these vars NOW into the trap body
-trap "[ -f '$BASE' ] && cp -f '$BASE' '$FIXTURE_CODEX_HOME/config.toml'; rm -f '$FIXTURE_CODEX_HOME/auth.json'; rm -rf '$TMPPARENT'" EXIT
+trap "[ -f '$BASE' ] && cp -f '$BASE' '$FIXTURE_CODEX_HOME/config.toml'; rm -rf '$TMPPARENT'" EXIT
 
 FRESH="$TMPPARENT/freshrepo"
 mkdir -p "$FRESH"

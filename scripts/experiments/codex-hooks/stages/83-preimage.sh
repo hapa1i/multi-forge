@@ -47,13 +47,16 @@ fi
 note "preimage computable -- proceeding to the empirical pre-enrollment test."
 
 # ---- 83.2: decisive empirical test (fresh home, FORGED trust record) ----------
-probe_auth # populates the fixture home's auth.json (source for the throwaway copy)
+probe_auth
+EMP_HOME="${PROBE_EMPIRICAL_CODEX_HOME:?Set PROBE_EMPIRICAL_CODEX_HOME to a second independently logged-in probe home}"
+python3 "$LIB_DIR/probe-home.py" "$EMP_HOME" || err "unsafe empirical login home"
+[ "$EMP_HOME" != "$CODEX_HOME" ] || err "empirical trust needs a separate login home"
+CODEX_HOME="$EMP_HOME" probe_auth
 EMP_ROOT="$(mktemp -d)" || err "mktemp -d failed."
-# Replace fixture_init's auth-only trap: also remove the throwaway tree. Expand now.
+# Remove only the disposable project, preserving both independent login stores.
 # shellcheck disable=SC2064
-trap "rm -f '$CODEX_HOME/auth.json'; rm -rf '$EMP_ROOT'" EXIT
+trap "rm -rf '$EMP_ROOT'" EXIT
 
-EMP_HOME="$EMP_ROOT/codex-home"
 EMP_PROJ="$EMP_ROOT/proj"
 EMP_BIN="$EMP_ROOT/hookbin"
 mkdir -p "$EMP_HOME" "$EMP_BIN" "$EMP_PROJ/.codex"
@@ -92,14 +95,13 @@ STATE_BLOCK="$(python3 "$PREIMAGE" \
 # ceremony actually leaves behind).
 write_user_config() { # write_user_config <include-trust-level: 1|0>
     {
-        printf '%s\n' "$STATE_BLOCK"
+        printf 'cli_auth_credentials_store = "file"\n[features]\nhooks = true\n%s\n' "$STATE_BLOCK"
         if [ "$1" = "1" ]; then
             echo "[projects.\"$EMP_PROJ_ABS\"]"
             echo 'trust_level = "trusted"'
         fi
     } >"$EMP_HOME/config.toml"
 }
-install -m 600 "$CODEX_HOME/auth.json" "$EMP_HOME/auth.json" || err "empirical auth copy failed."
 
 write_user_config 1
 cp "$EMP_PROJ/.codex/config.toml" "$PROBE_CAPTURE_DIR/meta/empirical-project-config.toml"

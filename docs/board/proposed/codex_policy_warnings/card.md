@@ -1,7 +1,7 @@
 # Warnings Codex can see
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3**. Depends on
-[B2: Codex 0.160.1 test round](../codex_0160_validation/card.md).
+[B2: Codex runtime test round](../../doing/codex_0160_validation/card.md).
 
 ## Problem and outcome
 
@@ -41,3 +41,15 @@ policy warnings and degraded supervisor outcomes. It does not depend on B1 or Je
   `additionalContext`; independently verify operator `systemMessage` visibility and retained activity records.
 - Verify both existing policy warnings and an injected rule-pack-shaped finding without requiring a Jev API call. Check
   diagnostics/JSON stream separation and the installed hook path.
+
+## B2 handoff (2026-10-09)
+
+On Codex 0.161.0, bare PreToolUse `additionalContext` reached the model after an allowed patch; the existing explicit
+`permissionDecision: allow` helper did not. `systemMessage` appeared as a TUI Hook notice without entering the model
+answer. Exit-zero stderr was not visible in the tested model or UI surfaces. Use the exact measured shape and preserve
+the catch-all authority guard; B2 does not implement feedback. Native rollout inspection found a developer message
+tagged `hooks.additional_context` only for bare context, with no nonce in the other four arms. Historical custom-hook
+stdout and exit status were not captured; the passing offline replay cannot prove the original exit status. See
+[results](../../doing/codex_0160_validation/evidence/README.md),
+[response evidence](../../doing/codex_0160_validation/evidence/feedback.json), and
+[TUI evidence](../../doing/codex_0160_validation/evidence/interactive-background.json).

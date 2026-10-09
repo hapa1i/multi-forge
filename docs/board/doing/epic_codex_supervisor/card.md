@@ -3,7 +3,8 @@
 Status: active coordination, 2026-10-08. B1 and its documentation prerequisites shipped through
 [PR #258](https://github.com/hapa1i/multi-forge/pull/258), merged to `main` as `56d4b8f5`. See the
 [coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
-B2 is the next proposed member to review; B2-B5 remain proposed and use separate execution branches when selected.
+B2 is selected on `test/codex-0160-validation` from `79563944`; its [checklist](../codex_0160_validation/checklist.md)
+owns the runtime experiment. B3-B5 remain proposed and use separate execution branches when selected.
 
 ## Problem and outcome
 
@@ -23,7 +24,7 @@ scope and limits.
 | ID  | Card                                                                                       | Independently shippable outcome                                                      | Depends on               |
 | --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------ |
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
-| B2  | [Codex 0.160.1 test round](../../proposed/codex_0160_validation/card.md)                   | Probe evidence for current hooks and native fork contracts                           | None; next proposed card |
+| B2  | [Codex runtime test round](../codex_0160_validation/card.md)                               | Probe evidence for current hooks and native fork contracts                           | None; active member      |
 | B3  | [Warnings Codex can see](../../proposed/codex_policy_warnings/card.md)                     | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B2                       |
 | B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
@@ -65,7 +66,8 @@ branches when activated.
   measured watermark property.
 - Stop review evaluates work after edits have occurred. It cannot substitute for a pre-edit deny or undo an edit.
 - B5 permits the executor thread as a fork source only with an approved plan file taking precedence. Record reduced
-  independence: the fork can inherit implementation reasoning, and 0.160.1 offers no earlier-turn fork selector.
+  independence: the fork can inherit implementation reasoning. B2 must establish the selected binary's fork-boundary
+  controls; do not assume an earlier-turn selector exists.
 
 ## Boundaries and sequencing
 

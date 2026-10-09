@@ -14,7 +14,7 @@
 #
 # Trust keys embed the registering config's ABSOLUTE path; the fixture paths are
 # stable ($CAPTURE_ROOT/fixture/...), so one ceremony's trust holds across reruns
-# of 81-83. The auth.json copy in the fixture home is removed on exit.
+# of 81-83. The independent login remains in place across stages.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 

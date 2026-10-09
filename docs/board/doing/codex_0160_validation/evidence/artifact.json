@@ -1,0 +1,361 @@
+{
+  "wheel": {
+    "wheel_sha256": "37fa57a91e142799a01b398ca0989826d99acf9118a8eccc8068a9cc17e6207a",
+    "wheel_path": "<CHECKOUT>/dist/multi_forge-1.0.2-py3-none-any.whl",
+    "commands": [
+      {
+        "command": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "enable",
+          "--scope",
+          "user",
+          "--runtime",
+          "codex",
+          "--profile",
+          "minimal",
+          "--with",
+          "hooks",
+          "--without",
+          "commands,agents,skills,status-line,permissions"
+        ],
+        "returncode": 0,
+        "stdout": "\nInstallation Plan\n  Scope:   user\n  Mode:    copy\n  Profile: minimal\n  Modules: hooks\n  Runtimes: codex\n\nModules:\n ACTION   MODULE  REASON           \n install  hooks   runtime_selected \n\nCodex hooks (config.toml):\n ACTION  TARGET                                               REASON            \n skip    <ROUND_ROOT>/wheel/codex-home/co…  already installed \n\nAlready up to date.\n\nTip: Additional skills available with --profile full: /qa\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "doctor",
+          "--json"
+        ],
+        "returncode": 0,
+        "stdout": "{\n  \"install_kind\": \"unknown\",\n  \"forge_path\": \"<ROUND_ROOT>/wheel/bin/forge\",\n  \"on_path\": true,\n  \"on_path_minimal\": false,\n  \"advice\": \"Forge is not installed as a globally reachable tool. Install it as a global tool so the CLI has a stable launcher and ordinary shells can resolve it.\",\n  \"hook_dispatcher\": {\n    \"path\": \"<ROUND_ROOT>/wheel/forge-home/bin/forge-hook\",\n    \"status\": \"current\",\n    \"installed_version\": \"1.0.2\",\n    \"expected_version\": \"1.0.2\",\n    \"installed_source_sha256\": \"e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209\",\n    \"expected_source_sha256\": \"e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209\",\n    \"metadata_path\": \"<ROUND_ROOT>/wheel/forge-home/runtime.json\",\n    \"metadata_status\": \"current\",\n    \"forge_binary_path\": \"<ROUND_ROOT>/wheel/bin/forge\",\n    \"dev_override\": {\n      \"present\": false,\n      \"value\": null,\n      \"target\": null,\n      \"valid\": false,\n      \"effective\": false,\n      \"advice\": null\n    },\n    \"advice\": null\n  },\n  \"runtime_hooks\": {\n    \"scopes\": [\n      \"user\"\n    ],\n    \"double_fire_risk\": false,\n    \"cleanup_required\": false,\n    \"legacy_registrations\": []\n  },\n  \"project_registry\": {\n    \"path\": \"<ROUND_ROOT>/wheel/forge-home/projects.json\",\n    \"status\": \"missing\",\n    \"enrolled_count\": 0,\n    \"stale_roots\": [],\n    \"error\": null,\n    \"advice\": null\n  },\n  \"project_compatibility\": {\n    \"path\": \"<ROUND_ROOT>/wheel/project/.forge/project.toml\",\n    \"state\": \"missing\",\n    \"compatible\": true,\n    \"required_forge\": null,\n    \"running_forge\": \"1.0.2\",\n    \"reason\": null,\n    \"degraded\": null\n  }\n}\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "policy",
+          "enable",
+          "--session",
+          "wheel-check",
+          "--bundle",
+          "tdd"
+        ],
+        "returncode": 0,
+        "stdout": "Policy enabled with bundles: tdd\n  Fail mode: open\n  Active rules:\n    - tdd.tests-before-impl\n    - tdd.no-skip-tests\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "<ROUND_ROOT>/wheel/forge-home/bin/forge-hook",
+          "codex-policy-check"
+        ],
+        "returncode": 0,
+        "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"<ROUND_ROOT>/captures/fixture/proj/src/blocked_b2.py:\\nPolicy violation(s):\\n  [tdd.tests-before-impl] Implementation changes require test changes first\\n    Intent: Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.\\n    Fix: Write or update tests in tests/ directory before modifying src/ code\\n    Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal.\"}}\n",
+        "stderr": "[forge] Policy: checked apply_patch:<ROUND_ROOT>/captures/fixture/proj/src/blocked_b2.py against tdd.tests-before-impl (blocked, 0.0s)\n"
+      },
+      {
+        "command": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "runtime",
+          "preflight",
+          "codex",
+          "--json"
+        ],
+        "returncode": 0,
+        "stdout": "{\n  \"installed\": true,\n  \"version\": \"0.161.0\",\n  \"version_ok\": true,\n  \"auth_method\": \"chatgpt_tokens\",\n  \"auth_source\": \"codex_store\",\n  \"billing_mode\": \"subscription_quota\",\n  \"ready\": true,\n  \"blocking_reason\": null,\n  \"hook_seam\": \"enrollment_gated\",\n  \"proxy_responses\": \"native_direct\",\n  \"doctor_status\": \"warning\",\n  \"version_validated\": \"0.161.0\",\n  \"version_beyond_validated\": false\n}\n",
+        "stderr": ""
+      }
+    ],
+    "doctor": {
+      "install_kind": "unknown",
+      "forge_path": "<ROUND_ROOT>/wheel/bin/forge",
+      "on_path": true,
+      "on_path_minimal": false,
+      "advice": "Forge is not installed as a globally reachable tool. Install it as a global tool so the CLI has a stable launcher and ordinary shells can resolve it.",
+      "hook_dispatcher": {
+        "path": "<ROUND_ROOT>/wheel/forge-home/bin/forge-hook",
+        "status": "current",
+        "installed_version": "1.0.2",
+        "expected_version": "1.0.2",
+        "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+        "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+        "metadata_path": "<ROUND_ROOT>/wheel/forge-home/runtime.json",
+        "metadata_status": "current",
+        "forge_binary_path": "<ROUND_ROOT>/wheel/bin/forge",
+        "dev_override": {
+          "present": false,
+          "value": null,
+          "target": null,
+          "valid": false,
+          "effective": false,
+          "advice": null
+        },
+        "advice": null
+      },
+      "runtime_hooks": {
+        "scopes": [
+          "user"
+        ],
+        "double_fire_risk": false,
+        "cleanup_required": false,
+        "legacy_registrations": []
+      },
+      "project_registry": {
+        "path": "<ROUND_ROOT>/wheel/forge-home/projects.json",
+        "status": "missing",
+        "enrolled_count": 0,
+        "stale_roots": [],
+        "error": null,
+        "advice": null
+      },
+      "project_compatibility": {
+        "path": "<ROUND_ROOT>/wheel/project/.forge/project.toml",
+        "state": "missing",
+        "compatible": true,
+        "required_forge": null,
+        "running_forge": "1.0.2",
+        "reason": null,
+        "degraded": null
+      }
+    },
+    "launchers": [
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "enable",
+          "--scope",
+          "user",
+          "--runtime",
+          "codex",
+          "--profile",
+          "minimal",
+          "--with",
+          "hooks",
+          "--without",
+          "commands,agents,skills,status-line,permissions"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "doctor",
+          "--json"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "session",
+          "start",
+          "wheel-check",
+          "--no-launch",
+          "--no-proxy"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "policy",
+          "enable",
+          "--session",
+          "wheel-check",
+          "--bundle",
+          "tdd"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "hook",
+          "codex-policy-check"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "runtime",
+          "preflight",
+          "codex",
+          "--json"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "enable",
+          "--scope",
+          "user",
+          "--runtime",
+          "codex",
+          "--profile",
+          "minimal",
+          "--with",
+          "hooks",
+          "--without",
+          "commands,agents,skills,status-line,permissions"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "extension",
+          "doctor",
+          "--json"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "policy",
+          "enable",
+          "--session",
+          "wheel-check",
+          "--bundle",
+          "tdd"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "hook",
+          "codex-policy-check"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      },
+      {
+        "argv": [
+          "<ROUND_ROOT>/wheel/bin/forge",
+          "runtime",
+          "preflight",
+          "codex",
+          "--json"
+        ],
+        "module": "<ROUND_ROOT>/wheel-venv/lib/python3.13/site-packages/forge/__init__.py",
+        "python": "<ROUND_ROOT>/wheel-venv/bin/python"
+      }
+    ],
+    "preflight": {
+      "installed": true,
+      "version": "0.161.0",
+      "version_ok": true,
+      "auth_method": "chatgpt_tokens",
+      "auth_source": "codex_store",
+      "billing_mode": "subscription_quota",
+      "ready": true,
+      "blocking_reason": null,
+      "hook_seam": "enrollment_gated",
+      "proxy_responses": "native_direct",
+      "doctor_status": "warning",
+      "version_validated": "0.161.0",
+      "version_beyond_validated": false
+    },
+    "qa_matrix": {
+      "schema_version": 1,
+      "blocking_track": "pinned",
+      "validated_forge_revision": "0b9d08ebe19e6ca7ca57b371ef9f81dfeef53bfe",
+      "validated_on": "2026-08-26",
+      "tracks": {
+        "pinned": {
+          "blocking": true,
+          "claude": {
+            "package": "@anthropic-ai/claude-code",
+            "version": "2.1.245",
+            "minimum_supported": "2.1.78",
+            "probe": {
+              "kind": "isolated_forge_lifecycle",
+              "command": "claude --print with isolated Claude/Forge homes and FORGE_DEV bound to the validated checkout",
+              "completed_model_turns": 1,
+              "observed": {
+                "expected_reply": true,
+                "session_start_id_recorded": true,
+                "stop_transcript_captured": true
+              }
+            }
+          },
+          "codex": {
+            "package": "@openai/codex",
+            "version": "0.149.1",
+            "general_probe_ceiling": "0.161.0",
+            "proxy_contract_floor": "0.141.0",
+            "probe": {
+              "kind": "preflight_and_codex_hooks_stages_00_10",
+              "command": "forge runtime preflight codex --json; scripts/experiments/codex-hooks/reproduce.sh 00 10",
+              "completed_model_turns": 2,
+              "observed": {
+                "version_matched": true,
+                "preflight_ready": true,
+                "within_validated_ceiling": true,
+                "hook_seam_enrollment_gated": true,
+                "isolated_auth": true,
+                "hooks_enabled": true,
+                "plain_exec_completed": true,
+                "trust_bypass_exec_completed": true,
+                "verdict": "FIRES-HEADLESS-TRUST-GATED",
+                "user_hooks_fired": true
+              }
+            }
+          }
+        },
+        "latest": {
+          "blocking": false,
+          "claude": {
+            "version": "latest"
+          },
+          "codex": {
+            "version": "latest"
+          }
+        }
+      }
+    }
+  },
+  "preflight_after": {
+    "installed": true,
+    "version": "0.161.0",
+    "version_ok": true,
+    "auth_method": "chatgpt_tokens",
+    "auth_source": "codex_store",
+    "billing_mode": "subscription_quota",
+    "ready": true,
+    "blocking_reason": null,
+    "hook_seam": "enrollment_gated",
+    "proxy_responses": "native_direct",
+    "doctor_status": "warning",
+    "version_validated": "0.161.0",
+    "version_beyond_validated": false
+  },
+  "teardown": {
+    "registered_identities": 1044,
+    "survivors_before_sweep": [],
+    "kill_escalation": [],
+    "remaining": [],
+    "fixture_auth_removed": true,
+    "codex_sha256_after": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+    "host_file_equality": "unverified: no whole-round baseline captured; all recorded credential/config operations used fixture homes"
+  }
+}
