@@ -35,6 +35,8 @@ def main() -> int:
     actions = []
     keys_sent = 0
     prompt_sent = False
+    terminal_ready = None
+    recent_output = b""
     with (capture / "terminal.log").open("wb", buffering=0) as log:
         while time.monotonic() - started < 180:
             inputs = [terminal] + ([sys.stdin.fileno()] if sys.stdin.isatty() else [])
@@ -50,6 +52,10 @@ def main() -> int:
                         actions.append({"at": time.time(), "keys_hex": data.hex()})
                 elif data:
                     log.write(data)
+                    recent_output += data
+                    if terminal_ready is None and b"\x1b[?2004h" in recent_output:
+                        terminal_ready = time.monotonic()
+                    recent_output = recent_output[-32:]
                     if sys.stdout.isatty():
                         os.write(sys.stdout.fileno(), data)
                     if b"\x1b[6n" in data:
@@ -61,7 +67,14 @@ def main() -> int:
                     os.write(terminal, bytes.fromhex(key))
                     actions.append({"at": time.time(), "keys_hex": key})
                 keys_sent = len(keys)
-            if args.prompt_file and not prompt_sent and time.monotonic() - started > 8:
+            # Forge preflight can outlast a fixed delay from process creation.
+            # Wait for Codex to own terminal input, then allow resume to settle.
+            if (
+                args.prompt_file
+                and not prompt_sent
+                and terminal_ready is not None
+                and time.monotonic() - terminal_ready > 8
+            ):
                 os.write(terminal, b"\x1b[200~" + args.prompt_file.read_bytes() + b"\x1b[201~")
                 time.sleep(0.3)
                 os.write(terminal, b"\r")
