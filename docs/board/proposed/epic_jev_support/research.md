@@ -379,7 +379,7 @@ own design. [Effort resolution](../../../../src/forge/proxy/reasoning.py),
 
 The draft scope is [A1: client and probes](../jev_client_probes/card.md),
 [A2: warning-only rule packs](../jev_rule_pack/card.md), and [A3: cascade](../jev_cascade/card.md). A2 needs
-[B3](../codex_policy_warnings/card.md) for Codex-visible warnings; A3 needs
+[B3](../../doing/codex_policy_warnings/card.md) for Codex-visible warnings; A3 needs
 [B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision. Those cards belong to the
 separate Codex supervisor epic. The broader avenues below remain research context, not additional committed members.
 

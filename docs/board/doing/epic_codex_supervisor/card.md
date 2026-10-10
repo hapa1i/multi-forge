@@ -5,7 +5,9 @@ Status: active coordination, 2026-10-10. B1 and its documentation prerequisites 
 [coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
 B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), merged as `2a15c087`; its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
-B3-B5 remain proposed and use separate execution branches when selected.
+B3 is selected on `feat/codex-policy-warnings` from `d54dba63`; its [checklist](../codex_policy_warnings/checklist.md)
+owns warning delivery and the explicit source-only opt-in. B4-B5 remain proposed and use separate execution branches
+when selected.
 
 ## Problem and outcome
 
@@ -26,14 +28,14 @@ shipped scope and limits.
 | --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------ |
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
-| B3  | [Warnings Codex can see](../../proposed/codex_policy_warnings/card.md)                     | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B2                       |
+| B3  | [Warnings Codex can see](../codex_policy_warnings/card.md)                                 | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
 | B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
-auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback. B4
-owns the review trigger and turn accounting. B5 owns native Codex context acquisition. Cards use separate execution
-branches when activated.
+auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback and
+the source-only formatter, using B1's approved-plan snapshot contract. B4 owns the review trigger and turn accounting.
+B5 owns native Codex context acquisition. Cards use separate execution branches when activated.
 
 ## Shared contract
 

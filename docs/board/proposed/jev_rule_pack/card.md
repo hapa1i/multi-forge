@@ -2,7 +2,7 @@
 
 Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../jev_client_probes/card.md). Codex-visible delivery also depends on
-[B3: warnings Codex can see](../codex_policy_warnings/card.md).
+[B3: warnings Codex can see](../../doing/codex_policy_warnings/card.md).
 
 ## Problem and outcome
 

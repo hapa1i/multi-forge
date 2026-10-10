@@ -1,7 +1,11 @@
 # Warnings Codex can see
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3**. Depends on
-[B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
+Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B3**. Depends on
+[B2: Codex runtime test round](../../done/codex_0160_validation/card.md) and
+[B1: approved-plan snapshot contract](../../done/plan_file_supervision/card.md); both have shipped.
+
+Selected 2026-10-10 on `feat/codex-policy-warnings`, from local `main` at `d54dba63`. The
+[execution checklist](checklist.md) includes the user-selected source-only mode. This activation changes planning only.
 
 ## Problem and outcome
 
@@ -11,8 +15,9 @@ Codex on an allowed action using the response shape B2 proves reaches model cont
 warnings through tested PreToolUse `systemMessage` behavior; UI/event-stream delivery and model context are separate
 channels.
 
-This enables [Jev rule-pack warnings](../jev_rule_pack/card.md) in Codex, but is independently useful for existing
-policy warnings and degraded supervisor outcomes. It does not depend on B1 or Jev.
+This enables [Jev rule-pack warnings](../../proposed/jev_rule_pack/card.md) in Codex, but is independently useful for
+existing policy warnings and degraded supervisor outcomes. Ordinary warning delivery needs no supervisor or Jev call.
+The optional source-only mode uses B1's shipped immutable plan snapshot to validate supervisor quotations.
 
 ## Scope
 
@@ -23,11 +28,16 @@ policy warnings and degraded supervisor outcomes. It does not depend on B1 or Je
   the violated rule's intent and supplied evidence where available; do not lose a later file's warning because the first
   file allowed cleanly. Make omission/truncation visible.
 - Reuse the existing policy failure semantics. A warning remains non-blocking; its delivery must not turn an allow into
-  deny or clear a deterministic denial. Apply any configured source-only feedback formatter consistently.
+  deny or clear a deterministic denial.
+- Add an explicit source-only opt-in for Codex model feedback: verified passages from the exact reviewed plan snapshot
+  plus fixed Forge diagnostics. Keep reviewer-generated explanations, evidence prose, and suggested fixes out of model
+  context in that mode. Apply it consistently to warning and block text without changing verdicts; preserve full durable
+  review evidence. Missing or fabricated quotations produce fixed diagnostics, never a claim of verified source text.
+  This is a content-selection option, not a watermark guarantee.
 - Respect `policy_summary_feedback` for model-visible `additionalContext`, including Jev findings: enabled sends bounded
   substantive rule/evidence feedback; disabled sends none. Keep operator diagnostics and durable records when disabled.
-  If B2 proves `systemMessage` reaches the UI/event stream, use it for operator warnings independently of that
-  model-feedback setting. If unsupported, name the tested operator surface without claiming in-session visibility.
+  B2 observed `systemMessage` as a TUI Hook notice; verify it with the product response independently of the
+  model-feedback setting. Report only the tested UI/event surfaces as supported.
 - Gate behavior using B2's tested runtime contract. Provide an accurate diagnostic on unsupported versions without
   claiming the model saw a warning that was only printed for the operator.
 - Update the runtime, workflow and end-user policy documentation with the validated delivery behavior.
@@ -41,6 +51,9 @@ policy warnings and degraded supervisor outcomes. It does not depend on B1 or Je
   `additionalContext`; independently verify operator `systemMessage` visibility and retained activity records.
 - Verify both existing policy warnings and an injected rule-pack-shaped finding without requiring a Jev API call. Check
   diagnostics/JSON stream separation and the installed hook path.
+- Source-only tests reject invented or stale quotes, retain exact snapshot attribution, and exclude reviewer prose from
+  every Codex model-visible warning/block field. A real Codex control distinguishes source text from a private reviewer
+  nonce; full durable review evidence remains inspectable.
 
 ## B2 handoff (2026-10-09)
 
