@@ -31,7 +31,7 @@ def main() -> int:
     started = time.monotonic()
     completed = None
     notice_opened = False
-    eof_sent = False
+    close_step = 0
     actions = []
     keys_sent = 0
     prompt_sent = False
@@ -77,9 +77,12 @@ def main() -> int:
                 os.write(terminal, b"\x1bOQ")
                 notice_opened = True
                 actions.append({"at": time.time(), "action": "F2 inspect notices"})
-            if completed is not None and time.monotonic() - completed > 5 and not eof_sent:
-                os.write(terminal, b"\x1b\x04\x04")
-                eof_sent = True
+            # Escape must be processed before EOF; sending both in one write can
+            # be interpreted as an Alt-modified key and leave the TUI running.
+            if completed is not None and close_step < 3 and time.monotonic() - completed > 5 + close_step:
+                os.write(terminal, b"\x1b" if close_step == 0 else b"\x04")
+                actions.append({"at": time.time(), "action": "dismiss notice" if close_step == 0 else "EOF"})
+                close_step += 1
             finished, status = os.waitpid(pid, os.WNOHANG)
             if finished:
                 (capture / "terminal-result.json").write_text(

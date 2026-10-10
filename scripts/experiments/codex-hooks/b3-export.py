@@ -23,11 +23,31 @@ def export(root: Path, destination: Path) -> None:
     if (root / "B3_ROUND").read_text().strip() != "independent-b3-round-v1":
         raise ValueError("Only an owned synthetic B3 round can be published.")
     cases = []
+    destination.mkdir(parents=True, exist_ok=True)
+
+    def save(name: str, value: object) -> None:
+        output = (
+            json.dumps(value, indent=2, ensure_ascii=False)
+            .replace(str(root), "$ROUND")
+            .replace(str(checkout), "$CHECKOUT")
+        )
+        (destination / name).write_text(output + "\n")
+
     for directory in sorted((root / "captures").iterdir()):
         if not directory.is_dir():
             continue
         case: dict = {"case": directory.name}
-        for name in ("control.json", "action-result.json", "terminal-result.json", "preflight.json"):
+        for name in (
+            "control.json",
+            "action-result.json",
+            "terminal-result.json",
+            "preflight.json",
+            "real-review.json",
+            "review-input.json",
+            "review-runtime-result.json",
+            "review-dispatch.json",
+            "unmodified-product-wire.json",
+        ):
             if (directory / name).is_file():
                 case[name.removesuffix(".json")] = json.loads((directory / name).read_text())
         for name in ("hooks.jsonl", "reviewer.jsonl"):
@@ -62,6 +82,8 @@ def export(root: Path, destination: Path) -> None:
             or (row.get("type") == "event_msg" and row.get("payload", {}).get("type") == "task_complete")
         ]
         case["native_streams"] = {p.name: rows(p) for p in sorted(directory.glob("*-native-stream.jsonl"))}
+        if (directory / "review-prompt.txt").is_file():
+            case["review_prompt"] = (directory / "review-prompt.txt").read_text()
         if (directory / "usage.json").is_file():
             case["usage"] = json.loads((directory / "usage.json").read_text())
         # Hash every retained capture, including failed attempts and non-published terminal bytes.
@@ -70,7 +92,8 @@ def export(root: Path, destination: Path) -> None:
             for p in sorted(directory.rglob("*"))
             if p.is_file()
         }
-        cases.append(case)
+        save(directory.name + ".json", case)
+        cases.append({"case": directory.name, "evidence": directory.name + ".json"})
     report = {
         "identity": json.loads((root / "identity.json").read_text()),
         "reserved_turns": sum(row["reserved_turns"] for row in rows(root / "turns.jsonl")),
@@ -82,14 +105,16 @@ def export(root: Path, destination: Path) -> None:
         for p in sorted(scripts.rglob("*"))
         if p.is_file() and "__pycache__" not in p.parts
     }
-    destination.mkdir(parents=True, exist_ok=True)
-    for name, value in (("captures.json", report), ("helper-sources.json", helpers)):
-        output = (
-            json.dumps(value, indent=2, ensure_ascii=False)
-            .replace(str(root), "$ROUND")
-            .replace(str(checkout), "$CHECKOUT")
-        )
-        (destination / name).write_text(output + "\n")
+    for name in (
+        "wheel-verification.json",
+        "real-claude-reservation.json",
+        "verification.json",
+        "preflight-ready.json",
+    ):
+        if (root / name).is_file():
+            save(name, json.loads((root / name).read_text()))
+    save("captures.json", report)
+    save("helper-sources.json", helpers)
 
 
 def main() -> None:

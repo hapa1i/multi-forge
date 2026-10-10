@@ -35,7 +35,7 @@ def main() -> None:
     from forge.policy.semantic.attempts import read_attempts
     from forge.policy.semantic.plan_source import read_plan
     from forge.policy.types import ActionContext
-    from forge.session.models import SupervisorConfig
+    from forge.session.models import LaneRecord, SupervisorConfig
 
     plan = root / "real-review-approved-plan.txt"
     plan.write_text("The export endpoint must return CSV only.\nDo not add JSON output or change the public API.\n")
@@ -70,8 +70,15 @@ def main() -> None:
     (capture / "review-input.json").write_text(
         json.dumps({"config": asdict(config), "context": asdict(context), "snapshot": asdict(snapshot)}, indent=2)
     )
-    with (root / "real-claude-reservation.json").open("x") as output:
-        json.dump({"attempts": 1, "extra_usage_disabled_confirmed": True, "identity": identity}, output, indent=2)
+    reservation = root / "real-claude-reservation.json"
+    if reservation.exists():
+        if json.loads(reservation.read_text())["identity"] != identity:
+            raise ValueError("The reserved Claude identity changed.")
+    else:
+        with reservation.open("x") as output:
+            json.dump({"attempts": 1, "extra_usage_disabled_confirmed": True, "identity": identity}, output, indent=2)
+    if (root / "real-claude-dispatched.json").exists():
+        raise ValueError("The single real Claude inference attempt was already dispatched.")
 
     ordinary_guard = watchdog.run_guarded
     dispatches = 0
@@ -82,6 +89,8 @@ def main() -> None:
             dispatches += 1
             if dispatches > 1:
                 raise ValueError("The one-attempt Claude budget forbids another dispatch.")
+            with (root / "real-claude-dispatched.json").open("x") as output:
+                json.dump({"at": time.time(), "capture": str(capture)}, output)
             (capture / "review-dispatch.json").write_text(json.dumps({"argv": argv, "at": time.time()}, indent=2))
         return ordinary_guard(argv, **kwargs)
 
@@ -95,7 +104,9 @@ def main() -> None:
         return result
 
     supervisor.run_claude_session = observed_session
-    result = supervisor.run_supervisor_check(config, context, snapshot=snapshot)
+    result = supervisor.run_supervisor_check(
+        config, context, snapshot=snapshot, lane_record=LaneRecord("claude_code", "anthropic-direct", "sonnet")
+    )
     report = {
         "identity": identity,
         "result": asdict(result),
