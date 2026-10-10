@@ -110,8 +110,10 @@ selects verified snapshot text or fixed fallback for every model-visible warning
 workspace reads. The quote-quality control completed one subscription-only Claude review with two verified quotations.
 
 The admission set is feature-specific: 0.161.0 and 0.162.1, with the historical 0.161.0 qualifications preserved. Launch
-identity is refreshed at each managed start/resume; unknown or unmeasured versions receive no new allowed-action
-channel. The general ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes
-at 12,000/5,000 and the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude
-retains its existing count summary; Jev A2 owns that formatter extension. B4/B5 are still proposed, and B3 remains
-`doing` until merge and closeout.
+identity is refreshed at each managed start/resume and checked against the invoking process's launch parent. Nested
+runtimes cannot reuse the inherited record. Unknown/unmeasured versions and unverifiable process chains, including
+forking wrappers, receive no new model/operator channel; launch and existing denials remain available. The general
+ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
+the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
+count summary; Jev A2 owns that formatter extension. B4/B5 are still proposed, and B3 remains `doing` until merge and
+closeout.

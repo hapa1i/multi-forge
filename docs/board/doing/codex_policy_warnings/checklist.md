@@ -6,9 +6,8 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 Selected 2026-10-10 on `feat/codex-policy-warnings`, based on clean local `main` at `d54dba63` (B2 closeout above merged
 PR #261, `2a15c087`). B2 closeout `d54dba63` was published to `origin/main` on 2026-10-10. Implementation, live
-evidence, and initial aggregate checks are complete. PR #262 review corrections are being verified. See
-[results](evidence/README.md) and [validation](evidence/validation.md). B1 and B2 are done. B4, B5, and the Jev cards
-remain proposed.
+evidence, and aggregate checks are complete, including PR #262 review corrections. See [results](evidence/README.md) and
+[validation](evidence/validation.md). B1 and B2 are done. B4, B5, and the Jev cards remain proposed.
 
 Deliver bounded, attributed policy warnings to the Codex model after allowed patches, with an independent operator
 warning channel. The user selected the source-only opt-in: Forge injects verified plan passages and fixed diagnostics
@@ -281,7 +280,7 @@ belongs under `tests/regression/test_bug_b3_*.py` with the regression mark. Publ
   import override. Record wheel/launcher hashes and restore fixture routing afterwards. A different home requires a
   fresh trust ceremony and budget reservation. Keep the general ceiling, blocking QA pin, shared validation
   revision/date, and proxy floor unchanged unless separately justified and revalidated.
-- [ ] Run aggregate `make test-unit`, `make test-regression`, and full `make pre-commit`; verify board links and diffs.
+- [x] Run aggregate `make test-unit`, `make test-regression`, and full `make pre-commit`; verify board links and diffs.
   Retain commands, results, skips/failures, exact tested source, runtime/artifact hashes, and sanitized captures in B3's
   evidence. Final evidence must account for any helper or product edits after its capture revision.
 - [x] Before opening the B3 PR, refresh `origin/main` and verify it contains published B2 closeout `d54dba63`. Reconcile
@@ -339,3 +338,15 @@ passed on explicitly selected 2.1.291. The real 2.1.294 macOS review passed.
 
 Full review/merge and fixture-auth teardown remain separate closeout work. Move inbound B3 links when the card moves to
 `done/`; keep the epic active and B4/B5/Jev unactivated.
+
+2026-10-10 PR review corrections: `fb26b011` preserves symlink launchers/child PATH lookup, streams hashing, binds
+feedback admission to the invoking process, and strips inherited identity from Claude children. It restores shared
+blocking guidance, excludes resolved tier-1 failures from unreviewed feedback, and scopes source-only stop-and-ask
+instructions to unquoted reviewer findings. Tests exercise real launchers and the actual Codex hook wire.
+
+Review validation passed 10,640 unit tests, 1,441 regressions, 32 Docker hook/manual-policy cases, and two Docker auth
+isolation controls with the explicit 2.1.291 override. A fresh wheel repeated source-only/off/deny, and the TUI replay
+confirmed both channels with schema-2 admission. `ab055ede` fixes delayed-terminal input and a cold-admission assumption
+in the deadline fixture; failed attempts remain in evidence. Full pre-commit passed. The extended round used 32/32 Codex
+reservations and still only one real Claude inference. Host configuration changed between the initial assertion report
+and this replay; both hashes and the timing qualification are recorded in [provenance](evidence/validation.md).

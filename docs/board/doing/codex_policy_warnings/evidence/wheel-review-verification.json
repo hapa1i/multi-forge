@@ -1,0 +1,73 @@
+{
+  "wheel_sha256": "f73b829b96dfbde45ed2d360b8d1903e6ff0635de14191412c289c1f29886e8d",
+  "launcher_sha256": "821ff51f75167ddf4dcdfeba0dffe90ebf5e672c90d98e157ed26b22fca8740f",
+  "forge_module": "$ROUND/wheel-env-review/lib/python3.13/site-packages/forge/__init__.py",
+  "before": {
+    "$ROUND/codex-home/config.toml": "a21237cdbf3715000075fca3b06f8bd302e2ecc36b7153e424cac30f3427efe7",
+    "$ROUND/forge-home/bin/forge-hook": "3f88cc7b59ba1762e12d8dcd1703ed94d7b9af14a110451e829bda9847c42707"
+  },
+  "metadata_override": {
+    "schema_version": 1,
+    "forge_binary_path": "$ROUND/wheel-env-review/bin/forge",
+    "dispatcher_path": "$ROUND/forge-home/bin/forge-hook",
+    "dispatcher_version": "1.0.2",
+    "dispatcher_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+    "updated_at": "2026-10-10T13:11:36+00:00"
+  },
+  "doctor": {
+    "install_kind": "venv",
+    "forge_path": "$ROUND/wheel-env-review/bin/forge",
+    "on_path": true,
+    "on_path_minimal": false,
+    "advice": "Forge is not installed as a globally reachable tool. Install it as a global tool so the CLI has a stable launcher and ordinary shells can resolve it.",
+    "hook_dispatcher": {
+      "path": "$ROUND/forge-home/bin/forge-hook",
+      "status": "current",
+      "installed_version": "1.0.2",
+      "expected_version": "1.0.2",
+      "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "metadata_path": "$ROUND/forge-home/runtime.json",
+      "metadata_status": "current",
+      "forge_binary_path": "$ROUND/wheel-env-review/bin/forge",
+      "dev_override": {
+        "present": false,
+        "value": null,
+        "target": null,
+        "valid": false,
+        "effective": false,
+        "advice": null
+      },
+      "advice": "Run 'forge extension sync --scope user' to replace the recorded virtualenv launcher used by hook dispatch."
+    },
+    "runtime_hooks": {
+      "scopes": [],
+      "double_fire_risk": false,
+      "cleanup_required": false,
+      "legacy_registrations": []
+    },
+    "project_registry": {
+      "path": "$ROUND/forge-home/projects.json",
+      "status": "ok",
+      "enrolled_count": 1,
+      "stale_roots": [],
+      "error": null,
+      "advice": null
+    },
+    "project_compatibility": {
+      "path": "$CHECKOUT/.forge/project.toml",
+      "state": "missing",
+      "compatible": true,
+      "required_forge": null,
+      "running_forge": "1.0.2",
+      "reason": null,
+      "degraded": null
+    }
+  },
+  "doctor_exit": 0,
+  "after": {
+    "$ROUND/codex-home/config.toml": "a21237cdbf3715000075fca3b06f8bd302e2ecc36b7153e424cac30f3427efe7",
+    "$ROUND/forge-home/bin/forge-hook": "3f88cc7b59ba1762e12d8dcd1703ed94d7b9af14a110451e829bda9847c42707"
+  },
+  "routing_restored": true
+}

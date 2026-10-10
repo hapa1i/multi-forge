@@ -151,13 +151,24 @@ def main() -> None:
     current = {
         path: hashlib.sha256(Path(path).read_bytes()).hexdigest() if Path(path).is_file() else None for path in original
     }
-    assert original == current
+    # A resumed round can span independent host configuration changes. Retain
+    # that observation separately from product assertions; never reset the host.
+    host_config = [
+        {
+            "path": path,
+            "before_sha256": original[path],
+            "after_sha256": current[path],
+            "mtime_ns": Path(path).stat().st_mtime_ns if Path(path).is_file() else None,
+        }
+        for path in original
+    ]
     report = {
         "cases": results,
         "real_quote_usable": bool(real_usable),
         "real_review_case": args.real_case,
         "real_review_failure": decision["failure_type"],
-        "host_codex_config_bytes_unchanged": True,
+        "host_codex_config_bytes_unchanged": original == current,
+        "host_codex_config_comparison": host_config,
         "host_codex_auth_not_copied": True,
         "reserved_codex_turns": sum(row["reserved_turns"] for row in rows(root / "turns.jsonl")),
         "wheel_trust_registration_unchanged": True,

@@ -7,8 +7,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.41102320799973313,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "trusted-v1-stub": {
       "passed": true,
@@ -17,8 +16,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.582923665999715,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "off-headless": {
       "passed": true,
@@ -27,8 +25,7 @@
       "native_model_context": false,
       "operator_wire": true,
       "hook_seconds": 0.5825456249999661,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "source": {
       "passed": true,
@@ -37,8 +34,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.5904204169996774,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "source-changed": {
       "passed": true,
@@ -47,8 +43,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.5827517079997051,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "source-invalid": {
       "passed": true,
@@ -57,8 +52,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.585474874999818,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "source-deny": {
       "passed": true,
@@ -67,8 +61,7 @@
       "native_model_context": false,
       "operator_wire": true,
       "hook_seconds": 0.5827804589998777,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "multi": {
       "passed": true,
@@ -77,8 +70,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 0.4143144999998185,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "mixed": {
       "passed": true,
@@ -87,8 +79,7 @@
       "native_model_context": false,
       "operator_wire": true,
       "hook_seconds": 0.4139544169997862,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "timeout": {
       "passed": true,
@@ -97,8 +88,7 @@
       "native_model_context": true,
       "operator_wire": true,
       "hook_seconds": 1.9302395839999917,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "tui-off-final": {
       "passed": true,
@@ -107,18 +97,16 @@
       "native_model_context": false,
       "operator_wire": true,
       "hook_seconds": 0.6178291249998438,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
-    "tui-review-final": {
+    "tui-combined": {
       "passed": true,
       "one_patch_no_other_tools": true,
       "action_landed": true,
       "native_model_context": true,
       "operator_wire": true,
-      "hook_seconds": 0.8989509580023878,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 2
+      "hook_seconds": 0.6132321670002057,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
     "model-only": {
       "passed": true,
@@ -127,59 +115,41 @@
       "native_model_context": true,
       "operator_wire": false,
       "hook_seconds": 0.6169689589996779,
-      "forge_module": "$CHECKOUT/src/forge/__init__.py",
-      "executor_identity_schema": 1
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
     },
-    "wheel-review-source": {
+    "wheel-final-source": {
       "passed": true,
       "one_patch_no_other_tools": true,
       "action_landed": true,
       "native_model_context": true,
       "operator_wire": true,
-      "hook_seconds": 0.7939924579986837,
-      "forge_module": "$ROUND/wheel-env-review/lib/python3.13/site-packages/forge/__init__.py",
-      "executor_identity_schema": 2
+      "hook_seconds": 0.6766741250003179,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
     },
-    "wheel-review-off": {
+    "wheel-final-off": {
       "passed": true,
       "one_patch_no_other_tools": true,
       "action_landed": true,
       "native_model_context": false,
       "operator_wire": true,
-      "hook_seconds": 0.7625551660021301,
-      "forge_module": "$ROUND/wheel-env-review/lib/python3.13/site-packages/forge/__init__.py",
-      "executor_identity_schema": 2
+      "hook_seconds": 0.7062914589996581,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
     },
-    "wheel-review-deny": {
+    "wheel-final-deny": {
       "passed": true,
       "one_patch_no_other_tools": true,
       "action_landed": false,
       "native_model_context": false,
       "operator_wire": true,
-      "hook_seconds": 0.744118583999807,
-      "forge_module": "$ROUND/wheel-env-review/lib/python3.13/site-packages/forge/__init__.py",
-      "executor_identity_schema": 2
+      "hook_seconds": 0.7194919579997077,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
     }
   },
   "real_quote_usable": true,
   "real_review_case": "real-claude-authenticated",
   "real_review_failure": null,
-  "host_codex_config_bytes_unchanged": false,
-  "host_codex_config_comparison": [
-    {
-      "path": "$HOST_HOME/.codex/config.toml",
-      "before_sha256": "c9c2350b5fc2a1e0edc3e45043434b5f47716feab2bf5b574fca729d3befd5fe",
-      "after_sha256": "f84270783103b23b1cdbb401c36948dc4ed7fd8df82232627435ec76437312f3",
-      "mtime_ns": 1791645153748163245
-    },
-    {
-      "path": "$HOST_HOME/.codex/hooks.json",
-      "before_sha256": null,
-      "after_sha256": null,
-      "mtime_ns": null
-    }
-  ],
+  "host_codex_config_bytes_unchanged": true,
   "host_codex_auth_not_copied": true,
-  "reserved_codex_turns": 32,
+  "reserved_codex_turns": 27,
   "wheel_trust_registration_unchanged": true
 }
