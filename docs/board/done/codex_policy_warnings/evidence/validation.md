@@ -136,7 +136,7 @@ The final replay-only assertion/export commands are:
 "$ROUND/run" "$CHECKOUT/.venv/bin/python" "$CHECKOUT/scripts/experiments/codex-hooks/b3-verify.py" \
   --real-case real-claude-authenticated --wheel-prefix wheel-review --tui-combined-case tui-review-final
 "$ROUND/run" "$CHECKOUT/.venv/bin/python" "$CHECKOUT/scripts/experiments/codex-hooks/b3-export.py" \
-  "$ROUND" "$CHECKOUT/docs/board/doing/codex_policy_warnings/evidence"
+  "$ROUND" "$CHECKOUT/docs/board/done/codex_policy_warnings/evidence"
 ```
 
 Initial publication checks used product source at `9ea12b6a`, plus evidence and the test-only repairs described below.
@@ -256,3 +256,20 @@ failures were that stale cache and Markdown formatting; no code check was bypass
 The final `COLUMNS=200 make test-unit` rerun passed **10,640 tests**, with 117 integration tests deselected. Full
 `make pre-commit` passed after the cache and formatting fixes. Together with the 1,449 regressions and 31 affected
 Docker cases, this completes the integration follow-up gates.
+
+## Merged closeout (2026-10-11)
+
+PR #262 merged as `f1019f6c`, with a tree identical to tested head `81c14448` and all five GitHub checks passing. The
+[merged checklist](../checklist.md#merged-closeout) records the completed board handoffs. The
+[cleanup command](closeout.md) and [result](closeout.json) retain their own provenance; they do not replace the
+capture-time helper inventory or any historical JSON/text evidence.
+
+The offline verifier passed all 16 selected controls and the prior quote-quality assertion in a separate output
+directory. No model call ran. All 52 historical JSON/text artifacts remain unchanged. Thirty-five process registries,
+260 recorded identities, and a fixture-path scan found no survivors. Closeout removed only the owned Codex auth file and
+preserved the retained package, wheels, captures, and enrollment configuration. The original round remains at 32/32
+Codex reservations; the separate API exception was not reused.
+
+Host configuration hashes and auth-file metadata were unchanged during cleanup. The earlier host configuration change
+remains unattributed, and neither token validity nor remote revocation was tested. Further live reproduction requires a
+new independent fixture and budget.

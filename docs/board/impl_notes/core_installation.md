@@ -8,6 +8,19 @@ Durable core, state, extension, hook, and installation decisions.
 
 ## Notes
 
+### Validate exported runtime images before integration setup (B3, reviewed 2026-10-11)
+
+- A passing build-time version probe does not prove the exported executable is intact. Check Claude/Codex startup in a
+  bounded, network-disabled container before integration setup, including cached-image reuse. Report the actual CLI
+  failure before installer tests can mislabel a crashing binary as missing.
+- Shell and pytest image selection must share the same source revision and dirty-content fingerprint. A constant
+  `-dirty` label misses later edits. B3's materialize-and-flush workaround preserved Claude through the failing export
+  path; it does not establish a general Docker hardlink defect or justify silently changing runtime versions.
+
+Sources: [image repair evidence](../done/codex_policy_warnings/evidence/validation.md#docker-image-repair),
+[recovery guide](../../developer/testing_guidelines.md#docker-runtime-startup-failures), and
+[regressions](../../../tests/regression/test_bug_integration_runtime_startup.py).
+
 ### Walkthrough evidence is bounded education with artifact-bound safety (refresh_walkthrough_for_1_0, approved 2026-09-02)
 
 - `/walkthrough` remains one Claude-hosted educational frontend. Its provider-neutral default teaches direct managed

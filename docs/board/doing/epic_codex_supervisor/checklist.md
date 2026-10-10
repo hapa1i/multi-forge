@@ -14,9 +14,13 @@ B2's broader runtime experiment closed on 2026-10-10 after [PR #261](https://git
 merged as `2a15c087`, matching tested head `29ee539d` with all five GitHub checks passing. Its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) and
 [2026-10-09 evidence](../../done/codex_0160_validation/evidence/README.md) record the 0.161.0 round, general-ceiling
-update, and source-drift limits. B3 is selected on `feat/codex-policy-warnings` from `d54dba63`; its
-[execution checklist](../codex_policy_warnings/checklist.md) includes the user-selected source-only mode. B4-B5 remain
-proposed. The epic remains active until the coordinated feedback, Stop, and native-fork outcomes also ship.
+update, and source-drift limits.
+
+B3 closed on 2026-10-11 after [PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged as `f1019f6c`, matching
+tested head `81c14448` with all five GitHub checks passing. Its
+[closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records the user-selected source-only mode,
+delivery limits, and fixture teardown. B4-B5 remain proposed. The epic remains active until Stop and native-fork
+outcomes also ship.
 
 ## Activation
 
@@ -59,7 +63,7 @@ its separate branch. Refresh and verify the B3 PR base before opening it.
 | -------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------- |
 | [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
 | [B2](../../done/codex_0160_validation/card.md)     | Done     | None       | Current-runtime probe evidence                                 |
-| [B3](../codex_policy_warnings/card.md)             | Doing    | B1, B2     | Allowed-action feedback and source-only formatting             |
+| [B3](../../done/codex_policy_warnings/card.md)     | Done     | B1, B2     | Allowed-action feedback and source-only formatting             |
 | [B4](../../proposed/codex_stop_review/card.md)     | Proposed | B1, B2     | Bounded review at turn completion                              |
 | [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
@@ -86,7 +90,9 @@ member closeout checks, not assertions that every later member already ships.
 - [x] B1 closeout: review its checklist evidence against the shared contract and record the B3-B5/Jev handoff.
 - [x] B2 closeout: review runtime captures and record the supported versions and claims later members may rely on; see
   the [B2 handoff](#b2-handoff) and [merged closeout](../../done/codex_0160_validation/checklist.md#merged-closeout).
-- [ ] B3 closeout: review delivery evidence against the shared contract and record its operator/model-context limits.
+- [x] B3 closeout: review delivery evidence against the shared contract and record its operator/model-context limits;
+  see the [B3 handoff](#b3-handoff) and
+  [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout).
 - [ ] B4 closeout: review Stop budget/failure evidence against the shared contract and record unreviewed-work behavior.
 - [ ] B5 closeout: review source-context/checkout evidence against the shared contract and record independence limits.
 
@@ -126,8 +132,28 @@ that the committed harness post-dates the captures; optional stage 88/97 recheck
   implementation reasoning. Depth suppression prevented recursion but mutated the parent Forge manifest; isolate hook
   state before reuse. Earlier-turn selection and general concurrent-source guarantees remain unverified.
 
-The three member cards retain the detailed evidence links. B3 is now selected; B4-B5 remain proposed. Closing B2 does
-not implement their features or satisfy the epic's integrated outcome.
+The three member cards retain the detailed evidence links. B3 subsequently shipped; B4-B5 remain proposed. Closing B2
+did not implement those features or satisfy the epic's integrated outcome.
+
+## B3 handoff
+
+The [feedback evidence](../../done/codex_policy_warnings/evidence/README.md) establishes separate model and operator
+delivery on retained Codex 0.162.1, with source-only snapshot quotations, fixed unavailable-review text, unchanged
+verdicts, and clean-wheel provenance. The feature admits 0.161.0 and 0.162.1 only with verifiable managed-process
+identity; B2's historical 0.161.0 qualifications still apply. The general ceiling and blocking QA pin are unchanged.
+
+- **Jev A2** can supply structured findings to the shipped Codex formatter. It still owns substantive Claude warnings
+  and its own rule/evidence provenance. Summary-off retains operator/audit output; source-only retains full readable
+  evidence while excluding reviewer prose from Forge's model-visible fields. This is not access isolation or a measured
+  watermark property.
+- **B4/B5** can reuse the audience, bounds, and unavailable-review conventions. B3's PreToolUse evidence does not
+  establish Stop continuation semantics or native-fork isolation. Each still needs its own activation and runtime
+  evidence.
+
+PR #262's 31 affected Docker cases passed after repairing an exported-image binary; both auth-isolation controls used
+Claude 2.1.294. The two explicitly authorized Haiku API checks are separate from the one subscription quote-quality
+review. The 32-turn Codex product round is closed, with no new closeout inference. Its isolated login was removed while
+captured evidence and runtime artifacts were retained.
 
 ## Closeout
 

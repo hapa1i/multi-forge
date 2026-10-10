@@ -2,7 +2,8 @@
 
 Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../jev_client_probes/card.md). Codex-visible delivery also depends on
-[B3: warnings Codex can see](../../doing/codex_policy_warnings/card.md).
+[B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
+2026-10-11. This card remains proposed.
 
 ## Problem and outcome
 
@@ -63,7 +64,7 @@ findings merely because it is configured; that extension would need an explicit 
 
 ## B3 formatter handoff (2026-10-10)
 
-B3's [results](../../doing/codex_policy_warnings/evidence/README.md) and
+B3's [results](../../done/codex_policy_warnings/evidence/README.md) and
 [workflow contract](../../../design_workflows.md#11-deterministic-policy-forge-policy) supply the Codex delivery path.
 Supply structured `warning_findings` with stable rule/path attribution while retaining legacy warning strings and
 deny-only `violations` semantics. Only known policy-authored text may claim `provenance=policy`; model-generated prose

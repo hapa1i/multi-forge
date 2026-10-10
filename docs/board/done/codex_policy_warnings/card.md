@@ -1,12 +1,14 @@
 # Warnings Codex can see
 
-Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B3**. Depends on
+Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3**. Depends on
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md) and
 [B1: approved-plan snapshot contract](../../done/plan_file_supervision/card.md); both have shipped.
 
-Selected 2026-10-10 on `feat/codex-policy-warnings`, from B2 closeout `d54dba63`, now published to `main`. The
-[execution checklist](checklist.md) includes the user-selected source-only mode. Implementation and
-[live evidence](evidence/README.md) are complete; the card remains active through PR review and merge.
+Completed 2026-10-11 through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged to `main` as `f1019f6c`.
+The merged tree matches tested head `81c14448`; all five GitHub checks passed. The
+[merged closeout](checklist.md#merged-closeout) records verification and fixture teardown. The
+[live evidence](evidence/README.md) includes the user-selected source-only mode and its limits. B4/B5 and Jev remain
+unactivated.
 
 ## Problem and outcome
 

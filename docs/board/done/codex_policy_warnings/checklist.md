@@ -1,13 +1,13 @@
 # Codex policy warnings checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card.md), member **B3**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B3**.
 
 ## Current focus
 
-Selected 2026-10-10 on `feat/codex-policy-warnings`, based on clean local `main` at `d54dba63` (B2 closeout above merged
-PR #261, `2a15c087`). B2 closeout `d54dba63` was published to `origin/main` on 2026-10-10. Implementation, live
-evidence, and aggregate checks are complete, including PR #262 review corrections. See [results](evidence/README.md) and
-[validation](evidence/validation.md). B1 and B2 are done. B4, B5, and the Jev cards remain proposed.
+Completed 2026-10-11 after [PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged as `f1019f6c`, matching
+tested head `81c14448` with all five GitHub checks passing. See [merged closeout](#merged-closeout),
+[results](evidence/README.md), and [validation](evidence/validation.md). Execution used `feat/codex-policy-warnings`
+from published B2 closeout `d54dba63`. B1-B3 are done; B4, B5, and the Jev cards remain proposed.
 
 Deliver bounded, attributed policy warnings to the Codex model after allowed patches, with an independent operator
 warning channel. The user selected the source-only opt-in: Forge injects verified plan passages and fixed diagnostics
@@ -288,7 +288,7 @@ belongs under `tests/regression/test_bug_b3_*.py` with the regression mark. Publ
   branch.
 - [x] Record B3's warning/formatting contract and limits in the epic and Jev A2 handoff. Keep B4/B5 and Jev cards
   unactivated. Source-only must have explicit passing evidence or an explicit scope revision before B3 closes.
-- [ ] After review/merge, record merge coordinates and completed work in the changelog; promote reviewed durable
+- [x] After review/merge, record merge coordinates and completed work in the changelog; promote reviewed durable
   lessons. Move B3 to `done/`, repair all inbound links, and leave the epic active until its other members ship. Tear
   down only fixture-owned processes/auth after preserving evidence; record cleanup and host-state limitations
   accurately.
@@ -314,7 +314,7 @@ quote-quality attempt. B2 closeout `d54dba63` was pushed separately to `main`; p
 have not started.
 
 The planning observations above are dated history. Implementation assertions below are backed by the execution record;
-post-merge closeout remains pending.
+post-merge closeout is recorded at the end.
 
 ## Execution record
 
@@ -336,8 +336,8 @@ Aggregate checks passed: 10,640 unit tests (117 integration tests deselected), 1
 Targeted Docker results initially included an exported-image Claude 2.1.294 startup failure; both auth-isolation cases
 passed on explicitly selected 2.1.291. The real 2.1.294 macOS review passed.
 
-Full review/merge and fixture-auth teardown remain separate closeout work. Move inbound B3 links when the card moves to
-`done/`; keep the epic active and B4/B5/Jev unactivated.
+At initial publication, full review/merge and fixture-auth teardown remained separate closeout work. The merged closeout
+below completes them; the epic stays active and B4/B5/Jev remain unactivated.
 
 2026-10-10 PR review corrections: `fb26b011` preserves symlink launchers/child PATH lookup, streams hashing, binds
 feedback admission to the invoking process, and strips inherited identity from Claude children. It restores shared
@@ -359,3 +359,31 @@ exact-wheel tests and the default 2.1.294 auth-isolation matrix. The two inherit
 exception for two Haiku API calls, with retries disabled; no additional Codex or Jev call ran. The prior one-review,
 32/32-turn product round remains separate. See [image repair evidence](evidence/validation.md#docker-image-repair).
 Final gates passed: 10,640 unit tests, 1,449 regressions, and full pre-commit.
+
+## Merged closeout
+
+[PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged to `main` as `f1019f6c7e3589500f0c8d8037ed4c8d9e5b4bd9`
+at 2026-10-10 23:03:00 UTC (2026-10-11 01:03 Europe/Berlin). Its tree matches tested head
+`81c1444830419b73ee53098d1d4130b7bfbc8d1a`; all five GitHub checks passed. Local `main` fast-forwarded to that merge
+before closeout. Git's connectivity check passed.
+
+Moved B3 to `done/`, repaired inbound links, and recorded the completed work in the
+[changelog](../../change_log.md#2026-10-11). Promoted reviewed delivery/launch and image-validation lessons to the
+[session](../../impl_notes/sessions.md) and [installation](../../impl_notes/core_installation.md) notes. The epic and
+Jev A2 handoffs now point to shipped B3; B4/B5 and Jev remain proposed. Normative workflow/runtime and end-user
+configuration, policy, and hook docs already describe the merged behavior. No runtime ceiling, release pin, or shared
+validation provenance changed during closeout.
+
+The [fixture closeout](evidence/closeout.md) rechecked all 16 selected captures and the one historical quote-quality
+result without inference. All 52 historical JSON/text artifacts were preserved. Process inspection covered 35 registries
+and 260 recorded identities plus a fixture-path sweep; no survivors remained and no signals were needed. Only the
+independently owned Codex auth file was removed. Captures, wheels, the retained executable, and enrollment configuration
+remain intact. Host config hashes and auth-file metadata stayed unchanged during cleanup; the earlier round-wide
+host-config difference remains unattributed, and host token validity was not tested. The product round stays at 32/32
+reserved Codex turns plus one Claude subscription review; the two separately authorized Haiku API checks remain separate
+evidence.
+
+Closeout validation: full `make pre-commit` passed after Markdown formatting; the link audit passed for 651 source
+files, and staged/working-tree diff checks passed. The preserved-artifact manifest matches the merge bytes, and the
+cleanup command matches its recorded SHA-256. Product, harness, and test source are unchanged, so their passing PR
+validation carries forward without another runtime or model call.

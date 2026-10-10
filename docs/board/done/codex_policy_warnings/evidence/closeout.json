@@ -1,0 +1,32 @@
+{
+  "closed_at_utc": "2026-10-10T23:08:32.853752+00:00",
+  "merge_commit": "f1019f6c7e3589500f0c8d8037ed4c8d9e5b4bd9",
+  "tested_head": "81c1444830419b73ee53098d1d4130b7bfbc8d1a",
+  "command_sha256": "0abde3637ce35e9a081ed252421d4a88fecf83ade402a44aa45068e6eaf014cf",
+  "probe_runtime_sha256": "ca429340a83016df304de8440ca9b95be870b2e802ff9f89a121ba86592141d9",
+  "offline_verifier_cases_passed": 16,
+  "offline_verifier_report_sha256": "078d62b042b08dc634fbe53bd5e334793248b2280629b291ce5f397961404559",
+  "real_quote_usable": true,
+  "reserved_codex_turns": 32,
+  "new_model_calls": 0,
+  "historical_artifacts_preserved": 52,
+  "process_registries_checked": 35,
+  "recorded_process_identities": 260,
+  "processes_before": {
+    "registered": [],
+    "fixture_path_pids": []
+  },
+  "processes_after": {
+    "registered": [],
+    "fixture_path_pids": []
+  },
+  "signals_sent": [],
+  "fixture_auth_file_removed": "$ROUND/codex-home/auth.json",
+  "host_codex_config_hashes_unchanged_during_cleanup": true,
+  "host_codex_auth_metadata_unchanged_during_cleanup": true,
+  "host_codex_config_unchanged_since_round_start": false,
+  "host_auth_validity_verified": false,
+  "fixture_enrollment_config_sha256": "a21237cdbf3715000075fca3b06f8bd302e2ecc36b7153e424cac30f3427efe7",
+  "retained_codex_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+  "captures_and_runtime_retained": true
+}

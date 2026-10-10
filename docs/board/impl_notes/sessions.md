@@ -8,6 +8,26 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Codex feedback needs separate delivery, provenance, and launch identity (B3, reviewed 2026-10-11)
+
+- Allowed model feedback uses bare PreToolUse `additionalContext`, without explicit `permissionDecision=allow`. Operator
+  `systemMessage` is independent. Summary-off removes allowed model context while retaining operator/audit output;
+  neither channel changes the verdict or atomic patch-state rules.
+- Verify reviewer quotations against the immutable reviewed snapshot before converting decisions to findings. Keep
+  provenance structural: source-only renders verified passages and fixed diagnostics, while full reviewer evidence
+  remains readable. Resolved tier-1 escalation reasons stay in audit, not unavailable-review feedback.
+- Fingerprint the resolved executable but launch the selected path, preserving basename-sensitive shims and the child
+  worktree's relative PATH semantics. Inherited environment identity alone cannot admit a nested runtime; tie admission
+  to the invoking process. Unverifiable wrapper chains suppress new feedback without breaking the launch.
+- Feature-specific measured versions do not redefine the general QA ceiling or release pin. Treat model-context delivery
+  and operator UI visibility as separate evidence claims; source-only does not provide access isolation or
+  prompt-injection immunity.
+
+Sources: [reviewed closeout](../done/codex_policy_warnings/checklist.md#merged-closeout),
+[workflow contract](../../design_workflows.md#11-deterministic-policy-forge-policy),
+[launch regressions](../../../tests/regression/test_bug_b3_executor_launch.py), and
+[actual hook-wire regression](../../../tests/regression/test_bug_b3_warning_delivery.py).
+
 ### Codex probes must preserve identity, enrollment, and hook-state boundaries (B2, reviewed 2026-10-10)
 
 - Retain the selected complete runtime package and record its executable path/hash, not just `--version`. Host hook

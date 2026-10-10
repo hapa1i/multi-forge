@@ -1,13 +1,13 @@
 # Epic: Codex supervisor
 
-Status: active coordination, 2026-10-10. B1 and its documentation prerequisites shipped through
+Status: active coordination, 2026-10-11. B1 and its documentation prerequisites shipped through
 [PR #258](https://github.com/hapa1i/multi-forge/pull/258), merged to `main` as `56d4b8f5`. See the
 [coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
 B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), merged as `2a15c087`; its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
-B3 is selected on `feat/codex-policy-warnings` from `d54dba63`; its [checklist](../codex_policy_warnings/checklist.md)
-owns warning delivery and the explicit source-only opt-in. B4-B5 remain proposed and use separate execution branches
-when selected.
+B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged as `f1019f6c`; its
+[closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
+formatting, and fixture teardown. B4-B5 remain proposed and use separate execution branches when selected.
 
 ## Problem and outcome
 
@@ -17,10 +17,10 @@ requiring a Claude planning conversation, then add visible feedback, review at t
 Codex planning context.
 
 Forge has Codex policy hooks and a Codex supervisor execution lane. B1 now selects the plan source and reviewer
-independently, allowing an approved plan file without a Claude planning target. B2 supplies broader runtime evidence;
-the remaining members own feedback delivery, Stop review, and native planning forks. The [research](research.md) retains
-dated source/runtime observations; the [B1 evidence](../../done/plan_file_supervision/evidence/README.md) records its
-shipped scope and limits.
+independently, allowing an approved plan file without a Claude planning target. B2 supplies broader runtime evidence; B3
+delivers model/operator feedback. The remaining members own Stop review and native planning forks. The
+[research](research.md) retains dated source/runtime observations; the
+[B1 evidence](../../done/plan_file_supervision/evidence/README.md) records its shipped scope and limits.
 
 ## Members and dependencies
 
@@ -28,7 +28,7 @@ shipped scope and limits.
 | --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------ |
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
-| B3  | [Warnings Codex can see](../codex_policy_warnings/card.md)                                 | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
+| B3  | [Warnings Codex can see](../../done/codex_policy_warnings/card.md)                         | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
 | B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
@@ -103,11 +103,12 @@ selection. Keep probe captures sanitized and retain the commands, versions, and 
 
 ## B3 implementation handoff (2026-10-10)
 
-B3's [evidence](../codex_policy_warnings/evidence/README.md) proves allowed warning delivery on retained Codex 0.162.1
-through enrolled product hooks, including independent model/operator channels, source-only snapshot quotations, mixed
-atomic denials, timeout status, and installed-wheel provenance. Source-only keeps reviewer prose in durable evidence and
-selects verified snapshot text or fixed fallback for every model-visible warning/block field. It does not restrict
-workspace reads. The quote-quality control completed one subscription-only Claude review with two verified quotations.
+B3's [evidence](../../done/codex_policy_warnings/evidence/README.md) proves allowed warning delivery on retained Codex
+0.162.1 through enrolled product hooks, including independent model/operator channels, source-only snapshot quotations,
+mixed atomic denials, timeout status, and installed-wheel provenance. Source-only keeps reviewer prose in durable
+evidence and selects verified snapshot text or fixed fallback for every model-visible warning/block field. It does not
+restrict workspace reads. The quote-quality control completed one subscription-only Claude review with two verified
+quotations.
 
 The admission set is feature-specific: 0.161.0 and 0.162.1, with the historical 0.161.0 qualifications preserved. Launch
 identity is refreshed at each managed start/resume and checked against the invoking process's launch parent. Nested
@@ -115,5 +116,6 @@ runtimes cannot reuse the inherited record. Unknown/unmeasured versions and unve
 forking wrappers, receive no new model/operator channel; launch and existing denials remain available. The general
 ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
 the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
-count summary; Jev A2 owns that formatter extension. B4/B5 are still proposed, and B3 remains `doing` until merge and
-closeout.
+count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4/B5 remain
+proposed. The [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and
+host-state qualifications and records the independently owned login teardown.

@@ -6,6 +6,9 @@ one real Claude review uses the maintainer's CLI-managed Max login with `auth_mo
 confirmed disabled. The product round used no paid API inference or Jev call. A later Docker follow-up used two
 explicitly authorized Haiku API calls, recorded separately in [validation](validation.md#docker-image-repair).
 
+B3 closed on 2026-10-11 after PR #262 merged. The [closeout record](closeout.md) preserves the offline verification and
+independent-login teardown; historical JSON/text captures remain unchanged.
+
 ## Results
 
 The retained runtime is Codex **0.162.1**, model `gpt-6.1-sol`, effort `low`. Its executable SHA-256 is
@@ -71,8 +74,9 @@ no-inference refusal. The real call passed after the user logged in and this com
 ## Reproduction and limits
 
 See [validation and provenance](validation.md) before replaying. The private round lives at `$ROUND`; exported paths use
-`$ROUND` and `$CHECKOUT`. Do not copy host auth or reset an enrolled home. Each live rerun needs a new case label; the
-quota wrapper reserves failed attempts too. The retained package must remain complete and unchanged.
+`$ROUND` and `$CHECKOUT`. The original round is closed and its isolated login removed. New live work needs a new owned
+round, independent login, and budget. Do not copy host auth or reset an enrolled home. The quota wrapper reserves failed
+attempts too; retained packages must remain complete and unchanged.
 
 The extended round reserved **32 of 32 Codex turns**, including enrollment, seed starts, failed TUI attempts, and all
 three wheel sets. Exactly **one real Claude inference** was dispatched in that product round; earlier local
@@ -84,5 +88,7 @@ review, B5 native forks, or any Jev inference.
 Fixture-owned process sweeps left no survivors, and isolated enrollment stayed unchanged. Host `config.toml` differs
 from the initial round hash; its modification time predates the review replays, and the cause is not established. Both
 hashes are retained in the report; `hooks.json` remains absent. Normal Codex auth was never copied, which does not prove
-host refresh-token validity. The user refreshed their own Claude login during the round. Keep the independent Codex
-login and retained artifacts until review/merge; post-merge closeout owns their teardown and the board lane move.
+host refresh-token validity. The user refreshed their own Claude login during the round. Post-merge closeout removed
+only the independent Codex login file and retained the captures, wheels, runtime package, and enrollment configuration.
+Host config hashes and auth-file metadata stayed unchanged during cleanup; this does not validate host tokens or erase
+the earlier round-wide configuration difference.

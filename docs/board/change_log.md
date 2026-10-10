@@ -6,6 +6,28 @@ Older entries are retained verbatim in [2026-08-15 through 2026-08-17](archive/c
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-11
+
+### Deliver bounded Codex policy feedback
+
+**Goal**: Make allowed policy findings visible to Codex and the operator while preserving verdicts and audit evidence.
+
+**Key changes**:
+
+- Added separate model/operator feedback, summary-off controls, and source-only verified plan quotations with fixed
+  diagnostics. Preserved blocking guidance, atomic patch state, and readable full evidence.
+- Bound feature admission to the managed executor process while preserving shim launch behavior. Accepted verified
+  current Claude subscription metadata and repaired exported Docker runtime startup and cache invalidation.
+- Closed B3, retained its evidence and runtime artifacts, and removed the independent fixture login. The Codex
+  supervisor epic stays active; B4/B5 and Jev remain proposed.
+
+**Verification**: 10,640 unit tests (117 deselected), 1,449 regressions, 31 affected Docker cases, and full pre-commit
+passed, alongside the retained delivery/TUI/clean-wheel evidence. The Docker cases include two separately authorized
+Haiku API checks. [PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged as `f1019f6c`, matching tested head
+`81c14448`, with all five GitHub checks passing. The
+[merged closeout](done/codex_policy_warnings/checklist.md#merged-closeout) records the 16-control offline recheck,
+fixture teardown, and host-state limits. No closeout inference ran.
+
 ## 2026-10-10
 
 ### Validate Codex 0.161.0 runtime contracts

@@ -166,6 +166,6 @@ conversation and record the tested version, argv policy and outcome in sanitized
 
 ## Boundaries
 
-Allowed-action model-visible feedback is [B3](../../doing/codex_policy_warnings/card.md), turn-completion review is
+Allowed-action model-visible feedback is [B3](../../done/codex_policy_warnings/card.md), turn-completion review is
 [B4](../../proposed/codex_stop_review/card.md), and native planning forks are
 [B5](../../proposed/codex_fork_supervisor/card.md). Jev and team supervision are separate.
