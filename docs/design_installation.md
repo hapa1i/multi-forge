@@ -172,6 +172,10 @@ NOT need Docker.
 - Tests catch real bugs (e.g., proxy startup failures)
 - Deterministic test environment across machines
 
+The shell runner and pytest fixture share a source revision plus dirty-content fingerprint for image reuse. Both check
+the exported image's Claude and Codex startup in a bounded, network-disabled container before tests; a cached build-time
+check is insufficient. See [runtime startup recovery](developer/testing_guidelines.md#docker-runtime-startup-failures).
+
 **Test workflow**:
 
 ```bash

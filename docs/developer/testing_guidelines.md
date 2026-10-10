@@ -148,6 +148,31 @@ Set `PYTHON_DOTENV_DISABLED=1` when an integration run must not load the reposit
 shell sourcing, and python-dotenv honors it in Python. The switch preserves inherited environment variables; it does not
 strip API credentials. Subscription-only experiments must also use their documented clean launcher.
 
+### Docker runtime startup failures
+
+The integration runner checks Claude and Codex startup in a disposable, network-disabled container before starting test
+infrastructure. The pytest image fixture repeats this check when invoked directly, including when it reuses a cached
+image. Both entry points use the same source revision and dirty-content fingerprint to invalidate old images. A matching
+source revision or a cached Docker build-time `--version` check does not prove that the exported image's executables
+still work. Failure reports the image and CLI output before unrelated installer tests can misreport an installed but
+crashing Claude binary as missing.
+
+The npm toolchain materializes and flushes Claude's launcher before committing its image layer. This preserves native
+binary bytes through the layer export path that truncated a package hardlink in the B3 investigation. Both CLIs are
+checked again after Codex installation and in the exported image. If an existing image fails preflight, rebuild it with
+`--no-cache` and the same runtime versions; do not silently substitute a different release. For example:
+
+```bash
+docker build --no-cache -f docker/Dockerfile.forge \
+  --build-arg CLAUDE_VERSION=2.1.294 --build-arg CODEX_VERSION=0.162.1 \
+  --build-arg FORGE_REV="$(git rev-parse HEAD)" \
+  -t forge-claude-test:2.1.294-codex-0.162.1 .
+```
+
+Use the selected versions printed by your runner in place of the example. Keep any runtime failure visible until the
+same selected binaries pass preflight. The two inherited-auth reviewer compatibility tests make real Haiku API calls and
+carry the `slow` marker; explicit file selection still runs them unless `-m 'integration and not slow'` is supplied.
+
 ### Advanced: Direct pytest (after `make` ran once)
 
 **WARNING:** Direct `pytest` assumes `make` ran; integration fails if LiteLLM isn't on 4001.

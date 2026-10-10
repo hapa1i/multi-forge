@@ -333,7 +333,7 @@ override and unchanged enrollment bytes. Earlier failures and helper changes are
 [provenance](evidence/validation.md), including the manually closed initial TUI capture.
 
 Aggregate checks passed: 10,640 unit tests (117 integration tests deselected), 1,416 regressions, and full pre-commit.
-Targeted Docker results include the documented Claude 2.1.294 Linux ARM startup failure; both auth-isolation cases
+Targeted Docker results initially included an exported-image Claude 2.1.294 startup failure; both auth-isolation cases
 passed on explicitly selected 2.1.291. The real 2.1.294 macOS review passed.
 
 Full review/merge and fixture-auth teardown remain separate closeout work. Move inbound B3 links when the card moves to
@@ -350,3 +350,12 @@ confirmed both channels with schema-2 admission. `ab055ede` fixes delayed-termin
 in the deadline fixture; failed attempts remain in evidence. Full pre-commit passed. The extended round used 32/32 Codex
 reservations and still only one real Claude inference. Host configuration changed between the initial assertion report
 and this replay; both hashes and the timing qualification are recorded in [provenance](evidence/validation.md).
+
+2026-10-10 integration follow-up: the exported Docker image contained a truncated Claude binary. Installing the same
+2.1.294 package, materializing its launcher, and flushing it before export preserved the working bytes. The build now
+does this; both integration entry points reject a crashing CLI before tests, and the shell uses pytest's dirty-content
+fingerprint instead of a constant `-dirty` label. All 31 cases in the affected Docker files passed, including both
+exact-wheel tests and the default 2.1.294 auth-isolation matrix. The two inherited-auth cases used the user's explicit
+exception for two Haiku API calls, with retries disabled; no additional Codex or Jev call ran. The prior one-review,
+32/32-turn product round remains separate. See [image repair evidence](evidence/validation.md#docker-image-repair).
+Final gates passed: 10,640 unit tests, 1,449 regressions, and full pre-commit.

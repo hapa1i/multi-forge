@@ -56,7 +56,7 @@ Review validation used product code `fb26b011` and harness/test repair `ab055ede
 | `COLUMNS=200 make test-unit`                       | 10,640 passed; 117 integration tests deselected                                                                          |
 | `COLUMNS=200 make test-regression`                 | 1,441 passed after the fixture repair                                                                                    |
 | Targeted Docker hook and manual-policy integration | 32 passed                                                                                                                |
-| Docker auth-isolation, explicit Claude 2.1.291     | 2 passed, no inference; the 2.1.294 Linux limitation below remains                                                       |
+| Docker auth-isolation, explicit Claude 2.1.291     | 2 passed, no inference; the image failure was subsequently diagnosed below                                               |
 | `make build`, fresh clean wheel install            | Passed; source/off/deny use the review wheel identified above                                                            |
 | TUI and wheel review replays                       | Four passing schema-2 controls; one earlier TUI setup failure retained                                                   |
 | Evidence verifier                                  | 16 selected controls passed: 12 historical captures and four review replays; the prior single real review remains usable |
@@ -65,7 +65,8 @@ Review validation used product code `fb26b011` and harness/test repair `ab055ede
 The [initial assertion report](verification-initial.json) remains unchanged. The latest [report](verification.json)
 records each selected case's identity schema. Neither report implies that historical schema-1 captures exercised the new
 process check. The review replays consumed the remaining five reservations, including the failed TUI setup, for **32/32
-Codex turns**. There was no additional real Claude inference.
+Codex turns**. There was no additional real Claude inference during those review replays. The later Docker follow-up
+below records the two separately authorized Haiku API cases.
 
 The host configuration comparison failed on the first review verification attempt. Host `config.toml` now differs from
 the 14:57 baseline; its recorded modification time is 17:12:33 +02:00, before the review replays began at 19:33. The
@@ -162,10 +163,10 @@ env -i HOME="$HOME" PATH="$PATH" PYTHON_DOTENV_DISABLED=1 COLUMNS=200 \
   tests/integration/docker/test_reviewer_compatibility.py::test_old_blocking_pin_refuses_without_inference
 ```
 
-Claude 2.1.294's Linux ARM executable crashed with a Bun bus error on `--version`, before the failing auth cases could
-exercise Forge. A network-disabled direct reproduction exited 135; its [startup output](linux-claude-version.txt) is
-retained. The explicit test-only version override installed 2.1.291 for those two cases; it is not an automatic fallback
-or product pin. The reproduction and replay commands were:
+The exported image's Claude 2.1.294 Linux ARM executable crashed with a Bun bus error on `--version`, before the failing
+auth cases could exercise Forge. A network-disabled direct reproduction exited 135; its
+[startup output](linux-claude-version.txt) is retained. The explicit test-only version override installed 2.1.291 for
+those two cases; it is not an automatic fallback or product pin. The reproduction and replay commands were:
 
 ```bash
 timeout -k 3s 20s docker run --rm --network none --entrypoint /bin/sh \
@@ -176,8 +177,9 @@ env -i HOME="$HOME" PATH="$PATH" PYTHON_DOTENV_DISABLED=1 COLUMNS=200 \
   ./scripts/test-integration.sh tests/integration/docker/test_supervisor_auth_isolation.py -s
 ```
 
-This establishes auth-setting isolation on Linux with 2.1.291, not 2.1.294. The actual macOS 2.1.294 subscription review
-passed. No test was skipped to stand in for either result.
+That replay established auth-setting isolation on Linux with 2.1.291 only; it did not establish a general 2.1.294
+compatibility failure. The actual macOS 2.1.294 subscription review passed. No test was skipped to stand in for either
+result. The later image investigation below corrects the earlier diagnosis.
 
 Earlier failures were repaired rather than skipped: launch mocks assumed the literal `codex` basename, the environment
 inventory lacked the new internal key, and B2's historical explicit-allow fixture imported the now-corrected product
@@ -191,3 +193,66 @@ The real quote-quality check is a single controlled example, not a reliability e
 quotations, with raw response, reviewed snapshot digest, verified offsets, actual `claude-sonnet-5-5` model, and
 subscription telemetry retained. Failed auth/config setup did not consume an inference retry. General account billing
 and quota exhaustion are not inferred from this result.
+
+## Docker image repair
+
+The reported installer failures shared a crashing executable, not a missing Claude installation. In the exported
+`forge-claude-test:2.1.294-codex-0.162.1` image, Claude was 213,909,504 bytes; a fresh installation of the same 2.1.294
+package was 252,108,792 bytes and started successfully. The first differing byte was 100,663,297, where the exported
+file began returning zeros. Its SHA-256 was `3d700099759f2ad80e936440b612831c0fb6836c645344b80bf744b8ed13b608`; the
+working installation and repaired export both had SHA-256
+`e5d2df19f30a6d63bf11188121f7edb2775249b57352a69269509a4b1496e763`. The repaired export's
+[size, hash, and startup output](linux-claude-repaired.txt) are retained beside the original failure.
+
+Rebuilding the npm toolchain without cache passed the in-build version check but reproduced the broken export. A fresh
+install followed by `cp --reflink=never`, replacement of the launcher, and `sync` preserved the working bytes through
+export. The Dockerfile now applies that combination. These experiments do not isolate copying from flushing as the cause
+of success or establish a general Docker hardlink defect. Neither runtime version nor product admission changed.
+
+Both integration entry points now check CLI startup in the exported image without networking or mounted credentials.
+Failures retain the exit status and CLI output, stop before shared infrastructure or tests, and name the rebuild path.
+The shell runner also uses pytest's dirty-content fingerprint; its former constant `-dirty` suffix could reuse an image
+after further uncommitted fixes. Eight regression cases cover healthy/crashing/missing runtimes, timeout cleanup, cached
+and newly built image refusal, and dirty-cache invalidation before the shell guard.
+
+The two inherited-auth cases passed on Claude 2.1.294 using the user's explicit exception for two Haiku API calls. They
+ran once with `--reruns 0`, with only the Anthropic credential in the clean child environment; dotenv and other provider
+credentials were disabled. Their `slow` marker keeps the default fast lane from starting paid inference. These calls are
+separate from the single subscription quote-quality review. The Codex round remains at 32/32 turns, and no additional
+Codex or Jev inference was run.
+
+The affected Docker files passed **31 tests**: 29 without inference, then the two authorized API cases. This includes
+all reported failures, both exact-wheel checks, and both auth-isolation cases on 2.1.294 without a version override. The
+default `GEMINI_API_KEY` warning was expected; these cases do not use LiteLLM. No selected case was skipped or
+automatically retried.
+
+```bash
+env -i HOME="$HOME" PATH="$PATH" PYTHON_DOTENV_DISABLED=1 COLUMNS=200 \
+  ./scripts/test-integration.sh \
+  tests/integration/docker/test_installer.py \
+  tests/integration/docker/test_qa_release_artifact.py \
+  tests/integration/docker/test_walkthrough_release_artifact.py \
+  tests/integration/docker/test_supervisor_auth_isolation.py \
+  tests/integration/docker/test_reviewer_compatibility.py \
+  -m 'integration and not slow' --reruns 0
+
+# Separate authorized run: clean child environment with ANTHROPIC_API_KEY only.
+# The secret was passed in the process environment, never command arguments.
+./scripts/test-integration.sh \
+  tests/integration/docker/test_reviewer_compatibility.py::test_inherited_auth_settings_can_complete_read_only_review \
+  --reruns 0 -v
+```
+
+The paid run used exported image `sha256:a27217291bfdac2915ee1b4dea4ed9bbf7add5c034f3d1185aa76d7b61f89662`, labelled
+`b5c1e18894585e2da52bc79bd45f2e199aef36fd-dirty-de9a51c47ac3`. The product source was unchanged from `b5c1e188`; the
+dirty tree contained the Docker/test repair. The later documentation edits were not part of the image. All fixture
+containers were removed after the runs.
+
+The aggregate regression suite passed 1,449 tests. The first unit run passed 10,638 tests and caught two documentation
+integrity checks while this evidence was still being added: an unstaged link target and the design document's old
+token-count hash. The evidence was staged and the required count refreshed before the final run. Initial pre-commit
+failures were that stale cache and Markdown formatting; no code check was bypassed.
+
+The final `COLUMNS=200 make test-unit` rerun passed **10,640 tests**, with 117 integration tests deselected. Full
+`make pre-commit` passed after the cache and formatting fixes. Together with the 1,449 regressions and 31 affected
+Docker cases, this completes the integration follow-up gates.

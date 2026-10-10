@@ -3,7 +3,8 @@
 Round: 2026-10-10. B3 implements bounded Codex model feedback, independent operator warnings, and the selected
 `source-only` format. The product controls use registered, user-trusted Forge hooks and an independent Codex login. The
 one real Claude review uses the maintainer's CLI-managed Max login with `auth_mode=subscription-only`; extra usage was
-confirmed disabled. No paid API inference or Jev call was used.
+confirmed disabled. The product round used no paid API inference or Jev call. A later Docker follow-up used two
+explicitly authorized Haiku API calls, recorded separately in [validation](validation.md#docker-image-repair).
 
 ## Results
 
@@ -74,10 +75,11 @@ See [validation and provenance](validation.md) before replaying. The private rou
 quota wrapper reserves failed attempts too. The retained package must remain complete and unchanged.
 
 The extended round reserved **32 of 32 Codex turns**, including enrollment, seed starts, failed TUI attempts, and all
-three wheel sets. Exactly **one real Claude inference** was dispatched; earlier local configuration/auth refusals made
-no model call. Runtime-reported token/cost fields are telemetry, not proof of an invoice or exact quota decrement.
-Subscription exhaustion did not happen naturally and remains unverified. The scope does not include B4 Stop review, B5
-native forks, or any Jev inference.
+three wheel sets. Exactly **one real Claude inference** was dispatched in that product round; earlier local
+configuration/auth refusals made no model call. The later two Haiku API cases do not extend the Codex round or the
+quote-quality sample. Runtime-reported token/cost fields are telemetry, not proof of an invoice or exact quota
+decrement. Subscription exhaustion did not happen naturally and remains unverified. The scope does not include B4 Stop
+review, B5 native forks, or any Jev inference.
 
 Fixture-owned process sweeps left no survivors, and isolated enrollment stayed unchanged. Host `config.toml` differs
 from the initial round hash; its modification time predates the review replays, and the cause is not established. Both

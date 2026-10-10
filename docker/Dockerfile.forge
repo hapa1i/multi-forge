@@ -94,7 +94,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # >= 2.1.112: downloads platform-native binary via optional deps (no cli.js)
 # <  2.1.112: ships cli.js directly in the package
 ARG CLAUDE_VERSION=latest
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION}
+# Materialize and flush the launcher before snapshotting. A native package
+# hardlink was truncated in an exported layer despite passing --version in-build.
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION} \
+    && binary="$(readlink -f "$(command -v claude)")" \
+    && cp --reflink=never "$binary" "$binary.forge-copy" \
+    && mv "$binary.forge-copy" "$binary" \
+    && sync
 
 # Support both the legacy cli.js package and native-binary packages.
 # CI=1 suppresses first-run prompts in non-TTY Docker builds.
@@ -114,6 +120,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG CODEX_VERSION=latest
 RUN npm install -g @openai/codex@${CODEX_VERSION} \
+    && CI=1 claude --version \
     && codex --version
 
 # Copy only manifests first so uv sync is re-run only when deps change.
