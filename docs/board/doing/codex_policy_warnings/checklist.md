@@ -6,8 +6,9 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 Selected 2026-10-10 on `feat/codex-policy-warnings`, based on clean local `main` at `d54dba63` (B2 closeout above merged
 PR #261, `2a15c087`). B2 closeout `d54dba63` was published to `origin/main` on 2026-10-10. Implementation, live
-evidence, and aggregate checks are complete; PR review and merge are pending. See [results](evidence/README.md) and
-[validation](evidence/validation.md). B1 and B2 are done. B4, B5, and the Jev cards remain proposed.
+evidence, and initial aggregate checks are complete. PR #262 review corrections are being verified. See
+[results](evidence/README.md) and [validation](evidence/validation.md). B1 and B2 are done. B4, B5, and the Jev cards
+remain proposed.
 
 Deliver bounded, attributed policy warnings to the Codex model after allowed patches, with an independent operator
 warning channel. The user selected the source-only opt-in: Forge injects verified plan passages and fixed diagnostics
@@ -280,7 +281,7 @@ belongs under `tests/regression/test_bug_b3_*.py` with the regression mark. Publ
   import override. Record wheel/launcher hashes and restore fixture routing afterwards. A different home requires a
   fresh trust ceremony and budget reservation. Keep the general ceiling, blocking QA pin, shared validation
   revision/date, and proxy floor unchanged unless separately justified and revalidated.
-- [x] Run aggregate `make test-unit`, `make test-regression`, and full `make pre-commit`; verify board links and diffs.
+- [ ] Run aggregate `make test-unit`, `make test-regression`, and full `make pre-commit`; verify board links and diffs.
   Retain commands, results, skips/failures, exact tested source, runtime/artifact hashes, and sanitized captures in B3's
   evidence. Final evidence must account for any helper or product edits after its capture revision.
 - [x] Before opening the B3 PR, refresh `origin/main` and verify it contains published B2 closeout `d54dba63`. Reconcile

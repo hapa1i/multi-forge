@@ -253,6 +253,9 @@ def build_claude_env(
     if extra_vars:
         env.update(extra_vars)
 
+    # A Claude child cannot carry admission facts for its parent Codex executor.
+    env.pop("FORGE_CODEX_EXECUTOR_IDENTITY", None)
+
     if base_url:
         env["ANTHROPIC_BASE_URL"] = base_url
     elif direct:

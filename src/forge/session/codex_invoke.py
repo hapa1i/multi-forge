@@ -126,7 +126,7 @@ def invoke_codex_interactive(
         env[FORGE_AUTHORITY_MARKER_VAR] = authority_marker
 
     logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
-    argv = prepare_executor_launch(argv, env)
+    argv = prepare_executor_launch(argv, env, cwd=cwd)
     result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
     return result.returncode
 

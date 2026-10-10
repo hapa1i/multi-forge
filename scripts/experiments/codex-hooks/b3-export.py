@@ -114,8 +114,10 @@ def export(root: Path, destination: Path) -> None:
     for name in (
         "wheel-verification.json",
         "wheel-final-verification.json",
+        "wheel-review-verification.json",
         "real-claude-reservation.json",
         "verification.json",
+        "verification-initial.json",
         "preflight-ready.json",
         "timeout-status.json",
         "claude-auth-status.json",

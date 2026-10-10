@@ -194,7 +194,7 @@ def _codex_mocks(
     mock_adapter.complete.return_value = _fake_completion(json.dumps(_CURATED))
     with (
         patch("forge.core.ops.codex_session.assert_codex_ready", return_value=_preflight()),
-        patch("forge.core.invoker.codex.prepare_executor_launch", side_effect=lambda argv, env: argv),
+        patch("forge.core.invoker.codex.prepare_executor_launch", side_effect=lambda argv, env, **kwargs: argv),
         patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
         patch("forge.core.llm.get_client"),
         patch("forge.core.invoker._lifecycle.subprocess.Popen", side_effect=_route) as mock_popen,

@@ -361,7 +361,10 @@ Purpose: run the Codex authority guard first, then apply ordinary policy to supp
   tools are denied under `shell_closed`
 - after the authority guard declines, evaluates each file operation in a Codex `apply_patch` action against the
   session's policy bundles and supervisor; shell (`Bash`) actions pass through ordinary policy unevaluated
-- a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
+- a block is delivered as Codex's deny JSON on stdout (not an exit code); admitted managed executors receive bounded
+  allowed-action warnings through `additionalContext` and independent operator notices through `systemMessage`. Clean
+  allows remain silent; `policy_summary_feedback=off` suppresses the allowed model context while retaining operator
+  warnings and audit evidence
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
 - **registered by `forge extension enable --scope user`** (Codex-owned half of the `hooks` module): the installer writes
   a managed block into `$CODEX_HOME/config.toml` and preserves an existing file's mode during atomic merge/remove.

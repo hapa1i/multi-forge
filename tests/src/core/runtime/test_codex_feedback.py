@@ -16,6 +16,12 @@ from forge.core.runtime.codex_feedback import (
 )
 
 
+@pytest.fixture(autouse=True)
+def bound_hook_origin(monkeypatch):
+    # These tests isolate record/version admission; real ancestry has regression coverage.
+    monkeypatch.setattr("forge.core.runtime.codex_feedback._hook_from_launch_child", lambda parent: True)
+
+
 def executable(tmp_path: Path, version="0.162.1") -> Path:
     path = tmp_path / "codex"
     path.write_text(f'#!/bin/sh\nprintf "codex-cli {version}\\n"\n')

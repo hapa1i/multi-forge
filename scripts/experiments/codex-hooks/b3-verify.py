@@ -19,6 +19,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--real-case", default="real-claude-quote")
     parser.add_argument("--wheel-prefix", default="wheel")
+    parser.add_argument("--tui-off-case", default="tui-off-final")
+    parser.add_argument("--tui-combined-case", default="tui-combined")
     args = parser.parse_args()
     root = Path(os.environ["PROBE_ROUND_ROOT"])
     results = {}
@@ -33,8 +35,8 @@ def main() -> None:
         "multi",
         "mixed",
         "timeout",
-        "tui-off-final",
-        "tui-combined",
+        args.tui_off_case,
+        args.tui_combined_case,
         "model-only",
         args.wheel_prefix + "-source",
         args.wheel_prefix + "-off",
@@ -69,7 +71,7 @@ def main() -> None:
             for c in r["payload"].get("content", [])
         ]
         blocked = name in {"source-deny", "mixed", args.wheel_prefix + "-deny"}
-        off = name in {"off-headless", "tui-off-final", args.wheel_prefix + "-off"}
+        off = name in {"off-headless", args.tui_off_case, args.wheel_prefix + "-off"}
         action = json.loads((directory / "action-result.json").read_text())
         assert action["exists"] is not blocked
         if blocked:
@@ -130,6 +132,7 @@ def main() -> None:
             "operator_wire": "systemMessage" in wire,
             "hook_seconds": hook["elapsed_seconds"],
             "forge_module": hook["forge_module"],
+            "executor_identity_schema": identity["schema"],
         }
     real = json.loads((root / "captures" / args.real_case / "real-review.json").read_text())
     decision = real["result"]["decision"]

@@ -1415,9 +1415,10 @@ def authority_check() -> None:
 def codex_policy_check() -> None:
     """Evaluate authority, then policies, for a Codex PreToolUse action.
 
-    Wire contract (probe-pinned, codex-cli 0.138.0): a block is a strict
-    ``hookSpecificOutput`` deny JSON on stdout with exit 0; an allow emits NO
-    stdout. Codex FAILS OPEN on malformed hook output, so stdout carries only
+    A block is a strict ``hookSpecificOutput`` deny JSON on stdout with exit 0.
+    Admitted executors also receive bounded allowed-action feedback and independent
+    operator notices; clean allows stay silent. Codex FAILS OPEN on malformed output,
+    so stdout carries only
     ``json.dumps`` wire strings -- diagnostics go to stderr, but only once a Forge
     session is resolved (an unresolvable unmarked session means Forge is not
     managing this turn and must stay silent: a user-scope registration fires for
@@ -1483,7 +1484,10 @@ def codex_policy_check() -> None:
     if not effective.policy or not effective.policy.enabled:
         sys.exit(0)
 
-    from forge.cli.hooks.codex_policy_feedback import render_policy_feedback
+    from forge.cli.hooks.codex_policy_feedback import (
+        decision_is_unreviewed,
+        render_policy_feedback,
+    )
     from forge.core.runtime.codex_feedback import policy_feedback_supported
     from forge.policy.types import CompositeDecision, FailMode, PolicyDecision
 
@@ -1655,7 +1659,7 @@ def codex_policy_check() -> None:
                 print(f"[forge] Policy warning: {path}: {warning}", file=sys.stderr)
 
     if show_summary:
-        unreviewed = any(d.fail_open or d.failure_type for _, r in file_results for d in r.decisions)
+        unreviewed = any(decision_is_unreviewed(d) for _, r in file_results for d in r.decisions)
         verdict = (
             "allowed, unreviewed"
             if unreviewed

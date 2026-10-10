@@ -193,9 +193,10 @@ lane override. The supervisor verifies citations against its immutable `PlanSnap
 outer whitespace. Findings retain source, SHA-256, character offsets, and exact verified text; reviewer filenames/hashes
 are ignored. No mutable path is reread. Verification does not change the existing confidence/citation block threshold.
 Source-only model fields select verified passages, fixed Forge diagnostics, and attributed deterministic findings;
-reviewer prose, fixes, and free-form warnings stay operator/audit-facing. Missing quotes yield a fixed blocked-action
-instruction to stop and ask the operator, with inspection commands only in operator output. Old records authorize no
-verified passage. Only clean allows are cached; resolved checker reasons are never substituted for plan quotations.
+reviewer prose, fixes, and free-form warnings stay operator/audit-facing. A blocked reviewer finding without a verified
+quote gets fixed stop-and-ask guidance; a deterministic finding retains its intent/fix. Inspection commands stay in
+operator output. Old records authorize no verified passage. Only clean allows are cached; resolved checker reasons are
+never substituted for plan quotations.
 
 Output quotes arbitrary finding text as JSON data. Limits are 600 characters per field, 2,400 serialized bytes per
 finding, 12 findings per channel, 12,000 bytes for the encoded model string, 5,000 for the encoded operator string, and
@@ -494,12 +495,16 @@ Policy violation(s):
     pass the check but defeat the goal.
 ```
 
-The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent. The reason text is composed once
-(`format_deny_text`/`format_needs_review_text` in `cli/hooks/policy.py`); each responder owns only the wire framing:
-Claude via stderr + exit 2, Codex via stdout JSON (`hookSpecificOutput.permissionDecisionReason`) + exit 0 (strict JSON
-because Codex **fails open** on malformed output; allow emits no stdout). The `[forge] Policy: …` summary line is stderr
-telemetry in the hook command, not part of either wire contract.
+Claude's `Intent:` line appears once per denying policy (not per violation). The shared project-owner note asks for a
+compliant approach, escalation of an unavoidable conflict, and no bypasses. `cli/hooks/policy.py` owns this note and the
+unresolved-review guidance. Claude uses its text layout on stderr + exit 2. Codex's `codex_policy_feedback.py` projects
+attributed findings into bounded normal/source-only output and retains the full shared guidance in
+`hookSpecificOutput.permissionDecisionReason`, on stdout + exit 0. Codex **fails open** on malformed output, so its wire
+must remain strict JSON. Admitted executors receive allowed-action warnings through bare `additionalContext` and
+independent operator notices through `systemMessage`; clean allows remain silent. The `[forge] Policy: …` summary is
+stderr telemetry. A resolved tier-1 escalation is retained in audit but does not label the action unreviewed; an
+unavailable final reviewer does. Source-only's stop-and-ask instruction belongs to an unquoted reviewer finding, not a
+deterministic rule with a supplied intent/fix or a reviewer finding with a verified quotation.
 
 ### 1.6 Policy state and ownership
 

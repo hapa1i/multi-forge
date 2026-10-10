@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from forge.cli.hooks.policy import DENY_NOTE, NEEDS_REVIEW_GUIDANCE
 from forge.policy.types import CompositeDecision, PolicyDecision, Violation
 
 FIELD_CHARS = 600
@@ -70,13 +71,13 @@ def render_policy_feedback(
         )
     )
     model_title = title + " The following JSON entries are quoted policy evidence."
-    if blocked:
-        model_title += " Note: This policy was configured by the project owner."
-        if source_only:
-            model_title += " Stop and ask the operator before retrying when no verified quotation explains the block."
+    if denied:
+        model_title += " " + DENY_NOTE
+    elif review:
+        model_title += " " + NEEDS_REVIEW_GUIDANCE
     wire: dict[str, Any] = {}
     if blocked or (supported and model_feedback and findings):
-        context = _channel(findings, model_title, MODEL_BYTES, source_only=source_only)
+        context = _channel(findings, model_title, MODEL_BYTES, source_only=source_only, blocked=blocked)
         hook: dict[str, str] = {"hookEventName": "PreToolUse"}
         if blocked:
             hook.update(permissionDecision="deny", permissionDecisionReason=context)
@@ -91,6 +92,11 @@ def render_policy_feedback(
     # Field budgets count JSON-encoded strings, including escape expansion.
     assert len(serialized.encode("utf-8")) <= WIRE_BYTES
     return serialized
+
+
+def decision_is_unreviewed(decision: PolicyDecision) -> bool:
+    """An escalation failure alone does not make the final review unavailable."""
+    return decision.decision != "needs_review" and bool(decision.fail_open or decision.failure_type)
 
 
 def _collect(
@@ -109,9 +115,13 @@ def _collect(
                 findings.extend(_violations(path, decision, decision.violations))
                 if not decision.violations:
                     findings.append(_Finding(path, decision.policy_id, diagnostic="unresolved"))
-            elif decision.failure_type in ("skipped", "evidence_unavailable") or "unconfigured" in codes:
+            elif (
+                decision.decision == "needs_review"
+                or decision.failure_type in ("skipped", "evidence_unavailable")
+                or "unconfigured" in codes
+            ):
                 continue
-            elif decision.fail_open or decision.failure_type:
+            elif decision_is_unreviewed(decision):
                 findings.append(_Finding(path, decision.policy_id, diagnostic=decision.failure_type or "unavailable"))
             elif decision.warning_findings:
                 findings.extend(_violations(path, decision, decision.warning_findings))
@@ -132,7 +142,9 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True, separators=(",", ":"))
 
 
-def _projection(finding: _Finding, *, source_only: bool, limit: int, operator: bool) -> tuple[dict[str, Any], bool]:
+def _projection(
+    finding: _Finding, *, source_only: bool, limit: int, operator: bool, blocked: bool
+) -> tuple[dict[str, Any], bool]:
     truncated = False
 
     def clip(value: object) -> str:
@@ -185,6 +197,8 @@ def _projection(finding: _Finding, *, source_only: bool, limit: int, operator: b
             else "Policy reported a finding. " + _NO_QUOTE
         )
         data["quotes"] = quotes
+        if blocked and not quotes:
+            data["status"] += " Stop and ask the operator before retrying this finding."
     elif v is not None:
         data.update(
             severity=clip(v.severity),
@@ -202,7 +216,15 @@ def _projection(finding: _Finding, *, source_only: bool, limit: int, operator: b
     return data, truncated
 
 
-def _channel(findings: list[_Finding], title: str, budget: int, *, source_only: bool, operator: bool = False) -> str:
+def _channel(
+    findings: list[_Finding],
+    title: str,
+    budget: int,
+    *,
+    source_only: bool,
+    operator: bool = False,
+    blocked: bool = False,
+) -> str:
     # Deduplicate the full attributed finding before truncation, within this response only.
     unique = {_json(asdict(f)): f for f in findings}
     ordered = sorted(
@@ -227,10 +249,12 @@ def _channel(findings: list[_Finding], title: str, budget: int, *, source_only: 
             omitted += 1
             continue
         limit = FIELD_CHARS
-        data, shortened = _projection(finding, source_only=source_only, limit=limit, operator=operator)
+        data, shortened = _projection(finding, source_only=source_only, limit=limit, operator=operator, blocked=blocked)
         while len(_json(data).encode()) > FINDING_BYTES and limit > 8:
             limit //= 2
-            data, shortened = _projection(finding, source_only=source_only, limit=limit, operator=operator)
+            data, shortened = _projection(
+                finding, source_only=source_only, limit=limit, operator=operator, blocked=blocked
+            )
         line = _json(data)
         if len(line.encode()) > FINDING_BYTES:
             omitted += 1
