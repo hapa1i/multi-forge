@@ -5,7 +5,8 @@ Epic: [Codex supervisor](../epic_codex_supervisor/card.md). Member **B3**. Depen
 [B1: approved-plan snapshot contract](../../done/plan_file_supervision/card.md); both have shipped.
 
 Selected 2026-10-10 on `feat/codex-policy-warnings`, from B2 closeout `d54dba63`, now published to `main`. The
-[execution checklist](checklist.md) includes the user-selected source-only mode. This activation changes planning only.
+[execution checklist](checklist.md) includes the user-selected source-only mode. Implementation and
+[live evidence](evidence/README.md) are complete; the card remains active through PR review and merge.
 
 ## Problem and outcome
 

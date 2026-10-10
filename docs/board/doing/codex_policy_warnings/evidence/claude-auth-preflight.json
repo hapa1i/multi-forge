@@ -1,0 +1,6 @@
+{
+  "ready": true,
+  "binary": "$HOST_HOME/.local/share/claude/versions/2.1.294",
+  "billing_mode": "subscription_quota",
+  "auth_mode": "subscription-only"
+}

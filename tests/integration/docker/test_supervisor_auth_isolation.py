@@ -1,6 +1,8 @@
 """Auth-location probes use only synthetic credentials in a disposable Linux HOME."""
 
 import json
+import os
+import shlex
 
 import pytest
 
@@ -100,12 +102,23 @@ assert result.returncode == 0, result.stderr
 inherited_status = json.loads(result.stdout)
 assert inherited_status["authMethod"] == "api_key_helper", inherited_status
 rows.append({"case":"inherited-user-or-sidecar-helper", "authMethod":inherited_status["authMethod"]})
-print(json.dumps({"platform":"linux", "synthetic_only":True, "control":control, "clean":clean_status, "rows":rows, "helper_invocations":0}))
+version = subprocess.check_output(["claude", "--version"], text=True).strip()
+print(json.dumps({"platform":"linux", "claude_version":version, "synthetic_only":True, "control":control, "clean":clean_status, "rows":rows, "helper_invocations":0}))
 """
 
 
 @pytest.mark.parametrize("legacy_metadata", [True, False])
 def test_disposable_auth_location_matrix(forge_workspace: ContainerLike, legacy_metadata: bool):
+    # An explicit compatibility run may select an older supported reviewer when
+    # the host-matched Linux binary cannot start on the container architecture.
+    if version := os.environ.get("FORGE_AUTH_TEST_CLAUDE_VERSION"):
+        package = shlex.quote("@anthropic-ai/claude-code@" + version)
+        installed = forge_workspace.exec(f"npm install --prefix /tmp/auth-reviewer {package}", timeout=120)
+        assert installed.returncode == 0, installed.stderr
+        selected = forge_workspace.exec(
+            "ln -sfn /tmp/auth-reviewer/node_modules/.bin/claude /usr/local/bin/claude-real"
+        )
+        assert selected.returncode == 0, selected.stderr
     setup_real_claude(forge_workspace, session_name="auth-matrix")
     probe = (
         _PROBE

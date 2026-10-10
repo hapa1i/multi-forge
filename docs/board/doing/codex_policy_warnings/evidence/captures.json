@@ -1,0 +1,271 @@
+{
+  "identity": {
+    "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+    "retained_path": "$ROUND/runtime/0.162.1/bin/codex",
+    "version": "0.162.1",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "model": "gpt-6.1-sol",
+    "effort": "low",
+    "forge_revision": "5b9f6da8e021770e85f6ec7ba93f50bc80ef8701"
+  },
+  "reserved_turns": 27,
+  "turn_ledger": [
+    {
+      "reserved_turns": 1,
+      "at": 1791638014.302988,
+      "pid": 8933
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791638114.619919,
+      "pid": 11822
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791638216.829511,
+      "pid": 14128
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639510.040898,
+      "pid": 52795
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639524.587129,
+      "pid": 53296
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639543.623882,
+      "pid": 53866
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639579.700827,
+      "pid": 54456
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639594.536173,
+      "pid": 54923
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639644.3365061,
+      "pid": 55472
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639658.6365619,
+      "pid": 55982
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639678.536014,
+      "pid": 56551
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639698.451304,
+      "pid": 57200
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639717.614342,
+      "pid": 57752
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639748.550439,
+      "pid": 58350
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639767.651453,
+      "pid": 58950
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639786.570587,
+      "pid": 59485
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791639818.848662,
+      "pid": 60071
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640022.38611,
+      "pid": 63067
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640067.378824,
+      "pid": 65440
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640114.6691358,
+      "pid": 68203
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640185.357244,
+      "pid": 73956
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640200.146634,
+      "pid": 74889
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640220.197936,
+      "pid": 75596
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640240.276352,
+      "pid": 76124
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640806.636919,
+      "pid": 84112
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640830.045289,
+      "pid": 86109
+    },
+    {
+      "reserved_turns": 1,
+      "at": 1791640852.123086,
+      "pid": 89625
+    }
+  ],
+  "cases": [
+    {
+      "case": "enrollment",
+      "evidence": "enrollment.json"
+    },
+    {
+      "case": "enrollment-2",
+      "evidence": "enrollment-2.json"
+    },
+    {
+      "case": "mixed",
+      "evidence": "mixed.json"
+    },
+    {
+      "case": "model-only",
+      "evidence": "model-only.json"
+    },
+    {
+      "case": "multi",
+      "evidence": "multi.json"
+    },
+    {
+      "case": "off-headless",
+      "evidence": "off-headless.json"
+    },
+    {
+      "case": "real-claude",
+      "evidence": "real-claude.json"
+    },
+    {
+      "case": "real-claude-authenticated",
+      "evidence": "real-claude-authenticated.json"
+    },
+    {
+      "case": "real-claude-final",
+      "evidence": "real-claude-final.json"
+    },
+    {
+      "case": "real-claude-quote",
+      "evidence": "real-claude-quote.json"
+    },
+    {
+      "case": "seed-b3-executor",
+      "evidence": "seed-b3-executor.json"
+    },
+    {
+      "case": "seed-b3-off",
+      "evidence": "seed-b3-off.json"
+    },
+    {
+      "case": "seed-b3-source",
+      "evidence": "seed-b3-source.json"
+    },
+    {
+      "case": "seed-b3-wheel",
+      "evidence": "seed-b3-wheel.json"
+    },
+    {
+      "case": "source",
+      "evidence": "source.json"
+    },
+    {
+      "case": "source-changed",
+      "evidence": "source-changed.json"
+    },
+    {
+      "case": "source-deny",
+      "evidence": "source-deny.json"
+    },
+    {
+      "case": "source-invalid",
+      "evidence": "source-invalid.json"
+    },
+    {
+      "case": "timeout",
+      "evidence": "timeout.json"
+    },
+    {
+      "case": "trusted-v1-stub",
+      "evidence": "trusted-v1-stub.json"
+    },
+    {
+      "case": "trusted-v1-tdd",
+      "evidence": "trusted-v1-tdd.json"
+    },
+    {
+      "case": "tui-combined",
+      "evidence": "tui-combined.json"
+    },
+    {
+      "case": "tui-off",
+      "evidence": "tui-off.json"
+    },
+    {
+      "case": "tui-off-final",
+      "evidence": "tui-off-final.json"
+    },
+    {
+      "case": "wheel-deny",
+      "evidence": "wheel-deny.json"
+    },
+    {
+      "case": "wheel-final-deny",
+      "evidence": "wheel-final-deny.json"
+    },
+    {
+      "case": "wheel-final-off",
+      "evidence": "wheel-final-off.json"
+    },
+    {
+      "case": "wheel-final-source",
+      "evidence": "wheel-final-source.json"
+    },
+    {
+      "case": "wheel-off",
+      "evidence": "wheel-off.json"
+    },
+    {
+      "case": "wheel-source",
+      "evidence": "wheel-source.json"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "attempts": 1,
+  "extra_usage_disabled_confirmed": true,
+  "identity": {
+    "executable": "$HOST_HOME/.local/share/claude/versions/2.1.294",
+    "sha256": "def0d15e64dd7d89621f88d28214f885b1c38b0ddd69762fb8593e34915d6d53",
+    "version": "2.1.294 (Claude Code)"
+  }
+}

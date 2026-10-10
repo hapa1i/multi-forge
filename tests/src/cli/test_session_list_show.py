@@ -590,7 +590,7 @@ class TestSessionShowPlanInfo:
 
         assert result.exit_code == 0
         assert f"Plan (draft): {draft}" in result.output
-        assert "file missing" not in result.output
+        assert "file missing" not in " ".join(result.output.split())
 
     def test_show_resolves_nested_project_draft_against_launch_root(
         self,
@@ -666,7 +666,7 @@ class TestSessionShowPlanInfo:
         assert result.exit_code == 0
         assert "Plans approved: 1" in result.output
         assert "gone.md" in result.output
-        assert "file missing" in result.output
+        assert "file missing" in " ".join(result.output.split())
 
     def test_show_omits_plan_section_when_empty(self, runner: CliRunner, temp_env: Path) -> None:
         _seed_bare_session(temp_env, "solo")

@@ -100,3 +100,18 @@ Every member must ship or receive an explicit board disposition. The integrated 
 reviewed from a plan file, model-visible allowed-action feedback, bounded Stop review, and a separately opted-in native
 fork review. Verify the no-API everyday route, quota/error behavior, existing Claude supervision, and actual checkout
 selection. Keep probe captures sanitized and retain the commands, versions, and outcomes used for each conclusion.
+
+## B3 implementation handoff (2026-10-10)
+
+B3's [evidence](../codex_policy_warnings/evidence/README.md) proves allowed warning delivery on retained Codex 0.162.1
+through enrolled product hooks, including independent model/operator channels, source-only snapshot quotations, mixed
+atomic denials, timeout status, and installed-wheel provenance. Source-only keeps reviewer prose in durable evidence and
+selects verified snapshot text or fixed fallback for every model-visible warning/block field. It does not restrict
+workspace reads. The quote-quality control completed one subscription-only Claude review with two verified quotations.
+
+The admission set is feature-specific: 0.161.0 and 0.162.1, with the historical 0.161.0 qualifications preserved. Launch
+identity is refreshed at each managed start/resume; unknown or unmeasured versions receive no new allowed-action
+channel. The general ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes
+at 12,000/5,000 and the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude
+retains its existing count summary; Jev A2 owns that formatter extension. B4/B5 are still proposed, and B3 remains
+`doing` until merge and closeout.

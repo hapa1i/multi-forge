@@ -1,0 +1,22 @@
+{
+  "passed": false,
+  "clean": false,
+  "final_decision": "deny",
+  "files_checked": 1,
+  "violations": [
+    {
+      "file_path": "src/manual-check.py",
+      "rule_id": "coding_standards.no-type-checking",
+      "message": "TYPE_CHECKING blocks are not allowed",
+      "severity": "medium",
+      "suggested_fix": "Fix circular imports architecturally by:\n1. Moving shared types to a separate types.py module\n2. Using dependency injection\n3. Restructuring the module hierarchy",
+      "intent": "Circular imports indicate an architectural problem. TYPE_CHECKING blocks hide the symptom instead of fixing the dependency structure. This policy ensures clean module boundaries."
+    }
+  ],
+  "warnings": [],
+  "policies_evaluated": [
+    "coding_standards.no-type-checking",
+    "coding_standards.no-backward-compat",
+    "coding_standards.no-emoji"
+  ]
+}

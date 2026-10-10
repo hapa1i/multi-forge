@@ -1,0 +1,19 @@
+aarch64
+============================================================
+Bun v1.4.3 (eecfd55de) Linux arm64
+Linux Kernel v7.0.14 | glibc v2.36
+CPU: neon fp aes crc32 atomics
+Args: "claude" "--version"
+
+Elapsed: 44ms | User: 0ms | Sys: 4ms
+RSS: 8.23 MB | Peak: 8.23 MB | Commit: 18.22 MB | Faults: 16
+
+panic(main thread): Bus error at address 0xF27C832
+oh no: Bun has crashed. This indicates a bug in Bun, not your code.
+
+To send a redacted crash report to Bun's team,
+please file a GitHub issue using the link below:
+
+ https://bun.report/1.4.3/L_1eecfd55AA2+0muDul4i9Bm/r/8B+29j/Bm07Juh8JmjolvBA4Akjk/kP
+
+Bus error

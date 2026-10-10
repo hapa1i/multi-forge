@@ -1,0 +1,1343 @@
+{
+  "case": "timeout",
+  "control": {
+    "kind": "timeout",
+    "session": "b3-executor",
+    "feedback": true,
+    "source_only": false,
+    "reviewer_nonce": "B3-e74a32a95948486984574a679069a8be",
+    "plan_path": "$ROUND/timeout-approved-plan.txt",
+    "source_quote": "Use the approved interface. Source marker: SOURCE-6b6b165a3be34afe8fbdf4b607966324.",
+    "verdict": {
+      "verdict": "divergent",
+      "confidence": 0.5,
+      "violations": [
+        {
+          "severity": "medium",
+          "evidence": "Reviewer prose B3-e74a32a95948486984574a679069a8be",
+          "suggested_fix": "Reviewer fix B3-e74a32a95948486984574a679069a8be",
+          "citations": [
+            "Use the approved interface. Source marker: SOURCE-6b6b165a3be34afe8fbdf4b607966324."
+          ]
+        }
+      ]
+    },
+    "reviewer": "sleep",
+    "prompt": "Use apply_patch exactly once to add src/timeout.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent.",
+    "target": "src/timeout.py",
+    "capture": "$ROUND/captures/timeout"
+  },
+  "action-result": {
+    "target": "src/timeout.py",
+    "exists": true,
+    "content": "VALUE = 1\n"
+  },
+  "hooks": [
+    {
+      "at": 1791639788.9302258,
+      "dev_override": "$CHECKOUT",
+      "elapsed_seconds": 0.4188371659997756,
+      "executor_identity": "{\"schema\":1,\"executable\":\"$ROUND/bin/codex\",\"sha256\":\"94c9472655751b31b2296f22466b9773ab952ae7d28d66fa5ea2f37739a00b86\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":208121774,\"size\":223,\"mtime_ns\":1791637079421280326}",
+      "exit_code": 0,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py",
+      "hook": [
+        "codex-session-start"
+      ],
+      "launcher": "$CHECKOUT/.venv/bin/forge",
+      "pid": 59613,
+      "python": "$CHECKOUT/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12609-5c44-7fa0-86a7-8d00e10de59b\",\"transcript_path\":\"$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-38-32-01a12609-5c44-7fa0-86a7-8d00e10de59b.jsonl\",\"cwd\":\"$ROUND/project\",\"hook_event_name\":\"SessionStart\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"source\":\"resume\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791639794.339784,
+      "dev_override": "$CHECKOUT",
+      "elapsed_seconds": 1.9302395839999917,
+      "executor_identity": "{\"schema\":1,\"executable\":\"$ROUND/bin/codex\",\"sha256\":\"94c9472655751b31b2296f22466b9773ab952ae7d28d66fa5ea2f37739a00b86\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":208121774,\"size\":223,\"mtime_ns\":1791637079421280326}",
+      "exit_code": 0,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py",
+      "hook": [
+        "codex-policy-check"
+      ],
+      "launcher": "$CHECKOUT/.venv/bin/forge",
+      "pid": 59718,
+      "python": "$CHECKOUT/.venv/bin/python3",
+      "stderr": "[forge] Policy warning: src/timeout.py: Implementation changes require test changes first\n[forge] Policy warning: src/timeout.py: Supervisor error: Timed out after 1s, failing open\n[forge] Policy: checked apply_patch:src/timeout.py against semantic.supervisor (allowed, unreviewed, 1.5s)\n",
+      "stdin": "{\"session_id\":\"01a12609-5c44-7fa0-86a7-8d00e10de59b\",\"turn_id\":\"01a1260d-9487-7091-b0cb-d86db7de0c72\",\"transcript_path\":\"$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-38-32-01a12609-5c44-7fa0-86a7-8d00e10de59b.jsonl\",\"cwd\":\"$ROUND/project\",\"hook_event_name\":\"PreToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Add File: $ROUND/project/src/timeout.py\\n+VALUE = 1\\n*** End Patch\"},\"tool_use_id\":\"exec-3ec0c76c-eb9f-4f98-895a-bc3a00ff322c\"}",
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Policy warnings for an allowed action. The following JSON entries are quoted policy evidence.\\n{\\\"path\\\":\\\"src/timeout.py\\\",\\\"policy\\\":\\\"semantic.supervisor\\\",\\\"rule\\\":\\\"semantic.supervisor\\\",\\\"label\\\":\\\"src/timeout.py: [semantic.supervisor]\\\",\\\"status\\\":\\\"Policy review unavailable; this allowed action is unreviewed.\\\"}\\n{\\\"path\\\":\\\"src/timeout.py\\\",\\\"policy\\\":\\\"tdd.tests-before-impl\\\",\\\"rule\\\":\\\"tdd.tests-before-impl\\\",\\\"label\\\":\\\"src/timeout.py: [tdd.tests-before-impl]\\\",\\\"severity\\\":\\\"high\\\",\\\"message\\\":\\\"Implementation changes require test changes first\\\",\\\"intent\\\":\\\"Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.\\\",\\\"evidence\\\":\\\"Writing to src/timeout.py without touching any test files\\\",\\\"suggested_fix\\\":\\\"Write or update tests in tests/ directory before modifying src/ code\\\",\\\"citations\\\":[]}\\nOmitted findings: 0. Truncated findings: 0.\"},\"systemMessage\":\"Policy warnings for an allowed action.\\n{\\\"path\\\":\\\"src/timeout.py\\\",\\\"policy\\\":\\\"semantic.supervisor\\\",\\\"rule\\\":\\\"semantic.supervisor\\\",\\\"label\\\":\\\"src/timeout.py: [semantic.supervisor]\\\",\\\"status\\\":\\\"Policy review unavailable; this allowed action is unreviewed.\\\",\\\"recovery\\\":\\\"Reviewer timed out. Check supervisor status and its timeout setting.\\\"}\\n{\\\"path\\\":\\\"src/timeout.py\\\",\\\"policy\\\":\\\"tdd.tests-before-impl\\\",\\\"rule\\\":\\\"tdd.tests-before-impl\\\",\\\"label\\\":\\\"src/timeout.py: [tdd.tests-before-impl]\\\",\\\"severity\\\":\\\"high\\\",\\\"message\\\":\\\"Implementation changes require test changes first\\\",\\\"intent\\\":\\\"Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.\\\",\\\"evidence\\\":\\\"Writing to src/timeout.py without touching any test files\\\",\\\"suggested_fix\\\":\\\"Write or update tests in tests/ directory before modifying src/ code\\\",\\\"citations\\\":[]}\\nOmitted findings: 0. Truncated findings: 0.\\nInspect: forge policy supervisor status --json; forge session show <session> --json.\"}\n"
+    }
+  ],
+  "reviewer": [
+    {
+      "at": 1791639792.9804091,
+      "kind": "dispatch_started",
+      "pid": 59740,
+      "synthetic": true
+    },
+    {
+      "at": 1791639793.821144,
+      "kind": "signal",
+      "pid": 59740,
+      "signal": 15,
+      "synthetic": true
+    }
+  ],
+  "command": {
+    "command": [
+      "$CHECKOUT/.venv/bin/forge",
+      "session",
+      "resume",
+      "b3-executor",
+      "--task",
+      "Use apply_patch exactly once to add src/timeout.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent."
+    ],
+    "cwd": "$ROUND/project",
+    "started_at": 1791639781.600632,
+    "codex_identity": {
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "retained_path": "$ROUND/runtime/0.162.1/bin/codex",
+      "version": "0.162.1",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "forge_revision": "5b9f6da8e021770e85f6ec7ba93f50bc80ef8701"
+    },
+    "forge_revision": "bd9e71dc790cc7074c85c391a653b37c23e22e8a",
+    "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "harness_files": {
+      "README.md": "8ac2840ef4c931eebf93d95023b0cfab5d40760791ffb5de53c0cc5c4482f5f3",
+      "b2-concurrent.py": "bcd5423ad94e287a124c99ee2c36213fb00661f5b9ef565b5a0fc5cd14cec2b2",
+      "b2-coverage.py": "56785776b69a840a16977190970dcfa76c611f586b5789b922cf2a16bdfd1ade",
+      "b2-forks.py": "f4757695b591700be2dd612f8cf9fafd267c636faa1e383af9c5cee2367a4ed6",
+      "b2-interactive.py": "f0962990b1491777164817f2c9f0c1170ad70ca3338df155e8a3129d0ab5005f",
+      "b2-lifetime.py": "145e13961b84066b713288c86a0ee057a6045d1d0b50b0d4aa4b7ba0ae8d9d1e",
+      "b2-prepare.py": "328f7371f092d46a757334132c27ba2e3fb8715aebdec91d19acb19981b22ed0",
+      "b2-run.py": "e14fd7fc08da43e5ff4be5380e5a73487afe41702d34591561e8ee1c40b9b1fa",
+      "b2-terminal.py": "d6b086e62082fdc43bb552fb609bbcb735d9fef9ce157a7a0af39c2896bf8ae8",
+      "b3-export.py": "957f41d3a1e8506b41a19f20171d225355d5747c1073ca60c40f68df54757fd0",
+      "b3-fixture.py": "e14283d2952652d9d54ebb9a071d37b6b5d61194ed29efbf0df9ffcd5854156b",
+      "b3-real-review.py": "53379b7d76736546420a19d1605297b534aec1580bc7d3e4f32e9d21c70a5ae7",
+      "b3-run.py": "3d88a5e54740de39fd7ff0b0efccf9e237b25a320b27a5ba6d9c9c14325fa1bd",
+      "b3-terminal.py": "052854af3ac810a25a548ca508114ea176f5ecc10a19926cc0047c64e999ccb4",
+      "b3-wheel.py": "b7605dda460c4d73063ef429986ee86fd7a1b2a9563a45f3d0c8d04f9e18ee4b",
+      "b3_instrumentation/__init__.py": "7b9b8b3fc610b5a4922e4711eae63bff1375d0a79603101fb0bdc521bf9a9f79",
+      "b3_instrumentation/sitecustomize.py": "6ce2c32a1df9b5395af3858b6a4a441c00dd06789c25785e342ce4c6e74b86c5",
+      "b3_model_control/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "b3_model_control/sitecustomize.py": "66deb23081b32e029eb33a736eb7f56e577ecde292f37256c9f76f1359626735",
+      "export-evidence.py": "bbea8c5330e182a831ed0e7271804ab8f9e62cbfbdeafb834c38dec77ed3c61c",
+      "hooks/b2-hook.py": "cb0ee3b02304bd028fc94df2bae3bb639eae69be77548e889fb3959917de80dc",
+      "hooks/b2-mcp.py": "134ce04709f0e207be84fc2d6ee12245301d3ab8705b777e15c0d0fc0e311f44",
+      "hooks/b2-reviewer.py": "b02b25bcd17ecd113480416d63f73bd0c93bf9162c8f5551c3057f506243ef6b",
+      "hooks/b3-reviewer.py": "881ef1771326a1f000495775e64323004f2fb91f640dc1c37d795e72d8f1c9b3",
+      "hooks/gen-config.py": "669671268f545a6a72c3617eb92d9b38890015d417c7a2f11ea1a8e1048e0dba",
+      "hooks/hash-preimage.py": "7c94628eaf7dc7c01fe0bf825cb3a15316663e2068cfec60806d9baae96ae51a",
+      "hooks/respond-hook.sh": "28cd62a456f022cc4855cd487d39ff69d2f50a88388eca4f7b5f0872799a2563",
+      "hooks/tee-hook.sh": "1832aa74cadc2cf8bb83ebd88c433247f2ef555a5f4b03f2f99d48e1ab0e0f42",
+      "instrumentation/sitecustomize.py": "dc75ec31489d930f589a74c12e5bc75f504d4b786c1c2c7df4843584f5c4c389",
+      "lib.sh": "0bf60ada0cab327a8c62ae034471c92fd337f5c7ed45b27bd8a6a0a42c08a280",
+      "probe-home.py": "8c197d113ce8f62e1eec1c5491f2c80a3428af5fe93b86c6cac6dbcceffe84d7",
+      "probe-runtime.py": "ca429340a83016df304de8440ca9b95be870b2e802ff9f89a121ba86592141d9",
+      "reproduce.sh": "c8f92e0c51538113966f5d8fa7652d217c7c751771bfe2da014ef87984137fd3",
+      "responses/permissionrequest-allow.json": "3f9ea19a8b5d338a4d94c1afe252957a764f3d37dd1b329e3fed84fea2374787",
+      "responses/permissionrequest-deny.json": "4f728b70a0fd3ecd77f60873469360f1e287cedc2f2e82711dd96a2345951787",
+      "responses/pretooluse-allow-updatedinput.json": "6b5b981a4baac6a2e5b922b0c36972f5c14cc6f4f71fd9c2e0357fc414b998fa",
+      "responses/pretooluse-deny-exit2.txt": "d732af8ccbe648e6c19b069e8ed38666b585d627240e937d280c124344282f2b",
+      "responses/pretooluse-deny.json": "2a883fa5c85518689fbda92f4516668986f595ceae7e4d2e088cf69a4a9523b1",
+      "responses/pretooluse-malformed.json": "c11e8a8a07c459b7eb269501c65ac405cdb644fa87d6d53772ca175f2fb3f18e",
+      "responses/sessionstart-additionalcontext.json": "c6fb4f19ebb23bde12771eb6f382fb424eda2e9a4fd2c9bfd2b173f48de9ed13",
+      "responses/stop-block-once.json": "2f2cab74ec5e671db4eecc0c3428a1287f012d0c351248e2dcde68f3df38f6b5",
+      "responses/userpromptsubmit-block.json": "6a16f4022ff805612844fa77e6b3d128bbae7011acfbc764ca277ecc94037919",
+      "sanitize.sh": "c433192f26f0d7f2947c55bf0ecdab283123ab92136285e29717880a7db2a9f8",
+      "stages/00-preflight.sh": "589b24264dde64762f2d7d13b4965f9d3579a94f38f8bf8d6b94fb506781ae11",
+      "stages/05-config-schema.sh": "2e8dd20cc1b288c4bd3853abc3c951b104f18f945d0a511cf10b6fbb419c174c",
+      "stages/10-headless-fire.sh": "819f8a1e7819429f6fafc187840295603a5cfb13b4f31514fdf4b65672f34c1e",
+      "stages/20-payloads.sh": "50ba81fe7f622cc2246bd445a30288c3315050d2efe12a522fdcb514f2e42bf6",
+      "stages/30-responses.sh": "4e1c0a6a9d6ccf15da108e5884b4a5a18163a5d64c5fe63f5f54e64acf6cf084",
+      "stages/40-trust.sh": "0cff175cbf5b64f94817f9e5b962a86ed9de581d7a325c35fec95b57603408fb",
+      "stages/50-interactive.sh": "11fb8010cd99f90c8addf2b72ec9ee2d57f505894f0bfd0c5decf3b3e559f95e",
+      "stages/60-exec-resume.sh": "2f230725f823d3f535369223e091b6bacba12e118b13183c6588670487d2d772",
+      "stages/61-rollout-identity.sh": "fc546b163425c28b10f84cc4c22fc8f91b2390bf631ed4b3cfa773d21df942ab",
+      "stages/70-bypass.sh": "7c6e2e11946edb6e89067ded5c671731f93f4e329183a3fdc962dd8225774910",
+      "stages/80-enroll-fixture.sh": "cb6d4a61109a4d1b68849715c90016adcff3271dec60cf74435343e06e32d629",
+      "stages/81-enrolled-coverage.sh": "f7849505ffac96b17e59ca150dd21cb2f776b4458be09aac7cdfb445f90964ce",
+      "stages/82-trust-dimensions.sh": "aef16d6ac2a7d15101072eb9f061e60cb75c35e973139180d9a2d78f76aa87c8",
+      "stages/83-preimage.sh": "efa4a62a076d7f8545875309c8aa3c3dca2a25b01d4b9752f3a8a612d3aa9dce",
+      "stages/84-fresh-project.sh": "d2dcace2f8e0136f666f0b506fd9d65dffa24bf95ad86415631f1197a9737cae",
+      "stages/85-policy-check-e2e.sh": "63a3bfcbf412d50db5843627e8d7d31fae90a4c1da93e61e1ef361f6558cbb71",
+      "stages/86-sessionstart-delivery-e2e.sh": "6be2fd9f2e652e26e88c66f2ddebda1ec1984a36850b499d69e4ac94a702a57c",
+      "stages/87-interactive-smoke.sh": "d866a5e9f93528e17e12b248752a29c53349a6a69c8684afacbb3bc957d555ac",
+      "stages/88-b2-enrollment.sh": "21378644029a2281a19234503b0b1772ba81ecf4264adc877e3af2c7ffcba3b2",
+      "upstream-issues/pretooluse-malformed-fails-open.md": "3111446e3507c4da864edc1cd10fa1170d272dde929f61cbd73f35f53e605571"
+    }
+  },
+  "process-result": {
+    "returncode": 0,
+    "elapsed_seconds": 15.996062375000292,
+    "survivors_before_sweep": [],
+    "kill_escalation": [],
+    "remaining": [],
+    "owner": "6d922f7ea4974c53a3951fc6058e7c8a",
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "codex_identity_unchanged": true
+  },
+  "stdout": "Resumed Codex session: b3-executor (thread 01a12609-5c44-7fa0-86a7-8d00e10de59b)\n\nI’ll add the file with a single apply_patch call.\n\nNONE\n",
+  "stderr": "",
+  "session": {
+    "name": "b3-executor",
+    "policy": {
+      "forge_version": null,
+      "bundles": [
+        "tdd",
+        "coding_standards"
+      ],
+      "rules_active": [
+        "tdd.tests-before-impl",
+        "tdd.no-skip-tests",
+        "coding_standards.no-type-checking",
+        "coding_standards.no-backward-compat",
+        "coding_standards.no-emoji",
+        "semantic.supervisor"
+      ],
+      "decisions": [
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/trusted_v1_tdd.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first"
+          ],
+          "evaluated_at": "2026-10-10T13:38:51+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/trusted_v1_tdd.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:38:51+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:38:51+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/trusted_v1_stub.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first",
+            "Possible divergence: Reviewer prose B3-49c211a15e7843309d692914d3bb7b1a (confidence: 50%)"
+          ],
+          "evaluated_at": "2026-10-10T13:39:10+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/trusted_v1_stub.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:39:10+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:39:10+00:00"
+            },
+            {
+              "decision": "warn",
+              "policy_id": "semantic.supervisor",
+              "violations": [],
+              "warnings": [
+                "Possible divergence: Reviewer prose B3-49c211a15e7843309d692914d3bb7b1a (confidence: 50%)"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "semantic.supervisor.alignment",
+                  "message": "Reviewer prose B3-49c211a15e7843309d692914d3bb7b1a",
+                  "severity": "medium",
+                  "evidence": "Reviewer prose B3-49c211a15e7843309d692914d3bb7b1a",
+                  "suggested_fix": "Reviewer fix B3-49c211a15e7843309d692914d3bb7b1a",
+                  "citations": [
+                    "Use the approved interface. Source marker: SOURCE-19e825bcc823414d9b2348b7f25d90ce."
+                  ],
+                  "provenance": "reviewer",
+                  "verified_citations": [
+                    {
+                      "source": "$ROUND/trusted-v1-stub-approved-plan.txt",
+                      "digest": "d314e695f368fda30bf4f5f59cad681a55793c83a2032828f6f45353937f7ada",
+                      "start": 0,
+                      "end": 83,
+                      "text": "Use the approved interface. Source marker: SOURCE-19e825bcc823414d9b2348b7f25d90ce."
+                    }
+                  ]
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:39:10+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "allow",
+          "context_summary": "apply_patch:docs/multi.txt",
+          "blocking_violations": [],
+          "warnings": [],
+          "evaluated_at": "2026-10-10T13:42:35+00:00",
+          "decisions": [
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:35+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/multi.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first"
+          ],
+          "evaluated_at": "2026-10-10T13:42:35+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/multi.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:35+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:35+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/multi_later.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first"
+          ],
+          "evaluated_at": "2026-10-10T13:42:35+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/multi_later.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:35+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:35+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/mixed.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first"
+          ],
+          "evaluated_at": "2026-10-10T13:42:54+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/mixed.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-type-checking",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-backward-compat",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-emoji",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "deny",
+          "context_summary": "apply_patch:src/mixed_blocked.py",
+          "blocking_violations": [
+            {
+              "rule_id": "coding_standards.no-type-checking",
+              "message": "TYPE_CHECKING blocks are not allowed",
+              "severity": "medium",
+              "evidence": "Found TYPE_CHECKING pattern(s): if\\s+TYPE_CHECKING\\s*:",
+              "suggested_fix": "Fix circular imports architecturally by:\n1. Moving shared types to a separate types.py module\n2. Using dependency injection\n3. Restructuring the module hierarchy",
+              "citations": [],
+              "provenance": "policy",
+              "verified_citations": []
+            }
+          ],
+          "warnings": [
+            "Implementation changes require test changes first"
+          ],
+          "evaluated_at": "2026-10-10T13:42:54+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/mixed_blocked.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "deny",
+              "policy_id": "coding_standards.no-type-checking",
+              "violations": [
+                {
+                  "rule_id": "coding_standards.no-type-checking",
+                  "message": "TYPE_CHECKING blocks are not allowed",
+                  "severity": "medium",
+                  "evidence": "Found TYPE_CHECKING pattern(s): if\\s+TYPE_CHECKING\\s*:",
+                  "suggested_fix": "Fix circular imports architecturally by:\n1. Moving shared types to a separate types.py module\n2. Using dependency injection\n3. Restructuring the module hierarchy",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Circular imports indicate an architectural problem. TYPE_CHECKING blocks hide the symptom instead of fixing the dependency structure. This policy ensures clean module boundaries.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-backward-compat",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-emoji",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:42:54+00:00"
+            }
+          ]
+        },
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/timeout.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Implementation changes require test changes first",
+            "Supervisor error: Timed out after 1s, failing open"
+          ],
+          "evaluated_at": "2026-10-10T13:43:14+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "tdd.tests-before-impl",
+              "violations": [],
+              "warnings": [
+                "Implementation changes require test changes first"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "tdd.tests-before-impl",
+                  "message": "Implementation changes require test changes first",
+                  "severity": "high",
+                  "evidence": "Writing to src/timeout.py without touching any test files",
+                  "suggested_fix": "Write or update tests in tests/ directory before modifying src/ code",
+                  "citations": [],
+                  "provenance": "policy",
+                  "verified_citations": []
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:12+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "tdd.no-skip-tests",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:12+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-type-checking",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:12+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-backward-compat",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:12+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "coding_standards.no-emoji",
+              "violations": [],
+              "warnings": [],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:12+00:00"
+            },
+            {
+              "decision": "allow",
+              "policy_id": "semantic.supervisor",
+              "violations": [],
+              "warnings": [
+                "Supervisor error: Timed out after 1s, failing open"
+              ],
+              "warning_findings": [],
+              "diagnostic_codes": [],
+              "fail_open": true,
+              "failure_type": "timeout",
+              "intent": null,
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:43:14+00:00"
+            }
+          ]
+        }
+      ],
+      "policy_states": {
+        "tdd.tests-before-impl": {
+          "tests_touched": []
+        },
+        "semantic.supervisor": {
+          "cache": {}
+        }
+      }
+    },
+    "codex": {
+      "thread_id": "01a12609-5c44-7fa0-86a7-8d00e10de59b",
+      "rollout_path": "$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-38-32-01a12609-5c44-7fa0-86a7-8d00e10de59b.jsonl",
+      "rollout_source": "discovered_by_thread_id",
+      "auth_method": "chatgpt_tokens",
+      "auth_source": "codex_store",
+      "billing_mode": "subscription_quota",
+      "last_run_at": "2026-10-10T13:43:17+00:00",
+      "context_delivery": "initial_message"
+    }
+  },
+  "native_turn": [
+    {
+      "timestamp": "2026-10-10T13:43:08.987Z",
+      "ordinal": 95,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_01a1260d-9dbb-7880-b9e9-eeed5ce9aea2",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Use apply_patch exactly once to add src/timeout.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent."
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639788.9875,
+          "content_item_kinds": [
+            "user.text"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_01a1260d-9dbb-7880-b9e9-eeed5ce9aea2",
+            "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+            "role": "user"
+          },
+          "revision": "retained_01a1260d-9dbb-7880-b9e9-ef08b0c82ddd",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 14,
+        "mcp_attribution": {
+          "status": "none"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:11.063Z",
+      "ordinal": 98,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_0f58a850a098136f016aca40eefa248191888c9fc377656d54",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I’ll add the file with a single apply_patch call.\n"
+          }
+        ],
+        "phase": "commentary",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639790.9985414,
+          "content_item_kinds": [
+            "unknown"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_0f58a850a098136f016aca40eefa248191888c9fc377656d54",
+            "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+            "role": "assistant"
+          },
+          "revision": "retained_01a1260d-a5d7-70e0-b0de-a11d3edde17b",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 15
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:12.286Z",
+      "ordinal": 99,
+      "type": "response_item",
+      "payload": {
+        "type": "custom_tool_call",
+        "id": "ctc_0f58a850a098136f016aca40ef61a08191b8aa1ab2eb6fc5f1",
+        "status": "completed",
+        "call_id": "call_301fef75c8f64783b391231b51bc22fe",
+        "name": "exec",
+        "input": "const result = await tools.apply_patch(\"*** Begin Patch\\n*** Add File: $ROUND/project/src/timeout.py\\n+VALUE = 1\\n*** End Patch\");\ntext(result);\n",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639791.3954775
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:14.397Z",
+      "ordinal": 101,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_01a1260d-b2dd-7050-bd5c-285a103c285a",
+        "role": "developer",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Policy warnings for an allowed action. The following JSON entries are quoted policy evidence.\n{\"path\":\"src/timeout.py\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor\",\"label\":\"src/timeout.py: [semantic.supervisor]\",\"status\":\"Policy review unavailable; this allowed action is unreviewed.\"}\n{\"path\":\"src/timeout.py\",\"policy\":\"tdd.tests-before-impl\",\"rule\":\"tdd.tests-before-impl\",\"label\":\"src/timeout.py: [tdd.tests-before-impl]\",\"severity\":\"high\",\"message\":\"Implementation changes require test changes first\",\"intent\":\"Test-driven development: write tests first to define expected behavior, then implement. This catches design issues early and ensures every change has test coverage from the start.\",\"evidence\":\"Writing to src/timeout.py without touching any test files\",\"suggested_fix\":\"Write or update tests in tests/ directory before modifying src/ code\",\"citations\":[]}\nOmitted findings: 0. Truncated findings: 0."
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639794.397364,
+          "content_item_kinds": [
+            "hooks.additional_context"
+          ]
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:14.413Z",
+      "ordinal": 103,
+      "type": "response_item",
+      "payload": {
+        "type": "custom_tool_call_output",
+        "id": "ctco_01a1260d-b2ed-7663-9b7c-7a5dbe1d8e26",
+        "call_id": "call_301fef75c8f64783b391231b51bc22fe",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Script completed\nWall time 2.1 seconds\nOutput:\n"
+          },
+          {
+            "type": "input_text",
+            "text": "{}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639794.41354
+        }
+      },
+      "metadata": {
+        "client_authored": false,
+        "fallback_token_limit_override": 12000
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:16.157Z",
+      "ordinal": 106,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_0f58a850a098136f016aca40f4338481918971aad6a8777126",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "NONE"
+          }
+        ],
+        "phase": "final_answer",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+          "create_time": 1791639796.2150614,
+          "content_item_kinds": [
+            "unknown"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_0f58a850a098136f016aca40f4338481918971aad6a8777126",
+            "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+            "role": "assistant"
+          },
+          "revision": "retained_01a1260d-b9bd-7752-b3d5-cb87c290d750",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 16
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:43:16.235Z",
+      "ordinal": 109,
+      "type": "event_msg",
+      "payload": {
+        "type": "task_complete",
+        "root_turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+        "turn_id": "01a1260d-9487-7091-b0cb-d86db7de0c72",
+        "last_agent_message": "NONE",
+        "started_at": 1791639786,
+        "completed_at": 1791639796,
+        "duration_ms": 9601,
+        "time_to_first_token_ms": 4311
+      }
+    }
+  ],
+  "native_streams": {
+    "run_baf9b6af331c-native-stream.jsonl": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12609-5c44-7fa0-86a7-8d00e10de59b"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add the file with a single apply_patch call.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "$ROUND/project/src/timeout.py",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "$ROUND/project/src/timeout.py",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "NONE"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 190269,
+          "cached_input_tokens": 182144,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 537,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ]
+  },
+  "usage": [
+    {
+      "run_id": "run_f7fd8b10fe04",
+      "root_run_id": "run_ef33a86426f0",
+      "runtime": "codex",
+      "command": "codex-bridge",
+      "status": "success",
+      "parent_run_id": "run_ef33a86426f0",
+      "session": "b3-executor",
+      "workflow": "transfer",
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 15780,
+      "output_tokens": 5,
+      "cached_tokens": 12288,
+      "latency_ms": 7587.0,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_897e5e5c794a",
+      "ts": "2026-10-10T13:38:37Z"
+    },
+    {
+      "run_id": "run_ce953650db12",
+      "root_run_id": "run_8b5e7da11ea7",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_8b5e7da11ea7",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 48695,
+      "output_tokens": 88,
+      "cached_tokens": 44032,
+      "latency_ms": 10826.8,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_090fa4f53576",
+      "ts": "2026-10-10T13:38:55Z"
+    },
+    {
+      "run_id": "run_17bb09ddb893",
+      "root_run_id": "run_6aa897fce770",
+      "runtime": "claude_code",
+      "command": "supervisor",
+      "status": "success",
+      "parent_run_id": "run_997ca2d0d3a6",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": null,
+      "model": "sonnet",
+      "proxy_id": null,
+      "billing_mode": "unknown",
+      "measurement_source": "unattributed",
+      "attribution_granularity": "verb",
+      "route": "claude_p",
+      "reporter": null,
+      "confidence": "unavailable",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "latency_ms": 167.3,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_3c1bf649b8e8",
+      "ts": "2026-10-10T13:39:10Z"
+    },
+    {
+      "run_id": "run_997ca2d0d3a6",
+      "root_run_id": "run_6aa897fce770",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_6aa897fce770",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 82487,
+      "output_tokens": 212,
+      "cached_tokens": 76928,
+      "latency_ms": 11723.2,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_fe9ef7d90421",
+      "ts": "2026-10-10T13:39:15Z"
+    },
+    {
+      "run_id": "run_1892e9ed0ba9",
+      "root_run_id": "run_3d312720f7a5",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_3d312720f7a5",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 117443,
+      "output_tokens": 345,
+      "cached_tokens": 110848,
+      "latency_ms": 11271.7,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_70e6f1b1c89c",
+      "ts": "2026-10-10T13:42:39Z"
+    },
+    {
+      "run_id": "run_89ebdce778bc",
+      "root_run_id": "run_84a9e428f396",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_84a9e428f396",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 153430,
+      "output_tokens": 458,
+      "cached_tokens": 146048,
+      "latency_ms": 10360.2,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_ea5c1d513669",
+      "ts": "2026-10-10T13:42:57Z"
+    },
+    {
+      "run_id": "run_b2e27f3d3448",
+      "root_run_id": "run_2f287ff945c9",
+      "runtime": "claude_code",
+      "command": "supervisor",
+      "status": "timeout",
+      "parent_run_id": "run_baf9b6af331c",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": null,
+      "model": "sonnet",
+      "proxy_id": null,
+      "billing_mode": "unknown",
+      "measurement_source": "unattributed",
+      "attribution_granularity": "verb",
+      "route": "claude_p",
+      "reporter": null,
+      "confidence": "unavailable",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "latency_ms": 1516.8,
+      "failure_type": "timeout",
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_13ea8abe344d",
+      "ts": "2026-10-10T13:43:14Z"
+    },
+    {
+      "run_id": "run_baf9b6af331c",
+      "root_run_id": "run_2f287ff945c9",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_2f287ff945c9",
+      "session": "b3-executor",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 190269,
+      "output_tokens": 537,
+      "cached_tokens": 182144,
+      "latency_ms": 11232.9,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_d54fa7ecc23a",
+      "ts": "2026-10-10T13:43:17Z"
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "action-result.json",
+      "sha256": "28b58f2d3e1dcbfebe6d176bc605ce3c13513a5363bd9cc2cc8aa8e372cf97b1"
+    },
+    {
+      "path": "control.json",
+      "sha256": "30548251d5ccda4befd772fdf3c95cb00ebe2b79641ac435982ed9f0b3a143ff"
+    },
+    {
+      "path": "hooks.jsonl",
+      "sha256": "ba9789fd9f54967c7be13cf0c8031f047e123534305724cdef9c8268b3e85797"
+    },
+    {
+      "path": "private-rollout.jsonl",
+      "sha256": "a1e217277df882ec4021ec49649d54a4b3fc0ba669b100f3bfe0deb728ab0c52"
+    },
+    {
+      "path": "reviewer-59740.prompt.txt",
+      "sha256": "32af1a0e2815634045b8bdff11483120a8bd7605014a3a0b46db5e273e3fb9eb"
+    },
+    {
+      "path": "reviewer.jsonl",
+      "sha256": "d60bcc30d418765886ccc7440739f941d6b5441ea938be952cc120fb4142c195"
+    },
+    {
+      "path": "run/command.json",
+      "sha256": "956e820efe6d0779a666072d44fb25f9a8c27e52c0c010f033305f45b461b98a"
+    },
+    {
+      "path": "run/process-result.json",
+      "sha256": "acbe933f1af44afb9aff8a38618d459d7498c85c86061f07d30d23526cd2106a"
+    },
+    {
+      "path": "run/processes.jsonl",
+      "sha256": "7b3db328a9164435ff08550dbec9db6bb1b3a5f883afc6d38363e228b6539082"
+    },
+    {
+      "path": "run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "run/stdout",
+      "sha256": "6282ef16b9ed2aa6f3f1a6b5d43f6cd17b319a408f110e48678615c8293223ec"
+    },
+    {
+      "path": "run_baf9b6af331c-native-stream.jsonl",
+      "sha256": "ca9ccf70d9bc0b2c6fd216dd179c4c883a51d4b283c2e17cf53d48b36035ab76"
+    },
+    {
+      "path": "session.json",
+      "sha256": "337b0fe3c0a58bc29d6a330a6e091ed34ebf2c6983fb8b6e7d42325978d437f1"
+    },
+    {
+      "path": "usage.json",
+      "sha256": "fd17b06ca7e6373a22bfb7045f548edf915a87c06243d63060549275982cf4c8"
+    }
+  ]
+}

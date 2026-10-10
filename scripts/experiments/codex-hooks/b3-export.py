@@ -25,12 +25,15 @@ def export(root: Path, destination: Path) -> None:
         raise ValueError("Only an owned synthetic B3 round can be published.")
     cases = []
     destination.mkdir(parents=True, exist_ok=True)
+    host_config_hashes = json.loads((root / "host-config-hashes.json").read_text())
+    host_home = str(Path(next(iter(host_config_hashes))).parent.parent)
 
     def save(name: str, value: object) -> None:
         output = (
             json.dumps(value, indent=2, ensure_ascii=False)
             .replace(str(root), "$ROUND")
             .replace(str(checkout), "$CHECKOUT")
+            .replace(host_home, "$HOST_HOME")
         )
         (destination / name).write_text(output + "\n")
 
@@ -90,11 +93,11 @@ def export(root: Path, destination: Path) -> None:
         if (directory / "usage.json").is_file():
             case["usage"] = json.loads((directory / "usage.json").read_text())
         # Hash every retained capture, including failed attempts and non-published terminal bytes.
-        case["raw_sha256"] = {
-            str(p.relative_to(directory)): hashlib.sha256(p.read_bytes()).hexdigest()
+        case["raw_files"] = [
+            {"path": str(p.relative_to(directory)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in sorted(directory.rglob("*"))
             if p.is_file()
-        }
+        ]
         save(directory.name + ".json", case)
         cases.append({"case": directory.name, "evidence": directory.name + ".json"})
     report = {
@@ -117,6 +120,8 @@ def export(root: Path, destination: Path) -> None:
         "timeout-status.json",
         "claude-auth-status.json",
         "claude-auth-preflight.json",
+        "manual-file.json",
+        "manual-diff.json",
     ):
         if (root / name).is_file():
             save(name, json.loads((root / name).read_text()))

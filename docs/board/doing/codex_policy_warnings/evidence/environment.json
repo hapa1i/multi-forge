@@ -1,0 +1,100 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "doctor_overall": "ok",
+  "doctor_check_status": {
+    "app_server.status": "ok",
+    "auth.credentials": "ok",
+    "config.load": "ok",
+    "desktop.app.version": "ok",
+    "desktop.app_server.handshake": "ok",
+    "desktop.security.enforcement": "ok",
+    "git.environment": "ok",
+    "installation": "ok",
+    "mcp.config": "ok",
+    "network.env": "ok",
+    "network.provider_reachability": "ok",
+    "network.websocket_reachability": "ok",
+    "runtime.provenance": "ok",
+    "runtime.search": "ok",
+    "sandbox.filesystem_paths": "ok",
+    "sandbox.helpers": "ok",
+    "security.endpoint": "ok",
+    "state.paths": "ok",
+    "state.rollout_db_parity": "ok",
+    "system.disk": "ok",
+    "system.environment": "ok",
+    "terminal.env": "ok",
+    "terminal.title": "ok",
+    "updates.status": "ok"
+  },
+  "doctor_raw_sha256": "526ebc2551e77bd8bdcc86bc3ab5bdba8bae68d1fe8c7048c8fa2bed06b55f18",
+  "dispatcher_doctor": {
+    "install_kind": "editable",
+    "forge_path": "$CHECKOUT/.venv/bin/forge",
+    "on_path": true,
+    "on_path_minimal": false,
+    "advice": "Editable/development install (contributor setup). With FORGE_DEV unset, eligible host hooks use an executable recorded launcher or a known global-tool launcher; they do not infer this checkout's venv. Install the persistent editable launcher from the checkout root (end users install the release: 'uv tool install multi-forge').",
+    "hook_dispatcher": {
+      "path": "$ROUND/forge-home/bin/forge-hook",
+      "status": "current",
+      "installed_version": "1.0.2",
+      "expected_version": "1.0.2",
+      "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "metadata_path": "$ROUND/forge-home/runtime.json",
+      "metadata_status": "current",
+      "forge_binary_path": null,
+      "dev_override": {
+        "present": true,
+        "value": "$CHECKOUT",
+        "target": "$CHECKOUT/.venv/bin/forge",
+        "valid": true,
+        "effective": true,
+        "advice": null
+      },
+      "advice": "FORGE_DEV is effective for this process; without it, normal resolution reports: No recorded or known global Forge launcher is executable; install one and run 'forge extension sync --scope user'."
+    },
+    "runtime_hooks": {
+      "scopes": [],
+      "double_fire_risk": false,
+      "cleanup_required": false,
+      "legacy_registrations": []
+    },
+    "project_registry": {
+      "path": "$ROUND/forge-home/projects.json",
+      "status": "ok",
+      "enrolled_count": 1,
+      "stale_roots": [],
+      "error": null,
+      "advice": null
+    },
+    "project_compatibility": {
+      "path": "$ROUND/project/.forge/project.toml",
+      "state": "missing",
+      "compatible": true,
+      "required_forge": null,
+      "running_forge": "1.0.2",
+      "reason": null,
+      "degraded": null
+    }
+  },
+  "enrollment": {
+    "preflight": {
+      "ready": true,
+      "registered": true,
+      "config_path": "$ROUND/codex-home/config.toml",
+      "attempted": true,
+      "codex_succeeded": true,
+      "enrolled": true,
+      "reason": "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.",
+      "version": "0.162.1",
+      "version_validated": "0.161.0"
+    },
+    "config_sha256": "a21237cdbf3715000075fca3b06f8bd302e2ecc36b7153e424cac30f3427efe7"
+  },
+  "host_config_before": {
+    "$HOST_HOME/.codex/config.toml": "c9c2350b5fc2a1e0edc3e45043434b5f47716feab2bf5b574fca729d3befd5fe",
+    "$HOST_HOME/.codex/hooks.json": null
+  },
+  "timeout_activity": "\nForge activity — b3-executor (today)\nForge automation (supervisor, memory writer, workflow verbs) — not your full \ninteractive session.\nSupervisor review: unavailable at 2026-10-10T13:43:12.818146+00:00 (timeout)\n\nOperation outcomes\nSupervisor: 1 allow · 1 warn · 0 block · failing open: 1 timeout\n  • Possible divergence: Reviewer prose B3-49c211a15e7843309d692914d3bb7b1a \n(confidence: 50%)\n  • Supervisor error: Timed out after 1s, failing open\n  Command         Operation        Status     Count    Join       Reason        \n  policy-check    policy.evalu…    timeout        1    matched    timeout       \n  policy-check    policy.evalu…    warning        7    matched    warning       \n  policy-check    policy.evalu…    deny           1    matched    coding_stan…  \n  policy-check    policy.evalu…    warning        1    matched    warning       \n\nModel calls\n                                                                 Toke…          \n  Comm…    Calls    Work…    Atte…    Erro…    Join     Runt…    in/o…    Cost  \n  code…        0        5        5        0    matc…    code…    5923…       -  \n  supe…        2        -        2        1    matc…    clau…        -       -  \n  code…        0        1        1        0    down…    code…    1578…       -  \n\nTotal: 8 events · 608104/1645 tok · n/a\nsome calls (e.g. the action tagger) are not session-attributed\ncost is reported-or-estimated, best-effort; 'forge telemetry costs show' is the \nauthoritative spend view\n"
+}

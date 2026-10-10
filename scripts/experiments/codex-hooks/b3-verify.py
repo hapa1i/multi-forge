@@ -154,8 +154,8 @@ def main() -> None:
         "real_quote_usable": bool(real_usable),
         "real_review_case": args.real_case,
         "real_review_failure": decision["failure_type"],
-        "host_config_bytes_unchanged": True,
-        "host_auth_not_copied_or_inspected": True,
+        "host_codex_config_bytes_unchanged": True,
+        "host_codex_auth_not_copied": True,
         "reserved_codex_turns": sum(row["reserved_turns"] for row in rows(root / "turns.jsonl")),
         "wheel_trust_registration_unchanged": True,
     }

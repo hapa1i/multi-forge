@@ -1,0 +1,155 @@
+{
+  "cases": {
+    "trusted-v1-tdd": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.41102320799973313,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "trusted-v1-stub": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.582923665999715,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "off-headless": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.5825456249999661,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "source": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.5904204169996774,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "source-changed": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.5827517079997051,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "source-invalid": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.585474874999818,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "source-deny": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": false,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.5827804589998777,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "multi": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.4143144999998185,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "mixed": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": false,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.4139544169997862,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "timeout": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 1.9302395839999917,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "tui-off-final": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.6178291249998438,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "tui-combined": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.6132321670002057,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "model-only": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": false,
+      "hook_seconds": 0.6169689589996779,
+      "forge_module": "$CHECKOUT/src/forge/__init__.py"
+    },
+    "wheel-final-source": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": true,
+      "operator_wire": true,
+      "hook_seconds": 0.6766741250003179,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
+    },
+    "wheel-final-off": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": true,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.7062914589996581,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
+    },
+    "wheel-final-deny": {
+      "passed": true,
+      "one_patch_no_other_tools": true,
+      "action_landed": false,
+      "native_model_context": false,
+      "operator_wire": true,
+      "hook_seconds": 0.7194919579997077,
+      "forge_module": "$ROUND/wheel-env-final/lib/python3.13/site-packages/forge/__init__.py"
+    }
+  },
+  "real_quote_usable": true,
+  "real_review_case": "real-claude-authenticated",
+  "real_review_failure": null,
+  "host_codex_config_bytes_unchanged": true,
+  "host_codex_auth_not_copied": true,
+  "reserved_codex_turns": 27,
+  "wheel_trust_registration_unchanged": true
+}
