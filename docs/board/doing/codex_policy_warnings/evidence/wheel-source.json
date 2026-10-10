@@ -1,0 +1,681 @@
+{
+  "case": "wheel-source",
+  "control": {
+    "kind": "source",
+    "session": "b3-wheel",
+    "feedback": true,
+    "source_only": true,
+    "reviewer_nonce": "B3-a510ae72237540a1ace9a4fe3254c28f",
+    "plan_path": "$ROUND/wheel-source-approved-plan.txt",
+    "source_quote": "Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f.",
+    "verdict": {
+      "verdict": "divergent",
+      "confidence": 0.5,
+      "violations": [
+        {
+          "severity": "medium",
+          "evidence": "Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f",
+          "suggested_fix": "Reviewer fix B3-a510ae72237540a1ace9a4fe3254c28f",
+          "citations": [
+            "Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f."
+          ]
+        }
+      ]
+    },
+    "prompt": "Use apply_patch exactly once to add src/wheel_source.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent.",
+    "target": "src/wheel_source.py",
+    "capture": "$ROUND/captures/wheel-source"
+  },
+  "action-result": {
+    "target": "src/wheel_source.py",
+    "exists": true,
+    "content": "VALUE = 1\n"
+  },
+  "hooks": [
+    {
+      "at": 1791640202.783349,
+      "dev_override": null,
+      "elapsed_seconds": 0.46554545899971345,
+      "executor_identity": "{\"schema\":1,\"executable\":\"$ROUND/bin/codex\",\"sha256\":\"94c9472655751b31b2296f22466b9773ab952ae7d28d66fa5ea2f37739a00b86\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":208121774,\"size\":223,\"mtime_ns\":1791637079421280326}",
+      "exit_code": 0,
+      "forge_module": "$ROUND/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-session-start"
+      ],
+      "launcher": "$ROUND/wheel-env/bin/forge",
+      "pid": 75098,
+      "python": "$ROUND/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12613-aa36-7dd3-aaee-8e06f9813d74\",\"transcript_path\":\"$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-49-45-01a12613-aa36-7dd3-aaee-8e06f9813d74.jsonl\",\"cwd\":\"$ROUND/project\",\"hook_event_name\":\"SessionStart\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"source\":\"resume\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791640207.2824519,
+      "dev_override": null,
+      "elapsed_seconds": 0.6028943329997674,
+      "executor_identity": "{\"schema\":1,\"executable\":\"$ROUND/bin/codex\",\"sha256\":\"94c9472655751b31b2296f22466b9773ab952ae7d28d66fa5ea2f37739a00b86\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":208121774,\"size\":223,\"mtime_ns\":1791637079421280326}",
+      "exit_code": 0,
+      "forge_module": "$ROUND/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-policy-check"
+      ],
+      "launcher": "$ROUND/wheel-env/bin/forge",
+      "pid": 75303,
+      "python": "$ROUND/wheel-env/bin/python",
+      "stderr": "[forge] Policy warning: src/wheel_source.py: Possible divergence: Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f (confidence: 50%)\n[forge] Policy: checked apply_patch:src/wheel_source.py against semantic.supervisor (allowed, 1 warning, 0.2s)\n",
+      "stdin": "{\"session_id\":\"01a12613-aa36-7dd3-aaee-8e06f9813d74\",\"turn_id\":\"01a12613-e413-7410-9b69-faaa7619fc10\",\"transcript_path\":\"$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-49-45-01a12613-aa36-7dd3-aaee-8e06f9813d74.jsonl\",\"cwd\":\"$ROUND/project\",\"hook_event_name\":\"PreToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Add File: $ROUND/project/src/wheel_source.py\\n+VALUE = 1\\n*** End Patch\"},\"tool_use_id\":\"exec-49f487a2-2de5-4a5f-9477-8e2638cba79f\"}",
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Policy warnings for an allowed action. The following JSON entries are quoted policy evidence.\\n{\\\"path\\\":\\\"src/wheel_source.py\\\",\\\"policy\\\":\\\"semantic.supervisor\\\",\\\"rule\\\":\\\"semantic.supervisor.alignment\\\",\\\"label\\\":\\\"src/wheel_source.py: [semantic.supervisor.alignment]\\\",\\\"status\\\":\\\"Policy finding; verified approved-plan quotations follow.\\\",\\\"quotes\\\":[{\\\"source\\\":\\\"$ROUND/wheel-source-approved-plan.txt\\\",\\\"sha256\\\":\\\"7f15b91b4e3c97fd60ae7b9ec9b3a5621a2cca1bbe3b36ddf611d55d2a3d9251\\\",\\\"start\\\":0,\\\"end\\\":83,\\\"text\\\":\\\"Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f.\\\"}]}\\nOmitted findings: 0. Truncated findings: 0.\"},\"systemMessage\":\"Policy warnings for an allowed action.\\n{\\\"path\\\":\\\"src/wheel_source.py\\\",\\\"policy\\\":\\\"semantic.supervisor\\\",\\\"rule\\\":\\\"semantic.supervisor.alignment\\\",\\\"label\\\":\\\"src/wheel_source.py: [semantic.supervisor.alignment]\\\",\\\"severity\\\":\\\"medium\\\",\\\"message\\\":\\\"Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f\\\",\\\"intent\\\":\\\"Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.\\\",\\\"evidence\\\":\\\"Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f\\\",\\\"suggested_fix\\\":\\\"Reviewer fix B3-a510ae72237540a1ace9a4fe3254c28f\\\",\\\"citations\\\":[\\\"Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f.\\\"]}\\nOmitted findings: 0. Truncated findings: 0.\\nInspect: forge policy supervisor status --json; forge session show <session> --json.\"}\n"
+    }
+  ],
+  "reviewer": [
+    {
+      "at": 1791640207.265219,
+      "kind": "dispatch_started",
+      "pid": 75328,
+      "synthetic": true
+    },
+    {
+      "at": 1791640207.265729,
+      "kind": "completed",
+      "pid": 75328,
+      "synthetic": true,
+      "verdict": {
+        "confidence": 0.5,
+        "verdict": "divergent",
+        "violations": [
+          {
+            "citations": [
+              "Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f."
+            ],
+            "evidence": "Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f",
+            "severity": "medium",
+            "suggested_fix": "Reviewer fix B3-a510ae72237540a1ace9a4fe3254c28f"
+          }
+        ]
+      }
+    }
+  ],
+  "command": {
+    "command": [
+      "$ROUND/wheel-env/bin/forge",
+      "session",
+      "resume",
+      "b3-wheel",
+      "--task",
+      "Use apply_patch exactly once to add src/wheel_source.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent."
+    ],
+    "cwd": "$ROUND/project",
+    "started_at": 1791640195.2700958,
+    "codex_identity": {
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "retained_path": "$ROUND/runtime/0.162.1/bin/codex",
+      "version": "0.162.1",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "forge_revision": "5b9f6da8e021770e85f6ec7ba93f50bc80ef8701"
+    },
+    "harness_files": {
+      "README.md": "8ac2840ef4c931eebf93d95023b0cfab5d40760791ffb5de53c0cc5c4482f5f3",
+      "b2-concurrent.py": "bcd5423ad94e287a124c99ee2c36213fb00661f5b9ef565b5a0fc5cd14cec2b2",
+      "b2-coverage.py": "56785776b69a840a16977190970dcfa76c611f586b5789b922cf2a16bdfd1ade",
+      "b2-forks.py": "f4757695b591700be2dd612f8cf9fafd267c636faa1e383af9c5cee2367a4ed6",
+      "b2-interactive.py": "f0962990b1491777164817f2c9f0c1170ad70ca3338df155e8a3129d0ab5005f",
+      "b2-lifetime.py": "145e13961b84066b713288c86a0ee057a6045d1d0b50b0d4aa4b7ba0ae8d9d1e",
+      "b2-prepare.py": "328f7371f092d46a757334132c27ba2e3fb8715aebdec91d19acb19981b22ed0",
+      "b2-run.py": "e14fd7fc08da43e5ff4be5380e5a73487afe41702d34591561e8ee1c40b9b1fa",
+      "b2-terminal.py": "d6b086e62082fdc43bb552fb609bbcb735d9fef9ce157a7a0af39c2896bf8ae8",
+      "b3-export.py": "66816fb9fb2f8f34225d35759eb7fb5309154fcbd7fe024c7798550aa4cea25f",
+      "b3-fixture.py": "e14283d2952652d9d54ebb9a071d37b6b5d61194ed29efbf0df9ffcd5854156b",
+      "b3-real-review.py": "bca6188b17e3a2380de0b15bba7c4c80bb8e7968047f00a34f8fa208efc41713",
+      "b3-run.py": "3d88a5e54740de39fd7ff0b0efccf9e237b25a320b27a5ba6d9c9c14325fa1bd",
+      "b3-terminal.py": "1da3a7cab3dba6474b4beead453f4fd2662d9cd68f9f5cc9475ffdec154dc507",
+      "b3-verify.py": "4a3ce6055b764741222b4b59414b1cd19633bb06b784b8f205a1efe6db38be32",
+      "b3-wheel.py": "b7605dda460c4d73063ef429986ee86fd7a1b2a9563a45f3d0c8d04f9e18ee4b",
+      "b3_instrumentation/__init__.py": "7b9b8b3fc610b5a4922e4711eae63bff1375d0a79603101fb0bdc521bf9a9f79",
+      "b3_instrumentation/sitecustomize.py": "6ce2c32a1df9b5395af3858b6a4a441c00dd06789c25785e342ce4c6e74b86c5",
+      "b3_model_control/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "b3_model_control/sitecustomize.py": "66deb23081b32e029eb33a736eb7f56e577ecde292f37256c9f76f1359626735",
+      "export-evidence.py": "bbea8c5330e182a831ed0e7271804ab8f9e62cbfbdeafb834c38dec77ed3c61c",
+      "hooks/b2-hook.py": "cb0ee3b02304bd028fc94df2bae3bb639eae69be77548e889fb3959917de80dc",
+      "hooks/b2-mcp.py": "134ce04709f0e207be84fc2d6ee12245301d3ab8705b777e15c0d0fc0e311f44",
+      "hooks/b2-reviewer.py": "b02b25bcd17ecd113480416d63f73bd0c93bf9162c8f5551c3057f506243ef6b",
+      "hooks/b3-reviewer.py": "881ef1771326a1f000495775e64323004f2fb91f640dc1c37d795e72d8f1c9b3",
+      "hooks/gen-config.py": "669671268f545a6a72c3617eb92d9b38890015d417c7a2f11ea1a8e1048e0dba",
+      "hooks/hash-preimage.py": "7c94628eaf7dc7c01fe0bf825cb3a15316663e2068cfec60806d9baae96ae51a",
+      "hooks/respond-hook.sh": "28cd62a456f022cc4855cd487d39ff69d2f50a88388eca4f7b5f0872799a2563",
+      "hooks/tee-hook.sh": "1832aa74cadc2cf8bb83ebd88c433247f2ef555a5f4b03f2f99d48e1ab0e0f42",
+      "instrumentation/sitecustomize.py": "dc75ec31489d930f589a74c12e5bc75f504d4b786c1c2c7df4843584f5c4c389",
+      "lib.sh": "0bf60ada0cab327a8c62ae034471c92fd337f5c7ed45b27bd8a6a0a42c08a280",
+      "probe-home.py": "8c197d113ce8f62e1eec1c5491f2c80a3428af5fe93b86c6cac6dbcceffe84d7",
+      "probe-runtime.py": "ca429340a83016df304de8440ca9b95be870b2e802ff9f89a121ba86592141d9",
+      "reproduce.sh": "c8f92e0c51538113966f5d8fa7652d217c7c751771bfe2da014ef87984137fd3",
+      "responses/permissionrequest-allow.json": "3f9ea19a8b5d338a4d94c1afe252957a764f3d37dd1b329e3fed84fea2374787",
+      "responses/permissionrequest-deny.json": "4f728b70a0fd3ecd77f60873469360f1e287cedc2f2e82711dd96a2345951787",
+      "responses/pretooluse-allow-updatedinput.json": "6b5b981a4baac6a2e5b922b0c36972f5c14cc6f4f71fd9c2e0357fc414b998fa",
+      "responses/pretooluse-deny-exit2.txt": "d732af8ccbe648e6c19b069e8ed38666b585d627240e937d280c124344282f2b",
+      "responses/pretooluse-deny.json": "2a883fa5c85518689fbda92f4516668986f595ceae7e4d2e088cf69a4a9523b1",
+      "responses/pretooluse-malformed.json": "c11e8a8a07c459b7eb269501c65ac405cdb644fa87d6d53772ca175f2fb3f18e",
+      "responses/sessionstart-additionalcontext.json": "c6fb4f19ebb23bde12771eb6f382fb424eda2e9a4fd2c9bfd2b173f48de9ed13",
+      "responses/stop-block-once.json": "2f2cab74ec5e671db4eecc0c3428a1287f012d0c351248e2dcde68f3df38f6b5",
+      "responses/userpromptsubmit-block.json": "6a16f4022ff805612844fa77e6b3d128bbae7011acfbc764ca277ecc94037919",
+      "sanitize.sh": "c433192f26f0d7f2947c55bf0ecdab283123ab92136285e29717880a7db2a9f8",
+      "stages/00-preflight.sh": "589b24264dde64762f2d7d13b4965f9d3579a94f38f8bf8d6b94fb506781ae11",
+      "stages/05-config-schema.sh": "2e8dd20cc1b288c4bd3853abc3c951b104f18f945d0a511cf10b6fbb419c174c",
+      "stages/10-headless-fire.sh": "819f8a1e7819429f6fafc187840295603a5cfb13b4f31514fdf4b65672f34c1e",
+      "stages/20-payloads.sh": "50ba81fe7f622cc2246bd445a30288c3315050d2efe12a522fdcb514f2e42bf6",
+      "stages/30-responses.sh": "4e1c0a6a9d6ccf15da108e5884b4a5a18163a5d64c5fe63f5f54e64acf6cf084",
+      "stages/40-trust.sh": "0cff175cbf5b64f94817f9e5b962a86ed9de581d7a325c35fec95b57603408fb",
+      "stages/50-interactive.sh": "11fb8010cd99f90c8addf2b72ec9ee2d57f505894f0bfd0c5decf3b3e559f95e",
+      "stages/60-exec-resume.sh": "2f230725f823d3f535369223e091b6bacba12e118b13183c6588670487d2d772",
+      "stages/61-rollout-identity.sh": "fc546b163425c28b10f84cc4c22fc8f91b2390bf631ed4b3cfa773d21df942ab",
+      "stages/70-bypass.sh": "7c6e2e11946edb6e89067ded5c671731f93f4e329183a3fdc962dd8225774910",
+      "stages/80-enroll-fixture.sh": "cb6d4a61109a4d1b68849715c90016adcff3271dec60cf74435343e06e32d629",
+      "stages/81-enrolled-coverage.sh": "f7849505ffac96b17e59ca150dd21cb2f776b4458be09aac7cdfb445f90964ce",
+      "stages/82-trust-dimensions.sh": "aef16d6ac2a7d15101072eb9f061e60cb75c35e973139180d9a2d78f76aa87c8",
+      "stages/83-preimage.sh": "efa4a62a076d7f8545875309c8aa3c3dca2a25b01d4b9752f3a8a612d3aa9dce",
+      "stages/84-fresh-project.sh": "d2dcace2f8e0136f666f0b506fd9d65dffa24bf95ad86415631f1197a9737cae",
+      "stages/85-policy-check-e2e.sh": "63a3bfcbf412d50db5843627e8d7d31fae90a4c1da93e61e1ef361f6558cbb71",
+      "stages/86-sessionstart-delivery-e2e.sh": "6be2fd9f2e652e26e88c66f2ddebda1ec1984a36850b499d69e4ac94a702a57c",
+      "stages/87-interactive-smoke.sh": "d866a5e9f93528e17e12b248752a29c53349a6a69c8684afacbb3bc957d555ac",
+      "stages/88-b2-enrollment.sh": "21378644029a2281a19234503b0b1772ba81ecf4264adc877e3af2c7ffcba3b2",
+      "upstream-issues/pretooluse-malformed-fails-open.md": "3111446e3507c4da864edc1cd10fa1170d272dde929f61cbd73f35f53e605571"
+    }
+  },
+  "process-result": {
+    "returncode": 0,
+    "elapsed_seconds": 16.334356792000108,
+    "survivors_before_sweep": [],
+    "kill_escalation": [],
+    "remaining": [],
+    "owner": "ffecc8ebdbb04cefb27c4c762436792e",
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "codex_identity_unchanged": true
+  },
+  "stdout": "Resumed Codex session: b3-wheel (thread 01a12613-aa36-7dd3-aaee-8e06f9813d74)\n\nI’ll add `src/wheel_source.py` with the requested value using one patch.\n\nSOURCE-a4eefa79bebb4c3295ec2eb9df5c882f\n",
+  "stderr": "",
+  "session": {
+    "name": "b3-wheel",
+    "policy": {
+      "forge_version": null,
+      "bundles": [],
+      "rules_active": [
+        "semantic.supervisor"
+      ],
+      "decisions": [
+        {
+          "final_decision": "warn",
+          "context_summary": "apply_patch:src/wheel_source.py",
+          "blocking_violations": [],
+          "warnings": [
+            "Possible divergence: Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f (confidence: 50%)"
+          ],
+          "evaluated_at": "2026-10-10T13:50:07+00:00",
+          "decisions": [
+            {
+              "decision": "warn",
+              "policy_id": "semantic.supervisor",
+              "violations": [],
+              "warnings": [
+                "Possible divergence: Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f (confidence: 50%)"
+              ],
+              "warning_findings": [
+                {
+                  "rule_id": "semantic.supervisor.alignment",
+                  "message": "Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f",
+                  "severity": "medium",
+                  "evidence": "Reviewer prose B3-a510ae72237540a1ace9a4fe3254c28f",
+                  "suggested_fix": "Reviewer fix B3-a510ae72237540a1ace9a4fe3254c28f",
+                  "citations": [
+                    "Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f."
+                  ],
+                  "provenance": "reviewer",
+                  "verified_citations": [
+                    {
+                      "source": "$ROUND/wheel-source-approved-plan.txt",
+                      "digest": "7f15b91b4e3c97fd60ae7b9ec9b3a5621a2cca1bbe3b36ddf611d55d2a3d9251",
+                      "start": 0,
+                      "end": 83,
+                      "text": "Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f."
+                    }
+                  ]
+                }
+              ],
+              "diagnostic_codes": [],
+              "fail_open": false,
+              "failure_type": null,
+              "intent": "Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.",
+              "cached": false,
+              "evaluated_at": "2026-10-10T13:50:07+00:00"
+            }
+          ]
+        }
+      ],
+      "policy_states": {
+        "semantic.supervisor": {
+          "cache": {}
+        }
+      }
+    },
+    "codex": {
+      "thread_id": "01a12613-aa36-7dd3-aaee-8e06f9813d74",
+      "rollout_path": "$ROUND/codex-home/sessions/2026/10/10/rollout-2026-10-10T15-49-45-01a12613-aa36-7dd3-aaee-8e06f9813d74.jsonl",
+      "rollout_source": "discovered_by_thread_id",
+      "auth_method": "chatgpt_tokens",
+      "auth_source": "codex_store",
+      "billing_mode": "subscription_quota",
+      "last_run_at": "2026-10-10T13:50:11+00:00",
+      "context_delivery": "initial_message"
+    }
+  },
+  "native_turn": [
+    {
+      "timestamp": "2026-10-10T13:50:02.848Z",
+      "ordinal": 19,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_01a12613-ee60-7453-b74b-0d273f057ad9",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Use apply_patch exactly once to add src/wheel_source.py containing VALUE = 1. Do not read files or use any other tool. If blocked, stop without retrying. Then reply with any B3- or SOURCE- marker you received in hook feedback, or NONE if absent."
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640202.848677,
+          "content_item_kinds": [
+            "user.text"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_01a12613-ee60-7453-b74b-0d273f057ad9",
+            "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+            "role": "user"
+          },
+          "revision": "retained_01a12613-ee60-7453-b74b-0d43f90746ac",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 2,
+        "mcp_attribution": {
+          "status": "none"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:05.537Z",
+      "ordinal": 22,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_0b82ace9d6378588016aca428d2f5c8191b5e5dfd85d010593",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I’ll add `src/wheel_source.py` with the requested value using one patch.\n"
+          }
+        ],
+        "phase": "commentary",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640205.1935427,
+          "content_item_kinds": [
+            "unknown"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_0b82ace9d6378588016aca428d2f5c8191b5e5dfd85d010593",
+            "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+            "role": "assistant"
+          },
+          "revision": "retained_01a12613-f8e1-7853-8ea7-897fb4051329",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 3
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:06.569Z",
+      "ordinal": 23,
+      "type": "response_item",
+      "payload": {
+        "type": "custom_tool_call",
+        "id": "ctc_0b82ace9d6378588016aca428dc184819180eb254d64b2e3cf",
+        "status": "completed",
+        "call_id": "call_7b40b654eb0048c6a33b348733f61f74",
+        "name": "exec",
+        "input": "const result = await tools.apply_patch(\"*** Begin Patch\\n*** Add File: $ROUND/project/src/wheel_source.py\\n+VALUE = 1\\n*** End Patch\");\ntext(result);\n",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640205.7730215
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:07.359Z",
+      "ordinal": 25,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_01a12613-ffff-7ed3-96b2-df6feff0133e",
+        "role": "developer",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Policy warnings for an allowed action. The following JSON entries are quoted policy evidence.\n{\"path\":\"src/wheel_source.py\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"src/wheel_source.py: [semantic.supervisor.alignment]\",\"status\":\"Policy finding; verified approved-plan quotations follow.\",\"quotes\":[{\"source\":\"$ROUND/wheel-source-approved-plan.txt\",\"sha256\":\"7f15b91b4e3c97fd60ae7b9ec9b3a5621a2cca1bbe3b36ddf611d55d2a3d9251\",\"start\":0,\"end\":83,\"text\":\"Use the approved interface. Source marker: SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f.\"}]}\nOmitted findings: 0. Truncated findings: 0."
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640207.359424,
+          "content_item_kinds": [
+            "hooks.additional_context"
+          ]
+        }
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:07.375Z",
+      "ordinal": 27,
+      "type": "response_item",
+      "payload": {
+        "type": "custom_tool_call_output",
+        "id": "ctco_01a12614-000f-7310-8065-1bf229642808",
+        "call_id": "call_7b40b654eb0048c6a33b348733f61f74",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Script completed\nWall time 0.8 seconds\nOutput:\n"
+          },
+          {
+            "type": "input_text",
+            "text": "{}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640207.375248
+        }
+      },
+      "metadata": {
+        "client_authored": false,
+        "fallback_token_limit_override": 12000
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:09.530Z",
+      "ordinal": 30,
+      "type": "response_item",
+      "payload": {
+        "type": "message",
+        "id": "msg_0b82ace9d6378588016aca42914f0481918c1da27ec28dda4f",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f"
+          }
+        ],
+        "phase": "final_answer",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+          "create_time": 1791640209.316442,
+          "content_item_kinds": [
+            "unknown"
+          ]
+        }
+      },
+      "metadata": {
+        "retained_source": {
+          "id": {
+            "message_id": "msg_0b82ace9d6378588016aca42914f0481918c1da27ec28dda4f",
+            "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+            "role": "assistant"
+          },
+          "revision": "retained_01a12614-087a-79a0-a366-707704ef7458",
+          "complete": true
+        },
+        "client_authored": false,
+        "user_input_order": 4
+      }
+    },
+    {
+      "timestamp": "2026-10-10T13:50:09.624Z",
+      "ordinal": 33,
+      "type": "event_msg",
+      "payload": {
+        "type": "task_complete",
+        "root_turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+        "turn_id": "01a12613-e413-7410-9b69-faaa7619fc10",
+        "last_agent_message": "SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f",
+        "started_at": 1791640200,
+        "completed_at": 1791640209,
+        "duration_ms": 9410,
+        "time_to_first_token_ms": 4909
+      }
+    }
+  ],
+  "native_streams": {
+    "run_7954e87af2df-native-stream.jsonl": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12613-aa36-7dd3-aaee-8e06f9813d74"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll add `src/wheel_source.py` with the requested value using one patch.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "$ROUND/project/src/wheel_source.py",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "$ROUND/project/src/wheel_source.py",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "SOURCE-a4eefa79bebb4c3295ec2eb9df5c882f"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 44186,
+          "cached_input_tokens": 39040,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 111,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ]
+  },
+  "usage": [
+    {
+      "run_id": "run_c9628dda0041",
+      "root_run_id": "run_463464487467",
+      "runtime": "codex",
+      "command": "codex-bridge",
+      "status": "success",
+      "parent_run_id": "run_463464487467",
+      "session": "b3-wheel",
+      "workflow": "transfer",
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 14582,
+      "output_tokens": 5,
+      "cached_tokens": 12288,
+      "latency_ms": 6487.7,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_77295058dec6",
+      "ts": "2026-10-10T13:49:51Z"
+    },
+    {
+      "run_id": "run_df7ac0c8fab4",
+      "root_run_id": "run_9f31db30640c",
+      "runtime": "claude_code",
+      "command": "supervisor",
+      "status": "success",
+      "parent_run_id": "run_7954e87af2df",
+      "session": "b3-wheel",
+      "workflow": null,
+      "provider": null,
+      "model": "sonnet",
+      "proxy_id": null,
+      "billing_mode": "unknown",
+      "measurement_source": "unattributed",
+      "attribution_granularity": "verb",
+      "route": "claude_p",
+      "reporter": null,
+      "confidence": "unavailable",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "latency_ms": 149.5,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_775b8dc4e6ec",
+      "ts": "2026-10-10T13:50:07Z"
+    },
+    {
+      "run_id": "run_7954e87af2df",
+      "root_run_id": "run_9f31db30640c",
+      "runtime": "codex",
+      "command": "codex-resume",
+      "status": "success",
+      "parent_run_id": "run_9f31db30640c",
+      "session": "b3-wheel",
+      "workflow": null,
+      "provider": "openai",
+      "model": null,
+      "proxy_id": null,
+      "billing_mode": "subscription_quota",
+      "measurement_source": "runtime_native",
+      "attribution_granularity": "worker",
+      "route": "codex_exec",
+      "reporter": "codex_jsonl",
+      "confidence": "unavailable",
+      "input_tokens": 44186,
+      "output_tokens": 111,
+      "cached_tokens": 39040,
+      "latency_ms": 11646.9,
+      "failure_type": null,
+      "cost_micro_usd": null,
+      "source_refs": null,
+      "schema_version": 1,
+      "event_id": "evt_4288f919eaa7",
+      "ts": "2026-10-10T13:50:11Z"
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "action-result.json",
+      "sha256": "93bd44826b1e414017f49faf0ef69e8e3ed0b5536023ed1354103d0596fc99f2"
+    },
+    {
+      "path": "control.json",
+      "sha256": "fe4e3e6e9fd964e6d2b51f00b68e5b111ac56f848a0563a6a5e446f92211230f"
+    },
+    {
+      "path": "hooks.jsonl",
+      "sha256": "c0300366e12d4a5527e053f3a1470a9f313cc338796bf088f6a642562e2cc35d"
+    },
+    {
+      "path": "private-rollout.jsonl",
+      "sha256": "07cde82742ff66a80a3d6dc7ff0665651c31c8050dca67768cd5839a53740616"
+    },
+    {
+      "path": "reviewer-75328.prompt.txt",
+      "sha256": "3ddff360c5e0c93025542f1c41c7dce792e5dc22520a819e9c17496b05d11d5e"
+    },
+    {
+      "path": "reviewer.jsonl",
+      "sha256": "c57e9472033df37fba623ca02540e1a7ac9f9e3b4c0bf28b0c15c4f8e693a79f"
+    },
+    {
+      "path": "run/command.json",
+      "sha256": "bc7e12f815f6abcdb6f43a437310f979732910c21cee8968b0fe34e08b155ac9"
+    },
+    {
+      "path": "run/process-result.json",
+      "sha256": "396b42faccefaf4641889f5c77f8ff78708743b476b48c29c0b2ac8d919d8882"
+    },
+    {
+      "path": "run/processes.jsonl",
+      "sha256": "ecf02a65bdced3812d1af7c091b563c2418677eac510d4c9a6ca8e0092cdb7e5"
+    },
+    {
+      "path": "run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "run/stdout",
+      "sha256": "949fa8c01c4cf6793248571874ac4de75421c4d409009490611ea6f4af4b1187"
+    },
+    {
+      "path": "run_7954e87af2df-native-stream.jsonl",
+      "sha256": "a358e691beee3c7fd79222790fde6bfd7fc97712416d8dfdc5b516f5c7a53e01"
+    },
+    {
+      "path": "session.json",
+      "sha256": "edf8d4b6cc2a9af6e25096a7fd5437b92775a8f10f4306bbdf38439e353d79ca"
+    },
+    {
+      "path": "usage.json",
+      "sha256": "da860e391a2022fd01dfb4807bfbdaf48e79c5a4b08bdf09c325c1639b61c657"
+    }
+  ]
+}

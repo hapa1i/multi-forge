@@ -12,6 +12,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
 
 @pytest.mark.parametrize("source", ["helper", "settings-env"])
+@pytest.mark.slow
 def test_inherited_auth_settings_can_complete_read_only_review(forge_workspace: ContainerLike, source: str):
     setup_real_claude(forge_workspace, session_name="inherit-auth")
     key = os.environ.get("ANTHROPIC_API_KEY")

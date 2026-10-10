@@ -38,27 +38,36 @@ def test_new_hook_processes_each_negotiate_with_one_deadline(tmp_path):
 
     binary = tmp_path / "claude"
     binary.write_text("""#!/usr/bin/env python3
-import sys,time
+import json,sys,time
+from pathlib import Path
 if '--version' in sys.argv:
     print('2.1.291'); sys.exit(0)
 if '--help' in sys.argv:
     print('--restricted --safe-mode --strict-mcp-config --disable-slash-commands --tools --allowedTools --setting-sources'); sys.exit(0)
+with Path(sys.argv[0]).with_suffix('.calls').open('a') as calls:
+    calls.write(json.dumps(sys.argv[1:]) + '\\n')
 if '--output-format' in sys.argv:
-    time.sleep(.6)
+    time.sleep(1.2)
     print("error: unknown option '--output-format'", file=sys.stderr)
     sys.exit(2)
 time.sleep(4)
 """)
     binary.chmod(0o700)
     program = """import json,time
+from forge.core.reactive.env import build_claude_env
+from forge.core.reactive.reviewer_runtime import require_reviewer_runtime
 from forge.core.reactive.session_runner import run_claude_session
+# This test owns output-format negotiation, not cold admission startup latency.
+require_reviewer_runtime(env=build_claude_env(), deadline=time.monotonic()+10)
 start=time.monotonic()
-r=run_claude_session('review',timeout_seconds=1,read_only=True)
-print(json.dumps({'timed_out':r.timed_out,'elapsed':time.monotonic()-start}))
+r=run_claude_session('review',timeout_seconds=2,read_only=True)
+print(json.dumps({'timed_out':r.timed_out,'elapsed':time.monotonic()-start,'error':r.error,'dispatched':r.dispatched}))
 """
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])
     for _ in range(2):
-        result = subprocess.run([sys.executable, "-c", program], env=env, capture_output=True, text=True, timeout=5)
+        result = subprocess.run([sys.executable, "-c", program], env=env, capture_output=True, text=True, timeout=15)
         assert result.returncode == 0, result.stderr
         row = json.loads(result.stdout)
-        assert row["timed_out"] and row["elapsed"] < 2.5, row
+        assert row["dispatched"] and row["timed_out"] and row["elapsed"] < 3.5, row
+    calls = [json.loads(line) for line in binary.with_suffix(".calls").read_text().splitlines()]
+    assert ["--output-format" in argv for argv in calls] == [True, False, True, False]

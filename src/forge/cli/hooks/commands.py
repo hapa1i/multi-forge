@@ -1415,9 +1415,10 @@ def authority_check() -> None:
 def codex_policy_check() -> None:
     """Evaluate authority, then policies, for a Codex PreToolUse action.
 
-    Wire contract (probe-pinned, codex-cli 0.138.0): a block is a strict
-    ``hookSpecificOutput`` deny JSON on stdout with exit 0; an allow emits NO
-    stdout. Codex FAILS OPEN on malformed hook output, so stdout carries only
+    A block is a strict ``hookSpecificOutput`` deny JSON on stdout with exit 0.
+    Admitted executors also receive bounded allowed-action feedback and independent
+    operator notices; clean allows stay silent. Codex FAILS OPEN on malformed output,
+    so stdout carries only
     ``json.dumps`` wire strings -- diagnostics go to stderr, but only once a Forge
     session is resolved (an unresolvable unmarked session means Forge is not
     managing this turn and must stay silent: a user-scope registration fires for
@@ -1483,7 +1484,12 @@ def codex_policy_check() -> None:
     if not effective.policy or not effective.policy.enabled:
         sys.exit(0)
 
-    from forge.policy.types import FailMode
+    from forge.cli.hooks.codex_policy_feedback import (
+        decision_is_unreviewed,
+        render_policy_feedback,
+    )
+    from forge.core.runtime.codex_feedback import policy_feedback_supported
+    from forge.policy.types import CompositeDecision, FailMode, PolicyDecision
 
     fail_mode: FailMode = effective.policy.fail_mode or "open"
     bundles = effective.policy.bundles or []
@@ -1531,15 +1537,29 @@ def codex_policy_check() -> None:
         try:
             result = engine.evaluate(context)
         except Exception as e:
+            print(f"[forge] Policy evaluation failed: {e}", file=sys.stderr)
             if fail_mode == "closed":
                 # Wire JSON goes explicitly to stdout; everything else in this
                 # command rides stderr (Codex fails OPEN on malformed stdout).
                 print(
-                    responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"),
+                    responder.format_error_deny(
+                        "Policy evaluation failed (fail-closed). Ask the operator to inspect diagnostics."
+                    ),
                     file=sys.stdout,
                 )
                 sys.exit(responder.BLOCK_EXIT)
-            continue  # fail-open: skip this file
+            file_results.append(
+                (
+                    context.target_path,
+                    CompositeDecision(
+                        final_decision="allow",
+                        decisions=[
+                            PolicyDecision("allow", "forge.policy", fail_open=True, failure_type="evaluation_error")
+                        ],
+                    ),
+                )
+            )
+            continue
         aggregated_state.update(engine.get_collected_state())
         file_results.append((context.target_path, result))
     elapsed = time.monotonic() - t0
@@ -1558,6 +1578,7 @@ def codex_policy_check() -> None:
     # must not record tests_touched, or a later impl-only patch would wrongly
     # pass tests-before-impl. Decision-log entries persist either way (audit).
     blocked = bool(denying or reviews)
+    persistence_failed = False
     try:
         _persist_policy_decisions(
             store=store,
@@ -1569,19 +1590,47 @@ def codex_policy_check() -> None:
             supervisor_lane=supervisor_lane,
         )
     except Exception as e:
+        persistence_failed = True
         print(f"[forge] Policy state persistence failed: {e}", file=sys.stderr)
 
     from forge.runtime_config import get_runtime_config
 
-    show_summary = get_runtime_config().policy_summary_feedback == "on"
+    config = get_runtime_config()
+    show_summary = config.policy_summary_feedback == "on"
     # Label telemetry from the decisive file -- the first denying (or unresolved)
     # result -- not file_results[0], which may be an allowing file whose result
     # would route _derive_policy_source_label down the wrong branch.
     decisive = denying[0][1] if denying else reviews[0][1] if reviews else file_results[0][1]
     source_label = _derive_policy_source_label(decisive, effective)
 
+    supported = policy_feedback_supported(os.environ)
+    try:
+        wire = render_policy_feedback(
+            file_results,
+            model_feedback=show_summary,
+            source_only=config.codex_policy_feedback_format == "source-only",
+            supported=supported,
+            persistence_failed=persistence_failed,
+        )
+    except Exception as e:
+        logger.warning("Codex policy feedback formatting failed: %s", e)
+        # Presentation failure cannot erase an already computed block or leak
+        # reviewer prose through a source-only fallback.
+        wire = (
+            responder.format_error_deny(
+                "Policy blocked this patch. Feedback unavailable; stop and ask the operator before retrying."
+            )
+            if blocked
+            else (
+                json.dumps({"systemMessage": "Policy feedback unavailable. Inspect Forge policy diagnostics."})
+                if supported
+                else None
+            )
+        )
+    if wire is not None:
+        print(wire, file=sys.stdout)
+
     if denying:
-        print(responder.format_deny_multi(denying), file=sys.stdout)
         if show_summary:
             print(
                 f"[forge] Policy: checked {target_label} against {source_label}" f" (blocked, {elapsed:.1f}s)",
@@ -1590,7 +1639,6 @@ def codex_policy_check() -> None:
         sys.exit(responder.BLOCK_EXIT)
 
     if reviews:
-        print(responder.format_needs_review_multi(reviews), file=sys.stdout)
         if show_summary:
             print(
                 f"[forge] Policy: checked {target_label} against {source_label}"
@@ -1599,8 +1647,7 @@ def codex_policy_check() -> None:
             )
         sys.exit(responder.BLOCK_EXIT)
 
-    # Allow: NO stdout (PreToolUse allow-feedback delivery is unprobed on Codex).
-    # Surface warnings with path attribution, deduped to avoid spam.
+    # Keep legacy stderr diagnostics as well as the independently gated channels.
     seen: set[str] = set()
     warning_count = 0
     for path, result in file_results:
@@ -1612,8 +1659,15 @@ def codex_policy_check() -> None:
                 print(f"[forge] Policy warning: {path}: {warning}", file=sys.stderr)
 
     if show_summary:
+        unreviewed = any(decision_is_unreviewed(d) for _, r in file_results for d in r.decisions)
         verdict = (
-            "aligned" if warning_count == 0 else f"allowed, {warning_count} warning{'s' if warning_count != 1 else ''}"
+            "allowed, unreviewed"
+            if unreviewed
+            else (
+                "aligned"
+                if warning_count == 0
+                else f"allowed, {warning_count} warning{'s' if warning_count != 1 else ''}"
+            )
         )
         is_cached = any(getattr(d, "cached", False) for _, r in file_results for d in r.decisions)
         cache_label = ", cached" if is_cached else ""

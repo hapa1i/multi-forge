@@ -1,0 +1,4 @@
+252108792 bytes; 1 links
+e5d2df19f30a6d63bf11188121f7edb2775249b57352a69269509a4b1496e763  /usr/local/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe
+2.1.294 (Claude Code)
+codex-cli 0.162.1

@@ -2,7 +2,7 @@
 
 Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../jev_client_probes/card.md). Codex-visible delivery also depends on
-[B3: warnings Codex can see](../codex_policy_warnings/card.md).
+[B3: warnings Codex can see](../../doing/codex_policy_warnings/card.md).
 
 ## Problem and outcome
 
@@ -31,12 +31,14 @@ stable rule citations, action evidence and semantic correctness.
 - Return non-blocking warnings only. Service failure or malformed/incomplete evidence must not introduce a new Jev
   denial or unresolved `needs_review`; display an unavailable-check diagnostic. Existing independent denials remain
   intact. This card does not invoke a supervisor, even when one is configured.
-- Deliver attributed warnings through an extended Claude formatter and B3's verified Codex path. Follow the existing
-  `policy_summary_feedback` setting: when enabled, send bounded rule text/citation and action evidence in
-  `additionalContext`; when disabled, omit model feedback while retaining operator diagnostics and audit records.
-  Claude's current generic warning count is insufficient for actionable rule-pack feedback. Distinguish Codex operator
-  `systemMessage` from model context and do not claim model visibility from stderr alone. Keep Jev disabled for everyday
-  no-API-spend supervision.
+- Deliver attributed warnings through an extended Claude formatter and B3's verified Codex path. Extend the existing
+  `policy_summary_feedback` setting to substantive Claude feedback, matching B3's Codex contract: when enabled, send
+  bounded rule text/citation and action evidence in `additionalContext`; when disabled, omit model feedback while
+  retaining operator diagnostics and audit records. Claude keeps its generic summary until this card ships; B3 alone
+  changes Codex. Update runtime configuration help and end-user config/policy docs with that staged contract. Respect
+  B3's audience, bounds, and provenance rules, including its Codex-only source-only preference; keep evidence-inspection
+  commands in operator output in that mode. Distinguish Codex operator `systemMessage` from model context and do not
+  claim model visibility from stderr alone. Keep Jev disabled for everyday no-API-spend supervision.
 
 ## Acceptance and validation
 
@@ -58,3 +60,20 @@ stable rule citations, action evidence and semantic correctness.
 Direct blocking and escalation of fixed-rule findings are deferred. The existing plan supervisor cannot adjudicate rule
 findings merely because it is configured; that extension would need an explicit rule/evidence handoff.
 [A3](../jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
+
+## B3 formatter handoff (2026-10-10)
+
+B3's [results](../../doing/codex_policy_warnings/evidence/README.md) and
+[workflow contract](../../../design_workflows.md#11-deterministic-policy-forge-policy) supply the Codex delivery path.
+Supply structured `warning_findings` with stable rule/path attribution while retaining legacy warning strings and
+deny-only `violations` semantics. Only known policy-authored text may claim `provenance=policy`; model-generated prose
+must not acquire that classification. Verified supervisor quotations carry source/digest/character spans from the
+reviewed snapshot. Rule-pack findings still need their own source/evidence provenance; selecting a rule does not verify
+a violation or authorize a fabricated plan quotation.
+
+Respect `policy_summary_feedback=off`, independent operator/audit output, and the Codex-only source-only preference. The
+model/operator string budgets are 12,000/5,000 JSON-encoded bytes, with a 20,000-byte wire ceiling, 600-character
+fields, 2,400-byte findings, and at most 12 findings per channel. Use the shared formatter and visible omission
+counters; do not reintroduce explicit `permissionDecision=allow`. The real 0.162.1 operator surface is an inline
+`Hook ·` notice. Claude's substantive warning formatter remains A2 work; this handoff does not activate Jev or authorize
+a paid call.

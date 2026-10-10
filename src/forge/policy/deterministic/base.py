@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -143,16 +144,18 @@ class DeterministicPolicy(ABC):
         return PolicyDecision(
             decision="deny",
             policy_id=self.policy_id,
-            violations=violations,
+            violations=[replace(v, provenance="policy") for v in violations],
             intent=self.intent,
         )
 
-    def _warn(self, warnings: list[str]) -> PolicyDecision:
-        """Return a warn decision."""
+    def _warn(self, findings: list[Violation]) -> PolicyDecision:
+        """Retain findings without adding them to blocking violation counts."""
         return PolicyDecision(
             decision="warn",
             policy_id=self.policy_id,
-            warnings=warnings,
+            warnings=[v.message for v in findings],
+            warning_findings=[replace(v, provenance="policy") for v in findings],
+            intent=self.intent,
         )
 
 

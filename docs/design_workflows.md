@@ -170,8 +170,40 @@ evidence and a warning, preserving the computed verdict, including denies.
 and status/activity projection. A timeout or missing terminal output is never an aligned verdict.
 
 Persistent terminal setup owns the new plan/model/auth options. `%policy` retains target-based setup and shared
-lifecycle controls; one-shot `evaluate -r` retains its conversation argument and three-way exit contract. Source-only
-feedback is deferred to B3; B1 does not claim allowed-action feedback in Codex context.
+lifecycle controls; one-shot `evaluate -r` retains its conversation argument and three-way exit contract.
+
+**Codex feedback:** B3 projects already evaluated per-file decisions through a pure formatter. Deny takes precedence
+over unresolved review, then warn/allow. Blocking output includes only blocking files/findings; other warnings remain in
+audit. Clean allows are silent. A warning uses bare PreToolUse `additionalContext` (no explicit allow) and a separate
+top-level `systemMessage` for the operator, subject to the executor admission in
+[session execution](design_session_execution.md#i3-codex-operational-guards-probe-churn-enrollment).
+`policy_summary_feedback=off` suppresses allowed-action model context, retaining blocking reasons, substantive operator
+notices, and audit. Claude keeps its count-summary behavior.
+
+Warning findings have their own structured field, separate from blocking violations. Permissive TDD and low-confidence
+supervisor findings preserve attribution, intent, citations, evidence, and fixes without changing denial thresholds,
+telemetry reason/count semantics, or the manual CLI's deny-only `violations` list. Per-file audit and aggregated state
+still commit together; blocked patches never persist optimistic state. Formatting/evidence failure preserves a computed
+denial. Review failure uses fixed unreviewed status and operator recovery, never raw exception text. Expected depth
+skips, unconfigured defensive calls, and resolved tier-1 reasons are audit-only. Evidence-write failure is
+operator-only.
+
+The global Codex-only `codex_policy_feedback_format` selects `normal` (default) or `source-only`, with no session or
+lane override. The supervisor verifies citations against its immutable `PlanSnapshot` before conversion, ignoring only
+outer whitespace. Findings retain source, SHA-256, character offsets, and exact verified text; reviewer filenames/hashes
+are ignored. No mutable path is reread. Verification does not change the existing confidence/citation block threshold.
+Source-only model fields select verified passages, fixed Forge diagnostics, and attributed deterministic findings;
+reviewer prose, fixes, and free-form warnings stay operator/audit-facing. A blocked reviewer finding without a verified
+quote gets fixed stop-and-ask guidance; a deterministic finding retains its intent/fix. Inspection commands stay in
+operator output. Old records authorize no verified passage. Only clean allows are cached; resolved checker reasons are
+never substituted for plan quotations.
+
+Output quotes arbitrary finding text as JSON data. Limits are 600 characters per field, 2,400 serialized bytes per
+finding, 12 findings per channel, 12,000 bytes for the encoded model string, 5,000 for the encoded operator string, and
+20,000 for the whole wire object. Escaping counts toward budgets; omission/truncation counters and operator inspection
+commands have reserved space. Deduplication is per attributed finding within one response, without session suppression.
+Full original evidence remains workspace-readable: source-only controls hook emission, not access isolation or immunity
+to instructions within developer-role data.
 
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set <target> --cascade` or
 `forge policy supervisor cascade on` routes checks through a cheap tier before the frontier. The direct toggle is
@@ -463,12 +495,16 @@ Policy violation(s):
     pass the check but defeat the goal.
 ```
 
-The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent. The reason text is composed once
-(`format_deny_text`/`format_needs_review_text` in `cli/hooks/policy.py`); each responder owns only the wire framing:
-Claude via stderr + exit 2, Codex via stdout JSON (`hookSpecificOutput.permissionDecisionReason`) + exit 0 (strict JSON
-because Codex **fails open** on malformed output; allow emits no stdout). The `[forge] Policy: …` summary line is stderr
-telemetry in the hook command, not part of either wire contract.
+Claude's `Intent:` line appears once per denying policy (not per violation). The shared project-owner note asks for a
+compliant approach, escalation of an unavoidable conflict, and no bypasses. `cli/hooks/policy.py` owns this note and the
+unresolved-review guidance. Claude uses its text layout on stderr + exit 2. Codex's `codex_policy_feedback.py` projects
+attributed findings into bounded normal/source-only output and retains the full shared guidance in
+`hookSpecificOutput.permissionDecisionReason`, on stdout + exit 0. Codex **fails open** on malformed output, so its wire
+must remain strict JSON. Admitted executors receive allowed-action warnings through bare `additionalContext` and
+independent operator notices through `systemMessage`; clean allows remain silent. The `[forge] Policy: …` summary is
+stderr telemetry. A resolved tier-1 escalation is retained in audit but does not label the action unreviewed; an
+unavailable final reviewer does. Source-only's stop-and-ask instruction belongs to an unquoted reviewer finding, not a
+deterministic rule with a supplied intent/fix or a reviewer finding with a verified quotation.
 
 ### 1.6 Policy state and ownership
 

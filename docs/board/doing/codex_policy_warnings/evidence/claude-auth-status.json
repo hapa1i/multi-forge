@@ -1,0 +1,8 @@
+{
+  "loggedIn": false,
+  "authMethod": "none",
+  "apiProvider": "firstParty",
+  "apiKeySource": null,
+  "subscriptionType": null,
+  "returncode": 1
+}

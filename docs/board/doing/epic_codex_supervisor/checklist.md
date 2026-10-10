@@ -14,8 +14,9 @@ B2's broader runtime experiment closed on 2026-10-10 after [PR #261](https://git
 merged as `2a15c087`, matching tested head `29ee539d` with all five GitHub checks passing. Its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) and
 [2026-10-09 evidence](../../done/codex_0160_validation/evidence/README.md) record the 0.161.0 round, general-ceiling
-update, and source-drift limits. B3-B5 remain proposed. B3 receives the optional source-only feedback decision. The epic
-remains active until the coordinated feedback, Stop, and native-fork outcomes also ship.
+update, and source-drift limits. B3 is selected on `feat/codex-policy-warnings` from `d54dba63`; its
+[execution checklist](../codex_policy_warnings/checklist.md) includes the user-selected source-only mode. B4-B5 remain
+proposed. The epic remains active until the coordinated feedback, Stop, and native-fork outcomes also ship.
 
 ## Activation
 
@@ -38,13 +39,27 @@ B2 activation, 2026-10-08: the user selected B2 and requested its checklist. Cre
 `79563944`, moved the card from `proposed/` to `doing/`, and repointed inbound links. The base includes the B1 closeout
 commit above merged stack `56d4b8f5`. B2's checklist records planning validation; B3-B5 are not activated.
 
+B3 activation, 2026-10-10: selected separately from clean local `main` at B2 closeout `d54dba63`, above merged PR #261
+(`2a15c087`). Moved B3 to `doing/` and created its execution checklist. The user selected the explicit source-only mode,
+making B1's shipped approved-plan snapshot contract an explicit prerequisite alongside B2's delivery evidence. Both
+prerequisites are done. B4-B5 and the Jev cards are not activated.
+
+B3 review revision, 2026-10-10: source-only controls Codex hook injection while full evidence remains readable. The B3
+checklist now specifies structured warning provenance, audience filtering, the Codex-only global format setting,
+launch-time identity, and trusted fixture/wheel enrollment continuity. `policy_summary_feedback` gains substantive Codex
+semantics; A2 owns the later Claude extension. The reserved live budget is 32 Codex turns, including 8 retries, plus one
+subscription-only Claude quote-quality attempt. Product implementation and live probes have not started.
+
+B2 publication, 2026-10-10: fast-forwarded remote `main` from `2a15c087` to existing closeout `d54dba63`; B3 remains on
+its separate branch. Refresh and verify the B3 PR base before opening it.
+
 ## Sequence and ownership
 
 | Member                                             | State    | Dependency | Owned outcome                                                  |
 | -------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------- |
 | [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
 | [B2](../../done/codex_0160_validation/card.md)     | Done     | None       | Current-runtime probe evidence                                 |
-| [B3](../../proposed/codex_policy_warnings/card.md) | Proposed | B2         | Allowed-action feedback delivery                               |
+| [B3](../codex_policy_warnings/card.md)             | Doing    | B1, B2     | Allowed-action feedback and source-only formatting             |
 | [B4](../../proposed/codex_stop_review/card.md)     | Proposed | B1, B2     | Bounded review at turn completion                              |
 | [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
@@ -54,8 +69,10 @@ commit above merged stack `56d4b8f5`. B2's checklist records planning validation
   B1's normative updates; reconcile links after merging them. B1's probe work can proceed first.
 - [x] Select B2 separately; keep B1's narrow required runtime checks distinct from B2's broader experiment.
 - [x] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.
-- [ ] Activate each later member on its own branch and add its own checklist. Record any changed dependency here and in
-  both affected cards before implementation relies on it.
+- [x] Activate B3 on its own branch with a checklist; record B1's shipped snapshot dependency for source-only feedback
+  here and on B3. B1 already handed that option to B3; its completed implementation scope is unchanged.
+- [ ] Activate B4 and B5 separately with their own checklists. Record any changed dependency here and in the affected
+  member cards before implementation relies on it.
 - [x] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.
 - [x] Confirm B1 preserves the shared `LaneRecord` and four-consumer resolution contracts; no separate model-format
   member was needed. Any later change still requires its own accepted member and dependency decision.
@@ -109,8 +126,8 @@ that the committed harness post-dates the captures; optional stage 88/97 recheck
   implementation reasoning. Depth suppression prevented recursion but mutated the parent Forge manifest; isolate hook
   state before reuse. Earlier-turn selection and general concurrent-source guarantees remain unverified.
 
-The three member cards retain the detailed evidence links and remain proposed. Closing B2 does not implement their
-features or satisfy the epic's integrated outcome.
+The three member cards retain the detailed evidence links. B3 is now selected; B4-B5 remain proposed. Closing B2 does
+not implement their features or satisfy the epic's integrated outcome.
 
 ## Closeout
 

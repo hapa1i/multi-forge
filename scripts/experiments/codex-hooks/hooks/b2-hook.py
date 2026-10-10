@@ -32,7 +32,7 @@ class CapturedOutput:
 
 
 def respond(event: str, payload: dict, control: dict, capture: Path, name: str) -> None:
-    """Emit one controlled hook response, including the real explicit-allow helper."""
+    """Emit the B2 response shapes independently of later product helper changes."""
     mode = control.get("mode", "observe")
     nonce = control.get("nonce", "")
     response: dict = {}
@@ -41,12 +41,8 @@ def respond(event: str, payload: dict, control: dict, capture: Path, name: str) 
     tool = payload.get("tool_name")
     if event == "PreToolUse" and tool == "apply_patch":
         if mode == "feedback-explicit":
-            from forge.cli.hooks.codex_policy import CodexHookResponder
-
-            # The real helper, as distinct from today's empty product allow output.
-            print(json.dumps(CodexHookResponder().allow_feedback(context)))
-            return
-        if mode == "feedback-context":
+            response = {"hookSpecificOutput": {**specific, "permissionDecision": "allow", "additionalContext": context}}
+        elif mode == "feedback-context":
             response = {"hookSpecificOutput": {**specific, "additionalContext": context}}
         elif mode == "system-message":
             response = {"systemMessage": context}

@@ -203,7 +203,6 @@ class TestCodexHookResponder:
         assert out == {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
                 "additionalContext": "ok",
             }
         }

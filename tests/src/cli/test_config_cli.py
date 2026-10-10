@@ -27,6 +27,21 @@ class TestConfigShow:
     def teardown_method(self):
         reset_runtime_config()
 
+    def test_codex_feedback_format_round_trip_and_validation(self):
+        runner = CliRunner()
+        assert get_runtime_config().codex_policy_feedback_format == "normal"
+        result = runner.invoke(config, ["set", "codex_policy_feedback_format=source-only"])
+        assert result.exit_code == 0, result.output
+        reset_runtime_config()
+        assert get_runtime_config().codex_policy_feedback_format == "source-only"
+        shown = runner.invoke(config, ["show", "--json"])
+        assert shown.exit_code == 0
+        assert '"codex_policy_feedback_format": "source-only"' in shown.stdout
+        invalid = runner.invoke(config, ["set", "codex_policy_feedback_format=verbatim"])
+        assert invalid.exit_code != 0
+        reset_runtime_config()
+        assert get_runtime_config().codex_policy_feedback_format == "source-only"
+
     def test_show_auto_creates_and_displays_defaults(self):
         runner = CliRunner()
         result = runner.invoke(config, ["show"])

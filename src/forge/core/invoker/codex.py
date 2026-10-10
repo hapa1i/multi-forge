@@ -5,8 +5,8 @@ subprocess lifecycle in :class:`_HeadlessLifecycleBase`. Codex differs from Clau
 three ways the hooks capture:
 
 - **argv**: the caller builds the full ``codex exec --json --sandbox ...`` argv
-  (:func:`prepare_codex_request`); ``_prepare_argv`` passes it through unchanged (no
-  capability-gated flag injection -- ``--json`` is native and always supported).
+  (:func:`prepare_codex_request`). Managed executors select and identify their
+  launcher just before spawn; worker/reviewer jobs retain the caller's argv.
 - **result**: the output is a JSONL *event stream*, reduced by
   :func:`parse_codex_jsonl_stream`, not a single envelope.
 - **emit**: a ``runtime_native`` usage event (route ``codex_exec``) with tokens but no
@@ -42,6 +42,10 @@ from forge.core.reactive.env import (
     get_forge_depth,
     stamp_run_identity,
 )
+from forge.core.runtime.codex_feedback import (
+    CODEX_EXECUTOR_IDENTITY_VAR,
+    prepare_executor_launch,
+)
 from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     codex_api_key_for_subprocess,
@@ -55,6 +59,7 @@ CodexSandbox = Literal["read-only", "workspace-write", "danger-full-access"]
 # (a stale inherited CODEX_API_KEY would override a codex_store/ChatGPT login). Stripped, then
 # only the preflight-resolved auth is re-established.
 _CODEX_CHILD_STRIP_VARS = (
+    CODEX_EXECUTOR_IDENTITY_VAR,
     "CODEX_API_KEY",
     "CODEX_ACCESS_TOKEN",
     "ANTHROPIC_API_KEY",
@@ -71,8 +76,14 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
     """Runs ``codex exec --json`` jobs. Implements the :class:`HeadlessInvoker` protocol."""
 
     def _prepare_argv(self, request: HeadlessRequest) -> tuple[list[str], ParseHints]:
-        # The caller built the full argv (--json is already present). No capability gate.
-        return request.argv, ParseHints(is_jsonl_stream=True)
+        # Worker/reviewer jobs are not managed executors. Do not spend a reviewer's
+        # whole-hook deadline on an executor feature probe.
+        if request.attribution and request.attribution.command in {"codex-bridge", "codex-resume"}:
+            argv = prepare_executor_launch(request.argv, request.env, cwd=request.cwd)
+        else:
+            request.env.pop(CODEX_EXECUTOR_IDENTITY_VAR, None)
+            argv = request.argv
+        return argv, ParseHints(is_jsonl_stream=True)
 
     def _build_result(
         self,
@@ -123,8 +134,7 @@ def sanitize_codex_child_env(preflight: CodexPreflight) -> dict[str, str]:
 
     Strips inherited Codex/Anthropic/proxy vars so the child cannot contradict the
     preflight's resolved auth posture, advances the ``FORGE_DEPTH`` recursion guard
-    (Codex can run shell commands that invoke ``forge``, even though it does not run
-    Forge hooks), then re-establishes exactly the preflight-resolved auth:
+    (Codex can run shell commands that invoke ``forge``), then re-establishes exactly the preflight-resolved auth:
     ``CODEX_API_KEY`` for an api-key login the ``codex`` binary can't otherwise see
     (``env``/``credential_file``), the inherited ``CODEX_ACCESS_TOKEN`` for an
     enterprise login, or **nothing** for ``codex_store`` (Codex reads its own
@@ -208,7 +218,7 @@ def prepare_codex_request(
         provider="openai",
         proxy_id=None,
         # Codex's --json is already in argv; the Claude format-injection path is never
-        # reached (CodexHeadlessInvoker._prepare_argv passes argv through). base_url=None
+        # reached (executor preparation does not inject format flags). base_url=None
         # because Codex is direct -- the cost-precedence "proxied" branch must not fire.
         output_format=None,
         base_url=None,

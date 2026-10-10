@@ -29,6 +29,7 @@ from forge.core.ops.codex_bridge import (
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import RunIdentity
+from forge.core.runtime.codex_feedback import CODEX_EXECUTOR_IDENTITY_VAR
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.core.usage.ledger import read_usage_events
 from forge.session.models import SessionState, create_session_state
@@ -44,6 +45,26 @@ _CURATED = {
     "files": ["src/forge/core/ops/codex_bridge.py"],
     "open_questions": ["Sandbox default?"],
 }
+
+
+@pytest.fixture(autouse=True)
+def isolated_codex_launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Exercise identity stamping without inspecting the developer's installed CLI."""
+    import subprocess
+
+    launcher = tmp_path / "codex"
+    launcher.write_text("#!/bin/sh\nexit 0\n")
+    launcher.chmod(0o700)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    ordinary_run = subprocess.run
+
+    def version_probe(argv, *args, **kwargs):
+        if argv == [str(launcher), "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "codex-cli 0.162.1\n", "")
+        return ordinary_run(argv, *args, **kwargs)
+
+    monkeypatch.setattr("forge.core.runtime.codex_feedback.subprocess.run", version_probe)
+    return launcher
 
 
 def _preflight() -> CodexPreflight:
@@ -271,7 +292,7 @@ class TestBridgeSessionToCodex:
             bridge_session_to_codex(ctx=_ctx(tmp_path, forge_root=None), parent="planner", task="t", cwd=str(tmp_path))
 
     def test_bridge_runs_codex_with_curated_transfer_under_one_run_tree(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_codex_launcher: Path
     ) -> None:
         monkeypatch.delenv("FORGE_RUN_ID", raising=False)
         monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
@@ -305,6 +326,10 @@ class TestBridgeSessionToCodex:
         assert result.codex.success
         assert result.codex.stdout == "OK"
         assert result.curation_ran is True
+        identity = json.loads(mock_popen.call_args.kwargs["env"][CODEX_EXECUTOR_IDENTITY_VAR])
+        assert identity["launcher"] == str(isolated_codex_launcher)
+        assert identity["version"] == "0.162.1"
+        assert identity["launch_parent_pid"] == os.getpid()
 
         # Per-run unique child key (a fixed name would re-feed Codex a stale snapshot).
         assert result.child.startswith("planner-codex-")

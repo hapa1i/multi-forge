@@ -85,11 +85,14 @@ Respond with JSON in a code fence:
       "severity": "high",
       "evidence": "what was done that violates the plan",
       "suggested_fix": "what should be done instead",
-      "citations": ["quoted plan section that was violated"]
+      "citations": ["verbatim passage copied exactly from the approved plan"]
     }}
   ]
 }}
 ```
+
+Copy citations verbatim, preserving spelling, punctuation, and internal whitespace.
+Do not paraphrase, add section labels, or supply a filename in place of a quotation.
 
 If the action aligns with the plan, use an empty violations array:
 ```json
@@ -243,6 +246,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
                 decision="allow",
                 policy_id=self.policy_id,
                 warnings=["Supervisor not configured"],
+                diagnostic_codes=["unconfigured"],
             )
         if self._config.suspended:
             return PolicyDecision(decision="allow", policy_id=self.policy_id)
@@ -285,8 +289,8 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         # Invoke supervisor
         decision = invoke_supervisor(self._config, context, lane_record=self._lane_record, snapshot=snapshot)
 
-        # Attach intent to deny decisions
-        if decision.decision == "deny":
+        # Retain intent for both blocking and non-blocking findings.
+        if decision.decision in ("deny", "warn"):
             decision.intent = self.intent
 
         # Only cache genuinely clean allows. Warns, allow-with-warnings
@@ -830,6 +834,7 @@ def run_supervisor_check(
         except Exception as exc:
             _log.warning("Supervisor evidence finalization failed: %s", exc)
             result.decision.warnings.append("Supervisor evidence could not be saved; the review verdict is unchanged.")
+            result.decision.diagnostic_codes.append("evidence_unavailable")
     return result
 
 
@@ -871,6 +876,7 @@ def _run_supervisor_check(
                 decision="allow",
                 policy_id="semantic.supervisor",
                 warnings=["Supervisor not configured (no planning target or plan file)"],
+                diagnostic_codes=["unconfigured"],
             )
         )
 
@@ -1010,7 +1016,7 @@ def _run_supervisor_check(
         )
 
     verdict, parsed = parse_supervisor_verdict_with_status(result.stdout)
-    decision = verdict_to_decision(verdict, intent=intent)
+    decision = verdict_to_decision(verdict, intent=intent, snapshot=snapshot)
     if not parsed:
         warning = decision.warnings[0] if decision.warnings else "Supervisor verdict could not be parsed, failing open"
         decision = _supervisor_fail_open_decision(

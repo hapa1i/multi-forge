@@ -311,6 +311,28 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
 
+**Policy feedback admission:** `core/runtime/codex_feedback.py` owns a feature-specific measured-version set, separate
+from the general QA ceiling, blocking release pin, and proxy floor. The B2 baseline is 0.161.0; B3's retained executor
+is 0.162.1. Allowed-action model feedback uses bare PreToolUse `additionalContext` without an explicit allow decision;
+operator feedback uses top-level `systemMessage`. Combined, model-only, and operator-only delivery need distinct
+evidence. Serialization alone establishes emission, not delivery.
+
+Managed headless start/resume and interactive start/reattach refresh `FORGE_CODEX_EXECUTOR_IDENTITY` immediately before
+launch. Its schema-v2 record contains the selected launcher path, resolved fingerprint path, streamed SHA-256, stat
+identity, parsed `--version` result, and Forge launch-parent PID. Selection and version probing use the child's working
+directory. Launch uses the selected absolute path without resolving its symlink, preserving basename-dispatched shims;
+replacement during probing invalidates feedback admission without changing launch behavior. Inherited records are
+removed, including from Claude children; reviewer or workflow-worker invocations do not probe executor features.
+
+The installed dispatcher execs Forge, so the hook's parent is the invoking Codex process. A bounded 250 ms OS `ps`
+lookup requires that process's parent to be the recorded Forge launch parent. A nested runtime therefore cannot reuse
+its ancestor's admission. An unreadable process relationship or a wrapper that forks instead of replacing itself
+suppresses the new channels; the managed launch and existing deny wire remain available. Hooks do not run Codex
+version/auth probes, read account metadata, or consult a reviewer-readiness cache. A running process retains its launch
+facts after an on-disk upgrade; the next launch probes again. These facts describe compatibility, not a security
+boundary. Unknown/unparseable records, older record schemas, and untested versions suppress the new channels. Relaunch
+sessions after upgrading the launch-record schema.
+
 Codex's trust/enrollment and `apply_patch`/argv behavior are pinned **empirically**, not contractually, so two
 operator-facing guards backstop version churn and the unverifiable trust ceremony:
 

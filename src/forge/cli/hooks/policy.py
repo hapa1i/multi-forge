@@ -80,20 +80,23 @@ class ClaudeHookAdapter:
 
 # Appended once per denying policy so the agent satisfies the intent instead of
 # bypassing the check.
-_DENY_NOTE = (
-    "    Note: This policy was configured by the project owner. First"
+DENY_NOTE = (
+    "Note: This policy was configured by the project owner. First"
     " try a compliant approach that satisfies the intent above. If the"
     " user's request cannot be fulfilled without violating the intent,"
     " explain the conflict and ask how to proceed. Do not attempt"
     " bypasses that pass the check but defeat the goal."
+)
+NEEDS_REVIEW_GUIDANCE = (
+    "Configure a supervisor for this session or ask the user how to proceed before making this change."
 )
 
 
 def format_deny_text(result: CompositeDecision) -> str:
     """Compose the deny reason text (violations + intent + fix + note).
 
-    Runtime-neutral: Claude delivers it via stderr, Codex inside the deny JSON's
-    ``permissionDecisionReason``. Each responder owns only the wire framing.
+    Claude uses this layout. Codex's bounded audience renderer shares DENY_NOTE
+    but projects findings separately for normal and source-only feedback.
     """
     lines = ["Policy violation(s):"]
     for d in result.decisions:
@@ -105,7 +108,7 @@ def format_deny_text(result: CompositeDecision) -> str:
                 lines.append(f"    Intent: {d.intent}")
             if v.suggested_fix:
                 lines.append(f"    Fix: {v.suggested_fix}")
-        lines.append(_DENY_NOTE)
+        lines.append("    " + DENY_NOTE)
     return "\n".join(lines)
 
 
@@ -117,9 +120,7 @@ def format_needs_review_text(result: CompositeDecision) -> str:
             lines.append(f"  [{d.policy_id}] requested review")
             if d.intent:
                 lines.append(f"    Intent: {d.intent}")
-    lines.append(
-        "    Configure a supervisor for this session or ask the user how to proceed before making this change."
-    )
+    lines.append("    " + NEEDS_REVIEW_GUIDANCE)
     return "\n".join(lines)
 
 

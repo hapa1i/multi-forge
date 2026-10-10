@@ -33,6 +33,8 @@ from typing import Generator, Protocol
 import pytest
 from _pytest.nodes import Item
 
+from tests.fixtures.runtime_image import check_runtime_image
+
 _active_container_id: str | None = None
 
 _WRITE_FILE_SCRIPT = r"""set -euo pipefail
@@ -429,6 +431,13 @@ def _get_dirty_worktree_fingerprint(repo_root: Path) -> str | None:
         return None
 
 
+def _require_runtime_image(image: str) -> None:
+    try:
+        check_runtime_image(image)
+    except RuntimeError as exc:
+        pytest.fail(str(exc), pytrace=False)
+
+
 @pytest.fixture(scope="session")
 def docker_available() -> bool:
     """Session-scoped fixture to check Docker availability once."""
@@ -477,6 +486,7 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
             needs_build = True
 
     if not needs_build:
+        _require_runtime_image(image_name)
         return image_name
 
     dockerfile = repo_root / "docker" / "Dockerfile.forge"
@@ -512,6 +522,7 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     if result.returncode != 0:
         pytest.fail(f"Failed to build Docker image:\n{result.stderr}")
 
+    _require_runtime_image(image_name)
     return image_name
 
 

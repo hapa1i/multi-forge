@@ -60,23 +60,9 @@ fi
 CODEX_VERSION="${CODEX_VERSION:-latest}"
 IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}-codex-${CODEX_VERSION}"
 
-get_forge_rev() {
-    # Use git revision to detect stale test images (code is COPY'd at build time).
-    # If repo is dirty, append -dirty so local changes trigger a rebuild.
-    if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null; then
-        local rev
-        rev="$(git rev-parse HEAD)"
-        if [[ -n "$(git status --porcelain)" ]]; then
-            echo "${rev}-dirty"
-        else
-            echo "${rev}"
-        fi
-        return 0
-    fi
-    echo "unknown"
-}
-
-FORGE_REV="$(get_forge_rev)"
+# Match pytest's content fingerprint: a constant '-dirty' suffix can reuse an
+# image built before later uncommitted fixes, including Dockerfile changes.
+FORGE_REV="$(uv run python -c 'from pathlib import Path; from tests.fixtures.docker import _get_forge_revision; print(_get_forge_revision(Path.cwd()))')"
 
 if ! command -v docker &> /dev/null; then
     error "Docker command not found. Please install Docker."
@@ -128,6 +114,14 @@ if [[ "$needs_build" == "true" ]]; then
     info "Build complete: $IMAGE_NAME"
 else
     info "Using existing image: $IMAGE_NAME"
+fi
+
+# Cached toolchain layers can fail at runtime despite a matching source label.
+# Refuse before shared infrastructure or pytest turns that into unrelated failures.
+info "Checking integration runtime startup"
+if ! uv run python tests/fixtures/runtime_image.py "$IMAGE_NAME"; then
+    error "Integration runtime preflight failed; no tests were run."
+    exit 1
 fi
 
 # Build the sidecar image (base + entrypoint) so sidecar integration tests have

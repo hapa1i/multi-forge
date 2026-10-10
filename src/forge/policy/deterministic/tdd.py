@@ -105,7 +105,7 @@ class TDDEnforcementPolicy(StatefulDeterministicPolicy):
                 if self.strict:
                     return self._deny([violation])
                 else:
-                    return self._warn([violation.message])
+                    return self._warn([violation])
 
         return self._allow()
 

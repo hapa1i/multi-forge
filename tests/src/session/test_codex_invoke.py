@@ -58,7 +58,9 @@ def _invoke(mock_run: MagicMock, **overrides: Any) -> int:
         "run_identity": _IDENTITY,
     }
     kwargs.update(overrides)
-    return invoke_codex_interactive(**kwargs)
+    # Launch-fact collection has its own executable/replacement tests.
+    with patch("forge.session.codex_invoke.prepare_executor_launch", side_effect=lambda argv, env, **kwargs: argv):
+        return invoke_codex_interactive(**kwargs)
 
 
 @patch("forge.session.codex_invoke.subprocess.run")

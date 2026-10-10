@@ -1,0 +1,15 @@
+{
+  "installed": true,
+  "version": "0.162.1",
+  "version_ok": true,
+  "auth_method": "chatgpt_tokens",
+  "auth_source": "codex_store",
+  "billing_mode": "subscription_quota",
+  "ready": true,
+  "blocking_reason": null,
+  "hook_seam": "enrollment_gated",
+  "proxy_responses": "native_direct",
+  "doctor_status": "fail",
+  "version_validated": "0.161.0",
+  "version_beyond_validated": true
+}

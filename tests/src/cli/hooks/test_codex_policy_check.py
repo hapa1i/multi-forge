@@ -430,5 +430,6 @@ class TestCascadeSharedWiring:
 
         assert result.exit_code == 0
         out = _deny_wire(result.stdout)
-        assert "[semantic.supervisor.alignment] Divergent from plan" in out["permissionDecisionReason"]
+        assert "[semantic.supervisor.alignment]" in out["permissionDecisionReason"]
+        assert '"message":"Divergent from plan"' in out["permissionDecisionReason"]
         assert mock_invoke.call_count == 1

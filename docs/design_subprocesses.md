@@ -122,7 +122,10 @@ Resolvable keys still win as API for all four consumers; the backend name alone 
 `subscription-only` is a supervisor-local, direct Claude/`claude-max` route: construct the child once without Forge
 credential hydration, remove competing auth/cloud/profile/proxy selectors, isolate settings, then run version and auth
 status checks with the same executable, environment, CWD, and restrictions used for inference. Accept only a verified
-personal CLI-managed Pro/Max login. The tested version is 2.1.291. Managed policy/MCP, nonempty server policy, active or
+personal CLI-managed Pro/Max login. When current login metadata omits `organizationType`, auth status must explicitly
+report `subscriptionType=pro|max`; absent classification on both surfaces is refused. Legacy personal metadata still
+supports older auth status without that field, and contradictory organization or auth results remain refused. B1 tested
+2.1.291; B3 exercises the current metadata shape on 2.1.294. Managed policy/MCP, nonempty server policy, active or
 default profiles, alternate config directories, organization/gateway routes, and sidecars remain unavailable. No API
 retry follows auth/quota failure. Usage credits disabled is an account prerequisite Forge cannot inspect. Model and
 effort are supervisor-owned explicit choices; proxy tier mappings remain proxy-owned. Changing auth/model/effort after

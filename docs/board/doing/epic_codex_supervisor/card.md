@@ -5,7 +5,9 @@ Status: active coordination, 2026-10-10. B1 and its documentation prerequisites 
 [coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
 B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), merged as `2a15c087`; its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
-B3-B5 remain proposed and use separate execution branches when selected.
+B3 is selected on `feat/codex-policy-warnings` from `d54dba63`; its [checklist](../codex_policy_warnings/checklist.md)
+owns warning delivery and the explicit source-only opt-in. B4-B5 remain proposed and use separate execution branches
+when selected.
 
 ## Problem and outcome
 
@@ -26,14 +28,14 @@ shipped scope and limits.
 | --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------ |
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
-| B3  | [Warnings Codex can see](../../proposed/codex_policy_warnings/card.md)                     | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B2                       |
+| B3  | [Warnings Codex can see](../codex_policy_warnings/card.md)                                 | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
 | B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
-auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback. B4
-owns the review trigger and turn accounting. B5 owns native Codex context acquisition. Cards use separate execution
-branches when activated.
+auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback and
+the source-only formatter, using B1's approved-plan snapshot contract. B4 owns the review trigger and turn accounting.
+B5 owns native Codex context acquisition. Cards use separate execution branches when activated.
 
 ## Shared contract
 
@@ -57,14 +59,20 @@ branches when activated.
 - Preserve existing deterministic policy decisions and supervisor failure behavior. Missing or failed review remains
   visible; an execution failure is not an alignment verdict. Before B3, B1 exposes review state/reason/time in
   `forge policy supervisor status [--json]` and unavailable/incomplete attempts in `forge telemetry activity [session]`.
-  B3 distinguishes model context from operator UI warnings and respects `policy_summary_feedback` for model injection.
+  B3 distinguishes model context from operator UI warnings and extends `policy_summary_feedback` to substantive Codex
+  model feedback. Claude keeps its existing summary injection until Jev A2 extends that formatter; document the
+  temporary difference. Expected depth/cascade noise stays out of model feedback, while unavailable review has fixed
+  status text.
 - Fit all per-file checks, retries and any cascade into a shared hook deadline with time reserved for cancellation and
   recording. Probe both executors' timeout behavior and bound reviewer lifetime even if only the hook is killed. Persist
   attempts so a killed hook leaves detectable incomplete work. Both policy-hook presets use 60 seconds; changing Codex's
   timeout or matcher requires re-enrollment. B4 chooses its Stop timeout explicitly.
-- Keep the option for source-only feedback: verified plan passages and fixed Forge diagnostics, with Claude's generated
-  wording retained out of the executor's context. This addresses the user's watermark concern without claiming a
-  measured watermark property.
+- B3 adds the explicitly Codex-scoped global `codex_policy_feedback_format=normal|source-only` preference, default
+  `normal`. Source-only selects verified plan passages and fixed Forge diagnostics for hook injection, retaining
+  generated reviewer wording in durable evidence. Validate quotations while the reviewed snapshot is available and
+  preserve their provenance on warning and blocking findings. Workspace evidence remains executor-readable; the
+  preference limits Forge's injected text without claiming access isolation or a measured watermark property. Claude
+  output remains unchanged.
 - Stop review evaluates work after edits have occurred. It cannot substitute for a pre-edit deny or undo an edit.
 - B5 permits the executor thread as a fork source only with an approved plan file taking precedence. Record reduced
   independence: the fork can inherit implementation reasoning. B2 observed one controlled concurrent boundary on
@@ -92,3 +100,20 @@ Every member must ship or receive an explicit board disposition. The integrated 
 reviewed from a plan file, model-visible allowed-action feedback, bounded Stop review, and a separately opted-in native
 fork review. Verify the no-API everyday route, quota/error behavior, existing Claude supervision, and actual checkout
 selection. Keep probe captures sanitized and retain the commands, versions, and outcomes used for each conclusion.
+
+## B3 implementation handoff (2026-10-10)
+
+B3's [evidence](../codex_policy_warnings/evidence/README.md) proves allowed warning delivery on retained Codex 0.162.1
+through enrolled product hooks, including independent model/operator channels, source-only snapshot quotations, mixed
+atomic denials, timeout status, and installed-wheel provenance. Source-only keeps reviewer prose in durable evidence and
+selects verified snapshot text or fixed fallback for every model-visible warning/block field. It does not restrict
+workspace reads. The quote-quality control completed one subscription-only Claude review with two verified quotations.
+
+The admission set is feature-specific: 0.161.0 and 0.162.1, with the historical 0.161.0 qualifications preserved. Launch
+identity is refreshed at each managed start/resume and checked against the invoking process's launch parent. Nested
+runtimes cannot reuse the inherited record. Unknown/unmeasured versions and unverifiable process chains, including
+forking wrappers, receive no new model/operator channel; launch and existing denials remain available. The general
+ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
+the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
+count summary; Jev A2 owns that formatter extension. B4/B5 are still proposed, and B3 remains `doing` until merge and
+closeout.

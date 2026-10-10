@@ -264,10 +264,12 @@ forge telemetry activity
 This explicit mode requires a compatible Claude 2.x (at least 2.1.248 with all review flags), a personal Pro/Max CLI
 login, and **usage credits disabled on the Claude account**. Forge cannot inspect that account setting. It strips
 competing API/cloud/proxy credentials, skips Forge credential hydration and user/project/local settings, and verifies
-the same child auth configuration used for review. Missing/expired login, quota failure, managed policy, active/default
-profiles, alternate config directories, and unverified organization/gateway routes produce unavailable review with no
-API fallback. No login tokens are read or copied. Runtime capability checks refresh after auto-updates; setup and status
-report incompatibility. This proves route selection, not a measured invoice or quota decrement.
+the same child auth configuration used for review. The CLI must identify a personal Pro/Max subscription through current
+auth status or supported legacy account metadata; an unclassified login is refused. Missing/expired login, quota
+failure, managed policy, active/default profiles, alternate config directories, and unverified organization/gateway
+routes produce unavailable review with no API fallback. No login tokens are read or copied. Runtime capability checks
+refresh after auto-updates; setup and status report incompatibility. This proves route selection, not a measured invoice
+or quota decrement.
 
 For an explicit paid direct route, use `--auth-mode inherit --no-supervisor-proxy`; an existing environment or Forge
 credential remains available, as do user-settings `apiKeyHelper` and auth environment settings from user or explicitly
@@ -289,7 +291,8 @@ sidecar image refuses launch with rebuild guidance before mounting user state.
 configuration revalidates the stored file; `reload --from <path>` changes it atomically. Content hashes invalidate
 cached verdicts even if timestamps and file sizes match. Status keeps suspended/unusable configuration visible and
 reports the latest live completed, unavailable, or incomplete attempt. Background shadow verdicts remain audits and
-never replace the live verdict. Allowed Codex actions remain silent in the executor.
+never replace the live verdict. Admitted managed Codex executors receive bounded allowed-action warnings; clean allows
+remain silent. The summary toggle controls allowed model context independently of operator warnings and audit evidence.
 
 Upgrades leave existing frozen `claude-max` bindings on inherited auth. Opting in or changing a frozen model/effort
 requires `forge policy supervisor remove` followed by `set`. Legacy timeouts over 45 seconds migrate to 45. Ordinary
@@ -556,14 +559,44 @@ forge session show <name> --json | jq '.confirmed.policy.decisions'
 
 The human-readable `forge session show <name>` includes a "Policy Evals:" summary line under Confirmed State.
 
-To silence the post-evaluation summary lines printed after each Write/Edit check:
+To turn off Claude's count summary and Codex's allowed-action model feedback:
 
 ```bash
 forge config set policy_summary_feedback=off
 ```
 
-This suppresses the `[forge] Policy: checked ...` summary and `additionalContext`. Deny messages and substantive
-warnings stay visible regardless.
+Codex warnings normally reach the model as attributed `additionalContext` after an allowed patch. The independent
+`systemMessage` channel supplies the operator's Hook notice. `off` omits allowed-action model context and stderr
+summaries; blocking reasons, substantive operator notices, and audit records remain. A clean allow produces no Codex
+hook output. A failed or unavailable final review is described as unreviewed, never as aligned. A tier-1 failure
+resolved by the supervisor remains in audit and does not label the completed review unreviewed.
+
+Codex also supports a global format preference:
+
+```bash
+forge config set codex_policy_feedback_format=source-only
+```
+
+The default is `normal`. `source-only` keeps reviewer-written explanations, fixes, and unverified citations out of
+model-visible hook fields. It selects verbatim quotations verified against the plan snapshot actually reviewed, plus
+fixed Forge diagnostics and attributed deterministic-policy findings. Only surrounding citation whitespace is ignored.
+Missing or fabricated quotes never change a verdict: a blocked reviewer finding without a verified quote tells the
+executor to stop and ask the operator. Inspection commands stay in the operator channel. `policy_summary_feedback=off`
+takes precedence for allowed-action context. Claude output is unchanged by the Codex format setting; there is no session
+override.
+
+Full reviewer findings remain in session evidence, which the executor can still read from the workspace. This setting
+controls Forge's hook emissions, not file access or the authority of developer-role context. Both channels are bounded;
+notices report omitted/truncated findings and offer inspection commands. Repeated actions may repeat a finding.
+
+Feedback requires user-scope hook enrollment (`forge runtime preflight codex --verify-enrollment`). Forge records
+executor identity at each managed start/resume and enables new channels only for feature-tested versions whose hook
+process can be tied to that launch. Nested runtimes cannot reuse inherited admission. Older, unknown, or untested
+executors retain blocking behavior and stderr diagnostics. The same conservative behavior applies when an OS process
+lookup fails or a launcher forks Codex instead of replacing itself. Such launchers still run normally; their new
+feedback channels stay off. Relaunch existing sessions after updating Forge's launch-record schema. This feature
+admission is separate from the general QA ceiling and release pin; see
+[Codex runtime guards](../design_session_execution.md#i3-codex-operational-guards-probe-churn-enrollment).
 
 ## Files to inspect (debugging)
 
