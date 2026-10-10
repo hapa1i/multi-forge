@@ -311,6 +311,20 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
 
+**Policy feedback admission:** `core/runtime/codex_feedback.py` owns a feature-specific measured-version set, separate
+from the general QA ceiling, blocking release pin, and proxy floor. The B2 baseline is 0.161.0; B3's retained executor
+is 0.162.1. Allowed-action model feedback uses bare PreToolUse `additionalContext` without an explicit allow decision;
+operator feedback uses top-level `systemMessage`. Combined, model-only, and operator-only delivery need distinct
+evidence. Serialization alone establishes emission, not delivery.
+
+Managed headless start/resume and interactive start/reattach refresh `FORGE_CODEX_EXECUTOR_IDENTITY` immediately before
+launch. It contains only the resolved launcher path, SHA-256, stat identity, and a parsed `--version` result. The launch
+uses that absolute path; replacement during probing invalidates the record. Inherited records are removed, and reviewer
+or workflow-worker invocations do not probe executor features. Hooks validate the launch record without a subprocess,
+account metadata, or reviewer-readiness cache. A running process retains its launch facts after an on-disk upgrade; the
+next launch probes again. These facts describe compatibility, not a security boundary. Unknown/unparseable records or
+untested versions suppress the new allowed-action channels; the existing deny wire remains available.
+
 Codex's trust/enrollment and `apply_patch`/argv behavior are pinned **empirically**, not contractually, so two
 operator-facing guards backstop version churn and the unverifiable trust ceremony:
 

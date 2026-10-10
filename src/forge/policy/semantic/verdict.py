@@ -14,7 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from forge.core.reactive.structured_output import extract_json_from_response
-from forge.policy.types import PolicyDecision, Severity, Violation
+from forge.policy.semantic.plan_source import PlanSnapshot
+from forge.policy.types import PolicyDecision, Severity, VerifiedCitation, Violation
 
 _log = logging.getLogger(__name__)
 
@@ -158,7 +159,24 @@ def _normalize_citations(value: Any) -> list[str]:
     return [citation for citation in value if isinstance(citation, str) and citation.strip()]
 
 
-def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None) -> PolicyDecision:
+def verify_citations(citations: list[str], snapshot: PlanSnapshot | None) -> list[VerifiedCitation]:
+    """Accept exact nonblank substrings; only outer quote whitespace is ignored.
+
+    Do not reread the file: it may have changed while the reviewer was running.
+    Verification selects feedback text and never changes the existing block bar.
+    """
+    if snapshot is None or not snapshot.text or not snapshot.path or not snapshot.digest:
+        return []
+    verified = []
+    for quote in dict.fromkeys(citation.strip() for citation in citations):
+        if quote and (start := snapshot.text.find(quote)) >= 0:
+            verified.append(VerifiedCitation(snapshot.path, snapshot.digest, start, start + len(quote), quote))
+    return verified
+
+
+def verdict_to_decision(
+    verdict: SupervisorVerdict, *, intent: str | None = None, snapshot: PlanSnapshot | None = None
+) -> PolicyDecision:
     """Convert a SupervisorVerdict to a PolicyDecision.
 
     Blocking rules:
@@ -185,6 +203,7 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
 
     # Divergent: check confidence and citations
     blocking_violations: list[Violation] = []
+    warning_findings: list[Violation] = []
     warnings: list[str] = []
 
     for v in verdict.violations:
@@ -203,6 +222,8 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
             evidence=v.get("evidence"),
             suggested_fix=v.get("suggested_fix"),
             citations=citations,
+            provenance="reviewer",
+            verified_citations=verify_citations(citations, snapshot),
         )
 
         # Only block on high-confidence violations with citations
@@ -211,6 +232,7 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
         else:
             # Low confidence or no citations → warning only
             warnings.append(f"Possible divergence: {violation.message} (confidence: {verdict.confidence:.0%})")
+            warning_findings.append(violation)
 
     if blocking_violations:
         return PolicyDecision(
@@ -218,6 +240,7 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
             policy_id=policy_id,
             violations=blocking_violations,
             warnings=warnings,
+            warning_findings=warning_findings,
             intent=intent,
         )
 
@@ -227,6 +250,8 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
             decision="warn",
             policy_id=policy_id,
             warnings=warnings,
+            warning_findings=warning_findings,
+            intent=intent,
         )
 
     # No violations at all (shouldn't happen for divergent, but handle gracefully)

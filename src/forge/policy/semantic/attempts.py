@@ -145,6 +145,7 @@ class ReviewAttempt:
             # we release the lock. A telemetry failure cannot authorize an edit.
             _log.warning("Supervisor evidence finalization failed: %s", exc)
             decision.warnings.append("Supervisor evidence could not be saved; the review verdict is unchanged.")
+            decision.diagnostic_codes.append("evidence_unavailable")
         finally:
             self._lock.close()
 

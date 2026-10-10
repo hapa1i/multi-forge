@@ -8,6 +8,7 @@ invocations, since hooks are short-lived processes.
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from typing import Any
 
 from forge.core.state import now_iso
@@ -33,6 +34,11 @@ def serialize_decision(decision: PolicyDecision) -> dict[str, Any]:
         "policy_id": decision.policy_id,
         "violations": [_serialize_violation(v) for v in decision.violations],
         "warnings": decision.warnings,
+        "warning_findings": [_serialize_violation(v) for v in decision.warning_findings],
+        "diagnostic_codes": decision.diagnostic_codes,
+        "fail_open": decision.fail_open,
+        "failure_type": decision.failure_type,
+        "intent": decision.intent,
         "cached": decision.cached,
         "evaluated_at": decision.evaluated_at,
     }
@@ -47,6 +53,8 @@ def _serialize_violation(violation: Violation) -> dict[str, Any]:
         "evidence": violation.evidence,
         "suggested_fix": violation.suggested_fix,
         "citations": violation.citations,
+        "provenance": violation.provenance,
+        "verified_citations": [asdict(c) for c in violation.verified_citations],
     }
 
 

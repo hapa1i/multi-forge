@@ -72,6 +72,21 @@ class ActionContext:
     action_fingerprint: str | None = None
 
 
+@dataclass(frozen=True)
+class VerifiedCitation:
+    """A verbatim passage verified against the immutable reviewed plan.
+
+    Offsets are Python character offsets in the UTF-8 text identified by digest.
+    Reviewer-provided paths and digests never populate this record.
+    """
+
+    source: str
+    digest: str
+    start: int
+    end: int
+    text: str
+
+
 @dataclass
 class Violation:
     """A single policy violation.
@@ -91,6 +106,8 @@ class Violation:
     evidence: str | None = None
     suggested_fix: str | None = None
     citations: list[str] = field(default_factory=list)
+    provenance: Literal["unknown", "policy", "reviewer"] = "unknown"
+    verified_citations: list[VerifiedCitation] = field(default_factory=list)
 
 
 @dataclass
@@ -101,7 +118,7 @@ class PolicyDecision:
         decision: The policy's verdict. ``needs_review`` must be resolved by
             semantic supervision before a hook allows the action.
         policy_id: Which policy made this decision
-        violations: List of violations found (for deny/warn decisions)
+        violations: Findings used by blocking decisions and tier-1 review requests
         warnings: Non-blocking warnings to display
         intent: Why the policy exists (shown on deny to help models understand
             the goal and surface conflicts instead of working around them)
@@ -125,6 +142,9 @@ class PolicyDecision:
     telemetry_run_id: str | None = None
     telemetry_parent_run_id: str | None = None
     telemetry_root_run_id: str | None = None
+    # Separate from violations to preserve blocking counts and legacy CLI JSON.
+    warning_findings: list[Violation] = field(default_factory=list)
+    diagnostic_codes: list[str] = field(default_factory=list)
 
 
 @dataclass

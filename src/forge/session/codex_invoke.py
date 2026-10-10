@@ -31,6 +31,7 @@ from forge.core.reactive.env import (
     RunIdentity,
     get_forge_depth,
 )
+from forge.core.runtime.codex_feedback import prepare_executor_launch
 from forge.core.runtime.codex_preflight import CodexPreflight
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ def invoke_codex_interactive(
         env[FORGE_AUTHORITY_MARKER_VAR] = authority_marker
 
     logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
+    argv = prepare_executor_launch(argv, env)
     result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
     return result.returncode
 

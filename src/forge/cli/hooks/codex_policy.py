@@ -150,15 +150,10 @@ class CodexHookResponder:
         return self._deny_wire(reason)
 
     def allow_feedback(self, additional_context: str) -> dict[str, Any]:
-        """Build the allow JSON (protocol conformance only).
-
-        Not emitted in Phase 3: PreToolUse ``additionalContext`` delivery on allow is
-        unprobed (only SessionStart's is confirmed), so the command allows silently.
-        """
+        """Build bare context: explicit allow suppresses delivery on measured Codex."""
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
                 "additionalContext": additional_context,
             }
         }

@@ -556,14 +556,39 @@ forge session show <name> --json | jq '.confirmed.policy.decisions'
 
 The human-readable `forge session show <name>` includes a "Policy Evals:" summary line under Confirmed State.
 
-To silence the post-evaluation summary lines printed after each Write/Edit check:
+To turn off Claude's count summary and Codex's allowed-action model feedback:
 
 ```bash
 forge config set policy_summary_feedback=off
 ```
 
-This suppresses the `[forge] Policy: checked ...` summary and `additionalContext`. Deny messages and substantive
-warnings stay visible regardless.
+Codex warnings normally reach the model as attributed `additionalContext` after an allowed patch. The independent
+`systemMessage` channel supplies the operator's Hook notice. `off` omits allowed-action model context and stderr
+summaries; blocking reasons, substantive operator notices, and audit records remain. A clean allow produces no Codex
+hook output. A failed or unavailable review is described as unreviewed, never as aligned.
+
+Codex also supports a global format preference:
+
+```bash
+forge config set codex_policy_feedback_format=source-only
+```
+
+The default is `normal`. `source-only` keeps reviewer-written explanations, fixes, and unverified citations out of
+model-visible hook fields. It selects verbatim quotations verified against the plan snapshot actually reviewed, plus
+fixed Forge diagnostics and attributed deterministic-policy findings. Only surrounding citation whitespace is ignored.
+Missing or fabricated quotes never change a verdict: a blocked patch stays blocked and tells the executor to stop and
+ask the operator. Inspection commands stay in the operator channel. `policy_summary_feedback=off` takes precedence for
+allowed-action context. Claude output is unchanged by the Codex format setting; there is no session override.
+
+Full reviewer findings remain in session evidence, which the executor can still read from the workspace. This setting
+controls Forge's hook emissions, not file access or the authority of developer-role context. Both channels are bounded;
+notices report omitted/truncated findings and offer inspection commands. Repeated actions may repeat a finding.
+
+Feedback requires user-scope hook enrollment (`forge runtime preflight codex --verify-enrollment`). Forge records
+executor identity at each managed start/resume and enables new channels only for feature-tested versions. Older,
+unknown, or untested executors keep blocking behavior and stderr diagnostics without new allowed-action fields. This
+feature admission is separate from the general QA ceiling and release pin; see
+[Codex runtime guards](../design_session_execution.md#i3-codex-operational-guards-probe-churn-enrollment).
 
 ## Files to inspect (debugging)
 

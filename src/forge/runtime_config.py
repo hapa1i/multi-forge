@@ -84,8 +84,12 @@ _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
         "0 disables automatic session cleanup. Worktrees and branches are kept.",
     ),
     "policy_summary_feedback": (
-        "Policy summary feedback after evaluations: on or off.",
-        "Deny messages and substantive warnings stay visible either way.",
+        "Policy feedback: on or off. Controls Claude count summaries and Codex allowed-action model context.",
+        "Deny reasons, Codex operator warnings, and audit records remain available when off.",
+    ),
+    "codex_policy_feedback_format": (
+        "Codex hook feedback format: normal or source-only. Claude output is unchanged.",
+        "source-only selects verified plan quotes and fixed diagnostics for model-visible fields.",
     ),
     "upstream_event_volume": (
         "Upstream outcome telemetry volume: non_success or all.",
@@ -452,10 +456,9 @@ class RuntimeConfig:
     # under .forge/artifacts/ are NOT removed.
     session_retention_days: int = 0
 
-    # Policy summary feedback after evaluations: "on" (default), "off".
-    # Gates post-hoc "[forge] Policy: checked ..." summary lines and additionalContext.
-    # Does NOT affect deny output or substantive warning lines -- those stay visible always.
+    # Claude summaries and Codex allowed-action model context; never gates denies or operator warnings.
     policy_summary_feedback: str = "on"
+    codex_policy_feedback_format: str = "normal"
 
     # Upstream telemetry volume: "non_success" records failure/exception outcomes;
     # "all" also records successful deterministic passes and cached allows.
@@ -528,6 +531,11 @@ class RuntimeConfig:
                 f"(must be one of: {', '.join(sorted(valid_feedback))})"
             )
         valid_upstream_event_volume = {"non_success", "all"}
+        if self.codex_policy_feedback_format not in {"normal", "source-only"}:
+            raise ValueError(
+                f"Invalid codex_policy_feedback_format: '{self.codex_policy_feedback_format}' "
+                "(must be one of: normal, source-only)"
+            )
         if self.upstream_event_volume not in valid_upstream_event_volume:
             raise ValueError(
                 f"Invalid upstream_event_volume: '{self.upstream_event_volume}' "
@@ -1010,10 +1018,13 @@ proxy_mode: host
 # Manual cleanup: forge session clean --older-than DAYS
 # session_retention_days: 0
 
-# Policy summary feedback: show post-evaluation summary lines and additionalContext.
-# "on" (default) prints what was checked and the verdict after each policy evaluation.
-# "off" silences summary lines. Deny messages and substantive warnings stay visible always.
+# Policy feedback: Claude count summaries and Codex allowed-action model context.
+# "off" omits that context; deny reasons, operator warnings, and audit records remain.
 # policy_summary_feedback: "on"
+
+# Codex model-visible hook fields: normal or source-only (verified plan quotes/fixed diagnostics).
+# Does not affect Claude or prevent the executor reading full evidence from the workspace.
+# codex_policy_feedback_format: "normal"
 
 # Upstream outcome telemetry volume: non_success (failure/exception log) or all.
 # upstream_event_volume: "non_success"
