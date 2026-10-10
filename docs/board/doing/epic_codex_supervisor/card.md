@@ -59,14 +59,20 @@ B5 owns native Codex context acquisition. Cards use separate execution branches 
 - Preserve existing deterministic policy decisions and supervisor failure behavior. Missing or failed review remains
   visible; an execution failure is not an alignment verdict. Before B3, B1 exposes review state/reason/time in
   `forge policy supervisor status [--json]` and unavailable/incomplete attempts in `forge telemetry activity [session]`.
-  B3 distinguishes model context from operator UI warnings and respects `policy_summary_feedback` for model injection.
+  B3 distinguishes model context from operator UI warnings and extends `policy_summary_feedback` to substantive Codex
+  model feedback. Claude keeps its existing summary injection until Jev A2 extends that formatter; document the
+  temporary difference. Expected depth/cascade noise stays out of model feedback, while unavailable review has fixed
+  status text.
 - Fit all per-file checks, retries and any cascade into a shared hook deadline with time reserved for cancellation and
   recording. Probe both executors' timeout behavior and bound reviewer lifetime even if only the hook is killed. Persist
   attempts so a killed hook leaves detectable incomplete work. Both policy-hook presets use 60 seconds; changing Codex's
   timeout or matcher requires re-enrollment. B4 chooses its Stop timeout explicitly.
-- Keep the option for source-only feedback: verified plan passages and fixed Forge diagnostics, with Claude's generated
-  wording retained out of the executor's context. This addresses the user's watermark concern without claiming a
-  measured watermark property.
+- B3 adds the explicitly Codex-scoped global `codex_policy_feedback_format=normal|source-only` preference, default
+  `normal`. Source-only selects verified plan passages and fixed Forge diagnostics for hook injection, retaining
+  generated reviewer wording in durable evidence. Validate quotations while the reviewed snapshot is available and
+  preserve their provenance on warning and blocking findings. Workspace evidence remains executor-readable; the
+  preference limits Forge's injected text without claiming access isolation or a measured watermark property. Claude
+  output remains unchanged.
 - Stop review evaluates work after edits have occurred. It cannot substitute for a pre-edit deny or undo an edit.
 - B5 permits the executor thread as a fork source only with an approved plan file taking precedence. Record reduced
   independence: the fork can inherit implementation reasoning. B2 observed one controlled concurrent boundary on

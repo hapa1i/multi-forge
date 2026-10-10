@@ -31,12 +31,14 @@ stable rule citations, action evidence and semantic correctness.
 - Return non-blocking warnings only. Service failure or malformed/incomplete evidence must not introduce a new Jev
   denial or unresolved `needs_review`; display an unavailable-check diagnostic. Existing independent denials remain
   intact. This card does not invoke a supervisor, even when one is configured.
-- Deliver attributed warnings through an extended Claude formatter and B3's verified Codex path. Follow the existing
-  `policy_summary_feedback` setting: when enabled, send bounded rule text/citation and action evidence in
-  `additionalContext`; when disabled, omit model feedback while retaining operator diagnostics and audit records.
-  Claude's current generic warning count is insufficient for actionable rule-pack feedback. Distinguish Codex operator
-  `systemMessage` from model context and do not claim model visibility from stderr alone. Keep Jev disabled for everyday
-  no-API-spend supervision.
+- Deliver attributed warnings through an extended Claude formatter and B3's verified Codex path. Extend the existing
+  `policy_summary_feedback` setting to substantive Claude feedback, matching B3's Codex contract: when enabled, send
+  bounded rule text/citation and action evidence in `additionalContext`; when disabled, omit model feedback while
+  retaining operator diagnostics and audit records. Claude keeps its generic summary until this card ships; B3 alone
+  changes Codex. Update runtime configuration help and end-user config/policy docs with that staged contract. Respect
+  B3's audience, bounds, and provenance rules, including its Codex-only source-only preference; keep evidence-inspection
+  commands in operator output in that mode. Distinguish Codex operator `systemMessage` from model context and do not
+  claim model visibility from stderr alone. Keep Jev disabled for everyday no-API-spend supervision.
 
 ## Acceptance and validation
 

@@ -42,8 +42,16 @@ commit above merged stack `56d4b8f5`. B2's checklist records planning validation
 B3 activation, 2026-10-10: selected separately from clean local `main` at B2 closeout `d54dba63`, above merged PR #261
 (`2a15c087`). Moved B3 to `doing/` and created its execution checklist. The user selected the explicit source-only mode,
 making B1's shipped approved-plan snapshot contract an explicit prerequisite alongside B2's delivery evidence. Both
-prerequisites are done. B4-B5 and the Jev cards are not activated. The B2 closeout is still local; publish it to
-`origin/main` before opening B3's PR so the PR contains only B3 work.
+prerequisites are done. B4-B5 and the Jev cards are not activated.
+
+B3 review revision, 2026-10-10: source-only controls Codex hook injection while full evidence remains readable. The B3
+checklist now specifies structured warning provenance, audience filtering, the Codex-only global format setting,
+launch-time identity, and trusted fixture/wheel enrollment continuity. `policy_summary_feedback` gains substantive Codex
+semantics; A2 owns the later Claude extension. The reserved live budget is 32 Codex turns, including 8 retries, plus one
+subscription-only Claude quote-quality attempt. Product implementation and live probes have not started.
+
+B2 publication, 2026-10-10: fast-forwarded remote `main` from `2a15c087` to existing closeout `d54dba63`; B3 remains on
+its separate branch. Refresh and verify the B3 PR base before opening it.
 
 ## Sequence and ownership
 
