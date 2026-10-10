@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -15,6 +16,10 @@ def rows(path: Path) -> list[dict]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--real-case", default="real-claude-quote")
+    parser.add_argument("--wheel-prefix", default="wheel")
+    args = parser.parse_args()
     root = Path(os.environ["PROBE_ROUND_ROOT"])
     results = {}
     names = [
@@ -31,9 +36,9 @@ def main() -> None:
         "tui-off-final",
         "tui-combined",
         "model-only",
-        "wheel-source",
-        "wheel-off",
-        "wheel-deny",
+        args.wheel_prefix + "-source",
+        args.wheel_prefix + "-off",
+        args.wheel_prefix + "-deny",
     ]
     for name in names:
         directory = root / "captures" / name
@@ -63,8 +68,8 @@ def main() -> None:
             if r.get("payload", {}).get("role") == "developer" and "hooks.additional_context" in json.dumps(r)
             for c in r["payload"].get("content", [])
         ]
-        blocked = name in {"source-deny", "mixed", "wheel-deny"}
-        off = name in {"off-headless", "tui-off-final", "wheel-off"}
+        blocked = name in {"source-deny", "mixed", args.wheel_prefix + "-deny"}
+        off = name in {"off-headless", "tui-off-final", args.wheel_prefix + "-off"}
         action = json.loads((directory / "action-result.json").read_text())
         assert action["exists"] is not blocked
         if blocked:
@@ -80,7 +85,7 @@ def main() -> None:
         if control["source_only"]:
             assert control["reviewer_nonce"] not in native_text
             assert control["reviewer_nonce"] not in json.dumps(model)
-            if name in {"source", "source-changed", "wheel-source"}:
+            if name in {"source", "source-changed", args.wheel_prefix + "-source"}:
                 assert control["source_quote"] in native_text
                 match = re.search(r"SOURCE-[a-f0-9]+", control["source_quote"])
                 assert match is not None and match[0] in answer_text
@@ -96,9 +101,10 @@ def main() -> None:
             assert "Hook ·" in terminal and control["reviewer_nonce"] in terminal
             assert json.loads((directory / "terminal-result.json").read_text())["exited"]
         if name.startswith("wheel-"):
+            wheel = json.loads((root / (args.wheel_prefix + "-verification.json")).read_text())
             assert hook["dev_override"] is None
-            assert str(root / "wheel-env") in hook["forge_module"]
-            assert hook["launcher"] == str(root / "wheel-env/bin/forge")
+            assert hook["forge_module"] == wheel["forge_module"]
+            assert hook["launcher"] == wheel["metadata_override"]["forge_binary_path"]
         if name == "multi":
             assert "src/multi.py" in model["additionalContext"]
             assert "src/multi_later.py" in model["additionalContext"]
@@ -125,11 +131,18 @@ def main() -> None:
             "hook_seconds": hook["elapsed_seconds"],
             "forge_module": hook["forge_module"],
         }
-    real = json.loads((root / "captures/real-claude-quote/real-review.json").read_text())
-    assert real["dispatches"] == 1 and real["result"]["run_ok"] and real["result"]["parsed"]
-    assert any(v["verified_citations"] for v in real["result"]["decision"]["violations"])
-    assert real["usage"] and all(row["billing_mode"] == "subscription_quota" for row in real["usage"])
-    wheel = json.loads((root / "wheel-verification.json").read_text())
+    real = json.loads((root / "captures" / args.real_case / "real-review.json").read_text())
+    decision = real["result"]["decision"]
+    real_usable = (
+        real["dispatches"] == 1
+        and real["result"]["run_ok"]
+        and real["result"]["parsed"]
+        and any(v["verified_citations"] for v in decision["violations"])
+    )
+    if real_usable:
+        usage = [row for row in real["usage"] if row["run_id"] == decision["telemetry_run_id"]]
+        assert usage and all(row["billing_mode"] == "subscription_quota" for row in usage)
+    wheel = json.loads((root / (args.wheel_prefix + "-verification.json")).read_text())
     assert wheel["before"] == wheel["after"] and wheel["routing_restored"]
     original = json.loads((root / "host-config-hashes.json").read_text())
     current = {
@@ -138,7 +151,9 @@ def main() -> None:
     assert original == current
     report = {
         "cases": results,
-        "real_quote_usable": True,
+        "real_quote_usable": bool(real_usable),
+        "real_review_case": args.real_case,
+        "real_review_failure": decision["failure_type"],
         "host_config_bytes_unchanged": True,
         "host_auth_not_copied_or_inspected": True,
         "reserved_codex_turns": sum(row["reserved_turns"] for row in rows(root / "turns.jsonl")),
@@ -147,6 +162,8 @@ def main() -> None:
     assert report["reserved_codex_turns"] <= 32
     (root / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
+    if not real_usable:
+        raise SystemExit("Product controls passed; real quote-quality acceptance remains unverified.")
 
 
 if __name__ == "__main__":

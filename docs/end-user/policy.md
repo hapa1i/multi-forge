@@ -264,10 +264,12 @@ forge telemetry activity
 This explicit mode requires a compatible Claude 2.x (at least 2.1.248 with all review flags), a personal Pro/Max CLI
 login, and **usage credits disabled on the Claude account**. Forge cannot inspect that account setting. It strips
 competing API/cloud/proxy credentials, skips Forge credential hydration and user/project/local settings, and verifies
-the same child auth configuration used for review. Missing/expired login, quota failure, managed policy, active/default
-profiles, alternate config directories, and unverified organization/gateway routes produce unavailable review with no
-API fallback. No login tokens are read or copied. Runtime capability checks refresh after auto-updates; setup and status
-report incompatibility. This proves route selection, not a measured invoice or quota decrement.
+the same child auth configuration used for review. The CLI must identify a personal Pro/Max subscription through current
+auth status or supported legacy account metadata; an unclassified login is refused. Missing/expired login, quota
+failure, managed policy, active/default profiles, alternate config directories, and unverified organization/gateway
+routes produce unavailable review with no API fallback. No login tokens are read or copied. Runtime capability checks
+refresh after auto-updates; setup and status report incompatibility. This proves route selection, not a measured invoice
+or quota decrement.
 
 For an explicit paid direct route, use `--auth-mode inherit --no-supervisor-proxy`; an existing environment or Forge
 credential remains available, as do user-settings `apiKeyHelper` and auth environment settings from user or explicitly

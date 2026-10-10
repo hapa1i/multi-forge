@@ -50,8 +50,8 @@ def _present(path: Path) -> bool:
         return False
 
 
-def validate_subscription_location(env: dict[str, str]) -> None:
-    """Admit the verified personal-login case without treating HOME as Keychain isolation."""
+def validate_subscription_location(env: dict[str, str]) -> str | None:
+    """Reject unverified locations and return any legacy personal-account classification."""
     if sys.platform not in {"darwin", "linux"}:
         raise ValueError("Subscription-only supervision is unverified on this operating system.")
     if env.get("FORGE_SIDECAR") or env.get("FORGE_LAUNCH_MODE") == "sidecar":
@@ -78,11 +78,13 @@ def validate_subscription_location(env: dict[str, str]) -> None:
     remote = config / "remote-settings.json"
     if _present(remote) and json.loads(remote.read_text()) != {}:
         raise ValueError("Subscription-only review is unavailable with server-managed Claude settings.")
-    # This non-secret metadata distinguishes personal accounts from unverified
-    # organization/gateway configurations which may fetch policy at startup.
+    # Older CLIs wrote this classification. Newer logins can omit it; those
+    # require an explicit Pro/Max classification from the isolated auth status.
     account = json.loads((home / ".claude.json").read_text()).get("oauthAccount", {})
-    if account.get("organizationType") not in {"claude_max", "claude_pro"}:
+    organization_type = account.get("organizationType")
+    if organization_type not in {None, "claude_max", "claude_pro"}:
         raise ValueError("Subscription-only review requires a verified personal Claude Pro/Max login.")
+    return organization_type
 
 
 def preflight_subscription(*, env: dict[str, str], cwd: str | None, deadline: float) -> str:
@@ -109,5 +111,7 @@ def preflight_subscription(*, env: dict[str, str], cwd: str | None, deadline: fl
     ):
         raise ValueError("Claude CLI-managed subscription login is unavailable; no API fallback was attempted.")
     # Detect settings arriving during preflight before permitting the inference run.
-    validate_subscription_location(env)
+    legacy_personal_type = validate_subscription_location(env)
+    if status.get("subscriptionType") is None and legacy_personal_type is None:
+        raise ValueError("Claude auth status did not verify a personal Pro/Max subscription; no review was dispatched.")
     return binary

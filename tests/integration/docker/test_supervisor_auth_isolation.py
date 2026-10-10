@@ -104,9 +104,15 @@ print(json.dumps({"platform":"linux", "synthetic_only":True, "control":control, 
 """
 
 
-def test_disposable_auth_location_matrix(forge_workspace: ContainerLike):
+@pytest.mark.parametrize("legacy_metadata", [True, False])
+def test_disposable_auth_location_matrix(forge_workspace: ContainerLike, legacy_metadata: bool):
     setup_real_claude(forge_workspace, session_name="auth-matrix")
-    written = forge_workspace.write_file("/tmp/b1-auth-matrix.py", _PROBE, mode=0o600)
+    probe = (
+        _PROBE
+        if legacy_metadata
+        else _PROBE.replace('"organizationType":"claude_max"', '"billingType":"stripe_subscription"')
+    )
+    written = forge_workspace.write_file("/tmp/b1-auth-matrix.py", probe, mode=0o600)
     assert written.returncode == 0, written.stderr
     result = forge_workspace.exec("/forge/.venv/bin/python /tmp/b1-auth-matrix.py", timeout=100)
     assert result.returncode == 0, result.stdout + result.stderr

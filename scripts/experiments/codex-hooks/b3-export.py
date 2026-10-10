@@ -110,10 +110,13 @@ def export(root: Path, destination: Path) -> None:
     }
     for name in (
         "wheel-verification.json",
+        "wheel-final-verification.json",
         "real-claude-reservation.json",
         "verification.json",
         "preflight-ready.json",
         "timeout-status.json",
+        "claude-auth-status.json",
+        "claude-auth-preflight.json",
     ):
         if (root / name).is_file():
             save(name, json.loads((root / name).read_text()))
