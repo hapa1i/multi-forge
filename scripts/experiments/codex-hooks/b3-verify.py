@@ -60,9 +60,8 @@ def main() -> None:
         injected = [
             c.get("text", "")
             for r in turn
-            if r.get("payload", {}).get("role") == "developer"
+            if r.get("payload", {}).get("role") == "developer" and "hooks.additional_context" in json.dumps(r)
             for c in r["payload"].get("content", [])
-            if "hooks.additional_context" in c.get("text", "")
         ]
         blocked = name in {"source-deny", "mixed", "wheel-deny"}
         off = name in {"off-headless", "tui-off-final", "wheel-off"}
@@ -126,7 +125,7 @@ def main() -> None:
             "hook_seconds": hook["elapsed_seconds"],
             "forge_module": hook["forge_module"],
         }
-    real = json.loads((root / "captures/real-claude-final/real-review.json").read_text())
+    real = json.loads((root / "captures/real-claude-quote/real-review.json").read_text())
     assert real["dispatches"] == 1 and real["result"]["run_ok"] and real["result"]["parsed"]
     assert any(v["verified_citations"] for v in real["result"]["decision"]["violations"])
     assert real["usage"] and all(row["billing_mode"] == "subscription_quota" for row in real["usage"])

@@ -33,6 +33,7 @@ def main() -> None:
     from forge.core.usage.ledger import read_usage_events
     from forge.policy.semantic import supervisor
     from forge.policy.semantic.attempts import read_attempts
+    from forge.policy.semantic.identity import validate_reviewer
     from forge.policy.semantic.plan_source import read_plan
     from forge.policy.types import ActionContext
     from forge.session.models import LaneRecord, SupervisorConfig
@@ -48,6 +49,8 @@ def main() -> None:
         timeout_seconds=45,
         shadow_sample_rate=0,
     )
+    lane = LaneRecord("claude_code", "claude-max", "sonnet")
+    validate_reviewer(config, lane)
     context = ActionContext(
         origin="codex",
         event="PreToolUse.apply_patch",
@@ -104,9 +107,7 @@ def main() -> None:
         return result
 
     supervisor.run_claude_session = observed_session
-    result = supervisor.run_supervisor_check(
-        config, context, snapshot=snapshot, lane_record=LaneRecord("claude_code", "anthropic-direct", "sonnet")
-    )
+    result = supervisor.run_supervisor_check(config, context, snapshot=snapshot, lane_record=lane)
     report = {
         "identity": identity,
         "result": asdict(result),

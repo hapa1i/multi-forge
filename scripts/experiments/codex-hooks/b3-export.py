@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
 
 
@@ -84,6 +85,8 @@ def export(root: Path, destination: Path) -> None:
         case["native_streams"] = {p.name: rows(p) for p in sorted(directory.glob("*-native-stream.jsonl"))}
         if (directory / "review-prompt.txt").is_file():
             case["review_prompt"] = (directory / "review-prompt.txt").read_text()
+        if directory.name.startswith("tui-") and (directory / "terminal.log").is_file():
+            case["terminal_utf8"] = (directory / "terminal.log").read_text(errors="replace")
         if (directory / "usage.json").is_file():
             case["usage"] = json.loads((directory / "usage.json").read_text())
         # Hash every retained capture, including failed attempts and non-published terminal bytes.
@@ -110,9 +113,24 @@ def export(root: Path, destination: Path) -> None:
         "real-claude-reservation.json",
         "verification.json",
         "preflight-ready.json",
+        "timeout-status.json",
     ):
         if (root / name).is_file():
             save(name, json.loads((root / name).read_text()))
+    doctor = json.loads((root / "doctor-private.json").read_text())
+    save(
+        "environment.json",
+        {
+            "platform": platform.platform(),
+            "doctor_overall": doctor["overallStatus"],
+            "doctor_check_status": {key: value["status"] for key, value in doctor["checks"].items()},
+            "doctor_raw_sha256": hashlib.sha256((root / "doctor-private.json").read_bytes()).hexdigest(),
+            "dispatcher_doctor": json.loads((root / "dispatcher-doctor.json").read_text()),
+            "enrollment": json.loads((root / "ENROLLED").read_text()),
+            "host_config_before": json.loads((root / "host-config-hashes.json").read_text()),
+            "timeout_activity": (root / "timeout-activity.txt").read_text(),
+        },
+    )
     save("captures.json", report)
     save("helper-sources.json", helpers)
 
