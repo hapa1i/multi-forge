@@ -325,8 +325,15 @@ pin.
 separate. PreToolUse adds request evidence without changing authority/deterministic decisions. Stop mode omits semantic
 policy registration, cascade and shadow sampling from per-edit checks. `policy/semantic/stop_review.py` owns immutable
 review inputs, spending, carry-forward and stale-result validation. `turn_evidence.py` enumerates paths with read-only
-Git commands, disables fsmonitor/hooks, and captures raw working bytes. A private-index `git add` design was rejected:
-clean/process filters can execute outside private storage, so changing index/object directories is insufficient.
+Git commands, disables fsmonitor/hooks, and captures raw working bytes. A bounded `git config` query resolves the
+effective `core.excludesFile` with Git's includes, scope precedence and path expansion, including worktree and
+environment config overrides. Inherited repository/index selectors and trace outputs are disabled for that query.
+Enumeration continues to suppress global/system config and receives only a private, bounded copy of the resolved
+exclusion rules; per-directory `.gitignore` and `.git/info/exclude` retain Git's precedence. An unset setting uses Git's
+XDG/HOME default; an empty setting, `/dev/null`, or a missing file contributes no rules. Unreadable, malformed,
+oversized or special-file inputs refuse capture under its existing deadline. Ignore rules apply to untracked
+enumeration, not tracked bytes or explicit tool payloads. A private-index `git add` design was rejected: clean/process
+filters can execute outside private storage, so changing index/object directories is insufficient.
 
 The baseline comes from UserPromptSubmit, not SessionStart. Verified UUIDv7 turn IDs advance a bounded durable
 watermark; repeated or stale turn-start delivery cannot reset spending. Automatic Stop correction retains the same

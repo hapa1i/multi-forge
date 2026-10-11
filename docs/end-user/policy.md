@@ -334,13 +334,21 @@ resuming supervision mid-turn cannot create a missing baseline or reset that tur
 Capture uses bounded raw repository bytes before tools and at Stop, including edits on already-dirty files, additions,
 deletions, renames, mode changes, and recorded tool outcomes. Pre-existing dirty changes are excluded. Forge does not
 stage, stash, run clean/process filters, or write Git objects to capture evidence. The reviewed scope excludes ignored
-files and effects outside the repository; author attribution is not provable when another editor changes the checkout.
-Changed binary, oversized, symlink, or submodule content, HEAD/staged index changes during a turn, missing tool events,
-or limits exceeded make coverage incomplete. Available evidence can still receive a `partial` review, whose verdict
-neither approves the whole turn nor triggers an automatic correction. Omitted scope remains in `excluded_work` as
-unreviewed; the next explicit turn can be reviewed normally. With no usable evidence, Forge records the exclusion
+untracked files and effects outside the repository; author attribution is not provable when another editor changes the
+checkout. Changed binary, oversized, symlink, or submodule content, HEAD/staged index changes during a turn, missing
+tool events, or limits exceeded make coverage incomplete. Available evidence can still receive a `partial` review, whose
+verdict neither approves the whole turn nor triggers an automatic correction. Omitted scope remains in `excluded_work`
+as unreviewed; the next explicit turn can be reviewed normally. With no usable evidence, Forge records the exclusion
 without a call. Current limits include 6,000 files, 64 MB per snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB
 plan, 48 tool-event records, and a 7-second capture deadline.
+
+Untracked enumeration honors `.gitignore`, `.git/info/exclude`, and the effective `core.excludesFile`, including global
+settings and repository/worktree overrides. When unset, the latter defaults to `$XDG_CONFIG_HOME/git/ignore` or
+`$HOME/.config/git/ignore`. An empty setting, `/dev/null`, or a missing file contributes no extra rules, matching Git.
+Invalid config or unreadable, oversized (over 1 MB), or special-file exclusion inputs make capture unavailable instead
+of silently omitting the rules. Check `git config --path --get core.excludesFile` and its file permissions, fix the
+input, then start a new explicit prompt to establish a fresh baseline. Ignore rules do not remove tracked files or
+content explicitly supplied in tool requests or responses.
 
 A completed divergent review may request one correction. Codex receives its reason as a user-role hook message; normal
 format attributes reviewer findings, while `source-only` includes verified approved-plan quotations and fixed Forge
