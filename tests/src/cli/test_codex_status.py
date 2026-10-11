@@ -29,6 +29,9 @@ from forge.install.tracking import TrackingStore
 _EXPECTED_COMMANDS = {
     "$FORGE_HOME/bin/forge-hook codex-session-start",
     "$FORGE_HOME/bin/forge-hook codex-policy-check",
+    "$FORGE_HOME/bin/forge-hook codex-turn-start",
+    "$FORGE_HOME/bin/forge-hook codex-turn-tool",
+    "$FORGE_HOME/bin/forge-hook codex-stop",
 }
 
 
@@ -138,7 +141,7 @@ def test_status_catches_wrong_event(codex_home, monkeypatch):
     assert scope["registered"] == "wrong-event"  # not "yes"
 
 
-def test_status_treats_legacy_correct_event_registration_as_registered(codex_home, monkeypatch):
+def test_status_reports_legacy_two_event_registration_as_partial(codex_home, monkeypatch):
     _fake_runtime(monkeypatch, installed=True, version="1.2.3")
     (codex_home / "config.toml").write_text(
         "[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\n"
@@ -148,7 +151,7 @@ def test_status_treats_legacy_correct_event_registration_as_registered(codex_hom
         encoding="utf-8",
     )
     scope = _status_json(["--scope", "user", "--json"])["scopes"][0]
-    assert scope["registered"] == "yes"
+    assert scope["registered"] == "partial"
     assert scope["commands_registered"] == [
         "forge hook codex-policy-check",
         "forge hook codex-session-start",

@@ -65,6 +65,8 @@ def select_supervisor_lane(
 
 def validate_reviewer(config: SupervisorConfig, lane: LaneRecord) -> None:
     """Validate authored or decoded configuration before any model/proxy dispatch."""
+    if config.review_trigger == "stop" and (config.cascade or config.shadow_sample_rate):
+        raise ValueError("Stop supervision cannot use cascade or shadow sampling.")
     if config.supervisor_model is not None and config.supervisor_model != lane.model:
         raise ValueError("Supervisor model differs from its bound lane. Remove and reconfigure the supervisor.")
     effort = config.supervisor_effort
@@ -91,9 +93,21 @@ def validate_reviewer(config: SupervisorConfig, lane: LaneRecord) -> None:
 
 
 def validate_sidecar_supervisor(config: SupervisorConfig | None, *, sidecar: bool) -> None:
+    if sidecar and config and config.review_trigger == "stop":
+        raise ValueError(
+            "Stop supervision requires a host Codex executor. Select pre-tool-use before changing runtime."
+        )
     if sidecar and config and (config.plan_override_path or config.auth_mode == "subscription-only"):
         raise ValueError(
             "Plan-file and subscription-only supervision require a host executor. Remove supervision or launch on the host."
+        )
+
+
+def validate_stop_executor(config: SupervisorConfig | None, *, runtime: str, sidecar: bool = False) -> None:
+    """Refuse unsupported Stop intent before creating or launching a child."""
+    if config and config.review_trigger == "stop" and (runtime != "codex" or sidecar):
+        raise ValueError(
+            "Stop supervision requires a host Codex executor. Select pre-tool-use before changing runtime."
         )
 
 
@@ -132,10 +146,17 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
 
     sup = effective.policy.supervisor if effective.policy else None
     if sup and sup.configured:
-        validate_timeout(sup.timeout_seconds)
+        validate_timeout(sup.timeout_seconds, trigger=sup.review_trigger)
         validate_reviewer(sup, read_bound_lane(state, SUPERVISOR_CONSUMER) or select_supervisor_lane())
         sidecar = effective.launch.mode == "sidecar" if effective.launch else bool(state.confirmed.is_sandboxed)
         validate_sidecar_supervisor(sup, sidecar=sidecar)
+        from forge.session.models import session_runtime
+
+        validate_stop_executor(sup, runtime=session_runtime(state), sidecar=sidecar)
+        if sup.review_trigger == "stop":
+            from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+            require_for_launch(cwd=state.worktree.path if state.worktree else state.forge_root)
     if confirmed_lane(state, SUPERVISOR_CONSUMER) is not None:
 
         def identity(value: SupervisorConfig | None):
@@ -143,3 +164,10 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
 
         if identity(sup) != identity(old):
             raise ValueError("Frozen supervisor identity requires remove/reconfigure.")
+
+
+def validate_inherited_claude_trigger(parent: SessionState) -> None:
+    """Guard policy-inheriting Claude derivation before transfer or publication."""
+    sup = snapshot_supervisor_options(parent)
+    if sup:
+        validate_stop_executor(sup, runtime="claude")

@@ -432,6 +432,7 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         return None
     data: dict[str, object] = {
         "auth_mode": sup.auth_mode,
+        "review_trigger": sup.review_trigger,
         "model": sup.supervisor_model,
         "configured": sup.configured,
         "active": sup.active,
@@ -453,6 +454,19 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         "resolved_uuid": None,
         "source_model": None,
     }
+    if sup.review_trigger == "stop":
+        from forge.policy.semantic.stop_review import status as stop_status
+
+        data["turn_review"] = (
+            stop_status(
+                Path(manifest.forge_root),
+                manifest.name,
+                config=sup,
+                lane=read_bound_lane(manifest, SUPERVISOR_CONSUMER),
+            )
+            if manifest.forge_root
+            else {"state": "unavailable", "reason": "missing_forge_root"}
+        )
     if sup.resume_id:
         ts = read_scoped_supervisor_target(sup.resume_id, sup.forge_root, manifest.forge_root)
         if ts is not None:
@@ -500,12 +514,20 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         from forge.policy.semantic.plan_source import read_plan
 
         lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
-        validate_timeout(sup.timeout_seconds)
+        validate_timeout(sup.timeout_seconds, trigger=sup.review_trigger)
         validate_reviewer(sup, LaneRecord(lane.runtime_id, lane.backend_id, lane.model))
         from forge.session.launch import is_sidecar_session
 
         sidecar = is_sidecar_session(manifest)
         validate_sidecar_supervisor(sup, sidecar=sidecar)
+        if sup.review_trigger == "stop":
+            from forge.core.runtime.codex_turn_enrollment import verified
+            from forge.policy.semantic.identity import validate_stop_executor
+            from forge.session.models import session_runtime
+
+            validate_stop_executor(sup, runtime=session_runtime(manifest), sidecar=sidecar)
+            if not verified():
+                raise ValueError("Stop hook enrollment is unverified; sync, trust and verify enrollment.")
         if not sidecar:
             from forge.core.reactive.reviewer_runtime import (
                 preflight_supervisor_runtime,
@@ -1186,6 +1208,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     console.print(f"  Timeout: {sup.timeout_seconds}s")
     console.print(f"  Throttle: {sup.throttle_seconds}s")
     console.print(f"  Auth: {sup.auth_mode}")
+    console.print(f"  Review trigger: {sup.review_trigger}")
     console.print(f"  Model selector: {sup.supervisor_model or 'legacy runtime default'}")
     if sup.supervisor_effort:
         console.print(f"  Supervisor effort: {sup.supervisor_effort}")
@@ -1203,6 +1226,12 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     details = _supervisor_status_dict(sup, manifest) or {}
     if details.get("unavailable_reason"):
         console.print(f"Review unavailable: {details['unavailable_reason']}")
+    turn = details.get("turn_review")
+    if isinstance(turn, dict):
+        console.print(f"  Turn review: {turn['state']} ({turn.get('reason') or 'bounded snapshot'})")
+        console.print(
+            f"  Turn allowance: spent={turn.get('spent', 'unknown')}; outstanding={turn.get('outstanding', 'unknown')}"
+        )
     latest = details.get("latest_review")
     if isinstance(latest, dict):
         console.print(
@@ -1223,6 +1252,13 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
 @click.argument("target", required=False)
 @click.option("--model", help="Supervisor model selector; proxy routes accept opus, sonnet, or haiku")
 @click.option("--auth-mode", type=click.Choice(["inherit", "subscription-only"]), default="inherit", show_default=True)
+@click.option(
+    "--trigger",
+    "review_trigger",
+    type=click.Choice(["pre-tool-use", "stop"]),
+    default=None,
+    help="Review before edits or once at Codex Stop; omission preserves the saved trigger",
+)
 @click.option("--plan", type=click.Path(path_type=Path), help="Approved plan file; required when TARGET is omitted")
 @_session_option
 @click.option(
@@ -1297,6 +1333,7 @@ def supervisor_set(
     plan: Path | None,
     model: str | None,
     auth_mode: str,
+    review_trigger: str | None,
     session_name: str | None,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
@@ -1349,6 +1386,7 @@ def supervisor_set(
             plan=plan,
             model=model,
             auth_mode=auth_mode,
+            review_trigger=review_trigger,
             policy_forge_root=_policy_fr,
             supervisor_proxy=supervisor_proxy,
             supervisor_direct=supervisor_direct,

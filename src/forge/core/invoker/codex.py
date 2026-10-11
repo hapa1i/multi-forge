@@ -78,7 +78,11 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
     def _prepare_argv(self, request: HeadlessRequest) -> tuple[list[str], ParseHints]:
         # Worker/reviewer jobs are not managed executors. Do not spend a reviewer's
         # whole-hook deadline on an executor feature probe.
-        if request.attribution and request.attribution.command in {"codex-bridge", "codex-resume"}:
+        if request.attribution and request.attribution.command in {
+            "codex-bridge",
+            "codex-resume",
+            "codex-enroll-verify",
+        }:
             argv = prepare_executor_launch(request.argv, request.env, cwd=request.cwd)
         else:
             request.env.pop(CODEX_EXECUTOR_IDENTITY_VAR, None)

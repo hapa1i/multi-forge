@@ -15,6 +15,7 @@ from __future__ import annotations
 
 # The Click group — imported by cli/main.py
 from ._group import hooks
+from . import codex_stop as _codex_stop  # noqa: F401 -- registers dedicated Codex turn hooks
 from . import commands as _commands  # noqa: F401  — registers @hooks.command() decorators
 from .verification import (
     _get_last_assistant_text_for_verification,

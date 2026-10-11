@@ -360,7 +360,8 @@ Purpose: run the Codex authority guard first, then apply ordinary policy to supp
   `apply_patch` filter, `policy.enabled`, bundle/supervisor gates, or patch adapter; `Bash`, `apply_patch`, and unknown
   tools are denied under `shell_closed`
 - after the authority guard declines, evaluates each file operation in a Codex `apply_patch` action against the
-  session's policy bundles and supervisor; shell (`Bash`) actions pass through ordinary policy unevaluated
+  session's policy bundles and, in per-edit mode, supervisor; shell (`Bash`) actions pass through ordinary policy
+  unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); admitted managed executors receive bounded
   allowed-action warnings through `additionalContext` and independent operator notices through `systemMessage`. Clean
   allows remain silent; `policy_summary_feedback=off` suppresses the allowed model context while retaining operator
@@ -380,6 +381,18 @@ Purpose: run the Codex authority guard first, then apply ordinary policy to supp
 The managed Codex registration command bytes do not change for authority mode. This preserves existing trust enrollment;
 the authority guard is an earlier branch inside the same handler. As with Claude, runtime hook non-delivery, timeout,
 dispatcher failure, or Codex discarding malformed deny output remains outside Forge's fail-closed handler boundary.
+
+### codex-turn-start, codex-turn-tool, codex-stop (Codex turn review)
+
+User-scope Codex hooks also register UserPromptSubmit, PostToolUse and Stop, each with a 60-second timeout. Updating the
+managed block requires a new Codex trust approval; then run `forge runtime preflight codex --verify-enrollment --json`.
+Its `stop_review_enrolled` field requires observations from the complete turn-hook set on the exact configuration.
+
+These handlers are inert for unmanaged, disabled, per-edit, or unverified executors. In opt-in Stop mode they capture a
+bounded baseline before tools, record outcomes, and reserve at most one semantic reviewer dispatch per explicit turn.
+PreToolUse keeps deterministic policy and authority checks and records requests. A completed divergent review may
+request one correction after edits have happened; later changes stay unreviewed. State survives telemetry reset. See
+[Stop review](policy.md#review-once-at-codex-stop-opt-in) for limits, recovery and model/operator feedback behavior.
 
 ### codex-session-start (Codex SessionStart)
 

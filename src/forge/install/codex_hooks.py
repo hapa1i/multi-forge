@@ -105,6 +105,9 @@ def get_builtin_codex_entries() -> tuple[CodexHookEntry, ...]:
             command=render_dispatcher_command("codex-session-start"),
         ),
         CodexHookEntry(event="PreToolUse", command=render_dispatcher_command("codex-policy-check")),
+        CodexHookEntry(event="UserPromptSubmit", command=render_dispatcher_command("codex-turn-start")),
+        CodexHookEntry(event="PostToolUse", command=render_dispatcher_command("codex-turn-tool")),
+        CodexHookEntry(event="Stop", command=render_dispatcher_command("codex-stop")),
     )
 
 

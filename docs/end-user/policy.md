@@ -226,9 +226,9 @@ blocking. The `tdd.no-skip-tests` policy is unaffected (always blocks skip patte
 
 ### Semantic supervisor (advanced)
 
-The semantic supervisor validates Write/Edit actions against an approved plan. Claude continues a planning conversation
-when a target is configured, or starts fresh for a plan file alone. Both paths are read-only. The runtime is selectable
-(see [Supervisor runtime (lane)](#supervisor-runtime-lane) below).
+By default, the semantic supervisor validates Write/Edit actions against an approved plan. Claude continues a planning
+conversation when a target is configured, or starts fresh for a plan file alone. Both paths are read-only. The runtime
+is selectable (see [Supervisor runtime (lane)](#supervisor-runtime-lane) below).
 
 Configured in the session manifest under `policy.supervisor`:
 
@@ -302,6 +302,66 @@ candidates freeze source, effective model, effort, auth, and lane. Supervisor re
 `%policy` lifecycle commands work with these configurations, while new setup options belong to the terminal CLI;
 one-shot `evaluate -r` remains conversation-based.
 
+### Review once at Codex Stop (opt-in)
+
+The default `review_trigger=pre-tool-use` keeps per-edit supervision. On a managed host Codex 0.162.1 executor,
+`--trigger stop` instead reviews the repository changes already made during one explicit user turn. It makes at most one
+frontier reviewer dispatch, including any automatic correction continuation. Deterministic PreToolUse policies and
+artifact authority checks still apply. Stop mode rejects cascade and shadow sampling; it does not fall back to another
+reviewer or retry a rejected output-format request.
+
+First update and trust the user hooks, then verify their delivery. This verification uses one Codex turn and runs the
+read-only command `pwd`. The result must include `stop_review_enrolled: true`; `enrolled` alone describes SessionStart.
+
+```bash
+forge extension sync
+# Open Codex interactively and approve the updated hook registrations.
+forge runtime preflight codex --verify-enrollment --json
+forge policy supervisor set --session executor --plan ./approved-plan.md --model sonnet --auth-mode subscription-only --trigger stop
+forge policy supervisor status --session executor --json
+```
+
+The subscription-only route requires a verified direct Claude login and disabled account extra usage, as described
+above. The executor and reviewer are separate runtimes. Stop accepts the existing supported reviewer lanes; it does not
+add Codex planner-history lookup. A conversation-backed source must have an approved plan snapshot, which setup resolves
+and saves. An unreadable or oversized plan makes the review unavailable.
+
+Omitting `--trigger` from `set` preserves the selected trigger; explicitly choose `pre-tool-use` to return to per-edit
+review. Configure the idle executor before its next explicit prompt. Switching modes, changing configuration, or
+resuming supervision mid-turn cannot create a missing baseline or reset that turn's spent allowance.
+
+Capture uses bounded raw repository bytes before tools and at Stop, including edits on already-dirty files, additions,
+deletions, renames, mode changes, and recorded tool outcomes. Pre-existing dirty changes are excluded. Forge does not
+stage, stash, run clean/process filters, or write Git objects to capture evidence. The reviewed scope excludes ignored
+files and effects outside the repository; author attribution is not provable when another editor changes the checkout.
+Changed binary, oversized, symlink, or submodule content, a changed HEAD/index, missing tool events, or limits exceeded
+make coverage incomplete. They never become a clean whole-turn verdict. Current limits include 6,000 files, 64 MB per
+snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB plan, 48 tool-event records, and a 7-second capture deadline.
+
+A completed divergent review may request one correction. Codex receives its reason as a user-role hook message; normal
+format attributes reviewer findings, while `source-only` includes verified approved-plan quotations and fixed Forge
+guidance. The correction is consumed before output, so even a lost response cannot be replayed. Further changes remain
+unreviewed and carry into the next explicit turn with their original baseline and provenance. `evaluate` is a separate
+single-file check and cannot clear that outstanding turn state.
+
+Stop notices appear in Codex's operator notices, not the model context. `policy_summary_feedback=off` retains these
+notices and required correction guidance; there is no optional non-blocking model channel for Stop. Inspect
+`turn_review` in supervisor status or `forge telemetry activity <session> --json` for scope, coverage, spending,
+correction consumption, and unreviewed changes. A reservation is not proof of dispatch: `dispatched: null` preserves
+uncertainty after interruption. Review timeouts remain 1–45 seconds inside a 55-second whole-hook budget and the
+registered 60-second Stop timeout.
+
+Private operational state lives under `.forge/artifacts/<session>/review/` and survives telemetry reset. Its bounded
+journal preserves a turn watermark during compaction. Missing or damaged established history refuses review; restore
+those artifacts or start a new managed session. Do not delete them to retry a spent turn. Outstanding scope is bounded
+to 32 turns; lost provenance also requires restoration or a new session.
+
+Stop intent or overrides use manifest schema v4. Default-only supervision retains the existing v2/v3 encoding. Non-Codex
+executors and sidecars refuse Stop before deriving a child; choose a host Codex path or explicitly switch the source
+trigger to `pre-tool-use`. `forge session start <child> --runtime codex --resume-from <parent> --strategy structured`
+starts with fresh supervisor policy and a fresh allowance. Configure the child explicitly after any initial
+transfer-prompt turn; `forge session fork` and `--no-launch` are not Codex paths.
+
 ### Supervisor runtime (lane)
 
 The supervisor runs on `claude_code` (the default `claude -p --resume` path) unless you pin a different runtime. The
@@ -316,23 +376,24 @@ forge session fork planner --supervise --supervisor-runtime codex
 forge policy supervisor set planner --runtime codex
 ```
 
-The chosen runtime is **frozen on the first registered policy check**, the supervisor's commitment point; the check can
-freeze an explicit lane even when preflight or plan validation prevents a runtime dispatch. After that,
-`forge policy supervisor set <target> --runtime <other>` refuses to change it (re-pinning the *same* lane is a no-op).
-To use a different lane, start or fork a fresh session, or run `forge policy supervisor remove` first — remove clears
-the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
-`(runtime, backend, model)` lane.
+In per-edit mode the chosen runtime is **frozen on the first registered policy check**, the supervisor's commitment
+point; the check can freeze an explicit lane even when preflight or plan validation prevents a runtime dispatch. After
+that, `forge policy supervisor set <target> --runtime <other>` refuses to change it (re-pinning the *same* lane is a
+no-op). To use a different lane, start or fork a fresh session, or run `forge policy supervisor remove` first — remove
+clears the binding so a later re-add starts from the default again. Stop mode freezes an explicit lane when a completed
+review returns; unavailable or interrupted reviews retain their reserved route in the operational evidence.
+`forge policy supervisor status` shows the bound `(runtime, backend, model)` lane.
 
 A project compatibility refusal happens before the registered check reaches or persists its commitment write and
 therefore cannot freeze the lane. Recover by running a Forge version satisfying `required_forge`, or edit/reset project
 state. If the hook binary comes from `FORGE_DEV`, relaunch after changing it; a sidecar must carry the satisfying Forge
 version in its image.
 
-**If your codex subscription runs out mid-session**, Forge degrades the supervisor to the default `claude -p` lane for
-the rest of the session instead of failing every check open — real plan-enforcement keeps working. The codex binding
-itself stays put (it resets next session; clear it now with `forge policy supervisor remove` or re-pin with
-`set --runtime`, and a fresh resume retries codex in case your quota refilled). While it is routed around,
-`forge policy supervisor status` and `forge session lane show` mark the lane `degraded`.
+**In per-edit mode, if your Codex reviewer subscription runs out mid-session**, Forge degrades the supervisor to the
+default `claude -p` lane for the rest of the session instead of failing every check open — real plan-enforcement keeps
+working. The codex binding itself stays put (it resets next session; clear it now with `forge policy supervisor remove`
+or re-pin with `set --runtime`, and a fresh resume retries codex in case your quota refilled). While it is routed
+around, `forge policy supervisor status` and `forge session lane show` mark the lane `degraded`.
 
 ### Claude Max subscription billing (`--backend claude-max`)
 

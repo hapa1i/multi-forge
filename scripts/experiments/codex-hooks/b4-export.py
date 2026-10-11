@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export B4 gate evidence, retaining failures and source drift without publishing credentials."""
+"""Export B4 gate/product evidence, retaining failures and source drift without credentials."""
 
 from __future__ import annotations
 
@@ -14,6 +14,20 @@ SCRIPTS = Path(__file__).resolve().parent
 
 def read(path: Path, default: Any = None) -> Any:
     return json.loads(path.read_text()) if path.is_file() else default
+
+
+def lines(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
+
+
+def command_result(path: Path) -> dict | None:
+    value = read(path)
+    if value is not None:
+        try:
+            value["stdout"] = json.loads(value["stdout"])
+        except (ValueError, KeyError):
+            pass
+    return value
 
 
 def export(root: Path, destination: Path) -> None:
@@ -56,11 +70,16 @@ def export(root: Path, destination: Path) -> None:
                 }
             )
         events.sort(key=lambda e: e["observation"].get("started_at", 0))
+        turn_ids = {event["payload"].get("turn_id") for event in events}
         hook_messages = []
         for rollout in capture.glob("rollout-*.jsonl"):
             for line in rollout.read_text().splitlines():
                 row = json.loads(line)
-                if row.get("type") == "response_item" and "<hook_prompt " in line:
+                if (
+                    row.get("type") == "response_item"
+                    and "<hook_prompt " in line
+                    and row.get("metadata", {}).get("turn_id") in turn_ids
+                ):
                     hook_messages.append(row)
         terminal = capture / "terminal.log"
         cases[capture.name] = {
@@ -74,9 +93,25 @@ def export(root: Path, destination: Path) -> None:
                 "B4-STOP-OPERATOR-NOTICE" in terminal.read_text(errors="replace") if terminal.exists() else None
             ),
             "terminal": read(capture / "terminal-result.json"),
+            "idle_configuration": read(capture / "idle-configuration.json"),
+            "fresh_policy": read(capture / "fresh-policy.json"),
             "stdout": ((capture / "run/stdout").read_text() if (capture / "run/stdout").exists() else None),
             "stderr": ((capture / "run/stderr").read_text() if (capture / "run/stderr").exists() else None),
             "receipts": {p.name: read(p) for p in capture.glob("*-receipt.json")},
+            "product_hooks": lines(capture / "hooks.jsonl"),
+            "review_checkpoints": lines(capture / "review-events.jsonl"),
+            "supervisor_status": command_result(capture / "supervisor-status.json"),
+            "activity": command_result(capture / "activity.json"),
+            "session": command_result(capture / "session.json"),
+            "real_review": read(capture / "real-review.json"),
+            "fault": read(capture / "fault.json"),
+            "stop_enrollment": read(capture / "stop-enrollment.json"),
+            "completion_usage": [
+                row
+                for stream in capture.glob("*-native-stream.jsonl")
+                for row in lines(stream)
+                if row.get("type") == "turn.completed"
+            ],
             "reviewer_events": (
                 [json.loads(line) for line in (capture / "reviewer.jsonl").read_text().splitlines()]
                 if (capture / "reviewer.jsonl").exists()
@@ -101,11 +136,25 @@ def export(root: Path, destination: Path) -> None:
             "identity": read(root / "identity.json"),
             "readiness": read(root / "readiness.json"),
             "stub_admission": read(root / "stub-admission.json"),
-            "enrollment": read(root / "ENROLLED"),
+            "enrollment": read(root / "gate-enrollment.json", read(root / "ENROLLED")),
             "budget": read(root / "budget.json"),
             "turn_reservations": [json.loads(line) for line in (root / "turns.jsonl").read_text().splitlines()],
             "setup_attempts": {p.name: read(p) for p in root.glob("*setup*.json")},
-            "cases": cases,
+            "cases": {key: value for key, value in cases.items() if key[:2].isdigit() and int(key[:2]) <= 11},
+        },
+    )
+    save(
+        "product.json",
+        {
+            "cases": {key: value for key, value in cases.items() if not key[:2].isdigit() or int(key[:2]) > 11},
+            "enrollment": read(root / "ENROLLED"),
+            "product_sync": read(root / "product-sync.json"),
+            "ui_seal_change": read(root / "ui-seal-change.json"),
+            "wheel": {p.name: read(p) for p in root.glob("wheel-*.json")},
+            "verification": read(root / "product-verification.json"),
+            "teardown": read(root / "teardown.json"),
+            "budget": read(root / "budget.json"),
+            "turn_reservations": lines(root / "turns.jsonl"),
         },
     )
     save("harness-snapshots.json", snapshots)

@@ -169,6 +169,7 @@ def supervisor_set(
     backend: str | None = None,
     model: str | None = None,
     auth_mode: str = "inherit",
+    review_trigger: str | None = None,
     lock_timeout_s: float = 5.0,
     confirmed_lane_func: Callable[[SessionState, Consumer], LaneRecord | None] = confirmed_lane,
 ) -> SupervisorSetResult:
@@ -178,11 +179,31 @@ def supervisor_set(
         cascade_flag=cascade_flag,
         checker_model=checker_model,
     )
+    previous_sup = snapshot_supervisor_options(manifest)
+    selected_trigger = review_trigger or (previous_sup.review_trigger if previous_sup else "pre-tool-use")
+    from forge.policy.semantic.identity import validate_stop_executor
+    from forge.session.models import session_runtime
+
+    try:
+        validate_stop_executor(
+            SupervisorConfig(review_trigger=selected_trigger),
+            runtime=session_runtime(manifest),
+            sidecar=_is_sidecar(manifest),
+        )
+    except ValueError as exc:
+        raise SupervisorInputError(str(exc)) from exc
     if timeout_seconds is not None:
         from forge.policy.semantic.deadline import validate_timeout
 
         try:
-            validate_timeout(timeout_seconds)
+            validate_timeout(timeout_seconds, trigger=selected_trigger)
+        except ValueError as exc:
+            raise SupervisorInputError(str(exc)) from exc
+    if selected_trigger == "stop":
+        from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+        try:
+            require_for_launch(cwd=manifest.worktree.path if manifest.worktree else manifest.forge_root)
         except ValueError as exc:
             raise SupervisorInputError(str(exc)) from exc
     checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
@@ -215,6 +236,7 @@ def supervisor_set(
         selected_lane = lane_record or previous_lane or select_supervisor_lane()
         selected_model = selected_lane.model if model or not target else None
         preview = SupervisorConfig(
+            review_trigger=selected_trigger,
             resume_id=target,
             plan_override_path=plan_path,
             supervisor_model=selected_model,
@@ -261,6 +283,7 @@ def supervisor_set(
     current_direct = not bool(manifest.intent.proxy)
 
     sup_config = SupervisorConfig(
+        review_trigger=selected_trigger,
         resume_id=target,
         forge_root=source_state.forge_root or policy_forge_root,
         plan_override_path=plan_path,
@@ -271,6 +294,15 @@ def supervisor_set(
         sup_config.timeout_seconds = timeout_seconds
     if supervisor_effort is not None:
         sup_config.supervisor_effort = supervisor_effort
+
+    if selected_trigger == "stop" and not sup_config.plan_override_path:
+        resolved_plan = supervisor_semantic.resolve_supervisor_reload_plan_path(sup_config, manifest)
+        if resolved_plan is None:
+            raise SupervisorPlanUnavailableError(
+                "Stop review requires an approved plan snapshot.",
+                tip="Approve a plan in the planning session, or repeat with --plan <path>.",
+            )
+        sup_config.plan_override_path = resolved_plan.path
 
     routing_display = supervisor_semantic.apply_supervisor_routing(
         sup_config,
@@ -342,6 +374,7 @@ def supervisor_set(
     def _apply(m: SessionState) -> None:
         check_frozen(m)
         validate_sidecar_supervisor(sup_config, sidecar=_is_sidecar(m))
+        validate_stop_executor(sup_config, runtime=session_runtime(m), sidecar=_is_sidecar(m))
         replacements = tuple(
             name
             for name, value in (
@@ -349,10 +382,14 @@ def supervisor_set(
                 ("checker_model", checker_model),
                 ("checker_provider", checker_provider),
                 ("checker_effort", checker_effort),
+                ("review_trigger", review_trigger),
             )
             if value is not None
         )
         supervisor_semantic.apply_supervisor_to_intent(m, sup_config, replace_overrides=replacements)
+        effective_supervisor = snapshot_supervisor_options(m)
+        if effective_supervisor:
+            validate_reviewer(effective_supervisor, selected_lane)
         if lane_record is not None:
             set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
             clear_supervisor_degrade(m)
@@ -497,6 +534,8 @@ def supervisor_cascade(
         raise SupervisorNotConfiguredError("No supervisor configured.")
     if cascade_on and sup.auth_mode == "subscription-only":
         raise SupervisorInputError("Subscription-only supervision cannot enable the paid API checker.")
+    if cascade_on and sup.review_trigger == "stop":
+        raise SupervisorInputError("Stop supervision cannot enable cascade.")
 
     if not cascade_on:
 
@@ -524,6 +563,8 @@ def supervisor_cascade(
         if _is_sidecar(m):
             raise SupervisorInputError("Plan-file supervision requires a host executor.")
         if m.intent.policy and m.intent.policy.supervisor:
+            if m.intent.policy.supervisor.review_trigger == "stop":
+                raise SupervisorInputError("Stop supervision cannot enable cascade.")
             if m.intent.policy.supervisor.auth_mode == "subscription-only":
                 raise SupervisorInputError("Subscription-only supervision cannot enable the paid API checker.")
             m.intent.policy.supervisor.cascade = True

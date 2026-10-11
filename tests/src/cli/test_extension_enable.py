@@ -2663,6 +2663,9 @@ class TestEnableCodexHooks:
         assert [_normalize_forge_home(command) for command in installation["codex_commands"]] == [
             "$FORGE_HOME/bin/forge-hook codex-policy-check",
             "$FORGE_HOME/bin/forge-hook codex-session-start",
+            "$FORGE_HOME/bin/forge-hook codex-stop",
+            "$FORGE_HOME/bin/forge-hook codex-turn-start",
+            "$FORGE_HOME/bin/forge-hook codex-turn-tool",
         ]
 
     def test_disable_previews_and_removes_block(self) -> None:

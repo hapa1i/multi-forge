@@ -23,3 +23,12 @@ def retain_receipts() -> None:
 
 
 atexit.register(retain_receipts)
+
+# Fault controls need the live hook's PID/start-time before a SIGKILL prevents
+# atexit recording. This observation neither reads nor changes hook decisions.
+if sys.argv[1:3] == ["hook", "codex-stop"] and os.environ.get("PROBE_CONTROL"):
+    observer = runpy.run_path(str(Path(__file__).resolve().parents[1] / "probe-runtime.py"))
+    row = observer["process_table"]().get(os.getpid())
+    if row:
+        capture = Path(json.loads(Path(os.environ["PROBE_CONTROL"]).read_text())["capture"])
+        observer["append_json"](capture / "stop-starts.jsonl", row)

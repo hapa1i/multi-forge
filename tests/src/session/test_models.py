@@ -942,8 +942,8 @@ class TestConstants:
     """Test module constants."""
 
     def test_schema_version(self) -> None:
-        """SCHEMA_VERSION should be 3 for explicit supervisor identity."""
-        assert SCHEMA_VERSION == 3
+        """SCHEMA_VERSION should be 4 for non-default review triggers."""
+        assert SCHEMA_VERSION == 4
 
     def test_index_version(self) -> None:
         """INDEX_VERSION should be 1."""

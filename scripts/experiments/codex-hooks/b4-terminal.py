@@ -8,6 +8,7 @@ import os
 import pty
 import select
 import struct
+import subprocess
 import sys
 import termios
 import time
@@ -19,6 +20,8 @@ def main() -> int:
     parser.add_argument("--close-after-turn", action="store_true")
     parser.add_argument("--prompt-file", type=Path)
     parser.add_argument("--prompts-json", type=Path)
+    parser.add_argument("--initial-turns", type=int, default=0)
+    parser.add_argument("--after-initial-command-json", type=Path)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -40,6 +43,7 @@ def main() -> int:
         prompts.append(args.prompt_file.read_text())
     prompt_count = 0
     completed_count = 0
+    initial_configured = args.after_initial_command_json is None
     next_prompt_at = None
     terminal_ready = None
     recent_output = b""
@@ -89,11 +93,23 @@ def main() -> int:
                 completed_count = completions
                 next_prompt_at = time.monotonic() + 3
                 actions.append({"at": time.time(), "completed_count": completed_count})
-                if args.close_after_turn and completed_count >= len(prompts):
+                if args.close_after_turn and completed_count >= len(prompts) + args.initial_turns:
                     completed = time.monotonic()
+            if not initial_configured and terminal_ready is not None and completed_count >= args.initial_turns:
+                result = subprocess.run(
+                    json.loads(args.after_initial_command_json.read_text()),
+                    capture_output=True,
+                    text=True,
+                    timeout=45,
+                )
+                (capture / "idle-configuration.json").write_text(json.dumps(vars(result), default=str, indent=2))
+                result.check_returncode()
+                initial_configured = True
+                next_prompt_at = time.monotonic() + 3
             if (
                 prompt_count < len(prompts)
-                and prompt_count <= completed_count
+                and prompt_count + args.initial_turns <= completed_count
+                and initial_configured
                 and next_prompt_at is not None
                 and time.monotonic() > next_prompt_at
             ):

@@ -16,6 +16,7 @@ transferred to the user and dropping tracking is correct).
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any, Generator
@@ -25,6 +26,7 @@ import pytest
 
 from forge.core.runtime import get_runtime
 from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
+from forge.install.codex_hooks import get_builtin_codex_entries
 from forge.install.installer import Installer
 from forge.install.models import InstallScope
 from forge.install.tracking import TrackingStore
@@ -126,11 +128,9 @@ def test_manual_registration_skip_still_drops_tracking(setup_installer: tuple[In
     """
     installer, claude_home = setup_installer
     _run(installer, claude_home)
-    manual = (
-        "[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\n"
-        'type = "command"\ncommand = "forge hook codex-session-start"\ntimeout = 60\n'
-        "[[hooks.PreToolUse]]\n[[hooks.PreToolUse.hooks]]\n"
-        'type = "command"\ncommand = "forge hook codex-policy-check"\ntimeout = 60\n'
+    manual = "".join(
+        f'[[hooks.{entry.event}]]\n[[hooks.{entry.event}.hooks]]\ntype = "command"\ncommand = {json.dumps(entry.command)}\ntimeout = 60\n'
+        for entry in get_builtin_codex_entries()
     )
     _codex_config().write_text(manual)
 

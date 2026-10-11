@@ -36,7 +36,12 @@ def is_supervisor_degraded(state: SessionState) -> bool:
 
 
 def read_supervisor_degrade(state: SessionState) -> dict[str, Any] | None:
-    """Return the degrade marker dict, or None when absent."""
+    """Return the active per-edit overlay; Stop never falls back to another reviewer."""
+    from forge.policy.semantic.identity import snapshot_supervisor_options
+
+    sup = snapshot_supervisor_options(state)
+    if sup and sup.review_trigger == "stop":
+        return None
     policy = state.confirmed.policy
     if policy is None:
         return None

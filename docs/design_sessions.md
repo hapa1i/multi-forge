@@ -114,7 +114,14 @@ launch:
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
 
-In schema v2/v3, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral
+Stop supervision adds manifest schema v4 only when stored supervisor intent or an override selects
+`review_trigger=stop`. Default-only state omits the new field and retains the existing v2/v3 writer choice. An explicit
+`pre-tool-use` override masking stored Stop intent still requires v4. Readers accept v1–v4, reject trigger fields in
+older schemas, and keep the existing v1/v2-to-v3 in-memory migration without rewriting on read. Switching all stored
+intent/overrides back to the default restores the compatible encoding. Policy-inheriting Claude/sidecar derivations
+refuse Stop before child publication or transfer inference; Codex `start --resume-from` retains fresh policy.
+
+In schema v2/v3/v4, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral
 route selection:
 
 ```yaml

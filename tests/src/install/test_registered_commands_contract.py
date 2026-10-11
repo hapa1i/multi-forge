@@ -112,6 +112,9 @@ def test_codex_hook_commands_are_pinned() -> None:
     ] == [
         ("SessionStart", "$FORGE_HOME/bin/forge-hook codex-session-start", 60),
         ("PreToolUse", "$FORGE_HOME/bin/forge-hook codex-policy-check", 60),
+        ("UserPromptSubmit", "$FORGE_HOME/bin/forge-hook codex-turn-start", 60),
+        ("PostToolUse", "$FORGE_HOME/bin/forge-hook codex-turn-tool", 60),
+        ("Stop", "$FORGE_HOME/bin/forge-hook codex-stop", 60),
     ]
 
 

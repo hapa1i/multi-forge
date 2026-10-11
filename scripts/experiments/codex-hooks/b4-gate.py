@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -20,6 +21,8 @@ RUNTIME = runpy.run_path(str(SCRIPTS / "probe-runtime.py"))
 
 
 def validate(root: Path) -> None:
+    if (root / "CLOSED").exists():
+        raise ValueError("This probe round is closed; use a new independent fixture")
     if (root / "B4_ROUND").read_text().strip() != "independent-b4-round-v1":
         raise ValueError("An owned B4 round is required.")
     for key, value in (
@@ -124,12 +127,19 @@ def seal(root: Path, enrollment: Path) -> None:
         json.dumps(
             {
                 "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+                "config_without_tui_sha256": config_without_tui(config),
                 "preflight": result,
-                "note": "Existing SessionStart receipt only; new events need their own observations.",
+                "note": "Event coverage comes from the saved preflight result; TUI presentation counters are excluded.",
             },
             indent=2,
         )
     )
+
+
+def config_without_tui(path: Path) -> str:
+    config = tomllib.loads(path.read_text())
+    config.pop("tui", None)
+    return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
 def execute(root: Path, label: str, control: dict, command: list[str], seconds: int) -> int:
@@ -137,7 +147,10 @@ def execute(root: Path, label: str, control: dict, command: list[str], seconds: 
         raise ValueError("Capture labels must be plain unique names.")
     if (root / "ENROLLED").exists():
         sealed = json.loads((root / "ENROLLED").read_text())
-        if sealed["config_sha256"] != hashlib.sha256((root / "codex-home/config.toml").read_bytes()).hexdigest():
+        config = root / "codex-home/config.toml"
+        if sealed["config_sha256"] != hashlib.sha256(config.read_bytes()).hexdigest() and sealed.get(
+            "config_without_tui_sha256"
+        ) != config_without_tui(config):
             raise ValueError("Exact enrolled configuration changed; explicitly re-enroll before continuing.")
     capture = root / "captures" / label
     capture.mkdir(exist_ok=False)

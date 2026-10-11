@@ -82,11 +82,14 @@ class ReviewAttempt:
         budget: float,
         stage: str = "frontier",
         purpose: str = "live",
+        attempt_id: str | None = None,
     ) -> None:
         now = datetime.now(timezone.utc)
+        if attempt_id is not None and (len(attempt_id) != 32 or any(c not in "0123456789abcdef" for c in attempt_id)):
+            raise ValueError("Invalid reserved supervisor attempt identity")
         self.record = AttemptRecord(
             schema_version=2,
-            attempt_id=uuid4().hex,
+            attempt_id=attempt_id or uuid4().hex,
             session=context.session_name,
             forge_root=os.environ.get("FORGE_FORGE_ROOT") or config.forge_root,
             root_run_id=os.environ.get("FORGE_ROOT_RUN_ID"),

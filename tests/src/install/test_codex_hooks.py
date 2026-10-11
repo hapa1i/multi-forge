@@ -58,10 +58,13 @@ def _install(config: Path) -> None:
 
 
 class TestBuiltinEntries:
-    def test_two_entries_with_trust_durable_commands(self) -> None:
+    def test_five_entries_with_trust_durable_commands(self) -> None:
         assert [(e.event, _normalize_forge_home(e.command)) for e in _entries()] == [
             ("SessionStart", "$FORGE_HOME/bin/forge-hook codex-session-start"),
             ("PreToolUse", "$FORGE_HOME/bin/forge-hook codex-policy-check"),
+            ("UserPromptSubmit", "$FORGE_HOME/bin/forge-hook codex-turn-start"),
+            ("PostToolUse", "$FORGE_HOME/bin/forge-hook codex-turn-tool"),
+            ("Stop", "$FORGE_HOME/bin/forge-hook codex-stop"),
         ]
 
     def test_pretooluse_has_no_matcher(self) -> None:
@@ -150,6 +153,15 @@ class TestRenderBlock:
             'type = "command"\n'
             'command = "$FORGE_HOME/bin/forge-hook codex-policy-check"\n'
             "timeout = 60\n"
+            "\n"
+            "[[hooks.UserPromptSubmit]]\n[[hooks.UserPromptSubmit.hooks]]\n"
+            'type = "command"\ncommand = "$FORGE_HOME/bin/forge-hook codex-turn-start"\ntimeout = 60\n'
+            "\n"
+            "[[hooks.PostToolUse]]\n[[hooks.PostToolUse.hooks]]\n"
+            'type = "command"\ncommand = "$FORGE_HOME/bin/forge-hook codex-turn-tool"\ntimeout = 60\n'
+            "\n"
+            "[[hooks.Stop]]\n[[hooks.Stop.hooks]]\n"
+            'type = "command"\ncommand = "$FORGE_HOME/bin/forge-hook codex-stop"\ntimeout = 60\n'
             "# <<< forge hooks <<<\n"
         )
         assert _normalize_forge_home(render_codex_block(_entries())) == expected
@@ -243,7 +255,7 @@ class TestPlanMerge:
         assert plan.action == "skip"
         assert "outside Forge markers" in (plan.reason or "")
 
-    def test_full_legacy_manual_registration_skips(self, tmp_path: Path) -> None:
+    def test_legacy_two_event_manual_registration_requires_operator_merge(self, tmp_path: Path) -> None:
         config = tmp_path / "config.toml"
         config.write_text(
             "[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\n"
@@ -252,8 +264,7 @@ class TestPlanMerge:
             'type = "command"\ncommand = "forge hook codex-policy-check"\ntimeout = 60\n'
         )
         plan = plan_codex_merge(config, _entries())
-        assert plan.action == "skip"
-        assert "outside Forge markers" in (plan.reason or "")
+        assert plan.action == "conflict"
 
     def test_partial_manual_registration_conflicts(self, tmp_path: Path) -> None:
         # Installing the full block would double-register the manual hook
@@ -622,10 +633,7 @@ class TestReadRegistration:
         apply_codex_merge(config, _entries())
         status = read_codex_registration(config, _entries())
         assert status.block_present
-        assert status.commands_registered == (
-            _entries()[1].command,
-            _entries()[0].command,
-        )
+        assert status.commands_registered == tuple(sorted(e.command for e in _entries()))
 
     def test_legacy_manual_registration_reports_registered(self, tmp_path: Path) -> None:
         config = tmp_path / "config.toml"

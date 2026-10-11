@@ -600,7 +600,7 @@ class TestSessionStoreRead:
         store.write(sample_manifest)
         loaded = store.read()
 
-        assert loaded.schema_version == sample_manifest.schema_version
+        assert loaded.schema_version == 3  # Ordinary v2 writes retain the pinned v3 read projection.
         assert loaded.name == sample_manifest.name
         assert loaded.created_at == sample_manifest.created_at
         assert loaded.last_accessed_at == sample_manifest.last_accessed_at

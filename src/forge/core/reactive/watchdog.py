@@ -17,11 +17,38 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 TERMINATION_GRACE_SECONDS = 0.5
 _WATCHDOG_MODULE = "forge.core.reactive.watchdog"
 _TIMEOUT_EXIT = 124
+
+
+@contextmanager
+def exit_on_parent_death(parent_pid: int) -> Iterator[None]:
+    """Bound an admitted native hook that the executor may leave detached on exit.
+
+    Reparenting is kernel-maintained and cannot mistake a reused PID for the
+    original parent. Abrupt exit closes the reviewer's watchdog pipe even while
+    the hook is blocked; its durable reservation remains incomplete.
+    """
+    if parent_pid <= 1:
+        raise ValueError("An invoking executor is required")
+    finished = threading.Event()
+
+    def observe() -> None:
+        while not finished.wait(0.05):
+            if os.getppid() != parent_pid:
+                os._exit(128 + signal.SIGTERM)
+
+    observer = threading.Thread(target=observe, daemon=True)
+    observer.start()
+    try:
+        yield
+    finally:
+        finished.set()
+        observer.join(timeout=0.1)
 
 
 def run_guarded(

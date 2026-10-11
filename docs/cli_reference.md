@@ -408,8 +408,9 @@ hook seam, and exits non-zero when Codex is not ready. A direct preflight refres
 consumer-lane dispatches. `--proxy <id>` reads the existing proxy configuration and checks that it exposes a compatible
 Responses ingress; it starts nothing and does not replace the direct-readiness cache. `--verify-enrollment` goes beyond
 static hook registration by running one cheap `codex exec` turn and confirming by effect that the user-scope
-SessionStart hook fired. With `--json`, ordinary preflight emits the secret-free readiness record; enrollment
-verification emits its registered/attempted/enrolled result instead.
+SessionStart hook fired. Stop-mode enrollment separately requires UserPromptSubmit, PreToolUse, PostToolUse and Stop
+receipts from that same probe, reported as `stop_review_enrolled`; ordinary `enrolled` still describes SessionStart.
+With `--json`, ordinary preflight emits the secret-free readiness record; enrollment verification emits these results.
 
 ### Model management
 
@@ -442,6 +443,7 @@ runners.
 | `forge policy supervisor evaluate -f <path> -r <id>`                      | Evaluate file against approved plan                                                                                                                                                                     |
 | `forge policy supervisor set [target] [--plan <file>]`                    | Set persistent supervisor for session                                                                                                                                                                   |
 | `forge policy supervisor set --plan <file> --model <id>`                  | Plan-only review; actual model/tier selection for Claude or Codex                                                                                                                                       |
+| `forge policy supervisor set --plan <file> --trigger stop`                | Opt-in host Codex review once per explicit turn; `pre-tool-use` restores per-edit mode; omission preserves the saved trigger                                                                            |
 | `forge policy supervisor set --plan <file> --auth-mode subscription-only` | Verified personal Claude login, direct `claude-max`, no API fallback; host only                                                                                                                         |
 | `forge policy supervisor cascade on/off`                                  | Toggle the tier-1 plan check (cascade)                                                                                                                                                                  |
 | `forge policy supervisor cascade on --checker-effort <lvl>`               | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`                                                                                                                                     |

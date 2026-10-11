@@ -20,7 +20,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 INDEX_VERSION = 1
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -221,6 +221,7 @@ class SupervisorConfig:
     """
 
     auth_mode: str = "inherit"  # Subscription-only is an explicit supervisor-local opt-in.
+    review_trigger: str = "pre-tool-use"
     supervisor_model: str | None = None  # None preserves legacy runtime-selected model behavior.
     resume_id: str | None = None  # Claude session UUID, or a Forge session name resolved to a UUID at runtime
     proxy: str | None = None  # Optional: proxy_id or template name for base_url lookup
@@ -262,6 +263,10 @@ class SupervisorConfig:
         # Range validation lives here (the broadest shared construction path) rather than on the CLI surface: dacite
         # runs __post_init__ on every manifest read / session set / start / fork, and compute_effective_intent's
         # strict branch auto-wraps this ValueError into the typed InvalidOverrideValueError.
+        if self.review_trigger not in {"pre-tool-use", "stop"}:
+            raise ValueError("Supervisor review_trigger must be pre-tool-use or stop")
+        if self.review_trigger == "stop" and (self.cascade or self.shadow_sample_rate):
+            raise ValueError("Stop supervision permits one frontier review; cascade and shadow sampling must be off")
         if not 0.0 <= self.shadow_sample_rate <= 1.0:
             raise ValueError(f"shadow_sample_rate must be in [0.0, 1.0], got {self.shadow_sample_rate}")
         if self.shadow_max_per_session < 1:

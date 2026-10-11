@@ -90,6 +90,13 @@ Correlation uses `model_run_id`; incomplete work never implies zero cost. Shadow
 and through the existing shadow audit surfaces. Failed final evidence writes add a warning and leave an incomplete
 start; they cannot turn a computed deny into an allow.
 
+**Codex Stop spending state.** The session's `review` event domain owns the bounded turn watermark, reservation,
+immutable evidence references and correction consumption. It survives telemetry reset and attempt retention; deleting
+usage cannot grant another review. Status and activity expose its current `turn_review` independently of the selected
+telemetry window, with unknown dispatch kept distinct from zero dispatch. The reviewer transport emits usage once;
+checkpoint writes add no model-call or cost events. See
+[Stop review ownership](design_session_execution.md#i2a-codex-stop-review).
+
 **Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
 to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens
 from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and `confidence=unavailable` (the
@@ -547,16 +554,16 @@ from upstream or `usage/events`, records whose provider-session id matches the h
 `downstream_only`); a truly orphaned downstream record with no session-known run tree is not session-attributable.
 
 `forge telemetry activity --json` is a clean-break shape with top-level `session`, `since`, `upstream`, `downstream`,
-`shadow`, `subagents`, and `notes` only. Old top-level `commands`, `policy`, `total_events`, and
-`session_tagging_partial` fields are represented inside panes or `notes`. The launcher still prints the compact one-line
-`render_summary_line(...)` on exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error`
-clause still comes from the window's supervisor failure split; JSON exposes those legacy counts under
-`downstream.rows[*].error_kinds`. The downstream pane also exposes `skipped_legacy_schema` when older downstream
-identity schemas were fenced from the current read. Cost is reported-or-estimated and may be partial;
-`forge telemetry costs show` is authoritative. Each model-call row also carries the lane its usage events ran on --
-`runtime` and `billing_mode` (uniform, `mixed` when a command's events disagree, `null`/`-` for a downstream-only row
-with no usage-event source). The per-call ledger carries **no** catalog backend id, so the full
-`(runtime, backend, model)` lane shows on `forge policy supervisor status`, not here.
+`shadow`, `subagents`, `turn_review`, and `notes`. `turn_review` is null outside configured Stop supervision. Old
+top-level `commands`, `policy`, `total_events`, and `session_tagging_partial` fields are represented inside panes or
+`notes`. The launcher still prints the compact one-line `render_summary_line(...)` on exit (host, sidecar, fork) from
+the same builder. The `failing open: N timeout, N error` clause still comes from the window's supervisor failure split;
+JSON exposes those legacy counts under `downstream.rows[*].error_kinds`. The downstream pane also exposes
+`skipped_legacy_schema` when older downstream identity schemas were fenced from the current read. Cost is
+reported-or-estimated and may be partial; `forge telemetry costs show` is authoritative. Each model-call row also
+carries the lane its usage events ran on -- `runtime` and `billing_mode` (uniform, `mixed` when a command's events
+disagree, `null`/`-` for a downstream-only row with no usage-event source). The per-call ledger carries **no** catalog
+backend id, so the full `(runtime, backend, model)` lane shows on `forge policy supervisor status`, not here.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

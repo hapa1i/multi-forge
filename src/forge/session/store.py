@@ -44,7 +44,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -169,13 +169,22 @@ def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
 
 
 def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
-    """Use v2 when the state is losslessly readable by existing sidecar images."""
+    """Write Stop intent as v4; preserve the v2/v3 shape for ordinary supervision."""
     data = session_state_to_dict(manifest)
     supervisor = (data["intent"].get("policy") or {}).get("supervisor")
     override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
     new_override = isinstance(override_sup, dict) and bool({"auth_mode", "supervisor_model"} & override_sup.keys())
     legacy = not supervisor or (supervisor["auth_mode"] == "inherit" and supervisor["supervisor_model"] is None)
-    data["schema_version"] = 2 if legacy and not new_override else SCHEMA_VERSION
+    stop_required = any(
+        isinstance(config, dict) and config.get("review_trigger", "pre-tool-use") != "pre-tool-use"
+        for config in (supervisor, override_sup)
+    )
+    # A default override masking stored Stop intent is significant and remains in v4.
+    if not stop_required:
+        for config in (supervisor, override_sup):
+            if isinstance(config, dict):
+                config.pop("review_trigger", None)
+    data["schema_version"] = SCHEMA_VERSION if stop_required else 2 if legacy and not new_override else 3
     if data["schema_version"] == 2 and supervisor:
         del supervisor["auth_mode"]
         del supervisor["supervisor_model"]
@@ -573,7 +582,7 @@ class SessionStore:
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version in {2, 3} and "model_route" not in launch:
+            if schema_version in {2, 3, 4} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
 
         policy = intent.get("policy") if isinstance(intent, dict) else None
@@ -584,13 +593,23 @@ class SessionStore:
                     raise ManifestCorruptedError(
                         str(self._manifest_path), f"schema v{schema_version} cannot contain supervisor.{field_name}"
                     )
-                if schema_version == 3 and field_name not in supervisor:
+                if schema_version in {3, 4} and field_name not in supervisor:
                     raise ManifestCorruptedError(
-                        str(self._manifest_path), f"schema v3 requires supervisor.{field_name}"
+                        str(self._manifest_path), f"schema v{schema_version} requires supervisor.{field_name}"
                     )
 
         # Strict overrides schema: keys must be valid SessionIntent paths
         overrides = data.get("overrides")
+        override_policy = overrides.get("policy") if isinstance(overrides, dict) else None
+        override_supervisor = override_policy.get("supervisor") if isinstance(override_policy, dict) else None
+        if schema_version in {1, 2, 3}:
+            for config in (supervisor, override_supervisor):
+                if isinstance(config, dict) and "review_trigger" in config:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path), f"schema v{schema_version} cannot contain supervisor.review_trigger"
+                    )
+        elif schema_version == 4 and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
+            raise ManifestCorruptedError(str(self._manifest_path), "schema v4 requires supervisor.review_trigger")
         if isinstance(overrides, dict):
             _validate_overrides_schema(overrides, str(self._manifest_path))
 

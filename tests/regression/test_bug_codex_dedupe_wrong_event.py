@@ -70,9 +70,7 @@ def test_one_correct_one_wrong_event_conflicts(tmp_path: Path) -> None:
 def test_correct_event_manual_registration_still_skips(tmp_path: Path) -> None:
     """Guard the intended behavior: correct (event, command) pairs dedupe."""
     config = tmp_path / "config.toml"
-    config.write_text(
-        _entry("SessionStart", "forge hook codex-session-start") + _entry("PreToolUse", "forge hook codex-policy-check")
-    )
+    config.write_text("".join(_entry(entry.event, entry.command) for entry in ENTRIES))
     plan = plan_codex_merge(config, ENTRIES)
     assert plan.action == "skip"
     assert "outside Forge markers" in (plan.reason or "")
@@ -86,8 +84,10 @@ def test_matcher_is_ignored_in_dedupe(tmp_path: Path) -> None:
     """
     config = tmp_path / "config.toml"
     config.write_text(
-        _entry("SessionStart", "forge hook codex-session-start")
-        + _entry("PreToolUse", "forge hook codex-policy-check", extra='matcher = "apply_patch"\n')
+        "".join(
+            _entry(entry.event, entry.command, extra='matcher = "apply_patch"\n' if entry.event == "PreToolUse" else "")
+            for entry in ENTRIES
+        )
     )
     assert plan_codex_merge(config, ENTRIES).action == "skip"
 
