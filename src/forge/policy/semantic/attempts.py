@@ -63,6 +63,7 @@ class AttemptRecord:
     model_run_id: str | None = None
     observed_models: list[str] = field(default_factory=list)
     purpose: str = "live"
+    native_review: dict[str, Any] | None = None
 
 
 def attempts_directory() -> Path:
@@ -88,7 +89,7 @@ class ReviewAttempt:
         if attempt_id is not None and (len(attempt_id) != 32 or any(c not in "0123456789abcdef" for c in attempt_id)):
             raise ValueError("Invalid reserved supervisor attempt identity")
         self.record = AttemptRecord(
-            schema_version=2,
+            schema_version=3 if config.native_source else 2,
             attempt_id=attempt_id or uuid4().hex,
             session=context.session_name,
             forge_root=os.environ.get("FORGE_FORGE_ROOT") or config.forge_root,
@@ -109,6 +110,11 @@ class ReviewAttempt:
             started_at=now.isoformat(),
             deadline_at=(now + timedelta(seconds=max(0, budget) + 2)).isoformat(),
             owner_pid=os.getpid(),
+            native_review=(
+                {"source_thread_id": config.native_source.thread_id, "state": "selecting"}
+                if config.native_source
+                else None
+            ),
         )
         if stage == "checker":
             from forge.policy.semantic.plan_check import resolve_plan_check_route
@@ -132,6 +138,11 @@ class ReviewAttempt:
             self.lock_path.unlink(missing_ok=True)
             raise
         _prune_attempts(directory, prefix)
+
+    def note_native(self, evidence: dict[str, Any]) -> None:
+        """Persist immutable selected input before dispatch and raw counters afterward."""
+        self.record.native_review = evidence
+        atomic_write_json(self.path, asdict(self.record))
 
     def finish(self, decision: PolicyDecision) -> None:
         """Record the outcome without changing an already computed verdict."""
@@ -205,7 +216,7 @@ def read_attempts(
             if raw.get("schema_version") == 1:
                 raw["purpose"] = "unknown"  # v1 cannot distinguish audit from enforcement.
             record = dacite.from_dict(AttemptRecord, raw, config=dacite.Config(strict=True))
-            if record.schema_version not in {1, 2}:
+            if record.schema_version not in {1, 2, 3}:
                 raise ValueError("Unsupported supervisor-attempt schema; upgrade Forge")
             if record.session != session or (forge_root and record.forge_root != forge_root):
                 continue

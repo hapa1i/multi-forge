@@ -116,13 +116,20 @@ preferences.
 
 Stop supervision adds manifest schema v4 only when stored supervisor intent or an override selects
 `review_trigger=stop`. Default-only state omits the new field and retains the existing v2/v3 writer choice. An explicit
-`pre-tool-use` override masking stored Stop intent still requires v4. Readers accept v1–v4, reject trigger fields in
+`pre-tool-use` override masking stored Stop intent still requires v4. Readers accept v1–v5, reject trigger fields in
 older schemas, and keep the existing v1/v2-to-v3 in-memory migration without rewriting on read. Switching all stored
 intent/overrides back to the default restores the compatible encoding. Policy-inheriting Claude/sidecar derivations
 refuse Stop before child publication or transfer inference; Codex `start --resume-from` retains fresh policy.
 
-In schema v2/v3/v4, a present `intent.launch` object must include `model_route`, either `null` or the complete neutral
-route selection:
+Native supervision adds schema v5 only when stored intent or overrides contain `native_source`. The source records its
+runtime, full thread ID, native home, rollout path, source CWD, header digest and optional managed-session binding. It
+is distinct from Claude's `resume_id`; dispatch revalidates both native evidence and any managed binding. Older
+encodings omit the new field entirely. Native source/auth/model/effort are frozen with the reviewer lane; effective
+set/reset, reload/on, inheritance and dispatch validate the same cross-field restrictions. Policy inheritance checks the
+child's copied intent and lane as well as the parent's effective state. No reader rewrites on inspection.
+
+In schema v2/v3/v4/v5, a present `intent.launch` object must include `model_route`, either `null` or the complete
+neutral route selection:
 
 ```yaml
 model_route:

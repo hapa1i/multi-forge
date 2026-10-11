@@ -22,11 +22,13 @@ tested head `81c14448` with all five GitHub checks passing. Its
 delivery limits, and fixture teardown. B4 closed on 2026-10-11 after
 [PR #263](https://github.com/hapa1i/multi-forge/pull/263) merged as `2045aea1`, matching tested head `5eecc6ff` with all
 five GitHub checks passing. Its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records turn
-attribution and evidence limits. B5 has
-[runtime findings for contract review](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`,
-rebased onto `225ab3dd`. Product implementation awaits its source/home/trigger decision and installed admission, lease
-and accounting obligations. Captures use 48/60 native starts and 3/4 authorized API starts. The epic remains active
-until its native-fork outcome also ships.
+attribution and evidence limits. B5 implements the user-approved
+[native source/login/trigger contract](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`,
+rebased onto `225ab3dd`. Its [product evidence](../codex_fork_supervisor/evidence/product.md) records installed
+allow/deny, shared active Stop, source-only feedback, global-ignore composition and clean-wheel verification. The ledger
+is closed at 60/60 native starts and 3/4 authorized API starts; both fixture logins are removed. Aggregate validation
+passes and the per-card PR is ready for review. The epic remains active until its native-fork outcome ships and the
+merged tree is verified.
 
 ## Activation
 
@@ -97,6 +99,15 @@ preservation in the measured cases, isolated hooks, read-only writes and actual 
 dedicated reviewer-home ownership, cancellation of detached native tools and inherited-token counters require the
 [contract supplement](../codex_fork_supervisor/gate-decision.md). This is not product acceptance or epic closeout.
 
+B5 product verification, 2026-10-11: the user approved the supplement. Six installed native reviews exercised the
+separate-source allow/deny path, shared active Stop, approved-plan precedence and source-only feedback. Both Stop
+controls requested exactly one correction; final-wheel review excluded the globally ignored sentinel. Each reviewer
+emitted one attributed new-review usage delta. The Claude control used a synthetic adapter payload with a real Codex
+reviewer; API product configuration used a dummy key, with live route evidence from the earlier gate. Targeted
+integration passed 14 tests with eleven explicit legacy-native deselections; regression passed 1,546. The final wheel's
+installed source hashes match the working tree. Aggregate unit passes 10,770 tests, with 117 deselected; full pre-commit
+passes after the approved three-guide token-count refresh. Review, CI and shipped-tree closeout remain outstanding.
+
 ## Sequence and ownership
 
 | Member                                         | State               | Dependency | Owned outcome                                                  |
@@ -105,7 +116,7 @@ dedicated reviewer-home ownership, cancellation of detached native tools and inh
 | [B2](../../done/codex_0160_validation/card.md) | Done                | None       | Current-runtime probe evidence                                 |
 | [B3](../../done/codex_policy_warnings/card.md) | Done                | B1, B2     | Allowed-action feedback and source-only formatting             |
 | [B4](../../done/codex_stop_review/card.md)     | Done                | B1, B2, B3 | Bounded review at turn completion                              |
-| [B5](../codex_fork_supervisor/card.md)         | Doing; runtime gate | B1, B2     | Native Codex source context                                    |
+| [B5](../codex_fork_supervisor/card.md)         | Doing; verification | B1, B2     | Native Codex source context                                    |
 
 - [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
 - [x] Complete the [session](../../done/partition_session_design/card.md) and

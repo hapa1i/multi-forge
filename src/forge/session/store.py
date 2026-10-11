@@ -47,7 +47,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, 5}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -172,7 +172,7 @@ def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
 
 
 def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
-    """Write Stop intent as v4; preserve the v2/v3 shape for ordinary supervision."""
+    """Use v5 for native input, retaining v2/v3 ordinary and v4 Stop compatibility."""
     data = session_state_to_dict(manifest)
     supervisor = (data["intent"].get("policy") or {}).get("supervisor")
     override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
@@ -182,12 +182,21 @@ def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
         isinstance(config, dict) and config.get("review_trigger", "pre-tool-use") != "pre-tool-use"
         for config in (supervisor, override_sup)
     )
+    native_required = bool(supervisor and supervisor.get("native_source")) or (
+        isinstance(override_sup, dict) and "native_source" in override_sup
+    )
+    if not native_required:
+        for config in (supervisor, override_sup):
+            if isinstance(config, dict):
+                config.pop("native_source", None)
     # A default override masking stored Stop intent is significant and remains in v4.
-    if not stop_required:
+    if not stop_required and not native_required:
         for config in (supervisor, override_sup):
             if isinstance(config, dict):
                 config.pop("review_trigger", None)
-    data["schema_version"] = SCHEMA_VERSION if stop_required else 2 if legacy and not new_override else 3
+    data["schema_version"] = (
+        SCHEMA_VERSION if native_required else 4 if stop_required else 2 if legacy and not new_override else 3
+    )
     if data["schema_version"] == 2 and supervisor:
         del supervisor["auth_mode"]
         del supervisor["supervisor_model"]
@@ -628,7 +637,7 @@ class SessionStore:
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version in {2, 3, 4} and "model_route" not in launch:
+            if schema_version in {2, 3, 4, 5} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
 
         policy = intent.get("policy") if isinstance(intent, dict) else None
@@ -640,7 +649,7 @@ class SessionStore:
                         str(self._manifest_path),
                         f"schema v{schema_version} cannot contain supervisor.{field_name}",
                     )
-                if schema_version in {3, 4} and field_name not in supervisor:
+                if schema_version in {3, 4, 5} and field_name not in supervisor:
                     raise ManifestCorruptedError(
                         str(self._manifest_path),
                         f"schema v{schema_version} requires supervisor.{field_name}",
@@ -650,6 +659,11 @@ class SessionStore:
         overrides = data.get("overrides")
         override_policy = overrides.get("policy") if isinstance(overrides, dict) else None
         override_supervisor = override_policy.get("supervisor") if isinstance(override_policy, dict) else None
+        for config in (supervisor, override_supervisor):
+            if schema_version != 5 and isinstance(config, dict) and "native_source" in config:
+                raise ManifestCorruptedError(str(self._manifest_path), "Native supervisor source requires schema v5")
+        if schema_version == 5 and isinstance(supervisor, dict) and "native_source" not in supervisor:
+            raise ManifestCorruptedError(str(self._manifest_path), "schema v5 requires supervisor.native_source")
         if schema_version in {1, 2, 3}:
             for config in (supervisor, override_supervisor):
                 if isinstance(config, dict) and "review_trigger" in config:
@@ -657,8 +671,10 @@ class SessionStore:
                         str(self._manifest_path),
                         f"schema v{schema_version} cannot contain supervisor.review_trigger",
                     )
-        elif schema_version == 4 and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
-            raise ManifestCorruptedError(str(self._manifest_path), "schema v4 requires supervisor.review_trigger")
+        elif schema_version in {4, 5} and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
+            raise ManifestCorruptedError(
+                str(self._manifest_path), f"schema v{schema_version} requires supervisor.review_trigger"
+            )
         if isinstance(overrides, dict):
             _validate_overrides_schema(overrides, str(self._manifest_path))
 

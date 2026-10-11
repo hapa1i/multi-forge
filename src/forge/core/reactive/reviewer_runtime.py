@@ -91,6 +91,11 @@ def require_reviewer_runtime(*, env: dict[str, str], deadline: float) -> str:
 
 def preflight_supervisor_runtime(config: SupervisorConfig, lane: LaneRecord, *, cwd: str | None) -> None:
     """Refuse unusable host Claude supervision before saving or launching it."""
+    if config.native_source and config.active:
+        from forge.policy.semantic.native_codex import preflight_native
+
+        preflight_native(config)
+        return
     if lane.runtime_id != "claude_code" or not config.active:
         return
     from forge.core.reactive.env import build_claude_env
@@ -140,4 +145,8 @@ def preflight_host_supervisor(state: SessionState) -> None:
     lane = read_bound_lane(state, SUPERVISOR_CONSUMER) or select_supervisor_lane()
     validate_timeout(config.timeout_seconds, trigger=config.review_trigger)
     validate_reviewer(config, lane)
+    if config.native_source:
+        from forge.policy.semantic.native_codex import validate_native_executor
+
+        validate_native_executor(config, state)
     preflight_supervisor_runtime(config, lane, cwd=state.worktree.path if state.worktree else None)

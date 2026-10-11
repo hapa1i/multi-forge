@@ -1,14 +1,23 @@
-# B5 runtime gate evidence
+# B5 runtime and product evidence
 
-2026-10-11: the allocated runtime cases have run on retained **Codex 0.162.1**, on macOS. Product implementation remains
-gated on the [contract decision](../gate-decision.md). The captures establish useful native context and candidate
-isolation controls, while exposing lifetime and accounting work omitted from the original dispatch plan.
+Product verification, 2026-10-11: [installed and clean-wheel evidence](product.json) completes the ledger at **60/60
+native starts, 3/4 API starts**. Six product reviewers each emitted one attributed usage delta. Separate-source allow
+and deny, active shared-source Stop with one correction, source-only feedback and global-ignore composition passed. The
+[product report](product.md) records exact timing, wheel identity, scope and qualifications. No further inference is
+authorized by the exhausted ledger. [Teardown](product-teardown.json) removed both fixture logins and copied product
+inputs, verified process cleanup, and closed the private round. The earlier gate captures below remain unchanged.
 
-**48/60 starts reserved; 3/4 authorized API starts used.** The [ledger](ledger.json) includes failed starts, setup,
-parents and reviewers. Only the twelve P1/P2 product slots remain. Before G14, the unused G0 setup slot was explicitly
-reallocated to the fresh-index control; the total ceiling and API authorization did not change. A mistakenly counted
-`doctor --json` diagnostic remains charged to G0. No Claude inference ran. The user confirmed extra usage is off and
-independently completed both fixture logins. No ordinary Codex login secrets were copied.
+At the gate handoff on 2026-10-11, the allocated runtime cases had run on retained **Codex 0.162.1**, on macOS. Product
+implementation was gated on the subsequently approved [contract decision](../gate-decision.md). The captures establish
+useful native context and candidate isolation controls, while exposing lifetime and accounting work omitted from the
+original dispatch plan.
+
+**Gate handoff: 48/60 starts reserved; 3/4 authorized API starts used.** The [ledger](ledger.json) includes failed
+starts, setup, parents and reviewers. The remaining twelve P1/P2 product slots are recorded in
+[product evidence](product.json). Before G14, the unused G0 setup slot was explicitly reallocated to the fresh-index
+control; the total ceiling and API authorization did not change. A mistakenly counted `doctor --json` diagnostic remains
+charged to G0. No Claude inference ran. The user confirmed extra usage is off and independently completed both fixture
+logins. No ordinary Codex login secrets were copied.
 
 ## Results
 

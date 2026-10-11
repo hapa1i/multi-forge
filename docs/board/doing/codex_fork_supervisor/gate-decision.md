@@ -1,11 +1,12 @@
-# B5 runtime gate decision for review
+# B5 approved runtime gate decision
 
 The [evidence](evidence/README.md) supports a bounded native-fork implementation on retained macOS Codex 0.162.1.
-**Recommend proceeding after review of the dedicated login and trigger limits below.** The original plan cannot use
-ordinary login state or the shipped watchdog unchanged, and cannot emit native terminal usage directly. This supplement
-specifies the replacement contract. Product work has not started.
+**Approved by the user on 2026-10-11: proceed under the dedicated login and trigger limits below.** The original plan
+cannot use ordinary login state or the shipped watchdog unchanged, and cannot emit native terminal usage directly. This
+supplement specifies the replacement contract. The implementation and [installed product evidence](evidence/product.md)
+now follow it; aggregate validation passes, with PR review and shipping remaining.
 
-## Proposed contract
+## Approved contract
 
 1. **Select immutable native input.** Copy the selected complete prefix and each paginated ancestor prefix it needs.
    Preserve native IDs/metadata and hash each artifact. Reuse rollout discovery; reject ambiguity, missing parents,
@@ -15,7 +16,7 @@ specifies the replacement contract. Product work has not started.
 2. **Own a dedicated reviewer home.** Subscription review uses an independently logged-in, Forge-owned reviewer home;
    setup must explain and verify that login. No copying/symlinking ordinary `auth.json`. API review uses an explicit
    child-environment key and ephemeral credentials. Restrictions go on the `fork` leaf; mismatches never fall back.
-   Setup and lifecycle use the proposed commands and ownership below.
+   Setup and lifecycle use the commands and ownership below.
 3. **Protect copied inputs for the whole attempt.** A bounded lease serializes source copies in a subscription reviewer
    home. The watchdog retains that lease if the hook dies until descendants are cleaned up. Contention means review
    unavailable, never overwriting an active input or spending twice. API attempts may use separate ephemeral homes. This
@@ -46,10 +47,11 @@ Copies identify selected input, not complete model retention. Preserve approved-
 for shared/unknown ancestry, no native verdict cache, no cascade/shadow, fail-open unavailable outcomes, and B4's single
 dispatch/correction journal. Only verified approved-plan quotations may enter B3 source-only feedback.
 
-## Proposed login and storage lifecycle
+## Approved login and storage lifecycle
 
 Add `forge policy supervisor auth login|status|logout --runtime codex`. The three leaves own a supervisor credential
-store, distinct from a session's supervisor configuration. This is a proposed surface, not an installed command.
+store, distinct from a session's supervisor configuration. The B5 branch implements this surface; it is not released
+yet.
 
 - `login` creates a marked, private `$FORGE_HOME/reviewers/codex/` and invokes native device login with file-backed,
   forced ChatGPT authentication. It requires the operator's extra-usage-off confirmation and records that as a user
@@ -75,7 +77,7 @@ for real native sources, not only fixture manifests.
 
 ## Trigger and support decision
 
-| Source/boundary                                          | Proposed admission                                                    |
+| Source/boundary                                          | Approved admission                                                    |
 | -------------------------------------------------------- | --------------------------------------------------------------------- |
 | Separate completed source, host Claude or Codex executor | PreToolUse; approved plan optional only when independence is verified |
 | Shared thread or shared ancestry, host Codex executor    | Stop with an approved plan and trusted current-turn boundary          |
@@ -118,4 +120,6 @@ implementation.”
   lifecycle through shared owners. Then P1/P2 must prove installed allow/deny, refusal, Stop composition and clean-wheel
   behavior. Experimental helpers and fixture stubs cannot satisfy those product acceptance items.
 
-Keep B5 in `doing/`. Product, wheel, aggregate verification, PR and closeout remain outstanding.
+The obligations above record the gate-to-product handoff. The [product report](evidence/product.md) supplies installed
+and clean-wheel results, qualifications and fixture teardown at 60/60 starts. Aggregate verification passes. Keep B5 in
+`doing/` for PR review, CI, merge and closeout.

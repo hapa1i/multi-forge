@@ -943,7 +943,7 @@ class TestConstants:
 
     def test_schema_version(self) -> None:
         """SCHEMA_VERSION should be 4 for non-default review triggers."""
-        assert SCHEMA_VERSION == 4
+        assert SCHEMA_VERSION == 5
 
     def test_index_version(self) -> None:
         """INDEX_VERSION should be 1."""

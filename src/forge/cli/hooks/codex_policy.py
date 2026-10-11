@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +64,14 @@ class CodexHookAdapter:
         cwd = Path(payload_cwd) if isinstance(payload_cwd, str) and payload_cwd else Path(os.getcwd())
         cwd = cwd.resolve()
 
-        return [self._context_for_op(op, cwd, manifest) for op in ops if op.kind != "delete"]
+        from forge.core.runtime.codex_review_source import boundary_from_hook
+
+        boundary = boundary_from_hook(payload)
+        return [
+            replace(self._context_for_op(op, cwd, manifest), native_boundary=boundary)
+            for op in ops
+            if op.kind != "delete"
+        ]
 
     def _context_for_op(self, op: PatchFileOp, cwd: Path, manifest: Any) -> ActionContext:
         # Normalize to the tool names every policy's applies_to expects.

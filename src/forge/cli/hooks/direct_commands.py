@@ -871,9 +871,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     - ``%policy supervisor cascade on|off``: toggle the tier-1 plan check
     - ``%policy supervisor``: show current config (including the bound consumer lane)
 
-    The consumer-lane *runtime* is intentionally not settable here -- it is a resolving-command
-    flag (``forge policy supervisor set <target> --runtime``) so the binding stays write-once.
-    This path only shows the bound lane.
+    Setup shares terminal option parsing and operations, including frozen-lane
+    checks. A direct command always applies to its invoking session.
     """
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
@@ -1007,14 +1006,22 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     if argv:
         if not _guard_direct_project_mutation(store):
             return
-        target = argv[0]
         try:
+            from forge.cli.policy import supervisor_set as set_command
+
+            arguments = argv[1:] if argv[0] == "set" else argv
+            with set_command.make_context("policy supervisor set", arguments) as parsed:
+                options = dict(parsed.params)
+            if options.pop("session_name", None):
+                raise ValueError("Direct supervisor setup applies to this session; use the terminal for --session")
+            target = options.pop("target")
             set_result = policy_ops.supervisor_set(
                 store=store,
                 manifest=manifest,
                 target=target,
                 policy_forge_root=manifest.forge_root,
                 lock_timeout_s=HOOK_LOCK_TIMEOUT_S,
+                **options,
             )
         except (
             policy_ops.SupervisorInputError,
@@ -1030,7 +1037,7 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
             _block(f"Error: {e}")
             return
 
-        msg = f"Supervisor set to '{target}'"
+        msg = f"Supervisor set to '{target or set_result.config.plan_override_path}'"
         if set_result.config.proxy:
             msg += f" (proxy: {set_result.config.proxy})"
         _block(msg)

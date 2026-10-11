@@ -4,14 +4,14 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 ## Current focus
 
-Review the [runtime findings and proposed contract](gate-decision.md) on `codex/codex-fork-supervisor`, rebased onto
-synchronized `main` at `225ab3dd`. The user authorized B5 execution after the separate global-ignore fix merged and
-separately authorized four API starts. The [evidence](evidence/README.md) records 48/60 starts, including 3/4 API
-starts. Product implementation awaits review of the source/home/trigger decision. Installed admission, leases and
-accounting remain implementation obligations. B1 and B2 remain the prerequisites. B3 and B4 are shipped integration
-contracts: native context must preserve their feedback provenance, turn attribution, dispatch cap, and failure behavior.
-Their completed captures do not establish native-fork isolation. Jev, native team orchestration, general session
-fork/resume, and the proposed Codex source adapter remain outside this card. The separate
+Review the implemented [runtime contract](gate-decision.md) on `codex/codex-fork-supervisor`, rebased onto synchronized
+`main` at `225ab3dd`. The user authorized B5 execution after the separate global-ignore fix merged and separately
+authorized four API starts. The [evidence](evidence/README.md) records 60/60 starts, including 3/4 API starts. The user
+approved the source/home/trigger decision on 2026-10-11. Installed admission, leases, accounting and native product
+controls and aggregate verification now pass; the per-card PR is ready for review. B1 and B2 remain the prerequisites.
+B3 and B4 are shipped integration contracts: native context must preserve their feedback provenance, turn attribution,
+dispatch cap, and failure behavior. Their completed captures do not establish native-fork isolation. Jev, native team
+orchestration, general session fork/resume, and the proposed Codex source adapter remain outside this card. The separate
 [Stop global-ignore fix](../../done/preserve_stop_global_ignores/card.md) shipped in PR #264 (`d33721a2`). Its merged
 tree matches the tested fix and its five PR checks pass; B5 still verifies native Stop composition.
 
@@ -60,8 +60,8 @@ tree matches the tested fix and its five PR checks pass; B5 still verifies nativ
 ## Proposed contract for review
 
 The runtime round adds a [decision supplement](gate-decision.md). The original surface below is not sufficient to own a
-dedicated reviewer login, copied ancestry, an attempt-lifetime lease or comparable native usage baselines. Resolve that
-supplement before treating sections 2–6 as an implementation-ready contract.
+dedicated reviewer login, copied ancestry, an attempt-lifetime lease or comparable native usage baselines. The user
+approved that supplement before sections 2–6 began; it supersedes these original proposals where they differ.
 
 The proposed setup is
 `forge policy supervisor set <source> --source-runtime codex --runtime codex --model <model> --auth-mode subscription-only|api`
@@ -178,7 +178,7 @@ of the [contract supplement](gate-decision.md).
   Stop's reduced remaining budget. Test absent/malformed verdicts and exit-zero runtime errors with deterministic
   fixtures. Quota-shaped fixtures validate classification; they do not establish live quota exhaustion. Preserve B4's
   recorded native cancellation and quota qualifications unless new captures replace them.
-- [ ] Record a go/no-go decision with links to each capture. Parent isolation, read-only enforcement, useful context,
+- [x] Record a go/no-go decision with links to each capture. Parent isolation, read-only enforcement, useful context,
   bounded lifetime, stdin transport, and an enforceable model/auth/context-size support matrix are required before
   product work. A shared/active source may dispatch only for a demonstrated, enforceable boundary; otherwise report it
   unsupported before inference. If that prevents this card's shared-source acceptance, return the scope decision for
@@ -229,7 +229,7 @@ measured cases where their assertions truly overlap. No live calls are part of t
 
 ## 2. Add runtime-qualified source and configuration ownership
 
-- [ ] Implement the reviewed source contract in `session/models.py`, shared policy operations, target resolution, and
+- [x] Implement the reviewed source contract in `session/models.py`, shared policy operations, target resolution, and
   reviewer validation. Reuse `core/runtime/codex_rollouts.py` and the ambiguity rules in
   `core/ops/codex_adopt.py:find_adoptable_rollout`; extract shared read-only resolution where needed. Use
   `find_rollouts_by_thread_id`, not `find_rollout_path`'s newest-mtime winner, for binding. Resolve the source's
@@ -237,111 +237,112 @@ measured cases where their assertions truly overlap. No live calls are part of t
   Use confirmed Codex identity and native-store evidence, not a UUID shape or the Claude UUID field. Reject missing,
   ambiguous, mismatched-runtime, deleted, or changed sources without partial config/lane writes; revalidate the stored
   binding before dispatch and never silently follow a renamed/recreated managed session.
-- [ ] Add the source selector to terminal and direct-command setup through shared operations. Validate combinations
+- [x] Add the source selector to terminal and direct-command setup through shared operations. Validate combinations
   before proxy startup or durable mutation: Codex source requires Codex reviewer, supported host executor, admissible
   boundary, appropriate auth policy, and no native `fork_session=False`, cascade, or shadow sampling. Keep
   omitted-source behavior for existing conversation-backed Claude and fresh plan-only reviewers.
-- [ ] Validate the complete effective candidate after applying retained/replaced overrides on every authoring path:
+- [x] Validate the complete effective candidate after applying retained/replaced overrides on every authoring path:
   `supervisor set`, `forge session set policy.supervisor.*`, `forge session reset <key>|--all`, lane changes, inherited
   intent/overrides, and lifecycle `on`/reload. Include source, reviewer runtime, auth, trigger, required plan, sidecar,
   cascade and shadow combinations. Repeat identity-sensitive checks under mutation/launch, and reject malformed
   persisted combinations at dispatch without crashing. Extend B4's effective-config regressions for masking overrides,
   reset exposing invalid intent, frozen identity, and concurrent changes; do not validate only authored intent.
-- [ ] Encode new source/auth semantics with a new manifest version only when needed, including effective overrides. Keep
+- [x] Encode new source/auth semantics with a new manifest version only when needed, including effective overrides. Keep
   ordinary v2/v3 writes and existing Stop-only v4 writes compatible. Cover strict reads, unknown fields/versions,
   generic override application/removal, frozen reviewer identity, malformed records, and old supported readers. Do not
   serialize new null/default fields into older manifests.
-- [ ] Freeze source resolution and auth/model/effort identity consistently with the existing lane commitment. Make
+- [x] Freeze source resolution and auth/model/effort identity consistently with the existing lane commitment. Make
   source replacement explicit, invalidate related state, and prevent a failed replacement from erasing working config.
   Cover `set`, `off`, `on`, `remove`, and `reload`, including suspended and frozen sessions.
-- [ ] Keep plan reload runtime-aware. Reuse one immutable `PlanSnapshot` for the prompt, citation verification, attempt,
+- [x] Keep plan reload runtime-aware. Reuse one immutable `PlanSnapshot` for the prompt, citation verification, attempt,
   and cache identity. A configured but missing/unreadable plan makes review unavailable; never fall back to conversation
   instructions. Detect source/executor equality through confirmed IDs, including name-versus-ID aliases and resume;
   apply the verified lineage rules and unknown-independence handling to different IDs. Require a nonempty approved
   snapshot for every native Stop setup and dispatch, preserving B4's gate.
-- [ ] Preserve supported session lifecycle behavior: Codex children use `session start --runtime codex --resume-from`
+- [x] Preserve supported session lifecycle behavior: Codex children use `session start --runtime codex --resume-from`
   and receive fresh policy; `session fork` is not a Codex path. Recheck equality and admission on resume and on any path
   that inherits supervisor intent. Refuse incompatible inheritance before transfer inference or child publication.
 
 ## 3. Dispatch an isolated native reviewer
 
-- [ ] Add a typed fork request to the shared Codex invoker without changing managed fresh/resume behavior. Use the newly
+- [x] Add a typed fork request to the shared Codex invoker without changing managed fresh/resume behavior. Use the newly
   demonstrated fork stdin/argument composition, protected schema/output files, runtime admission, action CWD, read-only
   sandbox, and ephemeral semantics. Clean temporary artifacts on success, failure, timeout, and cancellation.
-- [ ] Apply the tested reviewer-specific hook/environment isolation before launch. Keep source access available without
+- [x] Apply the tested reviewer-specific hook/environment isolation before launch. Keep source access available without
   binding the child to the parent Forge session. Carry the outer attempt, session and run-tree attribution explicitly;
   distinguish legitimate outer review bookkeeping from child hook mutations in integrated assertions.
-- [ ] Bind cached readiness and auth verification to the actual executable, configuration/account location, child
+- [x] Bind cached readiness and auth verification to the actual executable, configuration/account location, child
   environment, and selected billing mode. Refuse cold/stale/unready or mismatched evidence without probing in the hook.
   Subscription cases must not hydrate a key or fall through to paid settings; API cases must not fall back to login.
   Enforce the gate-proved login/API restriction in the launched process, including negative stored-credential cases; do
   not treat preflight alone as an enforcement boundary. Preserve the other consumers' inherited-credential contracts.
-- [ ] Supply bounded action evidence and the current approved snapshot after native source selection, with explicit plan
+- [x] Supply bounded action evidence and the current approved snapshot after native source selection, with explicit plan
   precedence and untrusted conversation/action content. Record unavailable or compacted context honestly. Validate
   structured verdicts and citations through existing rules; do not promote remembered text into verified plan quotes or
   reinterpret model confidence as calibrated probability.
-- [ ] Persist source runtime/ID/provenance, boundary evidence or its limits, child ID when returned, action checkout,
+- [x] Persist source runtime/ID/provenance, boundary evidence or its limits, child ID when returned, action checkout,
   plan digest, independence, effective reviewer/auth identity, and outcome in the review record. Version record changes
   explicitly and preserve readable older records. Failed launches may have no child ID; do not invent one.
-- [ ] Disable native verdict-cache reuse in B5. Preserve the source artifact/prefix hash for audit, with native loading
+- [x] Disable native verdict-cache reuse in B5. Preserve the source artifact/prefix hash for audit, with native loading
   and compaction qualifications; a hash alone does not prove model-visible context. Recheck plan/source/config/action
   identity under the chosen boundary contract before applying the verdict. A changed live source invalidates review;
   later appends to a proved immutable copy are reported separately from that copy's identity. Keep existing cache
   behavior for other source modes.
-- [ ] Reuse the whole-hook deadline and parent-death watchdog. Record a durable attempt before dispatch, preserve an
+- [x] Reuse the whole-hook deadline and parent-death watchdog. Record a durable attempt before dispatch, preserve an
   incomplete outcome after interruption, and emit usage once through `CodexHeadlessInvoker` with `operation=None`.
   Detect quota/runtime errors even on exit zero; suppress native-mode sticky degrade and alternate-context retries.
 
 ## 4. Preserve policy, feedback, and operational contracts
 
-- [ ] Exercise native review with host Claude Write/Edit and host Codex `apply_patch`. Deterministic checks and artifact
+- [x] Exercise native review with host Claude Write/Edit and host Codex `apply_patch`. Deterministic checks and artifact
   authority retain their current order and effect. Source/refusal/runtime failures remain unavailable reviews under the
   existing failure policy, never synthetic alignment or unexpected engine-construction errors.
-- [ ] Compose with B4 Stop review: the outer journal reserves the single dispatch; source failures and uncertain starts
+- [x] Compose with B4 Stop review: the outer journal reserves the single dispatch; source failures and uncertain starts
   cannot reopen spending. Keep one correction, no per-edit semantic calls, no cascade/shadow or transport retry, current
   checkout attribution, partial-evidence limits, and persistence across telemetry reset. Native fork hooks must neither
   reserve a second turn nor mutate the parent's watermark.
-- [ ] Keep native Stop product admission blocked on the separate
+- [x] Keep native Stop product admission blocked on the separate
   [global-ignore evidence fix](../../done/preserve_stop_global_ignores/card.md). Add a composition regression using a
   synthetic file ignored only through global `core.excludesFile`: it must not enter snapshots or outgoing evidence.
   Scope this to incidental untracked-file capture; global ignore is not a secrecy guarantee for tracked files or
   explicit tool payloads. Do not bypass the issue by asserting B4 evidence is already safe or by loading arbitrary
   global Git execution settings. Runtime experiments use disposable synthetic content throughout.
-- [ ] Preserve B3 normal/source-only audience rules and summary-off behavior. Only verified approved-plan passages may
+- [x] Preserve B3 normal/source-only audience rules and summary-off behavior. Only verified approved-plan passages may
   enter source-only model feedback; an admitted conversation-only PreToolUse review without a verifiable quote uses
   fixed diagnostics while full generated evidence remains operator-readable. Stop always has an approved snapshot.
   Native history is not a new authority for injected instructions.
-- [ ] Show source runtime/ID, available boundary facts, approved-plan digest, shared-source reduced independence, actual
+- [x] Show source runtime/ID, available boundary facts, approved-plan digest, shared-source reduced independence, actual
   reviewer/billing route, and unavailable/incomplete reasons in supervisor status/JSON and review/activity evidence.
   Preserve stable result streams and source-vs-reviewer distinctions in lane `set|show|clear` and telemetry surfaces.
-- [ ] Reject unsupported manual-evaluate and shadow reconstructions explicitly or extend them through the same verified
+- [x] Reject unsupported manual-evaluate and shadow reconstructions explicitly or extend them through the same verified
   source contract; never silently substitute a fresh prompt. Keep native cascade/shadow configuration refused,
   historical audits readable, and live enforcement evidence separate from shadow evidence. Correct stale dispatch
   comments in touched code.
 
 ## 5. Acceptance tests
 
-Use `tests.fixtures.session_state` to publish coherent indexed fixtures. Paths marked **new** are planned test homes; do
-not create placeholder tests during this planning change.
+Use `tests.fixtures.session_state` to publish coherent indexed fixtures. The table maps the reviewed acceptance matrix
+to automated tests and retained native evidence. Live compatibility claims use the gate/product captures, not stub
+delivery alone.
 
 | Test                       | Fixture                                                        | Assertion                                                               | Test file                                                                                                   |
 | -------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Source identity            | Managed name, full native ID, duplicate/missing/Claude source  | Confirmed binding or refusal without mutation                           | **new** `tests/src/policy/semantic/test_codex_fork_supervisor.py`                                           |
+| Source identity            | Managed name, full native ID, duplicate/missing/Claude source  | Confirmed binding or refusal without mutation                           | `tests/src/core/runtime/test_codex_review_source.py`                                                        |
 | Schema compatibility       | Legacy v2/v3, Stop v4, native config and overrides             | Conditional new version; old writes remain readable                     | `tests/src/session/test_store.py`                                                                           |
 | Setup and lifecycle        | Set/reset, masking overrides, inherited intent, frozen/sidecar | Effective combinations validated atomically; reset cannot expose bypass | `tests/src/cli/test_policy_supervisor.py`, `tests/regression/test_bug_b4_effective_config.py`               |
 | Native request             | Explicit source, schema, action CWD, model/effort              | Fork arguments; fresh/resume requests unchanged                         | `tests/src/core/invoker/test_codex_invoker.py`                                                              |
-| Fork transport             | Multiline bounded prompt via stdin                             | Exact payload received; no prompt content in argv                       | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
-| Model/auth compatibility   | G2–G4 source/reviewer matrix                                   | Context loads or admission refuses; no model/route substitution         | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
-| Long/compacted context     | G5–G6 with repeated forks and sentinels                        | Retention, cached input and real remaining deadline recorded            | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
+| Fork transport             | Multiline bounded prompt via stdin                             | Exact payload received; no prompt content in argv                       | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
+| Model/auth compatibility   | G2–G4 source/reviewer matrix                                   | Context loads or admission refuses; no model/route substitution         | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
+| Long/compacted context     | G5–G6 with repeated forks and sentinels                        | Retention, cached input and real remaining deadline recorded            | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
 | Hook ownership             | Parent markers plus CWD discovery and B4 hooks                 | No child adoption, parent mutation or recursive review                  | **new** `tests/regression/test_bug_codex_reviewer_parent_mutation.py`                                       |
-| Read-only and context      | Planning sentinel, separate checkouts, writable control        | Source preserved; action checkout read; attempted writes denied         | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
-| Shared source              | Later conflicting reasoning; with/without approved plan        | Plan wins; reduced independence; absent plan means no dispatch          | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
-| Source lineage             | Same ID, known fork ancestry, missing ancestry                 | Shared/unknown independence visible; plan required                      | **new** `tests/src/policy/semantic/test_codex_fork_supervisor.py`                                           |
-| Active boundary            | Parent suspended in supported hook; source changes             | Only proved boundary admitted; no invented snapshot guarantee           | **new** `tests/integration/docker/test_codex_fork_supervisor.py`                                            |
-| Auth and accounting        | Login, explicit API, ambient key, stale preflight              | Selected billing only; one usage event; no paid fallback                | **new** `tests/src/policy/semantic/test_codex_fork_supervisor.py`                                           |
+| Read-only and context      | Planning sentinel, separate checkouts, writable control        | Source preserved; action checkout read; attempted writes denied         | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
+| Shared source              | Later conflicting reasoning; with/without approved plan        | Plan wins; reduced independence; absent plan means no dispatch          | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
+| Source lineage             | Same ID, known fork ancestry, missing ancestry                 | Shared/unknown independence visible; plan required                      | `tests/src/core/runtime/test_codex_review_source.py`                                                        |
+| Active boundary            | Parent suspended in supported hook; source changes             | Only proved boundary admitted; no invented snapshot guarantee           | `tests/integration/core/test_codex_fork_supervisor.py` and native gate/product evidence                     |
+| Auth and accounting        | Login, explicit API, ambient key, stale preflight              | Selected billing only; one usage event; no paid fallback                | `tests/src/core/runtime/test_codex_review_source.py`                                                        |
 | Runtime failures           | Exit-zero error, quota, malformed verdict, cold cache          | Unavailable reason; no alignment or alternate-context retry             | `tests/src/policy/semantic/test_supervisor.py`                                                              |
 | Lifetime                   | Sleeping reviewer/descendant; hook-only kill                   | Bounded cleanup and durable incomplete attempt                          | **new** `tests/integration/core/test_codex_fork_supervisor.py`                                              |
-| Context freshness          | Live source advances, immutable copy, changed plan             | Native cache disabled; audit identifies selected input and limits       | **new** `tests/src/policy/semantic/test_codex_fork_supervisor.py`                                           |
+| Context freshness          | Live source advances, immutable copy, changed plan             | Native cache disabled; audit identifies selected input and limits       | `tests/src/core/runtime/test_codex_review_source.py`                                                        |
 | Stop composition           | Duplicate hooks, correction, telemetry reset, partial work     | One dispatch/correction; exclusions and journal ownership preserved     | `tests/integration/core/test_codex_stop_review.py`                                                          |
 | Stop plan gate             | Separate native source with absent/empty plan                  | Setup rejects; persisted invalid config cannot dispatch                 | `tests/src/policy/semantic/test_stop_review.py`                                                             |
 | Stop evidence prerequisite | Synthetic untracked file ignored only globally                 | Excluded from capture and reviewer evidence after separate fix          | `tests/src/policy/semantic/test_turn_evidence.py`                                                           |
@@ -350,30 +351,33 @@ not create placeholder tests during this planning change.
 
 ## 6. Product verification and documentation
 
-- [ ] Run focused unit/regression checks for each changed contract, then `make test-unit`, `make test-regression`, and
+- [x] Run focused unit/regression checks for each changed contract, then `make test-unit`, `make test-regression`, and
   `make pre-commit` on the integrated head. Every corrected bug gets a reproducer; do not count fixture-only delivery as
   native proof.
-- [ ] Run new Docker and real-process integration files through `./scripts/test-integration.sh <path-or-pytest-args>`;
+- [x] Run new Docker and real-process integration files through `./scripts/test-integration.sh <path-or-pytest-args>`;
   also target `tests/integration/docker/test_plan_file_supervision.py`,
   `tests/integration/core/test_codex_policy_feedback.py`, and `tests/integration/core/test_codex_stop_review.py` for
   compatibility. Keep paid/native cases explicit and within the approved ledger; report missing prerequisites or
   deselections rather than treating them as passes.
-- [ ] Refresh `forge runtime preflight codex` outside hooks and verify enrollment when needed. Exercise source setup,
+- [x] Refresh `forge runtime preflight codex` outside hooks and verify enrollment when needed. Exercise source setup,
   lifecycle controls, `forge policy supervisor status --json`,
   `forge session lane set|show|clear --consumer supervisor`, and `forge telemetry activity <session>`. Test the
   no-`.env` subscription path and explicit API configuration separately. Verify unavailable-source and
   unsupported-version recovery commands apply to the selected mode.
-- [ ] Build one candidate with `make build` and exercise native review from a clean wheel install, including packaged
+- [x] Build one candidate with `make build` and exercise native review from a clean wheel install, including packaged
   schema/resources, hook registration/trust, action-checkout selection, and parent preservation. Retain exact wheel and
   binary hashes and compare captured product code to the final head; qualify any later source drift.
-- [ ] Update shipped contracts in `docs/design_workflows.md`, `docs/design_subprocesses.md`,
+- [x] Update shipped contracts in `docs/design_workflows.md`, `docs/design_subprocesses.md`,
   `docs/design_session_execution.md`, and the session state design where serialization ownership changes. Update
   `docs/end-user/policy.md`, relevant runtime guidance, and `docs/cli_reference.md` with the tested setup, billing,
   support/refusal matrix, independence limits, and recovery. Do not turn proposed behavior into normative documentation
   before implementation passes.
-- [ ] Export sanitized commands, versions, assertions, dispatch counts and negative results under this card's
+- [x] Export sanitized commands, versions, assertions, dispatch counts and negative results under this card's
   `evidence/`. Preserve B2–B4 captures unchanged. Tear down only the B5-owned login, processes and fixtures; verify
-  normal login/settings/source state remains unchanged.
+  normal login/settings/source state remains unchanged where evidence permits. Teardown removed both owned logins and
+  product input copies, with no fixture processes left. Ordinary credentials were not accessed; all selected original
+  source prefixes stayed intact. The earlier unexplained ordinary config hash change prevents a whole-round settings
+  preservation claim and remains documented in the evidence.
 
 ## Closeout
 
@@ -443,3 +447,38 @@ Markdown formatting. The Markdown link audit passes for 662 source files; workin
 final allocation is 48/60 starts and 3/4 API starts, leaving only the twelve product slots. Both original-rollout and
 copied-rollout holding directories are empty, and the export contains no fixture account identifiers. The contract
 supplement is ready for the scope review required before product implementation; B5 and the epic remain in `doing/`.
+
+Contract approval, 2026-10-11: the user approved the dedicated reviewer login, copied histories with fresh native
+indexes, separate completed-source PreToolUse, and approved-plan Stop for shared/active sources. Proceeding with
+sections 2–6; the remaining twelve native starts stay allocated to product and clean-wheel verification.
+
+Product verification, 2026-10-11: implemented conditional schema v5, effective source/auth/lane validation, dedicated
+reviewer login, copied native ancestry with fresh indexes, cancellation-first lifetime ownership, new-review usage
+deltas and uncached native dispatch. Runtime support follows the approved gate matrix. The six product reviewers passed
+separate-source allow/deny, shared active Stop with approved-plan precedence, source-only feedback and global-ignore
+composition. Each emitted exactly one attributed usage event. Both Stop controls allowed one correction and left that
+correction unreviewed. The [product export](evidence/product.json) records **60/60 total starts, 3/4 API starts**, wheel
+identity and installed-source hashes matching the final working tree; there will be no additional native calls in this
+round.
+
+The final targeted integration runner passed **14 tests**, with **11 legacy native cases explicitly deselected** because
+they require separate fixtures or more inference. New B5 native controls compose those installed paths within the
+budget. `make test-regression` passed **1,546 tests**. The Claude adapter control used a synthetic Write payload with a
+real Codex reviewer, not a live Claude executor; explicit product API configuration used a dummy key without inference,
+with route evidence supplied by the three earlier API starts. Source/config/plan races, malformed output, quota errors,
+override/reset/inheritance admission and lease cleanup have deterministic or real-process coverage.
+
+Final verification: `make test-unit` passes **10,770 tests, 117 deselected**; `make test-regression` passes **1,546**;
+full `make pre-commit` passes, including type checks, lint, secret scan, formatting, file-size limits and Markdown
+links. The user explicitly approved counting the three changed large guides through Anthropic's token-count endpoint.
+Their refreshed cache entries and the previously failing exact-byte cache assertion now pass. No model generation was
+used for that refresh, and the native-start ledger remains closed at 60.
+
+The deterministic policy CLI file and diff paths both pass for `coding_standards`, each reporting one checked file.
+`origin/main` remains `225ab3dd`, and installed product source hashes still match. The implementation, tests, documents
+and sanitized evidence are ready for per-card PR review. CI and merged-tree verification remain closeout obligations.
+
+The [fixture teardown](evidence/product-teardown.json) logged out both independently authenticated fixture stores,
+verified all fixture auth files absent and removed copied product inputs. No fixture processes remained, and the round
+is marked closed. Sanitized evidence and credential-free private captures remain for review. B5 and the epic remain in
+`doing/` until review, merge and shipped-tree closeout.

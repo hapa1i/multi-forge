@@ -11,7 +11,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from forge.core.invoker.codex_stream import is_subscription_exhausted
 from forge.core.invoker.types import Attribution, HeadlessResult
@@ -281,7 +281,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         if self._config.plan_override_path:
             cache_key = cache_key + "|plan:" + snapshot.fingerprint
 
-        cached = self._cache.check(cache_key)
+        cached = None if self._config.native_source else self._cache.check(cache_key)
         if cached is not None:
             cached_confidence = cached.get("confidence")
             clean_allow = (
@@ -322,6 +322,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
             and not decision.warnings
             and not decision.fail_open
             and not decision.failure_type
+            and not self._config.native_source
         ):
             self._cache.update(cache_key, verdict="aligned", confidence=1.0)
 
@@ -569,8 +570,8 @@ def _dispatch_supervisor(
     # uncaught -> engine policy_error -> DENY under fail_mode="closed" (the supervisor's contract
     # is fail-open, design_workflows 1.2).
     if runtime == "codex":
-        # No `resolved`: the codex arm is blind/transfer-fed (no --resume) and runs in the
-        # ACTION repo (context.repo_root), so it needs nothing from the resolved resume target.
+        # Fresh plan-only reviews run in the action checkout. Native sources have
+        # their own immutable-input dispatch before this legacy routing arm.
         return _dispatch_codex_supervisor(
             prompt=prompt,
             config=config,
@@ -679,8 +680,8 @@ def _dispatch_codex_supervisor(
 ) -> SessionResult:
     """Run the supervisor on the codex-exec lane.
 
-    Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
-    be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
+    Fresh plan-only reviews receive the approved plan in ``prompt`` through the
+    plan-override preamble. ``run_supervisor_check``
     enforces that precondition (plan-present) before selecting this arm; this function does
     not re-check it. Read-only sandbox (the supervisor inspects, never writes), rooted at the
     **action's** checkout (``context.repo_root``) -- NOT the planner's ``source_cwd`` -- so a
@@ -727,7 +728,7 @@ def _dispatch_codex_supervisor(
             ),
             # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
             # worktree, needed only because `claude --resume` is CWD-scoped to find the
-            # transcript -- a Claude-arm constraint codex (no --resume) doesn't share. Codex
+            # transcript -- fresh Codex reviews do not use that lookup. Codex
             # judges in a read-only sandbox and may inspect the repo; target_path is relative
             # to context.repo_root, so a fork/worktree flow (planner cwd != action cwd) would
             # otherwise have codex read the wrong branch. `or None` -> inherit the worker cwd
@@ -843,6 +844,7 @@ def run_supervisor_check(
                 lane_record=lane_record,
                 snapshot=snapshot,
                 resolved_target=resolved_target,
+                record_native=attempt.note_native,
             )
     except Exception as exc:
         result = SupervisorRun(
@@ -877,6 +879,7 @@ def _run_supervisor_check(
     lane_record: LaneRecord | None = None,
     snapshot: PlanSnapshot | None = None,
     resolved_target: _ResolvedTarget | None = None,
+    record_native: Callable[[dict[str, Any]], None] | None = None,
 ) -> SupervisorRun:
     """Run the frontier supervisor once; return decision + raw verdict + run/parse status.
 
@@ -982,12 +985,9 @@ def _run_supervisor_check(
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
-    # Codex has no `--resume`: the approved plan reaches it only via the plan-override
-    # preamble (folded into `prompt` above when plan_content is present). With no plan text
-    # we would be asking Codex to check against a plan it cannot see, so fail open WITHOUT
-    # spawning it. Re-checkable: set plan_override_path or run `%policy supervisor reload`,
-    # and the next action re-runs this arm -- the lane is never permanently disabled.
-    if lane.runtime_id == "codex" and not plan_content:
+    # Fresh plan-only Codex reviews need in-band text. Native forks validate their
+    # complete source and required plan at the immutable-input admission boundary.
+    if lane.runtime_id == "codex" and not plan_content and not config.native_source:
         return SupervisorRun(
             _supervisor_fail_open_decision(
                 "Codex supervisor lane needs an approved plan in-band: set "
@@ -998,14 +998,42 @@ def _run_supervisor_check(
         )
 
     try:
-        result = _dispatch_supervisor(
-            lane,
-            prompt=prompt,
-            config=config,
-            context=context,
-            resolved=resolved,
-            usage_command=usage_command,
-        )
+        if config.native_source:
+            from forge.policy.semantic.native_codex import (
+                NativeInvocationError,
+                dispatch_native,
+            )
+
+            if usage_command != "supervisor" or record_native is None:
+                raise _SupervisorRoutingError(
+                    "Native review requires live attempt evidence; shadow is unsupported",
+                    failure_type="configuration_error",
+                )
+            try:
+                native = dispatch_native(
+                    config,
+                    context,
+                    prompt=prompt,
+                    plan=plan_content or "",
+                    deadline=review_deadline(config.timeout_seconds, trigger=config.review_trigger),
+                    record=record_native,
+                )
+            except Exception as exc:
+                raise _SupervisorRoutingError(
+                    f"Native Codex review unavailable: {exc}",
+                    failure_type="native_unavailable",
+                    dispatched=None if isinstance(exc, NativeInvocationError) else False,
+                ) from exc
+            result = _headless_to_session_result(native)
+        else:
+            result = _dispatch_supervisor(
+                lane,
+                prompt=prompt,
+                config=config,
+                context=context,
+                resolved=resolved,
+                usage_command=usage_command,
+            )
     except _SupervisorRoutingError as e:
         return SupervisorRun(
             _supervisor_fail_open_decision(
@@ -1409,6 +1437,7 @@ def apply_supervisor_to_intent(
         # (including shadow sampling and checker defaults) remains user-owned.
         for key in (
             "resume_id",
+            "native_source",
             "forge_root",
             "plan_override_path",
             "proxy",

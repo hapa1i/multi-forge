@@ -69,6 +69,21 @@ def validate_reviewer(config: SupervisorConfig, lane: LaneRecord) -> None:
         raise ValueError("Stop supervision cannot use cascade or shadow sampling.")
     if config.supervisor_model is not None and config.supervisor_model != lane.model:
         raise ValueError("Supervisor model differs from its bound lane. Remove and reconfigure the supervisor.")
+    if config.native_source:
+        if (
+            lane.runtime_id != "codex"
+            or config.resume_id
+            or config.cascade
+            or config.shadow_sample_rate
+            or not config.fork_session
+        ):
+            raise ValueError("Native sources require an isolated Codex reviewer without resume, cascade or shadow")
+        if config.auth_mode not in {"subscription-only", "api"}:
+            raise ValueError("Native Codex sources require explicit subscription-only or api auth")
+        if config.supervisor_model not in {"gpt-6.1-sol", "gpt-6-sol"} or config.supervisor_effort != "low":
+            raise ValueError("Native supervision currently requires gpt-6.1-sol or gpt-6-sol with low effort")
+        if config.review_trigger == "stop" and not config.plan_override_path:
+            raise ValueError("Native Stop supervision requires an explicit approved plan file")
     effort = config.supervisor_effort
     if lane.runtime_id == "codex":
         if config.proxy or config.base_url:
@@ -83,6 +98,8 @@ def validate_reviewer(config: SupervisorConfig, lane: LaneRecord) -> None:
         validate_claude_effort(effort)
         if (config.proxy or config.base_url) and config.supervisor_model not in (None, "opus", "sonnet", "haiku"):
             raise ValueError("Proxied supervisors select opus, sonnet, or haiku; the proxy owns their model mapping.")
+    if config.native_source:
+        return  # The native route is enforced in the dedicated fork child.
     if config.auth_mode == "subscription-only":
         if lane.runtime_id != "claude_code" or lane.backend_id != "claude-max" or not config.direct:
             raise ValueError("Subscription-only supervision requires direct Claude on backend claude-max.")
@@ -93,6 +110,8 @@ def validate_reviewer(config: SupervisorConfig, lane: LaneRecord) -> None:
 
 
 def validate_sidecar_supervisor(config: SupervisorConfig | None, *, sidecar: bool) -> None:
+    if sidecar and config and config.native_source:
+        raise ValueError("Native Codex supervision requires a host executor")
     if sidecar and config and config.review_trigger == "stop":
         raise ValueError(
             "Stop supervision requires a host Codex executor. Select pre-tool-use before changing runtime."
@@ -117,6 +136,7 @@ def reviewer_cache_identity(config: SupervisorConfig, lane: LaneRecord | None) -
         {
             "lane": asdict(lane) if lane else None,
             "target": config.resume_id,
+            "native_source": asdict(config.native_source) if config.native_source else None,
             "root": config.forge_root,
             "model": config.supervisor_model,
             "effort": config.supervisor_effort,
@@ -153,6 +173,15 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
         from forge.session.models import session_runtime
 
         validate_stop_executor(sup, runtime=session_runtime(state), sidecar=sidecar)
+        if sup.native_source:
+            from forge.policy.semantic.native_codex import (
+                preflight_native,
+                validate_native_executor,
+            )
+
+            validate_native_executor(sup, state)
+            if sup.active:
+                preflight_native(sup)
         if sup.review_trigger == "stop":
             from forge.core.runtime.codex_turn_enrollment import require_for_launch
 
@@ -160,7 +189,11 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
     if confirmed_lane(state, SUPERVISOR_CONSUMER) is not None:
 
         def identity(value: SupervisorConfig | None):
-            return (value.auth_mode, value.supervisor_model, value.supervisor_effort) if value else None
+            return (
+                (value.auth_mode, value.supervisor_model, value.supervisor_effort, value.native_source)
+                if value
+                else None
+            )
 
         if identity(sup) != identity(old):
             raise ValueError("Frozen supervisor identity requires remove/reconfigure.")
@@ -171,3 +204,18 @@ def validate_inherited_claude_trigger(parent: SessionState) -> None:
     sup = snapshot_supervisor_options(parent)
     if sup:
         validate_stop_executor(sup, runtime="claude")
+    # Derivation copies intent without overrides. Validate both the parent's
+    # effective identity and the exact native configuration the child inherits.
+    from forge.session.consumer_lanes import intent_lane, read_bound_lane
+
+    inherited = parent.intent.policy.supervisor if parent.intent.policy else None
+    for candidate, lane in (
+        (sup, read_bound_lane(parent, SUPERVISOR_CONSUMER)),
+        (inherited, intent_lane(parent, SUPERVISOR_CONSUMER)),
+    ):
+        if candidate and candidate.native_source:
+            validate_reviewer(candidate, lane or select_supervisor_lane())
+            if candidate.active:
+                from forge.policy.semantic.native_codex import preflight_native
+
+                preflight_native(candidate)

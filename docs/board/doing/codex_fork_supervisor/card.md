@@ -4,10 +4,11 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
-Status: runtime findings ready for [contract review](gate-decision.md), 2026-10-11, on `codex/codex-fork-supervisor`,
-rebased onto `main` at `225ab3dd`. The user approved the [execution checklist](checklist.md). The
-[captures](evidence/README.md) use 48/60 native starts and 3/4 authorized API starts. Copied ancestry, dedicated login
-ownership, cancellation and inherited usage counters need a reviewed contract before product implementation.
+Status: implementation verified and ready for review, 2026-10-11, on `codex/codex-fork-supervisor`, rebased onto `main`
+at `225ab3dd`. The user approved the [contract supplement](gate-decision.md) and [execution checklist](checklist.md).
+The [captures](evidence/README.md) now use 60/60 native starts and 3/4 authorized API starts. Installed allow/deny,
+shared-source Stop, source-only feedback and clean-wheel controls pass, along with aggregate unit, regression and
+pre-commit checks. PR review, CI and shipped-tree closeout remain.
 
 The revised checklist preserves B4's approved-plan requirement for native Stop, gates model/auth switching and
 long/compacted sources, and treats PreToolUse support as a measured scope decision. Native Stop product admission also

@@ -70,6 +70,11 @@ class HeadlessRequest:
     base_url: str | None = None
     # Supervisor-only lifetime guard; other callers retain the ordinary invoker lifecycle.
     watchdog_deadline: float | None = None
+    # Leases remain owned by the watchdog/anchor if the invoking hook dies.
+    pass_fds: tuple[int, ...] = ()
+    cancel_before_kill: bool = False
+    # Reviewer attribution stays in the parent, outside the isolated child env.
+    run_identity: tuple[str, str | None, str] | None = None
 
 
 @dataclass
@@ -108,6 +113,10 @@ class HeadlessResult:
     # `codex exec resume` id); Claude leaves it None (its session id is Forge-owned
     # via --session-id, not read back from output).
     runtime_session_id: str | None = None
+    # Native fork counters include inherited history. Preserve them for audit;
+    # the public usage fields carry only a verified new-review delta.
+    inherited_usage: dict[str, int | None] | None = None
+    terminal_usage: dict[str, int | None] | None = None
 
     @property
     def success(self) -> bool:

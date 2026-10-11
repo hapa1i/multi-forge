@@ -913,6 +913,11 @@ change it (re-pinning the same lane is a no-op). Fork or start a fresh session f
 `forge policy supervisor remove` (clears the binding) and re-add. `forge session fork` / `resume` carry the requested
 lane to the child, which re-freezes on its own first check. See [policy.md](policy.md#supervisor-runtime-lane).
 
+To review from a native Codex planning thread, configure `forge policy supervisor set <target> --source-runtime codex`
+with the explicit reviewer model and auth described in [native supervision](native_supervision.md). The source selector
+is distinct from a Claude planning target. Configure an existing/adopted executor before resuming it; Codex
+`start --resume-from` creates a child with fresh policy and `session fork` remains a Claude path.
+
 **Launch-time cascade and checker controls:** `fork` and `start` accept the same tier-1 cascade knobs as
 `forge policy supervisor set`, so you can wire the cheap pre-check at launch instead of in a second command. All require
 `--supervise`:

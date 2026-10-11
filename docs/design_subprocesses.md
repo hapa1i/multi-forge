@@ -145,6 +145,25 @@ inherited file descriptor, not command-line JSON or a named credential file; hoo
 customizations remain excluded. Subscription-only review never uses this projection. Both watchdog helpers use Python
 isolated mode and a neutral CWD; only the reviewer receives the action CWD.
 
+**Native Codex supervision (B5).** This separate source mode requires explicit `subscription-only` or `api`; it does not
+change inherited auth for fresh Codex or auxiliary consumers. `codex_reviewer_home` owns a marked private reviewer login
+and its lease. Subscription setup performs an independent device login and records the operator's extra-usage-off
+assertion. Dispatch compares the recorded source account locally and never copies ordinary credentials. API keys resolve
+environment-first, then Forge credentials, and enter only an ephemeral child home. Auth restrictions are on the `fork`
+leaf; source model/account provenance and the tested executable fingerprint are checked before inference.
+
+The fork child receives only process essentials, its owned home, depth guard and any explicit API key. Parent session,
+run, launcher and provider-routing identities are removed; usage attribution travels out of band through the shared
+invoker. Hooks, rules, agents, plugins and apps are disabled, with a read-only action checkout. Each attempt copies only
+the selected root/one-generation ancestry and starts a fresh native index. A real file lock is inherited by watchdog and
+anchor; explicit unlock is forbidden because hook death must not release another process's input. Cleanup acquires the
+lease before removing marked artifacts. API orphan recovery skips active, unmarked and unsafe homes.
+
+The shared watchdog's opt-in native cancellation sends SIGINT, waits one second, sends TERM, then escalates to KILL
+after half a second. The independent anchor also cancels when the watcher dies. Legacy cancellation remains unchanged.
+Product requests use the existing hook deadline and completion reserve, not a second allowance. See the
+[support matrix](end-user/native_supervision.md) for platform, binary, history and trigger limits.
+
 **Aux consumers on `claude-max` (T6a).** All three aux consumers use the same machinery. A `claude-max` binding keeps
 the default `claude_code` runtime, changing the **billing label, not dispatch**. Shadow-curation and memory-writer also
 have dispatch-changing Codex lanes (T6b/T6c); team-supervisor is billing-only.

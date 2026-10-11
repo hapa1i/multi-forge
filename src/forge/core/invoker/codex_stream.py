@@ -55,7 +55,7 @@ class CodexStreamResult:
     thread_id: str | None = None
 
 
-def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
+def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> CodexStreamResult:
     """Reduce a ``codex exec --json`` JSONL event stream to a :class:`CodexStreamResult`."""
     texts: list[str] = []
     input_tokens: int | None = None
@@ -90,9 +90,9 @@ def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
                 # turn.completed, so this assigns once. If a future multi-turn stream emits
                 # several, this keeps the LAST (the final cumulative figure). Revisit to sum
                 # only if probes show per-turn *incremental* usage instead.
-                input_tokens = _as_int(usage.get("input_tokens"))
-                output_tokens = _as_int(usage.get("output_tokens"))
-                cached_tokens = _as_int(usage.get("cached_input_tokens"))
+                input_tokens = _as_int(usage.get("input_tokens"), strict=strict_usage)
+                output_tokens = _as_int(usage.get("output_tokens"), strict=strict_usage)
+                cached_tokens = _as_int(usage.get("cached_input_tokens"), strict=strict_usage)
                 # NOTE: `reasoning_output_tokens` is a SUBSET of `output_tokens` (Responses
                 # usage is inclusive), so it is deliberately NOT lifted -- adding it would
                 # double-count. There is no HeadlessResult field for it.
@@ -207,12 +207,12 @@ def _error_type_is_exhaustion(error_message: str) -> bool:
     return isinstance(error_type, str) and error_type.casefold() in _EXHAUSTION_ERROR_TYPES
 
 
-def _as_int(value: object) -> int | None:
+def _as_int(value: object, *, strict: bool = False) -> int | None:
     """Coerce a usage value to int, tolerating absent/non-numeric fields (boundary)."""
     if isinstance(value, bool):  # bool is an int subclass; a usage count is never a bool
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, float):
+    if isinstance(value, float) and not strict:
         return int(value)
     return None

@@ -75,6 +75,15 @@ as `forge +$Y`: Forge-added LLM spend for the session, **excluding** the main in
 (`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
 ([§A.8](design_telemetry.md#a8-status-line-guidance-3611)).
 
+**Native fork usage.** B5 uses the existing Codex emitter once, with `command=supervisor`, parent session/run
+attribution held outside the child environment and no second operation-level emitter. Terminal fork counters include
+inherited usage. The selected prefixes supply the comparable `event_msg.token_count.info.total_token_usage` baseline;
+the source's post-compaction thread counter is not interchangeable. Emit the nonnegative input/output/cached deltas, or
+unknown when counters are absent, decreasing or incomparable. This classifies `subscription_quota` or `api` from the
+enforced child route without estimating an invoice change. Native attempt schema v3 retains prefix hashes,
+source/boundary identities, independence, raw baseline/terminal counters and the new-review delta, with no credential or
+account identifiers.
+
 **Supervisor attempts.** `FORGE_HOME/telemetry/supervisor_attempts/<session-root-hash>-<attempt-id>.json` is global
 telemetry, preserved on session deletion and removed by telemetry reset. Writes retain the newest 200 records per
 session/root and prune records older than 30 days daily; a live writer's lock prevents pruning. Read paths select the

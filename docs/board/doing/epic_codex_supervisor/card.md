@@ -9,11 +9,12 @@ B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), me
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
 formatting, and fixture teardown. B4 shipped through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged
 as `2045aea1`; its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records bounded Stop review,
-turn attribution, and evidence limits. B5 has
-[runtime findings for contract review](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`,
-rebased onto `225ab3dd` after the global-ignore correction shipped. Its captures use 48/60 native starts and 3/4
-authorized API starts. Product work awaits the source/home/trigger contract and remaining admission, lease and usage
-proofs.
+turn attribution, and evidence limits. B5 implements the
+[approved native-source contract](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`, rebased
+onto `225ab3dd` after the global-ignore correction shipped. Its captures use 60/60 native starts and 3/4 authorized API
+starts. Installed and clean-wheel controls cover native allow/deny, shared-source Stop, source-only feedback,
+global-ignore composition and inherited usage deltas. Aggregate unit, regression and pre-commit checks pass; the
+per-card PR is ready for review, with CI and shipped-tree closeout remaining.
 
 ## Problem and outcome
 
@@ -45,10 +46,10 @@ and depends on B3 to preserve source-only/provenance behavior in Stop's separate
 native Codex context acquisition. Cards use separate execution branches when activated.
 
 B5's [checklist](../codex_fork_supervisor/checklist.md) is rebased onto fix closeout `225ab3dd`. B1/B2 remain its
-prerequisites; B3/B4 are shipped integration contracts. Its runtime gate must establish hook-state isolation and an
-enforceable source boundary before product implementation. Source/auth configuration, shared-source admission, and the
-native probe budget were approved for gate execution, not accepted runtime guarantees. The user separately authorized
-four API starts; three have been used.
+prerequisites; B3/B4 are shipped integration contracts. The user approved dedicated login/copy ownership and the
+measured trigger limits after reviewing the runtime gate. The implementation uses immutable selected prefixes, retained
+leases, native cancellation and comparable usage baselines. The user separately authorized four API starts; three have
+been used. Other platforms, executable builds, source formats and larger/deeper histories remain unsupported.
 
 The B5 review revision keeps Stop's approved-plan gate and adds measured model/auth, stdin and long/compacted-source
 admission. PreToolUse eligibility remains a scope decision after measurement. The separate
