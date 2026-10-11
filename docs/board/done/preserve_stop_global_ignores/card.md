@@ -1,7 +1,8 @@
 # Preserve global ignores in Stop evidence
 
-Status: doing, 2026-10-11. Execution branch: `codex/preserve-stop-global-ignores`, based on `main` at `5613b185`.
-Discovered during [B5 planning](../../proposed/codex_fork_supervisor/card.md). This is a separate correction to shipped
+Status: done, 2026-10-11. [PR #264](https://github.com/hapa1i/multi-forge/pull/264) merged as `d33721a2`. Execution
+branch: `codex/preserve-stop-global-ignores`, based on `main` at `5613b185`. Discovered during
+[B5 planning](../../proposed/codex_fork_supervisor/card.md). This is a separate correction to shipped
 [B4 Stop evidence](../../done/codex_stop_review/card.md), not B5 implementation work.
 
 ## Problem and evidence

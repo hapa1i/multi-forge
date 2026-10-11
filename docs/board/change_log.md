@@ -9,6 +9,18 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 
 ## 2026-10-11
 
+### Preserve global ignores in Stop evidence
+
+**Goal**: Keep globally ignored untracked files out of Stop snapshots and reviewer evidence.
+
+**Key changes**: Resolve effective Git exclusions as bounded data while preserving helper isolation, config precedence,
+and normal tracked-file scope; refuse unreadable or invalid exclusion inputs.
+
+**Verification**: 10,697 unit tests, 1,542 regressions, four targeted integrations, and full pre-commit passed.
+[PR #264](https://github.com/hapa1i/multi-forge/pull/264) merged as `d33721a2`, identical to tested head `697bf553`,
+with all five PR checks passing; the merged-tree recheck passed 35 tests. See the
+[closeout](done/preserve_stop_global_ignores/checklist.md#merged-closeout).
+
 ### Review Codex turns once at Stop
 
 **Goal**: Review completed Codex work against the approved plan with at most one reviewer dispatch per explicit turn.

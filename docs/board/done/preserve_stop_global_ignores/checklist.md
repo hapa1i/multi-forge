@@ -1,8 +1,7 @@
 # Preserve global ignores in Stop evidence
 
-Current focus: PR review of the verified B4 evidence correction on `codex/preserve-stop-global-ignores`, based on `main`
-`5613b185`. B5 planning is committed independently at `a5428554`; no B5 runtime probes or implementation are part of
-this branch.
+Current focus: closed after [PR #264](https://github.com/hapa1i/multi-forge/pull/264) merged as `d33721a2`. B5 planning
+remains on its independent branch; its proposal and prerequisite links are reconciled during B5 rebase.
 
 ## Capture contract
 
@@ -35,8 +34,7 @@ this branch.
 - [x] Run aggregate unit and regression suites, full pre-commit, and board/link checks; record any failures or skips.
 - [x] Update design and end-user evidence-scope documentation with precedence, failure behavior, and scope limits.
 - [x] Review the standalone implementation diff; B5 planning changes are excluded.
-- [ ] Merge/CI and closeout: verify the merged tree, record completed work, move this card to done, and reconcile B5's
-  proposal and prerequisite link before continuing B5.
+- [x] Merge/CI and closeout: verify the merged tree, record completed work, and move this card to done.
 
 ## Recorded evidence
 
@@ -52,3 +50,10 @@ this branch.
   used the wrong public status key (`status` instead of `state`) and was corrected. The rerun passed all 4 tests.
   Command:
   `env -u GEMINI_API_KEY PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/core/test_codex_stop_ignores.py tests/integration/core/test_codex_stop_recovery.py -q --tb=short`.
+
+## Merged closeout
+
+2026-10-11: `main` synchronized to `d33721a2`; its tree exactly matches tested head `697bf553`
+(`git diff --exit-code 697bf553 d33721a2`). All five PR checks passed. The merged-tree focused capture/regression
+recheck passed all 35 tests. Full verification above remains applicable to the identical tree. No closeout inference
+ran. B5 must remove its superseded proposal and link this completed correction when rebasing its planning commit.
