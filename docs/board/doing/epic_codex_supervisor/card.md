@@ -7,8 +7,9 @@ B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), me
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
 B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged as `f1019f6c`; its
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
-formatting, and fixture teardown. B4 is active on `codex/codex-stop-review` from published B3 closeout `897ed95c`, with
-its own [execution checklist](../codex_stop_review/checklist.md). B5 remains proposed.
+formatting, and fixture teardown. B4 shipped through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged
+as `2045aea1`; its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records bounded Stop review,
+turn attribution, and evidence limits. B5 remains proposed.
 
 ## Problem and outcome
 
@@ -19,7 +20,7 @@ Codex planning context.
 
 Forge has Codex policy hooks and a Codex supervisor execution lane. B1 now selects the plan source and reviewer
 independently, allowing an approved plan file without a Claude planning target. B2 supplies broader runtime evidence; B3
-delivers model/operator feedback. The remaining members own Stop review and native planning forks. The
+delivers model/operator feedback; B4 adds bounded Stop review. B5 still owns native planning forks. The
 [research](research.md) retains dated source/runtime observations; the
 [B1 evidence](../../done/plan_file_supervision/evidence/README.md) records its shipped scope and limits.
 
@@ -30,7 +31,7 @@ delivers model/operator feedback. The remaining members own Stop review and nati
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
 | B3  | [Warnings Codex can see](../../done/codex_policy_warnings/card.md)                         | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
-| B4  | [Once-per-turn Stop review](../codex_stop_review/card.md)                                  | Review accumulated work with at most one reviewer dispatch per explicit turn         | B1, B2, B3               |
+| B4  | [Once-per-turn Stop review](../../done/codex_stop_review/card.md)                          | Review accumulated work with at most one reviewer dispatch per explicit turn         | B1, B2, B3               |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
@@ -121,19 +122,26 @@ forking wrappers, receive no new model/operator channel; launch and existing den
 ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
 the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
 count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4 subsequently
-activated with this feedback dependency and B5 remains proposed. The
+shipped with this feedback dependency and B5 remains proposed. The
 [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and host-state
 qualifications and records the independently owned login teardown.
 
-## B4 candidate handoff (2026-10-11)
+## B4 merged handoff (2026-10-11)
 
 B4 implements opt-in, once-per-explicit-turn Stop review on admitted Codex 0.162.1. Native and clean-wheel controls
 pass; operational journal state caps dispatch and correction independently of telemetry, and outstanding correction
-changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the checks and measured limits
-for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). B4 stays `doing/` until merge; B5 remains proposed and
-adds no authority to the Stop reason.
+changes carry forward. [Validation](../../done/codex_stop_review/evidence/validation.md) records the checks and measured
+limits for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). The
+[merged closeout](../../done/codex_stop_review/checklist.md#merged-closeout) verifies `2045aea1` against tested head
+`5eecc6ff`, with all five GitHub checks passing. B4 is done; B5 remains proposed and adds no authority to the Stop
+reason.
 
-The [attribution follow-up](../codex_stop_review/evidence/attribution-followup.md) adds a separate eight-unit native
-round: between-turn manual changes remain unattributed, a large read gets a partial review, and the next ordinary edit
-receives a complete review. Partial verdicts cannot correct omitted work. Recreated sessions receive a new journal owner
-while retained artifacts stay historical.
+The [attribution follow-up](../../done/codex_stop_review/evidence/attribution-followup.md) adds a separate eight-unit
+native round: between-turn manual changes remain unattributed, a large read gets a partial review, and the next ordinary
+edit receives a complete review. Partial verdicts cannot correct omitted work. Recreated sessions receive a new journal
+owner while retained artifacts stay historical.
+
+Quota exhaustion remains unverified. Native cancellation was not repeated after the parent-death cleanup fix; its
+real-process regression supplies the follow-up evidence. Later missing-tracking fixes likewise retain their recorded
+automated coverage and native-source drift. B5 must preserve these limits and still establish reviewer hook-state
+isolation and its own native-source contract.

@@ -247,7 +247,7 @@ subscription quota. Only report a quota decrement if the provider exposes usable
 [Supervisor behavior and billing](../../../end-user/policy.md#semantic-supervisor-advanced)
 
 The everyday constraint is no API spend: [B1](../../done/plan_file_supervision/card.md) proposes independent direct
-subscription supervision, with [B4](../../doing/codex_stop_review/card.md) reducing review frequency. Jev is a separate
+subscription supervision, with [B4](../../done/codex_stop_review/card.md) reducing review frequency. Jev is a separate
 paid opt-in. A warning-only pack adds checks and API cost; the cascade preserves quota only for requests where it
 actually skips the Claude supervisor. Subscription terms and the difference between a lane label and a guaranteed
 unbilled route are covered in the

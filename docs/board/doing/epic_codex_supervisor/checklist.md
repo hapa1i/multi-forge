@@ -19,9 +19,10 @@ update, and source-drift limits.
 B3 closed on 2026-10-11 after [PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged as `f1019f6c`, matching
 tested head `81c14448` with all five GitHub checks passing. Its
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records the user-selected source-only mode,
-delivery limits, and fixture teardown. B4 is active on `codex/codex-stop-review` from published closeout `897ed95c`; its
-[checklist](../codex_stop_review/checklist.md) is the current implementation plan. B5 remains proposed. The epic remains
-active until Stop and native-fork outcomes also ship.
+delivery limits, and fixture teardown. B4 closed on 2026-10-11 after
+[PR #263](https://github.com/hapa1i/multi-forge/pull/263) merged as `2045aea1`, matching tested head `5eecc6ff` with all
+five GitHub checks passing. Its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records turn
+attribution and evidence limits. B5 remains proposed. The epic remains active until its native-fork outcome also ships.
 
 ## Activation
 
@@ -76,7 +77,7 @@ filter/helper isolation. No product work or live inference was performed for thi
 | [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
 | [B2](../../done/codex_0160_validation/card.md)     | Done     | None       | Current-runtime probe evidence                                 |
 | [B3](../../done/codex_policy_warnings/card.md)     | Done     | B1, B2     | Allowed-action feedback and source-only formatting             |
-| [B4](../codex_stop_review/card.md)                 | Doing    | B1, B2, B3 | Bounded review at turn completion                              |
+| [B4](../../done/codex_stop_review/card.md)         | Done     | B1, B2, B3 | Bounded review at turn completion                              |
 | [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
 - [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
@@ -106,7 +107,8 @@ member closeout checks, not assertions that every later member already ships.
 - [x] B3 closeout: review delivery evidence against the shared contract and record its operator/model-context limits;
   see the [B3 handoff](#b3-handoff) and
   [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout).
-- [ ] B4 closeout: review Stop budget/failure evidence against the shared contract and record unreviewed-work behavior.
+- [x] B4 closeout: review Stop budget/failure evidence against the shared contract and record unreviewed-work behavior;
+  see the [B4 handoff](#b4-handoff) and [merged closeout](../../done/codex_stop_review/checklist.md#merged-closeout).
 - [ ] B5 closeout: review source-context/checkout evidence against the shared contract and record independence limits.
 
 ## B1 handoff
@@ -145,8 +147,8 @@ that the committed harness post-dates the captures; optional stage 88/97 recheck
   implementation reasoning. Depth suppression prevented recursion but mutated the parent Forge manifest; isolate hook
   state before reuse. Earlier-turn selection and general concurrent-source guarantees remain unverified.
 
-The three member cards retain the detailed evidence links. B3 subsequently shipped; B4 is now active and B5 remains
-proposed. Closing B2 did not implement those features or satisfy the epic's integrated outcome.
+The three member cards retain the detailed evidence links. B3 and B4 subsequently shipped; B5 remains proposed. Closing
+B2 did not implement those features or satisfy the epic's integrated outcome.
 
 ## B3 handoff
 
@@ -160,13 +162,27 @@ identity; B2's historical 0.161.0 qualifications still apply. The general ceilin
   evidence while excluding reviewer prose from Forge's model-visible fields. This is not access isolation or a measured
   watermark property.
 - **B4/B5** can reuse the audience, bounds, and unavailable-review conventions. B3's PreToolUse evidence does not
-  establish Stop continuation semantics or native-fork isolation. Each still needs its own activation and runtime
-  evidence.
+  establish Stop continuation semantics or native-fork isolation. B4 supplied its separate Stop evidence; B5 still needs
+  its own activation and runtime evidence.
 
 PR #262's 31 affected Docker cases passed after repairing an exported-image binary; both auth-isolation controls used
 Claude 2.1.294. The two explicitly authorized Haiku API checks are separate from the one subscription quote-quality
 review. The 32-turn Codex product round is closed, with no new closeout inference. Its isolated login was removed while
 captured evidence and runtime artifacts were retained.
+
+## B4 handoff
+
+[B4's closeout](../../done/codex_stop_review/checklist.md#merged-closeout) verifies the shipped one-dispatch and
+one-correction contract on admitted host Codex 0.162.1. The operational journal survives telemetry reset and belongs to
+a session-creation owner. Each prompt uses current checkout context; pending work carries only through observed
+tool/Stop endpoints, while manual between-turn changes remain unattributed. Partial reviews cannot correct omitted
+scope, and historical exclusions stay unreviewed after later complete reviews.
+
+The [latest evidence](../../done/codex_stop_review/evidence/attribution-followup.md) retains native-source drift and
+automated coverage for subsequent missing-tracking fixes. Quota exhaustion remains unverified, and native cancellation
+was not repeated after its cleanup fix. B5 can reuse plan snapshots and reviewer lanes; it still must isolate reviewer
+hooks from parent state, establish native-source boundaries, and record reduced independence for shared sources. No B5
+or Jev work is activated by this closeout.
 
 ## Closeout
 

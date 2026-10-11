@@ -5,12 +5,12 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md), and
 [B3: bounded, source-aware feedback](../../done/codex_policy_warnings/card.md); all have shipped.
 
-Activated 2026-10-11 on `codex/codex-stop-review` from published `main` at `897ed95c` (B3 closeout). The
-[execution checklist](checklist.md) records the implementation plan and fresh runtime gates. The
-[runtime gate](evidence/README.md) passed on 2026-10-11 for retained Codex 0.162.1. The opt-in implementation,
-installed-wheel controls and regression suite are complete. [Validation](evidence/validation.md) records the completed
-checks and measured limits for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). The card remains active until
-merge and closeout.
+Completed 2026-10-11 through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged to `main` as `2045aea1`.
+The merged tree matches tested head `5eecc6ff`; all five GitHub checks passed. The
+[merged closeout](checklist.md#merged-closeout) records verification and the move to `done/`. The
+[runtime gate](evidence/README.md) and [latest validation](evidence/attribution-followup.md) retain the Codex 0.162.1
+controls, installed-wheel evidence, source-drift qualifications, and measured limits. The epic remains active; B5
+remains proposed.
 
 The [PR review follow-up](evidence/review-followup.md) adds explicit recovery for interrupted/incomplete turns,
 preserves enrollment receipts, reserves completion time, and avoids full CLI startup for inactive turn hooks. The
@@ -18,10 +18,10 @@ preserves enrollment receipts, reserves completion time, and avoids full CLI sta
 between-turn edits stay outside correction scope, partial reviews preserve gaps without disabling later reviews, and
 session-name reuse cannot import old operational state. It includes a separate eight-unit native round.
 
-Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
-changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit
-sessions retain compatible v2/v3 serialization. Codex children use `session start --runtime codex --resume-from`, with
-their supervisor configured explicitly; incompatible inherited Stop mode is refused before child creation or inference.
+The runtime go/no-go gate passed before product configuration, schema, CLI, and installed-hook changes. Non-default Stop
+trigger state requires manifest v4; ordinary per-edit sessions retain compatible v2/v3 serialization. Codex children use
+`session start --runtime codex --resume-from`, with their supervisor configured explicitly; incompatible inherited Stop
+mode is refused before child creation or inference.
 
 ## Problem and outcome
 

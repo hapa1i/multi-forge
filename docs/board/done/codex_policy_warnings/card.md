@@ -7,8 +7,9 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3
 Completed 2026-10-11 through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged to `main` as `f1019f6c`.
 The merged tree matches tested head `81c14448`; all five GitHub checks passed. The
 [merged closeout](checklist.md#merged-closeout) records verification and fixture teardown. The
-[live evidence](evidence/README.md) includes the user-selected source-only mode and its limits. B4/B5 and Jev remain
-unactivated.
+[live evidence](evidence/README.md) includes the user-selected source-only mode and its limits.
+[B4](../../done/codex_stop_review/card.md) subsequently shipped using this feedback contract; B5 and Jev remain
+proposed.
 
 ## Problem and outcome
 
@@ -87,7 +88,7 @@ stdout and exit status were not captured; the passing offline replay cannot prov
 
 ## B4 activation handoff (2026-10-11)
 
-[B4: Stop review](../../doing/codex_stop_review/checklist.md) now explicitly depends on B3's finding provenance,
+[B4: Stop review](../../done/codex_stop_review/checklist.md) now explicitly depends on B3's finding provenance,
 source-only preference, and bounded presentation. Stop's block reason has user authority in B2's observed runtime, so
 the source-only contract must cover that field too. B4 owns fresh Stop response, turn identity, timeout, and enrollment
 evidence; B3's PreToolUse admission is not Stop admission. This dependency does not extend B3's completed scope.

@@ -1,19 +1,20 @@
 # Once-per-turn Stop review checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card.md), member **B4**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B4**.
 
 ## Current focus
 
-Implemented on `codex/codex-stop-review`, based on published `main` at `897ed95c` (B3 closeout), 2026-10-11. B1, B2, and
-B3 are done. B4 adds an opt-in Codex Stop trigger with at most one semantic reviewer dispatch per explicit user turn,
-including automatic continuations. It reviews changes already made; deterministic PreToolUse checks and artifact
-authority remain active. B5 and Jev are outside this branch.
+Completed 2026-10-11 through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged as `2045aea1` with a tree
+identical to tested head `5eecc6ff` and all five GitHub checks passing. B1, B2, and B3 are done. B4 adds an opt-in Codex
+Stop trigger with at most one semantic reviewer dispatch per explicit user turn, including automatic continuations. It
+reviews changes already made; deterministic PreToolUse checks and artifact authority remain active. B5 and Jev remain
+proposed.
 
 The runtime gate passed before product work. Trigger/schema, bounded evidence, durable spending, hook delivery, and
 status integration are implemented. Product controls, the installed-wheel native test, regression suite, and teardown
-are complete. [PR #263](https://github.com/hapa1i/multi-forge/pull/263) is open. The documentation count gate is
-resolved; unit, regression, integration and full pre-commit checks pass. B4 remains in `doing/` through review and
-merge.
+are complete. The documentation count gate is resolved; unit, regression, integration and full pre-commit checks pass.
+The [merged closeout](#merged-closeout) records merge verification and board reconciliation. Earlier planning and
+validation entries below retain their dated state and evidence limits.
 
 ### Verified starting point
 
@@ -308,7 +309,7 @@ B2/B3 private round paths. Bug reproductions belong in `tests/regression/` with 
 - [x] Stop and verify all fixture-owned processes, preserving pre-sweep leak evidence. Remove only the round's own login
   material at teardown; retain sanitized captures, runtime identities, exact helper sources, and package provenance.
   Compare recorded host config/auth metadata without claiming unchanged bytes prove token validity or remote revocation.
-- [ ] After merge, pull `main`, verify the merge/tree and CI against the tested candidate, record closeout in this
+- [x] After merge, pull `main`, verify the merge/tree and CI against the tested candidate, record closeout in this
   checklist and `docs/board/change_log.md`, and move B4 to `done/`. Repair all inbound links and any source comments
   pointing into `doing/` (including `docs/design_session_execution.md` I.2a); promote durable lessons only after review.
   Keep the epic active and B5 parked.
@@ -416,3 +417,36 @@ integration tests passed, one real-inference control deselected**. Full pre-comm
 380 product Python files and the packaged QA checklist. [Follow-up evidence](evidence/review-followup.md) records
 recovery, receipt, completion, journal and inactive-hook cases, exact verification helpers, and final process timings.
 No additional live Codex or reviewer inference ran. The original native round remains historical evidence.
+
+## Merged closeout
+
+[PR #263](https://github.com/hapa1i/multi-forge/pull/263) merged to `main` as `2045aea18f63f6a71a8341047ebdd8a6cbe81258`
+at 2026-10-11 11:54:26 UTC (2026-10-11 13:54 Europe/Berlin). Local `main` fast-forwarded to that merge before closeout.
+Its tree and tested head `5eecc6fff2a9da61799b7849952509d984fb6d37` both resolve to
+`4ff3ce5f874e1146331498cffbccbdee9e6d73a9`; `git diff --exit-code` between them is empty.
+
+All five GitHub checks passed: [test](https://github.com/hapa1i/multi-forge/actions/runs/38130947671),
+[pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/38130947670), and
+[CodeQL's actions/Python analyses and result](https://github.com/hapa1i/multi-forge/actions/runs/38130946020). The
+[attribution follow-up](evidence/attribution-followup.md) retains the final local validation: 10,672 unit tests, 1,541
+regressions, 60 targeted integrations with one real-inference control deselected, 93 focused B4/link checks, full
+pre-commit, and clean-wheel verification.
+
+Moved B4 to `done/`, repaired inbound links including the session-execution design reference, and recorded the result in
+the [changelog](../../change_log.md#2026-10-11). The epic records B1-B4 complete and remains active with B5 proposed.
+The merged workflow, session, runtime, telemetry, installation, CLI, and end-user docs describe the shipped contract.
+
+The two native rounds remain dated evidence: 32 reserved Codex units and one real Claude subscription review in the
+original round, then eight reserved units and four stub reviews in the attribution round. Their fixture teardown is
+already recorded; no new inference or credential changes ran during closeout. Quota exhaustion remains unverified,
+native executor cancellation was not repeated after its cleanup fix, and the final missing-tracking fixes retain their
+automated-coverage/source-drift qualification. Partial reviews and later successful reviews do not approve historical
+exclusions; between-turn manual edits remain outside correction scope.
+
+All 34 evidence files match the merged bytes after the lane move. Adding the closeout entry crossed the changelog's
+local size screen, so the complete [2026-08-18 block](../../archive/change_log_2026-08-18.md) moved verbatim into the
+archive; its nine entries match the merged changelog. Product, harness, and test source are unchanged.
+
+Closeout validation: full `make pre-commit` passed after Markdown formatting and the lossless changelog rotation. The
+standalone Markdown link audit passed for 657 source files; staged and working-tree `git diff --check` passed. The
+passing product validation above carries forward without another runtime or model call.

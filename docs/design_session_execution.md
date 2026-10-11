@@ -380,7 +380,7 @@ Unreserved turns report `dispatched: false`; an interrupted reservation can repo
 uses an approval notice. The stdlib dispatcher skips full CLI startup for the three turn hooks when the current manifest
 proves Stop inactive; uncertain manifests and enrollment probes still reach the full handler.
 
-See the [B4 evidence and limits](board/doing/codex_stop_review/evidence/README.md) and
+See the [B4 evidence and limits](board/done/codex_stop_review/evidence/README.md) and
 [user configuration contract](end-user/policy.md#review-once-at-codex-stop-opt-in).
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
