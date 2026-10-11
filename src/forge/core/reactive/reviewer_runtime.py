@@ -125,9 +125,19 @@ def preflight_host_supervisor(state: SessionState) -> None:
     from forge.session.consumer_lanes import read_bound_lane
 
     config = snapshot_supervisor_options(state)
-    if config is None or not config.active:
+    if config is None:
         return
+    from forge.policy.semantic.identity import validate_stop_executor
+    from forge.session.models import session_runtime
+
+    validate_stop_executor(config, runtime=session_runtime(state))
+    if not config.active:
+        return
+    if config.review_trigger == "stop":
+        from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+        require_for_launch(cwd=state.worktree.path if state.worktree else state.forge_root)
     lane = read_bound_lane(state, SUPERVISOR_CONSUMER) or select_supervisor_lane()
-    validate_timeout(config.timeout_seconds)
+    validate_timeout(config.timeout_seconds, trigger=config.review_trigger)
     validate_reviewer(config, lane)
     preflight_supervisor_runtime(config, lane, cwd=state.worktree.path if state.worktree else None)

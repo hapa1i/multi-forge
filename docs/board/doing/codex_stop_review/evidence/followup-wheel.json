@@ -1,0 +1,86 @@
+{
+  "inference": false,
+  "runtime": "stub used for binary discovery only",
+  "forge_dev": false,
+  "wheel_sha256": "2863ae3fdb84e9e1706978b1e3b02fdf590f409e30dedb3e0153ecfda3cc39bc",
+  "python_files_matched": 380,
+  "source_inventory_sha256": "46ceea966fa293bd8767a6f44a11906bb852d8e7bf955019c53cfa9c8b234556",
+  "qa_checklist_sha256": "822f3e8aca8952c44b23e529e30c8904d28a5c475fe8b8c8fd0785096c197bc7",
+  "commands": [
+    {
+      "argv": [
+        "extension",
+        "enable",
+        "--scope",
+        "user",
+        "--runtime",
+        "codex",
+        "--profile",
+        "minimal",
+        "--with",
+        "hooks",
+        "--without",
+        "commands",
+        "--force"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "extension",
+        "doctor",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "extension",
+        "sync",
+        "--scope",
+        "user"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "codex",
+        "status",
+        "--scope",
+        "user",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "policy",
+        "supervisor",
+        "reset-review",
+        "--help"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "extension",
+        "disable",
+        "--scope",
+        "user",
+        "--runtime",
+        "codex",
+        "--yes"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "exact_hook_set": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart",
+    "Stop",
+    "UserPromptSubmit"
+  ],
+  "unrelated_config_preserved": true,
+  "fixture_removed": true
+}

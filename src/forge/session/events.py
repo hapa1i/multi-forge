@@ -18,13 +18,18 @@ from typing import Any, Callable
 
 from forge.core.run_id import is_valid_run_id
 from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
-from forge.core.state import file_lock_for_target, parse_iso, utc_timestamp_z
+from forge.core.state import (
+    atomic_write_text,
+    file_lock_for_target,
+    parse_iso,
+    utc_timestamp_z,
+)
 
 from .exceptions import ForgeSessionError, InvalidSessionNameError
 from .validation import validate_name
 
 SESSION_EVENT_SCHEMA_VERSION = 1
-SESSION_EVENT_DOMAINS = frozenset({"authority", "routing"})
+SESSION_EVENT_DOMAINS = frozenset({"authority", "routing", "review"})
 SESSION_EVENT_ORIGINS = frozenset(
     {
         "external_cli",
@@ -32,6 +37,7 @@ SESSION_EVENT_ORIGINS = frozenset(
         "launcher",
         "claude_authority_hook",
         "codex_policy_hook",
+        "codex_review_hook",
     }
 )
 SESSION_EVENT_OPERATIONS = frozenset(
@@ -322,7 +328,9 @@ def validate_session_event(
     return validated
 
 
-def get_session_event_journal_path(forge_root: str | Path, session: str, domain: str) -> Path:
+def get_session_event_journal_path(
+    forge_root: str | Path, session: str, domain: str, *, review_id: str | None = None
+) -> Path:
     """Return the contained journal path without creating it."""
     if domain not in SESSION_EVENT_DOMAINS:
         raise SessionEventPathError(f"unsupported session-event domain: {domain!r}")
@@ -339,7 +347,18 @@ def get_session_event_journal_path(forge_root: str | Path, session: str, domain:
     if not resolved_root.is_dir():
         raise SessionEventPathError(f"Forge root is not a directory: {resolved_root}")
 
-    journal = resolved_root / ".forge" / "artifacts" / session / domain / "events.jsonl"
+    directory = resolved_root / ".forge" / "artifacts" / session / domain
+    if domain == "review":
+        from forge.session.store import SessionStore
+
+        owner = review_id or SessionStore(str(resolved_root), session).review_identity()
+        if owner is not None:
+            if len(owner) != 32 or any(c not in "0123456789abcdef" for c in owner):
+                raise SessionEventPathError("invalid Stop review owner")
+            directory = directory / owner
+    elif review_id is not None:
+        raise SessionEventPathError("review owner supplied for a different event domain")
+    journal = directory / "events.jsonl"
     if not journal.is_relative_to(resolved_root):
         raise SessionEventPathError(f"journal path escapes Forge root: {journal}")
     _reject_existing_symlinks(resolved_root, journal)
@@ -406,9 +425,11 @@ def read_session_events(
     *,
     payload_validator: SessionEventPayloadValidator | None = None,
     event_validator: SessionEventValidator | None = None,
+    max_bytes: int | None = None,
+    review_id: str | None = None,
 ) -> list[SessionEvent]:
     """Read and strictly validate every journal record in append order."""
-    journal = get_session_event_journal_path(forge_root, session, domain)
+    journal = get_session_event_journal_path(forge_root, session, domain, review_id=review_id)
     if not journal.exists():
         return []
     try:
@@ -420,6 +441,8 @@ def read_session_events(
             metadata = os.fstat(fd)
             if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
                 raise OSError("session-event journal must be a singly linked regular file")
+            if max_bytes is not None and metadata.st_size > max_bytes:
+                raise OSError("session-event journal exceeds the bounded reader limit")
             with os.fdopen(fd, "r", encoding="utf-8") as stream:
                 fd = -1
                 lines = stream.readlines()
@@ -459,6 +482,120 @@ def read_session_events(
         event_ids.add(event.event_id)
         events.append(event)
     return events
+
+
+def update_review_checkpoint(
+    forge_root: str | Path,
+    session: str,
+    update: Callable[[SessionEvent | None], SessionEvent | None],
+    *,
+    payload_validator: SessionEventPayloadValidator,
+    timeout_s: float = 1.0,
+    review_id: str | None = None,
+) -> SessionEvent | None:
+    """Conditionally reserve/update review state under one domain lock.
+
+    Every review event carries its complete bounded spending watermark. Atomic
+    compaction replaces only this domain's journal, so old turns cannot become
+    unused between pruning and checkpoint publication. An initialization marker
+    makes a missing established journal an error instead of a fresh allowance.
+    No callback may dispatch inference or acquire the general session lock.
+    """
+    journal = get_session_event_journal_path(forge_root, session, "review", review_id=review_id)
+    root = Path(forge_root).expanduser().resolve(strict=True)
+    _ensure_journal_directories(root, journal.parent)
+    marker = journal.with_name("checkpoint-established")
+    _reject_existing_symlinks(root, marker)
+    with file_lock_for_target(target_path=journal, timeout_s=timeout_s):
+        _validate_review_marker(marker)
+        if marker.exists() and not journal.exists():
+            raise SessionEventReadError("review checkpoint history is missing; restore artifacts or use a new session")
+        records = read_session_events(
+            root,
+            session,
+            "review",
+            payload_validator=payload_validator,
+            max_bytes=2_000_000,
+            review_id=review_id,
+        )
+        previous = records[-1] if records else None
+        if journal.exists() and previous is None:
+            raise SessionEventReadError("established review checkpoint is empty")
+        candidate = update(previous)
+        if candidate is None:
+            return previous
+        validated = validate_session_event(
+            asdict(candidate),
+            expected_session=session,
+            payload_validator=payload_validator,
+        )
+        serialized = (
+            json.dumps(
+                asdict(validated),
+                separators=(",", ":"),
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        )
+        if len(serialized.encode()) > 900_000:
+            raise SessionEventWriteError("review checkpoint exceeds its bounded storage limit")
+        # Persist the latest full state in the same rename as compaction. A
+        # crash leaves either the previous spent watermark or the newer one.
+        retained = "".join(json.dumps(asdict(row), separators=(",", ":"), sort_keys=True) + "\n" for row in records)
+        if len((retained + serialized).encode()) > 1_800_000 or len(records) >= 16:
+            retained = ""
+        atomic_write_text(journal, retained + serialized, create_parents=False)
+        journal.chmod(0o600)
+        _fsync_directory(journal.parent)
+        # First publish the complete checkpoint. A crash before marker creation
+        # leaves validated spending state, which the next writer can retain.
+        # Marker-first could leave an unrecoverable empty established journal.
+        if not marker.exists():
+            atomic_write_text(marker, "review-checkpoint-v1\n", create_parents=False)
+            marker.chmod(0o600)
+            _fsync_directory(marker.parent)
+        return validated
+
+
+def read_review_checkpoint(
+    forge_root: str | Path,
+    session: str,
+    *,
+    payload_validator: SessionEventPayloadValidator,
+) -> SessionEvent | None:
+    """Read bounded review state without repairing history or acquiring an allowance."""
+    journal = get_session_event_journal_path(forge_root, session, "review")
+    marker = journal.with_name("checkpoint-established")
+    _reject_existing_symlinks(Path(forge_root).resolve(strict=True), marker)
+    _validate_review_marker(marker)
+    if marker.exists() and not journal.exists():
+        raise SessionEventReadError("review checkpoint history is missing")
+    records = read_session_events(
+        forge_root,
+        session,
+        "review",
+        payload_validator=payload_validator,
+        max_bytes=2_000_000,
+    )
+    if not records and journal.exists():
+        raise SessionEventReadError("established review checkpoint is empty")
+    return records[-1] if records else None
+
+
+def _validate_review_marker(marker: Path) -> None:
+    if not marker.exists():
+        return
+    try:
+        fd = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size != len(b"review-checkpoint-v1\n"):
+                raise ValueError("invalid review checkpoint marker")
+            if stream.read(22) != b"review-checkpoint-v1\n":
+                raise ValueError("invalid review checkpoint marker")
+    except (OSError, ValueError) as exc:
+        raise SessionEventReadError("review checkpoint marker is damaged") from exc
 
 
 def _require_string(record: dict[str, Any], field: str, record_number: int | None) -> str:

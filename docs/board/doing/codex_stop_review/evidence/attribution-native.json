@@ -1,0 +1,391 @@
+{
+  "cases": {
+    "01-trust": {
+      "at": 1791712610.531887,
+      "exit": 0
+    },
+    "02-enrollment": {
+      "at": 1791712656.644866,
+      "exit": 0
+    },
+    "03-attribution": {
+      "at": 1791712795.3227599,
+      "exit": 0
+    }
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "state": "reviewed",
+      "turn_id": "01a12a66-55fb-7122-99c8-0d4be53a9d2f",
+      "spent": true,
+      "dispatched": true,
+      "coverage": {
+        "complete": true,
+        "omissions": []
+      },
+      "unattributed_changes": {
+        "count": 0,
+        "paths": []
+      },
+      "excluded_work": null,
+      "evidence": {
+        "actions": [
+          {
+            "id": "exec-2c374307-5d15-4822-9e02-dc104a203254",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <round>/project/work.txt\n+FIRST\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12a66-55fb-7122-99c8-0d4be53a9d2f"
+          },
+          {
+            "id": "exec-2c374307-5d15-4822-9e02-dc104a203254",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <round>/project/work.txt\n+FIRST\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <round>/project/work.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12a66-55fb-7122-99c8-0d4be53a9d2f"
+          }
+        ],
+        "after": "62e32d8ea4275c4a45f56f39cf1099d7305d4e20be3ebcb5cc3c68e4e1fcd18c",
+        "before": "b71d2800f8ecc553372c5a90272af792af7ef7fb91981df3354d5bddd35a9368",
+        "changes": [
+          {
+            "after": {
+              "digest": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+              "mode": 420,
+              "size": 6
+            },
+            "before": null,
+            "diff": "--- work.txt\n+++ work.txt\n@@ -0,0 +1 @@\n+FIRST\n",
+            "kind": "add",
+            "path": "work.txt"
+          }
+        ],
+        "complete": true,
+        "omissions": [],
+        "provenance_turns": [
+          "01a12a66-55fb-7122-99c8-0d4be53a9d2f"
+        ],
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+      },
+      "stop_wire": {
+        "systemMessage": "Forge reviewed the bounded repository snapshot; later changes are unreviewed.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+      },
+      "stop_elapsed_seconds": 1.027638499996101
+    },
+    {
+      "turn": 2,
+      "state": "no_changes",
+      "turn_id": "01a12a66-9488-7591-914e-ab63465ea52d",
+      "spent": false,
+      "dispatched": false,
+      "coverage": {
+        "complete": true,
+        "omissions": []
+      },
+      "unattributed_changes": {
+        "count": 2,
+        "paths": [
+          ".DS_Store",
+          "notes.txt"
+        ]
+      },
+      "excluded_work": null,
+      "evidence": null,
+      "stop_wire": {
+        "systemMessage": "Forge Stop review skipped: no changes or outstanding work in the captured scope.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+      },
+      "stop_elapsed_seconds": 0.8402285420015687
+    },
+    {
+      "turn": 3,
+      "state": "reviewed",
+      "turn_id": "01a12a66-c35c-7611-b732-5a0c4e70bea2",
+      "spent": true,
+      "dispatched": true,
+      "coverage": {
+        "complete": true,
+        "omissions": []
+      },
+      "unattributed_changes": {
+        "count": 0,
+        "paths": []
+      },
+      "excluded_work": null,
+      "evidence": {
+        "actions": [
+          {
+            "id": "exec-7451817d-e8ff-4b1c-8126-2e9fa106c2cd",
+            "input": {
+              "command": "*** Begin Patch\n*** Update File: <round>/project/work.txt\n@@\n FIRST\n+SECOND\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12a66-c35c-7611-b732-5a0c4e70bea2"
+          },
+          {
+            "id": "exec-7451817d-e8ff-4b1c-8126-2e9fa106c2cd",
+            "input": {
+              "command": "*** Begin Patch\n*** Update File: <round>/project/work.txt\n@@\n FIRST\n+SECOND\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nM <round>/project/work.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12a66-c35c-7611-b732-5a0c4e70bea2"
+          }
+        ],
+        "after": "6486fe890625f26e61fdaa46adefa4bf145d01abb8498c68cbb878b08ada7cba",
+        "before": "5df9dfe049e7d0df491c24f69c26791346a1da52f76cfcfa7cba652fee992745",
+        "changes": [
+          {
+            "after": {
+              "digest": "bd635a533e90073159ed39880bb98a3d5726393e4e5b73cbf8bbf07bf2e289e7",
+              "mode": 420,
+              "size": 13
+            },
+            "before": {
+              "digest": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+              "mode": 420,
+              "size": 6
+            },
+            "diff": "--- work.txt\n+++ work.txt\n@@ -1 +1,2 @@\n FIRST\n+SECOND\n",
+            "kind": "modify",
+            "path": "work.txt"
+          }
+        ],
+        "complete": true,
+        "omissions": [],
+        "provenance_turns": [
+          "01a12a66-c35c-7611-b732-5a0c4e70bea2"
+        ],
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+      },
+      "stop_wire": {
+        "systemMessage": "Forge reviewed the bounded repository snapshot; later changes are unreviewed.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+      },
+      "stop_elapsed_seconds": 1.3858499589987332
+    },
+    {
+      "turn": 4,
+      "state": "partial",
+      "turn_id": "01a12a67-0997-7df0-98c2-55a8f3c0c889",
+      "spent": true,
+      "dispatched": true,
+      "coverage": {
+        "complete": false,
+        "omissions": [
+          "tool_evidence_byte_limit"
+        ]
+      },
+      "unattributed_changes": {
+        "count": 0,
+        "paths": []
+      },
+      "excluded_work": {
+        "last_thread": "01a12a66-21af-7e13-9c4d-f3a6ba2942d9",
+        "last_turn": "01a12a67-0997-7df0-98c2-55a8f3c0c889",
+        "reason": "partial_evidence",
+        "reviewed": false,
+        "turns": 1
+      },
+      "evidence": {
+        "actions": [
+          {
+            "id": "exec-d2d6155a-656a-4fb5-9376-b5fe140aaddc",
+            "input": {
+              "command": "cat large-read.txt"
+            },
+            "phase": "request",
+            "response": null,
+            "tool": "Bash",
+            "turn_id": "01a12a67-0997-7df0-98c2-55a8f3c0c889"
+          },
+          {
+            "coverage_issue": "tool_evidence_byte_limit",
+            "evidence_sha256": "66f4b2a130d86014ff0609b82f666347244031e460cfeff2aca138ffcc906849",
+            "id": "exec-d2d6155a-656a-4fb5-9376-b5fe140aaddc",
+            "phase": "outcome",
+            "tool": "Bash",
+            "turn_id": "01a12a67-0997-7df0-98c2-55a8f3c0c889"
+          }
+        ],
+        "after": "6486fe890625f26e61fdaa46adefa4bf145d01abb8498c68cbb878b08ada7cba",
+        "before": "6486fe890625f26e61fdaa46adefa4bf145d01abb8498c68cbb878b08ada7cba",
+        "changes": [],
+        "complete": false,
+        "omissions": [
+          "tool_evidence_byte_limit"
+        ],
+        "provenance_turns": [
+          "01a12a67-0997-7df0-98c2-55a8f3c0c889"
+        ],
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+      },
+      "stop_wire": {
+        "systemMessage": "Forge reviewed only the available evidence. Omitted work remains unreviewed; no correction was requested. Inspect supervisor status for excluded scope. A new explicit turn reviews new work, not the excluded history.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+      },
+      "stop_elapsed_seconds": 1.1794790830026614
+    },
+    {
+      "turn": 5,
+      "state": "reviewed",
+      "turn_id": "01a12a67-48ae-7ad1-93f6-e7f5dd9adeeb",
+      "spent": true,
+      "dispatched": true,
+      "coverage": {
+        "complete": true,
+        "omissions": []
+      },
+      "unattributed_changes": {
+        "count": 0,
+        "paths": []
+      },
+      "excluded_work": {
+        "last_thread": "01a12a66-21af-7e13-9c4d-f3a6ba2942d9",
+        "last_turn": "01a12a67-0997-7df0-98c2-55a8f3c0c889",
+        "reason": "partial_evidence",
+        "reviewed": false,
+        "turns": 1
+      },
+      "evidence": {
+        "actions": [
+          {
+            "id": "exec-817ccbdc-c312-4ca0-b5f2-c7798fbcc83b",
+            "input": {
+              "command": "*** Begin Patch\n*** Update File: <round>/project/work.txt\n@@\n FIRST\n SECOND\n+THIRD\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12a67-48ae-7ad1-93f6-e7f5dd9adeeb"
+          },
+          {
+            "id": "exec-817ccbdc-c312-4ca0-b5f2-c7798fbcc83b",
+            "input": {
+              "command": "*** Begin Patch\n*** Update File: <round>/project/work.txt\n@@\n FIRST\n SECOND\n+THIRD\n*** End Patch"
+            },
+            "paths": [
+              "work.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nM <round>/project/work.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12a67-48ae-7ad1-93f6-e7f5dd9adeeb"
+          }
+        ],
+        "after": "6c9007b01b87e4cec617ad892709ec663d9b6f5073ab456bef2b96a9f8226ae0",
+        "before": "6486fe890625f26e61fdaa46adefa4bf145d01abb8498c68cbb878b08ada7cba",
+        "changes": [
+          {
+            "after": {
+              "digest": "b391280103bb3d8bf6d44befa4fbd3ca55de5c12b7ad464f5f8f7710857a43ea",
+              "mode": 420,
+              "size": 19
+            },
+            "before": {
+              "digest": "bd635a533e90073159ed39880bb98a3d5726393e4e5b73cbf8bbf07bf2e289e7",
+              "mode": 420,
+              "size": 13
+            },
+            "diff": "--- work.txt\n+++ work.txt\n@@ -1,2 +1,3 @@\n FIRST\n SECOND\n+THIRD\n",
+            "kind": "modify",
+            "path": "work.txt"
+          }
+        ],
+        "complete": true,
+        "omissions": [],
+        "provenance_turns": [
+          "01a12a67-48ae-7ad1-93f6-e7f5dd9adeeb"
+        ],
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+      },
+      "stop_wire": {
+        "systemMessage": "Forge reviewed the bounded repository snapshot; later changes are unreviewed.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+      },
+      "stop_elapsed_seconds": 1.481241207999119
+    }
+  ],
+  "native_completed_turns": 6,
+  "reserved_units": 8,
+  "local_stub_reviews": 4,
+  "real_reviewer_inference": false,
+  "identity": {
+    "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+    "retained_path": "<round>/runtime/0.162.1/bin/codex",
+    "version": "0.162.1",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "selected_launcher": "/opt/homebrew/bin/codex",
+    "model": "gpt-6.1-sol",
+    "effort": "low",
+    "forge_revision": "aa1e0c4d3af83ccc69b2338a874e0191aa225471"
+  },
+  "stub_admission": {
+    "synthetic": true,
+    "no_inference": true,
+    "admitted": true,
+    "binary": "<round>/stub-bin/claude"
+  },
+  "execution_helper_hashes": {
+    "b4-attribution.py": "44f6d24afc79aea66c0244efe85ae1b68d596eb6b7d8de5d8f5cf13ba98b76fe",
+    "b4-terminal.py": "ec41bb42850e7d54b1a7d0af2038d150c2dbc9b7db4d788bd2e6d22b88c77d50",
+    "b4-product.py": "2f565e054b08da9157cd1902d739adbe1e200e0122e06eb44761b733f6a6e4d8",
+    "b4-gate.py": "9914f99f30865a282dd1f0a96ed1cd1a78bc95eac60a32590f0201c98f287e14",
+    "b4-cases.py": "f6875fe46ab307b3863befad85e0e84c907811ca1ae81d8301efe1b3d2235e44",
+    "probe-runtime.py": "ca429340a83016df304de8440ca9b95be870b2e802ff9f89a121ba86592141d9",
+    "hooks/b4-hook.py": "0becc09c2d392267dfb7896d01b0a2059ace4dcfa7dd5a13ccce1d5e54be59cc",
+    "hooks/b4-reviewer.py": "9b0bd3756cab4da74a81264bec4def8c984826940991ded2ecb9785851999c81",
+    "hooks/b3-reviewer.py": "881ef1771326a1f000495775e64323004f2fb91f640dc1c37d795e72d8f1c9b3",
+    "b4_instrumentation/sitecustomize.py": "f52d231a2e1e3422a6a8a27cbb930f224cab71f5929245a9640d6cf356c1473e",
+    "b3_instrumentation/sitecustomize.py": "6ce2c32a1df9b5395af3858b6a4a441c00dd06789c25785e342ce4c6e74b86c5"
+  },
+  "source_files": 380,
+  "source_inventory_sha256": "8fdb811c0bb55c88d98ee2411c9d5b1f00253994d068a6aeadb4ff3ef8d96cdd",
+  "post_run_product_drift": {
+    "src/forge/policy/semantic/stop_review.py": {
+      "run": "8f48d7266ca0a3d7180a2161ab530e7273203bd20271bb31df985371db11ec1c",
+      "current": "fc6e4f6c28db0e1327c98567dad4495250a7dca4477c0e5ebc86d03949ccb659"
+    }
+  },
+  "drift_qualification": "After this native run, two unexercised missing-tracking branches were tightened: failed baseline capture remains outstanding until exclusion, and an unknown newer Stop counts an unfinished preceding turn as excluded. Automated regressions cover both. No native result is relabelled as testing those changes.",
+  "teardown": {
+    "closed_at": 1791712810.847161,
+    "survivors_before_sweep": [],
+    "kill_escalation": [],
+    "remaining": [],
+    "fixture_auth_removed": true,
+    "host_config_hashes_unchanged": true,
+    "qualification": "Only recorded host config bytes are compared; unchanged bytes cannot prove token validity or remote revocation. The real Claude login is not owned or removed by this fixture."
+  },
+  "publication_helpers": {
+    "b4-verify-attribution.py": "f47540a1cdc11c6720dca4edae5cd429c29b4de06fd297278b3354c436865bbc",
+    "b4-close.py": "ab323dfca809bf93a832fbc84bb1d84dfbbcb454aa5c2052e28995a02003c523",
+    "b4-fixture.py": "fcf8a2615a92e9b2aaf85b0d327f341e5a665902ef462ebfcc18b72446ba41df",
+    "b4-validate-stub.py": "3ef65f32a8ee0027bde5130ffff96b38fa0f06f24030fa978a08457fb54a5ead"
+  }
+}

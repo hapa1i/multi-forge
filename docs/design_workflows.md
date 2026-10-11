@@ -469,6 +469,11 @@ enrollment remains the user's one-time interactive trust ceremony. Forge cannot 
 `runtime preflight codex --verify-enrollment` verifies its effect with a real probe turn; marked advisory launch repeats
 that empirical check for every attempt.
 
+Codex executors may instead opt into [once-per-turn Stop review](end-user/policy.md#review-once-at-codex-stop-opt-in).
+That path reviews already-applied bounded evidence and shares B1 reviewer admission and B3 feedback provenance, while
+keeping its spending reservation in the session's operational review journal. It excludes cascade, shadow sampling,
+per-edit semantic registration and automatic transport retries. Deterministic PreToolUse checks remain active.
+
 ### 1.5 Policy composition
 
 Multiple policies may run for a single action:

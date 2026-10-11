@@ -84,3 +84,10 @@ stdout and exit status were not captured; the passing offline replay cannot prov
 [results](../../done/codex_0160_validation/evidence/README.md),
 [response evidence](../../done/codex_0160_validation/evidence/feedback.json), and
 [TUI evidence](../../done/codex_0160_validation/evidence/interactive-background.json).
+
+## B4 activation handoff (2026-10-11)
+
+[B4: Stop review](../../doing/codex_stop_review/checklist.md) now explicitly depends on B3's finding provenance,
+source-only preference, and bounded presentation. Stop's block reason has user authority in B2's observed runtime, so
+the source-only contract must cover that field too. B4 owns fresh Stop response, turn identity, timeout, and enrollment
+evidence; B3's PreToolUse admission is not Stop admission. This dependency does not extend B3's completed scope.

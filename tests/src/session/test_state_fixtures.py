@@ -1,6 +1,7 @@
 """Unit contracts for invariant-preserving durable session test builders."""
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -36,7 +37,7 @@ def test_publish_session_writes_row_before_manifest(tmp_path: Path, monkeypatch:
     publish_session(index, state, project, forge_root=project)
 
     assert observations == [(True, False)]
-    assert SessionStore(str(project), state.name).read() == state
+    assert SessionStore(str(project), state.name).read() == replace(state, schema_version=3)
 
 
 def test_publish_session_compensates_when_manifest_write_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

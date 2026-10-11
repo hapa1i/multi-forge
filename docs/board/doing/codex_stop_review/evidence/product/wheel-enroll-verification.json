@@ -1,0 +1,76 @@
+{
+  "after": {
+    "<ROUND>/codex-home/config.toml": "678922c9426fa1a9f25d506e9fdae99401237efabd9a7b05158dec3853a25496",
+    "<ROUND>/forge-home/bin/forge-hook": "3f88cc7b59ba1762e12d8dcd1703ed94d7b9af14a110451e829bda9847c42707"
+  },
+  "before": {
+    "<ROUND>/codex-home/config.toml": "678922c9426fa1a9f25d506e9fdae99401237efabd9a7b05158dec3853a25496",
+    "<ROUND>/forge-home/bin/forge-hook": "3f88cc7b59ba1762e12d8dcd1703ed94d7b9af14a110451e829bda9847c42707"
+  },
+  "capture": "23-wheel-enrollment",
+  "doctor": {
+    "advice": "Forge is not installed as a globally reachable tool. Install it as a global tool so the CLI has a stable launcher and ordinary shells can resolve it.",
+    "forge_path": "<ROUND>/wheel-env/bin/forge",
+    "hook_dispatcher": {
+      "advice": "Run 'forge extension sync --scope user' to replace the recorded virtualenv launcher used by hook dispatch.",
+      "dev_override": {
+        "advice": null,
+        "effective": false,
+        "present": false,
+        "target": null,
+        "valid": false,
+        "value": null
+      },
+      "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "expected_version": "1.0.2",
+      "forge_binary_path": "<ROUND>/wheel-env/bin/forge",
+      "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+      "installed_version": "1.0.2",
+      "metadata_path": "<ROUND>/forge-home/runtime.json",
+      "metadata_status": "current",
+      "path": "<ROUND>/forge-home/bin/forge-hook",
+      "status": "current"
+    },
+    "install_kind": "venv",
+    "on_path": true,
+    "on_path_minimal": false,
+    "project_compatibility": {
+      "compatible": true,
+      "degraded": null,
+      "path": "<CHECKOUT>/.forge/project.toml",
+      "reason": null,
+      "required_forge": null,
+      "running_forge": "1.0.2",
+      "state": "missing"
+    },
+    "project_registry": {
+      "advice": null,
+      "enrolled_count": 1,
+      "error": null,
+      "path": "<ROUND>/forge-home/projects.json",
+      "stale_roots": [],
+      "status": "ok"
+    },
+    "runtime_hooks": {
+      "cleanup_required": false,
+      "double_fire_risk": false,
+      "legacy_registrations": [],
+      "scopes": []
+    }
+  },
+  "exit": 0,
+  "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+  "metadata_override": {
+    "dispatcher_path": "<ROUND>/forge-home/bin/forge-hook",
+    "dispatcher_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+    "dispatcher_version": "1.0.2",
+    "forge_binary_path": "<ROUND>/wheel-env/bin/forge",
+    "schema_version": 1,
+    "updated_at": "2026-10-11T01:07:00+00:00"
+  },
+  "qualification": "Only the owned fixture launcher metadata is temporarily overridden; trusted dispatcher bytes stay fixed.",
+  "routing_restored": true,
+  "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_revision": "c4354a9c48917d874d28a9807ca3fbf3092a0dd5",
+  "wheel_sha256": "874fe07b8a0e2000b9f5bdd720bf68e9c12a47a36ad436e5ee080d80875d88c1"
+}

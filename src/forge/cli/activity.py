@@ -109,6 +109,11 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
         "not your full interactive session.[/dim]"
     )
 
+    if summary.turn_review:
+        turn = summary.turn_review
+        console.print(
+            f"[bold]Stop review[/bold]: {turn['state']} · spent={turn.get('spent', 'unknown')} · {turn.get('reason') or 'bounded snapshot'}"
+        )
     if summary.supervisor_reviews:
         latest = summary.supervisor_reviews[0]
         console.print(

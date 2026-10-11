@@ -20,6 +20,7 @@ from pathlib import Path
 CODEX_EXECUTOR_IDENTITY_VAR = "FORGE_CODEX_EXECUTOR_IDENTITY"
 # Feature evidence is separate from the general QA ceiling and release pin.
 POLICY_FEEDBACK_VERSIONS = frozenset({"0.161.0", "0.162.1"})
+STOP_REVIEW_VERSIONS = frozenset({"0.162.1"})
 _VERSION = re.compile(r"codex-cli (\d+\.\d+\.\d+)")
 
 
@@ -86,6 +87,15 @@ def policy_feedback_supported(env: Mapping[str, str]) -> bool:
     nested runtime inherits the record but has a different launch parent. Wrappers
     that fork instead of exec are conservatively unsupported for new channels.
     """
+    return _feature_supported(env, POLICY_FEEDBACK_VERSIONS)
+
+
+def stop_review_supported(env: Mapping[str, str]) -> bool:
+    """Admit only B4's measured Stop version and verified invoking executor."""
+    return _feature_supported(env, STOP_REVIEW_VERSIONS)
+
+
+def _feature_supported(env: Mapping[str, str], versions: frozenset[str]) -> bool:
     raw = env.get(CODEX_EXECUTOR_IDENTITY_VAR, "")
     if not raw or len(raw) > 4096:
         return False
@@ -95,7 +105,7 @@ def policy_feedback_supported(env: Mapping[str, str]) -> bool:
             isinstance(data, dict)
             and type(data.get("schema")) is int
             and data["schema"] == 2
-            and data.get("version") in POLICY_FEEDBACK_VERSIONS
+            and data.get("version") in versions
             and isinstance(data.get("executable"), str)
             and Path(data["executable"]).is_absolute()
             and isinstance(data.get("sha256"), str)

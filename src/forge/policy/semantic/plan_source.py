@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,7 +33,19 @@ def read_plan(config: SupervisorConfig) -> PlanSnapshot:
     try:
         if not path.is_file():
             return PlanSnapshot(str(path), None, None)
-        raw = path.read_bytes()
+        if config.review_trigger == "stop":
+            # A Stop hook has a fixed wall-clock and prompt budget. Never block
+            # on a FIFO/device or silently treat a truncated plan as approved.
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, "rb") as stream:
+                info = os.fstat(stream.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_size > 64_000:
+                    return PlanSnapshot(str(path), None, None)
+                raw = stream.read(64_001)
+                if len(raw) > 64_000:
+                    return PlanSnapshot(str(path), None, None)
+        else:
+            raw = path.read_bytes()
         text = raw.decode("utf-8")
         if text.strip():
             return PlanSnapshot(str(path), text, hashlib.sha256(raw).hexdigest())

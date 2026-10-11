@@ -1341,6 +1341,9 @@ class TestInstallerCodexHooks:
         assert [_normalize_forge_home(command) for command in plan.codex.commands] == [
             "$FORGE_HOME/bin/forge-hook codex-session-start",
             "$FORGE_HOME/bin/forge-hook codex-policy-check",
+            "$FORGE_HOME/bin/forge-hook codex-turn-start",
+            "$FORGE_HOME/bin/forge-hook codex-turn-tool",
+            "$FORGE_HOME/bin/forge-hook codex-stop",
         ]
 
     def test_plan_minimal_has_no_codex(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
@@ -1382,6 +1385,9 @@ class TestInstallerCodexHooks:
         assert [_normalize_forge_home(command) for command in installation.codex_commands] == [
             "$FORGE_HOME/bin/forge-hook codex-policy-check",
             "$FORGE_HOME/bin/forge-hook codex-session-start",
+            "$FORGE_HOME/bin/forge-hook codex-stop",
+            "$FORGE_HOME/bin/forge-hook codex-turn-start",
+            "$FORGE_HOME/bin/forge-hook codex-turn-tool",
         ]
 
     def test_init_is_idempotent(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:

@@ -102,16 +102,17 @@ even when a binary is temporarily absent. Explicit narrowing refreshes selected 
 runtime ownership; sync derives its runtime set from the durable ownership relation. Removal belongs to disable.
 
 Settings merge remains additive (hooks append + dedupe, permissions union). The shared `hooks` module registers Claude
-settings and, when Codex is selected, `codex-session-start` and `codex-policy-check` in a marker-delimited user Codex
-config block (`$CODEX_HOME/config.toml`). Project/local installs write no runtime hook blocks. The Codex half remains
-best-effort when Codex is absent or its config conflicts; explicit Codex skill conflicts instead fail the whole install
-preflight. An automatically selected package that Forge already manages also blocks if a new same-name Codex duplicate
-appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all valid tracking
-rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact disable
-command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks every
-valid, present tracked project/local package of the same name, even outside the current directory chain, because a new
-user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only after
-the user's one-time interactive trust ceremony
+settings and, when Codex is selected, `codex-session-start`, `codex-policy-check`, `codex-turn-start`,
+`codex-turn-tool`, and `codex-stop` in a marker-delimited user Codex config block (`$CODEX_HOME/config.toml`). The
+dispatcher checks current effective policy before starting the full CLI for the three optional turn hooks. Project/local
+installs write no runtime hook blocks. The Codex half remains best-effort when Codex is absent or its config conflicts;
+explicit Codex skill conflicts instead fail the whole install preflight. An automatically selected package that Forge
+already manages also blocks if a new same-name Codex duplicate appears, preventing sync from silently dropping
+ownership. Duplicate classification cross-references all valid tracking rows: a package managed by another Forge scope
+remains a conflict whose recovery names that scope's exact disable command, while only an untracked package receives
+remove-or-rename guidance. User-scope planning/status checks every valid, present tracked project/local package of the
+same name, even outside the current directory chain, because a new user package would be visible inside all of those
+projects. Registration alone is inert — Codex hooks fire only after the user's one-time interactive trust ceremony
 ([session design §3.9](design_session_context.md#39-session-resume-context-management)).
 `forge runtime preflight codex --verify-enrollment` confirms enrollment by effect with one cheap managed turn.
 `~/.forge/installed.json` schema v3 records a sorted `module_owners` relation and a required tagged attribution on every
@@ -329,65 +330,66 @@ normal-flow surfaces speak in terms of `--session <name>`, "current session", an
 surfaces may name internal wiring when that is the evidence a user needs to inspect. Future user-settable `FORGE_*`
 variables must be added here and documented in the relevant end-user guide before help text or normal docs teach them.
 
-| Variable                           | Class             | Rule                                                                |
-| ---------------------------------- | ----------------- | ------------------------------------------------------------------- |
-| `FORGE_DEV`                        | Public            | Absolute checkout root used for contributor hook dispatch           |
-| `FORGE_HOME`                       | Public            | User-settable state-root relocation; documented in end-user guides  |
-| `FORGE_PROFILE`                    | Public            | User-settable credential profile selector                           |
-| `FORGE_DEBUG`                      | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces |
-| `FORGE_STATUS_TRUNCATE`            | Public diagnostic | User-settable status-line troubleshooting toggle                    |
-| `FORGE_AUTHORITY_MARKER`           | Internal wiring   | Advisory run id plus authority config/hook digests                  |
-| `FORGE_CODEX_EXECUTOR_IDENTITY`    | Internal wiring   | Fresh launch facts for measured Codex feedback channels             |
-| `FORGE_CODEX_PROXY_TOKEN`          | Internal wiring   | Loopback proxy bearer between Forge and Codex                       |
-| `FORGE_COMMAND`                    | Internal wiring   | Forge-spawned command attribution                                   |
-| `FORGE_DEFAULT_PROXY_BASE_URL`     | Internal wiring   | Legacy/default session proxy wiring                                 |
-| `FORGE_DEFAULT_PROXY_TEMPLATE`     | Internal wiring   | Legacy/default session proxy wiring                                 |
-| `FORGE_DEPTH`                      | Internal wiring   | Recursion guard for hook/subprocess chains                          |
-| `FORGE_FORGE_ROOT`                 | Internal wiring   | Launcher-provided Forge project root                                |
-| `FORGE_FORK_NAME`                  | Internal wiring   | Fork/relaunch session identity fast path                            |
-| `FORGE_LAUNCH_MODE`                | Internal wiring   | Host/sidecar launch metadata                                        |
-| `FORGE_OMIT_INTERACTIVE_KEY`       | Internal wiring   | Sidecar entrypoint instruction for interactive key omission         |
-| `FORGE_PARENT_RUN_ID`              | Internal wiring   | Run-tree attribution parent id                                      |
-| `FORGE_PARENT_SESSION`             | Internal wiring   | Fork/relaunch lineage metadata                                      |
-| `FORGE_PROXY_ID`                   | Internal wiring   | Sidecar/proxy runtime identity                                      |
-| `FORGE_PROXY_WIRE_SHAPE`           | Internal wiring   | Proxy wire-shape metadata propagated to children                    |
-| `FORGE_ROOT_RUN_ID`                | Internal wiring   | Run-tree attribution root id                                        |
-| `FORGE_RUN_ID`                     | Internal wiring   | Run-tree attribution id                                             |
-| `FORGE_SESSION`                    | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling |
-| `FORGE_SIDECAR`                    | Internal wiring   | Sidecar runtime marker                                              |
-| `FORGE_SIDECAR_HOST_FORGE_ROOT`    | Internal wiring   | Host Forge root retained for sidecar deferred-work markers          |
-| `FORGE_SIDECAR_HOST_WORKTREE_PATH` | Internal wiring   | Host worktree path retained for sidecar deferred-work markers       |
-| `FORGE_SKILL_RUNTIME`              | Internal wiring   | Compiled skill-to-packaged-script runtime binding                   |
-| `FORGE_SUBPROCESS_BASE_URL`        | Internal wiring   | Child-process proxy routing metadata                                |
-| `FORGE_SUBPROCESS_PROXY`           | Internal wiring   | Child-process proxy selection                                       |
-| `FORGE_SUBPROCESS_PROXY_ID`        | Internal wiring   | Child-process resolved proxy id                                     |
-| `FORGE_SUBPROCESS_TEMPLATE`        | Internal wiring   | Child-process resolved proxy template                               |
-| `FORGE_TEMPLATE`                   | Internal wiring   | Sidecar template metadata                                           |
-| `FORGE_MANUAL_TEST_SYSTEM_PROMPT`  | Test/QA harness   | Manual QA fixture marker                                            |
-| `FORGE_QA_ARTIFACT_MODE`           | Test/QA harness   | Prebuilt release candidate or development-build label               |
-| `FORGE_QA_ANTHROPIC_PROXY`         | Test/QA harness   | QA container proxy fixture                                          |
-| `FORGE_QA_ANTHROPIC_TEMPLATE`      | Test/QA harness   | QA container template fixture                                       |
-| `FORGE_QA_CLAUDE_VERSION`          | Test/QA harness   | Selected Claude client version                                      |
-| `FORGE_QA_CODEX_AUTH_MODE`         | Test/QA harness   | Isolated Codex auth ingress mode; never credential material         |
-| `FORGE_QA_CODEX_VERSION`           | Test/QA harness   | Selected Codex client version                                       |
-| `FORGE_QA_DEEPSEEK_TEMPLATE`       | Test/QA harness   | QA container template fixture                                       |
-| `FORGE_QA_DRIVER_SHA256`           | Test/QA harness   | Host QA-driver digest proven equal to the selected wheel package    |
-| `FORGE_QA_FORGE_VERSION`           | Test/QA harness   | Exact wheel distribution version                                    |
-| `FORGE_QA_GEMINI_PROXY`            | Test/QA harness   | QA container proxy fixture                                          |
-| `FORGE_QA_GEMINI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                       |
-| `FORGE_QA_MINIMAX_TEMPLATE`        | Test/QA harness   | QA container template fixture                                       |
-| `FORGE_QA_OPENAI_PROXY`            | Test/QA harness   | QA container proxy fixture                                          |
-| `FORGE_QA_OPENAI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                       |
-| `FORGE_QA_PROVIDER_PROFILE`        | Test/QA harness   | QA provider profile selector                                        |
-| `FORGE_QA_RUNTIME_TRACK`           | Test/QA harness   | Pinned blocking or latest compatibility runtime track               |
-| `FORGE_QA_RUNTIME_TRACK_BLOCKING`  | Test/QA harness   | Whether the selected runtime track can gate a release               |
-| `FORGE_QA_WHEEL_FILENAME`          | Test/QA harness   | Exact wheel basename                                                |
-| `FORGE_QA_WHEEL_PATH`              | Test/QA harness   | Canonical host artifact path recorded for the run                   |
-| `FORGE_QA_WHEEL_SHA256`            | Test/QA harness   | Exact wheel digest                                                  |
-| `FORGE_QA_WORKFLOW_MODEL_A`        | Test/QA harness   | QA workflow model fixture                                           |
-| `FORGE_QA_WORKFLOW_MODEL_B`        | Test/QA harness   | QA workflow model fixture                                           |
-| `FORGE_QA_WORKFLOW_MODELS`         | Test/QA harness   | QA workflow model fixture                                           |
-| `FORGE_TEST_REPO`                  | Test/QA harness   | Manual/QA test-repository root                                      |
+| Variable                           | Class             | Rule                                                                 |
+| ---------------------------------- | ----------------- | -------------------------------------------------------------------- |
+| `FORGE_DEV`                        | Public            | Absolute checkout root used for contributor hook dispatch            |
+| `FORGE_HOME`                       | Public            | User-settable state-root relocation; documented in end-user guides   |
+| `FORGE_PROFILE`                    | Public            | User-settable credential profile selector                            |
+| `FORGE_DEBUG`                      | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces  |
+| `FORGE_STATUS_TRUNCATE`            | Public diagnostic | User-settable status-line troubleshooting toggle                     |
+| `FORGE_AUTHORITY_MARKER`           | Internal wiring   | Advisory run id plus authority config/hook digests                   |
+| `FORGE_CODEX_ENROLLMENT_NONCE`     | Internal wiring   | Binds empirical turn-hook receipts to one disposable enrollment turn |
+| `FORGE_CODEX_EXECUTOR_IDENTITY`    | Internal wiring   | Fresh launch facts for measured Codex feedback channels              |
+| `FORGE_CODEX_PROXY_TOKEN`          | Internal wiring   | Loopback proxy bearer between Forge and Codex                        |
+| `FORGE_COMMAND`                    | Internal wiring   | Forge-spawned command attribution                                    |
+| `FORGE_DEFAULT_PROXY_BASE_URL`     | Internal wiring   | Legacy/default session proxy wiring                                  |
+| `FORGE_DEFAULT_PROXY_TEMPLATE`     | Internal wiring   | Legacy/default session proxy wiring                                  |
+| `FORGE_DEPTH`                      | Internal wiring   | Recursion guard for hook/subprocess chains                           |
+| `FORGE_FORGE_ROOT`                 | Internal wiring   | Launcher-provided Forge project root                                 |
+| `FORGE_FORK_NAME`                  | Internal wiring   | Fork/relaunch session identity fast path                             |
+| `FORGE_LAUNCH_MODE`                | Internal wiring   | Host/sidecar launch metadata                                         |
+| `FORGE_OMIT_INTERACTIVE_KEY`       | Internal wiring   | Sidecar entrypoint instruction for interactive key omission          |
+| `FORGE_PARENT_RUN_ID`              | Internal wiring   | Run-tree attribution parent id                                       |
+| `FORGE_PARENT_SESSION`             | Internal wiring   | Fork/relaunch lineage metadata                                       |
+| `FORGE_PROXY_ID`                   | Internal wiring   | Sidecar/proxy runtime identity                                       |
+| `FORGE_PROXY_WIRE_SHAPE`           | Internal wiring   | Proxy wire-shape metadata propagated to children                     |
+| `FORGE_ROOT_RUN_ID`                | Internal wiring   | Run-tree attribution root id                                         |
+| `FORGE_RUN_ID`                     | Internal wiring   | Run-tree attribution id                                              |
+| `FORGE_SESSION`                    | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling  |
+| `FORGE_SIDECAR`                    | Internal wiring   | Sidecar runtime marker                                               |
+| `FORGE_SIDECAR_HOST_FORGE_ROOT`    | Internal wiring   | Host Forge root retained for sidecar deferred-work markers           |
+| `FORGE_SIDECAR_HOST_WORKTREE_PATH` | Internal wiring   | Host worktree path retained for sidecar deferred-work markers        |
+| `FORGE_SKILL_RUNTIME`              | Internal wiring   | Compiled skill-to-packaged-script runtime binding                    |
+| `FORGE_SUBPROCESS_BASE_URL`        | Internal wiring   | Child-process proxy routing metadata                                 |
+| `FORGE_SUBPROCESS_PROXY`           | Internal wiring   | Child-process proxy selection                                        |
+| `FORGE_SUBPROCESS_PROXY_ID`        | Internal wiring   | Child-process resolved proxy id                                      |
+| `FORGE_SUBPROCESS_TEMPLATE`        | Internal wiring   | Child-process resolved proxy template                                |
+| `FORGE_TEMPLATE`                   | Internal wiring   | Sidecar template metadata                                            |
+| `FORGE_MANUAL_TEST_SYSTEM_PROMPT`  | Test/QA harness   | Manual QA fixture marker                                             |
+| `FORGE_QA_ARTIFACT_MODE`           | Test/QA harness   | Prebuilt release candidate or development-build label                |
+| `FORGE_QA_ANTHROPIC_PROXY`         | Test/QA harness   | QA container proxy fixture                                           |
+| `FORGE_QA_ANTHROPIC_TEMPLATE`      | Test/QA harness   | QA container template fixture                                        |
+| `FORGE_QA_CLAUDE_VERSION`          | Test/QA harness   | Selected Claude client version                                       |
+| `FORGE_QA_CODEX_AUTH_MODE`         | Test/QA harness   | Isolated Codex auth ingress mode; never credential material          |
+| `FORGE_QA_CODEX_VERSION`           | Test/QA harness   | Selected Codex client version                                        |
+| `FORGE_QA_DEEPSEEK_TEMPLATE`       | Test/QA harness   | QA container template fixture                                        |
+| `FORGE_QA_DRIVER_SHA256`           | Test/QA harness   | Host QA-driver digest proven equal to the selected wheel package     |
+| `FORGE_QA_FORGE_VERSION`           | Test/QA harness   | Exact wheel distribution version                                     |
+| `FORGE_QA_GEMINI_PROXY`            | Test/QA harness   | QA container proxy fixture                                           |
+| `FORGE_QA_GEMINI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                        |
+| `FORGE_QA_MINIMAX_TEMPLATE`        | Test/QA harness   | QA container template fixture                                        |
+| `FORGE_QA_OPENAI_PROXY`            | Test/QA harness   | QA container proxy fixture                                           |
+| `FORGE_QA_OPENAI_TEMPLATE`         | Test/QA harness   | QA container template fixture                                        |
+| `FORGE_QA_PROVIDER_PROFILE`        | Test/QA harness   | QA provider profile selector                                         |
+| `FORGE_QA_RUNTIME_TRACK`           | Test/QA harness   | Pinned blocking or latest compatibility runtime track                |
+| `FORGE_QA_RUNTIME_TRACK_BLOCKING`  | Test/QA harness   | Whether the selected runtime track can gate a release                |
+| `FORGE_QA_WHEEL_FILENAME`          | Test/QA harness   | Exact wheel basename                                                 |
+| `FORGE_QA_WHEEL_PATH`              | Test/QA harness   | Canonical host artifact path recorded for the run                    |
+| `FORGE_QA_WHEEL_SHA256`            | Test/QA harness   | Exact wheel digest                                                   |
+| `FORGE_QA_WORKFLOW_MODEL_A`        | Test/QA harness   | QA workflow model fixture                                            |
+| `FORGE_QA_WORKFLOW_MODEL_B`        | Test/QA harness   | QA workflow model fixture                                            |
+| `FORGE_QA_WORKFLOW_MODELS`         | Test/QA harness   | QA workflow model fixture                                            |
+| `FORGE_TEST_REPO`                  | Test/QA harness   | Manual/QA test-repository root                                       |
 
 Build-script locals, Docker build args, HTTP header constants, and Python constant names that merely contain `FORGE` are
 outside this vocabulary unless they are read from or written to a process environment.
@@ -648,8 +650,9 @@ Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `pan
 
 ### C.6 Codex hook registration (`hooks`, Codex-owned half)
 
-User enable registers two Codex hooks in a marker-delimited block (`# >>> forge hooks >>>` … `# <<< forge hooks <<<`).
-Hooks and skills share runtime selection but not availability. `$CODEX_HOME` selects only this config; skills use §C.5:
+User enable registers five Codex hooks (SessionStart, PreToolUse, UserPromptSubmit, PostToolUse and Stop) in a
+marker-delimited block (`# >>> forge hooks >>>` … `# <<< forge hooks <<<`). Hooks and skills share runtime selection but
+not availability. `$CODEX_HOME` selects only this config; skills use §C.5:
 
 | Forge scope | Codex config target                                        |
 | ----------- | ---------------------------------------------------------- |

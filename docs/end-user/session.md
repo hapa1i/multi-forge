@@ -874,9 +874,10 @@ forge session fork planner --into /path/to/executor-worktree --inline-plan
 # Reviewer sees: planner context + approved plan + executor's code
 ```
 
-The `--supervise` flag wires the parent as a semantic supervisor. Every code change is checked against the approved plan
-at `PreToolUse` time. Supervisor config persists through `forge session resume`. You can also wire supervision on
-existing sessions with `forge policy supervisor set <session>` or `%policy supervisor <session>` in-session.
+The `--supervise` flag wires the parent as a semantic supervisor. In the default per-edit mode, every code change is
+checked against the approved plan at `PreToolUse` time. Supervisor config persists through `forge session resume`. You
+can also wire supervision on existing sessions with `forge policy supervisor set <session>` or
+`%policy supervisor <session>` in-session.
 
 **Supervisor routing:** By default, the supervisor inherits the planner's proxy. Use `--supervisor-proxy` or
 `--no-supervisor-proxy` to override:

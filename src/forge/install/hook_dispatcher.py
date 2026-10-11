@@ -293,8 +293,55 @@ def _resolve_forge() -> tuple[Path | None, list[Path]]:
 """
 
 _DISPATCHER_SOURCE = r"""
+def _needs_codex_turn_hooks() -> bool:
+    # These opt-in hooks fire for every native tool. Read the current atomic
+    # manifest using stdlib only, so ordinary sessions avoid full CLI startup.
+    # Uncertain/invalid manifests go through the normal handler for diagnosis.
+    name = os.environ.get("FORGE_FORK_NAME") or os.environ.get("FORGE_SESSION")
+    if not name:
+        return False
+    if os.environ.get("FORGE_CODEX_ENROLLMENT_NONCE"):
+        return True
+    root = os.environ.get("FORGE_FORGE_ROOT")
+    if not root or "/" in name or name in {".", ".."}:
+        return True
+    try:
+        path = Path(root) / ".forge" / "sessions" / name / "forge.session.json"
+        if not path.is_file() or path.stat().st_size > 1_000_000:
+            return True
+        with path.open(encoding="utf-8") as stream:
+            raw = stream.read(1_000_001)
+        if len(raw) > 1_000_000:
+            return True
+        state = json.loads(raw)
+        if state.get("schema_version") not in {1, 2, 3, 4}:
+            return True
+
+        def merge(base, override):
+            if not isinstance(base, dict) or not isinstance(override, dict):
+                return override
+            return {key: merge(base.get(key), override[key]) if key in override else value
+                    for key, value in (base | override).items()}
+
+        intent = merge(state["intent"], state.get("overrides", {}))
+        policy = intent.get("policy")
+        if policy is None or policy.get("enabled", False) is False:
+            return False
+        supervisor = policy.get("supervisor")
+        if supervisor is None or supervisor.get("suspended", False) is True:
+            return False
+        if supervisor.get("review_trigger", "pre-tool-use") == "pre-tool-use":
+            return False
+        return bool(supervisor.get("resume_id") or supervisor.get("plan_override_path"))
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError):
+        return True
+
+
 def main() -> int:
     argv = sys.argv[1:]
+    if argv and argv[0] in {"codex-turn-start", "codex-turn-tool", "codex-stop"}:
+        if not _needs_codex_turn_hooks():
+            return 0
     if argv and argv[0] == "authority-check":
         if "FORGE_AUTHORITY_MARKER" not in os.environ:
             return 0

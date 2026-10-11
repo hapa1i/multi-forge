@@ -121,8 +121,11 @@ def run_claude_session(
     additional_dirs: tuple[str, ...] = (),
     deadline: float | None = None,
     subscription_only: bool = False,
+    retry_output_format: bool = True,
 ) -> SessionResult:
     """Run ``claude -p`` as a headless subprocess.
+
+    Stop callers set ``retry_output_format=False`` to cap actual dispatches at one.
 
     Builds the command, environment, and runs ``subprocess.run`` with
     ``capture_output=True``. All exceptions are caught and reported
@@ -336,7 +339,7 @@ def run_claude_session(
 
         # Retry-once backstop: the version gate allowed the flag but this CLI still
         # rejected it. Latch unsupported (siblings skip it) and re-run without it.
-        if json_requested and is_json_flag_rejection(result.returncode, result.stderr):
+        if retry_output_format and json_requested and is_json_flag_rejection(result.returncode, result.stderr):
             mark_json_output_unsupported()
             _log.debug("claude rejected --output-format; retrying without it")
             result = execute(cmd)

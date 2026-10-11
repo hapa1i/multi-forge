@@ -19,8 +19,9 @@ update, and source-drift limits.
 B3 closed on 2026-10-11 after [PR #262](https://github.com/hapa1i/multi-forge/pull/262) merged as `f1019f6c`, matching
 tested head `81c14448` with all five GitHub checks passing. Its
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records the user-selected source-only mode,
-delivery limits, and fixture teardown. B4-B5 remain proposed. The epic remains active until Stop and native-fork
-outcomes also ship.
+delivery limits, and fixture teardown. B4 is active on `codex/codex-stop-review` from published closeout `897ed95c`; its
+[checklist](../codex_stop_review/checklist.md) is the current implementation plan. B5 remains proposed. The epic remains
+active until Stop and native-fork outcomes also ship.
 
 ## Activation
 
@@ -57,6 +58,17 @@ subscription-only Claude quote-quality attempt. Product implementation and live 
 B2 publication, 2026-10-10: fast-forwarded remote `main` from `2a15c087` to existing closeout `d54dba63`; B3 remains on
 its separate branch. Refresh and verify the B3 PR base before opening it.
 
+B4 activation, 2026-10-11: selected separately from clean, synchronized `main` at B3 closeout `897ed95c`. Created
+`codex/codex-stop-review`, moved B4 to `doing/`, and added its checklist. B3 is now an explicit dependency for
+source-only feedback and provenance; B4 still needs independent Stop delivery, turn identity, and timeout evidence. The
+one-review cap counts actual frontier dispatches and excludes cascade/shadow work in Stop mode. Product work and live
+probes have not started. B5 and Jev remain unactivated.
+
+B4 review revision, 2026-10-11: the runtime go/no-go gate now precedes product work. The checklist specifies conditional
+manifest v4 serialization, the supported Codex child/setup path, refusal of incompatible inherited Stop mode, and reuse
+of the session-event journal with atomic reservation and bounded history. Private Git snapshots remain conditional on
+filter/helper isolation. No product work or live inference was performed for this revision.
+
 ## Sequence and ownership
 
 | Member                                             | State    | Dependency | Owned outcome                                                  |
@@ -64,7 +76,7 @@ its separate branch. Refresh and verify the B3 PR base before opening it.
 | [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
 | [B2](../../done/codex_0160_validation/card.md)     | Done     | None       | Current-runtime probe evidence                                 |
 | [B3](../../done/codex_policy_warnings/card.md)     | Done     | B1, B2     | Allowed-action feedback and source-only formatting             |
-| [B4](../../proposed/codex_stop_review/card.md)     | Proposed | B1, B2     | Bounded review at turn completion                              |
+| [B4](../codex_stop_review/card.md)                 | Doing    | B1, B2, B3 | Bounded review at turn completion                              |
 | [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
 
 - [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
@@ -75,8 +87,9 @@ its separate branch. Refresh and verify the B3 PR base before opening it.
 - [x] Before activating B3-B5, link the B2 captures each card relies on; parser help alone is insufficient evidence.
 - [x] Activate B3 on its own branch with a checklist; record B1's shipped snapshot dependency for source-only feedback
   here and on B3. B1 already handed that option to B3; its completed implementation scope is unchanged.
-- [ ] Activate B4 and B5 separately with their own checklists. Record any changed dependency here and in the affected
-  member cards before implementation relies on it.
+- [x] Activate B4 separately with its own checklist; record the B3 feedback dependency here and in B4/B3's cards.
+- [ ] Activate B5 separately with its own checklist. Record any changed dependency here and in the affected member cards
+  before implementation relies on it.
 - [x] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.
 - [x] Confirm B1 preserves the shared `LaneRecord` and four-consumer resolution contracts; no separate model-format
   member was needed. Any later change still requires its own accepted member and dependency decision.
@@ -132,8 +145,8 @@ that the committed harness post-dates the captures; optional stage 88/97 recheck
   implementation reasoning. Depth suppression prevented recursion but mutated the parent Forge manifest; isolate hook
   state before reuse. Earlier-turn selection and general concurrent-source guarantees remain unverified.
 
-The three member cards retain the detailed evidence links. B3 subsequently shipped; B4-B5 remain proposed. Closing B2
-did not implement those features or satisfy the epic's integrated outcome.
+The three member cards retain the detailed evidence links. B3 subsequently shipped; B4 is now active and B5 remains
+proposed. Closing B2 did not implement those features or satisfy the epic's integrated outcome.
 
 ## B3 handoff
 

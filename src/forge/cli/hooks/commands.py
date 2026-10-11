@@ -1428,8 +1428,12 @@ def codex_policy_check() -> None:
     needs_review > warn/allow.
     """
     data, _err = _read_stdin_json()
+    from forge.cli.hooks.codex_stop import observe_request
+
     guard = evaluate_authority_guard(data, runtime="codex")
+    observe_request(data)
     if guard.deny:
+        observe_request(data, denied=True)
         if not journal_authority_denial(guard, runtime="codex"):
             print(
                 "[forge] Authority denial journal write failed; request remains denied.",
@@ -1494,7 +1498,7 @@ def codex_policy_check() -> None:
     fail_mode: FailMode = effective.policy.fail_mode or "open"
     bundles = effective.policy.bundles or []
     sup = effective.policy.supervisor if effective.policy else None
-    has_supervisor = bool(sup and sup.active)
+    has_supervisor = bool(sup and sup.active and sup.review_trigger == "pre-tool-use")
 
     if not bundles and not has_supervisor:
         sys.exit(0)
@@ -1578,6 +1582,8 @@ def codex_policy_check() -> None:
     # must not record tests_touched, or a later impl-only patch would wrongly
     # pass tests-before-impl. Decision-log entries persist either way (audit).
     blocked = bool(denying or reviews)
+    if blocked:
+        observe_request(data, denied=True)
     persistence_failed = False
     try:
         _persist_policy_decisions(

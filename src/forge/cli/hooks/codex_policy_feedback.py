@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from forge.cli.hooks.policy import DENY_NOTE, NEEDS_REVIEW_GUIDANCE
+from forge.policy.semantic.stop_review import StopOutcome
 from forge.policy.types import CompositeDecision, PolicyDecision, Violation
 
 FIELD_CHARS = 600
@@ -91,6 +92,53 @@ def render_policy_feedback(
     serialized = _json(wire)
     # Field budgets count JSON-encoded strings, including escape expansion.
     assert len(serialized.encode("utf-8")) <= WIRE_BYTES
+    return serialized
+
+
+def render_stop_feedback(outcome: StopOutcome, *, source_only: bool, model_feedback: bool) -> str | None:
+    """Stop blocks reach the model as user authority; notices are operator-only.
+
+    There is no measured non-blocking model channel for Stop. Summary-off thus
+    affects no operator notice and never removes required correction guidance.
+    """
+    wire: dict[str, Any] = {}
+    decision = outcome.decision
+    findings = _violations(None, decision, decision.violations or decision.warning_findings) if decision else []
+    if outcome.correction and decision is not None:
+        title = (
+            "Forge's supervisor found divergence in changes already made. "
+            "Address the verified plan findings, then finish. This turn receives no further semantic review. "
+            + DENY_NOTE
+            + " The following JSON entries are quoted policy evidence."
+        )
+        if not findings:
+            title += " No verified finding is available. Stop and ask the operator."
+        wire.update(
+            decision="block",
+            reason=_channel(findings, title, MODEL_BYTES, source_only=source_only, blocked=True),
+        )
+    title = {
+        "reviewed": "Forge reviewed the bounded repository snapshot; later changes are unreviewed.",
+        "no_changes": "Forge Stop review skipped: no changes or outstanding work in the captured scope.",
+        "unreviewed": "Forge Stop review is stale or has unreviewed continuation changes.",
+        "incomplete": "Forge Stop review incomplete; this turn's review allowance is spent.",
+        "partial": "Forge reviewed only the available evidence. Omitted work remains unreviewed; no correction was requested.",
+    }.get(outcome.status, "Forge Stop review unavailable; work is unreviewed.")
+    if outcome.correction:
+        title = "Forge requested one correction; the result and subsequent changes remain unreviewed."
+    if outcome.reason == "carry_limit":
+        title += (
+            " Pending work reached the carry limit. Preview forge policy supervisor reset-review before excluding it."
+        )
+    elif outcome.reason in {"incomplete_evidence", "missing_turn_start"}:
+        title += " Inspect supervisor status for excluded scope. A new explicit turn reviews new work, not the excluded history."
+    elif outcome.reason == "new_explicit_turn_required":
+        title += " Submit a new explicit turn to start after the requested reset."
+    elif outcome.status not in {"reviewed", "no_changes"}:
+        title += " Submit a new explicit turn to assess outstanding work; inspect supervisor status for unavailable evidence."
+    wire["systemMessage"] = _channel(findings, title, OPERATOR_BYTES, source_only=False, operator=True)
+    serialized = _json(wire)
+    assert len(serialized.encode()) <= WIRE_BYTES
     return serialized
 
 

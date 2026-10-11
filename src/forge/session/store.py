@@ -22,14 +22,17 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import shutil
+import stat
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 from typing import Any, Callable, get_origin, get_type_hints
+from uuid import uuid4
 
 import dacite
 
-from forge.core.state import atomic_write_json, now_iso
+from forge.core.state import atomic_write_json, atomic_write_text, now_iso
 from forge.core.state.lock import file_lock_for_target
 from forge.core.typing_helpers import unwrap_optional
 
@@ -44,7 +47,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -169,13 +172,22 @@ def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
 
 
 def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
-    """Use v2 when the state is losslessly readable by existing sidecar images."""
+    """Write Stop intent as v4; preserve the v2/v3 shape for ordinary supervision."""
     data = session_state_to_dict(manifest)
     supervisor = (data["intent"].get("policy") or {}).get("supervisor")
     override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
     new_override = isinstance(override_sup, dict) and bool({"auth_mode", "supervisor_model"} & override_sup.keys())
     legacy = not supervisor or (supervisor["auth_mode"] == "inherit" and supervisor["supervisor_model"] is None)
-    data["schema_version"] = 2 if legacy and not new_override else SCHEMA_VERSION
+    stop_required = any(
+        isinstance(config, dict) and config.get("review_trigger", "pre-tool-use") != "pre-tool-use"
+        for config in (supervisor, override_sup)
+    )
+    # A default override masking stored Stop intent is significant and remains in v4.
+    if not stop_required:
+        for config in (supervisor, override_sup):
+            if isinstance(config, dict):
+                config.pop("review_trigger", None)
+    data["schema_version"] = SCHEMA_VERSION if stop_required else 2 if legacy and not new_override else 3
     if data["schema_version"] == 2 and supervisor:
         del supervisor["auth_mode"]
         del supervisor["supervisor_model"]
@@ -289,7 +301,10 @@ class SessionStore:
             raise ManifestUnreadableError(str(self._manifest_path), f"read error: {e}")
 
         if not isinstance(data, dict):
-            raise ManifestCorruptedError(str(self._manifest_path), f"expected a JSON object, got {type(data).__name__}")
+            raise ManifestCorruptedError(
+                str(self._manifest_path),
+                f"expected a JSON object, got {type(data).__name__}",
+            )
 
         strip_removed_memory_generated_file(data)
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
@@ -372,7 +387,47 @@ class SessionStore:
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             if self._manifest_path.is_file():
                 raise SessionExistsError(self._session_name)
+            # Artifact history survives deletion; operational Stop state must
+            # belong to this creation, even when the name is reused immediately.
+            atomic_write_text(
+                self.session_dir / "review-identity",
+                "review-owner-v1:" + uuid4().hex + "\n",
+            )
+            (self.session_dir / "review-identity").chmod(0o600)
             self._write_unlocked(manifest)
+
+    def review_identity(self, *, create: bool = False) -> str | None:
+        """Read the Stop journal owner; initialize pre-B4 sessions only before their first review."""
+        path = self.session_dir / "review-identity"
+        if create and not path.exists():
+            with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+                self.read()  # Deletion must not be undone by a late hook.
+                history = Path(self.forge_root) / ".forge/artifacts" / self._session_name / "review"
+                if history.exists() and any(history.iterdir()):
+                    raise ValueError(
+                        "Stop review history has no session owner; restore the owner file or create a new session"
+                    )
+                if not path.exists():
+                    atomic_write_text(path, "review-owner-v1:" + uuid4().hex + "\n")
+                    path.chmod(0o600)
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        except FileNotFoundError:
+            history = Path(self.forge_root) / ".forge/artifacts" / self._session_name / "review"
+            if history.exists() and any(history.iterdir()):
+                raise ValueError(
+                    "Stop review history has no session owner; restore the owner file or create a new session"
+                )
+            return None
+        with os.fdopen(fd, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ValueError("Invalid Stop review owner file")
+            raw = stream.read(80)
+        prefix = b"review-owner-v1:"
+        value = raw.removeprefix(prefix).removesuffix(b"\n")
+        if not raw.startswith(prefix) or len(value) != 32 or any(c not in b"0123456789abcdef" for c in value):
+            raise ValueError("Invalid Stop review owner; restore the session directory or create a new session")
+        return value.decode("ascii")
 
     def _ensure_session_dir(self) -> None:
         """Create the session directory, but only for a name that can be one.
@@ -573,7 +628,7 @@ class SessionStore:
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version in {2, 3} and "model_route" not in launch:
+            if schema_version in {2, 3, 4} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
 
         policy = intent.get("policy") if isinstance(intent, dict) else None
@@ -582,15 +637,28 @@ class SessionStore:
             for field_name in ("auth_mode", "supervisor_model"):
                 if schema_version in {1, 2} and field_name in supervisor:
                     raise ManifestCorruptedError(
-                        str(self._manifest_path), f"schema v{schema_version} cannot contain supervisor.{field_name}"
+                        str(self._manifest_path),
+                        f"schema v{schema_version} cannot contain supervisor.{field_name}",
                     )
-                if schema_version == 3 and field_name not in supervisor:
+                if schema_version in {3, 4} and field_name not in supervisor:
                     raise ManifestCorruptedError(
-                        str(self._manifest_path), f"schema v3 requires supervisor.{field_name}"
+                        str(self._manifest_path),
+                        f"schema v{schema_version} requires supervisor.{field_name}",
                     )
 
         # Strict overrides schema: keys must be valid SessionIntent paths
         overrides = data.get("overrides")
+        override_policy = overrides.get("policy") if isinstance(overrides, dict) else None
+        override_supervisor = override_policy.get("supervisor") if isinstance(override_policy, dict) else None
+        if schema_version in {1, 2, 3}:
+            for config in (supervisor, override_supervisor):
+                if isinstance(config, dict) and "review_trigger" in config:
+                    raise ManifestCorruptedError(
+                        str(self._manifest_path),
+                        f"schema v{schema_version} cannot contain supervisor.review_trigger",
+                    )
+        elif schema_version == 4 and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
+            raise ManifestCorruptedError(str(self._manifest_path), "schema v4 requires supervisor.review_trigger")
         if isinstance(overrides, dict):
             _validate_overrides_schema(overrides, str(self._manifest_path))
 

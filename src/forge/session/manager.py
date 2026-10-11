@@ -967,6 +967,9 @@ class SessionManager:
             raise SessionNotFoundError(parent_name)
 
         parent_state = parent_store.read()
+        from forge.policy.semantic.identity import validate_inherited_claude_trigger
+
+        validate_inherited_claude_trigger(parent_state)
         parent_worktree_path = (
             parent_state.worktree.path if parent_state.worktree is not None else parent_entry.worktree_path
         )
@@ -1383,6 +1386,9 @@ class SessionManager:
         if authority_explicit and os.environ.get("FORGE_SESSION"):
             raise ForgeSessionError("authority-bearing session creation is only available outside a managed session")
         parent = self.get_session(parent_name, forge_root=forge_root)
+        from forge.policy.semantic.identity import validate_inherited_claude_trigger
+
+        validate_inherited_claude_trigger(parent)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
 
@@ -1887,6 +1893,9 @@ class SessionManager:
             SessionNotFoundError: If parent doesn't exist.
         """
         parent = self.get_session(parent_name, forge_root=forge_root)
+        from forge.policy.semantic.identity import validate_inherited_claude_trigger
+
+        validate_inherited_claude_trigger(parent)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
 

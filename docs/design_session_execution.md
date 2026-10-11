@@ -309,6 +309,80 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 `forge runtime list` shows `SKILL SCOPES` separately from general `SCOPES`; its JSON records both `skill_scopes` and
 `install_scopes`.
 
+### I.2a Codex Stop review
+
+B4 admits Stop separately from PreToolUse feedback: only measured Codex 0.162.1, the directly launched managed executor,
+and the exact empirically observed hook configuration qualify. `codex_turn_enrollment.py` records UserPromptSubmit,
+PreToolUse, PostToolUse, and Stop from one disposable read-only enrollment turn, alongside native IDs, executable
+fingerprint and configuration digest. The existing SessionStart receipt remains separately reported. Hook definitions,
+trust state, hook feature switches (including profile overrides), and executable changes invalidate Stop proof.
+Unrelated model, MCP and presentation preferences are excluded. Failed or incomplete verification leaves the previous
+receipt intact; a successful same-turn observation replaces it atomically. The refined fingerprint requires one new
+verification for receipts from the initial B4 implementation. This does not change the general QA ceiling or release
+pin.
+
+`cli/hooks/codex_stop.py` owns Codex turn-start, tool-outcome and Stop handling; Claude's Stop pipeline remains
+separate. PreToolUse adds request evidence without changing authority/deterministic decisions. Stop mode omits semantic
+policy registration, cascade and shadow sampling from per-edit checks. `policy/semantic/stop_review.py` owns immutable
+review inputs, spending, carry-forward and stale-result validation. `turn_evidence.py` enumerates paths with read-only
+Git commands, disables fsmonitor/hooks, and captures raw working bytes. A private-index `git add` design was rejected:
+clean/process filters can execute outside private storage, so changing index/object directories is insufficient.
+
+The baseline comes from UserPromptSubmit, not SessionStart. Verified UUIDv7 turn IDs advance a bounded durable
+watermark; repeated or stale turn-start delivery cannot reset spending. Automatic Stop correction retains the same
+native turn ID. Captured scope is the raw repository delta and observed tool requests/outcomes, not arbitrary external
+effects or proven authorship. Missing events, changed repository identity, unsupported changed files and exceeded bounds
+refuse a complete review. Tool outcomes preserve edit/revert activity even when the final net diff is empty. Ordinary
+dirty starting work is excluded. The next prompt snapshots the current checkout; changes since the previous observed
+tool outcome or Stop are unattributed context, outside any correction. Pending work carries only through that observed
+endpoint. Its baseline is rebased onto the current checkout, preserving intervening files and Git metadata. If an
+operator also changes a pending path, the old scope is explicitly excluded and the overlap becomes a coverage gap. An
+unfinished observed turn can carry across native thread changes; a thread change alone does not imply pending work. An
+unknown newer Stop records a missing-start exclusion without inventing a baseline or spending a reviewer call. Index
+stat-cache refreshes do not change repository identity; staged object/mode/path changes do. Denied requests have no tool
+outcome or changed-path obligation. Coverage is recomputed for the current net delta and observed actions. Bounded
+available evidence may receive a `partial` review; its verdict cannot approve omitted work or deliver a correction.
+Partial scope is recorded as unreviewed in `excluded_work`, then later prompts start their own scope. An unreviewable
+gap is excluded without a call. Lost requests/outcomes and edit/revert activity remain explicit evidence. After 32
+pending turns carry stops with `carry_limit`, preserving a valid checkpoint. The operator can preview/apply
+`forge policy supervisor reset-review [--yes]`: it retains the watermark and current spending, records excluded scope as
+unreviewed, and takes a fresh baseline only on a later explicit prompt. Reset exclusions remain visible in status.
+
+Session creation writes a random owner to `.forge/sessions/<name>/review-identity`; the `review` event domain stores
+complete private checkpoints under `.forge/artifacts/<name>/review/<owner>/`, with its own lock. Deletion preserves
+historical artifacts; recreating the same name gets a fresh owner, even in the same second or a different checkout.
+Existing sessions with no review history acquire an owner on first use. Missing owners with history and older checkpoint
+schemas fail closed: restore the owner/history or start a new session. Old hooks cannot write to a replacement session.
+Reservation writes the attempt ID, config/lane/plan/evidence identities and spent bit before releasing the lock and
+calling B1. Inference never holds a session or review lock. A crash after reservation remains spent even if dispatch
+never began. Atomic compaction retains the full latest watermark. Initial publication writes the journal before its
+marker; a crash leaves a complete checkpoint, and a later writer can complete marker creation without losing spending. A
+marker with missing journal still refuses review. Other event domains and telemetry have independent lifetimes;
+resetting diagnostic attempts never resets this allowance. Snapshots use immutable content-addressed private blobs with
+bounded storage and checkpoint-owned pruning.
+
+Completion first saves the returned verdict, then rechecks checkout evidence, plan and effective configuration. A failed
+freshness check leaves that verdict as audit evidence. Stale results remain historical evidence and cannot request a
+correction or clear outstanding work. A completed divergent result consumes its one correction before returning
+`{"decision":"block","reason":...}`. Delivery itself remains unconfirmed until native rollout evidence is observed. The
+measured reason arrives as a user-role `<hook_prompt hook_run_id="stop:...">`; that ID is not globally unique. B3's
+bounded source-only projection applies to every model-visible field. Stop `systemMessage` is operator-only; no
+non-blocking model feedback channel is claimed. Later Stops never replay the block or call the reviewer again.
+
+B1's guarded reviewer lifecycle remains mandatory: native Stop expiry alone left an unguarded detached reviewer alive in
+the gate, while the parent-death watchdog reaped it. An admitted Stop hook also exits when its invoking Codex parent
+dies, closing that watchdog pipe even if Codex leaves the hook's process group alive. The Stop whole-hook budget is 55
+seconds inside the exact 60-second registration, reserving ten seconds for final capture, state recording and output.
+The existing 1–45-second reviewer ceiling is additionally capped by the remaining review portion. Format retries and
+alternative reviewer fallbacks are disabled for Stop. Usage remains emitted once by the actual transport.
+Status/activity distinguish reservation, known dispatch, incomplete results, reviewed snapshots and outstanding changes.
+Unreserved turns report `dispatched: false`; an interrupted reservation can report `null`. A correction follow-up never
+uses an approval notice. The stdlib dispatcher skips full CLI startup for the three turn hooks when the current manifest
+proves Stop inactive; uncertain manifests and enrollment probes still reach the full handler.
+
+See the [B4 evidence and limits](board/doing/codex_stop_review/evidence/README.md) and
+[user configuration contract](end-user/policy.md#review-once-at-codex-stop-opt-in).
+
 ### I.3 Codex operational guards (probe-churn + enrollment)
 
 **Policy feedback admission:** `core/runtime/codex_feedback.py` owns a feature-specific measured-version set, separate

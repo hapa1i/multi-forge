@@ -1,0 +1,82 @@
+{
+  "activity": null,
+  "cleanup": {
+    "codex_identity_unchanged": true,
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "elapsed_seconds": 41.07595216600021,
+    "kill_escalation": [],
+    "owner": "f7e0c5cceb834f3eb27fb7fa17df46b7",
+    "remaining": [],
+    "returncode": 0,
+    "survivors_before_sweep": []
+  },
+  "command": {
+    "codex_identity": {
+      "effort": "low",
+      "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "model": "gpt-6.1-sol",
+      "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+      "selected_launcher": "/opt/homebrew/bin/codex",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "version": "0.162.1"
+    },
+    "command": [
+      "<CHECKOUT>/.venv/bin/python",
+      "<CHECKOUT>/scripts/experiments/codex-hooks/b4-terminal.py",
+      "<ROUND>/bin/codex"
+    ],
+    "cwd": "<ROUND>/project",
+    "forge_revision": "9dcbff7e9e9594efbfdf03fa21ea5146ead5137e",
+    "source_diff_sha256": "4443a671c6807d33b0b18aef437dc0cb89a5aa81356a5ea3236f794b7259cd81",
+    "started_at": 1791680837.522012
+  },
+  "completion": {
+    "at": 1791680878.7353358,
+    "exit": 0
+  },
+  "completion_usage": [],
+  "control": {
+    "capture": "<ROUND>/captures/12-product-trust",
+    "mode": "observe",
+    "reviewer": "fast"
+  },
+  "events": [],
+  "fault": null,
+  "fresh_policy": null,
+  "hook_messages_in_retained_rollout": [],
+  "idle_configuration": null,
+  "operator_notice_in_terminal": false,
+  "product_hooks": [],
+  "real_review": null,
+  "receipts": {},
+  "review_checkpoints": [],
+  "reviewer_events": [],
+  "session": null,
+  "stderr": "",
+  "stdout": "",
+  "stop_enrollment": null,
+  "supervisor_status": null,
+  "terminal": {
+    "actions": [
+      {
+        "at": 1791680859.57388,
+        "keys_hex": "32"
+      },
+      {
+        "at": 1791680859.5738828,
+        "keys_hex": "0d"
+      },
+      {
+        "at": 1791680876.0171678,
+        "keys_hex": "04"
+      },
+      {
+        "at": 1791680876.017169,
+        "keys_hex": "04"
+      }
+    ],
+    "exited": true,
+    "status": 0
+  }
+}

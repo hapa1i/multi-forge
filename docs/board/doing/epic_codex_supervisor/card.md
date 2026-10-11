@@ -7,7 +7,8 @@ B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), me
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
 B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged as `f1019f6c`; its
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
-formatting, and fixture teardown. B4-B5 remain proposed and use separate execution branches when selected.
+formatting, and fixture teardown. B4 is active on `codex/codex-stop-review` from published B3 closeout `897ed95c`, with
+its own [execution checklist](../codex_stop_review/checklist.md). B5 remains proposed.
 
 ## Problem and outcome
 
@@ -29,13 +30,14 @@ delivers model/operator feedback. The remaining members own Stop review and nati
 | B1  | [Plan-file supervision with a fresh `claude -p`](../../done/plan_file_supervision/card.md) | Supervise a Codex executor from a plan file; also test the fresh Codex reviewer      | None; first product card |
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
 | B3  | [Warnings Codex can see](../../done/codex_policy_warnings/card.md)                         | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
-| B4  | [Once-per-turn Stop review](../../proposed/codex_stop_review/card.md)                      | Review accumulated work with a bounded number of supervisor calls                    | B1, B2                   |
+| B4  | [Once-per-turn Stop review](../codex_stop_review/card.md)                                  | Review accumulated work with at most one reviewer dispatch per explicit turn         | B1, B2, B3               |
 | B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
 auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback and
-the source-only formatter, using B1's approved-plan snapshot contract. B4 owns the review trigger and turn accounting.
-B5 owns native Codex context acquisition. Cards use separate execution branches when activated.
+the source-only formatter, using B1's approved-plan snapshot contract. B4 owns the review trigger and turn accounting,
+and depends on B3 to preserve source-only/provenance behavior in Stop's separately verified delivery channel. B5 owns
+native Codex context acquisition. Cards use separate execution branches when activated.
 
 ## Shared contract
 
@@ -73,7 +75,9 @@ B5 owns native Codex context acquisition. Cards use separate execution branches 
   preserve their provenance on warning and blocking findings. Workspace evidence remains executor-readable; the
   preference limits Forge's injected text without claiming access isolation or a measured watermark property. Claude
   output remains unchanged.
-- Stop review evaluates work after edits have occurred. It cannot substitute for a pre-edit deny or undo an edit.
+- Stop review evaluates work after edits have occurred. It cannot substitute for a pre-edit deny or undo an edit. B4's
+  opt-in caps actual frontier dispatches at one per explicit turn, including automatic continuations and uncertain
+  outcomes. It excludes per-edit semantic calls, cascade, and shadow sampling while retaining deterministic checks.
 - B5 permits the executor thread as a fork source only with an approved plan file taking precedence. Record reduced
   independence: the fork can inherit implementation reasoning. B2 observed one controlled concurrent boundary on
   0.161.0; an earlier-turn selector and general snapshot guarantees remain unverified. B5 must also isolate reviewer
@@ -116,6 +120,20 @@ runtimes cannot reuse the inherited record. Unknown/unmeasured versions and unve
 forking wrappers, receive no new model/operator channel; launch and existing denials remain available. The general
 ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
 the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
-count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4/B5 remain
-proposed. The [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and
-host-state qualifications and records the independently owned login teardown.
+count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4 subsequently
+activated with this feedback dependency and B5 remains proposed. The
+[merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and host-state
+qualifications and records the independently owned login teardown.
+
+## B4 candidate handoff (2026-10-11)
+
+B4 implements opt-in, once-per-explicit-turn Stop review on admitted Codex 0.162.1. Native and clean-wheel controls
+pass; operational journal state caps dispatch and correction independently of telemetry, and outstanding correction
+changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the checks and measured limits
+for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). B4 stays `doing/` until merge; B5 remains proposed and
+adds no authority to the Stop reason.
+
+The [attribution follow-up](../codex_stop_review/evidence/attribution-followup.md) adds a separate eight-unit native
+round: between-turn manual changes remain unattributed, a large read gets a partial review, and the next ordinary edit
+receives a complete review. Partial verdicts cannot correct omitted work. Recreated sessions receive a new journal owner
+while retained artifacts stay historical.

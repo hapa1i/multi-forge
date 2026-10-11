@@ -27,6 +27,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from forge.core.runtime.codex_preflight import (
     CODEX_VERSION_VALIDATED,
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 # A disposable session name for the probe turn. The receipt lands under a temp forge_root
 # that is deleted with the run, so this never collides with a real session.
 _PROBE_SESSION = "forge-enroll-probe"
-_PROBE_PROMPT = "Reply with the single word OK. Make no file changes."
+_PROBE_PROMPT = "Run the read-only shell command pwd exactly once, then reply OK. Make no file changes."
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class CodexEnrollmentVerification:
     reason: str  # human summary / candidate causes
     version: str | None
     version_validated: str
+    stop_review_enrolled: bool = False  # all new events observed on the current exact config
 
 
 def verify_codex_enrollment(
@@ -209,6 +211,7 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
     from forge.core.invoker.types import Attribution
     from forge.core.ops.codex_bridge import _temporary_run_env
     from forge.core.reactive.env import new_root_run_identity
+    from forge.core.runtime import codex_turn_enrollment as turn_enrollment
     from forge.session.codex_handoff import (
         clear_observation_receipt,
         read_observation_receipt,
@@ -227,6 +230,7 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
         clear_observation_receipt(session_dir)  # only read a receipt THIS turn wrote
 
         root = new_root_run_identity()
+        nonce = uuid4().hex
         with _temporary_run_env(root, _PROBE_SESSION, forge_root=str(forge_root)):
             request = prepare_codex_request(
                 prompt=_PROBE_PROMPT,
@@ -238,7 +242,10 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
                 timeout_seconds=timeout_seconds,
                 label="codex-enroll-verify",
             )
+            request.env[turn_enrollment.PROBE_ENV] = nonce
             result = CodexHeadlessInvoker().run(request)
+            if result.success:
+                turn_enrollment.publish(repo, nonce)
 
         receipt = read_observation_receipt(session_dir)
         return result.success, receipt is not None
@@ -295,7 +302,10 @@ def _result(
     enrolled: bool | None,
     reason: str,
 ) -> CodexEnrollmentVerification:
+    from forge.core.runtime.codex_turn_enrollment import verified
+
     return CodexEnrollmentVerification(
+        stop_review_enrolled=verified(),
         ready=pf.ready,
         registered=registered,
         config_path=config_path,

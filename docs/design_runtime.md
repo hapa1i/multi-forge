@@ -156,6 +156,12 @@ chain (§3.6.12).
 
 ## 7. Isolation and Proxy Modes
 
+Host Codex's opt-in Stop supervisor uses the separate
+[turn-review lifecycle](design_session_execution.md#i2a-codex-stop-review). It admits an empirically enrolled managed
+executor, records one durable frontier-dispatch allowance per explicit turn, and exits the Stop owner on executor death
+so the reviewer watchdog cleans its process group. Sidecars reject this trigger; it neither creates a proxy route nor
+changes default per-edit supervision.
+
 | Concern                  | Solution                                     | Owner                                                                                             |
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Security isolation       | Seatbelt/bubblewrap per-command              | Claude Code native ([sandbox-runtime](https://github.com/anthropic-experimental/sandbox-runtime)) |

@@ -753,6 +753,7 @@ class TestSupervisorStatus:
         "active",
         "source",
         "auth_mode",
+        "review_trigger",
         "model",
         "latest_review",
         "state",

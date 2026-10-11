@@ -186,7 +186,7 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
     registered check -- not a fresh manifest read that could race an intent change.
     """
     sup = effective.policy.supervisor if effective.policy else None
-    has_supervisor = bool(sup and sup.active)
+    has_supervisor = bool(sup and sup.active and sup.review_trigger == "pre-tool-use")
     lane_record: LaneRecord | None = None
     if has_supervisor:
         from forge.policy.semantic.supervisor import (
@@ -363,7 +363,7 @@ def _persist_policy_decisions(
         # (cli/consumer_lane_freeze.py). They have no registration commitment point, so a
         # skip must not freeze. Same equality-guard mechanism, different trigger.
         sup = effective.policy.supervisor if effective.policy else None
-        if sup and sup.active:
+        if sup and sup.active and sup.review_trigger == "pre-tool-use":
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
             from forge.session.consumer_lanes import (
                 ensure_consumer_lane_binding,

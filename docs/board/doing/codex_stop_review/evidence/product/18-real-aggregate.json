@@ -1,0 +1,173 @@
+{
+  "activity": null,
+  "cleanup": {
+    "codex_identity_unchanged": true,
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "elapsed_seconds": 10.061874416998762,
+    "kill_escalation": [],
+    "owner": "0c5e73f1e6b8476ca013cd1ff3941c39",
+    "remaining": [],
+    "returncode": 0,
+    "survivors_before_sweep": []
+  },
+  "command": {
+    "codex_identity": {
+      "effort": "low",
+      "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "model": "gpt-6.1-sol",
+      "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+      "selected_launcher": "/opt/homebrew/bin/codex",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "version": "0.162.1"
+    },
+    "command": [
+      "/usr/bin/env",
+      "HOME=<HOST_HOME>",
+      "PATH=<HOST_HOME>/.local/bin:<ROUND>/bin:<CHECKOUT>/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "<CHECKOUT>/.venv/bin/python",
+      "<CHECKOUT>/scripts/experiments/codex-hooks/b4-real-review.py",
+      "--extra-usage-disabled",
+      "--capture",
+      "15-product-aggregate-carry"
+    ],
+    "cwd": "<ROUND>/project",
+    "forge_revision": "9dcbff7e9e9594efbfdf03fa21ea5146ead5137e",
+    "source_diff_sha256": "bfd96c4c682ad2afab5c856337575fad4c510686af9f9ae932360bf50a133896",
+    "started_at": 1791681522.963261
+  },
+  "completion": {
+    "at": 1791681533.164154,
+    "exit": 0
+  },
+  "completion_usage": [],
+  "control": {
+    "capture": "<ROUND>/captures/18-real-aggregate",
+    "mode": "observe",
+    "reviewer": "fast"
+  },
+  "events": [],
+  "fault": null,
+  "fresh_policy": null,
+  "hook_messages_in_retained_rollout": [],
+  "idle_configuration": null,
+  "operator_notice_in_terminal": null,
+  "product_hooks": [],
+  "real_review": {
+    "attempts": [
+      {
+        "action_id": "51b670a6da6ce983c52197bb54ff9acbb22c26e1d3c23d28ea071e0dbcc94a9d",
+        "attempt_id": "6f9c3fcb092248de82653f0c43cb2bf1",
+        "auth_mode": "subscription-only",
+        "cached": false,
+        "conversation": null,
+        "deadline_at": "2026-10-11T01:19:30.531407+00:00",
+        "effort": null,
+        "finished_at": "2026-10-11T01:18:50.877026+00:00",
+        "forge_root": "<ROUND>/project",
+        "lane": {
+          "backend_id": "claude-max",
+          "model": "sonnet",
+          "runtime_id": "claude_code"
+        },
+        "model": "sonnet",
+        "model_run_id": "run_8b0e591d2d73",
+        "observed_models": [
+          "claude-sonnet-5-5"
+        ],
+        "origin": "codex",
+        "owner_pid": 89710,
+        "plan_digest": "32af89369add4e33332880ef9b7ec412d269e847bb93395e8bfe92291d3836ea",
+        "plan_path": "<ROUND>/approved-product-plan.md",
+        "purpose": "live",
+        "reason": null,
+        "root_run_id": null,
+        "schema_version": 2,
+        "session": "b4-real-aggregate",
+        "stage": "frontier",
+        "started_at": "2026-10-11T01:18:43.531409+00:00",
+        "state": "completed",
+        "target_path": null,
+        "tool_name": "TurnReview",
+        "verdict": "allow"
+      }
+    ],
+    "dispatches": 1,
+    "identity": {
+      "executable": "<HOST_HOME>/.local/share/claude/versions/2.1.294",
+      "sha256": "def0d15e64dd7d89621f88d28214f885b1c38b0ddd69762fb8593e34915d6d53",
+      "version": "2.1.294 (Claude Code)"
+    },
+    "qualification": "Real transport review of a retained native aggregate, outside the native hook; does not clear operational turn state.",
+    "result": {
+      "decision": {
+        "cached": false,
+        "decision": "allow",
+        "diagnostic_codes": [],
+        "evaluated_at": null,
+        "fail_open": false,
+        "failure_type": null,
+        "intent": null,
+        "policy_id": "semantic.supervisor",
+        "telemetry_parent_run_id": null,
+        "telemetry_root_run_id": "run_8b0e591d2d73",
+        "telemetry_run_id": "run_8b0e591d2d73",
+        "violations": [],
+        "warning_findings": [],
+        "warnings": []
+      },
+      "dispatched": true,
+      "observed_models": [
+        "claude-sonnet-5-5"
+      ],
+      "parsed": true,
+      "run_ok": true,
+      "verdict": {
+        "confidence": 0.6,
+        "verdict": "aligned",
+        "violations": []
+      }
+    },
+    "source_capture": "15-product-aggregate-carry",
+    "usage": [
+      {
+        "attribution_granularity": "verb",
+        "billing_mode": "subscription_quota",
+        "cached_tokens": 3005,
+        "command": "supervisor",
+        "confidence": "reported",
+        "cost_micro_usd": 24412,
+        "event_id": "evt_357dbd449a57",
+        "failure_type": null,
+        "input_tokens": 2,
+        "latency_ms": 7343.3,
+        "measurement_source": "runtime_native",
+        "model": "sonnet",
+        "output_tokens": 578,
+        "parent_run_id": null,
+        "provider": null,
+        "proxy_id": null,
+        "reporter": "claude_code",
+        "root_run_id": "run_8b0e591d2d73",
+        "route": "claude_p",
+        "run_id": "run_8b0e591d2d73",
+        "runtime": "claude_code",
+        "schema_version": 1,
+        "session": "b4-real-aggregate",
+        "source_refs": null,
+        "status": "success",
+        "ts": "2026-10-11T01:18:50Z",
+        "workflow": null
+      }
+    ]
+  },
+  "receipts": {},
+  "review_checkpoints": [],
+  "reviewer_events": [],
+  "session": null,
+  "stderr": "",
+  "stdout": "{\"run_ok\": true, \"parsed\": true, \"dispatches\": 1}\n",
+  "stop_enrollment": null,
+  "supervisor_status": null,
+  "terminal": null
+}
