@@ -22,7 +22,8 @@ tested head `81c14448` with all five GitHub checks passing. Its
 delivery limits, and fixture teardown. B4 closed on 2026-10-11 after
 [PR #263](https://github.com/hapa1i/multi-forge/pull/263) merged as `2045aea1`, matching tested head `5eecc6ff` with all
 five GitHub checks passing. Its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records turn
-attribution and evidence limits. B5 remains proposed. The epic remains active until its native-fork outcome also ships.
+attribution and evidence limits. B5 is now active for checklist review on `codex/codex-fork-supervisor`; implementation
+and live probes await that review. The epic remains active until its native-fork outcome also ships.
 
 ## Activation
 
@@ -70,15 +71,28 @@ manifest v4 serialization, the supported Codex child/setup path, refusal of inco
 of the session-event journal with atomic reservation and bounded history. Private Git snapshots remain conditional on
 filter/helper isolation. No product work or live inference was performed for this revision.
 
+B5 activation, 2026-10-11: selected separately from clean, synchronized `main` at B4 closeout `5613b185`. Created
+`codex/codex-fork-supervisor`, moved B5 to `doing/`, and added its
+[execution checklist](../codex_fork_supervisor/checklist.md). B1/B2 remain the prerequisites; shipped B3/B4 contracts
+are integration constraints. The user requested review before implementation. Parent hook-state isolation, source
+boundaries, source/auth configuration, and the native budget remain review or runtime gates. Jev stays proposed.
+
+B5 review revision, 2026-10-11: verified B2's argv-only, same-route evidence and B4's approved-plan/deadline contract.
+The revised gate covers stdin, model changes, billing routes, long and compacted context, lineage and both isolation
+candidates, with 60 total Codex starts allocated by case. Native caching is disabled; PreToolUse eligibility awaits
+measurements. B4's effective-config fix is already merged. A synthetic fixture confirmed lost global-ignore exclusions;
+the separate [proposed correction](../../proposed/preserve_stop_global_ignores/card.md) is required before native Stop
+product admission. No product implementation or live inference is authorized by this planning revision.
+
 ## Sequence and ownership
 
-| Member                                             | State    | Dependency | Owned outcome                                                  |
-| -------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------- |
-| [B1](../../done/plan_file_supervision/card.md)     | Done     | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
-| [B2](../../done/codex_0160_validation/card.md)     | Done     | None       | Current-runtime probe evidence                                 |
-| [B3](../../done/codex_policy_warnings/card.md)     | Done     | B1, B2     | Allowed-action feedback and source-only formatting             |
-| [B4](../../done/codex_stop_review/card.md)         | Done     | B1, B2, B3 | Bounded review at turn completion                              |
-| [B5](../../proposed/codex_fork_supervisor/card.md) | Proposed | B1, B2     | Native Codex source context                                    |
+| Member                                         | State                 | Dependency | Owned outcome                                                  |
+| ---------------------------------------------- | --------------------- | ---------- | -------------------------------------------------------------- |
+| [B1](../../done/plan_file_supervision/card.md) | Done                  | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
+| [B2](../../done/codex_0160_validation/card.md) | Done                  | None       | Current-runtime probe evidence                                 |
+| [B3](../../done/codex_policy_warnings/card.md) | Done                  | B1, B2     | Allowed-action feedback and source-only formatting             |
+| [B4](../../done/codex_stop_review/card.md)     | Done                  | B1, B2, B3 | Bounded review at turn completion                              |
+| [B5](../codex_fork_supervisor/card.md)         | Doing; review pending | B1, B2     | Native Codex source context                                    |
 
 - [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
 - [x] Complete the [session](../../done/partition_session_design/card.md) and
@@ -89,7 +103,7 @@ filter/helper isolation. No product work or live inference was performed for thi
 - [x] Activate B3 on its own branch with a checklist; record B1's shipped snapshot dependency for source-only feedback
   here and on B3. B1 already handed that option to B3; its completed implementation scope is unchanged.
 - [x] Activate B4 separately with its own checklist; record the B3 feedback dependency here and in B4/B3's cards.
-- [ ] Activate B5 separately with its own checklist. Record any changed dependency here and in the affected member cards
+- [x] Activate B5 separately with its own checklist. Record any changed dependency here and in the affected member cards
   before implementation relies on it.
 - [x] Keep Jev A3's dependency on B1's escalation contract current. B1 does not introduce Jev or team supervision.
 - [x] Confirm B1 preserves the shared `LaneRecord` and four-consumer resolution contracts; no separate model-format
@@ -147,8 +161,8 @@ that the committed harness post-dates the captures; optional stage 88/97 recheck
   implementation reasoning. Depth suppression prevented recursion but mutated the parent Forge manifest; isolate hook
   state before reuse. Earlier-turn selection and general concurrent-source guarantees remain unverified.
 
-The three member cards retain the detailed evidence links. B3 and B4 subsequently shipped; B5 remains proposed. Closing
-B2 did not implement those features or satisfy the epic's integrated outcome.
+The three member cards retain the detailed evidence links. B3 and B4 subsequently shipped; B5 is now active for planning
+review. Closing B2 did not implement those features or satisfy the epic's integrated outcome.
 
 ## B3 handoff
 
@@ -163,7 +177,7 @@ identity; B2's historical 0.161.0 qualifications still apply. The general ceilin
   watermark property.
 - **B4/B5** can reuse the audience, bounds, and unavailable-review conventions. B3's PreToolUse evidence does not
   establish Stop continuation semantics or native-fork isolation. B4 supplied its separate Stop evidence; B5 still needs
-  its own activation and runtime evidence.
+  its own runtime evidence after checklist review.
 
 PR #262's 31 affected Docker cases passed after repairing an exported-image binary; both auth-isolation controls used
 Claude 2.1.294. The two explicitly authorized Haiku API checks are separate from the one subscription quote-quality

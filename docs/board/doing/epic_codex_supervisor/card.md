@@ -9,7 +9,8 @@ B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), me
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
 formatting, and fixture teardown. B4 shipped through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged
 as `2045aea1`; its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records bounded Stop review,
-turn attribution, and evidence limits. B5 remains proposed.
+turn attribution, and evidence limits. B5 is active for checklist review on `codex/codex-fork-supervisor`; product work
+and live probes await that review.
 
 ## Problem and outcome
 
@@ -32,13 +33,23 @@ delivers model/operator feedback; B4 adds bounded Stop review. B5 still owns nat
 | B2  | [Codex runtime test round](../../done/codex_0160_validation/card.md)                       | Probe evidence for current hooks and native fork contracts                           | None; shipped            |
 | B3  | [Warnings Codex can see](../../done/codex_policy_warnings/card.md)                         | Deliver allowed-action feedback to the model and distinguish operator UI warnings    | B1, B2                   |
 | B4  | [Once-per-turn Stop review](../../done/codex_stop_review/card.md)                          | Review accumulated work with at most one reviewer dispatch per explicit turn         | B1, B2, B3               |
-| B5  | [Codex fork supervisor](../../proposed/codex_fork_supervisor/card.md)                      | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
+| B5  | [Codex fork supervisor](../codex_fork_supervisor/card.md)                                  | Review using native Codex context, recording reduced independence for shared sources | B1, B2                   |
 
 B1 owns the shared supervisor configuration, model selection, plan-source contract, Claude isolation and subscription
 auth checks, and whole-hook deadline/outcome handling. B2 supplies runtime evidence. B3 owns allowed-action feedback and
 the source-only formatter, using B1's approved-plan snapshot contract. B4 owns the review trigger and turn accounting,
 and depends on B3 to preserve source-only/provenance behavior in Stop's separately verified delivery channel. B5 owns
 native Codex context acquisition. Cards use separate execution branches when activated.
+
+B5's [checklist](../codex_fork_supervisor/checklist.md) starts from B4 closeout `5613b185`. B1/B2 remain its
+prerequisites; B3/B4 are shipped integration contracts. Its runtime gate must establish hook-state isolation and an
+enforceable source boundary before product implementation. Source/auth configuration, shared-source admission, and the
+native probe budget are proposed for review, not accepted runtime guarantees.
+
+The B5 review revision keeps Stop's approved-plan gate and adds measured model/auth, stdin and long/compacted-source
+admission. PreToolUse eligibility remains a scope decision after measurement. The separately proposed
+[global-ignore evidence correction](../../proposed/preserve_stop_global_ignores/card.md) blocks native Stop product
+admission; it needs its own execution branch if accepted and is not a sixth epic member.
 
 ## Shared contract
 
@@ -122,7 +133,7 @@ forking wrappers, receive no new model/operator channel; launch and existing den
 ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
 the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
 count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4 subsequently
-shipped with this feedback dependency and B5 remains proposed. The
+shipped with this feedback dependency and B5 is now active for planning review. The
 [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and host-state
 qualifications and records the independently owned login teardown.
 
@@ -133,7 +144,7 @@ pass; operational journal state caps dispatch and correction independently of te
 changes carry forward. [Validation](../../done/codex_stop_review/evidence/validation.md) records the checks and measured
 limits for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). The
 [merged closeout](../../done/codex_stop_review/checklist.md#merged-closeout) verifies `2045aea1` against tested head
-`5eecc6ff`, with all five GitHub checks passing. B4 is done; B5 remains proposed and adds no authority to the Stop
+`5eecc6ff`, with all five GitHub checks passing. B4 is done; B5's planning activation adds no authority to the Stop
 reason.
 
 The [attribution follow-up](../../done/codex_stop_review/evidence/attribution-followup.md) adds a separate eight-unit
