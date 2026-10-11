@@ -1,6 +1,6 @@
 """Bounded raw worktree snapshots for an already-applied Codex turn.
 
-Git only enumerates paths and repository identity. We never stage into an index
+Git only reads exclusion config, paths and repository identity. We never stage into an index
 or invoke clean/process filters, hooks, external diff, textconv, or fsmonitor.
 Immutable private blobs preserve dirty starting contents without touching the
 user's index or object store. Unsupported changes remain explicit omissions.
@@ -15,6 +15,7 @@ import os
 import selectors
 import stat
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -79,7 +80,7 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
             if stage != "0":
                 omissions.append("unmerged_index")
             tracked[tracked_path] = mode
-        untracked = [os.fsdecode(p) for p in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0") if p]
+        untracked = [os.fsdecode(p) for p in _untracked_paths(root, env, expires).split(b"\0") if p]
         paths = sorted(set(tracked) | set(untracked))
         # Only Forge-owned root state is excluded; ordinary dirty project files remain evidence.
         paths = [p for p in paths if p.split("/", 1)[0] != ".forge"]
@@ -358,12 +359,60 @@ def _read_regular(path: Path, limit: int) -> bytes:
         return data
 
 
-def _git_output(root: Path, env: dict[str, str], args: tuple[str, ...], expires: float) -> bytes:
+def _untracked_paths(root: Path, env: dict[str, str], expires: float) -> bytes:
+    # Query config as data, with Git's includes/scope/path semantics. Only this
+    # command sees global/system config; repository selectors stay stripped.
+    config_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") or k.startswith("GIT_CONFIG_")}
+    config_env.update(GIT_OPTIONAL_LOCKS="0", GIT_TRACE2="0", GIT_TRACE2_EVENT="0", GIT_TRACE2_PERF="0")
+    configured = _git_output(
+        root,
+        config_env,
+        ("config", "--includes", "--null", "--path", "--get", "core.excludesFile"),
+        expires,
+        allow_unset=True,
+    )
+    rules = b""
+    if configured != b"\0":  # An explicit empty value disables the default file.
+        if configured:
+            if not configured.endswith(b"\0") or configured.count(b"\0") != 1:
+                raise ValueError("Invalid Git exclusion path")
+            path = Path(os.fsdecode(configured[:-1]))
+        else:
+            path = Path(config_env.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "git/ignore"
+        try:
+            path = (root / path).resolve(strict=True)
+            if path != Path(os.devnull):
+                rules = _read_regular(path, MAX_FILE_BYTES)
+        except FileNotFoundError:
+            pass  # Git treats a missing excludes file as no additional rules.
+
+    # Freeze the successfully read rules so Git cannot silently ignore an input
+    # that becomes unreadable between validation and enumeration.
+    with tempfile.NamedTemporaryFile(prefix="forge-stop-excludes-") as frozen:
+        frozen.write(rules)
+        frozen.flush()
+        return _git_output(
+            root,
+            env,
+            ("-c", "core.excludesFile=" + frozen.name, "ls-files", "--others", "--exclude-standard", "-z"),
+            expires,
+        )
+
+
+def _git_output(
+    root: Path,
+    env: dict[str, str],
+    args: tuple[str, ...],
+    expires: float,
+    *,
+    allow_unset: bool = False,
+) -> bytes:
     # Read incrementally: an adversarial index/path list must not allocate an
     # unbounded subprocess buffer before the snapshot's file limit is applied.
     with subprocess.Popen(
         [
             "git",
+            "--no-pager",
             "-c",
             "core.fsmonitor=false",
             "-c",
@@ -390,7 +439,8 @@ def _git_output(root: Path, env: dict[str, str], args: tuple[str, ...], expires:
                     output.extend(chunk)
                     if len(output) > MAX_MANIFEST_BYTES:
                         raise ValueError("Git evidence enumeration exceeded its byte limit")
-            if child.wait(timeout=max(0.001, expires - time.monotonic())):
+            status = child.wait(timeout=max(0.001, expires - time.monotonic()))
+            if status and not (allow_unset and status == 1 and not output):
                 raise ValueError("Git evidence enumeration failed")
             return bytes(output)
         finally:
