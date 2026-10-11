@@ -1,0 +1,354 @@
+{
+  "activity": null,
+  "cleanup": {
+    "codex_identity_unchanged": true,
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "elapsed_seconds": 20.094368375001068,
+    "kill_escalation": [],
+    "owner": "1cae0d6dd4d04830aed64375ceb1b8b6",
+    "remaining": [],
+    "returncode": 0,
+    "survivors_before_sweep": []
+  },
+  "command": {
+    "codex_identity": {
+      "effort": "low",
+      "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "model": "gpt-6.1-sol",
+      "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+      "selected_launcher": "/opt/homebrew/bin/codex",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "version": "0.162.1"
+    },
+    "command": [
+      "<ROUND>/wheel-env/bin/forge",
+      "runtime",
+      "preflight",
+      "codex",
+      "--verify-enrollment",
+      "--json"
+    ],
+    "cwd": "<ROUND>/project",
+    "started_at": 1791683302.84637
+  },
+  "completion": {
+    "at": 1791683323.0518432,
+    "exit": 0
+  },
+  "completion_usage": [],
+  "control": {
+    "capture": "<ROUND>/captures/23-wheel-enrollment",
+    "mode": "observe",
+    "reviewer": "fast"
+  },
+  "events": [
+    {
+      "observation": {
+        "dev_override": null,
+        "event": "SessionStart",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 28489,
+        "ppid": 28146,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "unavailable": "outside owned round"
+        },
+        "started_at": 1791683312.305395
+      },
+      "payload": {
+        "cwd": "/private/tmp/forge-codex-enroll-dug0s4ov",
+        "hook_event_name": "SessionStart",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+        "source": "startup",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+      },
+      "result": {
+        "elapsed_seconds": 0.0034761428833007812,
+        "exit_code": 0,
+        "finished_at": 1791683312.308871
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": null,
+        "event": "UserPromptSubmit",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 28655,
+        "ppid": 28146,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "unavailable": "outside owned round"
+        },
+        "started_at": 1791683313.004468
+      },
+      "payload": {
+        "cwd": "/private/tmp/forge-codex-enroll-dug0s4ov",
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "prompt": "Run the read-only shell command pwd exactly once, then reply OK. Make no file changes.",
+        "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl",
+        "turn_id": "01a128a5-b315-74a2-9eb8-e27411e0fb29"
+      },
+      "result": {
+        "elapsed_seconds": 0.0033071041107177734,
+        "exit_code": 0,
+        "finished_at": 1791683313.007775
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": null,
+        "event": "PreToolUse",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 29027,
+        "ppid": 28146,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "unavailable": "outside owned round"
+        },
+        "started_at": 1791683315.9426408
+      },
+      "payload": {
+        "cwd": "/private/tmp/forge-codex-enroll-dug0s4ov",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+        "tool_input": {
+          "command": "pwd"
+        },
+        "tool_name": "Bash",
+        "tool_use_id": "exec-bfa10e03-e13b-4038-aef8-9122920e0341",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl",
+        "turn_id": "01a128a5-b315-74a2-9eb8-e27411e0fb29"
+      },
+      "result": {
+        "elapsed_seconds": 0.003946065902709961,
+        "exit_code": 0,
+        "finished_at": 1791683315.9465868
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": null,
+        "event": "PostToolUse",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 29110,
+        "ppid": 28146,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "unavailable": "outside owned round"
+        },
+        "started_at": 1791683316.731873
+      },
+      "payload": {
+        "cwd": "/private/tmp/forge-codex-enroll-dug0s4ov",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+        "tool_input": {
+          "command": "pwd"
+        },
+        "tool_name": "Bash",
+        "tool_response": "/private/tmp/forge-codex-enroll-dug0s4ov\n",
+        "tool_use_id": "exec-bfa10e03-e13b-4038-aef8-9122920e0341",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl",
+        "turn_id": "01a128a5-b315-74a2-9eb8-e27411e0fb29"
+      },
+      "result": {
+        "elapsed_seconds": 0.0034928321838378906,
+        "exit_code": 0,
+        "finished_at": 1791683316.7353659
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": null,
+        "event": "Stop",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 29336,
+        "ppid": 28146,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "unavailable": "outside owned round"
+        },
+        "started_at": 1791683318.743833
+      },
+      "payload": {
+        "cwd": "/private/tmp/forge-codex-enroll-dug0s4ov",
+        "hook_event_name": "Stop",
+        "last_assistant_message": "OK",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+        "stop_hook_active": false,
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl",
+        "turn_id": "01a128a5-b315-74a2-9eb8-e27411e0fb29"
+      },
+      "result": {
+        "elapsed_seconds": 0.003732919692993164,
+        "exit_code": 0,
+        "finished_at": 1791683318.747566
+      },
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "fault": null,
+  "fresh_policy": null,
+  "hook_messages_in_retained_rollout": [],
+  "idle_configuration": null,
+  "operator_notice_in_terminal": null,
+  "product_hooks": [
+    {
+      "at": 1791683312.567936,
+      "dev_override": null,
+      "elapsed_seconds": 0.5060558330005733,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-session-start"
+      ],
+      "launcher": "<ROUND>/wheel-env/bin/forge",
+      "pid": 28488,
+      "python": "<ROUND>/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a128a5-afeb-7e93-a657-175844cdcee7\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl\",\"cwd\":\"/private/tmp/forge-codex-enroll-dug0s4ov\",\"hook_event_name\":\"SessionStart\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"source\":\"startup\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791683313.2842739,
+      "dev_override": null,
+      "elapsed_seconds": 0.5180396669966285,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-turn-start"
+      ],
+      "launcher": "<ROUND>/wheel-env/bin/forge",
+      "pid": 28654,
+      "python": "<ROUND>/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a128a5-afeb-7e93-a657-175844cdcee7\",\"turn_id\":\"01a128a5-b315-74a2-9eb8-e27411e0fb29\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl\",\"cwd\":\"/private/tmp/forge-codex-enroll-dug0s4ov\",\"hook_event_name\":\"UserPromptSubmit\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"prompt\":\"Run the read-only shell command pwd exactly once, then reply OK. Make no file changes.\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791683316.225028,
+      "dev_override": null,
+      "elapsed_seconds": 0.5686507920036092,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-policy-check"
+      ],
+      "launcher": "<ROUND>/wheel-env/bin/forge",
+      "pid": 29026,
+      "python": "<ROUND>/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a128a5-afeb-7e93-a657-175844cdcee7\",\"turn_id\":\"01a128a5-b315-74a2-9eb8-e27411e0fb29\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl\",\"cwd\":\"/private/tmp/forge-codex-enroll-dug0s4ov\",\"hook_event_name\":\"PreToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pwd\"},\"tool_use_id\":\"exec-bfa10e03-e13b-4038-aef8-9122920e0341\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791683317.016276,
+      "dev_override": null,
+      "elapsed_seconds": 0.5265861250009038,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-turn-tool"
+      ],
+      "launcher": "<ROUND>/wheel-env/bin/forge",
+      "pid": 29109,
+      "python": "<ROUND>/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a128a5-afeb-7e93-a657-175844cdcee7\",\"turn_id\":\"01a128a5-b315-74a2-9eb8-e27411e0fb29\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl\",\"cwd\":\"/private/tmp/forge-codex-enroll-dug0s4ov\",\"hook_event_name\":\"PostToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pwd\"},\"tool_response\":\"/private/tmp/forge-codex-enroll-dug0s4ov\\n\",\"tool_use_id\":\"exec-bfa10e03-e13b-4038-aef8-9122920e0341\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791683319.029057,
+      "dev_override": null,
+      "elapsed_seconds": 0.5322340830025496,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":27241,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<ROUND>/wheel-env/lib/python3.13/site-packages/forge/__init__.py",
+      "hook": [
+        "codex-stop"
+      ],
+      "launcher": "<ROUND>/wheel-env/bin/forge",
+      "pid": 29334,
+      "python": "<ROUND>/wheel-env/bin/python",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a128a5-afeb-7e93-a657-175844cdcee7\",\"turn_id\":\"01a128a5-b315-74a2-9eb8-e27411e0fb29\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl\",\"cwd\":\"/private/tmp/forge-codex-enroll-dug0s4ov\",\"hook_event_name\":\"Stop\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"bypassPermissions\",\"stop_hook_active\":false,\"last_assistant_message\":\"OK\"}",
+      "stdout": ""
+    }
+  ],
+  "real_review": null,
+  "receipts": {
+    "28488-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:48:32+00:00",
+      "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+    },
+    "28654-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:48:32+00:00",
+      "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+    },
+    "29026-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:48:32+00:00",
+      "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+    },
+    "29109-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:48:32+00:00",
+      "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+    },
+    "29334-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:48:32+00:00",
+      "session_id": "01a128a5-afeb-7e93-a657-175844cdcee7",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-48-30-01a128a5-afeb-7e93-a657-175844cdcee7.jsonl"
+    }
+  },
+  "review_checkpoints": [],
+  "reviewer_events": [],
+  "session": null,
+  "stderr": "",
+  "stdout": "{\n  \"ready\": true,\n  \"registered\": true,\n  \"config_path\": \"<ROUND>/codex-home/config.toml\",\n  \"attempted\": true,\n  \"codex_succeeded\": true,\n  \"enrolled\": true,\n  \"reason\": \"codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.\",\n  \"version\": \"0.162.1\",\n  \"version_validated\": \"0.161.0\",\n  \"stop_review_enrolled\": true\n}\n",
+  "stop_enrollment": null,
+  "supervisor_status": null,
+  "terminal": null
+}

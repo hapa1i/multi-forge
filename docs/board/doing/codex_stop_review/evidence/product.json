@@ -1,0 +1,335 @@
+{
+  "budget": {
+    "api_inference": 0,
+    "ceiling": 32,
+    "correction_continuations": 2,
+    "enrollment": 4,
+    "failure": 4,
+    "identity_boundary": 6,
+    "product_evidence": 4,
+    "real_claude_stage": "only after product implementation",
+    "real_claude_subscription_review": 1,
+    "retries": 8,
+    "wheel_tui": 4
+  },
+  "cases": {
+    "12-product-trust": {
+      "completion": {
+        "at": 1791680878.7353358,
+        "exit": 0
+      },
+      "evidence": "product/12-product-trust.json"
+    },
+    "13-product-enrollment": {
+      "completion": {
+        "at": 1791680913.481121,
+        "exit": 0
+      },
+      "evidence": "product/13-product-enrollment.json"
+    },
+    "14-product-aggregate": {
+      "completion": {
+        "at": 1791681036.12046,
+        "exit": 0
+      },
+      "evidence": "product/14-product-aggregate.json"
+    },
+    "15-product-aggregate-carry": {
+      "completion": {
+        "at": 1791681169.750526,
+        "exit": 0
+      },
+      "evidence": "product/15-product-aggregate-carry.json"
+    },
+    "16-product-source-correction": {
+      "completion": {
+        "at": 1791681302.5932941,
+        "exit": 0
+      },
+      "evidence": "product/16-product-source-correction.json"
+    },
+    "17-product-correction-carry": {
+      "completion": {
+        "at": 1791681437.3085718,
+        "exit": 0
+      },
+      "evidence": "product/17-product-correction-carry.json"
+    },
+    "18-real-aggregate": {
+      "completion": {
+        "at": 1791681533.164154,
+        "exit": 0
+      },
+      "evidence": "product/18-real-aggregate.json"
+    },
+    "19-product-deadline": {
+      "completion": {
+        "at": 1791681719.169142,
+        "exit": 0
+      },
+      "evidence": "product/19-product-deadline.json"
+    },
+    "20-product-hook-kill": {
+      "completion": {
+        "at": 1791682011.2427552,
+        "exit": 0
+      },
+      "evidence": "product/20-product-hook-kill.json"
+    },
+    "21-product-tui-child": {
+      "completion": {
+        "at": 1791682059.7063098,
+        "exit": 1
+      },
+      "evidence": "product/21-product-tui-child.json"
+    },
+    "21a-tui-safe-enrollment": {
+      "completion": {
+        "at": 1791682280.783191,
+        "exit": 0
+      },
+      "evidence": "product/21a-tui-safe-enrollment.json"
+    },
+    "21b-product-tui-resume": {
+      "completion": {
+        "at": 1791682313.3113012,
+        "exit": 1
+      },
+      "evidence": "product/21b-product-tui-resume.json"
+    },
+    "21c-product-tui-child": {
+      "completion": {
+        "at": 1791682422.702694,
+        "exit": 0
+      },
+      "evidence": "product/21c-product-tui-child.json"
+    },
+    "22-product-executor-cancel": {
+      "completion": {
+        "at": 1791682478.050828,
+        "exit": 241
+      },
+      "evidence": "product/22-product-executor-cancel.json"
+    },
+    "23-wheel-enrollment": {
+      "completion": {
+        "at": 1791683323.0518432,
+        "exit": 0
+      },
+      "evidence": "product/23-wheel-enrollment.json"
+    },
+    "24-wheel-correction": {
+      "completion": {
+        "at": 1791683393.5368829,
+        "exit": 0
+      },
+      "evidence": "product/24-wheel-correction.json"
+    }
+  },
+  "enrollment": {
+    "config_sha256": "678922c9426fa1a9f25d506e9fdae99401237efabd9a7b05158dec3853a25496",
+    "config_without_tui_sha256": "d4b4a64d735cb45667c0087bb93124a036615c93c3d32fdc76791f38cfc47bb4",
+    "note": "Event coverage comes from the saved preflight result; TUI presentation counters are excluded.",
+    "preflight": {
+      "attempted": true,
+      "codex_succeeded": true,
+      "config_path": "<ROUND>/codex-home/config.toml",
+      "enrolled": true,
+      "ready": true,
+      "reason": "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.",
+      "registered": true,
+      "stop_review_enrolled": true,
+      "version": "0.162.1",
+      "version_validated": "0.161.0"
+    }
+  },
+  "product_sync": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "extension",
+      "sync",
+      "--scope",
+      "user"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": "\nInstallation Plan\n  Scope:   user\n  Mode:    copy\n  Profile: minimal\n  Modules: hooks\n  Runtimes: codex\n\nModules:\n ACTION   MODULE  REASON           \n install  hooks   runtime_selected \n\nCodex hooks (config.toml):\n ACTION  TARGET                                                 REASON \n update  <ROUND>/codex-home/config.toml         \n\nSync complete. (Codex hooks updated)\n\nNext steps (Codex hooks):\n  - Forge hooks are registered in \n<ROUND>/codex-home/config.toml but stay inert until \ntrusted.\n  - Run 'codex' interactively in any project and grant trust when prompted \n(one-time).\n"
+  },
+  "teardown": {
+    "closed_at": 1791683437.3191922,
+    "fixture_auth_removed": true,
+    "host_config_hashes_unchanged": true,
+    "kill_escalation": [],
+    "qualification": "Only recorded host config bytes are compared; unchanged bytes cannot prove token validity or remote revocation. The real Claude login is not owned or removed by this fixture.",
+    "remaining": [],
+    "survivors_before_sweep": []
+  },
+  "turn_reservations": [
+    {
+      "at": 1791677537.450924,
+      "pid": 58329,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677603.4922051,
+      "pid": 60172,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677735.7734232,
+      "pid": 60897,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677779.312024,
+      "pid": 61547,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677810.397134,
+      "pid": 61986,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677862.541333,
+      "pid": 63141,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677894.273334,
+      "pid": 63733,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677937.7528489,
+      "pid": 64234,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791678077.104116,
+      "pid": 66153,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791678142.803314,
+      "pid": 66737,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791678430.588136,
+      "pid": 69839,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791680837.847297,
+      "pid": 83782,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791680901.04613,
+      "pid": 85263,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791681013.302065,
+      "pid": 86001,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791681156.088628,
+      "pid": 87367,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791681282.7115898,
+      "pid": 88248,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791681427.110174,
+      "pid": 89214,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791681701.6872032,
+      "pid": 90387,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791681995.530976,
+      "pid": 92020,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791682051.0155299,
+      "pid": 92724,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791682267.632549,
+      "pid": 94493,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791682393.851315,
+      "pid": 96094,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791682462.624116,
+      "pid": 97436,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791683309.487591,
+      "pid": 28146,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791683368.236486,
+      "pid": 34763,
+      "reserved_turns": 2
+    }
+  ],
+  "ui_seal_change": {
+    "previous_config": "<ROUND>/captures/21-product-tui-child/config-before.toml",
+    "previous_seal": {
+      "config_sha256": "d6345f1bddc8c1975f93c30a65b6df9115cb4f64c188933d9135ec15032a38b6",
+      "note": "Existing SessionStart receipt only; new events need their own observations.",
+      "preflight": {
+        "attempted": true,
+        "codex_succeeded": true,
+        "config_path": "<ROUND>/codex-home/config.toml",
+        "enrolled": true,
+        "ready": true,
+        "reason": "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.",
+        "registered": true,
+        "stop_review_enrolled": true,
+        "version": "0.162.1",
+        "version_validated": "0.161.0"
+      }
+    },
+    "stable": "d4b4a64d735cb45667c0087bb93124a036615c93c3d32fdc76791f38cfc47bb4"
+  },
+  "verification": {
+    "api_inference": 0,
+    "codex_units_reserved": 32,
+    "installed_wheel_verified": true,
+    "product_captures_verified": true,
+    "qualifications": [
+      "The real Claude control replays a retained native aggregate outside the hook; it does not approve later work.",
+      "Capture 14 exposed absolute-path coverage normalization and remains a failed attempt; 15 verifies carry after the fix.",
+      "The first TUI helper failed on null fresh policy; its child did not save a resume ID. The completed new-child control is 21c.",
+      "Native executor cancellation in 22 required harness cleanup. The later parent-death guard is verified by model-free real-process regression, not another native cancellation turn.",
+      "Quota exhaustion did not occur naturally and remains unverified; failure controls use admitted local stubs."
+    ],
+    "real_claude_dispatches": 1
+  },
+  "wheel": {
+    "wheel-correction-verification.json": "product/wheel-correction-verification.json",
+    "wheel-enroll-verification.json": "product/wheel-enroll-verification.json",
+    "wheel-lifecycle-verification.json": "product/wheel-lifecycle-verification.json",
+    "wheel-lifecycle.json": "product/wheel-lifecycle.json",
+    "wheel-provenance.json": "product/wheel-provenance.json"
+  }
+}

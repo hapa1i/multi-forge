@@ -1,0 +1,243 @@
+{
+  "activity": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "telemetry",
+      "activity",
+      "b4-tui-child",
+      "--period",
+      "all",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "downstream": {
+        "cost_estimated": false,
+        "cost_partial": false,
+        "downstream_records": 0,
+        "rows": [],
+        "skipped_legacy_schema": 0,
+        "total_cost_micro_usd": null,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0
+      },
+      "notes": [],
+      "session": "b4-tui-child",
+      "shadow": null,
+      "since": null,
+      "subagents": 0,
+      "supervisor_reviews": [],
+      "turn_review": null,
+      "upstream": {
+        "log_capped": false,
+        "manifest_fallback_used": false,
+        "operations": [],
+        "policy": null,
+        "upstream_count": 0
+      }
+    }
+  },
+  "cleanup": {
+    "codex_identity_unchanged": true,
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "elapsed_seconds": 2.6997072500016657,
+    "kill_escalation": [],
+    "owner": "c398193454ef478faa86396596e285f3",
+    "remaining": [],
+    "returncode": 1,
+    "survivors_before_sweep": []
+  },
+  "command": {
+    "codex_identity": {
+      "effort": "low",
+      "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "model": "gpt-6.1-sol",
+      "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+      "selected_launcher": "/opt/homebrew/bin/codex",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "version": "0.162.1"
+    },
+    "command": [
+      "<CHECKOUT>/.venv/bin/python",
+      "<CHECKOUT>/scripts/experiments/codex-hooks/b4-terminal.py",
+      "--close-after-turn",
+      "--initial-turns",
+      "0",
+      "--after-initial-command-json",
+      "<ROUND>/21b-product-tui-resume-configure.json",
+      "--prompt-file",
+      "<ROUND>/21b-product-tui-resume-prompt.txt",
+      "--",
+      "<CHECKOUT>/.venv/bin/forge",
+      "session",
+      "resume",
+      "b4-tui-child"
+    ],
+    "cwd": "<ROUND>/project",
+    "forge_revision": "9dcbff7e9e9594efbfdf03fa21ea5146ead5137e",
+    "source_diff_sha256": "cf5b81df77b8482a5e0a042598067205ca755e85f0f134e9cfdf78dcd1b4b067",
+    "started_at": 1791682310.4688268
+  },
+  "completion": {
+    "at": 1791682313.3113012,
+    "exit": 1
+  },
+  "completion_usage": [],
+  "control": {
+    "capture": "<ROUND>/captures/21b-product-tui-resume",
+    "mode": "observe",
+    "reviewer": "fast"
+  },
+  "events": [],
+  "fault": null,
+  "fresh_policy": {
+    "session_name": "b4-tui-child",
+    "supervisor": null
+  },
+  "hook_messages_in_retained_rollout": [],
+  "idle_configuration": null,
+  "operator_notice_in_terminal": false,
+  "product_hooks": [],
+  "real_review": null,
+  "receipts": {},
+  "review_checkpoints": [],
+  "reviewer_events": [],
+  "session": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "session",
+      "show",
+      "b4-tui-child",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "claude_session_id": null,
+      "confirmed": {
+        "artifacts": {},
+        "claude_project_root": null,
+        "claude_session_id": null,
+        "codex": null,
+        "confirmed_at": null,
+        "confirmed_by": null,
+        "derivation": null,
+        "is_sandboxed": false,
+        "latest_plan_path": null,
+        "policy": null,
+        "transcript_path": null
+      },
+      "context": {
+        "main_model": null,
+        "model_family": "anthropic",
+        "models": {},
+        "policy": {
+          "bundles": [],
+          "enabled": false,
+          "fail_mode": "open",
+          "supervisor_active": false,
+          "supervisor_plan_path": null,
+          "supervisor_resume_id": null
+        },
+        "proxy": {
+          "base_url": null,
+          "is_direct": true,
+          "proxy_id": null,
+          "template": null
+        }
+      },
+      "created_at": "2026-10-11T01:27:30+00:00",
+      "intent": {
+        "agent": "claude-code",
+        "proxy": null,
+        "runtime": "codex"
+      },
+      "is_fork": false,
+      "is_incognito": false,
+      "last_accessed_at": "2026-10-11T01:27:30+00:00",
+      "launchability": "launchable",
+      "main_model": null,
+      "model_family": "anthropic",
+      "models": {},
+      "overrides": {},
+      "parent_session": "b4-parent",
+      "plan": {
+        "approved_snapshots": [],
+        "display_path": null,
+        "draft_path": null,
+        "exists": null,
+        "kind": null,
+        "parent_session": null,
+        "preferred_path": null,
+        "source": null
+      },
+      "policy": {
+        "bundles": [],
+        "enabled": false,
+        "fail_mode": "open",
+        "supervisor_active": false,
+        "supervisor_plan_path": null,
+        "supervisor_resume_id": null
+      },
+      "project_root": "<ROUND>/project",
+      "proxy": {
+        "base_url": null,
+        "is_direct": true,
+        "proxy_id": null,
+        "template": null
+      },
+      "session_name": "b4-tui-child",
+      "worktree": {
+        "branch": "b4-tui-child",
+        "path": "<ROUND>/project"
+      }
+    }
+  },
+  "stderr": "",
+  "stdout": "",
+  "stop_enrollment": {
+    "config": {
+      "path": "<ROUND>/codex-home/config.toml",
+      "scope": "configuration_without_tui",
+      "sha256": "878ca8a5a41cd9fc61646ef8c8ebe2c1d9a274aee8ad5ea8941b265a383447e2"
+    },
+    "events": [
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PostToolUse",
+      "Stop"
+    ],
+    "executable": "<ROUND>/bin/codex",
+    "nonce": "d5d484b5a67f4433b5659aa15a4e6ff9",
+    "schema": 1,
+    "sha256": "2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb",
+    "thread_id": "01a12895-ca20-7f21-a929-8636f6c804fd",
+    "turn_id": "01a12895-ca5e-7b83-baee-545e6c8c3425",
+    "verified_at": "2026-10-11T01:31:18Z",
+    "version": "0.162.1"
+  },
+  "supervisor_status": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "policy",
+      "supervisor",
+      "status",
+      "--session",
+      "b4-tui-child",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "session_name": "b4-tui-child",
+      "supervisor": null
+    }
+  },
+  "terminal": {
+    "actions": [],
+    "exited": true,
+    "status": 256
+  }
+}

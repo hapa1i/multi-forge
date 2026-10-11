@@ -2,7 +2,10 @@
 """Check retained B4 product captures without inference; never reinterpret cleanup as product success."""
 
 import argparse
+import hashlib
 import json
+import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -20,6 +23,26 @@ def turn(capture: Path) -> dict:
 
 def dispatches(capture: Path) -> int:
     return sum(row["kind"] == "dispatch_started" for row in rows(capture / "reviewer.jsonl"))
+
+
+def wheel_provenance(root: Path) -> None:
+    """Compare installed-candidate Python bytes without trusting its unchanged version label."""
+    checkout = Path(__file__).resolve().parents[3]
+    wheel = next((root / "wheel").glob("*.whl"))
+    files = {
+        str(path.relative_to(checkout / "src")): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (checkout / "src/forge").rglob("*.py")
+    }
+    with zipfile.ZipFile(wheel) as archive:
+        assert all(hashlib.sha256(archive.read(path)).hexdigest() == sha for path, sha in files.items())
+    proof = {
+        "revision": subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip(),
+        "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
+        "source_python_files": [{"path": path, "sha256": sha} for path, sha in sorted(files.items())],
+        "source_python_matches_wheel": True,
+        "qualification": "Built from the same Python bytes before the candidate commit; compare content, not package version 1.0.2.",
+    }
+    (root / "wheel-provenance.json").write_text(json.dumps(proof, indent=2) + "\n")
 
 
 def verify(root: Path, *, wheel: bool = True) -> dict:
@@ -59,6 +82,7 @@ def verify(root: Path, *, wheel: bool = True) -> dict:
     cleanup = read(cancel / "run/process-result.json")
     assert cleanup["survivors_before_sweep"] and not cleanup["remaining"]
     if wheel:
+        wheel_provenance(root)
         assert read(captures / "23-wheel-enrollment/run/stdout")["stop_review_enrolled"]
         final = captures / "24-wheel-correction"
         assert dispatches(final) == 1 and turn(final)["state"] == "unreviewed"

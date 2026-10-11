@@ -7,9 +7,9 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4
 
 Activated 2026-10-11 on `codex/codex-stop-review` from published `main` at `897ed95c` (B3 closeout). The
 [execution checklist](checklist.md) records the implementation plan and fresh runtime gates. The
-[runtime gate](evidence/README.md) passed on 2026-10-11 for retained Codex 0.162.1. The opt-in implementation and native
-product controls are complete; installed-wheel and final validation are in progress. Its acceptance rows remain open
-until those checks finish.
+[runtime gate](evidence/README.md) passed on 2026-10-11 for retained Codex 0.162.1. The opt-in implementation,
+installed-wheel controls and regression suite are complete. [Validation](evidence/validation.md) records the remaining
+documentation count gate; the PR stays a draft while it is blocked. The card remains active until merge and closeout.
 
 Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
 changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit
@@ -91,3 +91,16 @@ idle turn. These are measured limits, not a Stop-supervisor implementation. See
 [lifetime evidence](../../done/codex_0160_validation/evidence/lifetime.json), and
 [results](../../done/codex_0160_validation/evidence/README.md). `update_plan` was absent from the tested inventory; do
 not make plan-event availability or agent plan text an approval prerequisite.
+
+## B4 implementation handoff
+
+The tested trigger is opt-in, host Codex 0.162.1 only, with separate empirical receipts for the required event set.
+Ordinary manifests retain v2/v3 encoding; a stored non-default trigger uses v4. The session review journal owns spending
+and survives telemetry reset. One divergent review can request one source-aware correction; later changes carry to the
+next explicit turn and remain visibly unreviewed until that exact snapshot is assessed.
+
+B5 can reuse B4's approved-plan snapshot and reviewer-lane contract without inheriting another session's allowance. The
+native Codex child path still creates fresh supervisor policy. Stop's block reason carries user authority, so B3's
+source-only restriction applies there. Keep default per-edit and Claude Stop behavior separate. See the
+[product evidence](evidence/README.md) for failures retained, cleanup boundaries and the single real-review
+qualification.

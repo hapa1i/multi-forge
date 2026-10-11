@@ -1,0 +1,1475 @@
+{
+  "activity": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "telemetry",
+      "activity",
+      "b4-tui-child-final",
+      "--period",
+      "all",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "downstream": {
+        "cost_estimated": false,
+        "cost_partial": false,
+        "downstream_records": 1,
+        "rows": [
+          {
+            "attempts": 1,
+            "billing_mode": "subscription_quota",
+            "cached_tokens": 0,
+            "calls": 1,
+            "command": "supervisor",
+            "cost_estimated": true,
+            "cost_micro_usd": null,
+            "cost_partial": true,
+            "error_kinds": {},
+            "errors": 0,
+            "input_tokens": 0,
+            "join_state": "downstream_only",
+            "output_tokens": 0,
+            "root_run_ids": [
+              "run_11031abb0a91"
+            ],
+            "runtime": "claude_code",
+            "workers": 0
+          }
+        ],
+        "skipped_legacy_schema": 0,
+        "total_cost_micro_usd": null,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0
+      },
+      "notes": [
+        "session_tagging_partial"
+      ],
+      "session": "b4-tui-child-final",
+      "shadow": null,
+      "since": null,
+      "subagents": 0,
+      "supervisor_reviews": [
+        {
+          "action_id": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+          "attempt_id": "b045abc11ad64dc392f13450c80735af",
+          "auth_mode": "subscription-only",
+          "cached": false,
+          "conversation": null,
+          "deadline_at": "2026-10-11T01:33:47.268862+00:00",
+          "effort": null,
+          "finished_at": "2026-10-11T01:33:33.606788+00:00",
+          "forge_root": "<ROUND>/project",
+          "lane": {
+            "backend_id": "claude-max",
+            "model": "sonnet",
+            "runtime_id": "claude_code"
+          },
+          "model": "sonnet",
+          "model_run_id": "run_6e94c864dd31",
+          "observed_models": [],
+          "origin": "codex",
+          "owner_pid": 96802,
+          "plan_digest": "32af89369add4e33332880ef9b7ec412d269e847bb93395e8bfe92291d3836ea",
+          "plan_path": "<ROUND>/approved-product-plan.md",
+          "purpose": "live",
+          "reason": null,
+          "root_run_id": "run_11031abb0a91",
+          "schema_version": 2,
+          "session": "b4-tui-child-final",
+          "stage": "frontier",
+          "started_at": "2026-10-11T01:33:33.268870+00:00",
+          "state": "completed",
+          "target_path": null,
+          "tool_name": "TurnReview",
+          "verdict": "allow"
+        }
+      ],
+      "turn_review": {
+        "assessed_snapshot": {
+          "digest": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+          "files": 11,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "attempt_id": "b045abc11ad64dc392f13450c80735af",
+        "correction_consumed": false,
+        "coverage": {
+          "complete": true,
+          "omissions": []
+        },
+        "dispatch_cap": 1,
+        "dispatched": true,
+        "evidence_digest": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+        "outstanding": false,
+        "provenance_turns": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "spent": true,
+        "state": "reviewed",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:33Z"
+      },
+      "upstream": {
+        "log_capped": false,
+        "manifest_fallback_used": false,
+        "operations": [],
+        "policy": null,
+        "upstream_count": 0
+      }
+    }
+  },
+  "cleanup": {
+    "codex_identity_unchanged": true,
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "elapsed_seconds": 35.5596666249985,
+    "kill_escalation": [],
+    "owner": "a93633248a594296bfe2497a23631648",
+    "remaining": [],
+    "returncode": 0,
+    "survivors_before_sweep": []
+  },
+  "command": {
+    "codex_identity": {
+      "effort": "low",
+      "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+      "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+      "model": "gpt-6.1-sol",
+      "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+      "selected_launcher": "/opt/homebrew/bin/codex",
+      "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "version": "0.162.1"
+    },
+    "command": [
+      "<CHECKOUT>/.venv/bin/python",
+      "<CHECKOUT>/scripts/experiments/codex-hooks/b4-terminal.py",
+      "--close-after-turn",
+      "--initial-turns",
+      "1",
+      "--after-initial-command-json",
+      "<ROUND>/21c-product-tui-child-configure.json",
+      "--prompt-file",
+      "<ROUND>/21c-product-tui-child-prompt.txt",
+      "--",
+      "<CHECKOUT>/.venv/bin/forge",
+      "session",
+      "start",
+      "b4-tui-child-final",
+      "--runtime",
+      "codex",
+      "--resume-from",
+      "b4-parent",
+      "--strategy",
+      "structured"
+    ],
+    "cwd": "<ROUND>/project",
+    "forge_revision": "9dcbff7e9e9594efbfdf03fa21ea5146ead5137e",
+    "source_diff_sha256": "0c7541a809fe34bb386aa7379c712b6f176de2e8cb75c1e6991e68d54eca3053",
+    "started_at": 1791682386.97694
+  },
+  "completion": {
+    "at": 1791682422.702694,
+    "exit": 0
+  },
+  "completion_usage": [],
+  "control": {
+    "capture": "<ROUND>/captures/21c-product-tui-child",
+    "mode": "observe",
+    "reviewer": "fast"
+  },
+  "events": [
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "SessionStart",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96321,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682397.9899871
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "SessionStart",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "source": "startup",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+      },
+      "result": {
+        "elapsed_seconds": 0.007824897766113281,
+        "exit_code": 0,
+        "finished_at": 1791682397.997812
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "UserPromptSubmit",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96349,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682398.7324328
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "prompt": "# Handoff context (curated transfer from a prior planning session)\n\nThe section below is curated context -- decisions, current state, relevant files, and\nopen questions -- distilled from a planning session in another agent runtime. Reasoning\nstate does not transfer across runtimes, so treat this as your authoritative context.\n\n# Session Context: b4-parent\n\n**Resumed at**: 2026-10-11T01:33:13+00:00\n**Parent proxy**: none\n**Lineage**: b4-parent\n\n---\n\n## Conversation Summary\n\n### Turn 1\n\n**Assistant**: Synthetic B4 fixture. Follow the operator's bounded file task.\n\n---\n\n## Artifacts\n\n*No artifacts recorded.*\n\n## Runtime Hints\n\nTarget runtime: codex.\n\nConsumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive changes through the Codex tool surface.\n\n# Hold for instructions\n\nThe section above is context only -- there is no task yet. Acknowledge the\ncontext in one short sentence and WAIT for the user's instruction. Do not\nedit files, run commands, or use tools until the user asks.\n",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-bac4-7d80-a418-bbbb05e3fdee"
+      },
+      "result": {
+        "elapsed_seconds": 0.007134199142456055,
+        "exit_code": 0,
+        "finished_at": 1791682398.739567
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "Stop",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96415,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682400.705081
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "Stop",
+        "last_assistant_message": "Context received; I’ll wait for your instruction.",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "stop_hook_active": false,
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-bac4-7d80-a418-bbbb05e3fdee"
+      },
+      "result": {
+        "elapsed_seconds": 0.008388996124267578,
+        "exit_code": 0,
+        "finished_at": 1791682400.713469
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "UserPromptSubmit",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96606,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682406.624995
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "prompt": "Use apply_patch to create product-tui.txt containing CHILD-CONTROL. Preserve other files and finish.",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+      },
+      "result": {
+        "elapsed_seconds": 0.005238056182861328,
+        "exit_code": 0,
+        "finished_at": 1791682406.630233
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "PreToolUse",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96698,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682409.655283
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_use_id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+      },
+      "result": {
+        "elapsed_seconds": 0.004137992858886719,
+        "exit_code": 0,
+        "finished_at": 1791682409.65942
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "PostToolUse",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96721,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "product-tui.txt": "cb4d197e1f1ea516876b0b0148fbebe9f26a7939f290f6145ee5543bb3b12c3b",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682410.26588
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+        },
+        "tool_name": "apply_patch",
+        "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+        "tool_use_id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+      },
+      "result": {
+        "elapsed_seconds": 0.0036458969116210938,
+        "exit_code": 0,
+        "finished_at": 1791682410.269526
+      },
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "observation": {
+        "dev_override": "<CHECKOUT>",
+        "event": "Stop",
+        "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+        "launch_parent_verified": true,
+        "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+        "pid": 96803,
+        "ppid": 96094,
+        "python": "<CHECKOUT>/.venv/bin/python",
+        "snapshot": {
+          "files": {
+            "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+            "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+            "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+            "product-a.txt": "1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005",
+            "product-b.txt": "a0d89cbe67e84a23d7de399463e2e9a6fb702a6c8acaab0dcdf36b32c2656d82",
+            "product-fix.txt": "d43cf775e7609f1274a4cd97b7649be036b01a6e22d6a04038ecd51811652cf7",
+            "product-kill.txt": "092989e97e3175e09397286a35c0eb5b7f1dd9f05e1ffc2da4f50ee9eed399ea",
+            "product-shell.txt": "866eaae02a75b906fcc1385dc8813a20a16dc946f73f62e12789c1a94a15ce70",
+            "product-timeout.txt": "480ffb4f4063388650d9ac4c1baf3654afdfb70b40dc0d0ef574612faca72e46",
+            "product-tui.txt": "cb4d197e1f1ea516876b0b0148fbebe9f26a7939f290f6145ee5543bb3b12c3b",
+            "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+          }
+        },
+        "started_at": 1791682413.01958
+      },
+      "payload": {
+        "cwd": "<ROUND>/project",
+        "hook_event_name": "Stop",
+        "last_assistant_message": "Created `product-tui.txt` containing `CHILD-CONTROL`. Other files were preserved.",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "default",
+        "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "stop_hook_active": false,
+        "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+      },
+      "result": {
+        "elapsed_seconds": 0.003951072692871094,
+        "exit_code": 0,
+        "finished_at": 1791682413.023531
+      },
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "fault": null,
+  "fresh_policy": {
+    "session_name": "b4-tui-child-final",
+    "supervisor": null
+  },
+  "hook_messages_in_retained_rollout": [],
+  "idle_configuration": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/python",
+      "<CHECKOUT>/scripts/experiments/codex-hooks/b4-product.py",
+      "<ROUND>",
+      "configure",
+      "--session",
+      "b4-tui-child-final",
+      "--require-fresh"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": ""
+  },
+  "operator_notice_in_terminal": false,
+  "product_hooks": [
+    {
+      "at": 1791682398.215581,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.5829977079993114,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-session-start"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96320,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"SessionStart\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"source\":\"startup\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682398.9595609,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.523453875000996,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-turn-start"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96348,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-bac4-7d80-a418-bbbb05e3fdee\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"UserPromptSubmit\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"prompt\":\"# Handoff context (curated transfer from a prior planning session)\\n\\nThe section below is curated context -- decisions, current state, relevant files, and\\nopen questions -- distilled from a planning session in another agent runtime. Reasoning\\nstate does not transfer across runtimes, so treat this as your authoritative context.\\n\\n# Session Context: b4-parent\\n\\n**Resumed at**: 2026-10-11T01:33:13+00:00\\n**Parent proxy**: none\\n**Lineage**: b4-parent\\n\\n---\\n\\n## Conversation Summary\\n\\n### Turn 1\\n\\n**Assistant**: Synthetic B4 fixture. Follow the operator's bounded file task.\\n\\n---\\n\\n## Artifacts\\n\\n*No artifacts recorded.*\\n\\n## Runtime Hints\\n\\nTarget runtime: codex.\\n\\nConsumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive changes through the Codex tool surface.\\n\\n# Hold for instructions\\n\\nThe section above is context only -- there is no task yet. Acknowledge the\\ncontext in one short sentence and WAIT for the user's instruction. Do not\\nedit files, run commands, or use tools until the user asks.\\n\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682400.949285,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.5150330000033136,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-stop"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96414,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-bac4-7d80-a418-bbbb05e3fdee\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"Stop\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"stop_hook_active\":false,\"last_assistant_message\":\"Context received; I’ll wait for your instruction.\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682406.87116,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.5235560830042232,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-turn-start"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96605,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-e72d-7431-b8fd-369b0e646449\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"UserPromptSubmit\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"prompt\":\"Use apply_patch to create product-tui.txt containing CHILD-CONTROL. Preserve other files and finish.\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682409.8588748,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.43253562500467524,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-policy-check"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96697,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-e72d-7431-b8fd-369b0e646449\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"PreToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Add File: <ROUND>/project/product-tui.txt\\n+CHILD-CONTROL\\n*** End Patch\"},\"tool_use_id\":\"exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682410.487273,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.4472273329956806,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-turn-tool"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96720,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-e72d-7431-b8fd-369b0e646449\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"PostToolUse\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Add File: <ROUND>/project/product-tui.txt\\n+CHILD-CONTROL\\n*** End Patch\"},\"tool_response\":\"Exit code: 0\\nWall time: 0 seconds\\nOutput:\\nSuccess. Updated the following files:\\nA <ROUND>/project/product-tui.txt\\n\",\"tool_use_id\":\"exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d\"}",
+      "stdout": ""
+    },
+    {
+      "at": 1791682413.649136,
+      "dev_override": "<CHECKOUT>",
+      "elapsed_seconds": 0.8632414160019835,
+      "executor_identity": "{\"schema\":2,\"launch_parent_pid\":95684,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+      "exit_code": 0,
+      "forge_module": "<CHECKOUT>/src/forge/__init__.py",
+      "hook": [
+        "codex-stop"
+      ],
+      "launcher": "<CHECKOUT>/.venv/bin/forge",
+      "pid": 96802,
+      "python": "<CHECKOUT>/.venv/bin/python3",
+      "stderr": "",
+      "stdin": "{\"session_id\":\"01a12897-ba42-7d41-9c90-280514db10aa\",\"turn_id\":\"01a12897-e72d-7431-b8fd-369b0e646449\",\"transcript_path\":\"<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl\",\"cwd\":\"<ROUND>/project\",\"hook_event_name\":\"Stop\",\"model\":\"gpt-6.1-sol\",\"permission_mode\":\"default\",\"stop_hook_active\":false,\"last_assistant_message\":\"Created `product-tui.txt` containing `CHILD-CONTROL`. Other files were preserved.\"}",
+      "stdout": "{\"systemMessage\":\"Forge reviewed the bounded repository snapshot; later changes are unreviewed.\\n\\nOmitted findings: 0. Truncated findings: 0.\\nInspect: forge policy supervisor status --json; forge session show <session> --json.\"}\n"
+    }
+  ],
+  "real_review": null,
+  "receipts": {
+    "96320-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96348-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96414-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96605-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96697-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96720-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    },
+    "96802-observation-receipt.json": {
+      "observed_at": "2026-10-11T01:33:18+00:00",
+      "session_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+      "source": "startup",
+      "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl"
+    }
+  },
+  "review_checkpoints": [
+    {
+      "event_id": "sevt_aec07dca96f94296a53a9ae1fd716af6",
+      "event_type": "review_checkpoint",
+      "operation": "runtime_event",
+      "origin_surface": "codex_review_hook",
+      "outcome": "success",
+      "payload": {
+        "actions": [],
+        "attempt_id": null,
+        "baseline": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "checkout": "<ROUND>/project",
+        "config_digest": "1e44bfdcd29589575442ba327ab80b5e4b655e0cae350ede59ea8218b58478bf",
+        "correction_consumed": false,
+        "coverage": null,
+        "decision": null,
+        "evidence": null,
+        "evidence_digest": null,
+        "forge_root": "<ROUND>/project",
+        "outstanding": false,
+        "provenance": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "reviewed": null,
+        "schema": 1,
+        "spent": false,
+        "start_snapshot": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "status": "collecting",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:26Z",
+        "watermark": "2166011121391696484174863675047568457"
+      },
+      "reason_code": null,
+      "run_id": null,
+      "runtime": "codex",
+      "schema_version": 1,
+      "session": "b4-tui-child-final",
+      "timestamp": "2026-10-11T01:33:26Z"
+    },
+    {
+      "event_id": "sevt_80ef9906faf44610a5b193da51cf7915",
+      "event_type": "review_checkpoint",
+      "operation": "runtime_event",
+      "origin_surface": "codex_review_hook",
+      "outcome": "success",
+      "payload": {
+        "actions": [
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          }
+        ],
+        "attempt_id": null,
+        "baseline": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "checkout": "<ROUND>/project",
+        "config_digest": "1e44bfdcd29589575442ba327ab80b5e4b655e0cae350ede59ea8218b58478bf",
+        "correction_consumed": false,
+        "coverage": null,
+        "decision": null,
+        "evidence": null,
+        "evidence_digest": null,
+        "forge_root": "<ROUND>/project",
+        "outstanding": false,
+        "provenance": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "reviewed": null,
+        "schema": 1,
+        "spent": false,
+        "start_snapshot": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "status": "collecting",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:29Z",
+        "watermark": "2166011121391696484174863675047568457"
+      },
+      "reason_code": null,
+      "run_id": null,
+      "runtime": "codex",
+      "schema_version": 1,
+      "session": "b4-tui-child-final",
+      "timestamp": "2026-10-11T01:33:29Z"
+    },
+    {
+      "event_id": "sevt_2be1db58003f4bc29296aab241748344",
+      "event_type": "review_checkpoint",
+      "operation": "runtime_event",
+      "origin_surface": "codex_review_hook",
+      "outcome": "success",
+      "payload": {
+        "actions": [
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          },
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          }
+        ],
+        "attempt_id": null,
+        "baseline": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "checkout": "<ROUND>/project",
+        "config_digest": "1e44bfdcd29589575442ba327ab80b5e4b655e0cae350ede59ea8218b58478bf",
+        "correction_consumed": false,
+        "coverage": null,
+        "decision": null,
+        "evidence": null,
+        "evidence_digest": null,
+        "forge_root": "<ROUND>/project",
+        "outstanding": false,
+        "provenance": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "reviewed": null,
+        "schema": 1,
+        "spent": false,
+        "start_snapshot": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "status": "collecting",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:30Z",
+        "watermark": "2166011121391696484174863675047568457"
+      },
+      "reason_code": null,
+      "run_id": null,
+      "runtime": "codex",
+      "schema_version": 1,
+      "session": "b4-tui-child-final",
+      "timestamp": "2026-10-11T01:33:30Z"
+    },
+    {
+      "event_id": "sevt_2b042126a7e744d28c2481a3b60df947",
+      "event_type": "review_checkpoint",
+      "operation": "runtime_event",
+      "origin_surface": "codex_review_hook",
+      "outcome": "success",
+      "payload": {
+        "actions": [
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          },
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          }
+        ],
+        "attempt_id": "b045abc11ad64dc392f13450c80735af",
+        "baseline": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "checkout": "<ROUND>/project",
+        "config_digest": "1e44bfdcd29589575442ba327ab80b5e4b655e0cae350ede59ea8218b58478bf",
+        "correction_consumed": false,
+        "coverage": {
+          "complete": true,
+          "omissions": []
+        },
+        "decision": null,
+        "evidence": {
+          "actions": [
+            {
+              "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+              "input": {
+                "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+              },
+              "paths": [
+                "product-tui.txt"
+              ],
+              "phase": "request",
+              "response": null,
+              "tool": "apply_patch",
+              "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+            },
+            {
+              "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+              "input": {
+                "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+              },
+              "paths": [
+                "product-tui.txt"
+              ],
+              "phase": "outcome",
+              "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+              "tool": "apply_patch",
+              "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+            }
+          ],
+          "after": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+          "before": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "changes": [
+            {
+              "after": {
+                "digest": "cb4d197e1f1ea516876b0b0148fbebe9f26a7939f290f6145ee5543bb3b12c3b",
+                "mode": 420,
+                "size": 14
+              },
+              "before": null,
+              "diff": "--- product-tui.txt\n+++ product-tui.txt\n@@ -0,0 +1 @@\n+CHILD-CONTROL\n",
+              "kind": "add",
+              "path": "product-tui.txt"
+            }
+          ],
+          "complete": true,
+          "omissions": [],
+          "provenance_turns": [
+            "01a12897-e72d-7431-b8fd-369b0e646449"
+          ],
+          "representation": "raw working bytes; executable Git filters are not run",
+          "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+        },
+        "evidence_digest": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+        "forge_root": "<ROUND>/project",
+        "outstanding": true,
+        "plan_digest": "32af89369add4e33332880ef9b7ec412d269e847bb93395e8bfe92291d3836ea",
+        "provenance": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "reviewed": {
+          "digest": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+          "files": 11,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "reviewer_identity": "{\"auth\":\"subscription-only\",\"base_url\":null,\"direct\":true,\"effort\":null,\"lane\":{\"backend_id\":\"claude-max\",\"model\":\"sonnet\",\"runtime_id\":\"claude_code\"},\"model\":\"sonnet\",\"proxy\":null,\"root\":\"<ROUND>/project\",\"target\":null}",
+        "schema": 1,
+        "spent": true,
+        "start_snapshot": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "status": "reviewing",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:33Z",
+        "watermark": "2166011121391696484174863675047568457"
+      },
+      "reason_code": null,
+      "run_id": null,
+      "runtime": "codex",
+      "schema_version": 1,
+      "session": "b4-tui-child-final",
+      "timestamp": "2026-10-11T01:33:33Z"
+    },
+    {
+      "event_id": "sevt_999c1cc4cd51413b98e4296af5b1c99b",
+      "event_type": "review_checkpoint",
+      "operation": "runtime_event",
+      "origin_surface": "codex_review_hook",
+      "outcome": "success",
+      "payload": {
+        "actions": [
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "request",
+            "response": null,
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          },
+          {
+            "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+            "input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+            },
+            "paths": [
+              "product-tui.txt"
+            ],
+            "phase": "outcome",
+            "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+            "tool": "apply_patch",
+            "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+          }
+        ],
+        "attempt_id": "b045abc11ad64dc392f13450c80735af",
+        "baseline": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "checkout": "<ROUND>/project",
+        "config_digest": "1e44bfdcd29589575442ba327ab80b5e4b655e0cae350ede59ea8218b58478bf",
+        "correction_consumed": false,
+        "coverage": {
+          "complete": true,
+          "omissions": []
+        },
+        "decision": {
+          "cached": false,
+          "decision": "allow",
+          "diagnostic_codes": [],
+          "evaluated_at": null,
+          "fail_open": false,
+          "failure_type": null,
+          "intent": null,
+          "policy_id": "semantic.supervisor",
+          "telemetry_parent_run_id": "run_11031abb0a91",
+          "telemetry_root_run_id": "run_11031abb0a91",
+          "telemetry_run_id": "run_6e94c864dd31",
+          "violations": [],
+          "warning_findings": [],
+          "warnings": []
+        },
+        "dispatched": true,
+        "evidence": {
+          "actions": [
+            {
+              "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+              "input": {
+                "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+              },
+              "paths": [
+                "product-tui.txt"
+              ],
+              "phase": "request",
+              "response": null,
+              "tool": "apply_patch",
+              "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+            },
+            {
+              "id": "exec-5e3a66e0-93ad-4a9d-889c-4bef54cde10d",
+              "input": {
+                "command": "*** Begin Patch\n*** Add File: <ROUND>/project/product-tui.txt\n+CHILD-CONTROL\n*** End Patch"
+              },
+              "paths": [
+                "product-tui.txt"
+              ],
+              "phase": "outcome",
+              "response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/product-tui.txt\n",
+              "tool": "apply_patch",
+              "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449"
+            }
+          ],
+          "after": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+          "before": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "changes": [
+            {
+              "after": {
+                "digest": "cb4d197e1f1ea516876b0b0148fbebe9f26a7939f290f6145ee5543bb3b12c3b",
+                "mode": 420,
+                "size": 14
+              },
+              "before": null,
+              "diff": "--- product-tui.txt\n+++ product-tui.txt\n@@ -0,0 +1 @@\n+CHILD-CONTROL\n",
+              "kind": "add",
+              "path": "product-tui.txt"
+            }
+          ],
+          "complete": true,
+          "omissions": [],
+          "provenance_turns": [
+            "01a12897-e72d-7431-b8fd-369b0e646449"
+          ],
+          "representation": "raw working bytes; executable Git filters are not run",
+          "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified."
+        },
+        "evidence_digest": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+        "forge_root": "<ROUND>/project",
+        "outstanding": false,
+        "plan_digest": "32af89369add4e33332880ef9b7ec412d269e847bb93395e8bfe92291d3836ea",
+        "provenance": [
+          "01a12897-e72d-7431-b8fd-369b0e646449"
+        ],
+        "reason": null,
+        "reviewed": {
+          "digest": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+          "files": 11,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "reviewer_identity": "{\"auth\":\"subscription-only\",\"base_url\":null,\"direct\":true,\"effort\":null,\"lane\":{\"backend_id\":\"claude-max\",\"model\":\"sonnet\",\"runtime_id\":\"claude_code\"},\"model\":\"sonnet\",\"proxy\":null,\"root\":\"<ROUND>/project\",\"target\":null}",
+        "schema": 1,
+        "spent": true,
+        "start_snapshot": {
+          "digest": "7f7c820480ef6894aa05a6476b6cc8cc0e6b10800280da3ca580cdbbc20f9922",
+          "files": 10,
+          "omissions": [],
+          "root": "<ROUND>/project"
+        },
+        "status": "reviewed",
+        "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+        "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+        "updated_at": "2026-10-11T01:33:33Z",
+        "watermark": "2166011121391696484174863675047568457"
+      },
+      "reason_code": null,
+      "run_id": null,
+      "runtime": "codex",
+      "schema_version": 1,
+      "session": "b4-tui-child-final",
+      "timestamp": "2026-10-11T01:33:33Z"
+    }
+  ],
+  "reviewer_events": [
+    {
+      "at": 1791682413.593201,
+      "kind": "dispatch_started",
+      "pid": 96845,
+      "synthetic": true
+    },
+    {
+      "at": 1791682413.593432,
+      "kind": "completed",
+      "pid": 96845,
+      "synthetic": true,
+      "verdict": {
+        "confidence": 1.0,
+        "verdict": "aligned",
+        "violations": []
+      }
+    }
+  ],
+  "session": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "session",
+      "show",
+      "b4-tui-child-final",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "claude_session_id": null,
+      "confirmed": {
+        "artifacts": {},
+        "claude_project_root": null,
+        "claude_session_id": null,
+        "codex": {
+          "auth_method": "chatgpt_tokens",
+          "auth_source": "codex_store",
+          "billing_mode": "subscription_quota",
+          "context_delivery": "initial_message",
+          "last_run_at": "2026-10-11T01:33:40+00:00",
+          "rollout_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T03-33-14-01a12897-ba42-7d41-9c90-280514db10aa.jsonl",
+          "rollout_source": "session_start_hook",
+          "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa"
+        },
+        "confirmed_at": "2026-10-11T01:33:40+00:00",
+        "confirmed_by": "cli:codex-interactive-start",
+        "derivation": {
+          "context_file": ".forge/prev_sessions/b4-parent/children/b4-tui-child-final.md",
+          "depth": 1,
+          "dropped_turns": null,
+          "inherited_proxy": null,
+          "lineage": [
+            "b4-parent"
+          ],
+          "parent_forge_root": "<ROUND>/project",
+          "parent_project_root": "<ROUND>/project",
+          "parent_session": "b4-parent",
+          "parent_transcript": null,
+          "relocated_parent_session_id": null,
+          "resume_mode": "transfer",
+          "resumed_at": "2026-10-11T01:33:40+00:00",
+          "rewind_relocated_session_id": null,
+          "strategy": "structured"
+        },
+        "is_sandboxed": false,
+        "latest_plan_path": null,
+        "policy": null,
+        "transcript_path": null
+      },
+      "context": {
+        "main_model": null,
+        "model_family": "anthropic",
+        "models": {},
+        "policy": {
+          "bundles": [],
+          "enabled": true,
+          "fail_mode": "open",
+          "supervisor_active": true,
+          "supervisor_plan_path": "<ROUND>/approved-product-plan.md",
+          "supervisor_resume_id": null
+        },
+        "proxy": {
+          "base_url": null,
+          "is_direct": true,
+          "proxy_id": null,
+          "template": null
+        }
+      },
+      "created_at": "2026-10-11T01:33:13+00:00",
+      "intent": {
+        "agent": "claude-code",
+        "proxy": null,
+        "runtime": "codex"
+      },
+      "is_fork": false,
+      "is_incognito": false,
+      "last_accessed_at": "2026-10-11T01:33:13+00:00",
+      "launchability": "launchable",
+      "main_model": null,
+      "model_family": "anthropic",
+      "models": {},
+      "overrides": {},
+      "parent_session": "b4-parent",
+      "plan": {
+        "approved_snapshots": [],
+        "display_path": null,
+        "draft_path": null,
+        "exists": null,
+        "kind": null,
+        "parent_session": null,
+        "preferred_path": null,
+        "source": null
+      },
+      "policy": {
+        "bundles": [],
+        "enabled": true,
+        "fail_mode": "open",
+        "supervisor_active": true,
+        "supervisor_plan_path": "<ROUND>/approved-product-plan.md",
+        "supervisor_resume_id": null
+      },
+      "project_root": "<ROUND>/project",
+      "proxy": {
+        "base_url": null,
+        "is_direct": true,
+        "proxy_id": null,
+        "template": null
+      },
+      "session_name": "b4-tui-child-final",
+      "worktree": {
+        "branch": "b4-tui-child-final",
+        "path": "<ROUND>/project"
+      }
+    }
+  },
+  "stderr": "",
+  "stdout": "",
+  "stop_enrollment": {
+    "config": {
+      "path": "<ROUND>/codex-home/config.toml",
+      "scope": "configuration_without_tui",
+      "sha256": "878ca8a5a41cd9fc61646ef8c8ebe2c1d9a274aee8ad5ea8941b265a383447e2"
+    },
+    "events": [
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PostToolUse",
+      "Stop"
+    ],
+    "executable": "<ROUND>/bin/codex",
+    "nonce": "d5d484b5a67f4433b5659aa15a4e6ff9",
+    "schema": 1,
+    "sha256": "2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb",
+    "thread_id": "01a12895-ca20-7f21-a929-8636f6c804fd",
+    "turn_id": "01a12895-ca5e-7b83-baee-545e6c8c3425",
+    "verified_at": "2026-10-11T01:31:18Z",
+    "version": "0.162.1"
+  },
+  "supervisor_status": {
+    "args": [
+      "<CHECKOUT>/.venv/bin/forge",
+      "policy",
+      "supervisor",
+      "status",
+      "--session",
+      "b4-tui-child-final",
+      "--json"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": {
+      "session_name": "b4-tui-child-final",
+      "supervisor": {
+        "active": true,
+        "auth_mode": "subscription-only",
+        "cascade": false,
+        "checker_budget_tokens": null,
+        "checker_effort": null,
+        "checker_model": null,
+        "checker_provider": null,
+        "configured": true,
+        "degraded": null,
+        "direct": true,
+        "fork_session": true,
+        "lane": {
+          "backend": "claude-max",
+          "model": "sonnet",
+          "runtime": "claude_code"
+        },
+        "latest_review": {
+          "action_id": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+          "attempt_id": "b045abc11ad64dc392f13450c80735af",
+          "auth_mode": "subscription-only",
+          "cached": false,
+          "conversation": null,
+          "deadline_at": "2026-10-11T01:33:47.268862+00:00",
+          "effort": null,
+          "finished_at": "2026-10-11T01:33:33.606788+00:00",
+          "forge_root": "<ROUND>/project",
+          "lane": {
+            "backend_id": "claude-max",
+            "model": "sonnet",
+            "runtime_id": "claude_code"
+          },
+          "model": "sonnet",
+          "model_run_id": "run_6e94c864dd31",
+          "observed_models": [],
+          "origin": "codex",
+          "owner_pid": 96802,
+          "plan_digest": "32af89369add4e33332880ef9b7ec412d269e847bb93395e8bfe92291d3836ea",
+          "plan_path": "<ROUND>/approved-product-plan.md",
+          "purpose": "live",
+          "reason": null,
+          "root_run_id": "run_11031abb0a91",
+          "schema_version": 2,
+          "session": "b4-tui-child-final",
+          "stage": "frontier",
+          "started_at": "2026-10-11T01:33:33.268870+00:00",
+          "state": "completed",
+          "target_path": null,
+          "tool_name": "TurnReview",
+          "verdict": "allow"
+        },
+        "model": "sonnet",
+        "plan_override_path": "<ROUND>/approved-product-plan.md",
+        "proxy": null,
+        "resolved_uuid": null,
+        "resume_id": null,
+        "review_trigger": "stop",
+        "source": "plan",
+        "source_model": null,
+        "state": "active",
+        "supervisor_effort": null,
+        "suspended": false,
+        "throttle_seconds": 30,
+        "timeout_seconds": 12,
+        "turn_review": {
+          "assessed_snapshot": {
+            "digest": "1e652c81a4a8e46478f632e77edc551d4426671f894d1f474170db06adf0b8b7",
+            "files": 11,
+            "omissions": [],
+            "root": "<ROUND>/project"
+          },
+          "attempt_id": "b045abc11ad64dc392f13450c80735af",
+          "correction_consumed": false,
+          "coverage": {
+            "complete": true,
+            "omissions": []
+          },
+          "dispatch_cap": 1,
+          "dispatched": true,
+          "evidence_digest": "849325b10a54d25c27b3926495a6efc8fde3d76df0de62ee01478ad869760499",
+          "outstanding": false,
+          "provenance_turns": [
+            "01a12897-e72d-7431-b8fd-369b0e646449"
+          ],
+          "reason": null,
+          "spent": true,
+          "state": "reviewed",
+          "thread_id": "01a12897-ba42-7d41-9c90-280514db10aa",
+          "turn_id": "01a12897-e72d-7431-b8fd-369b0e646449",
+          "updated_at": "2026-10-11T01:33:33Z"
+        },
+        "unavailable_reason": null
+      }
+    }
+  },
+  "terminal": {
+    "actions": [
+      {
+        "at": 1791682401.077902,
+        "completed_count": 1
+      },
+      {
+        "at": 1791682406.170979,
+        "submitted_prompt": 1
+      },
+      {
+        "at": 1791682413.718147,
+        "completed_count": 2
+      },
+      {
+        "action": "F2 inspect notices",
+        "at": 1791682415.898593
+      },
+      {
+        "action": "dismiss notice",
+        "at": 1791682418.936001
+      },
+      {
+        "action": "EOF",
+        "at": 1791682419.8304288
+      }
+    ],
+    "exited": true,
+    "status": 0
+  }
+}

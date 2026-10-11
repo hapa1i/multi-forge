@@ -10,8 +10,9 @@ turn, including automatic continuations. It reviews changes already made; determ
 authority remain active. B5 and Jev are outside this branch.
 
 The runtime gate passed before product work. Trigger/schema, bounded evidence, durable spending, hook delivery, and
-status integration are implemented. Product controls and failure captures are recorded; installed-wheel verification and
-PR preparation remain. External documentation token counting is awaiting operator permission.
+status integration are implemented. Product controls, the installed-wheel native test, regression suite, and teardown
+are complete. PR publication and the documentation count gate remain. External documentation token counting is awaiting
+operator permission.
 
 ### Verified starting point
 
@@ -283,18 +284,18 @@ B2/B3 private round paths. Bug reproductions belong in `tests/regression/` with 
 - [ ] Run focused unit/real-command regressions for E1–E13 and E15, then `make test-unit`, `make test-regression`, and
   `make pre-commit` on the candidate. Mock binaries in hermetic launch tests; do not hash or invoke a developer's real
   Codex accidentally. Use coherent indexed-session fixtures from `tests.fixtures.session_state`.
-- [ ] Run targeted Docker/integration owners through `./scripts/test-integration.sh`, with `-m 'not slow'` for the
+- [x] Run targeted Docker/integration owners through `./scripts/test-integration.sh`, with `-m 'not slow'` for the
   no-inference suites. Inspect selected tests before execution; no real API test is authorized by its file being named.
   Verify the exported image can execute Claude and uses the current Forge revision before interpreting test failures.
-- [ ] Build one candidate wheel; install it cleanly outside the source tree, with FORGE_DEV absent and independently
+- [x] Build one candidate wheel; install it cleanly outside the source tree, with FORGE_DEV absent and independently
   enrolled exact hooks. Exercise extension lifecycle, Stop review and correction, auth refusal, status/activity, and
   smoke-test the installed assets. Record the wheel hash and actual hook module paths. Re-enrollment consumes the
   budget.
-- [ ] Complete E14 with trusted hooks, actual stdout/stderr/exit capture, native rollout receipts, working-tree hashes,
+- [x] Complete E14 with trusted hooks, actual stdout/stderr/exit capture, native rollout receipts, working-tree hashes,
   reviewer dispatch counts, TUI evidence where claimed, and one subscription-only aggregate-review result. Include
   multi-turn/resume boundaries and a no-change control. Observe usage from completion events; quota exhaustion stays
   unverified unless it happens naturally, with synthetic failure coverage labelled separately.
-- [ ] Commit the harness, exporter/redactor, stub-admission checker, and teardown helper used for publication. Retain
+- [x] Commit the harness, exporter/redactor, stub-admission checker, and teardown helper used for publication. Retain
   failing attempts as well as successes. Hash helper sources per run; if a source changes afterward, identify the drift
   and rerun affected controls on the candidate. Offline replay validates saved evidence, not a historical process exit.
 
@@ -303,7 +304,7 @@ B2/B3 private round paths. Bug reproductions belong in `tests/regression/` with 
 - [ ] Reconcile the card and epic with final guarantees, supported versions, failure/coverage limits, and downstream B5
   handoff. Link a compact evidence index and validation record. Recheck links and `git diff --check`; open B4's own PR
   with validation counts, skips, and unverified claims. Leave the card in `doing/` until merged and verified.
-- [ ] Stop and verify all fixture-owned processes, preserving pre-sweep leak evidence. Remove only the round's own login
+- [x] Stop and verify all fixture-owned processes, preserving pre-sweep leak evidence. Remove only the round's own login
   material at teardown; retain sanitized captures, runtime identities, exact helper sources, and package provenance.
   Compare recorded host config/auth metadata without claiming unchanged bytes prove token validity or remote revocation.
 - [ ] After merge, pull `main`, verify the merge/tree and CI against the tested candidate, record closeout in this
@@ -341,3 +342,10 @@ passed (one real-inference test deselected). The aggregate unit run has 10,670 p
 provider-token cache failure. Required refresh sends documentation text to Anthropic's count-only API; automatic
 approval review rejected that transfer without explicit permission. No cache values or tests were falsified. Final
 counts follow below.
+
+Final candidate validation: `c4354a9c`. `make test-unit`: 10,670 passed, 117 deselected, one stale provider-cache
+contract failure. `make test-regression`: 1,483 passed. Installed-wheel native integration: one passed; its hook module
+paths prove wheel provenance with `FORGE_DEV` absent. Local pre-commit checks pass with `file-size-limits` excluded
+while external counting is blocked. See [validation](evidence/validation.md) for commands, the exact blocker and limits,
+and [product evidence](evidence/product.json) for every attempt. The full round is 32 reserved Codex units and one real
+Claude subscription review. Teardown removed the fixture login and found no remaining recorded processes.

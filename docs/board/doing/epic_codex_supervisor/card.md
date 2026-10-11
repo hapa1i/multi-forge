@@ -124,3 +124,11 @@ count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 aft
 activated with this feedback dependency and B5 remains proposed. The
 [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and host-state
 qualifications and records the independently owned login teardown.
+
+## B4 candidate handoff (2026-10-11)
+
+B4 implements opt-in, once-per-explicit-turn Stop review on admitted Codex 0.162.1. Native and clean-wheel controls
+pass; operational journal state caps dispatch and correction independently of telemetry, and outstanding correction
+changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the documentation-count
+permission blocker and measured limits. B4 stays `doing/` until merge; B5 remains parked and adds no authority to the
+Stop reason.

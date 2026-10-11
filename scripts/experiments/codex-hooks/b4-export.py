@@ -127,7 +127,9 @@ def export(root: Path, destination: Path) -> None:
             (str(Path.home()), "<HOST_HOME>"),
         ):
             text = text.replace(source, target)
-        (destination / name).write_text(text)
+        output = destination / name
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text)
 
     save(
         "native-gate.json",
@@ -143,14 +145,24 @@ def export(root: Path, destination: Path) -> None:
             "cases": {key: value for key, value in cases.items() if key[:2].isdigit() and int(key[:2]) <= 11},
         },
     )
+    product_cases = {key: value for key, value in cases.items() if not key[:2].isdigit() or int(key[:2]) > 11}
+    for key, value in product_cases.items():
+        save("product/" + key + ".json", value)
+    wheel_reports = {}
+    for path in root.glob("wheel-*.json"):
+        save("product/" + path.name, read(path))
+        wheel_reports[path.name] = "product/" + path.name
     save(
         "product.json",
         {
-            "cases": {key: value for key, value in cases.items() if not key[:2].isdigit() or int(key[:2]) > 11},
+            "cases": {
+                key: {"evidence": "product/" + key + ".json", "completion": value["completion"]}
+                for key, value in product_cases.items()
+            },
             "enrollment": read(root / "ENROLLED"),
             "product_sync": read(root / "product-sync.json"),
             "ui_seal_change": read(root / "ui-seal-change.json"),
-            "wheel": {p.name: read(p) for p in root.glob("wheel-*.json")},
+            "wheel": wheel_reports,
             "verification": read(root / "product-verification.json"),
             "teardown": read(root / "teardown.json"),
             "budget": read(root / "budget.json"),
