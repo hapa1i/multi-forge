@@ -58,41 +58,41 @@ Run this section before changes to product configuration, CLI flags, manifest ve
 experiment helpers and disposable fixtures implement candidate behavior here. Product/wheel rows in the budget are
 reserved for section 6; they are not prerequisites for this gate.
 
-- [ ] Create a new B4 round root with dedicated HOME, CODEX_HOME, FORGE_HOME, checkout fixtures, and wrapper. Retain the
+- [x] Create a new B4 round root with dedicated HOME, CODEX_HOME, FORGE_HOME, checkout fixtures, and wrapper. Retain the
   installed Codex package/binary, selected launcher, resolved executable, version, and streaming SHA-256 for the whole
   round. Record Forge revision and dirty diff/hash for every capture. Never reuse B3's closed credential store or copy
   the normal `auth.json`; obtain an independent fixture login when execution starts.
-- [ ] Disable dotenv loading in probe environments and remove API/proxy credential sources. Default to an admitted
+- [x] Disable dotenv loading in probe environments and remove API/proxy credential sources. Default to an admitted
   Claude stub which answers version/help/auth checks and records actual dispatch before sleeping or returning a verdict.
   A PATH stub must not replace the Codex executor. Use one real Claude subscription-only review solely for the completed
   aggregate-review control, with explicit model, no API fallback, and account extra usage disabled. The two Haiku API
   exceptions used during B3 are consumed, not authorization for B4. Use deterministic `--strategy structured` for
   `--resume-from` probe launches: the default `ai-curated` transfer can itself make an API call. The single real
   aggregate review belongs to section 6 after product implementation.
-- [ ] Export `FORGE_DEV=<absolute checkout>` in every development probe terminal, including the operator's. Assert
+- [x] Export `FORGE_DEV=<absolute checkout>` in every development probe terminal, including the operator's. Assert
   `forge extension doctor --json` reports `hook_dispatcher.dev_override.effective: true`; capture the hook's actual
   launcher/module path. The clean-wheel row later unsets this override and proves installed-wheel provenance instead.
-- [ ] Before inference, enumerate the live cases and reserve a ceiling of **32 Codex turn units**: 4 enrollment checks,
+- [x] Before inference, enumerate the live cases and reserve a ceiling of **32 Codex turn units**: 4 enrollment checks,
   6 identity/boundary controls, 4 product/evidence controls, 4 failure controls, 4 wheel/TUI controls, 2 correction
   continuations, and 8 retries. Count every submitted start/resume and enrollment probe, including automatic advisory
   enrollment checks and any initial transfer-prompt turn; conservatively count a correction continuation even when Codex
   retains its turn ID. Share cases where assertions fit, track failed launches, and stop before expanding this ceiling.
   Reserve at most **one real Claude subscription review**, without an automatic retry; all other reviewers are stubs.
   This is a future execution budget, not evidence of work performed or paid-API authorization.
-- [ ] Record `forge runtime preflight codex --json` and Codex doctor readiness/auth/billing facts. Enroll exact
+- [x] Record `forge runtime preflight codex --json` and Codex doctor readiness/auth/billing facts. Enroll exact
   registrations with their selected timeout, retain config hashes, and inspect the existing SessionStart receipt. Add
   event-specific observations for every new event the design relies on. Pin config after enrollment: destructive probe
   initialization refuses an enrolled fixture unless explicitly reset, followed by re-enrollment.
-- [ ] Capture a normal Stop, multi-prompt TUI session, headless start/resume, no-change turn, and controlled correction.
+- [x] Capture a normal Stop, multi-prompt TUI session, headless start/resume, no-change turn, and controlled correction.
   Correlate raw hook stdin/stdout/stderr/exit status with native rollout events and working-tree outcomes. Establish
   which IDs identify a human turn, how missing/duplicate events behave, and whether the baseline event occurs before any
   tool mutation. Replayed duplicates test Forge idempotency but do not prove native retry behavior.
-- [ ] Probe the chosen Stop block/allow/operator shapes on the retained version, including source-only feedback and
+- [x] Probe the chosen Stop block/allow/operator shapes on the retained version, including source-only feedback and
   summary-off candidate payloads from fixture helpers. Repeat them through the product in section 6. Distinguish emitted
   output, model receipt, and TUI rendering. Identify hook-generated user messages by verified metadata, not merely their
   role or text. Do not assume `hook_run_id` is a global deduplication key or that B3's PreToolUse `systemMessage`
   behavior applies to Stop.
-- [ ] Record a Stop-specific go/no-go decision with capture references before beginning sections 2–5. Admit only
+- [x] Record a Stop-specific go/no-go decision with capture references before beginning sections 2–5. Admit only
   measured versions with a verified invoking executor; inherited environment identity, nested runtimes, or old rollout
   metadata are insufficient. Unknown identity or missing required events reports review unavailable and spends no model
   call. Preserve B3's shim basename/child-cwd launch behavior. Leave the general QA ceiling, release pin, and shared QA
@@ -102,6 +102,10 @@ Blocking decision: record whether the captures support turn identity, baseline t
 timeout handling, and the promised one-dispatch cap/evidence scope. A go records the measured limits and permits product
 implementation in sections 2–5. A no-go stops those sections until the card is revised to a supported contract. Do not
 substitute background notification for Stop review. This is distinct from the completed board activation in section 0.
+
+Runtime decision recorded 2026-10-11: **go for 0.162.1**, subject to the [measured constraints](evidence/README.md).
+Thirteen of 32 Codex turn units are reserved; product acceptance remains open. B1 watchdog cleanup is required because
+native Stop expiry alone left an unguarded detached reviewer alive.
 
 ## 2. Implement the trigger, spending, and failure contracts
 

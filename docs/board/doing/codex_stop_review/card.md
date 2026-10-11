@@ -6,8 +6,9 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4
 [B3: bounded, source-aware feedback](../../done/codex_policy_warnings/card.md); all have shipped.
 
 Activated 2026-10-11 on `codex/codex-stop-review` from published `main` at `897ed95c` (B3 closeout). The
-[execution checklist](checklist.md) records the implementation plan and fresh runtime gates. Implementation and live B4
-probes have not started.
+[execution checklist](checklist.md) records the implementation plan and fresh runtime gates. The
+[runtime gate](evidence/README.md) passed on 2026-10-11 for retained Codex 0.162.1. Product implementation is next; its
+acceptance rows remain open.
 
 Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
 changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit

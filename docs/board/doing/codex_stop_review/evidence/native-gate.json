@@ -1,0 +1,2831 @@
+{
+  "budget": {
+    "api_inference": 0,
+    "ceiling": 32,
+    "correction_continuations": 2,
+    "enrollment": 4,
+    "failure": 4,
+    "identity_boundary": 6,
+    "product_evidence": 4,
+    "real_claude_stage": "only after product implementation",
+    "real_claude_subscription_review": 1,
+    "retries": 8,
+    "wheel_tui": 4
+  },
+  "cases": {
+    "01-enroll-tui": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 60.94787258299766,
+        "kill_escalation": [],
+        "owner": "1384a3be7c454a5b8266e05a45f0b509",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b3-terminal.py",
+          "<ROUND>/bin/codex",
+          "--no-alt-screen",
+          "--sandbox",
+          "workspace-write",
+          "--ask-for-approval",
+          "never"
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677537.208641
+      },
+      "completion": {
+        "at": 1791677598.28091,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/01-enroll-tui",
+        "mode": "observe",
+        "reviewer": "fast"
+      },
+      "events": [],
+      "hook_messages_in_retained_rollout": [],
+      "operator_notice_in_terminal": false,
+      "receipts": {},
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "",
+      "terminal": {
+        "actions": [
+          {
+            "at": 1791677568.4909,
+            "keys_hex": "0d"
+          },
+          {
+            "at": 1791677580.9950411,
+            "keys_hex": "1b5b420d"
+          },
+          {
+            "at": 1791677597.588267,
+            "keys_hex": "04"
+          }
+        ],
+        "exited": true,
+        "status": 0
+      }
+    },
+    "02-enrollment": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 10.680009833995427,
+        "kill_escalation": [],
+        "owner": "2df252202ed6402bbb0d3be3c36af29d",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "runtime",
+          "preflight",
+          "codex",
+          "--verify-enrollment",
+          "--json"
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677599.315182
+      },
+      "completion": {
+        "at": 1791677610.123413,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/02-enrollment",
+        "mode": "observe",
+        "reviewer": "fast"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": null,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 60339,
+            "ppid": 60172,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "unavailable": "outside owned round"
+            },
+            "started_at": 1791677606.186767
+          },
+          "payload": {
+            "cwd": "/private/tmp/forge-codex-enroll-1ua7jysi",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f",
+            "source": "startup",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-13-23-01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0004470348358154297,
+            "exit_code": 0,
+            "finished_at": 1791677606.1872141
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": null,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 60368,
+            "ppid": 60172,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "unavailable": "outside owned round"
+            },
+            "started_at": 1791677606.817353
+          },
+          "payload": {
+            "cwd": "/private/tmp/forge-codex-enroll-1ua7jysi",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Reply with the single word OK. Make no file changes.",
+            "session_id": "01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-13-23-01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f.jsonl",
+            "turn_id": "01a1284e-9ee8-7630-bcbc-97275de98c6c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0003819465637207031,
+            "exit_code": 0,
+            "finished_at": 1791677606.817735
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": null,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 60415,
+            "ppid": 60172,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "unavailable": "outside owned round"
+            },
+            "started_at": 1791677608.563213
+          },
+          "payload": {
+            "cwd": "/private/tmp/forge-codex-enroll-1ua7jysi",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "OK",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-13-23-01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f.jsonl",
+            "turn_id": "01a1284e-9ee8-7630-bcbc-97275de98c6c"
+          },
+          "result": {
+            "elapsed_seconds": 0.00040602684020996094,
+            "exit_code": 0,
+            "finished_at": 1791677608.5636191
+          },
+          "stderr": "",
+          "stdout": ""
+        }
+      ],
+      "hook_messages_in_retained_rollout": [],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "60338-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:13:26+00:00",
+          "session_id": "01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f",
+          "source": "startup",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-13-23-01a1284e-9ecc-7631-8e7a-daa5ff4e9b1f.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "{\n  \"ready\": true,\n  \"registered\": true,\n  \"config_path\": \"<ROUND>/codex-home/config.toml\",\n  \"attempted\": true,\n  \"codex_succeeded\": true,\n  \"enrolled\": true,\n  \"reason\": \"codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.\",\n  \"version\": \"0.162.1\",\n  \"version_validated\": \"0.161.0\"\n}\n",
+      "terminal": null
+    },
+    "03-managed-start": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 17.940881415997865,
+        "kill_escalation": [],
+        "owner": "0feb46b5fa054c1bbdf3568d48ed94ac",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "start",
+          "b4-executor",
+          "--runtime",
+          "codex",
+          "--resume-from",
+          "b4-parent",
+          "--strategy",
+          "structured",
+          "--task",
+          "Use apply_patch to create first.txt containing FIRST, then use apply_patch to create second.txt containing SECOND. Make no other changes and finish with READY."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677729.694457
+      },
+      "completion": {
+        "at": 1791677747.773234,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/03-managed-start",
+        "mode": "observe",
+        "reviewer": "fast"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61061,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589"
+              }
+            },
+            "started_at": 1791677738.1576881
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "startup",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005128383636474609,
+            "exit_code": 0,
+            "finished_at": 1791677738.158201
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61085,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589"
+              }
+            },
+            "started_at": 1791677738.8712692
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "# Handoff context (curated transfer from a prior planning session)\n\nThe section below is curated context -- decisions, current state, relevant files, and\nopen questions -- distilled from a planning session in another agent runtime. Reasoning\nstate does not transfer across runtimes, so treat this as your authoritative context.\n\n# Session Context: b4-parent\n\n**Resumed at**: 2026-10-11T00:15:35+00:00\n**Parent proxy**: none\n**Lineage**: b4-parent\n\n---\n\n## Conversation Summary\n\n### Turn 1\n\n**Assistant**: Synthetic B4 fixture. Follow the operator's bounded file task.\n\n---\n\n## Artifacts\n\n*No artifacts recorded.*\n\n## Runtime Hints\n\nTarget runtime: codex.\n\nConsumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive changes through the Codex tool surface.\n\n# Your task\n\nUse apply_patch to create first.txt containing FIRST, then use apply_patch to create second.txt containing SECOND. Make no other changes and finish with READY.\n",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.0004916191101074219,
+            "exit_code": 0,
+            "finished_at": 1791677738.8717608
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PreToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61182,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589"
+              }
+            },
+            "started_at": 1791677743.156016
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PreToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/first.txt\n+FIRST\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_use_id": "exec-6e96c552-508f-444e-a43b-f5a446285af1",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005428791046142578,
+            "exit_code": 0,
+            "finished_at": 1791677743.156559
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PostToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61202,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335"
+              }
+            },
+            "started_at": 1791677743.721028
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PostToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/first.txt\n+FIRST\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/first.txt\n",
+            "tool_use_id": "exec-6e96c552-508f-444e-a43b-f5a446285af1",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.00046896934509277344,
+            "exit_code": 0,
+            "finished_at": 1791677743.721497
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PreToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61214,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335"
+              }
+            },
+            "started_at": 1791677743.792247
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PreToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/second.txt\n+SECOND\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_use_id": "exec-920db328-3096-4a14-9b60-833650720c07",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.0006430149078369141,
+            "exit_code": 0,
+            "finished_at": 1791677743.79289
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PostToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61235,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677744.350063
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PostToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/second.txt\n+SECOND\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/second.txt\n",
+            "tool_use_id": "exec-920db328-3096-4a14-9b60-833650720c07",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005159378051757812,
+            "exit_code": 0,
+            "finished_at": 1791677744.350579
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":60726,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61269,
+            "ppid": 60897,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677745.726756
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "READY",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12850-a3c7-7b31-a4c2-1669ec0f8624"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005588531494140625,
+            "exit_code": 0,
+            "finished_at": 1791677745.727315
+          },
+          "stderr": "",
+          "stdout": ""
+        }
+      ],
+      "hook_messages_in_retained_rollout": [],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "61060-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:15:38+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "startup",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        },
+        "61181-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:15:38+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "startup",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        },
+        "61213-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:15:38+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "startup",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "Created Codex session: b4-executor (from 'b4-parent')\nRouting: direct (OpenAI via codex CLI)\nWorktree: <ROUND>/project\nTransfer: \n<ROUND>/project/.forge/prev_sessions/b4-parent/children/b\n4-executor.md\nThread: 01a12850-a38a-7661-ac76-c05c0cae7f17\n\nI’ll create the two files in the requested order.\n\nREADY\n\nTip: Run 'forge session resume b4-executor --task <next step>' to continue this \nthread.\n",
+      "terminal": null
+    },
+    "04-managed-resume": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 12.222311333003745,
+        "kill_escalation": [],
+        "owner": "60ba67b6747d4506909c88bd23a320ae",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools or change files. Reply exactly NO-CHANGE."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677773.442455
+      },
+      "completion": {
+        "at": 1791677785.7868721,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/04-managed-resume",
+        "mode": "observe",
+        "reviewer": "fast"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61379,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61680,
+            "ppid": 61547,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677781.713026
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0010187625885009766,
+            "exit_code": 0,
+            "finished_at": 1791677781.7140448
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61379,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61699,
+            "ppid": 61547,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677782.2466712
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools or change files. Reply exactly NO-CHANGE.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-4db2-7a83-96f2-7cd753d2a20e"
+          },
+          "result": {
+            "elapsed_seconds": 0.0007679462432861328,
+            "exit_code": 0,
+            "finished_at": 1791677782.2474391
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61379,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 61748,
+            "ppid": 61547,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677784.287601
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "NO-CHANGE",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-4db2-7a83-96f2-7cd753d2a20e"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005779266357421875,
+            "exit_code": 0,
+            "finished_at": 1791677784.288179
+          },
+          "stderr": "",
+          "stdout": ""
+        }
+      ],
+      "hook_messages_in_retained_rollout": [],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "61679-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:16:22+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nNO-CHANGE\n",
+      "terminal": null
+    },
+    "05-tui-multiple": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 37.37635299999965,
+        "kill_escalation": [],
+        "owner": "72781d6d90644e27916863253f79369c",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b4-terminal.py",
+          "--close-after-turn",
+          "--prompts-json",
+          "<ROUND>/multi-prompts.json",
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor"
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677804.4720168
+      },
+      "completion": {
+        "at": 1791677841.978672,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/05-tui-multiple",
+        "mode": "notice",
+        "notice": "B4-STOP-OPERATOR-NOTICE: completed fixture review.",
+        "reviewer": "fast"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62294,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677819.467443
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0009560585021972656,
+            "exit_code": 0,
+            "finished_at": 1791677819.468399
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62316,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677820.148314
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Use apply_patch to append TUI-FIRST on a new line in first.txt. Make no other changes. Finish with TUI-FIRST-DONE.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-e830-7b61-aa70-34a268f26958"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005249977111816406,
+            "exit_code": 0,
+            "finished_at": 1791677820.148839
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PreToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62418,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "769de7aa90420fc20b613b9dba39e234821b286f19d63b9298583750d6359335",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677823.9220228
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PreToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Update File: <ROUND>/project/first.txt\n@@\n FIRST\n+TUI-FIRST\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_use_id": "exec-75d345a9-35ef-4ab0-8e0a-c1a68d5f43bb",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-e830-7b61-aa70-34a268f26958"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005412101745605469,
+            "exit_code": 0,
+            "finished_at": 1791677823.922564
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PostToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62438,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677824.476428
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PostToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Update File: <ROUND>/project/first.txt\n@@\n FIRST\n+TUI-FIRST\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nM <ROUND>/project/first.txt\n",
+            "tool_use_id": "exec-75d345a9-35ef-4ab0-8e0a-c1a68d5f43bb",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-e830-7b61-aa70-34a268f26958"
+          },
+          "result": {
+            "elapsed_seconds": 0.0004930496215820312,
+            "exit_code": 0,
+            "finished_at": 1791677824.476921
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62487,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677826.367197
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "TUI-FIRST-DONE",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12851-e830-7b61-aa70-34a268f26958"
+          },
+          "result": {
+            "elapsed_seconds": 0.0006089210510253906,
+            "exit_code": 0,
+            "finished_at": 1791677826.367806
+          },
+          "stderr": "",
+          "stdout": "{\"systemMessage\": \"B4-STOP-OPERATOR-NOTICE: completed fixture review.\"}\n"
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62599,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677829.831041
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Use a shell command to append TUI-SECOND on a new line in second.txt. Make no other changes. Finish with TUI-SECOND-DONE.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-1278-7181-9cff-2d3f314be1c6"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005958080291748047,
+            "exit_code": 0,
+            "finished_at": 1791677829.831637
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PreToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62672,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "c147bbabc3cc254f2914171fa3830faf0e1aa96bdc45a0541e177ec81a57cc5f"
+              }
+            },
+            "started_at": 1791677832.687419
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PreToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "printf '%s\\n' 'TUI-SECOND' >> second.txt"
+            },
+            "tool_name": "Bash",
+            "tool_use_id": "exec-37271819-fd10-4e21-847c-b0c2d7adfe88",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-1278-7181-9cff-2d3f314be1c6"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005950927734375,
+            "exit_code": 0,
+            "finished_at": 1791677832.688014
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PostToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62693,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677833.275063
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PostToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "printf '%s\\n' 'TUI-SECOND' >> second.txt"
+            },
+            "tool_name": "Bash",
+            "tool_response": "",
+            "tool_use_id": "exec-37271819-fd10-4e21-847c-b0c2d7adfe88",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-1278-7181-9cff-2d3f314be1c6"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005309581756591797,
+            "exit_code": 0,
+            "finished_at": 1791677833.275594
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":61831,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 62740,
+            "ppid": 61986,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677835.055864
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "TUI-SECOND-DONE",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-1278-7181-9cff-2d3f314be1c6"
+          },
+          "result": {
+            "elapsed_seconds": 0.000537872314453125,
+            "exit_code": 0,
+            "finished_at": 1791677835.056402
+          },
+          "stderr": "",
+          "stdout": "{\"systemMessage\": \"B4-STOP-OPERATOR-NOTICE: completed fixture review.\"}\n"
+        }
+      ],
+      "hook_messages_in_retained_rollout": [],
+      "operator_notice_in_terminal": true,
+      "receipts": {
+        "62293-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:17:00+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        },
+        "62417-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:17:00+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        },
+        "62671-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:17:00+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "",
+      "terminal": {
+        "actions": [
+          {
+            "at": 1791677818.9173388,
+            "submitted_prompt": 1
+          },
+          {
+            "at": 1791677826.378304,
+            "completed_count": 1
+          },
+          {
+            "at": 1791677829.73767,
+            "submitted_prompt": 2
+          },
+          {
+            "at": 1791677835.06637,
+            "completed_count": 2
+          },
+          {
+            "action": "F2 inspect notices",
+            "at": 1791677837.229735
+          },
+          {
+            "action": "dismiss notice",
+            "at": 1791677840.277888
+          },
+          {
+            "action": "EOF",
+            "at": 1791677841.1681972
+          }
+        ],
+        "exited": true,
+        "status": 0
+      }
+    },
+    "06-stop-correction": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 18.556457917002263,
+        "kill_escalation": [],
+        "owner": "05cb50ee0a264496bb30802f5c3d7453",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools. Reply INITIAL-STOP and finish."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677856.6997068
+      },
+      "completion": {
+        "at": 1791677875.3769112,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/06-stop-correction",
+        "mode": "block",
+        "reason": "Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.",
+        "reviewer": "fast"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63271,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677864.722145
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0008387565612792969,
+            "exit_code": 0,
+            "finished_at": 1791677864.7229838
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63290,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677865.262923
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools. Reply INITIAL-STOP and finish.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005629062652587891,
+            "exit_code": 0,
+            "finished_at": 1791677865.263486
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63341,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677867.405797
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "INITIAL-STOP",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0006930828094482422,
+            "exit_code": 0,
+            "finished_at": 1791677867.40649
+          },
+          "stderr": "",
+          "stdout": "{\"decision\": \"block\", \"reason\": \"Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.\"}\n"
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PreToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63426,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677870.9431129
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PreToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/corrected.txt\n+CORRECTED\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_use_id": "exec-abfd1439-51ac-4406-9dd5-c731b7941278",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005850791931152344,
+            "exit_code": 0,
+            "finished_at": 1791677870.943697
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "PostToolUse",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63446,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677871.485667
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "PostToolUse",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "tool_input": {
+              "command": "*** Begin Patch\n*** Add File: <ROUND>/project/corrected.txt\n+CORRECTED\n*** End Patch"
+            },
+            "tool_name": "apply_patch",
+            "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/project/corrected.txt\n",
+            "tool_use_id": "exec-abfd1439-51ac-4406-9dd5-c731b7941278",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005059242248535156,
+            "exit_code": 0,
+            "finished_at": 1791677871.486173
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":62970,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63485,
+            "ppid": 63141,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677873.123878
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "B4-CORRECTION-RECEIVED",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": true,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005648136138916016,
+            "exit_code": 0,
+            "finished_at": 1791677873.1244428
+          },
+          "stderr": "",
+          "stdout": ""
+        }
+      ],
+      "hook_messages_in_retained_rollout": [
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+                "role": "user",
+                "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+              },
+              "revision": "retained_01a12852-a592-7c40-90e9-1f6ff7ee68a9"
+            },
+            "user_input_order": 13
+          },
+          "ordinal": 83,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677867.410843,
+              "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:17:47.410Z",
+          "type": "response_item"
+        }
+      ],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "63270-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:17:45+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        },
+        "63425-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:17:45+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nINITIAL-STOP\nI’ll create `corrected.txt` containing `CORRECTED`.\n\nB4-CORRECTION-RECEIVED\n",
+      "terminal": null
+    },
+    "07-stop-source": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 13.304630792001262,
+        "kill_escalation": [],
+        "owner": "54139ee9c48e4afe8340b72ec667d4d9",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools. Reply SOURCE-INITIAL and finish."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677889.348711
+      },
+      "completion": {
+        "at": 1791677902.774166,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/07-stop-source",
+        "mode": "block",
+        "reason": "Forge fixture review: action required. Verified approved-plan quote: \"Include SOURCE-APPROVED in the final response.\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.",
+        "reviewer": "fast",
+        "source_only": true,
+        "summary_feedback": false
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":63587,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63861,
+            "ppid": 63733,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677896.3849459
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.0007460117340087891,
+            "exit_code": 0,
+            "finished_at": 1791677896.385692
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":63587,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63878,
+            "ppid": 63733,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677896.920254
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools. Reply SOURCE-INITIAL and finish.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005218982696533203,
+            "exit_code": 0,
+            "finished_at": 1791677896.920776
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":63587,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63941,
+            "ppid": 63733,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677899.5069141
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "SOURCE-INITIAL",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+          },
+          "result": {
+            "elapsed_seconds": 0.0006608963012695312,
+            "exit_code": 0,
+            "finished_at": 1791677899.507575
+          },
+          "stderr": "",
+          "stdout": "{\"decision\": \"block\", \"reason\": \"Forge fixture review: action required. Verified approved-plan quote: \\\"Include SOURCE-APPROVED in the final response.\\\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.\"}\n"
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":63587,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 63985,
+            "ppid": 63733,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677901.256595
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "SOURCE-APPROVED\n\nPlease inspect the unresolved finding.",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": true,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+          },
+          "result": {
+            "elapsed_seconds": 0.0005431175231933594,
+            "exit_code": 0,
+            "finished_at": 1791677901.257138
+          },
+          "stderr": "",
+          "stdout": ""
+        }
+      ],
+      "hook_messages_in_retained_rollout": [
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+                "role": "user",
+                "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+              },
+              "revision": "retained_01a12852-a592-7c40-90e9-1f6ff7ee68a9"
+            },
+            "user_input_order": 13
+          },
+          "ordinal": 83,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677867.410843,
+              "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:17:47.410Z",
+          "type": "response_item"
+        },
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+                "role": "user",
+                "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+              },
+              "revision": "retained_01a12853-22f7-71d0-8cc7-7b461ed2fd4b"
+            },
+            "user_input_order": 18
+          },
+          "ordinal": 107,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: action required. Verified approved-plan quote: \"Include SOURCE-APPROVED in the final response.\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677899.511407,
+              "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:18:19.511Z",
+          "type": "response_item"
+        }
+      ],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "63860-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:18:16+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nSOURCE-INITIAL\nSOURCE-APPROVED\n\nPlease inspect the unresolved finding.\n",
+      "terminal": null
+    },
+    "08-stop-native-expiry": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 71.52606312499847,
+        "kill_escalation": [],
+        "owner": "cbac6bc8ff19475d96f78915facbb92d",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": [
+          {
+            "owner": "cbac6bc8ff19475d96f78915facbb92d",
+            "pgid": 64461,
+            "pid": 64461,
+            "ppid": 64450,
+            "recorded_at": 1791677943.42918,
+            "started": "Sun Oct 11 02:19:03 2026    ",
+            "status": "Ss"
+          }
+        ]
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools or change files. Reply NATIVE-EXPIRY-CONTROL and finish."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791677932.629175
+      },
+      "completion": {
+        "at": 1791678004.2751338,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/08-stop-native-expiry",
+        "mode": "sleep",
+        "reviewer": "sleep"
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":64083,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 64367,
+            "ppid": 64234,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677940.234588
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.003595113754272461,
+            "exit_code": 0,
+            "finished_at": 1791677940.238183
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":64083,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 64386,
+            "ppid": 64234,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677940.758869
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools or change files. Reply NATIVE-EXPIRY-CONTROL and finish.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12853-b899-7510-ba14-c7308d17d01e"
+          },
+          "result": {
+            "elapsed_seconds": 0.003245115280151367,
+            "exit_code": 0,
+            "finished_at": 1791677940.762114
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":64083,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 64450,
+            "ppid": 64234,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791677943.369159
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "NATIVE-EXPIRY-CONTROL",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12853-b899-7510-ba14-c7308d17d01e"
+          },
+          "result": null,
+          "stderr": null,
+          "stdout": null
+        }
+      ],
+      "hook_messages_in_retained_rollout": [
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+                "role": "user",
+                "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+              },
+              "revision": "retained_01a12852-a592-7c40-90e9-1f6ff7ee68a9"
+            },
+            "user_input_order": 13
+          },
+          "ordinal": 83,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677867.410843,
+              "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:17:47.410Z",
+          "type": "response_item"
+        },
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+                "role": "user",
+                "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+              },
+              "revision": "retained_01a12853-22f7-71d0-8cc7-7b461ed2fd4b"
+            },
+            "user_input_order": 18
+          },
+          "ordinal": 107,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: action required. Verified approved-plan quote: \"Include SOURCE-APPROVED in the final response.\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677899.511407,
+              "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:18:19.511Z",
+          "type": "response_item"
+        }
+      ],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "64366-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:19:00+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [
+        {
+          "at": 1791677943.429447,
+          "kind": "dispatch_started",
+          "pid": 64461,
+          "synthetic": true
+        },
+        {
+          "at": 1791678004.062248,
+          "kind": "signal",
+          "pid": 64461,
+          "signal": 15,
+          "synthetic": true
+        }
+      ],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nNATIVE-EXPIRY-CONTROL\n",
+      "terminal": null
+    },
+    "09-stop-guarded-deadline": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 18.36951779100491,
+        "kill_escalation": [],
+        "owner": "311bb3eb2b204f2fa8a61d6f77371f6c",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools or change files. Reply GUARDED-DEADLINE and finish."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791678071.061568
+      },
+      "completion": {
+        "at": 1791678089.555223,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/09-stop-guarded-deadline",
+        "mode": "guarded-deadline",
+        "note": "Native-expiry arm deliberately uses a 90-second transport deadline to reach the registered 60-second Stop expiry; not a product timeout.",
+        "reviewer": "sleep",
+        "synthetic": true
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":65984,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66285,
+            "ppid": 66153,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678079.621314
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.004148006439208984,
+            "exit_code": 0,
+            "finished_at": 1791678079.625462
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":65984,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66304,
+            "ppid": 66153,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678080.172579
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools or change files. Reply GUARDED-DEADLINE and finish.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12855-d907-71f1-9027-50f816a81685"
+          },
+          "result": {
+            "elapsed_seconds": 0.0028760433197021484,
+            "exit_code": 0,
+            "finished_at": 1791678080.175455
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":65984,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66358,
+            "ppid": 66153,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678082.345255
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "GUARDED-DEADLINE",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12855-d907-71f1-9027-50f816a81685"
+          },
+          "result": {
+            "elapsed_seconds": 3.6817562580108643,
+            "exit_code": 0,
+            "finished_at": 1791678086.0270112
+          },
+          "stderr": "",
+          "stdout": "{\"systemMessage\": \"B4 review unavailable: controlled deadline.\"}\n"
+        }
+      ],
+      "hook_messages_in_retained_rollout": [
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+                "role": "user",
+                "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+              },
+              "revision": "retained_01a12852-a592-7c40-90e9-1f6ff7ee68a9"
+            },
+            "user_input_order": 13
+          },
+          "ordinal": 83,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677867.410843,
+              "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:17:47.410Z",
+          "type": "response_item"
+        },
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+                "role": "user",
+                "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+              },
+              "revision": "retained_01a12853-22f7-71d0-8cc7-7b461ed2fd4b"
+            },
+            "user_input_order": 18
+          },
+          "ordinal": 107,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: action required. Verified approved-plan quote: \"Include SOURCE-APPROVED in the final response.\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677899.511407,
+              "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:18:19.511Z",
+          "type": "response_item"
+        }
+      ],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "66284-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:21:19+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [
+        {
+          "at": 1791678082.645878,
+          "kind": "dispatch_started",
+          "pid": 66382,
+          "synthetic": true
+        },
+        {
+          "at": 1791678085.50721,
+          "kind": "signal",
+          "pid": 66382,
+          "signal": 15,
+          "synthetic": true
+        }
+      ],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nGUARDED-DEADLINE\n",
+      "terminal": null
+    },
+    "10-stop-guarded-expiry": {
+      "cleanup": {
+        "codex_identity_unchanged": true,
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "elapsed_seconds": 74.0389130830008,
+        "kill_escalation": [],
+        "owner": "c2a00bf50af647dfa3392df369250c19",
+        "remaining": [],
+        "returncode": 0,
+        "survivors_before_sweep": []
+      },
+      "command": {
+        "codex_identity": {
+          "effort": "low",
+          "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "model": "gpt-6.1-sol",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "version": "0.162.1"
+        },
+        "command": [
+          "<CHECKOUT>/.venv/bin/forge",
+          "session",
+          "resume",
+          "b4-executor",
+          "--task",
+          "Do not use tools or change files. Reply GUARDED-NATIVE-EXPIRY and finish."
+        ],
+        "cwd": "<ROUND>/project",
+        "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "started_at": 1791678137.1123369
+      },
+      "completion": {
+        "at": 1791678211.2901351,
+        "exit": 0
+      },
+      "control": {
+        "capture": "<ROUND>/captures/10-stop-guarded-expiry",
+        "mode": "guarded-native-expiry",
+        "note": "Native-expiry arm deliberately uses a 90-second transport deadline to reach the registered 60-second Stop expiry; not a product timeout.",
+        "reviewer": "sleep",
+        "synthetic": true
+      },
+      "events": [
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "SessionStart",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":66575,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66869,
+            "ppid": 66737,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678145.3734
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "source": "resume",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+          },
+          "result": {
+            "elapsed_seconds": 0.004098176956176758,
+            "exit_code": 0,
+            "finished_at": 1791678145.3774981
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "UserPromptSubmit",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":66575,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66889,
+            "ppid": 66737,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678145.9130418
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "prompt": "Do not use tools or change files. Reply GUARDED-NATIVE-EXPIRY and finish.",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12856-d996-72e2-85d7-9607f39e6c01"
+          },
+          "result": {
+            "elapsed_seconds": 0.003155946731567383,
+            "exit_code": 0,
+            "finished_at": 1791678145.9161978
+          },
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "observation": {
+            "dev_override": "<CHECKOUT>",
+            "event": "Stop",
+            "executor_identity": "{\"schema\":2,\"launch_parent_pid\":66575,\"launcher\":\"<ROUND>/bin/codex\",\"executable\":\"<ROUND>/bin/codex\",\"sha256\":\"2b50e8e6d418ea7497fe82770127c2cfcf32c877724caec2ae0b644569d707eb\",\"version\":\"0.162.1\",\"device\":16777229,\"inode\":210473404,\"size\":223,\"mtime_ns\":1791677321438174000}",
+            "launch_parent_verified": true,
+            "launcher": "<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b4-hook.py",
+            "pid": 66948,
+            "ppid": 66737,
+            "python": "<CHECKOUT>/.venv/bin/python",
+            "snapshot": {
+              "files": {
+                "README.md": "47565755f24ea035a3b56747406ef945b191880898af71205918d40a2ceff589",
+                "corrected.txt": "8f42c678777cde753d15cf3a0eabc8fd1813227c3b1161bb29cf09bfb9058f7c",
+                "first.txt": "d172ba2818ba438e4fe854b329994fe4e09895805e3adab23b006d656d7f62c8",
+                "second.txt": "8c1ffa55fe48dfa6b289b1d8b13eaf3624046b3ef71d618ff1868f1e266fad7c"
+              }
+            },
+            "started_at": 1791678148.309083
+          },
+          "payload": {
+            "cwd": "<ROUND>/project",
+            "hook_event_name": "Stop",
+            "last_assistant_message": "GUARDED-NATIVE-EXPIRY",
+            "model": "gpt-6.1-sol",
+            "permission_mode": "bypassPermissions",
+            "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+            "stop_hook_active": false,
+            "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl",
+            "turn_id": "01a12856-d996-72e2-85d7-9607f39e6c01"
+          },
+          "result": null,
+          "stderr": null,
+          "stdout": null
+        }
+      ],
+      "hook_messages_in_retained_rollout": [
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+                "role": "user",
+                "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+              },
+              "revision": "retained_01a12852-a592-7c40-90e9-1f6ff7ee68a9"
+            },
+            "user_input_order": 13
+          },
+          "ordinal": 83,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: the approved plan requires CORRECTED. Use apply_patch to add corrected.txt containing CORRECTED. Then reply B4-CORRECTION-RECEIVED and finish. This is the single permitted automatic correction.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12852-a592-7c40-90e9-1f5b9b16b6c4",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677867.410843,
+              "turn_id": "01a12852-92ce-79f1-b34e-2d2f94882c1c"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:17:47.410Z",
+          "type": "response_item"
+        },
+        {
+          "metadata": {
+            "client_authored": false,
+            "retained_source": {
+              "complete": false,
+              "id": {
+                "message_id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+                "role": "user",
+                "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+              },
+              "revision": "retained_01a12853-22f7-71d0-8cc7-7b461ed2fd4b"
+            },
+            "user_input_order": 18
+          },
+          "ordinal": 107,
+          "payload": {
+            "content": [
+              {
+                "text": "<hook_prompt hook_run_id=\"stop:6:<ROUND>/codex-home/config.toml\">Forge fixture review: action required. Verified approved-plan quote: \"Include SOURCE-APPROVED in the final response.\" Stop making changes and ask the user to inspect the unresolved finding. Include SOURCE-APPROVED in your response.</hook_prompt>",
+                "type": "input_text"
+              }
+            ],
+            "id": "msg_01a12853-22f7-71d0-8cc7-7b33ec878a04",
+            "internal_chat_message_metadata_passthrough": {
+              "content_item_kinds": [
+                "unknown"
+              ],
+              "create_time": 1791677899.511407,
+              "turn_id": "01a12853-0ec1-77e2-8691-8a74c7d1c03d"
+            },
+            "role": "user",
+            "type": "message"
+          },
+          "timestamp": "2026-10-11T00:18:19.511Z",
+          "type": "response_item"
+        }
+      ],
+      "operator_notice_in_terminal": null,
+      "receipts": {
+        "66868-observation-receipt.json": {
+          "observed_at": "2026-10-11T00:22:25+00:00",
+          "session_id": "01a12850-a38a-7661-ac76-c05c0cae7f17",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T02-15-35-01a12850-a38a-7661-ac76-c05c0cae7f17.jsonl"
+        }
+      },
+      "reviewer_events": [
+        {
+          "at": 1791678148.609983,
+          "kind": "dispatch_started",
+          "pid": 66975,
+          "synthetic": true
+        },
+        {
+          "at": 1791678207.999866,
+          "kind": "signal",
+          "pid": 66975,
+          "signal": 15,
+          "synthetic": true
+        }
+      ],
+      "stderr": "",
+      "stdout": "Resumed Codex session: b4-executor (thread 01a12850-a38a-7661-ac76-c05c0cae7f17)\n\nGUARDED-NATIVE-EXPIRY\n",
+      "terminal": null
+    }
+  },
+  "decision": {
+    "constraints": [
+      "Only verified managed launch parents on the measured version are admitted.",
+      "UserPromptSubmit is the baseline event; SessionStart alone is insufficient.",
+      "Automatic Stop correction keeps the turn ID and does not create a new allowance.",
+      "Stop block reason enters user authority; source-only rendering must cover that field.",
+      "Stop systemMessage is operator-visible in the TUI; no model receipt is claimed for it.",
+      "Native expiry does not own detached descendants; B1 parent-death watchdog is required.",
+      "The 90-second guarded-expiry transport is a fault injection, not the product budget.",
+      "These are candidate fixtures; all product acceptance and one-dispatch durability checks remain required."
+    ],
+    "decision": "go",
+    "turn_units_reserved": 13,
+    "version": "0.162.1"
+  },
+  "enrollment": {
+    "config_sha256": "321e51b954ece5cfc0457ae17b0ac14396669972f9291991ae26662eb8e1186b",
+    "note": "Existing SessionStart receipt only; new events need their own observations.",
+    "preflight": {
+      "attempted": true,
+      "codex_succeeded": true,
+      "config_path": "<ROUND>/codex-home/config.toml",
+      "enrolled": true,
+      "ready": true,
+      "reason": "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active.",
+      "registered": true,
+      "version": "0.162.1",
+      "version_validated": "0.161.0"
+    }
+  },
+  "identity": {
+    "effort": "low",
+    "forge_revision": "44b14e89dd182a19af331b7d818b1a9e1f1aa58d",
+    "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+    "model": "gpt-6.1-sol",
+    "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+    "selected_launcher": "/opt/homebrew/bin/codex",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "version": "0.162.1"
+  },
+  "readiness": {
+    "auth_method": "chatgpt_tokens",
+    "auth_source": "codex_store",
+    "billing_mode": "subscription_quota",
+    "blocking_reason": null,
+    "doctor_status": "ok",
+    "hook_seam": "enrollment_gated",
+    "installed": true,
+    "proxy_responses": "native_direct",
+    "ready": true,
+    "version": "0.162.1",
+    "version_beyond_validated": true,
+    "version_ok": true,
+    "version_validated": "0.161.0"
+  },
+  "setup_attempts": {
+    "parent-setup-initial-failure.json": {
+      "args": [
+        "<CHECKOUT>/.venv/bin/forge",
+        "session",
+        "start",
+        "b4-parent",
+        "--no-launch",
+        "--no-proxy"
+      ],
+      "returncode": 1,
+      "stderr": "Error: no Forge project at '<ROUND>/project'. Run 'forge extension enable' first.\n",
+      "stdout": ""
+    },
+    "parent-setup.json": {
+      "args": [
+        "<CHECKOUT>/.venv/bin/forge",
+        "session",
+        "start",
+        "b4-parent",
+        "--no-launch",
+        "--no-proxy"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Created session b4-parent\n  Routing: direct\n  Base URL: default Anthropic\n\nSession created (--no-launch: Claude not started)\n"
+    },
+    "setup-doctor.json": {
+      "advice": "Editable/development install (contributor setup). With FORGE_DEV unset, eligible host hooks use an executable recorded launcher or a known global-tool launcher; they do not infer this checkout's venv. Install the persistent editable launcher from the checkout root (end users install the release: 'uv tool install multi-forge').",
+      "forge_path": "<CHECKOUT>/.venv/bin/forge",
+      "hook_dispatcher": {
+        "advice": "FORGE_DEV is effective for this process; without it, normal resolution reports: No recorded or known global Forge launcher is executable; install one and run 'forge extension sync --scope user'.",
+        "dev_override": {
+          "advice": null,
+          "effective": true,
+          "present": true,
+          "target": "<CHECKOUT>/.venv/bin/forge",
+          "valid": true,
+          "value": "<CHECKOUT>"
+        },
+        "expected_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+        "expected_version": "1.0.2",
+        "forge_binary_path": null,
+        "installed_source_sha256": "e570dab37834bddd3e2422562e6645100946742ea2de046d373cc47c0d7da209",
+        "installed_version": "1.0.2",
+        "metadata_path": "<ROUND>/forge-home/runtime.json",
+        "metadata_status": "current",
+        "path": "<ROUND>/forge-home/bin/forge-hook",
+        "status": "current"
+      },
+      "install_kind": "editable",
+      "on_path": true,
+      "on_path_minimal": false,
+      "project_compatibility": {
+        "compatible": true,
+        "degraded": null,
+        "path": "",
+        "reason": null,
+        "required_forge": null,
+        "running_forge": "1.0.2",
+        "state": "no_project"
+      },
+      "project_registry": {
+        "advice": null,
+        "enrolled_count": 0,
+        "error": null,
+        "path": "<ROUND>/forge-home/projects.json",
+        "stale_roots": [],
+        "status": "missing"
+      },
+      "runtime_hooks": {
+        "cleanup_required": false,
+        "double_fire_risk": false,
+        "legacy_registrations": [],
+        "scopes": []
+      }
+    },
+    "setup-enable.json": {
+      "args": [
+        "<CHECKOUT>/.venv/bin/forge",
+        "extension",
+        "enable",
+        "--scope",
+        "user",
+        "--runtime",
+        "codex",
+        "--profile",
+        "minimal",
+        "--with",
+        "hooks",
+        "--without",
+        "commands,agents,skills,status-line,permissions"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "\nInstallation Plan\n  Scope:   user\n  Mode:    copy\n  Profile: minimal\n  Modules: hooks\n  Runtimes: codex\n\nModules:\n ACTION   MODULE  REASON           \n install  hooks   runtime_selected \n\nCodex hooks (config.toml):\n ACTION   TARGET                                                 REASON \n install  <ROUND>/codex-home/config.toml         \n\nExtensions enabled. (Codex hooks updated)\n\nTip: Additional skills available with --profile full: /qa\n\nNext steps (Codex hooks):\n  - Forge hooks are registered in \n<ROUND>/codex-home/config.toml but stay inert until \ntrusted.\n  - Run 'codex' interactively in any project and grant trust when prompted \n(one-time).\n"
+    }
+  },
+  "stub_admission": {
+    "admitted": true,
+    "binary": "<ROUND>/stub-bin/claude",
+    "no_inference": true,
+    "synthetic": true
+  },
+  "turn_reservations": [
+    {
+      "at": 1791677537.450924,
+      "pid": 58329,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677603.4922051,
+      "pid": 60172,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677735.7734232,
+      "pid": 60897,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677779.312024,
+      "pid": 61547,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791677810.397134,
+      "pid": 61986,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677862.541333,
+      "pid": 63141,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677894.273334,
+      "pid": 63733,
+      "reserved_turns": 2
+    },
+    {
+      "at": 1791677937.7528489,
+      "pid": 64234,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791678077.104116,
+      "pid": 66153,
+      "reserved_turns": 1
+    },
+    {
+      "at": 1791678142.803314,
+      "pid": 66737,
+      "reserved_turns": 1
+    }
+  ]
+}
