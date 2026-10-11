@@ -493,6 +493,11 @@ The [new validation record](evidence/review-fixes.md) preserves the original liv
 claim new native compatibility. The user retained the single-login contract; concurrent subscription inference remains
 outside B5.
 
-Review-fix verification: aggregate unit **10,770 passed, 117 deselected**; aggregate regression **1,587 passed**;
-targeted integration **16 passed, 11 legacy native cases deselected**. A clean installed wheel matched all 386 Forge
-Python files and passed offline admission, ownership and CLI smoke checks. No additional native/API starts were used.
+Review-fix verification on `aa86eb5d`: aggregate unit **10,770 passed, 117 deselected**; aggregate regression **1,587
+passed**; targeted integration **16 passed, 11 legacy native cases deselected**. A clean installed wheel matched all 386
+Forge Python files and passed offline admission, ownership and CLI smoke checks. No additional native/API starts were
+used.
+
+CI follow-up: preserve ordinary on/reload prerequisites while retaining native readiness outside the lock. Four added
+regressions forbid ordinary runtime probes and preserve Stop enrollment; 158 targeted tests pass. The wheel evidence was
+refreshed. See the [validation record](evidence/review-fixes.md) and PR #265 for the final aggregate checks.

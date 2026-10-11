@@ -9,7 +9,7 @@ from forge.cli.main import main
 from forge.core.reactive import codex_reviewer_home as reviewer
 from forge.core.reactive.reviewer_runtime import preflight_host_supervisor
 from forge.core.state.lock import file_lock_for_target
-from forge.session.models import CodexConfirmed
+from forge.session.models import CodexConfirmed, PolicyIntent, SupervisorConfig
 from tests.fixtures.native_supervisor import CHILD, synthetic_rows, write_rollout
 from tests.src.cli.test_native_supervisor import configure
 from tests.src.cli.test_native_supervisor import native_setup as native_setup
@@ -90,3 +90,36 @@ def test_long_confirmed_executor_allows_setup_and_launch(native_setup, monkeypat
     assert result.exit_code == 0, result.output
     assert Path(native_setup.read().intent.policy.supervisor.native_source.home) == source_home
     preflight_host_supervisor(native_setup.read())
+
+
+@pytest.mark.parametrize("operation", ["on", "reload"])
+@pytest.mark.parametrize("trigger", ["pre-tool-use", "stop"])
+def test_ordinary_lifecycle_keeps_enrollment_but_does_not_probe_reviewer(native_setup, monkeypatch, operation, trigger):
+    plan = native_setup.manifest_path.parent / "plan.md"
+    plan.write_text("Approved plan.")
+    state = native_setup.read()
+    state.intent.launch.runtime = "codex" if trigger == "stop" else "claude_code"
+    state.intent.policy = PolicyIntent(
+        enabled=True,
+        supervisor=SupervisorConfig(
+            plan_override_path=str(plan),
+            supervisor_model="opus",
+            suspended=True,
+            review_trigger=trigger,
+        ),
+    )
+    native_setup.write(state)
+    monkeypatch.setattr(
+        "forge.core.reactive.reviewer_runtime.preflight_host_supervisor",
+        lambda _: pytest.fail("Ordinary on/reload must not acquire a new runtime prerequisite"),
+    )
+    enrollment = []
+
+    def check_enrollment(**kwargs):
+        with file_lock_for_target(target_path=native_setup.manifest_path, timeout_s=0.05):
+            enrollment.append(True)
+
+    monkeypatch.setattr("forge.core.runtime.codex_turn_enrollment.require_for_launch", check_enrollment)
+    result = CliRunner().invoke(main, ["policy", "supervisor", operation])
+    assert result.exit_code == 0, result.output
+    assert bool(enrollment) == (trigger == "stop")

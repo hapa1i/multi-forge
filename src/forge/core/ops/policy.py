@@ -677,7 +677,15 @@ def _update_ready_supervisor(
     candidate = deepcopy(manifest)
     try:
         mutate(candidate)
-        preflight_host_supervisor(candidate)
+        config = snapshot_supervisor_options(candidate)
+        if config and config.native_source:
+            preflight_host_supervisor(candidate)
+        elif config and config.review_trigger == "stop":
+            # Preserve B4's enrollment gate without adding runtime/auth probes to
+            # ordinary on/reload operations. Native readiness is the B5 opt-in.
+            from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+            require_for_launch(cwd=candidate.worktree.path if candidate.worktree else candidate.forge_root)
 
         def apply(current: SessionState) -> None:
             if current != manifest:

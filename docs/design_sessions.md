@@ -130,8 +130,9 @@ child's copied intent and lane as well as the parent's effective state. No reade
 
 Generic set/reset performs structural validation only, without source/auth reads or reviewer preflight under the session
 lock. Native source bindings must be created through supervisor setup; generic overrides cannot rewrite them. Explicit
-on/reload checks readiness outside the lock and publishes only if the inspected state is unchanged. Disabled policy
-skips reviewer launch preflight, so an unavailable reviewer cannot prevent policy recovery.
+native on/reload checks readiness outside the lock and publishes only if the inspected state is unchanged. Ordinary
+on/reload retains its prior prerequisites, including Stop enrollment. Disabled policy skips reviewer launch preflight,
+so an unavailable reviewer cannot prevent policy recovery.
 
 In schema v2/v3/v4/v5, a present `intent.launch` object must include `model_route`, either `null` or the complete
 neutral route selection:

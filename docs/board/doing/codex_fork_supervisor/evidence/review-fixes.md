@@ -25,9 +25,9 @@ explicit local stub, including two sessions sharing a login and a large TUI exec
 additional API calls are authorized or performed for these fixes. Earlier [product captures](product.md) apply to
 `1b0f01cf`; they do not establish native compatibility of these later paths.
 
-`make test-unit` passed 10,770 tests (117 integration cases deselected). The targeted integration runner passed 16
-tests, with the same 11 legacy native cases explicitly deselected to preserve the closed budget. Deterministic policy
-CLI file and diff inputs both passed against the changed source selector.
+On `aa86eb5d`, `make test-unit` passed 10,770 tests (117 integration cases deselected). The targeted integration runner
+passed 16 tests, with the same 11 legacy native cases explicitly deselected to preserve the closed budget. Deterministic
+policy CLI file and diff inputs both passed against the changed source selector.
 
 `make build` produced a wheel installed into a clean Python 3.13 environment with independently resolved dependencies.
 The [offline wheel report](review-fixes-wheel.json) records matching hashes for all 386 installed Forge Python files,
@@ -38,3 +38,9 @@ The first aggregate regression run passed 1,583 tests and failed four fixture ca
 `policy.enabled=true`, and two new missing-source cases passed a Path instead of a manifest string. Those fixtures were
 corrected, and all 17 tests in the affected files passed on rerun. The final complete `make test-regression` run passed
 all 1,587 tests. PR #265 carries CI results for its exact head; merge and shipped-tree verification remain outstanding.
+
+CI then exposed three ordinary on/reload failures because the new helper also preflighted Claude, adding a prerequisite
+that the local Claude installation masked. The follow-up restricts runtime readiness to native supervision, preserves
+ordinary Stop enrollment outside the session lock, and adds four cases that forbid ordinary runtime probes. The 158-test
+targeted rerun passed, including the exact failed dispatcher tests. The offline wheel report was regenerated for this
+repair. Current aggregate results belong to the exact PR head; the earlier native captures remain unchanged.
