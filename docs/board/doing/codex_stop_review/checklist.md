@@ -328,6 +328,33 @@ inference ran.
 
 ## Product validation
 
+### Attribution and lifecycle review follow-up, 2026-10-11
+
+The first follow-up's synthetic cases did not establish that between-turn edits stayed out of Codex scope or that
+incomplete evidence recovered during ordinary use. The next review reproduced both failures, plus retained journal reuse
+and setup/input defects. This follow-up replaces those overbroad guarantees; the dated evidence below is retained.
+
+- [x] Start each prompt from current checkout context. Carry only through observed endpoints; exclude manual edits,
+  suspended work, commits and Finder metadata introduced between turns. Record unknown newer Stops as missing tracking.
+- [x] Recompute coverage from the current scope. Permit bounded partial review without correction or whole-turn
+  approval, keep omitted scope visibly unreviewed, and let later ordinary edits be reviewed without a reset.
+- [x] Give each session creation a private review owner. Reusing a deleted name in either checkout must preserve old
+  artifacts without importing scope or spending; a stale hook must not mutate the replacement session.
+- [x] Validate the effective merged supervisor configuration before admission and again under the write lock. Resolve
+  accepted plan symlinks consistently; scope-check move sources and destinations; separate unterminated diff lines.
+- [x] Return `carry_limit` from Stop at the cap; describe denied-request removal accurately. Add regressions for real
+  Git commits, `.DS_Store`, manual-edit/question turns, large reads and repeated recovery.
+- [x] Complete the separately authorized eight-unit native round with its own Codex login and local reviewer stub.
+  Record exact helper/product hashes, every attempt and the remaining limits; close only that fixture's credentials.
+- [x] Run aggregate unit/regression, targeted Docker session/hook integration, clean-wheel and full pre-commit checks;
+  publish the follow-up evidence and update PR #263. Keep B4 in `doing/` until merge and closeout.
+
+The [attribution follow-up](evidence/attribution-followup.md) records **10,672 unit tests**, **1,541 regressions**, **60
+targeted integration tests** (one real-inference control deselected), a final recovery integration rerun, **93 focused
+B4/link checks**, full pre-commit and clean-wheel byte/lifecycle verification. Its separate native round closed at eight
+reserved Codex units with four local stub reviews, no API inference, and no recorded process survivors. Product source
+drift after the native run is explicitly listed; older evidence is not relabelled.
+
 ### PR review follow-up, 2026-10-11
 
 The first implementation missed explicit acceptance cases for turns without Stop, bounded recovery from incomplete

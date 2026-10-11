@@ -1,7 +1,8 @@
 # B4 candidate validation
 
-The latest [PR review follow-up](review-followup.md) records the revised implementation's checks. The results below
-belong to the original native candidate and are retained as historical evidence.
+The latest [attribution and lifecycle follow-up](attribution-followup.md) records the revised implementation's checks
+and separate bounded native round. The [first PR review follow-up](review-followup.md) and results below belong to
+earlier candidates and are retained as historical evidence.
 
 Candidate: `c4354a9c48917d874d28a9807ca3fbf3092a0dd5`, 2026-10-11. Evidence publication follows in a separate commit.
 The card remains `doing/` until merge and closeout. See [results and qualifications](README.md).

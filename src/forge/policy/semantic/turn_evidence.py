@@ -221,7 +221,8 @@ def compare(
                 changes.append(change)
                 continue
             change["diff"] = "".join(
-                difflib.unified_diff(
+                (line if line.endswith("\n") else line + "\n\\ No newline at end of file\n")
+                for line in difflib.unified_diff(
                     texts[0].splitlines(keepends=True),
                     texts[1].splitlines(keepends=True),
                     fromfile=path,
@@ -235,8 +236,8 @@ def compare(
         if change.get("kind") == "add" and change["after"].get("digest") in deleted:
             change["renamed_from"] = deleted[change["after"]["digest"]]
     denied = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "denied"}
-    # A denied action has no mutation or PostToolUse to cover. Retain the raw
-    # audit in the journal, but omit both halves from reviewer scope and limits.
+    # A denied action has no mutation or PostToolUse to cover. The checkpoint
+    # writer removes its request; callers with paired rows exclude them here too.
     actions = [row for row in actions if (row.get("turn_id"), row["id"]) not in denied]
     requests = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "request"}
     outcomes = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "outcome"}
@@ -282,6 +283,47 @@ def compare(
     return evidence
 
 
+def rebase_pending(
+    storage: Path,
+    baseline: dict[str, Any],
+    observed: dict[str, Any],
+    current: dict[str, Any],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    """Carry observed changes without importing edits made between observation and the next prompt.
+
+    A pending path changed outside that interval is ambiguous. Its old scope
+    remains unreviewed, while the new prompt starts from its current contents.
+    HEAD and index metadata belong to the new prompt, including intervening commits.
+    """
+    before, end, start = (load(storage, ref) for ref in (baseline, observed, current))
+    omissions = list(start["omissions"]) + list(before["omissions"]) + list(end["omissions"])
+    if any(before[k] != end[k] for k in ("root", "git_dir", "head", "index_digest")):
+        omissions.append("repository_identity_or_index_changed")
+    result = dict(start, files=dict(start["files"]), omissions=sorted(set(omissions)))
+    unattributed = [
+        path
+        for path in sorted(set(end["files"]) | set(start["files"]))
+        if end["files"].get(path) != start["files"].get(path)
+    ]
+    conflicts = []
+    for path in set(before["files"]) | set(end["files"]):
+        left, right = before["files"].get(path), end["files"].get(path)
+        if left == right:
+            continue
+        if start["files"].get(path) != right:
+            conflicts.append(path)
+        elif left is None:
+            result["files"].pop(path, None)
+        else:
+            result["files"][path] = left
+    encoded = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+    sha = hashlib.sha256(encoded).hexdigest()
+    atomic_write_bytes(storage / (sha + ".snapshot"), encoded)
+    (storage / (sha + ".snapshot")).chmod(0o600)
+    reference = dict(current, digest=sha, files=len(result["files"]), omissions=result["omissions"])
+    return reference, unattributed, sorted(conflicts)
+
+
 def prune(storage: Path, references: list[dict[str, Any]]) -> None:
     """Keep only checkpoint-owned snapshots and their blobs, under the capture lock."""
     if not storage.exists():
@@ -320,7 +362,14 @@ def _git_output(root: Path, env: dict[str, str], args: tuple[str, ...], expires:
     # Read incrementally: an adversarial index/path list must not allocate an
     # unbounded subprocess buffer before the snapshot's file limit is applied.
     with subprocess.Popen(
-        ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, *args],
+        [
+            "git",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=" + os.devnull,
+            *args,
+        ],
         cwd=root,
         env=env,
         stdout=subprocess.PIPE,

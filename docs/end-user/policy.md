@@ -324,7 +324,8 @@ forge policy supervisor status --session executor --json
 The subscription-only route requires a verified direct Claude login and disabled account extra usage, as described
 above. The executor and reviewer are separate runtimes. Stop accepts the existing supported reviewer lanes; it does not
 add Codex planner-history lookup. A conversation-backed source must have an approved plan snapshot, which setup resolves
-and saves. An unreadable or oversized plan makes the review unavailable.
+and saves. Setup and reload resolve plan symlinks to their current target; changing the link later does not change the
+saved source. An unreadable or oversized plan makes the review unavailable.
 
 Omitting `--trigger` from `set` preserves the selected trigger; explicitly choose `pre-tool-use` to return to per-edit
 review. Configure the idle executor before its next explicit prompt. Switching modes, changing configuration, or
@@ -334,18 +335,23 @@ Capture uses bounded raw repository bytes before tools and at Stop, including ed
 deletions, renames, mode changes, and recorded tool outcomes. Pre-existing dirty changes are excluded. Forge does not
 stage, stash, run clean/process filters, or write Git objects to capture evidence. The reviewed scope excludes ignored
 files and effects outside the repository; author attribution is not provable when another editor changes the checkout.
-Changed binary, oversized, symlink, or submodule content, a changed HEAD/staged index, missing tool events, or limits
-exceeded make coverage incomplete. They never become a clean whole-turn verdict. Current limits include 6,000 files, 64
-MB per snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB plan, 48 tool-event records, and a 7-second capture
-deadline.
+Changed binary, oversized, symlink, or submodule content, HEAD/staged index changes during a turn, missing tool events,
+or limits exceeded make coverage incomplete. Available evidence can still receive a `partial` review, whose verdict
+neither approves the whole turn nor triggers an automatic correction. Omitted scope remains in `excluded_work` as
+unreviewed; the next explicit turn can be reviewed normally. With no usable evidence, Forge records the exclusion
+without a call. Current limits include 6,000 files, 64 MB per snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB
+plan, 48 tool-event records, and a 7-second capture deadline.
 
 A completed divergent review may request one correction. Codex receives its reason as a user-role hook message; normal
 format attributes reviewer findings, while `source-only` includes verified approved-plan quotations and fixed Forge
 guidance. The correction is consumed before output, so even a lost response cannot be replayed. Further changes remain
-unreviewed and carry into the next explicit turn with their original baseline and provenance. Turns interrupted before
-Stop and changes across native thread boundaries also carry forward. Index stat refreshes and denied actions do not
-create missing-evidence failures. `evaluate` is a separate single-file check and cannot clear that outstanding turn
-state.
+unreviewed and carry into the next explicit turn through the last observed tool outcome or Stop, with bounded
+provenance. Changes between that endpoint and the next prompt, including manual edits or work while supervision is
+suspended, become unattributed context outside correction scope. Status lists these paths separately in
+`unattributed_changes`. An intervening change to a pending path makes that overlap incomplete. A commit between turns
+belongs to the new baseline. Observed work interrupted before Stop can carry across native thread boundaries; an unknown
+Stop records missing tracking as an unreviewed exclusion. Index stat refreshes and denied actions do not create
+missing-evidence failures. `evaluate` is a separate single-file check and cannot clear that outstanding turn state.
 
 Stop notices appear in Codex's operator notices, not the model context. `policy_summary_feedback=off` retains these
 notices and required correction guidance; there is no optional non-blocking model channel for Stop. Inspect
@@ -355,10 +361,13 @@ uncertainty after interruption; `false` means no call was made. Review timeouts 
 whole-hook budget and the registered 60-second Stop timeout. Ten seconds are reserved for completion; shorter remaining
 budgets reduce reviewer time. Returned verdicts are saved before final freshness checks, even when those checks fail.
 
-Private operational state lives under `.forge/artifacts/<session>/review/` and survives telemetry reset. Its bounded
-journal preserves a turn watermark during compaction. Missing or damaged established history refuses review; restore
-those artifacts or start a new managed session. Do not delete them to retry a spent turn. Outstanding scope is bounded
-to 32 turns, after which `carry_limit` requires an explicit reset. An incomplete scope can also be reset earlier:
+Private operational state lives under `.forge/artifacts/<session>/review/<owner>/` and survives telemetry reset. The
+owner is stored in `.forge/sessions/<session>/review-identity`. Recreating a deleted session gets a fresh owner; old
+artifacts stay historical. Its bounded journal preserves a turn watermark during compaction. Missing or damaged owners
+or established history refuse review; restore those files or start a new managed session. Sessions with checkpoints from
+the initial B4 implementation need a new session; their older journal is preserved. Do not delete history to retry a
+spent turn. Outstanding scope is bounded to 32 turns, after which `carry_limit` requires an explicit reset. An
+incomplete scope can also be reset earlier:
 
 ```bash
 forge policy supervisor reset-review --session executor --json

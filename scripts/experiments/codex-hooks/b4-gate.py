@@ -101,7 +101,7 @@ def setup(root: Path) -> None:
     (root / "budget.json").write_text(
         json.dumps(
             {
-                "ceiling": 32,
+                "ceiling": int(os.environ["PROBE_TURN_CEILING"]),
                 "enrollment": 4,
                 "identity_boundary": 6,
                 "product_evidence": 4,
@@ -109,8 +109,9 @@ def setup(root: Path) -> None:
                 "wheel_tui": 4,
                 "correction_continuations": 2,
                 "retries": 8,
-                "real_claude_subscription_review": 1,
-                "real_claude_stage": "only after product implementation",
+                "real_claude_subscription_review": 0,
+                "reviewer": "local admission-compatible stub; real inference requires separate authorization",
+                "allocation_note": "Original gate estimates below do not increase the launcher's hard ceiling.",
                 "api_inference": 0,
             },
             indent=2,

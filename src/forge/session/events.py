@@ -328,7 +328,9 @@ def validate_session_event(
     return validated
 
 
-def get_session_event_journal_path(forge_root: str | Path, session: str, domain: str) -> Path:
+def get_session_event_journal_path(
+    forge_root: str | Path, session: str, domain: str, *, review_id: str | None = None
+) -> Path:
     """Return the contained journal path without creating it."""
     if domain not in SESSION_EVENT_DOMAINS:
         raise SessionEventPathError(f"unsupported session-event domain: {domain!r}")
@@ -345,7 +347,18 @@ def get_session_event_journal_path(forge_root: str | Path, session: str, domain:
     if not resolved_root.is_dir():
         raise SessionEventPathError(f"Forge root is not a directory: {resolved_root}")
 
-    journal = resolved_root / ".forge" / "artifacts" / session / domain / "events.jsonl"
+    directory = resolved_root / ".forge" / "artifacts" / session / domain
+    if domain == "review":
+        from forge.session.store import SessionStore
+
+        owner = review_id or SessionStore(str(resolved_root), session).review_identity()
+        if owner is not None:
+            if len(owner) != 32 or any(c not in "0123456789abcdef" for c in owner):
+                raise SessionEventPathError("invalid Stop review owner")
+            directory = directory / owner
+    elif review_id is not None:
+        raise SessionEventPathError("review owner supplied for a different event domain")
+    journal = directory / "events.jsonl"
     if not journal.is_relative_to(resolved_root):
         raise SessionEventPathError(f"journal path escapes Forge root: {journal}")
     _reject_existing_symlinks(resolved_root, journal)
@@ -413,9 +426,10 @@ def read_session_events(
     payload_validator: SessionEventPayloadValidator | None = None,
     event_validator: SessionEventValidator | None = None,
     max_bytes: int | None = None,
+    review_id: str | None = None,
 ) -> list[SessionEvent]:
     """Read and strictly validate every journal record in append order."""
-    journal = get_session_event_journal_path(forge_root, session, domain)
+    journal = get_session_event_journal_path(forge_root, session, domain, review_id=review_id)
     if not journal.exists():
         return []
     try:
@@ -477,6 +491,7 @@ def update_review_checkpoint(
     *,
     payload_validator: SessionEventPayloadValidator,
     timeout_s: float = 1.0,
+    review_id: str | None = None,
 ) -> SessionEvent | None:
     """Conditionally reserve/update review state under one domain lock.
 
@@ -486,7 +501,7 @@ def update_review_checkpoint(
     makes a missing established journal an error instead of a fresh allowance.
     No callback may dispatch inference or acquire the general session lock.
     """
-    journal = get_session_event_journal_path(forge_root, session, "review")
+    journal = get_session_event_journal_path(forge_root, session, "review", review_id=review_id)
     root = Path(forge_root).expanduser().resolve(strict=True)
     _ensure_journal_directories(root, journal.parent)
     marker = journal.with_name("checkpoint-established")
@@ -501,6 +516,7 @@ def update_review_checkpoint(
             "review",
             payload_validator=payload_validator,
             max_bytes=2_000_000,
+            review_id=review_id,
         )
         previous = records[-1] if records else None
         if journal.exists() and previous is None:

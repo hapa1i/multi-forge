@@ -122,10 +122,19 @@ def render_stop_feedback(outcome: StopOutcome, *, source_only: bool, model_feedb
         "no_changes": "Forge Stop review skipped: no changes or outstanding work in the captured scope.",
         "unreviewed": "Forge Stop review is stale or has unreviewed continuation changes.",
         "incomplete": "Forge Stop review incomplete; this turn's review allowance is spent.",
+        "partial": "Forge reviewed only the available evidence. Omitted work remains unreviewed; no correction was requested.",
     }.get(outcome.status, "Forge Stop review unavailable; work is unreviewed.")
     if outcome.correction:
         title = "Forge requested one correction; the result and subsequent changes remain unreviewed."
-    if outcome.status != "reviewed":
+    if outcome.reason == "carry_limit":
+        title += (
+            " Pending work reached the carry limit. Preview forge policy supervisor reset-review before excluding it."
+        )
+    elif outcome.reason in {"incomplete_evidence", "missing_turn_start"}:
+        title += " Inspect supervisor status for excluded scope. A new explicit turn reviews new work, not the excluded history."
+    elif outcome.reason == "new_explicit_turn_required":
+        title += " Submit a new explicit turn to start after the requested reset."
+    elif outcome.status not in {"reviewed", "no_changes"}:
         title += " Submit a new explicit turn to assess outstanding work; inspect supervisor status for unavailable evidence."
     wire["systemMessage"] = _channel(findings, title, OPERATOR_BYTES, source_only=False, operator=True)
     serialized = _json(wire)

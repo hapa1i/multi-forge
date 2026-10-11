@@ -1809,7 +1809,7 @@ class TestGuardSupervisorToggle:
         assert updated.intent.policy.supervisor is not None
         assert updated.intent.policy.supervisor.plan_override_path == str(plan.resolve())
 
-    def test_reload_absolute_symlink_path_is_stored_as_provided(
+    def test_reload_absolute_symlink_path_stores_the_readable_source(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         store = _make_supervised_session(tmp_path, monkeypatch)
@@ -1829,8 +1829,8 @@ class TestGuardSupervisorToggle:
         updated = store.read()
         assert updated.intent.policy is not None
         assert updated.intent.policy.supervisor is not None
-        assert updated.intent.policy.supervisor.plan_override_path == str(symlink_plan)
-        assert updated.intent.policy.supervisor.plan_override_path != str(real_plan.resolve())
+        # Plan admission and O_NOFOLLOW review reads must agree on the source.
+        assert updated.intent.policy.supervisor.plan_override_path == str(real_plan.resolve())
 
     def test_reload_extra_args_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_supervised_session(tmp_path, monkeypatch)

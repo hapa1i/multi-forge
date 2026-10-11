@@ -92,6 +92,7 @@ def test_missing_baseline_or_partial_tools_spend_no_call(tmp_path: Path, monkeyp
     call = Mock()
     monkeypatch.setattr(review, "run_supervisor_check", call)
     assert run(ctx).status == "unavailable"
+    ctx = replace(ctx, turn_id="01900001-0000-7000-8000-000000000002")
     review.begin_turn(ctx, deadline=deadline())
     review.record_action(ctx, {"id": "missing-post", "phase": "request", "turn_id": ctx.turn_id})
     assert run(ctx).reason == "incomplete_evidence"

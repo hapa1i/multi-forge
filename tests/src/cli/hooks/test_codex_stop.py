@@ -15,28 +15,20 @@ from forge.cli.hooks import hooks
 from forge.policy.semantic import stop_review
 from forge.policy.semantic.supervisor import SupervisorRun
 from forge.policy.types import PolicyDecision, VerifiedCitation, Violation
-from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import CodexConfirmed, LaunchIntent, PolicyIntent
-from tests.fixtures.session_state import publish_session
+from forge.session import SessionStore
 from tests.fixtures.stop_review import context
 
 
 @pytest.fixture
 def managed(tmp_path: Path, monkeypatch):
-    ctx = context(tmp_path)
     monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    ctx = context(tmp_path)
     monkeypatch.setenv("FORGE_SESSION", ctx.session)
     monkeypatch.setenv("FORGE_FORGE_ROOT", str(ctx.forge_root))
     monkeypatch.setenv("FORGE_CODEX_EXECUTOR_IDENTITY", "{}")
     monkeypatch.setattr(hook_module, "stop_review_supported", lambda env: True)
     monkeypatch.setattr(hook_module.codex_turn_enrollment, "verified", lambda identity=None: True)
     monkeypatch.setattr(hook_module.codex_turn_enrollment, "observe", lambda data: False)
-    state = create_session_state(ctx.session, worktree_path=str(ctx.checkout))
-    state.forge_root = str(ctx.forge_root)
-    state.intent.launch = LaunchIntent(runtime="codex")
-    state.confirmed.codex = CodexConfirmed(thread_id=ctx.thread_id)
-    state.intent.policy = PolicyIntent(enabled=True, bundles=[], supervisor=ctx.config)
-    publish_session(IndexStore(), state, ctx.checkout)
     return ctx
 
 

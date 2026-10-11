@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast, get_args
@@ -199,13 +200,6 @@ def supervisor_set(
             validate_timeout(timeout_seconds, trigger=selected_trigger)
         except ValueError as exc:
             raise SupervisorInputError(str(exc)) from exc
-    if selected_trigger == "stop":
-        from forge.core.runtime.codex_turn_enrollment import require_for_launch
-
-        try:
-            require_for_launch(cwd=manifest.worktree.path if manifest.worktree else manifest.forge_root)
-        except ValueError as exc:
-            raise SupervisorInputError(str(exc)) from exc
     checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
 
     if not target and plan is None:
@@ -335,18 +329,52 @@ def supervisor_set(
             checker_effort=checker_effort,
         )
 
+    replacements = tuple(
+        name
+        for name, value in (
+            ("timeout_seconds", timeout_seconds),
+            ("checker_model", checker_model),
+            ("checker_provider", checker_provider),
+            ("checker_effort", checker_effort),
+            ("review_trigger", review_trigger),
+        )
+        if value is not None
+    )
+
+    def replacement_config(state: SessionState) -> SupervisorConfig:
+        candidate = deepcopy(state)
+        supervisor_semantic.apply_supervisor_to_intent(candidate, deepcopy(sup_config), replace_overrides=replacements)
+        effective_config = snapshot_supervisor_options(candidate)
+        if effective_config is None:
+            raise ValueError("Supervisor replacement has no effective configuration")
+        validate_stop_executor(
+            effective_config,
+            runtime=session_runtime(candidate),
+            sidecar=_is_sidecar(candidate),
+        )
+        validate_reviewer(effective_config, selected_lane)
+        return effective_config
+
     try:
-        validate_reviewer(sup_config, selected_lane)
+        validated_config = replacement_config(manifest)
         from forge.policy.semantic.identity import validate_sidecar_supervisor
 
-        validate_sidecar_supervisor(sup_config, sidecar=_is_sidecar(manifest))
+        validate_sidecar_supervisor(validated_config, sidecar=_is_sidecar(manifest))
+        if validated_config.review_trigger == "stop":
+            from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+            if not validated_config.plan_override_path:
+                raise ValueError("Stop review requires an approved plan snapshot")
+            require_for_launch(cwd=manifest.worktree.path if manifest.worktree else manifest.forge_root)
         if not _is_sidecar(manifest):
             from forge.core.reactive.reviewer_runtime import (
                 preflight_supervisor_runtime,
             )
 
             preflight_supervisor_runtime(
-                sup_config, selected_lane, cwd=manifest.worktree.path if manifest.worktree else None
+                validated_config,
+                selected_lane,
+                cwd=manifest.worktree.path if manifest.worktree else None,
             )
         else:
             from forge.runtime_config import get_runtime_config
@@ -369,27 +397,23 @@ def supervisor_set(
         supervisor_proxy = resolved_proxy_id
 
         sup_config.proxy = supervisor_proxy
+        validated_config.proxy = supervisor_proxy
         routing_display = supervisor_proxy
 
     def _apply(m: SessionState) -> None:
         check_frozen(m)
-        validate_sidecar_supervisor(sup_config, sidecar=_is_sidecar(m))
-        validate_stop_executor(sup_config, runtime=session_runtime(m), sidecar=_is_sidecar(m))
-        replacements = tuple(
-            name
-            for name, value in (
-                ("timeout_seconds", timeout_seconds),
-                ("checker_model", checker_model),
-                ("checker_provider", checker_provider),
-                ("checker_effort", checker_effort),
-                ("review_trigger", review_trigger),
-            )
-            if value is not None
-        )
+        try:
+            current_config = replacement_config(m)
+            validate_sidecar_supervisor(current_config, sidecar=_is_sidecar(m))
+            if (
+                current_config != validated_config
+                or m.worktree != manifest.worktree
+                or m.forge_root != manifest.forge_root
+            ):
+                raise ValueError("Supervisor configuration changed during setup; repeat the set command")
+        except ValueError as exc:
+            raise SupervisorInputError(str(exc)) from exc
         supervisor_semantic.apply_supervisor_to_intent(m, sup_config, replace_overrides=replacements)
-        effective_supervisor = snapshot_supervisor_options(m)
-        if effective_supervisor:
-            validate_reviewer(effective_supervisor, selected_lane)
         if lane_record is not None:
             set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
             clear_supervisor_degrade(m)
@@ -649,7 +673,10 @@ def _has_configured_supervisor(manifest: SessionState) -> bool:
 
 
 def _validated_plan_path(path: str | Path) -> str:
-    resolved = Path(path).expanduser().absolute()
+    try:
+        resolved = Path(path).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SupervisorPlanFileNotFoundError(f"Plan file cannot be resolved: {path}") from exc
     if not resolved.is_file():
         raise SupervisorPlanFileNotFoundError(f"Plan file not found or not a regular file: {resolved}")
     try:

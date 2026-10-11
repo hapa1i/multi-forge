@@ -132,3 +132,8 @@ pass; operational journal state caps dispatch and correction independently of te
 changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the checks and measured limits
 for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). B4 stays `doing/` until merge; B5 remains proposed and
 adds no authority to the Stop reason.
+
+The [attribution follow-up](../codex_stop_review/evidence/attribution-followup.md) adds a separate eight-unit native
+round: between-turn manual changes remain unattributed, a large read gets a partial review, and the next ordinary edit
+receives a complete review. Partial verdicts cannot correct omitted work. Recreated sessions receive a new journal owner
+while retained artifacts stay historical.

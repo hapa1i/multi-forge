@@ -95,7 +95,10 @@ immutable evidence references and correction consumption. It survives telemetry 
 usage cannot grant another review. Status and activity expose its current `turn_review` independently of the selected
 telemetry window, with unknown dispatch kept distinct from zero dispatch. The reviewer transport emits usage once;
 checkpoint writes add no model-call or cost events. See
-[Stop review ownership](design_session_execution.md#i2a-codex-stop-review).
+[Stop review ownership](design_session_execution.md#i2a-codex-stop-review). The journal belongs to a random
+session-creation owner, so retained artifacts never become a recreated session's live state. `unattributed_changes`
+describes between-turn context outside correction scope; `excluded_work` retains gaps as unreviewed after partial
+reviews and operator resets. Later complete reviews do not approve those historical exclusions.
 
 **Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
 to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens

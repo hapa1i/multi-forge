@@ -1,7 +1,9 @@
 # B4 Stop-review evidence — 2026-10-11
 
-The [PR review follow-up](review-followup.md) records the recovery, enrollment, completion and inactive-hook fixes,
-their regression coverage and clean-wheel verification. It did not repeat the closed native round below.
+The [attribution and lifecycle follow-up](attribution-followup.md) supersedes the first follow-up's carry and recovery
+claims and records the separately authorized native check. The [first PR review follow-up](review-followup.md) records
+the recovery, enrollment, completion and inactive-hook fixes, their regression coverage and clean-wheel verification. It
+did not repeat the closed native round below.
 
 The original opt-in product and installed-wheel controls passed on **Codex 0.162.1**. Candidate `c4354a9c` provides a
 durable one-review allowance per explicit turn, one consumed correction, and visible outstanding work after the

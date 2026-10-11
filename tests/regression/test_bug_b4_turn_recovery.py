@@ -42,8 +42,8 @@ def test_changes_after_approval_without_followup_stop_are_carried(tmp_path: Path
     monkeypatch.setattr(review, "run_supervisor_check", call)
     assert run(ctx).status == "reviewed"
     review.record_action(ctx, {"id": "later", "phase": "request", "turn_id": ctx.turn_id})
-    review.record_action(ctx, {"id": "later", "phase": "outcome", "turn_id": ctx.turn_id})
     (ctx.checkout / "work.txt").write_text("later change\n")
+    review.record_action(ctx, {"id": "later", "phase": "outcome", "turn_id": ctx.turn_id})
     later = replace(ctx, turn_id="01900001-0000-7000-8000-000000000002")
     review.begin_turn(later, deadline=deadline())
     assert run(later).status == "reviewed"
@@ -54,13 +54,13 @@ def test_changes_after_approval_without_followup_stop_are_carried(tmp_path: Path
 def test_carry_limit_remains_readable_and_reset_preserves_spending(tmp_path: Path, monkeypatch) -> None:
     ctx = context(tmp_path)
     changed(ctx)
-    review.record_action(ctx, {"id": "missing", "phase": "request", "turn_id": ctx.turn_id})
-    assert run(ctx).reason == "incomplete_evidence"
+    # No Stop completes any of these prompts; the observed work remains pending.
     for number in range(2, 36):
         later = replace(ctx, turn_id=f"01900001-0000-7000-8000-{number:012x}")
         review.begin_turn(later, deadline=deadline())
     status = review.status(ctx.forge_root, ctx.session)
     assert status["reason"] == "carry_limit"
+    assert run(later).reason == "carry_limit"
     assert status["reset_required"] is True
     assert len(status["provenance_turns"]) <= review.MAX_PROVENANCE_TURNS
     preview = review.reset_review(ctx.forge_root, ctx.session)
@@ -91,8 +91,9 @@ def test_no_dispatch_is_false_until_reservation(tmp_path: Path) -> None:
     assert review.status(ctx.forge_root, ctx.session)["dispatched"] is False
 
 
-def test_dropped_action_limit_remains_incomplete_until_explicit_reset(
+def test_dropped_action_limit_remains_explicit_in_partial_review(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     ctx = context(tmp_path)
     review.begin_turn(ctx, deadline=deadline())
@@ -106,11 +107,18 @@ def test_dropped_action_limit_remains_incomplete_until_explicit_reset(
             },
         )
     changed_config = replace(ctx, config=replace(ctx.config, timeout_seconds=12))
-    review.record_action(changed_config, {"id": "config-change", "phase": "request", "turn_id": ctx.turn_id})
+    review.record_action(
+        changed_config,
+        {"id": "config-change", "phase": "request", "turn_id": ctx.turn_id},
+    )
     later = replace(changed_config, turn_id="01900001-0000-7000-8000-000000000002")
     review.begin_turn(later, deadline=deadline())
+    call = Mock(return_value=SupervisorRun(PolicyDecision("deny", "semantic.supervisor"), run_ok=True, parsed=True))
+    monkeypatch.setattr(review, "run_supervisor_check", call)
     assert run(later).reason == "incomplete_evidence"
     assert "action_limit" in review.status(ctx.forge_root, ctx.session)["coverage"]["omissions"]
+    assert review.status(ctx.forge_root, ctx.session)["state"] == "partial"
+    assert not run(later).correction
 
 
 def test_reviewer_depth_refusal_is_known_no_dispatch(tmp_path: Path, monkeypatch) -> None:
@@ -129,7 +137,10 @@ def test_codex_readiness_refusal_is_known_no_dispatch(tmp_path: Path, monkeypatc
     from forge.policy.types import ActionContext
 
     ctx = context(tmp_path)
-    monkeypatch.setattr("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight", lambda: None)
+    monkeypatch.setattr(
+        "forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight",
+        lambda: None,
+    )
     with pytest.raises(supervisor._SupervisorRoutingError) as failure:
         supervisor._dispatch_codex_supervisor(
             prompt="unused",

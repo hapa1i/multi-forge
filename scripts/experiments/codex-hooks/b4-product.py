@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from forge.session.events import get_session_event_journal_path
+
 SCRIPTS = Path(__file__).resolve().parent
 GATE = runpy.run_path(str(SCRIPTS / "b4-gate.py"))
 
@@ -57,7 +59,7 @@ def retain_product(root: Path, capture: Path, forge: str, session: str) -> None:
     ):
         result = subprocess.run([forge, *args], cwd=root / "project", capture_output=True, text=True, timeout=30)
         (capture / (name + ".json")).write_text(json.dumps(vars(result), default=str, indent=2))
-    journal = root / "project/.forge/artifacts" / session / "review/events.jsonl"
+    journal = get_session_event_journal_path(root / "project", session, "review")
     if journal.exists():
         shutil.copy2(journal, capture / "review-events.jsonl")
     proof = root / "forge-home/runtime/codex-stop-enrollment.json"
@@ -132,7 +134,7 @@ def main() -> int:
             (root / (args.session + "-fresh-policy.json")).write_text(result.stdout)
             fresh = json.loads(result.stdout)["supervisor"]
             assert fresh is None or not fresh["configured"]
-            assert not (root / "project/.forge/artifacts" / args.session / "review/events.jsonl").exists()
+            assert not get_session_event_journal_path(root / "project", args.session, "review").exists()
         configure(root, forge, session=args.session, timeout=args.timeout)
         return 0
     if not args.label:

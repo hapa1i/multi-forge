@@ -7,7 +7,9 @@ import time
 from pathlib import Path
 
 from forge.policy.semantic.stop_review import TurnContext, begin_turn, record_action
-from forge.session.models import SupervisorConfig
+from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.models import CodexConfirmed, PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 THREAD = "01900000-0000-7000-8000-000000000001"
 
@@ -29,14 +31,23 @@ def context(tmp_path: Path, *, turn: int = 1, name: str = "executor") -> TurnCon
         git(root, "commit", "-qm", "baseline")
     plan = tmp_path / "approved.md"
     plan.write_text("Keep the work small and correct.\n")
+    config = SupervisorConfig(review_trigger="stop", plan_override_path=str(plan), direct=True)
+    store = SessionStore(str(root), name)
+    if not store.exists():
+        state = create_session_state(name, worktree_path=str(root), runtime="codex")
+        state.forge_root = str(root)
+        state.confirmed.codex = CodexConfirmed(thread_id=THREAD)
+        state.intent.policy = PolicyIntent(enabled=True, bundles=[], supervisor=config)
+        publish_session(IndexStore(), state, root)
     return TurnContext(
         root,
         name,
         root,
         THREAD,
         f"01900001-0000-7000-8000-{turn:012x}",
-        SupervisorConfig(review_trigger="stop", plan_override_path=str(plan), direct=True),
+        config,
         None,
+        store.review_identity(create=True) or "",
     )
 
 
@@ -48,6 +59,8 @@ def changed(ctx: TurnContext, text: str = "changed\n", *, start: bool = True) ->
     if start:
         begin_turn(ctx, deadline=deadline())
     for phase in ("request", "outcome"):
+        if phase == "outcome":
+            (ctx.checkout / "work.txt").write_text(text)
         record_action(
             ctx,
             {
@@ -58,4 +71,3 @@ def changed(ctx: TurnContext, text: str = "changed\n", *, start: bool = True) ->
                 "paths": ["work.txt"],
             },
         )
-    (ctx.checkout / "work.txt").write_text(text)

@@ -22,6 +22,7 @@ def main() -> int:
     parser.add_argument("--prompts-json", type=Path)
     parser.add_argument("--initial-turns", type=int, default=0)
     parser.add_argument("--after-initial-command-json", type=Path)
+    parser.add_argument("--before-prompts-commands-json", type=Path)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -41,6 +42,11 @@ def main() -> int:
     prompts = json.loads(args.prompts_json.read_text()) if args.prompts_json else []
     if args.prompt_file:
         prompts.append(args.prompt_file.read_text())
+    before_prompts = (
+        json.loads(args.before_prompts_commands_json.read_text()) if args.before_prompts_commands_json else []
+    )
+    if before_prompts and len(before_prompts) != len(prompts):
+        raise ValueError("Supply one optional operator command for each explicit prompt")
     prompt_count = 0
     completed_count = 0
     initial_configured = args.after_initial_command_json is None
@@ -113,6 +119,17 @@ def main() -> int:
                 and next_prompt_at is not None
                 and time.monotonic() > next_prompt_at
             ):
+                if before_prompts and before_prompts[prompt_count]:
+                    result = subprocess.run(
+                        before_prompts[prompt_count],
+                        capture_output=True,
+                        text=True,
+                        timeout=45,
+                    )
+                    (capture / f"before-prompt-{prompt_count + 1}.json").write_text(
+                        json.dumps(vars(result), default=str, indent=2)
+                    )
+                    result.check_returncode()
                 os.write(
                     terminal,
                     b"\x1b[200~" + prompts[prompt_count].encode() + b"\x1b[201~",

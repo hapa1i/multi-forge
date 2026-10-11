@@ -18,8 +18,10 @@ def file_hash(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def prepare(root: Path) -> None:
+def prepare(root: Path, *, turn_ceiling: int = 32) -> None:
     """Retain the installed package and create a clean, independently authenticated launcher."""
+    if not 1 <= turn_ceiling <= 32:
+        raise ValueError("Turn ceiling must be between 1 and 32")
     root = root.absolute()
     if root.resolve() != root or root.exists():
         raise ValueError("Choose a new canonical round directory; preparation never resets existing state.")
@@ -107,7 +109,7 @@ def prepare(root: Path) -> None:
         "PROBE_LAUNCHER": str(root / "run"),
         "PROBE_CONTROL": str(root / "control.json"),
         "PROBE_RUNTIME_IDENTITY": str(root / "identity.json"),
-        "PROBE_TURN_CEILING": "32",
+        "PROBE_TURN_CEILING": str(turn_ceiling),
         "XDG_CACHE_HOME": str(root / "cache"),
         # Observation only: exact hook streams, provenance and ephemeral enrollment receipts.
         "PYTHONPATH": str(scripts / "b4_instrumentation"),
@@ -160,9 +162,10 @@ def prepare(root: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
+    parser.add_argument("--turn-ceiling", type=int, default=32)
     args = parser.parse_args()
     try:
-        prepare(args.root)
+        prepare(args.root, turn_ceiling=args.turn_ceiling)
     except (OSError, ValueError) as exc:
         parser.exit(1, f"{exc}\n")
 

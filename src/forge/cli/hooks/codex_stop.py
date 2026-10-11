@@ -108,6 +108,7 @@ def resolve_context(data: dict[str, Any]) -> tuple[stop_review.TurnContext, Sess
         data.get("turn_id", ""),
         sup,
         read_bound_lane(state, SUPERVISOR_CONSUMER),
+        store.review_identity(create=True) or "",
     )
     return context, store
 
@@ -186,7 +187,7 @@ def _action(data: dict[str, Any], phase: str, context: stop_review.TurnContext) 
         if not ops:
             action["coverage_issue"] = "malformed_patch_evidence"
         else:
-            paths = [op.path for op in ops]
+            paths = [value for op in ops for value in (op.source_path, op.path) if value is not None]
             action["paths"] = []
             for value in paths:
                 path = (context.checkout / value).resolve()

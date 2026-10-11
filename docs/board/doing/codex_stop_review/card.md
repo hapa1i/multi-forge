@@ -13,7 +13,10 @@ checks and measured limits for [PR #263](https://github.com/hapa1i/multi-forge/p
 merge and closeout.
 
 The [PR review follow-up](evidence/review-followup.md) adds explicit recovery for interrupted/incomplete turns,
-preserves enrollment receipts, reserves completion time, and avoids full CLI startup for inactive turn hooks.
+preserves enrollment receipts, reserves completion time, and avoids full CLI startup for inactive turn hooks. The
+[attribution follow-up](evidence/attribution-followup.md) corrects that first follow-up's carry guarantees: manual
+between-turn edits stay outside correction scope, partial reviews preserve gaps without disabling later reviews, and
+session-name reuse cannot import old operational state. It includes a separate eight-unit native round.
 
 Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
 changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit
@@ -101,7 +104,9 @@ not make plan-event availability or agent plan text an approval prerequisite.
 The tested trigger is opt-in, host Codex 0.162.1 only, with separate empirical receipts for the required event set.
 Ordinary manifests retain v2/v3 encoding; a stored non-default trigger uses v4. The session review journal owns spending
 and survives telemetry reset. One divergent review can request one source-aware correction; later changes carry to the
-next explicit turn and remain visibly unreviewed until that exact snapshot is assessed.
+next explicit turn only through observed tool/Stop boundaries. Between-turn edits remain unattributed. Partial reviews
+retain omissions as unreviewed exclusions and cannot issue corrections; subsequent turns can review their own work.
+Session creation assigns a fresh journal owner, preserving deleted-session artifacts as history.
 
 B5 can reuse B4's approved-plan snapshot and reviewer-lane contract without inheriting another session's allowance. The
 native Codex child path still creates fresh supervisor policy. Stop's block reason carries user authority, so B3's

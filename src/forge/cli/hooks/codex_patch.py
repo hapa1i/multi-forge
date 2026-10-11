@@ -48,6 +48,7 @@ class PatchFileOp:
     move_to: str | None
     added_content: str  # introduced lines ("" for delete)
     raw_section: str  # verbatim header + body (raw_diff source)
+    source_path: str | None = None
 
 
 @dataclass
@@ -65,6 +66,7 @@ class _Section:
             move_to=self.move_to,
             added_content="" if self.kind == "delete" else _extract_codex_added_lines(self.body),
             raw_section="\n".join(self.header_lines + self.body),
+            source_path=self.path if self.move_to else None,
         )
 
 

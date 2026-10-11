@@ -333,22 +333,33 @@ watermark; repeated or stale turn-start delivery cannot reset spending. Automati
 native turn ID. Captured scope is the raw repository delta and observed tool requests/outcomes, not arbitrary external
 effects or proven authorship. Missing events, changed repository identity, unsupported changed files and exceeded bounds
 refuse a complete review. Tool outcomes preserve edit/revert activity even when the final net diff is empty. Ordinary
-dirty starting work is excluded; unreviewed continuation work keeps its original baseline and bounded turn provenance.
-An unfinished turn or native thread change carries outstanding work rather than adopting it into the next baseline.
-Index stat-cache refreshes do not change repository identity; staged object/mode/path changes do. Denied requests have
-no tool outcome or changed-path obligation. Lost action evidence and incomplete scope remain explicit carry omissions.
-After 32 pending turns carry stops with `carry_limit`, preserving a valid checkpoint. The operator can preview/apply
+dirty starting work is excluded. The next prompt snapshots the current checkout; changes since the previous observed
+tool outcome or Stop are unattributed context, outside any correction. Pending work carries only through that observed
+endpoint. Its baseline is rebased onto the current checkout, preserving intervening files and Git metadata. If an
+operator also changes a pending path, the old scope is explicitly excluded and the overlap becomes a coverage gap. An
+unfinished observed turn can carry across native thread changes; a thread change alone does not imply pending work. An
+unknown newer Stop records a missing-start exclusion without inventing a baseline or spending a reviewer call. Index
+stat-cache refreshes do not change repository identity; staged object/mode/path changes do. Denied requests have no tool
+outcome or changed-path obligation. Coverage is recomputed for the current net delta and observed actions. Bounded
+available evidence may receive a `partial` review; its verdict cannot approve omitted work or deliver a correction.
+Partial scope is recorded as unreviewed in `excluded_work`, then later prompts start their own scope. An unreviewable
+gap is excluded without a call. Lost requests/outcomes and edit/revert activity remain explicit evidence. After 32
+pending turns carry stops with `carry_limit`, preserving a valid checkpoint. The operator can preview/apply
 `forge policy supervisor reset-review [--yes]`: it retains the watermark and current spending, records excluded scope as
 unreviewed, and takes a fresh baseline only on a later explicit prompt. Reset exclusions remain visible in status.
 
-The `review` session-event domain stores complete private checkpoints under its own lock. Reservation writes the attempt
-ID, config/lane/plan/evidence identities and spent bit before releasing the lock and calling B1. Inference never holds a
-session or review lock. A crash after reservation remains spent even if dispatch never began. Atomic compaction retains
-the full latest watermark. Initial publication writes the journal before its marker; a crash leaves a complete
-checkpoint, and a later writer can complete marker creation without losing spending. A marker with missing journal still
-refuses review. Other event domains and telemetry have independent lifetimes; resetting diagnostic attempts never resets
-this allowance. Snapshots use immutable content-addressed private blobs with bounded storage and checkpoint-owned
-pruning.
+Session creation writes a random owner to `.forge/sessions/<name>/review-identity`; the `review` event domain stores
+complete private checkpoints under `.forge/artifacts/<name>/review/<owner>/`, with its own lock. Deletion preserves
+historical artifacts; recreating the same name gets a fresh owner, even in the same second or a different checkout.
+Existing sessions with no review history acquire an owner on first use. Missing owners with history and older checkpoint
+schemas fail closed: restore the owner/history or start a new session. Old hooks cannot write to a replacement session.
+Reservation writes the attempt ID, config/lane/plan/evidence identities and spent bit before releasing the lock and
+calling B1. Inference never holds a session or review lock. A crash after reservation remains spent even if dispatch
+never began. Atomic compaction retains the full latest watermark. Initial publication writes the journal before its
+marker; a crash leaves a complete checkpoint, and a later writer can complete marker creation without losing spending. A
+marker with missing journal still refuses review. Other event domains and telemetry have independent lifetimes;
+resetting diagnostic attempts never resets this allowance. Snapshots use immutable content-addressed private blobs with
+bounded storage and checkpoint-owned pruning.
 
 Completion first saves the returned verdict, then rechecks checkout evidence, plan and effective configuration. A failed
 freshness check leaves that verdict as audit evidence. Stale results remain historical evidence and cannot request a
