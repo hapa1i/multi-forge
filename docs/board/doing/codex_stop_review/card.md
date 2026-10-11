@@ -1,14 +1,28 @@
 # Once-per-turn Stop review
 
 Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
-[B1: plan-file supervision](../../done/plan_file_supervision/card.md) and
-[B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
+[B1: plan-file supervision](../../done/plan_file_supervision/card.md),
+[B2: Codex runtime test round](../../done/codex_0160_validation/card.md), and
+[B3: bounded, source-aware feedback](../../done/codex_policy_warnings/card.md); all have shipped.
+
+Activated 2026-10-11 on `codex/codex-stop-review` from published `main` at `897ed95c` (B3 closeout). The
+[execution checklist](checklist.md) records the implementation plan and fresh runtime gates. Implementation and live B4
+probes have not started.
+
+Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
+changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit
+sessions retain compatible v2/v3 serialization. Codex children use `session start --runtime codex --resume-from`, with
+their supervisor configured explicitly; incompatible inherited Stop mode is refused before child creation or inference.
 
 ## Problem and outcome
 
 Per-edit supervision can consume substantial quota and interrupt execution repeatedly. Add an opt-in review at the end
 of a Codex turn, using B1's configured supervisor and approved plan. The ordinary budget is at most one supervisor
 review per user-initiated turn, including its automatic continuations.
+
+Count actual frontier model dispatches, including uncertain dispatch outcomes. Stop mode excludes per-edit semantic
+checks, cascade, and shadow sampling so the one-review cap is meaningful. Default per-edit supervision remains
+available.
 
 This matches the maintainer's manual review habit. It reviews changes that have already happened; it cannot prevent an
 edit from landing or roll it back. Deterministic PreToolUse enforcement remains independent.
@@ -31,7 +45,11 @@ edit from landing or roll it back. Deterministic PreToolUse enforcement remains 
   registered timeout; do not reuse the PreToolUse limit without an explicit choice.
 - Deliver findings through the tested Stop response. A requested correction may continue Codex, but must not create an
   automatic review loop. If the continuation changes files after the reviewed snapshot, mark those changes unreviewed;
-  the next explicit user turn or manual review can request a new assessment. Do not reuse an old allow for new work.
+  the next explicit user turn includes outstanding changes in its review scope. A single-file manual review does not
+  clear whole-turn status. Do not reuse an old allow for new work.
+- Preserve B3's Codex source-only preference, finding provenance, and bounded presentation in Stop feedback, including
+  its user-authority block reason. B3's PreToolUse response shape and version admission do not establish Stop delivery;
+  verify that separately. Full reviewer wording remains durable evidence under the existing source-only contract.
 - Timeouts, exhausted quota, missing evidence and interrupted reviews remain visible as unavailable or incomplete. Keep
   the existing supervisor failure policy; never label a skipped review successful. Background informational delivery is
   an alternative only where it meets the chosen feedback contract, not a way to enforce Stop decisions. Use B1's durable
@@ -39,8 +57,9 @@ edit from landing or roll it back. Deterministic PreToolUse enforcement remains 
 
 ## Acceptance and validation
 
-- Several edits in one user turn produce one semantic supervisor invocation; no-change turns and recursive hook
-  execution produce none. Repeated Stop and automatic correction events preserve the call cap.
+- Several edits in one user turn produce one semantic supervisor invocation; no-change turns without outstanding
+  unreviewed work and recursive hook execution produce none. Repeated Stop and automatic correction events preserve the
+  call cap.
 - Unit/regression tests cover turn identity, dirty baseline, missing/truncated evidence, changed plan, interruption,
   duplicate hooks, continuation changes, reviewer failure and stale-result rejection. Test budget validation, a
   controlled supervisor timeout, a runtime-killed Stop hook, child cleanup and incomplete-attempt recovery.
